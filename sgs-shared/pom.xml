@@ -1,0 +1,187 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- The sgs-shared module is a standard jar package that includes
+       classes used by both the sgs-server and sgs-client packages -->
+
+  <groupId>com.projectdarkstar.server</groupId>
+  <artifactId>sgs-shared</artifactId>
+  <name>sgs-shared</name>
+  <packaging>jar</packaging>
+  <version>0.1-SNAPSHOT</version>
+  <url>http://www.projectdarkstar.com</url>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.mina</groupId>
+      <artifactId>mina-core</artifactId>
+      <version>${org.apache.mina.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j-api.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-jdk14</artifactId>
+      <version>${slf4j-jdk14.version}</version>
+    </dependency>
+  </dependencies>
+
+
+  <build>
+    <plugins>
+
+      <!-- Compiler configuration -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.5</source>
+	  <target>1.5</target>
+	</configuration>
+      </plugin>
+
+      <!-- Manifest generation configuration -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>true</addClasspath>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- Configuration for running unit tests -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+	<version>${surefire.version}</version>
+        <configuration>
+          <skipTests>false</skipTests>
+          <includes>
+            <include>**/Test*.java</include>
+          </includes>
+	  <forkMode>always</forkMode>
+	  <failIfNoTests>false</failIfNoTests>
+	  <argLine>${test.jvm.args}</argLine>
+	  <redirectTestOutputToFile>true</redirectTestOutputToFile>
+        </configuration>
+      </plugin>
+
+      <!-- Configure checkstyle to have custom dependency -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<dependencies>
+	  <dependency>
+	    <groupId>com.projectdarkstar.tools</groupId>
+	    <artifactId>sgs-checkstyle-checks</artifactId>
+	    <version>${sgs-checkstyle-checks.version}</version>
+	  </dependency>
+	</dependencies>
+      </plugin>
+
+
+      <!-- Always attach a sources jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-source-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Always attach a javadoc jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-javadoc-plugin</artifactId>
+	<configuration>
+          <links>
+            <link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
+	    <link>http://mina.apache.org/report/1.1/apidocs/</link>
+          </links>
+        </configuration>
+	<executions>
+	  <execution>
+	    <id>attach-javadocs</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <quiet>true</quiet>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+    </plugins>
+
+
+  </build>
+
+
+  <reporting>
+    <plugins>
+
+      <!-- Configure checkstyle to run during site lifecycle -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<configuration>
+	  <linkXRef>false</linkXRef>
+	  <consoleOutput>true</consoleOutput>
+	  <enableRulesSummary>false</enableRulesSummary>
+	  <configLocation>com/sun/sgs/tools/checkstyle/darkstar_checks.xml</configLocation>
+	  <headerLocation>com/sun/sgs/tools/checkstyle/BSD.txt</headerLocation>
+	  <packageNamesLocation>com/sun/sgs/tools/checkstyle/packageNames.xml</packageNamesLocation>
+        </configuration>
+      </plugin>
+
+      <!-- Configure findbugs to run during site lifecycle -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+      </plugin>
+
+
+    </plugins>
+  </reporting>
+
+
+      
+  <properties>
+    <junit.version>4.2</junit.version>
+    <org.apache.mina.version>1.1.0</org.apache.mina.version>
+    <slf4j-api.version>1.4.0</slf4j-api.version>
+    <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
+    <sgs-checkstyle-checks.version>0.1</sgs-checkstyle-checks.version>
+
+    <test.assertions>-ea:com.sun.sgs...</test.assertions>
+    <test.max.heap>-Xmx1g</test.max.heap>
+    <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
+
+    <surefire.version>2.4.3</surefire.version>
+  </properties>
+
+</project>
