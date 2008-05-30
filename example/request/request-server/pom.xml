@@ -61,6 +61,7 @@
 	      <executable>java</executable>
 	      <classpathScope>test</classpathScope>
 	      <arguments>
+		<argument>${test.profile.jvm.args}</argument>
 		<argument>-Djava.library.path=${run.javapath}</argument>
 		<argument>-Djava.util.logging.config.file=${run.logging}</argument>
 		<argument>-classpath</argument>
@@ -87,6 +88,7 @@
 	      <executable>java</executable>
 	      <classpathScope>test</classpathScope>
 	      <arguments>
+		<argument>${test.profile.jvm.args}</argument>
 		<argument>-Djava.library.path=${run.javapath}</argument>
 		<argument>-Djava.util.logging.config.file=${run.logging}</argument>
 		<argument>-classpath</argument>
@@ -113,6 +115,7 @@
 	      <executable>java</executable>
 	      <classpathScope>test</classpathScope>
 	      <arguments>
+		<argument>${test.profile.jvm.args}</argument>
 		<argument>-Djava.library.path=${run.javapath}</argument>
 		<argument>-Djava.util.logging.config.file=${run.logging}</argument>
 		<argument>-classpath</argument>
@@ -124,6 +127,24 @@
 	  </plugin>
 	</plugins>
       </build>
+    </profile>
+
+
+    <!-- In order to enable the netbeans profiler, this profile must
+	 be activated.
+	 This needs to be reworked slightly so that it is platform
+	 and machine independent -->
+    <profile>
+      <id>netbeans-profiler</id>
+      <properties>
+	<test.profile.jvm.args>-agentpath:/opt/netbeans-6.1/profiler3/lib/deployed/jdk15/linux/libprofilerinterface.so=/opt/netbeans-6.1/profiler3/lib,5140</test.profile.jvm.args>
+      </properties>
+      <activation>
+	<property>
+	  <name>test.use.je</name>
+	  <value>true</value>
+	</property>
+      </activation>
     </profile>
 
 
@@ -180,6 +201,8 @@
     <run.properties.single>src/test/properties/RequestSingle.properties</run.properties.single>
     <run.properties.multi.core>src/test/properties/RequestCore.properties</run.properties.multi.core>
     <run.properties.multi.app>src/test/properties/RequestApp.properties</run.properties.multi.app>
+
+    <test.profile.jvm.args>-Dfixme</test.profile.jvm.args>
 
   </properties>
 
