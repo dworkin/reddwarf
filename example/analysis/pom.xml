@@ -1,0 +1,348 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.projectdarkstar.example</groupId>
+  <artifactId>analysis</artifactId>
+  <name>analysis</name>
+  <packaging>jar</packaging>
+  <version>0.1-SNAPSHOT</version>
+
+  <build>
+
+    <plugins>
+
+      <!-- Global compiler configuration -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.5</source>
+	  <target>1.5</target>
+	</configuration>
+      </plugin>
+
+      <!-- Global manifest generation configuration -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>true</addClasspath>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- Always attach a sources jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-source-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Always attach a javadoc jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-javadoc-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-javadocs</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <quiet>true</quiet>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+
+      <!-- The exec profiles are activated via the command line
+	   So to run the app,
+	   one would use the following command:
+	   mvn exec:exec -->
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+	<configuration>
+	  <executable>java</executable>
+	  <classpathScope>test</classpathScope>
+	  <arguments>
+	    <!-- <argument>${analysis.jvm.args}</argument> -->
+	    <argument>-Djava.library.path=${run.javapath}</argument>
+	    <argument>-Djava.util.logging.config.file=${run.logging}</argument>
+	    <argument>-Dcom.sun.sgs.impl.service.data.store.db.environment.class=${test.bdb.env}</argument>
+	    <argument>-Dcom.sun.sgs.impl.service.data.DataServiceImpl.data.store.class=${analysis.data.store.class}</argument>
+	    <argument>-Dcom.sun.sgs.impl.service.data.store.net.server.start=${analysis.data.store.server.start}</argument>
+	    <argument>-Dcom.sun.sgs.impl.service.data.store.net.server.host=${analysis.data.store.server.host}</argument>
+	    <argument>-Dcom.sun.sgs.impl.service.data.store.net.server.port=${analysis.data.store.server.port}</argument>
+	    <argument>-Dcom.sun.sgs.analysis.tasks=${analysis.tasks}</argument>
+	    <argument>-classpath</argument>
+	    <classpath/>
+	    <argument>com.sun.sgs.impl.kernel.Kernel</argument>
+	    <argument>${run.properties.single}</argument>
+	  </arguments>
+	</configuration>
+      </plugin>
+
+      <!-- Simple ant task to make the datastore directory 
+	   if the user wishes to run the server -->
+      <plugin>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <executions>
+              <execution>
+                  <id>make-datastore</id>
+                  <phase>generate-resources</phase>
+                  <configuration>
+                      <tasks>
+                          <mkdir dir="${project.build.directory}/dsdb/"/>
+			  <mkdir dir="${project.build.directory}/logs/"/>
+			  <mkdir dir="${project.build.directory}/data/"/>
+                      </tasks>
+                  </configuration>
+                  <goals>
+                      <goal>run</goal>
+                  </goals>
+              </execution>
+          </executions>
+      </plugin>
+
+      <!-- The berkeleydb binary package must be retrieved and unpacked
+	   Before the test phase so that they are available during
+	   runtime of the unit tests and other executions-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-db-binaries</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>berkeleydb</groupId>
+                  <artifactId>db-binaries</artifactId>
+		  <type>zip</type>
+                  <overWrite>false</overWrite>
+                  <outputDirectory>${project.build.directory}/</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+
+      
+
+
+    </plugins>
+
+  </build>
+
+
+
+  <dependencies>
+    
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server</artifactId>
+      <version>${sgs.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    
+    
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-api</artifactId>
+      <version>${sgs.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    
+    
+    <dependency>
+      <groupId>berkeleydb</groupId>
+      <artifactId>db-binaries</artifactId>
+      <version>${bdb.version}</version>
+      <type>zip</type>
+    </dependency>
+  </dependencies>
+
+
+  <!-- Profiles activated based on platform to set BDB properties
+       The profile that is activated sets the bdb.lib.dir to the directory
+       name of the bdb libraries in the bdb binary package for the
+       platform in use -->
+  <profiles>
+    <profile>
+      <id>macosx-ppc</id>
+      <properties>
+	<bdb.lib.dir>macosx-ppc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>ppc</arch>
+	</os>
+      </activation>
+    </profile>
+
+    <profile>
+      <id>macosx-x86</id>
+      <properties>
+	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-x86</id>
+      <properties>
+	<bdb.lib.dir>solaris-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>x86</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-sparc</id>
+      <properties>
+	<bdb.lib.dir>solaris-sparc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>sparc</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86</id>
+      <properties>
+	<bdb.lib.dir>linux-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86_64</id>
+      <properties>
+	<bdb.lib.dir>linux-x86_64</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>x86_64</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>win32-x86</id>
+      <properties>
+	<bdb.lib.dir>win32-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>windows</family>
+	</os>
+      </activation>
+    </profile>
+
+    <!-- profile enabled to test with BDB Java edition -->
+    <profile>
+      <id>bdb-java</id>
+      <properties>
+	<test.bdb.env>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</test.bdb.env>
+      </properties>
+      <dependencies>
+	<dependency>
+	  <groupId>berkeleydb</groupId>
+	  <artifactId>je</artifactId>
+	</dependency>
+      </dependencies>
+      <activation>
+	<property>
+	  <name>test.use.je</name>
+	  <value>true</value>
+	</property>
+      </activation>
+    </profile>
+    
+
+  </profiles>
+
+
+  
+
+
+  
+
+  <repositories>
+    <repository>
+      <id>sunlabs.maven</id>
+      <name>Sun Labs Maven Repository</name>
+      <url>http://frizbee.east.sun.com/maven</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+
+
+
+  <properties>
+    <analysis.version>0.1-SNAPSHOT</analysis.version>
+
+    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+    <bdb.version>4.5.20</bdb.version>
+
+
+    <analysis.jvm.args>-server -XX:+UseParallelGC -XX:+UseFastAccessorMethods -XX:+AggressiveOpts -XX:+MaxFDLimit -XX:NewSize=512m -Xms700m -Xmx2g</analysis.jvm.args>
+    <analysis.tasks>com.sun.sgs.analysis.task.ScheduleMapPutsTask</analysis.tasks>
+    <analysis.data.store.server.start>true</analysis.data.store.server.start>
+    <analysis.data.store.server.host>localhost</analysis.data.store.server.host>
+    <analysis.data.store.server.port>44530</analysis.data.store.server.port>
+
+    <!-- Set this to com.sun.sgs.impl.service.data.store.net.DataStoreClient if desired -->
+    <analysis.data.store.class>com.sun.sgs.impl.service.data.store.DataStoreImpl</analysis.data.store.class>
+
+    <run.javapath>${project.build.directory}/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
+    <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
+    <run.properties.single>src/test/properties/AnalysisApplication.properties</run.properties.single>
+
+    <test.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</test.bdb.env>
+  </properties>
+
+</project>
