@@ -4,6 +4,13 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- Inherit from the global SGS super POM -->
+  <parent>
+    <groupId>com.projectdarkstar</groupId>
+    <artifactId>sgs</artifactId>
+    <version>0.1</version>
+  </parent>
+
   <groupId>com.projectdarkstar.tools</groupId>
   <artifactId>sgs-build-utilities</artifactId>
   <name>sgs-build-utilities</name>
@@ -14,13 +21,16 @@
     <dependency>
       <groupId>checkstyle</groupId>
       <artifactId>checkstyle</artifactId>
-      <version>${checkstyle.version}</version>
     </dependency>
   </dependencies>
 
-
-  <properties>
-    <checkstyle.version>4.1</checkstyle.version>
-  </properties>
+  <repositories>
+    <repository>
+      <id>sunlabs.maven</id>
+      <name>Sun Labs Maven Repository</name>
+      <url>http://frizbee.east.sun.com/maven</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
 
 </project>

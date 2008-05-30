@@ -307,6 +307,14 @@
 	<version>${bdb.version}</version>
 	<type>zip</type>
       </dependency>
+
+
+      <!-- for the sgs-build-utilities -->
+      <dependency>
+	<groupId>checkstyle</groupId>
+	<artifactId>checkstyle</artifactId>
+	<version>${checkstyle.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -441,13 +449,25 @@
   </profiles>
 
 
+  <!-- Currently artifacts can be deployed to the
+       Maven repository on Owen's machine (frizbee.east)
+       This will change to the java.net repository when
+       we move to the outside -->
+  <distributionManagement>
+    <repository>
+      <id>sunlabs.maven.ssh</id>
+      <name>Sun Labs Maven Repository</name>
+      <url>scp://frizbee.east.sun.com/var/www/maven</url>
+    </repository>
+  </distributionManagement>
+
   
   <!-- Configuration properties which should be consistent
        across all children POMS -->
   <properties>
     
     <sgs.version>0.9.7-SNAPSHOT</sgs.version>
-    <sgs-shared.version>0.1-SNAPSHOT</sgs-shared.version>
+    <sgs-shared.version>0.1</sgs-shared.version>
     <sgs-build-utilities.version>0.1</sgs-build-utilities.version>
 
     <bdb.version>4.5.20</bdb.version>
@@ -456,6 +476,8 @@
     <org.apache.mina.version>1.1.0</org.apache.mina.version>
     <slf4j-api.version>1.4.0</slf4j-api.version>
     <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
+
+    <checkstyle.version>4.1</checkstyle.version>
 
 
     <test.assertions>-ea:com.sun.sgs...</test.assertions>

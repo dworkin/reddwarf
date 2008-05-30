@@ -18,7 +18,7 @@
   <artifactId>sgs-shared</artifactId>
   <name>sgs-shared</name>
   <packaging>jar</packaging>
-  <version>0.1-SNAPSHOT</version>
+  <version>0.1</version>
   <url>http://www.projectdarkstar.com</url>
 
   <dependencies>
