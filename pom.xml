@@ -1,0 +1,473 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- This is the super POM inherited by all sgs modules
+       It defines settings common to all projects -->
+  <groupId>com.projectdarkstar</groupId>
+  <artifactId>sgs</artifactId>
+  <name>sgs</name>
+  <packaging>pom</packaging>
+  <version>0.1</version>
+  <url>http://www.projectdarkstar.com</url>
+
+
+  <build>
+    <!-- This section defines global configuration of plugins
+	 These plugin settings are not activated in child projects
+	 unless the plugin is explicitly used -->
+    <pluginManagement>
+
+      <plugins>
+
+	<!-- Default configuration for running unit tests -->
+	<plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+	  <version>${surefire.version}</version>
+          <configuration>
+            <skipTests>false</skipTests>
+            <includes>
+              <include>**/Test*.java</include>
+            </includes>
+	    <forkMode>always</forkMode>
+	    <failIfNoTests>false</failIfNoTests>
+	    <argLine>${test.jvm.args}</argLine>
+	    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          </configuration>
+	</plugin>
+	
+	<!-- The berkeleydb binary package must be retrieved and unpacked
+	     Before the test phase so that they are available during
+	     runtime of the unit tests.
+	     To enable this dependency unpack, activate the unpack-dbd-binaries
+	     execution id in the child POM -->
+	<plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>unpack-bdb-binaries</id>
+              <phase>generate-test-resources</phase>
+              <goals>
+		<goal>unpack</goal>
+              </goals>
+              <configuration>
+		<artifactItems>
+                  <artifactItem>
+                    <groupId>berkeleydb</groupId>
+                    <artifactId>db-binaries</artifactId>
+		    <type>zip</type>
+                    <overWrite>false</overWrite>
+                    <outputDirectory>${project.build.directory}/</outputDirectory>
+                  </artifactItem>
+		</artifactItems>
+              </configuration>
+            </execution>
+          </executions>
+	</plugin>
+
+	<!-- A sources jar can be attached by enabling
+	     the attach-sources execution id of this plugin -->
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-source-plugin</artifactId>
+	  <executions>
+	    <execution>
+	      <id>attach-sources</id>
+	      <goals>
+		<goal>jar</goal>
+	      </goals>
+	    </execution>
+	  </executions>
+	</plugin>
+
+	<!-- A javadoc jar can be attached by enabling
+	     the attach-javadocs execution id of this plugin -->
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-javadoc-plugin</artifactId>
+	  <configuration>
+            <links>
+              <link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
+	      <link>http://mina.apache.org/report/1.1/apidocs/</link>
+            </links>
+          </configuration>
+	  <executions>
+	    <execution>
+	      <id>attach-javadocs</id>
+	      <goals>
+		<goal>jar</goal>
+	      </goals>
+	      <configuration>
+		<quiet>true</quiet>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+	
+      </plugins>
+      
+    </pluginManagement>
+
+
+    <!-- This section enables plugins globally for all child projects
+	 Any project inheriting from this POM will have these plugins
+	 enabled and configured as shown unless they override those
+	 settings -->
+    <plugins>
+      
+      <!-- Global compiler configuration -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.5</source>
+	  <target>1.5</target>
+	</configuration>
+      </plugin>
+
+      <!-- Global manifest generation configuration -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>true</addClasspath>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- Configure checkstyle to have custom dependency -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<dependencies>
+	  <dependency>
+	    <groupId>com.projectdarkstar.tools</groupId>
+	    <artifactId>sgs-build-utilities</artifactId>
+	    <version>${sgs-build-utilities.version}</version>
+	  </dependency>
+	</dependencies>
+      </plugin>
+      
+    </plugins>
+
+  </build>
+
+
+
+
+
+  <!-- Library of dependencies used in any sub module of this project
+       Define versions of dependencies in this file only to maintain
+       consistency -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+	<groupId>junit</groupId>
+	<artifactId>junit</artifactId>
+	<version>${junit.version}</version>
+	<scope>test</scope>
+      </dependency>
+
+      <dependency>
+	<groupId>org.apache.mina</groupId>
+	<artifactId>mina-core</artifactId>
+	<version>${org.apache.mina.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>org.slf4j</groupId>
+	<artifactId>slf4j-api</artifactId>
+	<version>${slf4j-api.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>org.slf4j</groupId>
+	<artifactId>slf4j-jdk14</artifactId>
+	<version>${slf4j-jdk14.version}</version>
+      </dependency>
+
+
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-shared</artifactId>
+	<version>${sgs-shared.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-api</artifactId>
+	<scope>provided</scope>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-javadoc</artifactId>
+	<classifier>api</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-shared</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs-shared.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-tutorial-server</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-tutorial-server</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-tutorial-server-dist</artifactId>
+	<type>zip</type>
+	<version>${sgs.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client-api</artifactId>
+	<scope>provided</scope>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client-javadoc</artifactId>
+	<classifier>api</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-tutorial-client</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-tutorial-client</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-tutorial-client-dist</artifactId>
+	<type>zip</type>
+	<version>${sgs.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>berkeleydb</groupId>
+	<artifactId>db</artifactId>
+	<version>${bdb.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>berkeleydb</groupId>
+	<artifactId>je</artifactId>
+	<version>${bdb.je.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>berkeleydb</groupId>
+	<artifactId>db-binaries</artifactId>
+	<version>${bdb.version}</version>
+	<type>zip</type>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+
+
+
+
+
+
+  <!-- Profiles activated based on platform to set BDB properties
+       The profile that is activated sets the bdb.lib.dir property 
+       to the directory name of the bdb libraries in the bdb
+       binary package for the platform in use.
+       Note that these profiles are activated as configured for
+       all children inheriting from this POM -->
+  <profiles>
+    <profile>
+      <id>macosx-ppc</id>
+      <properties>
+	<bdb.lib.dir>macosx-ppc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>ppc</arch>
+	</os>
+      </activation>
+    </profile>
+
+    <profile>
+      <id>macosx-x86</id>
+      <properties>
+	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-x86</id>
+      <properties>
+	<bdb.lib.dir>solaris-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>x86</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-sparc</id>
+      <properties>
+	<bdb.lib.dir>solaris-sparc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>sparc</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86</id>
+      <properties>
+	<bdb.lib.dir>linux-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86_64</id>
+      <properties>
+	<bdb.lib.dir>linux-x86_64</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>x86_64</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>win32-x86</id>
+      <properties>
+	<bdb.lib.dir>win32-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>windows</family>
+	</os>
+      </activation>
+    </profile>
+
+
+
+    <!-- profile enabled to test with BDB Java edition
+	 This will set the test.bdb.env property to the BDB java
+	 class rather than the native class.
+	 Activate the profile by setting the test.use.je property to true
+	 mvn -Dtest.use.je=true -->
+    <profile>
+      <id>bdb-java</id>
+      <properties>
+	<test.bdb.env>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</test.bdb.env>
+      </properties>
+      <dependencies>
+	<dependency>
+	  <groupId>berkeleydb</groupId>
+	  <artifactId>je</artifactId>
+	</dependency>
+      </dependencies>
+      <activation>
+	<property>
+	  <name>test.use.je</name>
+	  <value>true</value>
+	</property>
+      </activation>
+    </profile>
+  </profiles>
+
+
+  
+  <!-- Configuration properties which should be consistent
+       across all children POMS -->
+  <properties>
+    
+    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+    <sgs-shared.version>0.1-SNAPSHOT</sgs-shared.version>
+    <sgs-build-utilities.version>0.1</sgs-build-utilities.version>
+
+    <bdb.version>4.5.20</bdb.version>
+    <bdb.je.version>3.2.23</bdb.je.version>
+    <junit.version>4.2</junit.version>
+    <org.apache.mina.version>1.1.0</org.apache.mina.version>
+    <slf4j-api.version>1.4.0</slf4j-api.version>
+    <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
+
+
+    <test.assertions>-ea:com.sun.sgs...</test.assertions>
+    <test.max.heap>-Xmx1g</test.max.heap>
+    <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
+    <test.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</test.javapath>
+    <test.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</test.bdb.env>
+    <test.bdb.cache.size>1000000</test.bdb.cache.size>
+
+    <surefire.version>2.4.3</surefire.version>
+
+  </properties>
+
+
+</project>

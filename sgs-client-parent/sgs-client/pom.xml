@@ -59,19 +59,6 @@
       </plugin>
 
 
-      <!-- Configure checkstyle to have custom dependency -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<dependencies>
-	  <dependency>
-	    <groupId>com.projectdarkstar.tools</groupId>
-	    <artifactId>sgs-build-utilities</artifactId>
-	    <version>${sgs-build-utilities.version}</version>
-	  </dependency>
-	</dependencies>
-      </plugin>
-
     </plugins>
   </build>
 

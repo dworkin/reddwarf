@@ -29,7 +29,6 @@
       <groupId>com.projectdarkstar.client</groupId>
       <artifactId>sgs-tutorial-client</artifactId>
       <classifier>sources</classifier>
-      <version>${sgs.version}</version>
     </dependency>
   </dependencies>
 

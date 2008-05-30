@@ -20,124 +20,6 @@
   <version>0.9.7-SNAPSHOT</version>
 
 
-  <!-- Profiles activated based on platform to set BDB properties
-       The profile that is activated sets the bdb.lib.dir to the directory
-       name of the bdb libraries in the bdb binary package for the
-       platform in use -->
-  <profiles>
-    <profile>
-      <id>macosx-ppc</id>
-      <properties>
-	<bdb.lib.dir>macosx-ppc</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>mac</family>
-	  <arch>ppc</arch>
-	</os>
-      </activation>
-    </profile>
-
-    <profile>
-      <id>macosx-x86</id>
-      <properties>
-	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>mac</family>
-	  <arch>i386</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>solaris-x86</id>
-      <properties>
-	<bdb.lib.dir>solaris-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>SunOS</name>
-	  <arch>x86</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>solaris-sparc</id>
-      <properties>
-	<bdb.lib.dir>solaris-sparc</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>SunOS</name>
-	  <arch>sparc</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>linux-x86</id>
-      <properties>
-	<bdb.lib.dir>linux-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>Linux</name>
-	  <arch>i386</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>linux-x86_64</id>
-      <properties>
-	<bdb.lib.dir>linux-x86_64</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>Linux</name>
-	  <arch>x86_64</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>win32-x86</id>
-      <properties>
-	<bdb.lib.dir>win32-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>windows</family>
-	</os>
-      </activation>
-    </profile>
-
-
-
-    <!-- profile enabled to test with BDB Java edition -->
-    <profile>
-      <id>bdb-java</id>
-      <properties>
-	<test.bdb.env>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</test.bdb.env>
-      </properties>
-      <dependencies>
-	<dependency>
-	  <groupId>berkeleydb</groupId>
-	  <artifactId>je</artifactId>
-	</dependency>
-      </dependencies>
-      <activation>
-	<property>
-	  <name>test.use.je</name>
-	  <value>true</value>
-	</property>
-      </activation>
-    </profile>
-  </profiles>
-  
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -159,7 +41,7 @@
     </dependency>
 
     <!-- Included as compile time dependency only unless
-	 BDB Java edition profile is activated above -->
+	 BDB Java edition profile is activated (config from SGS super POM) -->
     <dependency>
       <groupId>berkeleydb</groupId>
       <artifactId>je</artifactId>
@@ -198,28 +80,14 @@
 
       <!-- The berkeleydb binary package must be retrieved and unpacked
 	   Before the test phase so that they are available during
-	   runtime of the unit tests -->
+	   runtime of the unit tests
+	   Execution activated from SGS super POM -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
-            <id>unpack-db-binaries</id>
-            <phase>generate-test-resources</phase>
-            <goals>
-              <goal>unpack</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>berkeleydb</groupId>
-                  <artifactId>db-binaries</artifactId>
-		  <type>zip</type>
-                  <overWrite>false</overWrite>
-                  <outputDirectory>${project.build.directory}/</outputDirectory>
-                </artifactItem>
-              </artifactItems>
-            </configuration>
+            <id>unpack-bdb-binaries</id>
           </execution>
         </executions>
       </plugin>
@@ -248,19 +116,6 @@
 	  </systemProperties>
 	  <argLine>${test.jvm.args} -Djava.library.path=${test.javapath}</argLine>
         </configuration>
-      </plugin>
-
-      <!-- Configure checkstyle to have custom dependency -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<dependencies>
-	  <dependency>
-	    <groupId>com.projectdarkstar.tools</groupId>
-	    <artifactId>sgs-build-utilities</artifactId>
-	    <version>${sgs-build-utilities.version}</version>
-	  </dependency>
-	</dependencies>
       </plugin>
 
     </plugins>
@@ -297,12 +152,6 @@
     </plugins>
   </reporting>
 
-
-  <properties>
-    <test.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</test.javapath>
-    <test.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</test.bdb.env>
-    <test.bdb.cache.size>1000000</test.bdb.cache.size>
-  </properties>
 
 
 </project>

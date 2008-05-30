@@ -4,6 +4,13 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- Inherit from the global SGS super POM -->
+  <parent>
+    <groupId>com.projectdarkstar</groupId>
+    <artifactId>sgs</artifactId>
+    <version>0.1</version>
+  </parent>
+
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-parent</artifactId>
   <name>sgs-server-parent</name>
@@ -20,156 +27,6 @@
     <module>sgs-tutorial-server-dist</module>
   </modules>
 
-  <build>
-    <plugins>
-
-      <!-- Global compiler configuration -->
-      <plugin>
-	<groupId>org.apache.maven.plugins</groupId>
-	<artifactId>maven-compiler-plugin</artifactId>
-	<configuration>
-	  <source>1.5</source>
-	  <target>1.5</target>
-	</configuration>
-      </plugin>
-
-      <!-- Global manifest generation configuration -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifest>
-	      <addClasspath>true</addClasspath>
-              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
-            </manifest>
-          </archive>
-        </configuration>
-      </plugin>
-
-      <!-- Global configuration for running unit tests -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-	<version>${surefire.version}</version>
-        <configuration>
-          <skipTests>false</skipTests>
-          <includes>
-            <include>**/Test*.java</include>
-          </includes>
-	  <forkMode>always</forkMode>
-	  <failIfNoTests>false</failIfNoTests>
-	  <argLine>${test.jvm.args}</argLine>
-	  <redirectTestOutputToFile>true</redirectTestOutputToFile>
-        </configuration>
-      </plugin>
-
-    </plugins>
-
-  </build>
-
-
-
-  <!-- Library of dependencies used in any sub module of this project
-       Define versions of dependencies in this file only to maintain
-       consistency -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-	<groupId>junit</groupId>
-	<artifactId>junit</artifactId>
-	<version>${junit.version}</version>
-	<scope>test</scope>
-      </dependency>
-
-      <dependency>
-	<groupId>org.apache.mina</groupId>
-	<artifactId>mina-core</artifactId>
-	<version>${org.apache.mina.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>org.slf4j</groupId>
-	<artifactId>slf4j-api</artifactId>
-	<version>${slf4j-api.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>org.slf4j</groupId>
-	<artifactId>slf4j-jdk14</artifactId>
-	<version>${slf4j-jdk14.version}</version>
-      </dependency>
-
-
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-shared</artifactId>
-	<version>${sgs-shared.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server-api</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server-javadoc</artifactId>
-	<classifier>api</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-shared</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs-shared.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-tutorial-server</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-tutorial-server-dist</artifactId>
-	<type>zip</type>
-	<version>${sgs.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>berkeleydb</groupId>
-	<artifactId>db</artifactId>
-	<version>${bdb.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>berkeleydb</groupId>
-	<artifactId>je</artifactId>
-	<version>${bdb.je.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>berkeleydb</groupId>
-	<artifactId>db-binaries</artifactId>
-	<version>${bdb.version}</version>
-	<type>zip</type>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
-
-
   <repositories>
     <repository>
       <id>sunlabs.maven</id>
@@ -178,28 +35,5 @@
       <layout>default</layout>
     </repository>
   </repositories>
-
-
-
-
-  <properties>
-    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
-    <sgs-shared.version>0.1-SNAPSHOT</sgs-shared.version>
-    <sgs-build-utilities.version>0.1</sgs-build-utilities.version>
-    <bdb.version>4.5.20</bdb.version>
-    <bdb.je.version>3.2.23</bdb.je.version>
-
-    <junit.version>4.2</junit.version>
-    <org.apache.mina.version>1.1.0</org.apache.mina.version>
-    <slf4j-api.version>1.4.0</slf4j-api.version>
-    <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
-
-
-    <test.assertions>-ea:com.sun.sgs...</test.assertions>
-    <test.max.heap>-Xmx1g</test.max.heap>
-    <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
-
-    <surefire.version>2.4.3</surefire.version>
-  </properties>
 
 </project>

@@ -29,7 +29,6 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-tutorial-server</artifactId>
       <classifier>sources</classifier>
-      <version>${sgs.version}</version>
     </dependency>
   </dependencies>
 
