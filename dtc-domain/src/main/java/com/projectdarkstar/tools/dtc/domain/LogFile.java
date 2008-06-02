@@ -17,9 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
-import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -27,25 +26,26 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.ManyToMany;
-import javax.persistence.OrderBy;
+import javax.persistence.Lob;
+import javax.persistence.Basic;
+import javax.persistence.FetchType;
+import javax.persistence.Version;
 
 /**
  *
  * @author owen
  */
 @Entity
-@Table(name = "SystemProbeTag")
-public class SystemProbeTag implements Serializable
+@Table(name = "LogFile")
+public class LogFile implements Serializable
 {
     private Long id;
-    private String tag;
+    private Long versionNumber;
+    private String log;
     
-    private List<SystemProbe> probes;
-    
-    public SystemProbeTag(String tag)
+    public LogFile(String log)
     {
-        this.setTag(tag);
+        this.setLog(log);
     }
     
     @Id
@@ -53,12 +53,15 @@ public class SystemProbeTag implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    @Column(name = "tag", nullable = false, unique = true)
-    public String getTag() { return tag; }
-    public void setTag(String tag) { this.tag = tag; }
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
-    @ManyToMany(mappedBy = "tags")
-    @OrderBy("name")
-    public List<SystemProbe> getProbes() { return probes; }
-    public void setProbes(List<SystemProbe> probes) { this.probes = probes; }
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "log", nullable = false)
+    public String getLog() { return log; }
+    public void setLog(String log) { this.log = log; }
+
 }

@@ -17,17 +17,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
 import java.io.Serializable;
+import java.sql.Date;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.ManyToMany;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.OneToMany;
 import javax.persistence.OrderBy;
 
 /**
@@ -35,17 +38,16 @@ import javax.persistence.OrderBy;
  * @author owen
  */
 @Entity
-@Table(name = "TestExecutionTag")
-public class TestExecutionTag implements Serializable
+@Table(name = "TestExecutionResultClientData")
+public class TestExecutionResultClientData implements Serializable
 {
     private Long id;
-    private String tag;
+    private Date timestamp;
+    private List<TestExecutionResultClientDataTuple> values;
     
-    private List<TestExecution> executions;
-    
-    public TestExecutionTag(String tag)
+    public TestExecutionResultClientData(Date timestamp)
     {
-        this.setTag(tag);
+        this.setTimestamp(timestamp);
     }
     
     @Id
@@ -53,12 +55,14 @@ public class TestExecutionTag implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    @Column(name = "tag", nullable = false, unique = true)
-    public String getTag() { return tag; }
-    public void setTag(String tag) { this.tag = tag; }
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "timestamp", nullable = false)
+    public Date getTimestamp() { return timestamp; }
+    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
     
-    @ManyToMany(mappedBy = "tags")
-    @OrderBy("dateFinished")
-    public List<TestExecution> getExecutions() { return executions; }
-    public void setExecutions(List<TestExecution> executions) { this.executions = executions; }
+    @OneToMany(mappedBy = "clientData")
+    @OrderBy("originalClientName")
+    public List<TestExecutionResultClientDataTuple> getValues() { return values; }
+    public void setValues(List<TestExecutionResultClientDataTuple> values) { this.values = values; }
+
 }

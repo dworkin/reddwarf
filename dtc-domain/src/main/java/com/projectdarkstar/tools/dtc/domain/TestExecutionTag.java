@@ -17,36 +17,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
+import java.util.List;
 import java.io.Serializable;
-import java.net.URI;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Version;
+import javax.persistence.ManyToMany;
+import javax.persistence.OrderBy;
 
 /**
  *
  * @author owen
  */
 @Entity
-@Table(name = "PkgLibrary")
-public class PkgLibrary implements Serializable
+@Table(name = "TestExecutionTag")
+public class TestExecutionTag implements Serializable
 {
     private Long id;
-    private Long versionNumber;
-    private String name;
-    private URI location;
+    private String tag;
     
-    public PkgLibrary(String name,
-                      URI location)
+    private List<TestExecution> executions;
+    
+    public TestExecutionTag(String tag)
     {
-        this.setName(name);
-        this.setLocation(location);
+        this.setTag(tag);
     }
     
     @Id
@@ -54,16 +53,12 @@ public class PkgLibrary implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    @Version
-    @Column(name = "versionNumber")
-    public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    @Column(name = "tag", nullable = false, unique = true)
+    public String getTag() { return tag; }
+    public void setTag(String tag) { this.tag = tag; }
     
-    @Column(name = "name", nullable = false, unique = true)
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    
-    @Column(name = "location", nullable = false)
-    public URI getLocation() { return location; }
-    public void setLocation(URI location) { this.location = location; }
+    @ManyToMany(mappedBy = "tags")
+    @OrderBy("dateFinished")
+    public List<TestExecution> getExecutions() { return executions; }
+    public void setExecutions(List<TestExecution> executions) { this.executions = executions; }
 }

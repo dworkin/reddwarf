@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
 import java.io.Serializable;
@@ -27,10 +27,9 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
+import javax.persistence.OneToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
-import javax.persistence.ManyToMany;
-import javax.persistence.JoinTable;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
@@ -39,22 +38,22 @@ import javax.persistence.Version;
  * @author owen
  */
 @Entity
-@Table(name = "ServerAppConfig")
-public class ServerAppConfig implements Serializable
+@Table(name = "ClientApp")
+public class ClientApp implements Serializable
 {
     private Long id;
     private Long versionNumber;
     private String name;
-    private String additionalCommandLine;
+    private String description;
     
-    private ServerApp serverApp;
-    private List<Property> properties;
+    private List<ClientAppConfig> configs;
+    private PkgLibrary requiredPkg;
     
-    public ServerAppConfig(String name,
-                           String additionalCommandLine)
+    public ClientApp(String name,
+                     String description)
     {
         this.setName(name);
-        this.setAdditionalCommandLine(additionalCommandLine);
+        this.setDescription(description);
     }
     
     @Id
@@ -71,22 +70,17 @@ public class ServerAppConfig implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
-    @Column(name = "additionalCommandLine", nullable = false)
-    public String getAdditionalCommandLine() { return additionalCommandLine; }
-    public void setAdditionalCommandLine(String additionalCommandLine) { this.additionalCommandLine = additionalCommandLine; }
+    @Column(name = "description", nullable = false)
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    
+    @OneToMany(mappedBy = "clientApp")
+    @OrderBy("name")
+    public List<ClientAppConfig> getConfigs() { return configs; }
+    public void setConfigs(List<ClientAppConfig> configs) { this.configs = configs; }
     
     @ManyToOne
-    @JoinColumn(name="serverApp", nullable = false)
-    public ServerApp getServerApp() { return serverApp; }
-    public void setServerApp(ServerApp serverApp) { this.serverApp = serverApp; }
-    
-    @ManyToMany
-    @OrderBy("property")
-    @JoinTable(name = "serverAppConfigProperties",
-               joinColumns = @JoinColumn(name = "serverAppConfigId"),
-               inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public List<Property> getProperties() { return properties; }
-    public void setProperties(List<Property> properties) { this.properties = properties; }
-            
-            
+    @JoinColumn(name = "requiredPkg", nullable = false)
+    public PkgLibrary getRequiredPkg() { return requiredPkg; }
+    public void setRequiredPkg(PkgLibrary requiredPkg) { this.requiredPkg = requiredPkg; }
 }

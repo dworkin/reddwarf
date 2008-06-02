@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.SortedSet;
 import java.io.Serializable;

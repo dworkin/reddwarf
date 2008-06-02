@@ -5,12 +5,12 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.projectdarkstar.tools</groupId>
+    <groupId>com.projectdarkstar.tools.dtc</groupId>
     <artifactId>dtc</artifactId>
     <version>0.1.SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.tools</groupId>
+  <groupId>com.projectdarkstar.tools.dtc</groupId>
   <artifactId>dtc-domain</artifactId>
   <name>dtc-domain</name>
   <packaging>jar</packaging>

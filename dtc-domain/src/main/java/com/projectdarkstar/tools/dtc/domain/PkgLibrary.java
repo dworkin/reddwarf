@@ -17,9 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
 import java.io.Serializable;
+import java.net.URI;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
@@ -33,23 +34,19 @@ import javax.persistence.Version;
  * @author owen
  */
 @Entity
-@Table(name = "Property")
-public class Property implements Serializable
+@Table(name = "PkgLibrary")
+public class PkgLibrary implements Serializable
 {
     private Long id;
     private Long versionNumber;
-    private String description;
-    private String property;
-    private String value;
+    private String name;
+    private URI location;
     
-
-    public Property(String description,
-                    String property,
-                    String value)
+    public PkgLibrary(String name,
+                      URI location)
     {
-        this.setDescription(description);
-        this.setProperty(property);
-        this.setValue(value);
+        this.setName(name);
+        this.setLocation(location);
     }
     
     @Id
@@ -62,15 +59,11 @@ public class Property implements Serializable
     public Long getVersionNumber() { return versionNumber; }
     protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
-    @Column(name = "description", nullable = false, length = 1024)
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    @Column(name = "name", nullable = false, unique = true)
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     
-    @Column(name = "property", nullable = false)
-    public String getProperty() { return property; }
-    public void setProperty(String property) { this.property = property; }
-    
-    @Column(name = "value")
-    public String getValue() { return value; }
-    public void setValue(String value) { this.value = value; }
+    @Column(name = "location", nullable = false)
+    public URI getLocation() { return location; }
+    public void setLocation(URI location) { this.location = location; }
 }

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
 import java.io.Serializable;
@@ -27,12 +27,7 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Enumerated;
-import javax.persistence.EnumType;
-import javax.persistence.ManyToOne;
 import javax.persistence.ManyToMany;
-import javax.persistence.JoinTable;
-import javax.persistence.JoinColumn;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
@@ -41,25 +36,30 @@ import javax.persistence.Version;
  * @author owen
  */
 @Entity
-@Table(name = "ClientAppConfig")
-public class ClientAppConfig implements Serializable
+@Table(name = "HardwareResourceFamily")
+public class HardwareResourceFamily implements Serializable
 {
     private Long id;
     private Long versionNumber;
     private String name;
-    private String path;
-    private ClientAppConfigType propertyMethod;
+    private String description;
+    private String system;
+    private String os;
+    private String memory;
     
-    private ClientApp clientApp;
-    private List<Property> properties;
+    private List<HardwareResource> members;
     
-    public ClientAppConfig(String name,
-                           String path,
-                           ClientAppConfigType propertyMethod)
+    public HardwareResourceFamily(String name,
+                                  String description,
+                                  String system,
+                                  String os,
+                                  String memory)
     {
         this.setName(name);
-        this.setPath(path);
-        this.setPropertyMethod(propertyMethod);
+        this.setDescription(description);
+        this.setSystem(system);
+        this.setOs(os);
+        this.setMemory(memory);
     }
     
     @Id
@@ -76,25 +76,26 @@ public class ClientAppConfig implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
-    @Column(name = "path", nullable = false)
-    public String getPath() { return path; }
-    public void setPath(String path) { this.path = path; }
+    @Column(name = "description", nullable = false, length = 1024)
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    @Column(name = "system", nullable = false)
+    public String getSystem() { return system; }
+    public void setSystem(String system) { this.system = system; }
     
-    @Column(name = "propertyMethod", nullable = false)
-    @Enumerated(EnumType.STRING)
-    public ClientAppConfigType getPropertyMethod() { return propertyMethod; }
-    public void setPropertyMethod(ClientAppConfigType propertyMethod) { this.propertyMethod = propertyMethod; }
+    @Column(name = "memory", nullable = false)
+    public String getMemory() { return memory; }
+    public void setMemory(String memory) { this.memory = memory; }
     
-    @ManyToOne
-    @JoinColumn(name="clientApp", nullable = false)
-    public ClientApp getClientApp() { return clientApp; }
-    public void setClientApp(ClientApp clientApp) { this.clientApp = clientApp; }
+    @Column(name = "os", nullable = false)
+    public String getOs() { return os; }
+    public void setOs(String os) { this.os = os; }
     
-    @ManyToMany
-    @OrderBy("property")
-    @JoinTable(name = "clientAppConfigProperties",
-               joinColumns = @JoinColumn(name = "clientAppConfigId"),
-               inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public List<Property> getProperties() { return properties; }
-    public void setProperties(List<Property> properties) { this.properties = properties; }
+    @ManyToMany(mappedBy="families")
+    @OrderBy("hostname")
+    public List<HardwareResource> getMembers() { return members; }
+    public void setMembers(List<HardwareResource> members) { this.members = members; }
+    
+    
 }

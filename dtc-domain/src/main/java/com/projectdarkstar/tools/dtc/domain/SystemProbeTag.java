@@ -17,20 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
 import java.io.Serializable;
-import java.sql.Date;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Temporal;
-import javax.persistence.TemporalType;
-import javax.persistence.OneToMany;
+import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 
 /**
@@ -38,16 +35,17 @@ import javax.persistence.OrderBy;
  * @author owen
  */
 @Entity
-@Table(name = "TestExecutionResultClientData")
-public class TestExecutionResultClientData implements Serializable
+@Table(name = "SystemProbeTag")
+public class SystemProbeTag implements Serializable
 {
     private Long id;
-    private Date timestamp;
-    private List<TestExecutionResultClientDataTuple> values;
+    private String tag;
     
-    public TestExecutionResultClientData(Date timestamp)
+    private List<SystemProbe> probes;
+    
+    public SystemProbeTag(String tag)
     {
-        this.setTimestamp(timestamp);
+        this.setTag(tag);
     }
     
     @Id
@@ -55,14 +53,12 @@ public class TestExecutionResultClientData implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "timestamp", nullable = false)
-    public Date getTimestamp() { return timestamp; }
-    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
+    @Column(name = "tag", nullable = false, unique = true)
+    public String getTag() { return tag; }
+    public void setTag(String tag) { this.tag = tag; }
     
-    @OneToMany(mappedBy = "clientData")
-    @OrderBy("originalClientName")
-    public List<TestExecutionResultClientDataTuple> getValues() { return values; }
-    public void setValues(List<TestExecutionResultClientDataTuple> values) { this.values = values; }
-
+    @ManyToMany(mappedBy = "tags")
+    @OrderBy("name")
+    public List<SystemProbe> getProbes() { return probes; }
+    public void setProbes(List<SystemProbe> probes) { this.probes = probes; }
 }

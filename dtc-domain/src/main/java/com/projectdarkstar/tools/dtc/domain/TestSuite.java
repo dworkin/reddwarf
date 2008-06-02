@@ -17,8 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.qa.tc.domain;
+package com.projectdarkstar.tools.dtc.domain;
 
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -26,9 +27,9 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Lob;
-import javax.persistence.Basic;
-import javax.persistence.FetchType;
+import javax.persistence.ManyToMany;
+import javax.persistence.JoinTable;
+import javax.persistence.JoinColumn;
 import javax.persistence.Version;
 
 /**
@@ -36,16 +37,21 @@ import javax.persistence.Version;
  * @author owen
  */
 @Entity
-@Table(name = "LogFile")
-public class LogFile implements Serializable
+@Table(name = "TestSuite")
+public class TestSuite implements Serializable
 {
     private Long id;
     private Long versionNumber;
-    private String log;
+    private String name;
+    private String description;
     
-    public LogFile(String log)
+    private List<TestSpec> testSpecs;
+    
+    public TestSuite(String name,
+                     String description)
     {
-        this.setLog(log);
+        this.setName(name);
+        this.setDescription(description);
     }
     
     @Id
@@ -58,10 +64,18 @@ public class LogFile implements Serializable
     public Long getVersionNumber() { return versionNumber; }
     protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
-    @Lob
-    @Basic(fetch = FetchType.LAZY)
-    @Column(name = "log", nullable = false)
-    public String getLog() { return log; }
-    public void setLog(String log) { this.log = log; }
-
+    @Column(name = "name", nullable = false)
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    
+    @Column(name = "description", nullable = false, length = 1024)
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    
+    @ManyToMany
+    @JoinTable(name = "testSuiteTestSpecs",
+               joinColumns = @JoinColumn(name = "testSuiteId"),
+               inverseJoinColumns = @JoinColumn(name = "testSpecId"))
+    public List<TestSpec> getTestSpecs() { return testSpecs; }
+    public void setTestSpecs(List<TestSpec> testSpecs) { this.testSpecs = testSpecs; }
 }

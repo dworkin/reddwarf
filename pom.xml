@@ -4,7 +4,7 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.projectdarkstar.tools</groupId>
+  <groupId>com.projectdarkstar.tools.dtc</groupId>
   <artifactId>dtc</artifactId>
   <name>dtc</name>
   <packaging>pom</packaging>
