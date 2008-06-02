@@ -22,7 +22,7 @@
   <dependencies>
     <dependency>
       <groupId>com.projectdarkstar.client</groupId>
-      <artifactId>sgs-client-api</artifactId>
+      <artifactId>sgs-client</artifactId>
       <scope>provided</scope>
     </dependency>
 
