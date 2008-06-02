@@ -19,7 +19,7 @@
 
 package com.sun.sgs.qa.tc.domain;
 
-import java.util.SortedSet;
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -28,6 +28,8 @@ import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
 import javax.persistence.ManyToMany;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -38,13 +40,14 @@ import javax.persistence.ManyToMany;
 public class HardwareResourceFamily implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String name;
     private String description;
     private String system;
     private String os;
     private String memory;
     
-    private SortedSet<HardwareResource> members;
+    private List<HardwareResource> members;
     
     public HardwareResourceFamily(String name,
                                   String description,
@@ -63,6 +66,11 @@ public class HardwareResourceFamily implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
@@ -85,8 +93,9 @@ public class HardwareResourceFamily implements Serializable
     public void setOs(String os) { this.os = os; }
     
     @ManyToMany(mappedBy="families")
-    public SortedSet<HardwareResource> getMembers() { return members; }
-    public void setMembers(SortedSet<HardwareResource> members) { this.members = members; }
+    @OrderBy("hostname")
+    public List<HardwareResource> getMembers() { return members; }
+    public void setMembers(List<HardwareResource> members) { this.members = members; }
     
     
 }

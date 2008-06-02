@@ -32,6 +32,8 @@ import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -42,6 +44,7 @@ import javax.persistence.ManyToOne;
 public class TestSpec implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String name;
     private String description;
     private String testRunner;
@@ -74,6 +77,11 @@ public class TestSpec implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
@@ -109,6 +117,7 @@ public class TestSpec implements Serializable
     public void setServerAppConfig(ServerAppConfig serverAppConfig) { this.serverAppConfig = serverAppConfig; }
     
     @ManyToMany
+    @OrderBy("name")
     @JoinTable(name = "testSpecClientAppConfigs",
                joinColumns = @JoinColumn(name = "testSpecId"),
                inverseJoinColumns = @JoinColumn(name = "clientAppConfigId"))
@@ -116,6 +125,7 @@ public class TestSpec implements Serializable
     public void setClientAppConfigs(List<ClientAppConfig> clientAppConfigs) { this.clientAppConfigs = clientAppConfigs; }
     
     @ManyToMany
+    @OrderBy("name")
     @JoinTable(name = "testSpecSystemProbes",
                joinColumns = @JoinColumn(name = "testSpecId"),
                inverseJoinColumns = @JoinColumn(name = "systemProbeId"))
@@ -123,6 +133,7 @@ public class TestSpec implements Serializable
     public void setSystemProbes(List<SystemProbe> systemProbes) { this.systemProbes = systemProbes; }
     
     @ManyToMany
+    @OrderBy("name")
     @JoinTable(name = "testSpecServerResources",
                joinColumns = @JoinColumn(name = "testSpecId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
@@ -130,6 +141,7 @@ public class TestSpec implements Serializable
     public void setServerResources(List<HardwareResourceFamily> serverResources) { this.serverResources = serverResources; }
     
     @ManyToMany
+    @OrderBy("name")
     @JoinTable(name = "testSpecClientResources",
                joinColumns = @JoinColumn(name = "testSpecId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))

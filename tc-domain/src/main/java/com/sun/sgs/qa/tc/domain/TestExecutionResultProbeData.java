@@ -19,6 +19,7 @@
 
 package com.sun.sgs.qa.tc.domain;
 
+import java.sql.Date;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -26,29 +27,29 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Version;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.ManyToOne;
+import javax.persistence.JoinColumn;
 
 /**
  *
  * @author owen
  */
 @Entity
-@Table(name = "Property")
-public class Property implements Serializable
+@Table(name = "TestExecutionResultProbeData")
+public class TestExecutionResultProbeData implements Serializable
 {
     private Long id;
-    private Long versionNumber;
-    private String description;
-    private String property;
-    private String value;
+    private Date timestamp;
+    private Long value;
     
-
-    public Property(String description,
-                    String property,
-                    String value)
+    private TestExecutionResultProbeLog parentProbe;
+    
+    public TestExecutionResultProbeData(Date timestamp,
+                                        Long value)
     {
-        this.setDescription(description);
-        this.setProperty(property);
+        this.setTimestamp(timestamp);
         this.setValue(value);
     }
     
@@ -57,20 +58,17 @@ public class Property implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    @Version
-    @Column(name = "versionNumber")
-    public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "timestamp", nullable = false)
+    public Date getTimestamp() { return timestamp; }
+    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
     
-    @Column(name = "description", nullable = false, length = 1024)
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    @Column(name = "value", nullable = false)
+    public Long getValue() { return value; }
+    public void setValue(Long value) { this.value = value; }
     
-    @Column(name = "property", nullable = false)
-    public String getProperty() { return property; }
-    public void setProperty(String property) { this.property = property; }
-    
-    @Column(name = "value")
-    public String getValue() { return value; }
-    public void setValue(String value) { this.value = value; }
+    @ManyToOne
+    @JoinColumn(name = "parentProbe", nullable = false)
+    public TestExecutionResultProbeLog getParentProbe() { return parentProbe; }
+    public void setParentProbe(TestExecutionResultProbeLog parentProbe) { this.parentProbe = parentProbe; }
 }

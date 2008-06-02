@@ -19,7 +19,6 @@
 
 package com.sun.sgs.qa.tc.domain;
 
-import java.util.SortedSet;
 import java.util.List;
 import java.io.Serializable;
 import java.sql.Date;
@@ -37,6 +36,8 @@ import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.OneToMany;
 import javax.persistence.CascadeType;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -47,11 +48,12 @@ import javax.persistence.CascadeType;
 public class TestExecution implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String name;
     private Date dateStarted;
     private Date dateFinished;
     
-    private SortedSet<TestExecutionTag> tags;
+    private List<TestExecutionTag> tags;
     private List<TestExecutionResult> results;
     
     private String originalTestSuiteName;
@@ -76,6 +78,11 @@ public class TestExecution implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -91,11 +98,12 @@ public class TestExecution implements Serializable
     public void setDateFinished(Date dateFinished) { this.dateFinished = dateFinished; }
     
     @ManyToMany
+    @OrderBy("tag")
     @JoinTable(name = "testExecutionTags",
                joinColumns = @JoinColumn(name = "testExecutionId"),
                inverseJoinColumns = @JoinColumn(name = "testExecutionTagId"))
-    public SortedSet<TestExecutionTag> getTags() { return tags; }
-    public void setTags(SortedSet<TestExecutionTag> tags) { this.tags = tags; }
+    public List<TestExecutionTag> getTags() { return tags; }
+    public void setTags(List<TestExecutionTag> tags) { this.tags = tags; }
     
     @OneToMany(mappedBy = "parentExecution", cascade=CascadeType.REMOVE)
     public List<TestExecutionResult> getResults() { return results; }

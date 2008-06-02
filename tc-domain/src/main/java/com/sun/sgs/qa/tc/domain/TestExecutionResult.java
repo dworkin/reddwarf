@@ -34,6 +34,9 @@ import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.Enumerated;
 import javax.persistence.EnumType;
+import javax.persistence.OneToMany;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -44,6 +47,7 @@ import javax.persistence.EnumType;
 public class TestExecutionResult implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     
     private TestExecutionResultValue result;
     private LogFile resultSummary;
@@ -80,6 +84,11 @@ public class TestExecutionResult implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    
     @Column(name = "result", nullable = false)
     @Enumerated(EnumType.STRING)
     public TestExecutionResultValue getResult() { return result; }
@@ -91,6 +100,28 @@ public class TestExecutionResult implements Serializable
     public void setResultSummary(LogFile resultSummary) { this.resultSummary = resultSummary; }
     
     @ManyToMany
+    @OrderBy("property")
+    @JoinTable(name = "testExecutionResultProperties",
+               joinColumns = @JoinColumn(name = "testExecutionResultId"),
+               inverseJoinColumns = @JoinColumn(name = "propertyId"))
+    public SortedSet<Property> getProperties() { return properties; }
+    public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
+    
+    @OneToMany(mappedBy = "parentResult")
+    public List<TestExecutionResultServerLog> getServerLogs() { return serverLogs; }
+    public void setServerLogs(List<TestExecutionResultServerLog> serverLogs) { this.serverLogs = serverLogs; }
+    
+    @OneToMany(mappedBy = "parentResult")
+    public List<TestExecutionResultClientLog> getClientLogs() { return clientLogs; }
+    public void setClientLogs(List<TestExecutionResultClientLog> clientLogs) { this.clientLogs = clientLogs; }
+    
+    @OneToMany(mappedBy = "parentResult")
+    public List<TestExecutionResultProbeLog> getProbeLogs() { return probeLogs; }
+    public void setProbeLogs(List<TestExecutionResultProbeLog> probeLogs) { this.probeLogs = probeLogs; }
+    
+    
+    @ManyToMany
+    @OrderBy("hostname")
     @JoinTable(name = "testExecutionResultServerResources",
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceId"))
@@ -98,6 +129,7 @@ public class TestExecutionResult implements Serializable
     public void setServerResources(List<HardwareResource> serverResources) { this.serverResources = serverResources; }
     
     @ManyToMany
+    @OrderBy("hostname")
     @JoinTable(name = "testExecutionResultClientResources",
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceId"))

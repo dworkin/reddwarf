@@ -20,7 +20,7 @@
 package com.sun.sgs.qa.tc.domain;
 
 import java.sql.Date;
-import java.util.SortedSet;
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -33,6 +33,8 @@ import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 
 /**
@@ -44,12 +46,13 @@ import javax.persistence.JoinTable;
 public class HardwareResource implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String hostname;
     private String lockedBy;
     private Date lockedAt;
     private Boolean enabled;
     
-    private SortedSet<HardwareResourceFamily> families;
+    private List<HardwareResourceFamily> families;
 
     public HardwareResource() {}
     
@@ -69,6 +72,11 @@ public class HardwareResource implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    
     @Column(name="hostname", nullable=false)
     public String getHostname() { return hostname; }
     public void setHostname(String hostname) { this.hostname = hostname; }
@@ -87,9 +95,10 @@ public class HardwareResource implements Serializable
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     
     @ManyToMany
+    @OrderBy("name")
     @JoinTable(name = "hardwareResourceFamilies",
                joinColumns = @JoinColumn(name = "hardwareResourceId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
-    public SortedSet<HardwareResourceFamily> getFamilies() { return families; }
-    public void setFamilies(SortedSet<HardwareResourceFamily> families) { this.families = families; }
+    public List<HardwareResourceFamily> getFamilies() { return families; }
+    public void setFamilies(List<HardwareResourceFamily> families) { this.families = families; }
 }

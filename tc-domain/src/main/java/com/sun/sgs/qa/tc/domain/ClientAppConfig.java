@@ -19,7 +19,7 @@
 
 package com.sun.sgs.qa.tc.domain;
 
-import java.util.SortedSet;
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -33,6 +33,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -43,12 +45,13 @@ import javax.persistence.JoinColumn;
 public class ClientAppConfig implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String name;
     private String path;
     private ClientAppConfigType propertyMethod;
     
     private ClientApp clientApp;
-    private SortedSet<Property> properties;
+    private List<Property> properties;
     
     public ClientAppConfig(String name,
                            String path,
@@ -63,6 +66,11 @@ public class ClientAppConfig implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
@@ -83,9 +91,10 @@ public class ClientAppConfig implements Serializable
     public void setClientApp(ClientApp clientApp) { this.clientApp = clientApp; }
     
     @ManyToMany
+    @OrderBy("property")
     @JoinTable(name = "clientAppConfigProperties",
                joinColumns = @JoinColumn(name = "clientAppConfigId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public SortedSet<Property> getProperties() { return properties; }
-    public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
+    public List<Property> getProperties() { return properties; }
+    public void setProperties(List<Property> properties) { this.properties = properties; }
 }

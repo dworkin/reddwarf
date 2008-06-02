@@ -19,7 +19,7 @@
 
 package com.sun.sgs.qa.tc.domain;
 
-import java.util.SortedSet;
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -28,6 +28,7 @@ import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
 import javax.persistence.ManyToMany;
+import javax.persistence.OrderBy;
 
 /**
  *
@@ -40,7 +41,7 @@ public class SystemProbeTag implements Serializable
     private Long id;
     private String tag;
     
-    private SortedSet<SystemProbe> probes;
+    private List<SystemProbe> probes;
     
     public SystemProbeTag(String tag)
     {
@@ -57,6 +58,7 @@ public class SystemProbeTag implements Serializable
     public void setTag(String tag) { this.tag = tag; }
     
     @ManyToMany(mappedBy = "tags")
-    public SortedSet<SystemProbe> getProbes() { return probes; }
-    public void setProbes(SortedSet<SystemProbe> probes) { this.probes = probes; }
+    @OrderBy("name")
+    public List<SystemProbe> getProbes() { return probes; }
+    public void setProbes(List<SystemProbe> probes) { this.probes = probes; }
 }

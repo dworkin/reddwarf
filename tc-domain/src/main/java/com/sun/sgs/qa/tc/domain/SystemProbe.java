@@ -19,7 +19,7 @@
 
 package com.sun.sgs.qa.tc.domain;
 
-import java.util.SortedSet;
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -31,6 +31,8 @@ import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -41,15 +43,16 @@ import javax.persistence.ManyToOne;
 public class SystemProbe implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String name;
     private String className;
     private String classPath;
     private String metric;
     private String units;
     
-    private SortedSet<SystemProbeTag> tags;
+    private List<SystemProbeTag> tags;
     
-    private SortedSet<Property> properties;
+    private List<Property> properties;
     private PkgLibrary requiredPkg;
     
     public SystemProbe(String name,
@@ -69,6 +72,11 @@ public class SystemProbe implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
@@ -91,18 +99,20 @@ public class SystemProbe implements Serializable
     public void setUnits(String units) { this.units = units; }
     
     @ManyToMany
+    @OrderBy("tag")
     @JoinTable(name = "systemProbeTags",
                joinColumns = @JoinColumn(name = "systemProbeId"),
                inverseJoinColumns = @JoinColumn(name = "systemProbeTagId"))
-    public SortedSet<SystemProbeTag> getTags() { return tags; }
-    public void setTags(SortedSet<SystemProbeTag> tags) { this.tags = tags; }
+    public List<SystemProbeTag> getTags() { return tags; }
+    public void setTags(List<SystemProbeTag> tags) { this.tags = tags; }
     
     @ManyToMany
+    @OrderBy("property")
     @JoinTable(name = "systemProbeProperties",
                joinColumns = @JoinColumn(name = "systemProbeId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public SortedSet<Property> getProperties() { return properties; }
-    public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
+    public List<Property> getProperties() { return properties; }
+    public void setProperties(List<Property> properties) { this.properties = properties; }
     
     @ManyToOne
     @JoinColumn(name = "requiredPkg", nullable = false)

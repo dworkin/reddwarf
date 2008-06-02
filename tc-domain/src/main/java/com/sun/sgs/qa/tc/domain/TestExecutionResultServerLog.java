@@ -31,6 +31,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -41,6 +43,7 @@ import javax.persistence.JoinTable;
 public class TestExecutionResultServerLog implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     
     private HardwareResource resource;
     private LogFile logFile;
@@ -75,6 +78,11 @@ public class TestExecutionResultServerLog implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @ManyToOne
     @JoinColumn(name = "resource")
@@ -122,6 +130,7 @@ public class TestExecutionResultServerLog implements Serializable
     
     
     @ManyToMany
+    @OrderBy("property")
     @JoinTable(name = "testExecutionResultServerLogProperties",
                joinColumns = @JoinColumn(name = "testExecutionResultServerLogId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))

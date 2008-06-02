@@ -19,6 +19,7 @@
 
 package com.sun.sgs.qa.tc.domain;
 
+import java.util.List;
 import java.util.SortedSet;
 import java.io.Serializable;
 
@@ -31,6 +32,9 @@ import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
+import javax.persistence.OneToMany;
+import javax.persistence.OrderBy;
+import javax.persistence.Version;
 
 /**
  *
@@ -41,6 +45,7 @@ import javax.persistence.JoinTable;
 public class TestExecutionResultProbeLog implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     
     private HardwareResource resource;
     private LogFile logFile;
@@ -55,6 +60,8 @@ public class TestExecutionResultProbeLog implements Serializable
     
     private SortedSet<Property> properties;
     private TestExecutionResult parentResult;
+    
+    private List<TestExecutionResultProbeData> data;
     
     public TestExecutionResultProbeLog(SystemProbe originalSystemProbe)
     {
@@ -71,6 +78,11 @@ public class TestExecutionResultProbeLog implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @ManyToOne
     @JoinColumn(name = "resource")
@@ -117,6 +129,7 @@ public class TestExecutionResultProbeLog implements Serializable
     
     
     @ManyToMany
+    @OrderBy("property")
     @JoinTable(name = "testExecutionResultProbeLogProperties",
                joinColumns = @JoinColumn(name = "testExecutionResultProbeLogId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
@@ -127,4 +140,9 @@ public class TestExecutionResultProbeLog implements Serializable
     @JoinColumn(name = "parentResult", nullable = false)
     public TestExecutionResult getParentResult() { return parentResult; }
     public void setParentResult(TestExecutionResult parentResult) { this.parentResult = parentResult; }
+    
+    @OneToMany(mappedBy="parentProbe")
+    @OrderBy("timestamp")
+    public List<TestExecutionResultProbeData> getData() { return data; }
+    public void setData(List<TestExecutionResultProbeData> data) { this.data = data; }
 }

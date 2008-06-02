@@ -19,34 +19,35 @@
 
 package com.sun.sgs.qa.tc.domain;
 
+import java.util.List;
 import java.io.Serializable;
-import java.net.URI;
+import java.sql.Date;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Version;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.OneToMany;
+import javax.persistence.OrderBy;
 
 /**
  *
  * @author owen
  */
 @Entity
-@Table(name = "PkgLibrary")
-public class PkgLibrary implements Serializable
+@Table(name = "TestExecutionResultClientData")
+public class TestExecutionResultClientData implements Serializable
 {
     private Long id;
-    private Long versionNumber;
-    private String name;
-    private URI location;
+    private Date timestamp;
+    private List<TestExecutionResultClientDataTuple> values;
     
-    public PkgLibrary(String name,
-                      URI location)
+    public TestExecutionResultClientData(Date timestamp)
     {
-        this.setName(name);
-        this.setLocation(location);
+        this.setTimestamp(timestamp);
     }
     
     @Id
@@ -54,16 +55,14 @@ public class PkgLibrary implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    @Version
-    @Column(name = "versionNumber")
-    public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "timestamp", nullable = false)
+    public Date getTimestamp() { return timestamp; }
+    public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
     
-    @Column(name = "name", nullable = false, unique = true)
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    
-    @Column(name = "location", nullable = false)
-    public URI getLocation() { return location; }
-    public void setLocation(URI location) { this.location = location; }
+    @OneToMany(mappedBy = "clientData")
+    @OrderBy("originalClientName")
+    public List<TestExecutionResultClientDataTuple> getValues() { return values; }
+    public void setValues(List<TestExecutionResultClientDataTuple> values) { this.values = values; }
+
 }

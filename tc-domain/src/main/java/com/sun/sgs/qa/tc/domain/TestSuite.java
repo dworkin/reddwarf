@@ -30,6 +30,7 @@ import javax.persistence.Column;
 import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
+import javax.persistence.Version;
 
 /**
  *
@@ -40,6 +41,7 @@ import javax.persistence.JoinColumn;
 public class TestSuite implements Serializable
 {
     private Long id;
+    private Long versionNumber;
     private String name;
     private String description;
     
@@ -56,6 +58,11 @@ public class TestSuite implements Serializable
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
+    @Version
+    @Column(name = "versionNumber")
+    public Long getVersionNumber() { return versionNumber; }
+    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false)
     public String getName() { return name; }
