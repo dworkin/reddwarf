@@ -5,16 +5,16 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.sun.sgs.qa</groupId>
-    <artifactId>tc</artifactId>
+    <groupId>com.projectdarkstar.tools</groupId>
+    <artifactId>dtc</artifactId>
     <version>0.1.SNAPSHOT</version>
   </parent>
 
-  <groupId>com.sun.sgs.qa</groupId>
-  <artifactId>tc-domain</artifactId>
-  <name>tc-domain</name>
+  <groupId>com.projectdarkstar.tools</groupId>
+  <artifactId>dtc-domain</artifactId>
+  <name>dtc-domain</name>
   <packaging>jar</packaging>
-  <version>${tc.version}</version>
+  <version>${dtc.version}</version>
 
   <dependencies>
     <dependency>
