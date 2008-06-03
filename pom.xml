@@ -42,7 +42,7 @@
 	<!-- The berkeleydb binary package must be retrieved and unpacked
 	     Before the test phase so that they are available during
 	     runtime of the unit tests.
-	     To enable this dependency unpack, activate the unpack-dbd-binaries
+	     To enable this dependency unpack, activate the unpack-bdb-binaries
 	     execution id in the child POM -->
 	<plugin>
           <groupId>org.apache.maven.plugins</groupId>
