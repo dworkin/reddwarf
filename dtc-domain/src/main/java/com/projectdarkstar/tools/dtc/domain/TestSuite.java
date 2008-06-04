@@ -31,6 +31,7 @@ import javax.persistence.ManyToMany;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
 import javax.persistence.Version;
+import javax.persistence.ManyToOne;
 
 /**
  *
@@ -45,6 +46,7 @@ public class TestSuite implements Serializable
     private String name;
     private String description;
     
+    private PkgLibrary darkstarPkg;
     private List<TestSpec> testSpecs;
     
     public TestSuite(String name,
@@ -71,6 +73,11 @@ public class TestSuite implements Serializable
     @Column(name = "description", nullable = false, length = 1024)
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    
+    @ManyToOne
+    @JoinColumn(name = "darkstarPkg", nullable = false)
+    public PkgLibrary getDarkstarPkg() { return darkstarPkg; }
+    public void setDarkstarPkg(PkgLibrary darkstarPkg) { this.darkstarPkg = darkstarPkg; }
     
     @ManyToMany
     @JoinTable(name = "testSuiteTestSpecs",

@@ -20,51 +20,28 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.io.Serializable;
-import java.net.URI;
+import java.sql.Date;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
-import javax.persistence.Version;
 
 /**
  *
  * @author owen
  */
 @Entity
-@Table(name = "PkgLibrary")
-public class PkgLibrary implements Serializable
+@Table(name = "TestQueue")
+public class TestQueue implements Serializable
 {
     private Long id;
-    private Long versionNumber;
+    private Date dateQueued;
+    private Date dateStarted;
+    private TestQueueStatus status;
     
-    private String name;
-    private URI location;
+    private TestExecution execution;
+    private TestExecutionResult currentlyRunning;
     
-    public PkgLibrary(String name,
-                      URI location)
-    {
-        this.setName(name);
-        this.setLocation(location);
-    }
-    
-    @Id
-    @GeneratedValue
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    @Version
-    @Column(name = "versionNumber")
-    public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
-    
-    @Column(name = "name", nullable = false, unique = true)
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    
-    @Column(name = "location", nullable = false)
-    public URI getLocation() { return location; }
-    public void setLocation(URI location) { this.location = location; }
 }

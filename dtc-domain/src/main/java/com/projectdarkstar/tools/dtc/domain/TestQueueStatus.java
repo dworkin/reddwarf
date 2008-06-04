@@ -23,8 +23,10 @@ package com.projectdarkstar.tools.dtc.domain;
  *
  * @author owen
  */
-public enum TestExecutionResultValue
+public enum TestQueueStatus
 {
-    PASS,
-    FAIL,
+    WAITING,
+    BLOCKED,
+    RUNNING,
+    COMPLETE
 }

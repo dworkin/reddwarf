@@ -60,6 +60,8 @@ public class TestExecutionResult implements Serializable
     private List<HardwareResource> serverResources;
     private List<HardwareResource> clientResources;
     
+    private List<HardwareResourceFamily> originalServerResources;
+    private List<HardwareResourceFamily> originalClientResources;
     private String originalTestSpecName;
     private String originalTestSpecDescription;
     private String originalTestSpecTestRunner;
@@ -71,6 +73,8 @@ public class TestExecutionResult implements Serializable
     
     public TestExecutionResult(TestSpec originalTestSpec)
     {
+        this.setOriginalServerResources(originalTestSpec.getServerResources());
+        this.setOriginalClientResources(originalTestSpec.getClientResources());
         this.setOriginalTestSpecName(originalTestSpec.getName());
         this.setOriginalTestSpecDescription(originalTestSpec.getDescription());
         this.setOriginalTestSpecTestRunner(originalTestSpec.getTestRunner());
@@ -135,6 +139,24 @@ public class TestExecutionResult implements Serializable
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceId"))
     public List<HardwareResource> getClientResources() { return clientResources; }
     public void setClientResources(List<HardwareResource> clientResources) { this.clientResources = clientResources; }
+    
+    
+    
+    @ManyToMany
+    @OrderBy("hostname")
+    @JoinTable(name = "testExecutionResultOriginalServerResources",
+               joinColumns = @JoinColumn(name = "testExecutionResultId"),
+               inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
+    public List<HardwareResourceFamily> getOriginalServerResources() { return originalServerResources; }
+    public void setOriginalServerResources(List<HardwareResourceFamily> originalServerResources) { this.originalServerResources = originalServerResources; }
+    
+    @ManyToMany
+    @OrderBy("hostname")
+    @JoinTable(name = "testExecutionResultOriginalClientResources",
+               joinColumns = @JoinColumn(name = "testExecutionResultId"),
+               inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
+    public List<HardwareResourceFamily> getOriginalClientResources() { return originalClientResources; }
+    public void setOriginalClientResources(List<HardwareResourceFamily> originalClientResources) { this.originalClientResources = originalClientResources; }
     
     
     
