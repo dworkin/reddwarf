@@ -29,8 +29,8 @@
   <modules>
     <module>sgs-server</module>
     <module>sgs-server-api</module>
-    <module>sgs-server-javadoc</module>
     <module>sgs-server-dist</module>
+    <module>sgs-server-javadoc</module>
     <module>sgs-tutorial-server</module>
     <module>sgs-tutorial-server-dist</module>
   </modules>

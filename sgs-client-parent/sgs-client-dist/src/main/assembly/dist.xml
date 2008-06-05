@@ -48,6 +48,13 @@
 	<include>com.projectdarkstar.client:sgs-client-javadoc:jar:api</include>
       </includes>
       <unpack>true</unpack>
+      <unpackOptions>
+	<excludes>
+	  <exclude>META-INF</exclude>
+	  <exclude>META-INF/*</exclude>
+	  <exclude>options</exclude>
+	</excludes>
+      </unpackOptions>
       <outputDirectory>sgs-client-${sgs.version}/doc</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>

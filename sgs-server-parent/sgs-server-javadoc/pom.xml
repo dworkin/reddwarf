@@ -68,6 +68,28 @@
         </executions>
       </plugin>
 
+      <!-- Configure buildnumber to get a timestamp available to the pom -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>buildnumber-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>validate</phase>
+            <goals>
+              <goal>create</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+	  <format>{0,date,yyyy-MM-dd HH:mm:ss}</format>
+          <items>
+            <item>timestamp</item>
+          </items>
+          <doCheck>false</doCheck>
+          <doUpdate>false</doUpdate>
+        </configuration>
+      </plugin>
+
 
       <!-- Generate two javadoc artifacts
 	   One aggregating all classes
@@ -89,6 +111,18 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <windowtitle>Project Darkstar Server ${project.version} API</windowtitle>
+	      <doctitle>Project Darkstar Server ${project.version} API</doctitle>
+	      <footer>
+		<![CDATA[<font size="-1">Project Darkstar, Version
+                ${project.version}<br/>${buildNumber}</font>]]>
+	      </footer>
+	      <bottom>
+		<![CDATA[<font size="-1">Copyright &copy; 
+                {inceptionYear}-{currentYear} Sun Microsystems,
+                Inc. All rights reserved</font>]]>
+	      </bottom>
 	      <finalName>all</finalName>
 	      <outputDirectory>${project.build.directory}/all-docs</outputDirectory>
 	    </configuration>
@@ -107,6 +141,18 @@
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <windowtitle>Project Darkstar Server ${project.version} External API</windowtitle>
+	      <doctitle>Project Darkstar Server ${project.version} External API</doctitle>
+	      <footer>
+		<![CDATA[<font size="-1">Project Darkstar, Version
+                ${project.version}<br/>${buildNumber}</font>]]>
+	      </footer>
+	      <bottom>
+		<![CDATA[<font size="-1">Copyright &copy; 
+                {inceptionYear}-{currentYear} Sun Microsystems,
+                Inc. All rights reserved</font>]]>
+	      </bottom>
 	      <finalName>api</finalName>
 	      <subpackages>com.sun.sgs.app:com.sun.sgs.protocol.simple</subpackages>
 	      <outputDirectory>${project.build.directory}/api-docs</outputDirectory>
