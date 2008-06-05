@@ -507,6 +507,13 @@
     <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
 
     <checkstyle.version>4.1</checkstyle.version>
+    <!-- Locations of checkstyle files
+	 Configure these in the individual modules that use the checkstyle plugin-->
+    <checkstyle.config>com/sun/sgs/tools/checkstyle/darkstar_checks.xml</checkstyle.config>
+    <checkstyle.header.bsd>com/sun/sgs/tools/checkstyle/BSD.txt</checkstyle.header.bsd>
+    <checkstyle.header.gpl>com/sun/sgs/tools/checkstyle/GPLv2.txt</checkstyle.header.gpl>
+    <checkstyle.packageNames>com/sun/sgs/tools/checkstyle/packageNames.xml</checkstyle.packageNames>
+
     <surefire.version>2.4.3</surefire.version>
 
     <test.assertions>-ea:com.sun.sgs...</test.assertions>

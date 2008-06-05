@@ -80,9 +80,9 @@
 	  <linkXRef>false</linkXRef>
 	  <consoleOutput>true</consoleOutput>
 	  <enableRulesSummary>false</enableRulesSummary>
-	  <configLocation>com/sun/sgs/tools/checkstyle/darkstar_checks.xml</configLocation>
-	  <headerLocation>com/sun/sgs/tools/checkstyle/GPL.txt</headerLocation>
-	  <packageNamesLocation>com/sun/sgs/tools/checkstyle/packageNames.xml</packageNamesLocation>
+	  <configLocation>${checkstyle.config}</configLocation>
+	  <headerLocation>${checkstyle.header.bsd}</headerLocation>
+	  <packageNamesLocation>${checkstyle.packageNames}</packageNamesLocation>
         </configuration>
       </plugin>
 
