@@ -124,8 +124,17 @@
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
-      
+
     </plugins>
+
+    <!-- Activate resource filtering so the sgs.version file
+	   can get the correct version replaced -->
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
   </build>
 
 

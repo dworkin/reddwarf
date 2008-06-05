@@ -32,7 +32,7 @@
         <include>com.projectdarkstar.ext.berkeleydb:db-binaries:zip</include>
       </includes>
       <unpack>true</unpack>
-      <outputDirectory>.</outputDirectory>
+      <outputDirectory></outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
     
@@ -49,20 +49,12 @@
     <dependencySet>
       <includes>
         <include>org.slf4j:slf4j-api</include>
+        <include>org.slf4j:slf4j-jdk14</include>
       </includes>
       <outputDirectory>slf4j-${slf4j-api.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
     
-    <!-- Include the slf4j jars in the slf4j directory -->
-    <dependencySet>
-      <includes>
-        <include>org.slf4j:slf4j-jdk14</include>
-      </includes>
-      <outputDirectory>slf4j-${slf4j-jdk14.version}</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-
     <!-- Unpack the tutorial component -->
     <dependencySet>
       <includes>       

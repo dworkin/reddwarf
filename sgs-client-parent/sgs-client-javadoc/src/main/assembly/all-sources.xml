@@ -12,26 +12,17 @@
   
   <dependencySets>
 
-    <!-- Include the sgs-server sources -->
+    <!-- Include the sources jars-->
     <dependencySet>
       <includes>
 	<include>com.projectdarkstar.client:sgs-client:jar:sources</include>
-      </includes>
-      <unpack>true</unpack>
-      <outputDirectory></outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-
-    <!-- Include the jar of sgs-shared sources -->
-    <dependencySet>
-      <includes>
 	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
       </includes>
       <unpack>true</unpack>
       <outputDirectory></outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
-    
+
   </dependencySets>
   
 </assembly>
