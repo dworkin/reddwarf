@@ -35,28 +35,35 @@
 
   <build>
     <plugins>
-      
-      <!-- Configured so you can run the client out of band
-	   mvn exec:exec -->
+
+      <!-- The antrun plugin is configured to run the app outside
+	   of the build lifecycle via the command line.
+	   However, the lifecycle must be run up through the generate-test-resources
+	   phase for the necessary items to be in place for the app to run.
+	   In order to run, use the following command:
+	   mvn generate-test-resources antrun:run -->
       <plugin>
-	<groupId>org.codehaus.mojo</groupId>
-	<artifactId>exec-maven-plugin</artifactId>
+        <artifactId>maven-antrun-plugin</artifactId>
 	<configuration>
-	  <executable>java</executable>
-	  <classpathScope>test</classpathScope>
-	  <arguments>
-	    <argument>-Djava.util.logging.config.file=${run.logging}</argument>
-	    <argument>-classpath</argument>
-	    <classpath/>
-	    <argument>com.sun.sgs.example.chat.client.ChatClient</argument>
-	  </arguments>
+	  <tasks>
+	    <java classname="com.sun.sgs.example.chat.client.ChatClient"
+		  fork="true">
+	      <jvmarg line="${run.jvm.args}"/>
+	      <sysproperty key="java.util.logging.config.file"
+			   file="${run.logging}"/>
+	      <classpath>
+		<path refid="maven.test.classpath"/>
+	      </classpath>
+	    </java>
+	  </tasks>
 	</configuration>
       </plugin>
-    </plugins>
 
+    </plugins>
   </build>
 
   <properties>
+    <run.jvm.args></run.jvm.args>
     <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
   </properties>
 
