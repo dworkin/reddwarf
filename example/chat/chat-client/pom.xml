@@ -28,6 +28,7 @@
     <dependency>
       <groupId>com.projectdarkstar.client</groupId>
       <artifactId>sgs-client</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 

@@ -87,6 +87,7 @@
         <executions>
           <execution>
             <id>unpack-bdb-binaries</id>
+	    <phase>generate-test-resources</phase>
           </execution>
         </executions>
       </plugin>
@@ -102,18 +103,18 @@
 	  <systemProperties>
 	    <property>
 	      <name>java.library.path</name>
-	      <value>${test.javapath}</value>
+	      <value>${run.javapath}</value>
 	    </property>
 	    <property>
 	      <name>com.sun.sgs.impl.service.data.store.db.environment.class</name>
-	      <value>${test.bdb.env}</value>
+	      <value>${run.bdb.env}</value>
 	    </property>
 	    <property>
 	      <name>com.sun.sgs.impl.service.data.store.db.bdb.cache.size</name>
-	      <value>${test.bdb.cache.size}</value>
+	      <value>${run.bdb.cache.size}</value>
 	    </property>
 	  </systemProperties>
-	  <argLine>${test.jvm.args} -Djava.library.path=${test.javapath}</argLine>
+	  <argLine>${test.jvm.args} -Djava.library.path=${run.javapath}</argLine>
         </configuration>
       </plugin>
 

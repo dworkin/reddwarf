@@ -63,13 +63,4 @@
     </repository>
   </repositories>
 
-
-  <properties>
-    <chat.version>0.1-SNAPSHOT</chat.version>
-
-    <!-- Override this value in case we want to lock
-	 to a specific version -->
-    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
-  </properties>
-
 </project>

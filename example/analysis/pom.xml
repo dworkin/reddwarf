@@ -44,54 +44,66 @@
       </plugin>
 
 
-      <!-- The exec profiles are activated via the command line
-	   So to run the app,
-	   one would use the following command:
-	   mvn exec:exec -->
+      <!-- The antrun plugin is configured to run the app outside
+	   of the build lifecycle via the command line.
+	   However, the lifecycle must be run up through the generate-test-resources
+	   phase for the necessary items to be in place for the app to run.
+	   In order to run, use the following command:
+	   mvn generate-test-resources antrun:run -->
       <plugin>
-	<groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
+        <artifactId>maven-antrun-plugin</artifactId>
 	<configuration>
-	  <executable>java</executable>
-	  <classpathScope>test</classpathScope>
-	  <arguments>
-	    <!-- <argument>${analysis.jvm.args}</argument> -->
-	    <argument>-Djava.library.path=${run.javapath}</argument>
-	    <argument>-Djava.util.logging.config.file=${run.logging}</argument>
-	    <argument>-Dcom.sun.sgs.impl.service.data.store.db.environment.class=${test.bdb.env}</argument>
-	    <argument>-Dcom.sun.sgs.impl.service.data.DataServiceImpl.data.store.class=${analysis.data.store.class}</argument>
-	    <argument>-Dcom.sun.sgs.impl.service.data.store.net.server.start=${analysis.data.store.server.start}</argument>
-	    <argument>-Dcom.sun.sgs.impl.service.data.store.net.server.host=${analysis.data.store.server.host}</argument>
-	    <argument>-Dcom.sun.sgs.impl.service.data.store.net.server.port=${analysis.data.store.server.port}</argument>
-	    <argument>-Dcom.sun.sgs.analysis.tasks=${analysis.tasks}</argument>
-	    <argument>-classpath</argument>
-	    <classpath/>
-	    <argument>com.sun.sgs.impl.kernel.Kernel</argument>
-	    <argument>${run.properties.single}</argument>
-	  </arguments>
+	  <tasks>
+	    <java classname="com.sun.sgs.impl.kernel.Kernel"
+		  fork="true">
+	      <jvmarg line="${run.jvm.args}"/>
+	      <sysproperty key="java.library.path" 
+			   file="${run.javapath}"/>
+	      <sysproperty key="java.util.logging.config.file"
+			   file="${run.logging}"/>
+	      <sysproperty key="com.sun.sgs.impl.service.data.store.db.environment.class"
+			   value="${run.bdb.env}"/>
+	      <sysproperty key="com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"
+			   value="${analysis.data.store.class}"/>
+	      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.start"
+			   value="${analysis.data.store.server.start}"/>
+	      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.host"
+			   value="${analysis.data.store.server.host}"/>
+	      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.port"
+			   value="${analysis.data.store.server.port}"/>
+	      <sysproperty key="com.sun.sgs.analysis.tasks"
+			   value="${analysis.tasks}"/>
+	      <classpath>
+		<path refid="maven.test.classpath"/>
+	      </classpath>
+	      <arg value="src/test/properties/AnalysisApplication.properties"/>
+	    </java>
+	  </tasks>
 	</configuration>
-      </plugin>
 
-      <!-- Simple ant task to make the datastore directory 
-	   if the user wishes to run the server -->
-      <plugin>
-          <artifactId>maven-antrun-plugin</artifactId>
-          <executions>
-              <execution>
-                  <id>make-datastore</id>
-                  <phase>generate-resources</phase>
-                  <configuration>
-                      <tasks>
-                          <mkdir dir="${project.build.directory}/dsdb/"/>
-			  <mkdir dir="${project.build.directory}/logs/"/>
-			  <mkdir dir="${project.build.directory}/data/"/>
-                      </tasks>
-                  </configuration>
-                  <goals>
-                      <goal>run</goal>
-                  </goals>
-              </execution>
-          </executions>
+
+	<!-- Builds the directories necessary for running the app
+	     with the antrun configuration above.  Runs in the
+	     generate-test-resources phase -->
+	<executions>
+          <execution>
+            <id>make-datastore</id>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <tasks>
+		<delete dir="${project.build.directory}/logs"/>
+		<delete dir="${project.build.directory}/data"/>
+		<delete dir="${project.build.directory}/dsdb/"/>
+		<mkdir dir="${project.build.directory}/logs"/>
+		<mkdir dir="${project.build.directory}/data"/>
+                <mkdir dir="${project.build.directory}/dsdb/"/>
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
 
       <!-- The berkeleydb binary package must be retrieved and unpacked
@@ -103,6 +115,7 @@
         <executions>
           <execution>
             <id>unpack-bdb-binaries</id>
+            <phase>generate-test-resources</phase>
           </execution>
         </executions>
       </plugin>
@@ -155,25 +168,18 @@
 
 
   <properties>
-    <analysis.version>0.1-SNAPSHOT</analysis.version>
 
-    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+    <run.jvm.args>-server -XX:+UseParallelGC -XX:+UseFastAccessorMethods -XX:+AggressiveOpts -XX:+MaxFDLimit -XX:NewSize=512m -Xms700m -Xmx2g</run.jvm.args>
 
-
-    <analysis.jvm.args>-server -XX:+UseParallelGC -XX:+UseFastAccessorMethods -XX:+AggressiveOpts -XX:+MaxFDLimit -XX:NewSize=512m -Xms700m -Xmx2g</analysis.jvm.args>
     <analysis.tasks>com.sun.sgs.analysis.task.ScheduleMapPutsTask</analysis.tasks>
     <analysis.data.store.server.start>true</analysis.data.store.server.start>
     <analysis.data.store.server.host>localhost</analysis.data.store.server.host>
     <analysis.data.store.server.port>44530</analysis.data.store.server.port>
-
     <!-- Set this to com.sun.sgs.impl.service.data.store.net.DataStoreClient if desired -->
     <analysis.data.store.class>com.sun.sgs.impl.service.data.store.DataStoreImpl</analysis.data.store.class>
 
-    <run.javapath>${project.build.directory}/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
     <run.properties.single>src/test/properties/AnalysisApplication.properties</run.properties.single>
-
-    <test.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</test.bdb.env>
   </properties>
 
 </project>

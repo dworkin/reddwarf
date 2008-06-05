@@ -22,8 +22,8 @@
   <modules>
     <module>sgs-client</module>
     <module>sgs-client-api</module>
-    <module>sgs-client-javadoc</module>
     <module>sgs-client-dist</module>
+    <module>sgs-client-javadoc</module>
     <module>sgs-tutorial-client</module>
     <module>sgs-tutorial-client-dist</module>
   </modules>

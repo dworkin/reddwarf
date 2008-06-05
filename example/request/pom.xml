@@ -65,13 +65,4 @@
     </repository>
   </repositories>
 
-
-
-
-  <properties>
-    <request.version>0.1-SNAPSHOT</request.version>
-
-    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
-  </properties>
-
 </project>
