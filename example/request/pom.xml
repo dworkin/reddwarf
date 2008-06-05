@@ -60,7 +60,7 @@
     <repository>
       <id>sunlabs.maven</id>
       <name>Sun Labs Maven Repository</name>
-      <url>http://frizbee.east.sun.com/maven</url>
+      <url>http://sunlabs.east.sun.com/darkstar/maven</url>
       <layout>default</layout>
     </repository>
   </repositories>

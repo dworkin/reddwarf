@@ -476,14 +476,14 @@
 
 
   <!-- Currently artifacts can be deployed to the
-       Maven repository on Owen's machine (frizbee.east)
+       Maven repository on sunlabs.east
        This will change to the java.net repository when
        we move to the outside -->
   <distributionManagement>
     <repository>
       <id>sunlabs.maven.ssh</id>
       <name>Sun Labs Maven Repository</name>
-      <url>scp://frizbee.east.sun.com/var/www/maven</url>
+      <url>scp://sunlabs.east.sun.com/export/darkstar/web/maven</url>
     </repository>
   </distributionManagement>
 
