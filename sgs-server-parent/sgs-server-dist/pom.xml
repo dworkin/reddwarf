@@ -14,11 +14,10 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-dist</artifactId>
-  <name>sgs-server-dist</name>
+  <name>Project Darkstar Server Distribution</name>
   <packaging>pom</packaging>
-  <version>${sgs.version}</version>
+  <url>http://www.projectdarkstar.com</url>
 
 
   <dependencies>
@@ -54,7 +53,7 @@
     </dependency>
 
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
     </dependency>

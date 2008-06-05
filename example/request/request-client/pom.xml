@@ -8,16 +8,14 @@
        used exclusively by the client -->
 
   <parent>
-    <groupId>com.projectdarkstar.example</groupId>
+    <groupId>com.projectdarkstar.example.request</groupId>
     <artifactId>request</artifactId>
     <version>0.1-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.example</groupId>
   <artifactId>request-client</artifactId>
-  <name>request-client</name>
+  <name>Request Example Client</name>
   <packaging>jar</packaging>
-  <version>0.1-SNAPSHOT</version>
 
   <dependencies>
     <!-- Compile time dependencies -->

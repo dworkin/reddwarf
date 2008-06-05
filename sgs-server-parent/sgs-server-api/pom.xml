@@ -14,11 +14,10 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-api</artifactId>
-  <name>sgs-server-api</name>
+  <name>Project Darkstar Server API</name>
   <packaging>jar</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <url>http://www.projectdarkstar.com</url>
 
   <build>
     <plugins>
@@ -83,6 +82,12 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-shared</artifactId>
+      <optional>true</optional>
     </dependency>
   </dependencies>
 

@@ -8,9 +8,9 @@
        It defines settings common to all projects -->
   <groupId>com.projectdarkstar</groupId>
   <artifactId>sgs</artifactId>
-  <name>sgs</name>
+  <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>0.1</version>
+  <version>1</version>
   <url>http://www.projectdarkstar.com</url>
 
 
@@ -57,7 +57,7 @@
               <configuration>
 		<artifactItems>
                   <artifactItem>
-                    <groupId>berkeleydb</groupId>
+                    <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
                     <artifactId>db-binaries</artifactId>
 		    <type>zip</type>
                     <overWrite>false</overWrite>
@@ -107,7 +107,8 @@
 	    </execution>
 	  </executions>
 	</plugin>
-	
+
+
       </plugins>
       
     </pluginManagement>
@@ -150,7 +151,7 @@
         <artifactId>maven-checkstyle-plugin</artifactId>
 	<dependencies>
 	  <dependency>
-	    <groupId>com.projectdarkstar.tools</groupId>
+	    <groupId>com.projectdarkstar.tools.build</groupId>
 	    <artifactId>sgs-build-utilities</artifactId>
 	    <version>${sgs-build-utilities.version}</version>
 	  </dependency>
@@ -290,19 +291,19 @@
       </dependency>
 
       <dependency>
-	<groupId>berkeleydb</groupId>
+	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
 	<artifactId>db</artifactId>
 	<version>${bdb.version}</version>
       </dependency>
 
       <dependency>
-	<groupId>berkeleydb</groupId>
+	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
 	<artifactId>je</artifactId>
 	<version>${bdb.je.version}</version>
       </dependency>
 
       <dependency>
-	<groupId>berkeleydb</groupId>
+	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
 	<artifactId>db-binaries</artifactId>
 	<version>${bdb.version}</version>
 	<type>zip</type>
@@ -435,7 +436,7 @@
       </properties>
       <dependencies>
 	<dependency>
-	  <groupId>berkeleydb</groupId>
+	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
 	  <artifactId>je</artifactId>
 	</dependency>
       </dependencies>
@@ -468,7 +469,9 @@
     
     <sgs.version>0.9.7-SNAPSHOT</sgs.version>
     <sgs-shared.version>0.1</sgs-shared.version>
-    <sgs-build-utilities.version>0.1</sgs-build-utilities.version>
+    <sgs-build-utilities.version>1.0</sgs-build-utilities.version>
+    <sgs-jar-resources-gpl.version>1.0</sgs-jar-resources-gpl.version>
+    <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.2.23</bdb.je.version>
@@ -483,7 +486,7 @@
     <test.assertions>-ea:com.sun.sgs...</test.assertions>
     <test.max.heap>-Xmx1g</test.max.heap>
     <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
-    <test.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</test.javapath>
+    <test.javapath>${project.build.directory}/bdb-${bdb.version}/${bdb.lib.dir}/</test.javapath>
     <test.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</test.bdb.env>
     <test.bdb.cache.size>1000000</test.bdb.cache.size>
 

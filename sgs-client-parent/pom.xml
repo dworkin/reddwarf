@@ -8,14 +8,15 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>0.1</version>
+    <version>1</version>
   </parent>
 
   <groupId>com.projectdarkstar.client</groupId>
   <artifactId>sgs-client-parent</artifactId>
-  <name>sgs-client-parent</name>
+  <name>Project Darkstar Client Parent POM</name>
   <packaging>pom</packaging>
   <version>0.9.7-SNAPSHOT</version>
+  <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
 
   <modules>
@@ -26,6 +27,38 @@
     <module>sgs-tutorial-client</module>
     <module>sgs-tutorial-client-dist</module>
   </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+	
+	<!-- The resource bundle executions should be activated in modules
+	     that produce jars that require the license to be bundled
+	     in the jar -->
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <executions>
+	    <execution>
+	      <id>include-bsd-license</id>
+	      <goals>
+		<goal>process</goal>
+	      </goals>
+	      <configuration>
+		<resourceBundles>
+		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
+		</resourceBundles>
+		<properties>
+		  <projectName>Project Darkstar Client</projectName>
+		</properties>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+	
+      </plugins>
+    </pluginManagement>
+  </build>
 
 
   <repositories>

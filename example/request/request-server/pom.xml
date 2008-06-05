@@ -8,16 +8,14 @@
        used exclusively by the server -->
 
   <parent>
-    <groupId>com.projectdarkstar.example</groupId>
+    <groupId>com.projectdarkstar.example.request</groupId>
     <artifactId>request</artifactId>
     <version>0.1-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.example</groupId>
   <artifactId>request-server</artifactId>
-  <name>request-server</name>
+  <name>Request Example Server</name>
   <packaging>jar</packaging>
-  <version>0.1-SNAPSHOT</version>
 
 
   <dependencies>
@@ -34,7 +32,7 @@
       <artifactId>sgs-server</artifactId>
     </dependency>
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
     </dependency>

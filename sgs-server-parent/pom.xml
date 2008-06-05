@@ -8,15 +8,23 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>0.1</version>
+    <version>1</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-parent</artifactId>
-  <name>sgs-server-parent</name>
+  <name>Project Darkstar Server Parent POM</name>
   <packaging>pom</packaging>
   <version>0.9.7-SNAPSHOT</version>
+  <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
+
+  <licenses>
+    <license>
+      <name>GNU General Public License v2</name>
+      <url>http://www.gnu.org/licenses/gpl-2.0.txt</url>
+    </license>
+  </licenses>
 
   <modules>
     <module>sgs-server</module>
@@ -26,6 +34,38 @@
     <module>sgs-tutorial-server</module>
     <module>sgs-tutorial-server-dist</module>
   </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+	
+	<!-- The resource bundle executions should be activated in modules
+	     that produce jars that require the license to be bundled
+	     in the jar -->
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <executions>
+	    <execution>
+	      <id>include-gpl-license</id>
+	      <goals>
+		<goal>process</goal>
+	      </goals>
+	      <configuration>
+		<resourceBundles>
+		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl:${sgs-jar-resources-gpl.version}</resourceBundle>
+		</resourceBundles>
+		<properties>
+		  <projectName>Project Darkstar Server</projectName>
+		</properties>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+	
+      </plugins>
+    </pluginManagement>
+  </build>
 
   <repositories>
     <repository>

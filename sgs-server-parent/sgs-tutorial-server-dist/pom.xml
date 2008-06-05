@@ -14,11 +14,10 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-tutorial-server-dist</artifactId>
-  <name>sgs-tutorial-server-dist</name>
+  <name>Project Darkstar Server Tutorial Distribution</name>
   <packaging>pom</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <url>http://www.projectdarkstar.com</url>
 
   <dependencies>
     <dependency>

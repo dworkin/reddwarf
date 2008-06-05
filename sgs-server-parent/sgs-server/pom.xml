@@ -13,11 +13,10 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server</artifactId>
-  <name>sgs-server</name>
+  <name>Project Darkstar Server</name>
   <packaging>jar</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <url>http://www.projectdarkstar.com</url>
 
 
   <dependencies>
@@ -31,11 +30,11 @@
     </dependency>
 
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>db</artifactId>
     </dependency>
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
     </dependency>
@@ -43,7 +42,7 @@
     <!-- Included as compile time dependency only unless
 	 BDB Java edition profile is activated (config from SGS super POM) -->
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>je</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -118,6 +117,13 @@
         </configuration>
       </plugin>
 
+      <!-- Activate the resource bundle plugin to include the license
+	   file in the jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+      </plugin>
+      
     </plugins>
   </build>
 

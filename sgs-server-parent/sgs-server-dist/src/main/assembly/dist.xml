@@ -29,7 +29,7 @@
     <!-- Unpack the berkeleydb binaries into the bdb directory -->
     <dependencySet>
       <includes>
-        <include>berkeleydb:db-binaries</include>
+        <include>com.projectdarkstar.ext.berkeleydb:db-binaries:zip</include>
       </includes>
       <unpack>true</unpack>
       <outputDirectory>.</outputDirectory>

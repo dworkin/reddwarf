@@ -12,18 +12,28 @@
   </parent>
 
   <groupId>com.projectdarkstar.tools.build</groupId>
-  <artifactId>sgs-build-utilities</artifactId>
-  <name>Project Darkstar Build Utilities</name>
+  <artifactId>sgs-jar-resources-bsd</artifactId>
+  <name>Project Darkstar BSD License Bundle</name>
   <packaging>jar</packaging>
   <version>1.0</version>
 
-  <dependencies>
-    <dependency>
-      <groupId>checkstyle</groupId>
-      <artifactId>checkstyle</artifactId>
-    </dependency>
-  </dependencies>
+  <build>
 
+    <plugins>
+      <!-- Bundle the resources as remote resources -->
+      <plugin>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <goals>
+	      <goal>bundle</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+    </plugins>
+  </build>
+  
   <repositories>
     <repository>
       <id>sunlabs.maven</id>

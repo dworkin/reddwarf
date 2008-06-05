@@ -8,12 +8,12 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>0.1</version>
+    <version>1</version>
   </parent>
 
-  <groupId>com.projectdarkstar.example</groupId>
+  <groupId>com.projectdarkstar.example.analysis</groupId>
   <artifactId>analysis</artifactId>
-  <name>analysis</name>
+  <name>Analysis Example</name>
   <packaging>jar</packaging>
   <version>0.1-SNAPSHOT</version>
 
@@ -134,7 +134,7 @@
     
     
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>db-binaries</artifactId>
       <type>zip</type>
     </dependency>

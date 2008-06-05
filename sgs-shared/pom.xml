@@ -11,14 +11,15 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>0.1</version>
+    <version>1</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-shared</artifactId>
-  <name>sgs-shared</name>
+  <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
   <version>0.1</version>
+  <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
 
   <dependencies>
@@ -62,6 +63,25 @@
 	<executions>
 	  <execution>
 	    <id>attach-javadocs</id>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Include the BSD license in the jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>include-bsd-license</id>
+	    <goals>
+	      <goal>process</goal>
+	    </goals>
+	    <configuration>
+	      <resourceBundles>
+		<resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
+	      </resourceBundles>
+	    </configuration>
 	  </execution>
 	</executions>
       </plugin>

@@ -8,16 +8,14 @@
        used exclusively by the client -->
 
   <parent>
-    <groupId>com.projectdarkstar.example</groupId>
+    <groupId>com.projectdarkstar.example.chat</groupId>
     <artifactId>chat</artifactId>
     <version>0.1-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.example</groupId>
   <artifactId>chat-client</artifactId>
-  <name>chat-client</name>
+  <name>Chat Example Client</name>
   <packaging>jar</packaging>
-  <version>0.1-SNAPSHOT</version>
 
   <dependencies>
     <!-- Compile time dependencies -->

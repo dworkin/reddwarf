@@ -13,11 +13,11 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-tutorial-server</artifactId>
-  <name>sgs-tutorial-server</name>
+  <name>Project Darkstar Server Tutorial</name>
   <packaging>jar</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <url>http://www.projectdarkstar.com</url>
+
 
   <dependencies>
     <dependency>
@@ -25,7 +25,6 @@
       <artifactId>sgs-server</artifactId>
       <scope>provided</scope>
     </dependency>
-
   </dependencies>
 
   <build>
@@ -54,6 +53,13 @@
 	    </configuration>
 	  </execution>
 	</executions>
+      </plugin>
+
+      <!-- Activate the resource bundle plugin to include the license
+	   file in the jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
 
     </plugins>

@@ -14,11 +14,10 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-javadoc</artifactId>
-  <name>sgs-server-javadoc</name>
+  <name>Project Darkstar Server Javadoc</name>
   <packaging>jar</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <url>http://www.projectdarkstar.com</url>
 
 
   <dependencies>
@@ -36,7 +35,7 @@
     <!-- Included in the classpath since it is not a
 	 transitive dependency -->
     <dependency>
-      <groupId>berkeleydb</groupId>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>je</artifactId>
       <scope>provided</scope>
     </dependency>

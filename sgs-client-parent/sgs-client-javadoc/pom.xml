@@ -14,12 +14,10 @@
     <version>0.9.7-SNAPSHOT</version>
   </parent>
 
-  <groupId>com.projectdarkstar.client</groupId>
   <artifactId>sgs-client-javadoc</artifactId>
-  <name>sgs-client-javadoc</name>
+  <name>Project Darkstar Client Javadoc</name>
   <packaging>jar</packaging>
-  <version>0.9.7-SNAPSHOT</version>
-
+  <url>http://www.projectdarkstar.com</url>
 
   <dependencies>
     <dependency>

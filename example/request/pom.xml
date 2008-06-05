@@ -8,12 +8,12 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>0.1</version>
+    <version>1</version>
   </parent>
 
-  <groupId>com.projectdarkstar.example</groupId>
+  <groupId>com.projectdarkstar.example.request</groupId>
   <artifactId>request</artifactId>
-  <name>request</name>
+  <name>Request Example</name>
   <packaging>pom</packaging>
   <version>0.1-SNAPSHOT</version>
 
