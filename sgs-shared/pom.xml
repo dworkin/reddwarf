@@ -74,14 +74,7 @@
 	<executions>
 	  <execution>
 	    <id>include-bsd-license</id>
-	    <goals>
-	      <goal>process</goal>
-	    </goals>
-	    <configuration>
-	      <resourceBundles>
-		<resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
-	      </resourceBundles>
-	    </configuration>
+	    <phase>generate-resources</phase>
 	  </execution>
 	</executions>
       </plugin>

@@ -108,6 +108,46 @@
 	  </executions>
 	</plugin>
 
+	<!-- The resource bundle executions should be activated in modules
+	     that produce jars that require the license to be bundled
+	     in the jar -->
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <executions>
+	    <execution>
+	      <id>include-gpl-license</id>
+	      <goals>
+		<goal>process</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<resourceBundles>
+		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl:${sgs-jar-resources-gpl.version}</resourceBundle>
+		</resourceBundles>
+		<properties>
+		  <projectName>Project Darkstar Server</projectName>
+		</properties>
+	      </configuration>
+	    </execution>
+	    <execution>
+	      <id>include-bsd-license</id>
+	      <goals>
+		<goal>process</goal>
+	      </goals>
+	      <phase></phase>
+	      <configuration>
+		<resourceBundles>
+		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
+		</resourceBundles>
+		<properties>
+		  <projectName>Project Darkstar Client</projectName>
+		</properties>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+
 
       </plugins>
       
@@ -157,6 +197,7 @@
 	  </dependency>
 	</dependencies>
       </plugin>
+
       
     </plugins>
 

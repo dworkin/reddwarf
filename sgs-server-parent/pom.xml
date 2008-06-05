@@ -48,13 +48,8 @@
 	  <executions>
 	    <execution>
 	      <id>include-gpl-license</id>
-	      <goals>
-		<goal>process</goal>
-	      </goals>
+	      <phase>generate-resources</phase>
 	      <configuration>
-		<resourceBundles>
-		  <resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-gpl:${sgs-jar-resources-gpl.version}</resourceBundle>
-		</resourceBundles>
 		<properties>
 		  <projectName>Project Darkstar Server</projectName>
 		</properties>
