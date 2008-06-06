@@ -32,39 +32,52 @@
   </dependencies>
 
 
-  <build>
-    <plugins>
+  <profiles>
 
-      <!-- The antrun plugin is configured to run the app outside
-	   of the build lifecycle via the command line.
-	   However, the lifecycle must be run up through the generate-test-resources
-	   phase for the necessary items to be in place for the app to run.
-	   In order to run, use the following command:
-	   mvn generate-test-resources antrun:run -->
-      <plugin>
-        <artifactId>maven-antrun-plugin</artifactId>
-	<configuration>
-	  <tasks>
-	    <java classname="com.sun.sgs.example.request.client.WandererClient"
-		  fork="true">
-	      <jvmarg line="${run.jvm.args}"/>
-	      <sysproperty key="java.util.logging.config.file"
-			   file="${run.logging}"/>
-	      <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
-			   value="${wanderer.host}"/>
-	      <sysproperty key="com.sun.sgs.example.request.client.wanderer.clients"
-			   value="${wanderer.clients}"/>
-	      <classpath>
-		<path refid="maven.test.classpath"/>
-	      </classpath>
-	    </java>
-	  </tasks>
-	</configuration>
-      </plugin>
-      
-    </plugins>
 
-  </build>
+    <!-- The test-run profile enables the antrun plugin
+	 to run the application in the process-test-resources
+	 phase of the lifecycle
+	 In order to run, use the following command:
+	 mvn process-test-resources -Ptest-run -->
+    <profile>
+      <id>test-run</id>
+      <build>
+	<plugins>
+	  <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+	    <executions>
+	      <execution>
+		<id>test-run</id>
+		<phase>process-test-resources</phase>
+		<goals>
+		  <goal>run</goal>
+		</goals>
+		<configuration>
+		  <tasks>
+		    <java classname="com.sun.sgs.example.request.client.WandererClient"
+			  fork="true">
+		      <jvmarg line="${run.jvm.args}"/>
+		      <sysproperty key="java.util.logging.config.file"
+				   file="${run.logging}"/>
+		      <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
+				   value="${wanderer.host}"/>
+		      <sysproperty key="com.sun.sgs.example.request.client.wanderer.clients"
+				   value="${wanderer.clients}"/>
+		      <classpath>
+			<path refid="maven.test.classpath"/>
+		      </classpath>
+		    </java>
+		  </tasks>
+		</configuration>
+	      </execution>
+	    </executions>
+	  </plugin>
+	</plugins>
+      </build>
+    </profile>
+
+  </profiles>
 
   <properties>
     <run.jvm.args></run.jvm.args>
