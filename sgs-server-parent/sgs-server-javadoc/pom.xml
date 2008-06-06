@@ -4,10 +4,6 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- The sgs-server-javadoc module produces two artifacts intended for consumption:
-       A jar of javadoc generated documentation for all sources
-       A jar of javadoc generated documentation for the sgs-server-api -->
-
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
@@ -18,6 +14,11 @@
   <name>Project Darkstar Server Javadoc</name>
   <packaging>jar</packaging>
   <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-server-javadoc module produces two artifacts intended for consumption:
+    A jar of javadoc generated documentation for all sources
+    A jar of javadoc generated documentation for the sgs-server-api
+  </description>
 
 
   <dependencies>

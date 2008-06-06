@@ -16,6 +16,9 @@
   <artifactId>chat-server</artifactId>
   <name>Chat Example Server</name>
   <packaging>jar</packaging>
+  <description>
+    Server module for the Project Darkstar Chat example.
+  </description>
 
 
   <dependencies>

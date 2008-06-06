@@ -16,6 +16,9 @@
   <name>Request Example</name>
   <packaging>pom</packaging>
   <version>0.1-SNAPSHOT</version>
+  <description>
+    Parent POM for the Project Darkstar request example.
+  </description>
 
   <modules>
     <module>request-client</module>

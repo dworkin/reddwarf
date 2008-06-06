@@ -4,9 +4,6 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- The sgs-shared module is a standard jar package that includes
-       classes used by both the sgs-server and sgs-client packages -->
-
   <!-- Inherit from the global SGS super POM -->
   <parent>
     <groupId>com.projectdarkstar</groupId>
@@ -21,6 +18,10 @@
   <version>0.1</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-shared module is a standard jar package that includes
+    classes used by both the sgs-server and sgs-client packages
+  </description>
 
   <dependencies>
     <dependency>

@@ -4,10 +4,6 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- The sgs-client-api package produces a jar artifact which includes
-       only the core classes required at compile time to develop
-       a darkstar client application -->
-
   <parent>
     <groupId>com.projectdarkstar.client</groupId>
     <artifactId>sgs-client-parent</artifactId>
@@ -18,6 +14,11 @@
   <name>Project Darkstar Client API</name>
   <packaging>jar</packaging>
   <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-client-api package produces a jar artifact which includes
+    only the core classes required at compile time to develop
+    a darkstar client application
+  </description>
 
   <build>
     <plugins>

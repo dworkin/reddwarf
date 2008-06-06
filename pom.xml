@@ -4,14 +4,16 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- This is the super POM inherited by all sgs modules
-       It defines settings common to all projects -->
   <groupId>com.projectdarkstar</groupId>
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
   <version>1</version>
   <url>http://www.projectdarkstar.com</url>
+  <description>
+    This is the super POM inherited by all sgs modules
+    It defines settings common to all projects
+  </description>
 
 
   <build>

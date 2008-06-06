@@ -4,10 +4,6 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- The sgs-tutorial-client-dist generates a zip artifact of 
-       the files intended to be packaged as the tutorial component
-       in the main sgs-client-dist distribution -->
-
   <parent>
     <groupId>com.projectdarkstar.client</groupId>
     <artifactId>sgs-client-parent</artifactId>
@@ -17,6 +13,11 @@
   <artifactId>sgs-tutorial-client-dist</artifactId>
   <name>Project Darkstar Client Tutorial Distribution</name>
   <packaging>pom</packaging>
+  <description>
+    The sgs-tutorial-client-dist generates a zip artifact of 
+    the files intended to be packaged as the tutorial component
+    in the main sgs-client-dist distribution
+  </description>
 
   <dependencies>
     <dependency>

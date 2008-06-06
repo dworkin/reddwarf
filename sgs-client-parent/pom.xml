@@ -18,6 +18,9 @@
   <version>0.9.7-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
+  <description>
+    Parent POM for the Project Darkstar Client
+  </description>
 
   <modules>
     <module>sgs-client</module>

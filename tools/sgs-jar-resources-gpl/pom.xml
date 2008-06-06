@@ -16,6 +16,11 @@
   <name>Project Darkstar Server GPL License Bundle</name>
   <packaging>jar</packaging>
   <version>1.0</version>
+  <description>
+    Resource bundle of GPL License files for Project Darkstar.
+    This package should be included using the remote-resources
+    plugin to bundle a GPL license file into a jar.
+  </description>
 
   <build>
 

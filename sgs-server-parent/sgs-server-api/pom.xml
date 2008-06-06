@@ -4,10 +4,6 @@
                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- The sgs-server-api package produces a jar artifact which
-       includes only the classes intended to be exposed for
-       developing applications -->
-
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
@@ -18,6 +14,11 @@
   <name>Project Darkstar Server API</name>
   <packaging>jar</packaging>
   <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-server-api package produces a jar artifact which
+    includes only the classes intended to be exposed for
+    developing applications
+  </description>
 
   <build>
     <plugins>

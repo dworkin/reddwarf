@@ -18,13 +18,9 @@
   <version>0.9.7-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
-
-  <licenses>
-    <license>
-      <name>GNU General Public License v2</name>
-      <url>http://www.gnu.org/licenses/gpl-2.0.txt</url>
-    </license>
-  </licenses>
+  <description>
+    Parent POM of the Project Darkstar Server
+  </description>
 
   <modules>
     <module>sgs-server</module>

@@ -16,6 +16,9 @@
   <name>Chat Example</name>
   <packaging>pom</packaging>
   <version>0.1-SNAPSHOT</version>
+  <description>
+    Parent POM for the Project Darkstar Chat example.
+  </description>
 
   <modules>
     <module>chat-client</module>

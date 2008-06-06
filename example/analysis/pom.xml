@@ -16,6 +16,9 @@
   <name>Analysis Example</name>
   <packaging>jar</packaging>
   <version>0.1-SNAPSHOT</version>
+  <description>
+    Analysis example application
+  </description>
 
   <build>
 

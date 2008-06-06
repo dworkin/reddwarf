@@ -16,6 +16,10 @@
   <name>Project Darkstar Build Utilities</name>
   <packaging>jar</packaging>
   <version>1.0</version>
+  <description>
+    Build utilities used by the Project Darkstar build process.
+    Includes custom checkstyle classes and configuration files.
+  </description>
 
   <dependencies>
     <dependency>

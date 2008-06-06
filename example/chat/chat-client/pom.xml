@@ -16,6 +16,9 @@
   <artifactId>chat-client</artifactId>
   <name>Chat Example Client</name>
   <packaging>jar</packaging>
+  <description>
+    Client module for the Project Darkstar Chat example.
+  </description>
 
   <dependencies>
     <!-- Compile time dependencies -->

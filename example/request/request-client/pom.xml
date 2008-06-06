@@ -16,6 +16,9 @@
   <artifactId>request-client</artifactId>
   <name>Request Example Client</name>
   <packaging>jar</packaging>
+  <description>
+    Server module for the Project Darkstar request example.
+  </description>
 
   <dependencies>
     <!-- Compile time dependencies -->
