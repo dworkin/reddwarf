@@ -226,6 +226,7 @@
 
   <properties>
     <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+    <sgs-shared.version>0.1</sgs-shared.version>
 
     <run.jvm.args>-server -XX:+UseParallelGC -XX:+UseFastAccessorMethods -XX:+AggressiveOpts -XX:+MaxFDLimit -XX:NewSize=512m -Xms700m -Xmx2g</run.jvm.args>
 
