@@ -39,6 +39,10 @@
 @set native_dir="%sgshome%\lib\bdb\win32-x86"
 
 @rem Check that the Berkeley DB libraries have been installed properly
+@if not exist "%sgshome%\lib\bdb\db.jar" (
+@echo The db.jar file needs to be installed in %sgshome%\lib\bdb
+@goto end
+)
 @if not exist "%native_dir%" (
 @echo The Berkeley DB native library directory was not found: %native_dir%
 @goto end

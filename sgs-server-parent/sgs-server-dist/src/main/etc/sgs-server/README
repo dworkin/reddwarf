@@ -62,12 +62,11 @@ from:
 
   http://www.oracle.com/database/berkeley-db/db/index.html
 
-The db-${bdb.version}.jar JAR file should be copied to the lib subdirectory.
-The subdirectories containing the native libraries for
+The db.jar and the subdirectories containing the native libraries for
 the platforms of interest should be copied to the lib/bdb subdirectory.
 If using files compiled separately, the Berkeley DB JAR file should be
-copied to the lib subdirectory, and the natives libraries for the
-current platform should be copied to proper lib/bdb subdirectory as specified in
+copied to the lib/bdb subdirectory, and the natives libraries for the
+current platform should be copied to proper subdirectory as specified in
 the startup scripts.
 
 This distribution requires Apache MINA, version ${org.apache.mina.version}, which may be

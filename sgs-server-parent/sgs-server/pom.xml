@@ -52,6 +52,26 @@
   <build>
     <plugins>
 
+      <!-- We need to customize the manifest for this particular jar
+	   The Class-Path entry is tweaked so that the db.jar does not
+	   contain a version number and is in a subdirectory.
+	   Life would be better if we didn't have to do this -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>false</addClasspath>
+	      <mainClass>com.sun.sgs.impl.kernel.Kernel</mainClass>
+            </manifest>
+	    <manifestEntries>
+	      <Class-Path>bdb/db.jar sgs-shared-${sgs-shared.version}.jar</Class-Path>
+	    </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+
       <!-- Always attach a sources jar (with the assembly plugin)
 	   Normally the maven-source-plugin should be used for this.
 	   However, that plugin currently does not attach classifier
@@ -128,7 +148,7 @@
     </plugins>
 
     <!-- Activate resource filtering so the sgs.version file
-	   can get the correct version replaced -->
+	 can get the correct version replaced -->
     <resources>
       <resource>
         <directory>src/main/resources</directory>

@@ -109,7 +109,10 @@ esac
 native_dir="$sgshome/lib/bdb/$platform"
 
 # Check that the Berkeley DB libraries have been installed properly
-if [ ! -d "$native_dir" ]; then
+if [ ! -f "$sgshome/lib/bdb/db.jar" ]; then
+    echo The db.jar file needs to be installed in $sgshome/lib/bdb
+    exit 1;
+elif [ ! -d "$native_dir" ]; then
     echo The Berkeley DB native library directory was not found: $native_dir
     exit 1;
 fi
