@@ -64,5 +64,10 @@
     </repository>
   </repositories>
 
+  <properties>
+    <sgs.version>${version}</sgs.version>
+    <sgs-shared.version>0.1</sgs-shared.version>
+  </properties>
+
 
 </project>

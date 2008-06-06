@@ -111,7 +111,7 @@
 
     <!-- This is here just to get an empty bdb directory in lib -->
     <fileSet>
-       <directory>target/</directory>
+       <directory>${project.build.directory}</directory>
        <outputDirectory>sgs-server-${sgs.version}/lib/bdb</outputDirectory>
        <excludes>
            <exclude>**/*</exclude>

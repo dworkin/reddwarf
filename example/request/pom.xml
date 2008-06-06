@@ -65,4 +65,8 @@
     </repository>
   </repositories>
 
+  <properties>
+    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+  </properties>
+
 </project>
