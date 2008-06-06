@@ -15,12 +15,6 @@
 
 
   <build>
-    <!-- Define these so that the build target can be overridden
-	 on the command line. example:
-	 mvn package -Pbuild-targets -Dbuild.root=/tmp -->
-    <directory>${build.root.single}/target</directory>
-    <outputDirectory>${build.root.single}/target/classes</outputDirectory>
-    <testOutputDirectory>${build.root.single}/target/test-classes</testOutputDirectory>
 
     <!-- This section defines global configuration of plugins
 	 These plugin settings are not activated in child projects
@@ -201,16 +195,6 @@
     </plugins>
 
   </build>
-
-  
-  <!-- Define these so that the build target can be overridden
-       on the command line. example:
-       mvn site -Pbuild-targets -Dbuild.root=/tmp -->
-  <reporting>
-    <outputDirectory>${build.root.single}/target/site</outputDirectory>
-  </reporting>
-
-
 
   <!-- Library of dependencies used in any sub module of this project
        Define versions of dependencies in this file only to maintain
@@ -485,18 +469,6 @@
 	</dependency>
       </dependencies>
     </profile>
-
-
-    <!-- This profile will cause the build targets to be built outside
-	 of the source tree.  By default they will go in the /tmp
-	 but this can be overridden by specifying
-	 the build.root property on the command line -->
-    <profile>
-      <id>build-targets</id>
-      <properties>
-	<build.root.single>${build.root}/${artifactId}</build.root.single>
-      </properties>
-    </profile>
     
   </profiles>
 
@@ -550,15 +522,9 @@
     <test.max.heap>-Xmx1g</test.max.heap>
     <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
 
-    <run.javapath>${build.root.single}/target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
+    <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</run.bdb.env>
     <run.bdb.cache.size>1000000</run.bdb.cache.size>
-
-    
-    <!-- These properties are defined to allow customization of the build target
-	 directories -->
-    <build.root>${basedir}</build.root>
-    <build.root.single>${build.root}</build.root.single>
 
   </properties>
 
