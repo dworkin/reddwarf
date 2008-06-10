@@ -104,6 +104,8 @@
       <directory>src/main/etc/sgs-server</directory>
       <excludes>
         <exclude>README</exclude>
+        <exclude>NOTICE.txt</exclude>
+        <exclude>NOTICE-gpl</exclude>
         <exclude>sgs.sh</exclude>
       </excludes>
       <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
@@ -121,8 +123,9 @@
     
   </fileSets>
   
-  <!-- Filter README files to replace parameterized version numbers -->
+
   <files>
+    <!-- Filter README files to replace parameterized version numbers -->
     <file>
       <source>src/main/etc/README</source>
       <outputDirectory>.</outputDirectory>
@@ -131,6 +134,20 @@
     </file>
     <file>
       <source>src/main/etc/sgs-server/README</source>
+      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+
+    <!-- Filter the NOTICE files -->
+    <file>
+      <source>src/main/etc/sgs-server/NOTICE.txt</source>
+      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+    <file>
+      <source>src/main/etc/sgs-server/NOTICE-gpl</source>
       <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
       <filtered>true</filtered>
       <fileMode>644</fileMode>

@@ -66,14 +66,32 @@
       <directory>src/main/etc/sgs-client</directory>
       <excludes>
 	<exclude>README</exclude>
+	<exclude>LICENSE</exclude>
+	<exclude>NOTICE.txt</exclude>
       </excludes>
       <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
     </fileSet>
   </fileSets>
-  <!-- Filter README with parameterized version numbers -->
+
+
   <files>
+    <!-- Filter README with parameterized version numbers -->
     <file>
       <source>src/main/etc/sgs-client/README</source>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+
+    <!-- Filter LICENSE and NOTICE with current year -->
+    <file>
+      <source>src/main/etc/sgs-client/LICENSE</source>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+    <file>
+      <source>src/main/etc/sgs-client/NOTICE.txt</source>
       <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
       <filtered>true</filtered>
       <fileMode>644</fileMode>

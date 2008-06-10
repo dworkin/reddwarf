@@ -1,4 +1,4 @@
-Copyright ${projectTimespan} Sun Microsystems, Inc.
+Copyright ${projectYear} Sun Microsystems, Inc.
 
 This file is part of #if ($projectName)$projectName#else${project.name}#end.
 

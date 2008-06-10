@@ -132,7 +132,7 @@
 	    </property>
 	    <property>
 	      <name>com.sun.sgs.impl.service.data.store.db.bdb.cache.size</name>
-	      <value>${run.bdb.cache.size}</value>
+	      <value>${test.bdb.cache.size}</value>
 	    </property>
 	  </systemProperties>
 	  <argLine>${test.jvm.args} -Djava.library.path=${run.javapath}</argLine>

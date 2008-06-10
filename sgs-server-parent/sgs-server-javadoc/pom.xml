@@ -40,7 +40,6 @@
       <artifactId>je</artifactId>
       <scope>provided</scope>
     </dependency>
-
   </dependencies>
 
 
@@ -109,6 +108,8 @@
 		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
 		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
+	      <show>package</show>
+	      <author>false</author>
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
@@ -125,6 +126,7 @@
                 Inc. All rights reserved</font>]]>
 	      </bottom>
 	      <finalName>all</finalName>
+	      <subpackages>com.sun.sgs</subpackages>
 	      <outputDirectory>${project.build.directory}/all-docs</outputDirectory>
 	    </configuration>
 	  </execution>
@@ -139,6 +141,8 @@
 		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
 		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
+	      <show>public</show>
+	      <author>false</author>
 	      <quiet>true</quiet>
 	      <attach>false</attach>
 	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>

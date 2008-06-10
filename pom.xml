@@ -116,6 +116,11 @@
 	<plugin>
 	  <groupId>org.apache.maven.plugins</groupId>
 	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <configuration>
+	    <properties>
+	      <projectYear>${projectYear}</projectYear>
+	    </properties>
+	  </configuration>
 	  <executions>
 	    <execution>
 	      <id>include-gpl-license</id>
@@ -492,6 +497,8 @@
        across all children POMS -->
   <properties>
     
+    <projectYear>2008</projectYear>
+    
     <!-- These two values should be overridden by children POMs
 	 The reason for this is so that it is not necessary to do a
 	 new release of this POM every time there is a new release
@@ -523,10 +530,10 @@
     <test.assertions>-ea:com.sun.sgs...</test.assertions>
     <test.max.heap>-Xmx1g</test.max.heap>
     <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
+    <test.bdb.cache.size>1000000</test.bdb.cache.size>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment</run.bdb.env>
-    <run.bdb.cache.size>1000000</run.bdb.cache.size>
 
   </properties>
 

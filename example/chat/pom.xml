@@ -68,7 +68,7 @@
 
   <properties>
     <sgs.version>0.9.7-SNAPSHOT</sgs.version>
-    <sgs-shared.version>0.1</sgs-shared.version>
+    <sgs-shared.version>1.0</sgs-shared.version>
   </properties>
 
 </project>

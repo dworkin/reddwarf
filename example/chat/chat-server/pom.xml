@@ -73,7 +73,8 @@
       </properties>
     </profile>
 
-    <!-- Unbind the deletion of the datastore to the generate-test-resources phase
+    <!-- Disable the deletion of the datastore
+	 by unbinding it from the lifecycle.
 	 Enabling this profile will keep the datastore from a previous
 	 execution if it exists.  example:
 	 mvn process-test-resources -Psingle-node-server,retain-datastore -->
