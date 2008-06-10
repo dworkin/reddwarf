@@ -1,0 +1,194 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.projectdarkstar.server</groupId>
+    <artifactId>sgs-server-parent</artifactId>
+    <version>0.9.7-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>sgs-server</artifactId>
+  <name>Project Darkstar Server</name>
+  <packaging>jar</packaging>
+  <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-server module is a standard jar package of sgs classes
+    used exclusively by the server
+  </description>
+
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-shared</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <artifactId>db</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <artifactId>db-binaries</artifactId>
+      <type>zip</type>
+    </dependency>
+
+    <!-- Included as compile time dependency only unless
+	 BDB Java edition profile is activated (config from SGS super POM) -->
+    <dependency>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <artifactId>je</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+
+  <build>
+    <plugins>
+
+      <!-- We need to customize the manifest for this particular jar
+	   The Class-Path entry is tweaked so that the db.jar does not
+	   contain a version number and is in a subdirectory.
+	   Life would be better if we didn't have to do this -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>false</addClasspath>
+	      <mainClass>com.sun.sgs.impl.kernel.Kernel</mainClass>
+            </manifest>
+	    <manifestEntries>
+	      <Class-Path>bdb/db.jar sgs-shared-${sgs-shared.version}.jar</Class-Path>
+	    </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- Always attach a sources jar (with the assembly plugin)
+	   Normally the maven-source-plugin should be used for this.
+	   However, that plugin currently does not attach classifier
+	   artifacts that are consumable by other modules in the reactor
+	   (i.e. the javadoc module).  Using this as a workaround -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-assembly-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <phase>package</phase>
+	    <goals>
+              <goal>attached</goal>
+	    </goals>
+	    <configuration>
+	      <descriptors>
+		<descriptor>src/main/assembly/sources.xml</descriptor>
+              </descriptors>
+	      <attach>true</attach>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- The berkeleydb binary package must be retrieved and unpacked
+	   Before the test phase so that they are available during
+	   runtime of the unit tests
+	   Execution activated from SGS super POM -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-bdb-binaries</id>
+	    <phase>generate-test-resources</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Configure the surefire plugin (which runs the unit tests)
+	   to feed the appropriate java.library.path which points to
+	   the extracted berkeleydb binary folder for the appropriate
+	   platform. -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+	  <systemProperties>
+	    <property>
+	      <name>java.library.path</name>
+	      <value>${run.javapath}</value>
+	    </property>
+	    <property>
+	      <name>com.sun.sgs.impl.service.data.store.db.environment.class</name>
+	      <value>${run.bdb.env}</value>
+	    </property>
+	    <property>
+	      <name>com.sun.sgs.impl.service.data.store.db.bdb.cache.size</name>
+	      <value>${test.bdb.cache.size}</value>
+	    </property>
+	  </systemProperties>
+	  <argLine>${test.jvm.args} -Djava.library.path=${run.javapath}</argLine>
+        </configuration>
+      </plugin>
+
+      <!-- Activate the resource bundle plugin to include the license
+	   file in the jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+      </plugin>
+
+    </plugins>
+
+    <!-- Activate resource filtering so the sgs.version file
+	 can get the correct version replaced -->
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+  </build>
+
+
+  <reporting>
+    <plugins>
+
+      <!-- Configure checkstyle to run during site lifecycle -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<configuration>
+	  <linkXRef>false</linkXRef>
+	  <consoleOutput>true</consoleOutput>
+	  <enableRulesSummary>false</enableRulesSummary>
+	  <configLocation>${checkstyle.config}</configLocation>
+	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
+	  <packageNamesLocation>${checkstyle.packageNames}</packageNamesLocation>
+        </configuration>
+      </plugin>
+
+      <!-- Configure findbugs to run during site lifecycle -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+	<configuration>
+	  <excludeFilterFile>src/main/etc/findbugs-exclude.xml</excludeFilterFile>
+	</configuration>
+      </plugin>
+
+
+    </plugins>
+  </reporting>
+
+
+
+</project>

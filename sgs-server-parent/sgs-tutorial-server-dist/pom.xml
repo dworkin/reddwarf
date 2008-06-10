@@ -1,0 +1,57 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.projectdarkstar.server</groupId>
+    <artifactId>sgs-server-parent</artifactId>
+    <version>0.9.7-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>sgs-tutorial-server-dist</artifactId>
+  <name>Project Darkstar Server Tutorial Distribution</name>
+  <packaging>pom</packaging>
+  <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-tutorial-server-dist generates a zip artifact of the
+    files intended to be the tutorial component of the sgs-server-dist
+    distribution
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-tutorial-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-tutorial-server</artifactId>
+      <classifier>sources</classifier>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <configuration>
+          <descriptors>
+            <descriptor>src/main/assembly/dist.xml</descriptor>
+          </descriptors>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>attached</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+
+</project>

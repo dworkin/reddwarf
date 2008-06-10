@@ -1,0 +1,207 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.projectdarkstar.server</groupId>
+    <artifactId>sgs-server-parent</artifactId>
+    <version>0.9.7-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>sgs-server-javadoc</artifactId>
+  <name>Project Darkstar Server Javadoc</name>
+  <packaging>jar</packaging>
+  <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-server-javadoc module produces two artifacts intended for consumption:
+    A jar of javadoc generated documentation for all sources
+    A jar of javadoc generated documentation for the sgs-server-api
+  </description>
+
+
+  <dependencies>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-shared</artifactId>
+      <classifier>sources</classifier>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server</artifactId>
+      <classifier>sources</classifier>
+    </dependency>
+
+    <!-- Included in the classpath since it is not a
+	 transitive dependency -->
+    <dependency>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <artifactId>je</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+
+  <build>
+    <plugins>
+
+      <!-- Retrieve the sources artifacts of each of the two
+	   core source packages (sgs-shared, sgs-server)
+	   and unpack them -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>directory-inline</goal>
+            </goals>
+            <configuration>
+	      <descriptors>
+		<descriptor>src/main/assembly/all-sources.xml</descriptor>
+              </descriptors>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Configure buildnumber to get a timestamp available to the pom -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>buildnumber-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>validate</phase>
+            <goals>
+              <goal>create</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+	  <format>{0,date,yyyy-MM-dd HH:mm:ss}</format>
+          <items>
+            <item>timestamp</item>
+          </items>
+          <doCheck>false</doCheck>
+          <doUpdate>false</doUpdate>
+        </configuration>
+      </plugin>
+
+
+      <!-- Generate two javadoc artifacts
+	   One aggregating all classes
+	   One for the core server-api -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-javadoc-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>all-javadoc</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <links>
+		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
+		<link>http://mina.apache.org/report/1.1/apidocs/</link>
+              </links>
+	      <show>package</show>
+	      <author>false</author>
+	      <quiet>true</quiet>
+	      <attach>false</attach>
+	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <windowtitle>Project Darkstar Server ${project.version} API</windowtitle>
+	      <doctitle>Project Darkstar Server ${project.version} API</doctitle>
+	      <footer>
+		<![CDATA[<font size="-1">Project Darkstar, Version
+                ${project.version}<br/>${buildNumber}</font>]]>
+	      </footer>
+	      <bottom>
+		<![CDATA[<font size="-1">Copyright &copy; 
+                {inceptionYear}-{currentYear} Sun Microsystems,
+                Inc. All rights reserved</font>]]>
+	      </bottom>
+	      <finalName>all</finalName>
+	      <subpackages>com.sun.sgs</subpackages>
+	      <outputDirectory>${project.build.directory}/all-docs</outputDirectory>
+	    </configuration>
+	  </execution>
+
+	  <execution>
+	    <id>api-javadoc</id>
+	    <goals>
+              <goal>jar</goal>
+	    </goals>
+	    <configuration>
+	      <links>
+		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
+		<link>http://mina.apache.org/report/1.1/apidocs/</link>
+              </links>
+	      <show>public</show>
+	      <author>false</author>
+	      <quiet>true</quiet>
+	      <attach>false</attach>
+	      <sourcepath>${project.build.directory}/${project.build.finalName}-all-sources.dir</sourcepath>
+	      <overview>${project.build.directory}/${project.build.finalName}-all-sources.dir/overview.html</overview>
+	      <windowtitle>Project Darkstar Server ${project.version} External API</windowtitle>
+	      <doctitle>Project Darkstar Server ${project.version} External API</doctitle>
+	      <footer>
+		<![CDATA[<font size="-1">Project Darkstar, Version
+                ${project.version}<br/>${buildNumber}</font>]]>
+	      </footer>
+	      <bottom>
+		<![CDATA[<font size="-1">Copyright &copy; 
+                {inceptionYear}-{currentYear} Sun Microsystems,
+                Inc. All rights reserved</font>]]>
+	      </bottom>
+	      <finalName>api</finalName>
+	      <subpackages>com.sun.sgs.app:com.sun.sgs.protocol.simple</subpackages>
+	      <outputDirectory>${project.build.directory}/api-docs</outputDirectory>
+	    </configuration>
+	  </execution>
+
+	</executions>
+      </plugin>
+
+
+
+      <!-- Attach each of the above generated javadoc jars with appropriate classifiers -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-artifacts</id>
+            <phase>package</phase>
+            <goals>
+              <goal>attach-artifact</goal>
+            </goals>
+            <configuration>
+              <artifacts>
+                <artifact>
+                  <file>${project.build.directory}/all-javadoc.jar</file>
+                  <type>jar</type>
+                  <classifier>all</classifier>
+                </artifact>
+		<artifact>
+                  <file>${project.build.directory}/api-javadoc.jar</file>
+                  <type>jar</type>
+                  <classifier>api</classifier>
+                </artifact>
+
+              </artifacts>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+
+    </plugins>
+  </build>
+
+
+</project>

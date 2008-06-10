@@ -1,0 +1,28 @@
+<!-- This assembly unpacks the source dependencies
+     into a directory.  Normally the maven-dependency-plugin
+     is suitable for this but it currently does not resolve
+     classified artifacts in the reactor correctly.  Using this as
+     a workaround for now -->
+<assembly>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <id>all-sources</id>
+  <formats>
+    <format>dir</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include the sources jars-->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-client:jar:sources</include>
+	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
+      </includes>
+      <unpack>true</unpack>
+      <outputDirectory></outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
+  </dependencySets>
+  
+</assembly>

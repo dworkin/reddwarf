@@ -1,0 +1,51 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Inherit from the global SGS super POM -->
+  <parent>
+    <groupId>com.projectdarkstar</groupId>
+    <artifactId>sgs</artifactId>
+    <version>1</version>
+  </parent>
+
+  <groupId>com.projectdarkstar.tools.build</groupId>
+  <artifactId>sgs-jar-resources-bsd</artifactId>
+  <name>Project Darkstar BSD License Bundle</name>
+  <packaging>jar</packaging>
+  <version>1.0</version>
+  <description>
+    Resource bundle of BSD License files for Project Darkstar.
+    This package should be included using the remote-resources
+    plugin to bundle a BSD license file into a jar.
+  </description>
+
+  <build>
+
+    <plugins>
+      <!-- Bundle the resources as remote resources -->
+      <plugin>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <goals>
+	      <goal>bundle</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+    </plugins>
+  </build>
+  
+  <repositories>
+    <repository>
+      <id>sunlabs.maven</id>
+      <name>Sun Labs Maven Repository</name>
+      <url>http://sunlabs.east.sun.com/darkstar/maven</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+</project>

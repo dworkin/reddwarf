@@ -1,0 +1,244 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Inherit from the global SGS super POM -->
+  <parent>
+    <groupId>com.projectdarkstar</groupId>
+    <artifactId>sgs</artifactId>
+    <version>1</version>
+  </parent>
+
+  <groupId>com.projectdarkstar.example.analysis</groupId>
+  <artifactId>analysis</artifactId>
+  <name>Analysis Example</name>
+  <packaging>jar</packaging>
+  <version>0.1-SNAPSHOT</version>
+  <description>
+    Analysis example application
+  </description>
+
+  <build>
+
+    <plugins>
+
+      <!-- Always attach a sources jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-source-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Always attach a javadoc jar where applicable -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-javadoc-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-javadocs</id>
+	  </execution>
+	</executions>
+      </plugin>
+
+
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+	<executions>
+	  
+	  <!-- Cleans out the directories used to run the app
+	       Runs during the validate phase -->
+	  <execution>
+	    <id>clean-datastore</id>
+	    <phase>generate-test-resources</phase>
+	    <goals>
+              <goal>run</goal>
+            </goals>
+	    <configuration>
+              <tasks>
+		<delete dir="${project.build.directory}/logs"/>
+		<delete dir="${project.build.directory}/data"/>
+		<delete dir="${project.build.directory}/dsdb/"/>
+              </tasks>
+            </configuration>
+	  </execution>
+
+	  <!-- Builds the directories necessary for running the app
+	       with the antrun configuration.  Runs in the
+	       generate-test-resources phase -->
+          <execution>
+            <id>make-datastore</id>
+            <phase>generate-test-resources</phase>
+	    <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+		<mkdir dir="${project.build.directory}/logs"/>
+		<mkdir dir="${project.build.directory}/data"/>
+                <mkdir dir="${project.build.directory}/dsdb/"/>
+              </tasks>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- The berkeleydb binary package must be retrieved and unpacked
+	   Before the test phase so that they are available during
+	   runtime of the unit tests and other executions-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-bdb-binaries</id>
+            <phase>generate-test-resources</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+
+  </build>
+
+
+  <profiles>
+
+    <!-- The test-run profile enables the antrun plugin
+	 to run the application in the process-test-resources
+	 phase of the lifecycle
+	 In order to run, use the following command:
+	 mvn process-test-resources -Ptest-run -->
+    <profile>
+      <id>test-run</id>
+      <build>
+	<plugins>
+	  <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+	    <executions>
+	      <execution>
+		<id>test-run</id>
+		<phase>process-test-resources</phase>
+		<goals>
+		  <goal>run</goal>
+		</goals>
+		<configuration>
+		  <tasks>
+		    <java classname="com.sun.sgs.impl.kernel.Kernel"
+			  fork="true">
+		      <jvmarg line="${run.jvm.args}"/>
+		      <sysproperty key="java.library.path" 
+				   file="${run.javapath}"/>
+		      <sysproperty key="java.util.logging.config.file"
+				   file="${run.logging}"/>
+		      <sysproperty key="com.sun.sgs.impl.service.data.store.db.environment.class"
+				   value="${run.bdb.env}"/>
+		      <sysproperty key="com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class"
+				   value="${analysis.data.store.class}"/>
+		      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.start"
+				   value="${analysis.data.store.server.start}"/>
+		      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.host"
+				   value="${analysis.data.store.server.host}"/>
+		      <sysproperty key="com.sun.sgs.impl.service.data.store.net.server.port"
+				   value="${analysis.data.store.server.port}"/>
+		      <sysproperty key="com.sun.sgs.analysis.tasks"
+				   value="${analysis.tasks}"/>
+		      <classpath>
+			<path refid="maven.test.classpath"/>
+		      </classpath>
+		      <arg value="src/test/properties/AnalysisApplication.properties"/>
+		    </java>
+		  </tasks>
+		</configuration>
+	      </execution>
+	    </executions>
+	  </plugin>
+	</plugins>
+      </build>
+    </profile>
+
+    <!-- Unbind the deletion of the datastore to the generate-test-resources phase
+	 Enabling this profile will keep the datastore from a previous
+	 execution if it exists.  example:
+	 mvn process-test-resources -Ptest-run,retain-datastore -->
+    <profile>
+      <id>retain-datastore</id>
+      <build>
+	<plugins>
+	  <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+	    <executions>
+	      <execution>
+		<id>clean-datastore</id>
+		<phase></phase>
+	      </execution>
+	    </executions>
+	  </plugin>
+	</plugins>
+      </build>
+    </profile>
+
+  </profiles>
+
+
+
+  <dependencies>
+    
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    
+    
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    
+    
+    <dependency>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <artifactId>db-binaries</artifactId>
+      <type>zip</type>
+    </dependency>
+  </dependencies>
+
+
+
+  <repositories>
+    <repository>
+      <id>sunlabs.maven</id>
+      <name>Sun Labs Maven Repository</name>
+      <url>http://sunlabs.east.sun.com/darkstar/maven</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+
+
+
+  <properties>
+    <sgs.version>0.9.7-SNAPSHOT</sgs.version>
+    <sgs-shared.version>1.0</sgs-shared.version>
+
+    <run.jvm.args>-server -XX:+UseParallelGC -XX:+UseFastAccessorMethods -XX:+AggressiveOpts -XX:+MaxFDLimit -XX:NewSize=512m -Xms700m -Xmx2g</run.jvm.args>
+
+    <analysis.tasks>com.sun.sgs.analysis.task.ScheduleMapPutsTask</analysis.tasks>
+    <analysis.data.store.server.start>true</analysis.data.store.server.start>
+    <analysis.data.store.server.host>localhost</analysis.data.store.server.host>
+    <analysis.data.store.server.port>44530</analysis.data.store.server.port>
+    <!-- Set this to com.sun.sgs.impl.service.data.store.net.DataStoreClient if desired -->
+    <analysis.data.store.class>com.sun.sgs.impl.service.data.store.DataStoreImpl</analysis.data.store.class>
+
+    <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
+    <run.properties.single>src/test/properties/AnalysisApplication.properties</run.properties.single>
+  </properties>
+
+</project>

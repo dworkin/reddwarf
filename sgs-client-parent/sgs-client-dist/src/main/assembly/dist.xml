@@ -1,0 +1,101 @@
+<assembly>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <formats>
+    <format>zip</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include the main sgs-client jar file
+	 Strip out the version number in the filename to 
+	 simplify usage -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-client:jar</include>
+      </includes>
+      <outputDirectory>sgs-client-${sgs.version}/lib</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
+    </dependencySet>
+
+    <!-- Include each of the jar files required at runtime for the
+	 client packages and place them in the lib directory -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.server:sgs-shared:jar</include>
+	<include>org.apache.mina:mina-core</include>
+        <include>org.slf4j:slf4j-api</include>
+        <include>org.slf4j:slf4j-jdk14</include>
+      </includes>
+      <outputDirectory>sgs-client-${sgs.version}/lib</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
+    <!-- Unpack the sgs-tutorial-client-dist tutorial component -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-tutorial-client-dist:zip</include>
+      </includes>
+      <unpack>true</unpack>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
+    <!-- Unpack the api artifact of the sgs-client-javadoc module
+	 into the doc directory -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-client-javadoc:jar:api</include>
+      </includes>
+      <unpack>true</unpack>
+      <unpackOptions>
+	<excludes>
+	  <exclude>META-INF</exclude>
+	  <exclude>META-INF/*</exclude>
+	  <exclude>options</exclude>
+	</excludes>
+      </unpackOptions>
+      <outputDirectory>sgs-client-${sgs.version}/doc</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+  </dependencySets>
+  
+  
+  <fileSets>
+    <fileSet>
+      <directory>src/main/etc/sgs-client</directory>
+      <excludes>
+	<exclude>README</exclude>
+	<exclude>LICENSE</exclude>
+	<exclude>NOTICE.txt</exclude>
+      </excludes>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+    </fileSet>
+  </fileSets>
+
+
+  <files>
+    <!-- Filter README with parameterized version numbers -->
+    <file>
+      <source>src/main/etc/sgs-client/README</source>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+
+    <!-- Filter LICENSE and NOTICE with current year -->
+    <file>
+      <source>src/main/etc/sgs-client/LICENSE</source>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+    <file>
+      <source>src/main/etc/sgs-client/NOTICE.txt</source>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+  </files>
+  
+</assembly>
