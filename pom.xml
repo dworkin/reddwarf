@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>1</version>
+  <version>2</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -391,6 +391,19 @@
 	<os>
 	  <family>mac</family>
 	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+
+    <profile>
+      <id>macosx-x86_64</id>
+      <properties>
+	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>x86_64</arch>
 	</os>
       </activation>
     </profile>
