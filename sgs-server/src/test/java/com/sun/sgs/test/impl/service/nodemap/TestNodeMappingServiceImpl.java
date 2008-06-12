@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.nodemap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.nodemap.LocalNodePolicy;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -533,6 +534,38 @@ public class TestNodeMappingServiceImpl extends TestCase {
         assertTrue("expected an id to move", foundDiff);
      }
     
+    public void testLocalNodePolicy() throws Exception {
+        // Remove what happened at setup().  I know, I know...
+        tearDown();
+        
+        // Create a new nodeMappingServer which will move an identity
+        // automatically every so often.  
+        serviceProps.setProperty(
+                "com.sun.sgs.impl.service.nodemap.policy.class", 
+                LocalNodePolicy.class.getName());
+
+        setUp(serviceProps);
+        addNodes(null);
+
+        Map<Identity, Long> idMap = new HashMap<Identity, Long>();
+        // Assign an identity on each of our nodes
+        for (int i = 0; i < NUM_NODES; i++) {
+            Identity id = new IdentityImpl("Identity" + i);
+            additionalNodes[i].getNodeMappingService().
+                                        assignNode(DataService.class, id);
+            idMap.put(id, additionalNodes[i].getNodeId());
+        }
+        
+        // Now test each identity to see where it was actually assigned
+        for (Identity id : idMap.keySet()) {
+            GetNodeTask task = new GetNodeTask(id);
+            txnScheduler.runTask(task, taskOwner);
+            long expectedNodeId = (long) idMap.get(id);
+            assertEquals(expectedNodeId, task.getNodeId());
+        }
+
+     }
+    
     public void testAssignNodeInTransaction() throws Exception {
         // TODO should API specify a transaction exception will be thrown?
         txnScheduler.runTask(new AbstractKernelRunnable() {
@@ -830,7 +863,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
         GetNodeTask task = new GetNodeTask(id);
         txnScheduler.runTask(task, taskOwner);
         Node firstNode = task.getNode();
-        TestListener firstNodeListener = nodeListenerMap.get(firstNode.getId());
+        long firstNodeId = task.getNodeId();
+        TestListener firstNodeListener = nodeListenerMap.get(firstNodeId);
         
         // Get the method, as it's not public
         Field serverImplField = 
@@ -840,9 +874,10 @@ public class TestNodeMappingServiceImpl extends TestCase {
         NodeMappingServerImpl server = 
             (NodeMappingServerImpl)serverImplField.get(nodeMappingService);
 
-        Method moveMethod = 
-                (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
-                        new Class[]{Identity.class, String.class, Node.class});
+        Method moveMethod =      
+            (NodeMappingServerImpl.class).getDeclaredMethod("mapToNewNode", 
+                new Class[]{Identity.class, String.class, 
+                            Node.class, long.class});
         moveMethod.setAccessible(true);
         
         // clear out the listeners
@@ -850,7 +885,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
             lis.clear();
         }
         // ... and invoke the method
-        moveMethod.invoke(server, id, null, firstNode);
+        moveMethod.invoke(server, id, null, firstNode, firstNodeId);
         
         txnScheduler.runTask(task, taskOwner);
         Node secondNode = task.getNode();
@@ -1015,13 +1050,16 @@ public class TestNodeMappingServiceImpl extends TestCase {
         private Identity id;
         /** The node the identity is assigned to */
         private Node node;
+        private long nodeId;
         GetNodeTask(Identity id) {
             this.id = id;
         }
         public void run() throws Exception {
             node = nodeMappingService.getNode(id);
+            nodeId = node.getId();
         }
         public Node getNode() { return node; }
+        public long getNodeId() { return nodeId; }
     }
     
     /** A test node mapping listener */

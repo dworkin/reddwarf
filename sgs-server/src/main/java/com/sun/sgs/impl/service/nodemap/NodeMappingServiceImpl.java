@@ -587,7 +587,7 @@ public class NodeMappingServiceImpl
         int tryCount = 0;
         while (tryCount < MAX_RETRY) {
             try {
-                server.assignNode(service, identity);
+                server.assignNode(service, identity, localNodeId);
                 tryCount = MAX_RETRY;
                 logger.log(Level.FINEST, "assign identity {0}", identity);
             } catch (IOException ioe) {
