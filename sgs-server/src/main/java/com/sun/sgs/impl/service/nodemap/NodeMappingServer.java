@@ -40,11 +40,12 @@ interface NodeMappingServer extends Remote {
      * @param service the class of the calling service
      * @param id the identity to assign
      *    <b> should this be a set? </b>
+     * @param requestingNode the id of the node requesting assignment
      *
      * @throws	IOException if a communication problem occurs while
      *          invoking this method
      */
-    void assignNode(Class service, Identity id) 
+    void assignNode(Class service, Identity id, long requestingNode) 
         throws IOException;
     
     /**

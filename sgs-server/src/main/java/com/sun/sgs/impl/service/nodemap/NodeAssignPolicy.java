@@ -33,16 +33,24 @@ import com.sun.sgs.auth.Identity;
 interface NodeAssignPolicy {
     
     /**
+     *  An id representing the server node.
+     */
+    long SERVER_NODE = -1L;
+    
+    /**
      * Choose a node to assign the identity to.  It is assumed that
      * we've already checked to see if the identity is in the map
      * before calling this method.
      *
      * @param id the identity which needs an assignment.
+     * @param requestingNode the id of the node making the request, or 
+     *         {@code SERVER_NODE} if the system is making the request
      * @return the chosen node's id
      *
      * @throws NoNodesAvailableException if there are no live nodes to assign to
      */
-    long chooseNode(Identity id) throws NoNodesAvailableException;
+    long chooseNode(Identity id, long requestingNode) 
+            throws NoNodesAvailableException;
     
     /**
      * Inform the policy that a node is now available.

@@ -315,7 +315,9 @@ public final class NodeMappingServerImpl
     /* -- Implement NodeMappingServer -- */
 
     /** {@inheritDoc} */
-    public void assignNode(Class service, Identity identity) throws IOException 
+    public void assignNode(Class service, Identity identity, 
+                           long requestingNode)
+        throws IOException 
     {
         callStarted();    
         try {
@@ -346,7 +348,8 @@ public final class NodeMappingServerImpl
             }
 
             try {
-                long newNodeId = mapToNewNode(identity, serviceName, node);
+                long newNodeId = 
+                    mapToNewNode(identity, serviceName, node, requestingNode);
                 logger.log(Level.FINEST, 
                            "assignNode id:{0} to {1}", identity, newNodeId);
             } catch (NoNodesAvailableException ex) {
@@ -671,10 +674,12 @@ public final class NodeMappingServerImpl
      * @param serviceName the name of the requesting service's class, or null
      * @param old the last node the identity was mapped to, or null if there
      *        was no prior mapping
+     * @param requestingNode the node making the mapping request
      *
      * @throws NoNodesAvailableException if there are no live nodes to map to
      */
-    long mapToNewNode(Identity id, String serviceName, Node old) 
+    long mapToNewNode(Identity id, String serviceName, Node old, 
+                      long requestingNode) 
         throws NoNodesAvailableException
     {
         assert(id != null);
@@ -684,7 +689,7 @@ public final class NodeMappingServerImpl
         final Node oldNode = old;
         final long newNodeId;
         try {
-            newNodeId = assignPolicy.chooseNode(id);
+            newNodeId = assignPolicy.chooseNode(id, requestingNode);
         } catch (NoNodesAvailableException ex) {
             logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}"
                     + " failed because no live nodes are available", 
@@ -787,7 +792,7 @@ public final class NodeMappingServerImpl
             // We can get an IllegalStateException if this server shuts
             // down while we're moving identities from failed nodes.
             // TODO - check that those identities are properly removed.
-            // Hmmm.  we've probably left some cruft in the data store.
+            // Hmmm.  we've probably left some garbage in the data store.
             // The most likely problem is one in our own code.
             logger.logThrow(Level.FINE, e, 
                             "Move {0} mappings from {1} to {2} failed", 
@@ -868,7 +873,8 @@ public final class NodeMappingServerImpl
                     if (!done) {
                         Identity id = task.getId().getIdentity();
                         try {
-                            mapToNewNode(id, null, node);
+                            mapToNewNode(id, null, node, 
+                                         NodeAssignPolicy.SERVER_NODE);
                         } catch (NoNodesAvailableException e) {
                             // This can be thrown from mapToNewNode if there are
                             // no live nodes.  Stop our loop.
