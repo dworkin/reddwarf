@@ -56,7 +56,7 @@ if ($? != 0) {
 # Create the directory structure in the repository
 system("set -x &&
 	mkdir " . escape($wc) . " &&
-	pushd " . escape($wc) . " &&
+	cd " . escape($wc) . " &&
 	svn checkout $repos . &&
 	svn mkdir proj1 &&
 	svn mkdir proj1/trunk &&
@@ -70,7 +70,6 @@ system("set -x &&
 	svn copy proj1/trunk proj1/branches/branch1 &&
 	svn copy proj1/trunk proj1/branches/branch2 &&
 	svn commit -m \"Create initial branches\" &&
-	popd &&
 	mkdir " . escape($wc2) . " &&
 	svn checkout $repos " . escape($wc2));
 if ($? != 0) {

@@ -1,3 +1,9 @@
+To run the full test suite, do:
+
+  ./testclean
+  ./testinit
+  ./testall
+
 Each separate test in each of the test files assumes the following
 preconditions for subversion trunks and branches:
 
