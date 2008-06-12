@@ -49,7 +49,8 @@ interface NodeAssignPolicy {
      *
      * @throws NoNodesAvailableException if there are no live nodes to assign to
      */
-    long chooseNode(Identity id, long requestingNode) throws NoNodesAvailableException;
+    long chooseNode(Identity id, long requestingNode) 
+            throws NoNodesAvailableException;
     
     /**
      * Inform the policy that a node is now available.
