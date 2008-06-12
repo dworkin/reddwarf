@@ -1,7 +1,7 @@
 To run the full test suite, do:
 
-  ./testinit
   ./testclean
+  ./testinit
   ./testall
 
 Each separate test in each of the test files assumes the following
