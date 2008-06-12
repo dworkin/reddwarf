@@ -325,12 +325,8 @@ sub set_merged_up {
 # itself, as opposed to subdirectories and files within the repository.
 sub get_base_url {
     my ($url) = @_;
-    # SVN URLs are easy: svn://host/repository/other-stuff
-    if ($url =~ m!^(svn://[^/]+/[^/]+)/.*$!) {
-	return $1;
-    }
-    # Otherwise, use 'svn list' to go up the tree until we fail.  Set
-    # $next to everything except the last slash, if present.
+    # Use 'svn list' to go up the tree until we fail.  Set $next to
+    # everything except the last slash, if present.
     my ($next) = $url =~ m!^(.*?)/?$!;
     my $root = "";
     # Stop if we moved up too high

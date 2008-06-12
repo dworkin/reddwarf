@@ -332,7 +332,7 @@ sub escape {
 
 # Returns the pathname for the temporary directory
 sub get_tmp_dir {
-    my $tmp_dir = tmpdir();
+    my $tmp_dir = -d '/tmp' ? '/tmp' : $ENV{TMPDIR} || $ENV{TEMP};
     my $pwd_command =
 	# Use the -P flag on the Mac to get the physical location, which
 	# is what Subversion uses in its error messages.
