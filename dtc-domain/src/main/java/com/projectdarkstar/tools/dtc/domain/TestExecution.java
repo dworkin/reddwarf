@@ -56,6 +56,7 @@ public class TestExecution implements Serializable
     private List<TestExecutionTag> tags;
     private List<TestExecutionResult> results;
     
+    private PkgLibrary originalTestSuiteDarkstarPkg;
     private String originalTestSuiteName;
     private String originalTestSuiteDescription;
     private TestSuite originalTestSuite;
@@ -68,6 +69,7 @@ public class TestExecution implements Serializable
         this.setName(name);
         this.setDateStarted(dateStarted);
         
+        this.setOriginalTestSuiteDarkstarPkg(originalTestSuite.getDarkstarPkg());
         this.setOriginalTestSuiteName(originalTestSuite.getName());
         this.setOriginalTestSuiteDescription(originalTestSuite.getDescription());
         this.setOriginalTestSuite(originalTestSuite);
@@ -109,6 +111,10 @@ public class TestExecution implements Serializable
     public List<TestExecutionResult> getResults() { return results; }
     public void setResults(List<TestExecutionResult> results) { this.results = results; }
     
+    @ManyToOne
+    @JoinColumn(name = "originalTestSuiteDarkstarPkg", nullable = false)
+    public PkgLibrary getOriginalTestSuiteDarkstarPkg() { return originalTestSuiteDarkstarPkg; }
+    public void setOriginalTestSuiteDarkstarPkg(PkgLibrary originalTestSuiteDarkstarPkg) { this.originalTestSuiteDarkstarPkg = originalTestSuiteDarkstarPkg; }
     
     @Column(name = "originalTestSuiteName", nullable = false)
     public String getOriginalTestSuiteName() { return originalTestSuiteName; }

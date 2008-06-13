@@ -20,7 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.io.Serializable;
-import java.net.URI;
+import java.util.List;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;
@@ -28,6 +28,13 @@ import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
 import javax.persistence.Version;
+import javax.persistence.Lob;
+import javax.persistence.Basic;
+import javax.persistence.FetchType;
+import javax.persistence.ManyToMany;
+import javax.persistence.OrderBy;
+import javax.persistence.JoinTable;
+import javax.persistence.JoinColumn;
 
 /**
  *
@@ -41,13 +48,15 @@ public class PkgLibrary implements Serializable
     private Long versionNumber;
     
     private String name;
-    private URI location;
+    private byte[] file;
+    
+    private List<PkgLibraryTag> tags;
     
     public PkgLibrary(String name,
-                      URI location)
+                      byte[] file)
     {
         this.setName(name);
-        this.setLocation(location);
+        this.setFile(file);
     }
     
     @Id
@@ -64,7 +73,17 @@ public class PkgLibrary implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
-    @Column(name = "location", nullable = false)
-    public URI getLocation() { return location; }
-    public void setLocation(URI location) { this.location = location; }
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file", nullable = false)
+    public byte[] getFile() { return file; }
+    public void setFile(byte[] file) { this.file = file; }
+    
+    @ManyToMany
+    @OrderBy("tag")
+    @JoinTable(name = "pkgLibraryTags",
+               joinColumns = @JoinColumn(name = "pkgLibraryId"),
+               inverseJoinColumns = @JoinColumn(name = "pkgLibraryTagId"))
+    public List<PkgLibraryTag> getTags() { return tags; }
+    public void setTags(List<PkgLibraryTag> tags) { this.tags = tags; }
 }

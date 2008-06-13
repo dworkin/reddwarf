@@ -27,6 +27,12 @@ import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.Enumerated;
+import javax.persistence.EnumType;
+import javax.persistence.OneToOne;
+import javax.persistence.JoinColumn;
 
 /**
  *
@@ -43,5 +49,44 @@ public class TestQueue implements Serializable
     
     private TestExecution execution;
     private TestExecutionResult currentlyRunning;
+    
+    public TestQueue(Date dateQueued,
+                     TestExecution execution)
+    {
+        this.dateQueued = dateQueued;
+        this.execution = execution;
+        
+        this.status = TestQueueStatus.WAITING;
+    }
+    
+    @Id
+    @GeneratedValue
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "dateQueued", nullable = false)
+    public Date getDateQueued() { return dateQueued; }
+    public void setDateQueued(Date dateQueued) { this.dateQueued = dateQueued; }
+    
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "dateStarted")
+    public Date getDateStarted() { return dateStarted; }
+    public void setDateStarted(Date dateStarted) { this.dateStarted = dateStarted; }
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    public TestQueueStatus getStatus() { return status; }
+    public void setStatus(TestQueueStatus status) { this.status = status; }
+    
+    @OneToOne
+    @JoinColumn(name = "execution", nullable = false)
+    public TestExecution getExecution () { return execution; }
+    public void setExecution(TestExecution execution ) { this.execution = execution; }
+    
+    @OneToOne
+    @JoinColumn(name = "currentlyRunning")
+    public TestExecutionResult getCurrentlyRunning() { return currentlyRunning; }
+    public void setCurrentlyRunning(TestExecutionResult currentlyRunning) { this.currentlyRunning = currentlyRunning; }
     
 }
