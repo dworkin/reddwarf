@@ -19,7 +19,6 @@
     used exclusively by the server
   </description>
 
-
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -49,7 +48,6 @@
     </dependency>
   </dependencies>
 
-
   <build>
     <plugins>
 
@@ -67,7 +65,9 @@
 	      <mainClass>com.sun.sgs.impl.kernel.Kernel</mainClass>
             </manifest>
 	    <manifestEntries>
-	      <Class-Path>bdb/db.jar sgs-shared-${sgs-shared.version}.jar</Class-Path>
+	      <Class-Path>
+		bdb/db.jar sgs-shared-${sgs-shared.version}.jar
+	      </Class-Path>
 	    </manifestEntries>
           </archive>
         </configuration>
@@ -127,15 +127,21 @@
 	      <value>${run.javapath}</value>
 	    </property>
 	    <property>
-	      <name>com.sun.sgs.impl.service.data.store.db.environment.class</name>
+	      <name>
+		com.sun.sgs.impl.service.data.store.db.environment.class
+	      </name>
 	      <value>${run.bdb.env}</value>
 	    </property>
 	    <property>
-	      <name>com.sun.sgs.impl.service.data.store.db.bdb.cache.size</name>
+	      <name>
+		com.sun.sgs.impl.service.data.store.db.bdb.cache.size
+	      </name>
 	      <value>${test.bdb.cache.size}</value>
 	    </property>
 	  </systemProperties>
-	  <argLine>${test.jvm.args} -Djava.library.path=${run.javapath}</argLine>
+	  <argLine>
+	    ${test.jvm.args} -Djava.library.path=${run.javapath}
+	  </argLine>
         </configuration>
       </plugin>
 
@@ -158,7 +164,6 @@
     </resources>
   </build>
 
-
   <reporting>
     <plugins>
 
@@ -172,7 +177,13 @@
 	  <enableRulesSummary>false</enableRulesSummary>
 	  <configLocation>${checkstyle.config}</configLocation>
 	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
-	  <packageNamesLocation>${checkstyle.packageNames}</packageNamesLocation>
+	  <packageNamesLocation>
+	    ${checkstyle.packageNames}
+	  </packageNamesLocation>
+	  <propertyExpansion>
+	    checkstyle.unusedImports=${checkstyle.unusedImports}
+	    checkstyle.warnings=${checkstyle.warnings}
+	  </propertyExpansion>
         </configuration>
       </plugin>
 
@@ -181,14 +192,16 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>findbugs-maven-plugin</artifactId>
 	<configuration>
-	  <excludeFilterFile>src/main/etc/findbugs-exclude.xml</excludeFilterFile>
+	  <effort>Max</effort>
+	  <excludeFilterFile>
+	    src/main/etc/findbugs-exclude.xml
+	  </excludeFilterFile>
+	  <threshold>Low</threshold>
+	  <xmlOutput>true</xmlOutput>
 	</configuration>
       </plugin>
 
-
     </plugins>
   </reporting>
-
-
 
 </project>
