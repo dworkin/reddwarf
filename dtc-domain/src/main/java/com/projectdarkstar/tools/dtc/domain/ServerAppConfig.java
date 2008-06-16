@@ -35,8 +35,7 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents a runtime configuration for a {@link ServerApp}
  */
 @Entity
 @Table(name = "ServerAppConfig")
@@ -57,11 +56,23 @@ public class ServerAppConfig implements Serializable
         this.setAdditionalCommandLine(additionalCommandLine);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -71,15 +82,34 @@ public class ServerAppConfig implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
+    /**
+     * Returns a string to be appended to the runtime command line used
+     * to start the server application.  This may be used to do things such
+     * as modify JVM parameters.
+     * 
+     * @return string to append to the command line
+     */
     @Column(name = "additionalCommandLine", nullable = false)
     public String getAdditionalCommandLine() { return additionalCommandLine; }
     public void setAdditionalCommandLine(String additionalCommandLine) { this.additionalCommandLine = additionalCommandLine; }
     
+    /**
+     * Returns the parent {@link ServerApp} which this configuration
+     * is associated with.
+     * 
+     * @return parent {@link ServerApp} for this configuration
+     */
     @ManyToOne
     @JoinColumn(name="serverApp", nullable = false)
     public ServerApp getServerApp() { return serverApp; }
     public void setServerApp(ServerApp serverApp) { this.serverApp = serverApp; }
     
+    /**
+     * Returns a list of arguments in the form of {@link Property} objects
+     * to be passed to the server during run time.
+     * 
+     * @return list of arguments
+     */
     @ManyToMany
     @OrderBy("property")
     @JoinTable(name = "serverAppConfigProperties",

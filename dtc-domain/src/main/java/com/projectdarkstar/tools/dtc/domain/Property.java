@@ -29,8 +29,7 @@ import javax.persistence.Column;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents a property by mapping a property name to a value.
  */
 @Entity
 @Table(name = "Property")
@@ -52,11 +51,23 @@ public class Property implements Serializable
         this.setValue(value);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }

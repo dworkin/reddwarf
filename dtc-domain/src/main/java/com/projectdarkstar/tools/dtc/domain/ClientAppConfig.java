@@ -37,8 +37,7 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents a runtime configuration for a {@link ClientApp}.
  */
 @Entity
 @Table(name = "ClientAppConfig")
@@ -62,11 +61,23 @@ public class ClientAppConfig implements Serializable
         this.setPropertyMethod(propertyMethod);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -76,20 +87,46 @@ public class ClientAppConfig implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
+    /**
+     * Returns the system path required to initiate execution of this
+     * client simulator.  The path could be a java executable or
+     * some other executable type since the client is not required to be
+     * a java application.
+     * 
+     * @return path of the client application executable
+     */
     @Column(name = "path", nullable = false)
     public String getPath() { return path; }
     public void setPath(String path) { this.path = path; }
     
+    /**
+     * Returns the mechanism required to pass arguments to the client
+     * executable.
+     * 
+     * @return mechanism required to pass arguments to the client
+     */
     @Column(name = "propertyMethod", nullable = false)
     @Enumerated(EnumType.STRING)
     public ClientAppConfigType getPropertyMethod() { return propertyMethod; }
     public void setPropertyMethod(ClientAppConfigType propertyMethod) { this.propertyMethod = propertyMethod; }
     
+    /**
+     * Returns the parent {@link ClientApp} which this configuration
+     * is associated with.
+     * 
+     * @return parent {@link ClientApp} for this configuration
+     */
     @ManyToOne
     @JoinColumn(name="clientApp", nullable = false)
     public ClientApp getClientApp() { return clientApp; }
     public void setClientApp(ClientApp clientApp) { this.clientApp = clientApp; }
     
+    /**
+     * Returns a list of arguments in the form of {@link Property} objects
+     * to be passed to the client during run time.
+     * 
+     * @return list of arguments
+     */
     @ManyToMany
     @OrderBy("property")
     @JoinTable(name = "clientAppConfigProperties",

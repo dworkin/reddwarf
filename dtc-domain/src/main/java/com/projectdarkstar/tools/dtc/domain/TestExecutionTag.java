@@ -31,8 +31,8 @@ import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 
 /**
- *
- * @author owen
+ * Represents a tag entity used to categorize {@link TestExecution}
+ * objects.
  */
 @Entity
 @Table(name = "TestExecutionTag")
@@ -48,6 +48,11 @@ public class TestExecutionTag implements Serializable
         this.setTag(tag);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
@@ -57,6 +62,12 @@ public class TestExecutionTag implements Serializable
     public String getTag() { return tag; }
     public void setTag(String tag) { this.tag = tag; }
     
+    /**
+     * Returns the list of {@link TestExecution} objects that are tagged
+     * with this tag.
+     * 
+     * @return test executions tagged with this tag.
+     */
     @ManyToMany(mappedBy = "tags")
     @OrderBy("dateFinished")
     public List<TestExecution> getExecutions() { return executions; }

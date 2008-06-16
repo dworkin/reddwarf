@@ -35,8 +35,11 @@ import javax.persistence.OneToOne;
 import javax.persistence.JoinColumn;
 
 /**
- *
- * @author owen
+ * Wrapper object for a {@link TestExecution} that is currently running, or is
+ * waiting to be run.  TestQueue objects are intended to be picked up by
+ * an external execution daemon to run the specified {@link TestExecution}.
+ * When the execution is complete, the TestQueue object is discarded and
+ * removed from persistent storage.
  */
 @Entity
 @Table(name = "TestQueue")
@@ -59,6 +62,11 @@ public class TestQueue implements Serializable
         this.status = TestQueueStatus.WAITING;
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }

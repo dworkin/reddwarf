@@ -34,8 +34,8 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents a client application simulator
+ * package to be run against a {@link ServerApp} in a DTC test.
  */
 @Entity
 @Table(name = "ClientApp")
@@ -56,11 +56,23 @@ public class ClientApp implements Serializable
         this.setDescription(description);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -73,12 +85,23 @@ public class ClientApp implements Serializable
     @Column(name = "description", nullable = false)
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
-    
+
+    /**
+     * Returns a list of client application configurations that can be used
+     * to run this client application.
+     * 
+     * @return list of runtime configurations for this client app
+     */
     @OneToMany(mappedBy = "clientApp")
     @OrderBy("name")
     public List<ClientAppConfig> getConfigs() { return configs; }
     public void setConfigs(List<ClientAppConfig> configs) { this.configs = configs; }
     
+    /**
+     * Returns the package library required to run this client application.
+     * 
+     * @return the package library required to run this client application.
+     */
     @ManyToOne
     @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }

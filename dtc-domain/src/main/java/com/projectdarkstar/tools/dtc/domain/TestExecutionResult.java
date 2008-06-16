@@ -39,8 +39,9 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents the results for a specific instance of a {@link TestSpec}.
+ * Each TestExecutionResult is part of a parent {@link TestExecution}
+ * to make up one cohesive set of test results.
  */
 @Entity
 @Table(name = "TestExecutionResult")
@@ -56,6 +57,8 @@ public class TestExecutionResult implements Serializable
     private List<TestExecutionResultServerLog> serverLogs;
     private List<TestExecutionResultClientLog> clientLogs;
     private List<TestExecutionResultProbeLog> probeLogs;
+    
+    private List<TestExecutionResultClientData> clientData;
     
     private List<HardwareResource> serverResources;
     private List<HardwareResource> clientResources;
@@ -83,11 +86,23 @@ public class TestExecutionResult implements Serializable
         this.setOriginalTestSpec(originalTestSpec);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -103,6 +118,14 @@ public class TestExecutionResult implements Serializable
     public LogFile getResultSummary() { return resultSummary; }
     public void setResultSummary(LogFile resultSummary) { this.resultSummary = resultSummary; }
     
+    /**
+     * Returns a list of arguments in the form of {@link Property} objects
+     * to be passed to the TestRunner during run time.  These are derived
+     * from the original {@link TestSpec} used to create this
+     * TestExecutionResult and should be customized for each specific case.
+     * 
+     * @return list of arguments
+     */
     @ManyToMany
     @OrderBy("property")
     @JoinTable(name = "testExecutionResultProperties",
@@ -111,19 +134,59 @@ public class TestExecutionResult implements Serializable
     public SortedSet<Property> getProperties() { return properties; }
     public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
     
+    /**
+     * A {@link TestExecutionResultServerLog} is generated for each
+     * {@link HardwareResource} that the server application is run on during
+     * the test.  Returns a list of these logs.
+     * 
+     * @return list of server logs
+     */
     @OneToMany(mappedBy = "parentResult")
     public List<TestExecutionResultServerLog> getServerLogs() { return serverLogs; }
     public void setServerLogs(List<TestExecutionResultServerLog> serverLogs) { this.serverLogs = serverLogs; }
     
+    /**
+     * A {@link TestExecutionResultClientLog} is generated for each
+     * {@link ClientAppConfig} client application simulator that is run
+     * during the test.  Returns a list of these logs.
+     * 
+     * @return list of client logs
+     */
     @OneToMany(mappedBy = "parentResult")
     public List<TestExecutionResultClientLog> getClientLogs() { return clientLogs; }
     public void setClientLogs(List<TestExecutionResultClientLog> clientLogs) { this.clientLogs = clientLogs; }
     
+    /**
+     * A {@link TestExecutionResultProbeLog} is generated for each
+     * {@link SystemProbe} monitoring the system during the test.
+     * Returns a list of these logs.
+     * 
+     * @return list of probe logs
+     */
     @OneToMany(mappedBy = "parentResult")
     public List<TestExecutionResultProbeLog> getProbeLogs() { return probeLogs; }
     public void setProbeLogs(List<TestExecutionResultProbeLog> probeLogs) { this.probeLogs = probeLogs; }
     
+    /**
+     * A list of {@link TestExecutionResultClientData} objects are
+     * periodically collected during the execution of a test to monitor how
+     * many clients are acting in the system over time.  Returns a list
+     * of these data objects.
+     * 
+     * @return list of client data points
+     */
+    @OneToMany(mappedBy="parentResult")
+    @OrderBy("timestamp")
+    public List<TestExecutionResultClientData> getClientData() { return clientData; }
+    public void setClientData(List<TestExecutionResultClientData> clientData) { this.clientData = clientData; }
     
+    
+    /**
+     * Returns a list of {@link HardwareResource} objects that are used to
+     * run the server application on during the test.
+     * 
+     * @return list of server resources
+     */
     @ManyToMany
     @OrderBy("hostname")
     @JoinTable(name = "testExecutionResultServerResources",
@@ -132,6 +195,12 @@ public class TestExecutionResult implements Serializable
     public List<HardwareResource> getServerResources() { return serverResources; }
     public void setServerResources(List<HardwareResource> serverResources) { this.serverResources = serverResources; }
     
+    /**
+     * Returns a list of {@link HardwareResource} objects taht are used
+     * to run the client application simulators during the test
+     * 
+     * @return list of client resources
+     */
     @ManyToMany
     @OrderBy("hostname")
     @JoinTable(name = "testExecutionResultClientResources",
@@ -139,7 +208,6 @@ public class TestExecutionResult implements Serializable
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceId"))
     public List<HardwareResource> getClientResources() { return clientResources; }
     public void setClientResources(List<HardwareResource> clientResources) { this.clientResources = clientResources; }
-    
     
     
     @ManyToMany

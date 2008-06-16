@@ -35,8 +35,8 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents a system probe application used to monitor and collect
+ * statistics during a DTC test.
  */
 @Entity
 @Table(name = "SystemProbe")
@@ -68,11 +68,23 @@ public class SystemProbe implements Serializable
         this.setUnits(units);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -82,22 +94,52 @@ public class SystemProbe implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
+    /**
+     * Returns the fully qualified class name of this system probe
+     * required to initiate execution of this system probe
+     * 
+     * @return main class name for the system probe
+     */
     @Column(name = "className", nullable = false)
     public String getClassName() { return className; }
     public void setClassName(String className) { this.className = className; }
     
+    /**
+     * Returns the classpath required to run the system probe application.
+     * The items in this path are relative to the root of the filesystem
+     * in the {@link #getRequiredPkg required} zip archive.
+     * 
+     * @return classpath required to run the system probe
+     */
     @Column(name = "classPath", nullable = false)
     public String getClassPath() { return classPath; }
     public void setClassPath(String classPath) { this.classPath = classPath; }
     
+    /**
+     * Returns the name of the metric that this system probe is designed
+     * to measure.
+     * 
+     * @return metric that this system probe measures
+     */
     @Column(name = "metric", nullable = false)
     public String getMetric() { return metric; }
     public void setMetric(String metric) { this.metric = metric; }
     
+    /**
+     * Returns the unit of measurement of the metric.
+     * 
+     * @return the unit of measurement of the metric.
+     */
     @Column(name = "units", nullable = false)
     public String getUnits() { return units; }
     public void setUnits(String units) { this.units = units; }
     
+    /**
+     * Returns a list of {@link SystemProbeTag} objects that are used
+     * to categorize system probes into groups.
+     * 
+     * @return list of tags for this system probe
+     */
     @ManyToMany
     @OrderBy("tag")
     @JoinTable(name = "systemProbeTags",
@@ -106,6 +148,12 @@ public class SystemProbe implements Serializable
     public List<SystemProbeTag> getTags() { return tags; }
     public void setTags(List<SystemProbeTag> tags) { this.tags = tags; }
     
+    /**
+     * Returns a list of arguments in the form of {@link Property} objects
+     * to be passed to the system probe during run time.
+     * 
+     * @return list of arguments
+     */
     @ManyToMany
     @OrderBy("property")
     @JoinTable(name = "systemProbeProperties",
@@ -114,6 +162,12 @@ public class SystemProbe implements Serializable
     public List<Property> getProperties() { return properties; }
     public void setProperties(List<Property> properties) { this.properties = properties; }
     
+    /**
+     * Returns the package library required to run this system probe.
+     * It is assumed that this library is a zip archive.
+     * 
+     * @return the package library required to run this system probe
+     */
     @ManyToOne
     @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }

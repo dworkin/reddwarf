@@ -33,8 +33,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 
 /**
- *
- * @author owen
+ * Represents a snapshot of the data collected by a specific {@link SystemProbe}
+ * at a specific point in time.
  */
 @Entity
 @Table(name = "TestExecutionResultProbeData")
@@ -53,6 +53,11 @@ public class TestExecutionResultProbeData implements Serializable
         this.setValue(value);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
