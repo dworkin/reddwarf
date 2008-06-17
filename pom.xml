@@ -539,10 +539,6 @@
     <checkstyle.packageNames>
       com/sun/sgs/tools/checkstyle/packageNames.xml
     </checkstyle.packageNames>
-    <!-- Whether to print checkstyle warnings
-	 If set to false, then checkstyle warnings will not be printed
-	 -->
-    <checkstyle.warnings>true</checkstyle.warnings>
     <!-- Checkstyle report level for unused imports
 	 You can suppress these warnings altogether by setting the value
          to ignore. -->
