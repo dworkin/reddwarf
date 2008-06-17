@@ -86,7 +86,6 @@
 	  </packageNamesLocation>
 	  <propertyExpansion>
 	    checkstyle.unusedImports=${checkstyle.unusedImports}
-	    checkstyle.warnings=${checkstyle.warnings}
 	  </propertyExpansion>
         </configuration>
       </plugin>
