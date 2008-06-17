@@ -343,8 +343,6 @@ public final class ClientSessionServiceImpl
              * is supplied, default to listen on all interfaces.
 	     */
             String hostAddress = properties.getProperty(LISTEN_HOST_PROPERTY);
-            System.out.println("listen address property= "+LISTEN_HOST_PROPERTY);
-            System.out.println("listen address= "+hostAddress);
             InetSocketAddress listenAddress =
                 hostAddress == null ? new InetSocketAddress(appPort) :
                                       new InetSocketAddress(hostAddress, appPort);
