@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="sgs" basedir=".">
+
+    <description>
+        Targets for running Wonderland Stress Test
+    </description>
+
+    <!-- VARIABLE DEFINITIONS -->
+
+    <!-- Wonderland/Darkstar server host and port -->
+    <property name="server.host" value="localhost"/>
+    <property name="server.port" value="1139"/>
+
+    <!-- Darkstar core server host -->
+    <property name="core.host" value="localhost"/>
+
+    <!-- Runtime platform for DB native libraries -->
+    <property name="platform" value="macosx-x86"/>
+        
+    <!-- File/directory locations -->
+    <property name="lib.dir" location="lib"/>
+    <property name="db.lib.dir" location="${lib.dir}/bdb"/>
+    <property name="db.library.path" location="${db.lib.dir}/${platform}/lib" />
+    <property name="tmp.dir" location="/tmp"/>
+    <property name="app.dir" location="${tmp.dir}/wonderland"/>
+
+    <!-- Set use.je to test with BDB Java Edition -->
+    <condition property="bdb.env"
+               value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
+               else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
+        <isset property="use.je"/>
+    </condition>
+    
+    <!-- JVM arguments -->
+    <property name="server.jvm.args"
+              value="-server
+                     -XX:+AggressiveOpts
+                     -XX:+UseParallelGC
+                     -XX:+UseParallelOldGC
+                     -Xmx768M
+                     -XX:NewRatio=1"/>
+
+    <property name="client.jvm.args"
+              value="-client
+                     -Xmx384m
+                     -Xms32m"/>
+                     
+    <!-- Classpaths -->
+    
+    <!--  for Berkeley DB class path -->
+    <path id="db.classpath">
+        <pathelement location="${db.lib.dir}/je-3.2.23.jar"/>
+        <pathelement location="${db.lib.dir}/db.jar"/>
+    </path>
+    
+    <!-- Mina etc class path -->
+    <path id="mina.classpath">
+        <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
+        <pathelement location="${lib.dir}/slf4j-jdk14-1.4.0.jar"/>
+        <pathelement location="${lib.dir}/slf4j-api-1.4.0.jar"/>
+    </path>
+
+    <!-- Darkstar server class path -->
+    <path id="server.classpath">
+        <pathelement location="${lib.dir}/sgs-server.jar"/>
+        <path refid="db.classpath"/>
+    </path>
+
+    <!-- Wonderland/Darkstar server class path -->
+    <path id="wonderland.server.classpath">
+        <pathelement location="${lib.dir}/wonderland-server.jar"/>
+        <pathelement location="${lib.dir}/wonderland-common.jar"/>
+        <pathelement location="${lib.dir}/jme.jar"/>
+        <path refid="server.classpath"/>
+    </path>
+
+    <!-- Client class path -->
+    <path id="client.classpath">
+        <pathelement location="${lib.dir}/multiboundstest-client.jar"/>
+        <pathelement location="${lib.dir}/wonderland-client.jar"/>
+        <pathelement location="${lib.dir}/wonderland-utils.jar"/>
+        <pathelement location="${lib.dir}/wonderland-common.jar"/>
+        <pathelement location="${lib.dir}/jme.jar"/>
+        <pathelement location="${lib.dir}/sgs-client.jar"/>
+        <path refid="mina.classpath"/>
+    </path>
+
+    <!-- Removes database, temporary property files, and directories -->
+    <target name="clean"
+            description="Removes database, temporary property files, and directories">
+        <delete dir="${app.dir}"/>
+    </target>
+
+    <!-- Deletes the data store files unless the retain.datastore property is set. -->
+    <target name="-maybe-delete-datastore"
+            unless="retain.datastore">
+        <delete dir="${app.dir}/dsdb"/>
+    </target>
+
+    <!-- Runs the Wonderland server in single-node mode -->
+    <target name="run-single"
+            depends="-maybe-delete-datastore"
+            description="Runs the Wonderland server as a single node">
+        <property name="app.logging" location="server-logging.properties"/>
+        <mkdir dir="${app.dir}"/>
+        <mkdir dir="${app.dir}/dsdb"/>
+        <property name="app.properties" location="${app.dir}/single.properties"/>
+        <concat destfile="${app.properties}">
+            <header filtering="no" trimleading="yes">
+                com.sun.sgs.app.name=Wonderland
+                com.sun.sgs.app.root=${app.dir}
+                com.sun.sgs.app.port=${server.port}
+                com.sun.sgs.impl.service.data.store.db.environment.class=${bdb.env}
+            </header>
+            <fileset file="darkstar-server.properties"/>
+            <fileset file="wonderland-server.properties"/>
+        </concat>
+        <java classname="com.sun.sgs.impl.kernel.Kernel"
+              classpathref="wonderland.server.classpath"
+              fork="true">
+            <jvmarg line="${server.jvm.args}"/>
+            <sysproperty key="com.sun.sgs.impl.service.session.listen.address" file="foo"/>
+            <sysproperty key="java.library.path" file="${db.library.path}"/>
+            <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+            <arg file="${app.properties}"/>
+        </java>
+    </target>
+
+    <!-- Runs the Wonderland server for use with multi-node mode -->
+    <target name="run-server"
+            depends="-maybe-delete-datastore"
+            description="Runs the Wonderland application server">
+        <property name="app.logging" location="server-logging.properties"/>
+        <mkdir dir="${app.dir}"/>
+        <property name="app.properties" location="${app.dir}/server.properties"/>
+        <concat destfile="${app.properties}">
+            <header filtering="no" trimleading="yes">
+                com.sun.sgs.app.name=Wonderland
+                com.sun.sgs.node.type=appNode
+                com.sun.sgs.app.root=${app.dir}
+                com.sun.sgs.app.port=${server.port}
+                com.sun.sgs.server.host=${core.host}
+            </header>
+            <fileset file="darkstar-server.properties"/>
+            <fileset file="wonderland-server.properties"/>
+        </concat>
+        <java classname="com.sun.sgs.impl.kernel.Kernel"
+              classpathref="wonderland.server.classpath"
+               fork="true">
+            <jvmarg line="${server.jvm.args}"/>
+            <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+            <arg file="${app.properties}"/>
+        </java>
+    </target>
+
+    <!-- Runs the core server for use with multi-node mode -->
+    <target name="run-core"
+            depends="-maybe-delete-datastore"
+            description="Runs the core server for use with multi-node mode">
+        <property name="app.logging" location="server-logging.properties"/>
+        <mkdir dir="${app.dir}"/>
+        <mkdir dir="${app.dir}/dsdb"/>
+        <property name="app.properties" location="${app.dir}/core.properties"/>
+        <concat destfile="${app.properties}">
+com.sun.sgs.app.name=Wonderland
+com.sun.sgs.node.type=coreServerNode
+com.sun.sgs.app.root=${app.dir}
+com.sun.sgs.impl.service.data.store.db.environment.class=${bdb.env}
+        </concat>
+        <java classname="com.sun.sgs.impl.kernel.Kernel"
+              classpathref="server.classpath"
+              fork="true">
+            <jvmarg line="${server.jvm.args}"/>
+            <sysproperty key="java.library.path" file="${db.library.path}"/>
+            <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
+            <arg file="${app.properties}"/>
+        </java>
+    </target>
+
+    <!-- Runs the Wonderland client -->
+    <target name="run-client" 
+            description="Runs the Wonderland client">
+        <buildnumber/>
+        <mkdir dir="${app.dir}"/>
+        <property name="app.properties" location="${app.dir}/client.${build.number}.properties"/>
+        <concat destfile="${app.properties}">
+sgs.server=${server.host}
+sgs.port=${server.port}
+        </concat>
+        <java classname="org.jdesktop.wonderland.multiboundstest.client.BoundsMultiClient"
+              classpathref="client.classpath"
+              fork="true">
+            <jvmarg line="${client.jvm.args}"/>
+            <arg value="${build.number}"/>
+            <arg file="${app.properties}"/>
+        </java>
+    </target>
+</project>
