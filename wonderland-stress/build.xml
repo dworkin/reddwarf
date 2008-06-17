@@ -16,8 +16,28 @@
     <property name="core.host" value="localhost"/>
 
     <!-- Runtime platform for DB native libraries -->
-    <property name="platform" value="macosx-x86"/>
-        
+    <condition property="platform" value="macosx-x86">
+    <and>
+      <os family="mac"/>
+      <or>
+        <os arch="x86_64"/>
+        <os arch="i386"/>
+      </or>
+    </and>
+    </condition>
+    <condition property="platform" value="solaris-x86">
+    <and>
+      <os name="SunOS"/>
+      <os arch="x86"/>
+    </and>
+    </condition>
+    <condition property="platform" value="solaris-sparc">
+    <and>
+      <os name="SunOS"/>
+      <os arch="sparc"/>
+    </and>
+    </condition>
+
     <!-- File/directory locations -->
     <property name="lib.dir" location="lib"/>
     <property name="db.lib.dir" location="${lib.dir}/bdb"/>

@@ -30,14 +30,6 @@ default value:  localhost
 description:    Host name of core server node. Used in run-server target and
                 should be set to the name of the host where run-core was invoked.
 
-property name:  platform
-default value:  solaris-x86
-valid values:   solaris-x86, solaris-sparc, macosx-x86
-description:    Platform type of host runninig the database. Used in the
-                run-single and run-core targets to specify which native DB
-                libraries to use. If use.je is defined this property is not
-                relevant.
-
 property name:  use.je
 default value:  <undefined>
 description:    If defined use Berkley DB Java Edition.
@@ -58,10 +50,6 @@ To run the Wonderland server and a client process on the same node:
 
     ant run-single
     ant run-client
-
-To run a single-node Wonderland server on a Mac:
-
-    ant -Dplatform=macosx-x86 run-single
 
 To run a multi-node Wonderland server and a client on three nodes using BDB Java edition:
 
