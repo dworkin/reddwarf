@@ -43,15 +43,6 @@
 
 <module name="Checker">
 
-    <!-- DARKSTAR: Provide a way to disable warnings.  If the
-	 checkstyle.warnings property is set to false, then warnings
-	 will not be printed. -->
-    <module name="SeverityMatchFilter">
-	<property name="severity" value="warning"/>
-	<property name="acceptOnMatch" value="${checkstyle.warnings}"
-		  default="true"/>
-    </module>
-
     <!-- Checks that a package.html file exists for each package.     -->
     <!-- See http://checkstyle.sf.net/config_javadoc.html#PackageHtml -->
     <!-- DARKSTAR: Use the added PackageDoc instead of PackageHtml to
