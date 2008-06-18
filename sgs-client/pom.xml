@@ -65,10 +65,8 @@
 	<artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
 
-
     </plugins>
   </build>
-
 
   <reporting>
     <plugins>
@@ -83,7 +81,12 @@
 	  <enableRulesSummary>false</enableRulesSummary>
 	  <configLocation>${checkstyle.config}</configLocation>
 	  <headerLocation>${checkstyle.header.bsd}</headerLocation>
-	  <packageNamesLocation>${checkstyle.packageNames}</packageNamesLocation>
+	  <packageNamesLocation>
+	    ${checkstyle.packageNames}
+	  </packageNamesLocation>
+	  <propertyExpansion>
+	    checkstyle.unusedImports=${checkstyle.unusedImports}
+	  </propertyExpansion>
         </configuration>
       </plugin>
 
@@ -91,10 +94,14 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>findbugs-maven-plugin</artifactId>
+	<configuration>
+	  <effort>Max</effort>
+	  <threshold>Low</threshold>
+	  <xmlOutput>true</xmlOutput>
+	</configuration>
       </plugin>
 
     </plugins>
   </reporting>
-
 
 </project>
