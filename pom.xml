@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>2</version>
+    <version>3</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -41,7 +41,6 @@
       <artifactId>slf4j-jdk14</artifactId>
     </dependency>
   </dependencies>
-
 
   <build>
     <plugins>
@@ -82,7 +81,6 @@
 
     </plugins>
 
-
   </build>
 
   <reporting>
@@ -98,7 +96,12 @@
 	  <enableRulesSummary>false</enableRulesSummary>
 	  <configLocation>${checkstyle.config}</configLocation>
 	  <headerLocation>${checkstyle.header.bsd}</headerLocation>
-	  <packageNamesLocation>${checkstyle.packageNames}</packageNamesLocation>
+	  <packageNamesLocation>
+	    ${checkstyle.packageNames}
+	  </packageNamesLocation>
+	  <propertyExpansion>
+	    checkstyle.unusedImports=${checkstyle.unusedImports}
+	  </propertyExpansion>
         </configuration>
       </plugin>
 
@@ -106,12 +109,18 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>findbugs-maven-plugin</artifactId>
+	<configuration>
+	  <effort>Max</effort>
+	  <excludeFilterFile>
+	    src/main/etc/findbugs-exclude.xml
+	  </excludeFilterFile>
+	  <threshold>Low</threshold>
+	  <xmlOutput>true</xmlOutput>
+	</configuration>
       </plugin>
-
 
     </plugins>
   </reporting>
-
 
   <repositories>
     <repository>
