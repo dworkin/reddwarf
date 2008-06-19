@@ -56,7 +56,6 @@
     <property name="server.jvm.args"
               value="-server
                      -XX:+AggressiveOpts
-                     -XX:+UseParallelGC
                      -XX:+UseParallelOldGC
                      -Xmx768M
                      -XX:NewRatio=1"/>
@@ -140,7 +139,6 @@
               classpathref="wonderland.server.classpath"
               fork="true">
             <jvmarg line="${server.jvm.args}"/>
-            <sysproperty key="com.sun.sgs.impl.service.session.listen.address" file="foo"/>
             <sysproperty key="java.library.path" file="${db.library.path}"/>
             <sysproperty key="java.util.logging.config.file" file="${app.logging}"/>
             <arg file="${app.properties}"/>
