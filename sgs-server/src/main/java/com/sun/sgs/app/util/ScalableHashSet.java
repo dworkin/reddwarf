@@ -70,6 +70,16 @@ import java.util.Iterator;
  *
  * <p>
  *
+ * Applications must make sure that objects used as elements in sets of this
+ * class have {@code equals} and {@code hashCode} methods that return the same
+ * values after the elements have been serialized and deserialized.  In
+ * particular, elements that use {@link Object#equals Object.equals} and {@link
+ * Object#hashCode Object.hashCode} will typically not be equal, and will have
+ * different hash codes, each time they are deserialized, and so are probably
+ * not suitable for use with this class.
+ *
+ * <p>
+ *
  * This class marks itself for update as necessary; no additional calls to the
  * {@link DataManager} are necessary when modifying the map.  Developers do not
  * need to call {@code markForUpdate} or {@code getForUpdate} on this set, as
