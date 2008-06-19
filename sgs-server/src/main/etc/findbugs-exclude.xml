@@ -288,13 +288,4 @@
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
 
-  <!-- Package com.sun.sgs.impl.sharedutil.logging -->
-
-  <!-- OK to catch all exceptions, since we intend to catch RuntimeException -->
-  <Match>
-    <Class name="com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration"/>
-    <Method name="readConfiguration"/>
-    <Bug pattern="REC_CATCH_EXCEPTION"/>
-  </Match>
-
 </FindBugsFilter>

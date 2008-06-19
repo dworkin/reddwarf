@@ -120,6 +120,14 @@ public final class ClientSessionServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
     
+    /**
+     * The server listen address property.
+     * This is the host interface we are listening on. Default is listen
+     * on all interfaces.
+     */
+    private static final String LISTEN_HOST_PROPERTY =
+        PKG_NAME + ".listen.address";
+    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
@@ -331,9 +339,13 @@ public final class ClientSessionServiceImpl
 		taskOwner);
 	    
 	    /*
-	     * Listen for incoming client connections.
+	     * Listen for incoming client connections. If no host address
+             * is supplied, default to listen on all interfaces.
 	     */
-            InetSocketAddress listenAddress = new InetSocketAddress(appPort);
+            String hostAddress = properties.getProperty(LISTEN_HOST_PROPERTY);
+            InetSocketAddress listenAddress =
+                hostAddress == null ? new InetSocketAddress(appPort) :
+                                      new InetSocketAddress(hostAddress, appPort);
             AsynchronousChannelProvider provider =
                 // TODO fetch from config
                 AsynchronousChannelProvider.provider();
