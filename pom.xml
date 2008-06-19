@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>3</version>
+  <version>4</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -30,14 +30,13 @@
           <artifactId>maven-surefire-plugin</artifactId>
 	  <version>${surefire.version}</version>
           <configuration>
-            <skipTests>false</skipTests>
             <includes>
               <include>**/Test*.java</include>
             </includes>
 	    <forkMode>always</forkMode>
 	    <failIfNoTests>false</failIfNoTests>
 	    <argLine>${test.jvm.args}</argLine>
-	    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+	    <redirectTestOutputToFile>${test.output.hide}</redirectTestOutputToFile>
           </configuration>
 	</plugin>
 	
@@ -549,6 +548,7 @@
     <test.assertions>-ea:com.sun.sgs...</test.assertions>
     <test.max.heap>-Xmx1g</test.max.heap>
     <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
+    <test.output.hide>true</test.output.hide>
     <test.bdb.cache.size>1000000</test.bdb.cache.size>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
