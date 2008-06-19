@@ -113,6 +113,26 @@
         </executions>
       </plugin>
 
+      <!-- Create a clean test-output directory -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <tasks>
+		<delete dir="${test.output}"/>
+		<mkdir dir="${test.output}"/>
+              </tasks>
+	    </configuration>
+	    <goals>
+	      <goal>run</goal>
+	    </goals>
+	  </execution>
+	</executions>
+      </plugin>
+
       <!-- Configure the surefire plugin (which runs the unit tests)
 	   to feed the appropriate java.library.path which points to
 	   the extracted berkeleydb binary folder for the appropriate
@@ -137,6 +157,10 @@
 		com.sun.sgs.impl.service.data.store.db.bdb.cache.size
 	      </name>
 	      <value>${test.bdb.cache.size}</value>
+	    </property>
+	    <property>
+	      <name>java.io.tmpdir</name>
+	      <value>${test.output}</value>
 	    </property>
 	  </systemProperties>
 	  <argLine>
@@ -202,5 +226,12 @@
 
     </plugins>
   </reporting>
+
+  <properties>
+    <!-- The directory to use as the temporary directory while running
+	 tests, for storing database files, etc.  The directory is
+	 removed and recreated for each test run. -->
+    <test.output>target/test-output</test.output>
+  </properties>
 
 </project>
