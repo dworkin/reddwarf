@@ -94,32 +94,10 @@ public class DungeonChannelListener extends GameChannelListener
 		addUidMappings(data);
 		break;
 	    case 1:
-		// we were sent game membership updates
-		int spriteSize = data.getInt();
-		@SuppressWarnings("unchecked")
-                    Map<Integer,byte[]> spriteMap =
-		    (Map<Integer,byte[]>)(getObject(data));
-		blistener.setSpriteMap(spriteSize, convertMap(spriteMap));
-                break;
-	    case 2:
-		// we got a complete board update
-		Board board = (Board)(getObject(data));
-		blistener.changeBoard(board);
-                break;
-	    case 3:
-		// we got some selective space updates
-		@SuppressWarnings("unchecked")
-                    Collection<BoardSpace> spaces =
-		    (Collection<BoardSpace>)(getObject(data));
-		BoardSpace [] s = new BoardSpace[spaces.size()];
-		blistener.updateSpaces(spaces.toArray(s));
-                break;
-	    case 4:
-		// we heard some message from the server
-		byte [] bytes = new byte[data.remaining()];
-		data.get(bytes);
-		String msg = new String(bytes);
-		blistener.hearMessage(msg);
+		// we were sent updated character statistics
+		int id = data.getInt();
+		CharacterStats stats = (CharacterStats)(getObject(data));
+		plistener.setCharacter(id, stats);
 		break;
 	    case 8:
 		notifyJoinOrLeave(data, true);
@@ -127,11 +105,34 @@ public class DungeonChannelListener extends GameChannelListener
 	    case 9:
 		notifyJoinOrLeave(data, true);
 		break;
-	    case 64:
-		// we were sent updated character statistics
-		int id = data.getInt();
-		CharacterStats stats = (CharacterStats)(getObject(data));
-		plistener.setCharacter(id, stats);
+
+	    case 21:
+		// we were sent game membership updates
+		int spriteSize = data.getInt();
+		@SuppressWarnings("unchecked")
+                    Map<Integer,byte[]> spriteMap =
+		    (Map<Integer,byte[]>)(getObject(data));
+		blistener.setSpriteMap(spriteSize, convertMap(spriteMap));
+                break;
+	    case 22:
+		// we got a complete board update
+		Board board = (Board)(getObject(data));
+		blistener.changeBoard(board);
+                break;
+	    case 23:
+		// we got some selective space updates
+		@SuppressWarnings("unchecked")
+                    Collection<BoardSpace> spaces =
+		    (Collection<BoardSpace>)(getObject(data));
+		BoardSpace [] s = new BoardSpace[spaces.size()];
+		blistener.updateSpaces(spaces.toArray(s));
+                break;
+	    case 24:
+		// we heard some message from the server
+		byte [] bytes = new byte[data.remaining()];
+		data.get(bytes);
+		String msg = new String(bytes);
+		blistener.hearMessage(msg);
 		break;
 	    default:
 		// someone must have sent us a chat message since

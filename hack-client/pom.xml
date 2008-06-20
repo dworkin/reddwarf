@@ -55,7 +55,7 @@
 		</goals>
 		<configuration>
 		  <tasks>
-		    <java classname="com.sun.sgs.example.hack.client.HackClient"
+		    <java classname="com.sun.sgs.example.hack.client.Client"
 			  fork="true">
 		      <jvmarg line="${run.jvm.args}"/>
 		      <sysproperty key="java.util.logging.config.file"

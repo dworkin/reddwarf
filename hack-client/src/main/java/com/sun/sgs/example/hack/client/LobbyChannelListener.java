@@ -77,7 +77,13 @@ public class LobbyChannelListener extends GameChannelListener
 		// we got some uid to player name mapping
 		addUidMappings(data);
 		break;
-	    case 1:
+	    case 8:
+		notifyJoinOrLeave(data, true);
+		break;
+	    case 9:
+		notifyJoinOrLeave(data, true);
+		break;
+	    case 11:
 		// we were sent game membership updates
 		@SuppressWarnings("unchecked")
                     Collection<GameMembershipDetail> details =
@@ -97,7 +103,7 @@ public class LobbyChannelListener extends GameChannelListener
 		    }
 		}
 		break;
-	    case 2: {
+	    case 12: {
 		// we got a membership count update for some game
 		int count = data.getInt();
 		byte [] bytes = new byte[data.remaining()];
@@ -111,19 +117,19 @@ public class LobbyChannelListener extends GameChannelListener
 		else
 		    llistener.playerCountUpdated(name, count);
 		break; }
-	    case 3: {
+	    case 13: {
 		// we heard about a new game
 		byte [] bytes = new byte[data.remaining()];
 		data.get(bytes);
 		llistener.gameAdded(new String(bytes));
 		break; }
-	    case 4: {
+	    case 14: {
 		// we heard that a game was removed
 		byte [] bytes = new byte[data.remaining()];
 		data.get(bytes);
 		llistener.gameRemoved(new String(bytes));
 		break; }
-	    case 5: {
+	    case 15: {
 		// we got updated with some character statistics...these
 		// are characters that the client is allowed to play
 		@SuppressWarnings("unchecked")
@@ -131,12 +137,6 @@ public class LobbyChannelListener extends GameChannelListener
 		    (Collection<CharacterStats>)(getObject(data));
 		llistener.setCharacters(characters);
 		break; }
-	    case 8:
-		notifyJoinOrLeave(data, true);
-		break;
-	    case 9:
-		notifyJoinOrLeave(data, true);
-		break;
 	    default:		    
 		// someone must have sent us a chat message since
 		// the first byte didn't start with a known

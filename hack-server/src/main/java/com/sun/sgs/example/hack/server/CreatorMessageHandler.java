@@ -64,7 +64,7 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 
         // FIXME: we should use an enum to define the messages
         //try {
-            switch (command) {
+	switch (command) {
             case 1:
                 // get the id and create the stats
                 characterId = data.getInt();
@@ -88,7 +88,9 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
                 // go to the lobby
                 moveToLobby(player);
                 break;
-            }
+	    default:
+		System.out.println("unknown command: " + command);
+	}
             /*} catch (Exception e) {
             // FIXME: here what we want to do is either log the error, or
             // send back a generic error response

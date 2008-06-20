@@ -69,7 +69,7 @@ public class CreatorChannelListener extends GameChannelListener
 	// if this is a message from the server, then it's some
 	// command that we need to process, so get the command code
 	int command = (int)(data.get());
-	
+
 	// FIXME: this should really be an enumeration
 	try {
 	    switch (command) {
@@ -77,17 +77,18 @@ public class CreatorChannelListener extends GameChannelListener
 		// we got some uid to player name mapping
 		addUidMappings(data);
 		break;
-	    case 8:
-		notifyJoinOrLeave(data, true);
-		break;
-	    case 9:
-		notifyJoinOrLeave(data, true);
-		break;
-	    case 64:
+	    case 1:
 		// we got some new character stats
 		int id = data.getInt();
 		CharacterStats stats = (CharacterStats)(getObject(data));
 		clistener.changeStatistics(id, stats);
+		System.out.println("changed stats");
+		break;
+	    case 9:
+		notifyJoinOrLeave(data, true);
+		break;
+	    case 8:
+		notifyJoinOrLeave(data, true);
 		break;
 	    default:
 		// someone must have sent us a chat message since

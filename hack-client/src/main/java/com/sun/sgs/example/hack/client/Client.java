@@ -72,6 +72,44 @@ import javax.swing.JPanel;
  */
 public class Client extends JFrame implements SimpleClientListener {
 
+    /**
+     * The possible states the client could be in.  
+     */
+    private enum State {
+	CREATE,
+	LOBBY,
+	DUNGEON
+    }
+
+    /**
+     * The current state of the server which determine the handler
+     * that gets the incoming message from the server
+     */
+    private State state;
+
+    /**
+     * A lookup table for determining the state based on the type of
+     * message seen.
+     */
+    private static final State[] stateTable = new State[25];
+
+    static {
+	// NOTE: we start in state CREATE, and once we transition from
+	// there, we can never go back, so no lookup should result in
+	// State.CREATE.
+
+	stateTable[11] = State.LOBBY;
+	stateTable[12] = State.LOBBY;
+	stateTable[13] = State.LOBBY;
+	stateTable[14] = State.LOBBY;
+	stateTable[15] = State.LOBBY;
+
+	stateTable[21] = State.DUNGEON;
+	stateTable[22] = State.DUNGEON;
+	stateTable[23] = State.DUNGEON;
+	stateTable[24] = State.DUNGEON;
+    }
+
     private static final long serialVersionUID = 1;
 
     // the simple client connection
@@ -150,6 +188,9 @@ public class Client extends JFrame implements SimpleClientListener {
         lmanager.setConnectionManager(client);
         crmanager.setConnectionManager(client);
         gmanager.setConnectionManager(client);
+	
+	// we start off the client in the create state
+	state = State.CREATE;
     }
 
     /**
@@ -170,14 +211,16 @@ public class Client extends JFrame implements SimpleClientListener {
     }
 
     public void loggedIn() {
-        System.err.println("logged in");
+        System.out.println("logged in");
     }
 
     public void loginFailed(String reason) {
         System.out.println("Login failed: " + reason);
     }
 
-    public void disconnected(boolean graceful, String reason) {}
+    public void disconnected(boolean graceful, String reason) {
+	System.out.println("disconnected: " + reason);
+    }
     public void reconnecting() {}
     public void reconnected() {}
 
@@ -229,10 +272,43 @@ public class Client extends JFrame implements SimpleClientListener {
         // The only "direct" message is sent to the client to inform it
         // that of its session id. -JM
 
-        byte[] bytes = new byte[message.remaining()];
-        message.get(bytes);
-        BigInteger sessionId = new BigInteger(1, bytes);
-        chatPanel.setSessionId(sessionId);
+	if (chatPanel.getSessionId() == null) {
+
+	    byte[] bytes = new byte[message.remaining()];
+	    message.get(bytes);
+	    BigInteger sessionId = new BigInteger(1, bytes);
+	    chatPanel.setSessionId(sessionId);
+	}
+	else {
+	    // peek at the command byte to determine what game state
+	    // we're in
+	    int command = (int)(message.get());
+
+	    // rewind the mark so the listeners can't tell we peeked.
+	    message.rewind();
+
+	    if (command == 0 || command == 1 ||
+		command == 8 || command == 9) {
+		// stay in the current state
+	    }
+	    else 
+		state = stateTable[command];	    
+
+	    switch (state) {
+	    case CREATE:		
+		crListener.receivedMessage(null, message);
+		break;
+	    case LOBBY:
+		llistener.receivedMessage(null, message);
+		break;
+	    case DUNGEON:
+		dlistener.receivedMessage(null, message);
+		break;
+	    default:
+		// FIXME: error out more gracefully
+		System.out.println("unhandled state: " + state);
+	    }
+	}
     }
 
     /**

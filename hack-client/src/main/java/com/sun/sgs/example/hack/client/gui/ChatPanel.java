@@ -108,6 +108,10 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
         currentSession = session;
     }
 
+    public BigInteger getSessionId() {
+	return currentSession;
+    }
+
     /**
      * Clears all the current messages in the display area.
      */

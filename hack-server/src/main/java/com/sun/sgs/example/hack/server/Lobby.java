@@ -69,7 +69,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     private ManagedReference<Channel> channelRef;
 
     // the set of players in the lobby, mapping from uid to account name
-    private HashMap<ClientSession,String> playerMap;
+    private HashMap<ManagedReference<ClientSession>,String> playerMap;
 
     // the map for player counts in each game
     private HashMap<String,GameMembershipDetail> countMap;
@@ -99,7 +99,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         gcmRef = dataManager.createReference(gcm);
 
         // initialize the player list
-        playerMap = new HashMap<ClientSession,String>();
+        playerMap = new HashMap<ManagedReference<ClientSession>,String>();
 
         // initialize the count for each game
         countMap = new HashMap<String,GameMembershipDetail>();
@@ -158,13 +158,15 @@ public class Lobby implements Game, GameChangeListener, Serializable {
 
         // update all existing members about the new uid's name
         ClientSession session = player.getCurrentSession();
+	ManagedReference<ClientSession> sessionRef = 
+	    AppContext.getDataManager().createReference(session);
         String playerName = player.getName();
         Messages.sendUidMap(session, playerName, channelRef.get(), 
 			    getCurrentUsers());
 
         // add the player to the lobby channel and the player map
         channelRef.get().join(session);
-        playerMap.put(session, playerName);
+        playerMap.put(sessionRef, playerName);
         player.userJoinedChannel(channelRef.get());
 	
         // update the player about all uid to name mappings on the channel
@@ -197,8 +199,11 @@ public class Lobby implements Game, GameChangeListener, Serializable {
 
         // remove the player from the lobby channel and the local map
         ClientSession session = player.getCurrentSession();
+	ManagedReference<ClientSession> sessionRef = 
+	    AppContext.getDataManager().createReference(session);
+
         channelRef.get().leave(session);
-        playerMap.remove(session);
+        playerMap.remove(sessionRef);
 
         // send an update about the new lobby membership count
         // FIXME: this was going to be a queued task, but that tripped the
@@ -242,7 +247,12 @@ public class Lobby implements Game, GameChangeListener, Serializable {
      * into an array to use in broadcasting messages.
      */
     private ClientSession [] getCurrentUsers() {
-        return playerMap.keySet().toArray(new ClientSession[playerMap.size()]);
+	ClientSession[] users = new ClientSession[playerMap.size()];
+	int i = 0;
+        for (ManagedReference<ClientSession> sessionRef :  playerMap.keySet()) {
+	    users[i++] = sessionRef.get();
+	}
+	return users;
     }
 
     /**

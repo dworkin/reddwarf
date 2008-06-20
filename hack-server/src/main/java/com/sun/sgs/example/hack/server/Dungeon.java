@@ -61,7 +61,7 @@ public class Dungeon implements Game, Serializable {
     private ManagedReference<GameConnector> connectorRef;
 
     // the set of players in the lobby, mapping from uid to account name
-    private HashMap<ClientSession,String> playerMap;
+    private HashMap<ManagedReference<ClientSession>,String> playerMap;
 
     private Channel channel() {
         return channelRef.get();
@@ -91,7 +91,7 @@ public class Dungeon implements Game, Serializable {
         channelRef = dataManager.createReference(channel);
 
         // initialize the player list
-        playerMap = new HashMap<ClientSession,String>();
+        playerMap = new HashMap<ManagedReference<ClientSession>,String>();
 
         // get a reference to the membership change manager
         gcmRef = dataManager.createReference(
@@ -111,13 +111,16 @@ public class Dungeon implements Game, Serializable {
         // update all existing members about the new uid's name
         ClientSession session = player.getCurrentSession();
         String playerName = player.getName();
-        ClientSession [] users = playerMap.keySet().
-            toArray(new ClientSession[playerMap.size()]);
+	ClientSession [] users = new ClientSession[playerMap.size()];
+	int i = 0;
+	for (ManagedReference<ClientSession> sessionRef : playerMap.keySet()) {
+	    users[i++] = sessionRef.get();
+	}
         Messages.sendUidMap(session, playerName, channel(), users);
 
         // add the player to the dungeon channel and the local map
         channel().join(session);
-        playerMap.put(session, playerName);
+        playerMap.put(dataManager.createReference(session), playerName);
 
         // update the player about all uid to name mappings on the channel
         Messages.sendUidMap(playerMap, channel(), session);
@@ -158,7 +161,7 @@ public class Dungeon implements Game, Serializable {
         // remove the player from the dungeon channel and the player map
         ClientSession session = player.getCurrentSession();
         channel().leave(player.getCurrentSession());
-        playerMap.remove(session);
+        playerMap.remove(AppContext.getDataManager().createReference(session));
 
         // just to be paranoid, we should make sure that they're out of
         // their current level...for instance, if we got called because the
