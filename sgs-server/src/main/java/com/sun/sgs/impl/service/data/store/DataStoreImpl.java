@@ -105,8 +105,8 @@ import java.util.logging.Logger;
  * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information
- * at the following logging levels: <p>
+ * <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> to log
+ * information at the following logging levels: <p>
  *
  * <ul>
  * <li> {@link Level#SEVERE SEVERE} - Initialization failures
@@ -119,8 +119,8 @@ import java.util.logging.Logger;
  *
  * In addition, name and object operations that throw {@link
  * TransactionAbortedException} will log the failure to the {@code Logger}
- * named {@code com.sun.sgs.impl.service.data.DataStoreImpl.abort}, to make it
- * easier to debug concurrency conflicts.
+ * named {@code com.sun.sgs.impl.service.data.store.DataStoreImpl.abort}, to
+ * make it easier to debug concurrency conflicts.
  */
 public class DataStoreImpl
     implements DataStore, TransactionParticipant, ProfileProducer
