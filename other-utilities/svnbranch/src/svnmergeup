@@ -3,7 +3,7 @@
 # Merges changes made in a Subversion branch into a working copy for the
 # associated trunk.
 
-# $Id$
+# $Id: svnmergeup 3091 2007-10-01 15:27:41Z tb97327 $
 
 ################
 # Use
@@ -32,7 +32,7 @@ require "$program_dir/svnmergeutil.pl";
 ################
 
 # Subversion ID for this revision
-my $id ='$Id$';
+my $id ='$Id: svnmergeup 3091 2007-10-01 15:27:41Z tb97327 $';
 
 # Usage message
 my $usage = "Usage: " . escape($0) .
