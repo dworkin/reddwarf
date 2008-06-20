@@ -71,12 +71,16 @@ class ProfileReportImpl implements ProfileReport {
     int tryCount = 0;
     Throwable throwable = null;
 
-    List<ProfileOperation> ops;
+
     Set<ProfileParticipantDetail> participants;
 
     // counters that are updated through methods on this class
     Map<String,Long> aggCounters;
     Map<String,Long> taskCounters;
+
+    // a list of operations performed, which is updated through
+    // methods on this class
+    List<ProfileOperation> ops;
 
     // samples that are aggregated through methods on this class
     Map<String,List<Long>> localSamples;
@@ -308,28 +312,13 @@ class ProfileReportImpl implements ProfileReport {
      */
     void merge(ProfileReportImpl report) {
 	
-	// for each of the child tasks counters and samples, we first
+	// for each of the child task counters and samples, we first
 	// check whether the task recorded any data.  If so, then we
 	// copy the data to this report.      
 
-	if (report.aggCounters != null) {
-	    if (aggCounters == null) {
-		aggCounters = new HashMap<String,Long>();
-		aggCounters.putAll(report.aggCounters);
-	    }
-	    for (Map.Entry<String,Long> e : report.aggCounters.entrySet()) {
-		Long curCount = aggCounters.get(e.getKey());
-		aggCounters.put(e.getKey(),
-				(curCount == null) 
-				? e.getValue()
-				: curCount + e.getValue());
-	    }
-	}
-
 	if (report.taskCounters != null) {
 	    if (taskCounters == null) {
-		taskCounters = new HashMap<String,Long>();
-		taskCounters.putAll(report.taskCounters);
+		taskCounters = new HashMap<String,Long>(report.taskCounters);
 	    }
 	    else {
 		for (Map.Entry<String,Long> e : 
@@ -369,9 +358,23 @@ class ProfileReportImpl implements ProfileReport {
 	    }
 	}
 
-	// NOTE: we do not need to update the aggregateSample, as this
-	//       is being collected across all tasks, and so by
-	//       updating we would really be double counting samples
+	if (report.ops != null) {
+	    if (ops == null) {
+		ops = new LinekdList<ProfileOperation>(report.ops);
+	    }
+	    else {
+		ops.addAll(report.ops);
+	    }
+	}
+
+	// NOTE: we do not need to update the aggregateSamples and
+	//       aggregateCounters, as this is being collected across
+	//       all tasks, and so by updating we would really be
+	//       double counting the data
+
+	// NOTE: we do not include the the participants information
+	//       since this is specific to a task and not to its
+	//       children.
     }
 
 }
