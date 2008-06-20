@@ -8,11 +8,12 @@ SRCS = \
 	sgs/buffer.c \
 	sgs/io_utils.c \
 	sgs/message.c \
-	sgs/compact_id.c \
+	sgs/id_impl.c \
 	sgs/connection.c \
 	sgs/context.c \
 	sgs/session.c \
-	sgs/channel.c
+	sgs/channel.c \
+	sgs/socket.c
 
 LIB = libsgsclient.a
 

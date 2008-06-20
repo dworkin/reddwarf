@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008 Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -203,7 +203,11 @@ size_t tailpos(const sgs_buffer_impl* buffer) {
  * writable_len()
  */
 size_t writable_len(const sgs_buffer_impl* buffer) {
-    size_t mytailpos = tailpos(buffer);
+    size_t mytailpos;
+
+	if (buffer->size == buffer->capacity) return 0;
+
+	mytailpos = tailpos(buffer);
   
     if (mytailpos >= buffer->position) {
         /*

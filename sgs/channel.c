@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -48,15 +48,6 @@
 
 #include <wchar.h>
 
-static const size_t SGS_MAX_RECIPIENTS = 65535;
-
-/*
- * STATIC FUNCTION DECLARATIONS
- * (can only be called by functions in this file)
- */
-static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id *recipients[], size_t recipslen);
-
 /*
  * sgs_channel_name()
  */
@@ -65,33 +56,33 @@ const wchar_t* sgs_channel_name(const sgs_channel_impl *channel) {
 }
 
 /*
- * sgs_session_channel_send_all()
+ * sgs_session_channel_send()
  */
-int sgs_channel_send_all(sgs_channel_impl *channel, const uint8_t *data,
+int sgs_channel_send(sgs_channel_impl *channel, const uint8_t *data,
     size_t datalen)
 {
-    return send_msg_general(channel, data, datalen, (const sgs_id**)NULL, 0);
-}
-
-/*
- * sgs_session_channel_send_multi()
- */
-int sgs_channel_send_multi(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id *recipients[], size_t recipslen)
-{
-    return send_msg_general(channel, data, datalen, recipients,
-        recipslen);
-}
-
-/*
- * sgs_session_channel_send_one()
- */
-int sgs_channel_send_one(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id *recipient)
-{
-    const sgs_id *recipients[] = { recipient };
+    int result;
+    sgs_session_impl *session = channel->session;
+    sgs_message msg;
     
-    return send_msg_general(channel, data, datalen, recipients, 1);
+    /** Initialize static fields of message. */
+    result = sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
+						  SGS_OPCODE_CHANNEL_MESSAGE);
+    if (result < 0)
+        return -1;
+    
+    /** Add channel-id data field to message. */
+    if (sgs_msg_add_id(&msg, channel->id) == -1)
+        return -1;
+	
+    
+    /** Add message payload to message. */
+    if (sgs_msg_add_arb_content(&msg, data, datalen) == -1) return -1;
+    
+    /** Done assembling message; tell session to send it. */
+    if (sgs_session_impl_send_msg(session) == -1) return -1;
+    
+    return 0;
 }
 
 
@@ -143,59 +134,4 @@ sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
     return channel;
 }
 
-
-/*
- * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS
- * (these are functions that can only be called within this file)
- */
-
-/*
- * function: send_msg()
- *
- * Acts as a common implementation for all of sgs_channel_send_all(),
- * sgs_channel_send_one(), and sgs_channel_send_multi().
- */
-static int send_msg_general(sgs_channel_impl *channel, const uint8_t *data,
-    size_t datalen, const sgs_id *recipients[], size_t recipslen)
-{
-    int result;
-    size_t i;
-    uint16_t _uint16_tmp;
-    sgs_session_impl *session = channel->session;
-    sgs_message msg;
-    
-    /** Initialize static fields of message. */
-    result = sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
-            SGS_OPCODE_CHANNEL_SEND_REQUEST, SGS_CHANNEL_SERVICE);
-    if (result < 0)
-        return -1;
-    
-    /** Add channel-id data field to message. */
-    if (sgs_msg_add_id(&msg, channel->id) == -1)
-        return -1;
-    
-    /** Add sequence number to message. */
-    if (sgs_msg_add_uint32(&msg, session->seqnum_hi) == -1) return -1;
-    if (sgs_msg_add_uint32(&msg, session->seqnum_lo) == -1) return -1;
-    
-    /** Add recipient-count to message. */
-    if (recipslen > SGS_MAX_RECIPIENTS) { errno = SGS_ERR_SIZE_ARG_TOO_LARGE; return -1; }
-    _uint16_tmp = htons(recipslen);
-    if (sgs_msg_add_arb_content(&msg, (uint8_t*)(&_uint16_tmp), 2) == -1)
-        return -1;
-    
-    /** Add each recipient-id to message. */
-    for (i=0; i < recipslen; i++) {
-        if (sgs_msg_add_id(&msg, recipients[i]) == -1)
-            return -1;
-    }
-    
-    /** Add message payload to message. */
-    if (sgs_msg_add_fixed_content(&msg, data, datalen) == -1) return -1;
-    
-    /** Done assembling message; tell session to send it. */
-    if (sgs_session_impl_send_msg(session) == -1) return -1;
-    
-    return 0;
-}
 

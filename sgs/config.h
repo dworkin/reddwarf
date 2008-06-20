@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -50,10 +50,12 @@ extern "C" {
 #include <Winsock2.h>
 
 typedef int socklen_t;
-#define EMSGSIZE WSAEMSGSIZE
-#define ENOBUFS WSAENOBUFS
-#define EINPROGRESS WSAEINPROGRESS
-#define ENOTCONN WSAENOTCONN
+#define EMSGSIZE		90
+#define ENOBUFS			105
+#define ENOTCONN		107
+#define ECONNREFUSED	111
+#define EINPROGRESS		115
+#define ETIMEDOUT       56
 
 typedef signed char int8_t;
 typedef unsigned char uint8_t;
@@ -62,7 +64,14 @@ typedef unsigned short uint16_t;
 typedef signed int int32_t;
 typedef unsigned int uint32_t;
 typedef int ssize_t;
-#else /* !WIN32 */
+#elif defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <poll.h>
+#include <stdint.h>
+#else /* !WIN32 && !MACOSX */
 #include <stdint.h>
 #include <unistd.h>
 #include <poll.h>

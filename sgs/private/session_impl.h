@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -48,24 +48,18 @@ typedef struct sgs_session_impl sgs_session_impl;
 struct sgs_session_impl {
     /** The underlying network connection. */
     sgs_connection_impl* connection;
-    
-    /** Server-assigned unique ID for this session. */
-    sgs_id* session_id;
-    
+        
     /** Server-assigned key used to reconnect after disconnect. */
     sgs_id* reconnect_key;
     
     /** Map of channels to which this session is currently a member. */
     sgs_map* channels;
-    
-    /**
-     * Sequence number used in some messages (increment after each use).  We
-     * have to store this as two 32-bit ints instead of just a single 64-bit
-     * int so that we can use htonl() and ntohl() of which there are no 64-bit
-     * versions.
-     */
-    uint32_t seqnum_hi;
-    uint32_t seqnum_lo;
+	
+	/** login information for this session. This is kept so that reconnect
+	 *  can occur transparently for the user.
+	 */
+	char *login;
+	char *password;
     
     /**
      * Used as the backing array for any sgs_messages (more efficient to just

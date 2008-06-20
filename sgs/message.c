@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -46,8 +46,6 @@
 #include "sgs/private/message.h"
 #include "sgs/protocol.h"
 
-/* for sgs_id_impl_write() */
-#include "sgs/private/id_impl.h"
 
 static void update_msg_len(sgs_message *pmsg);
 
@@ -123,15 +121,19 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
 
 /*
  * sgs_msg_add_id()
+ * This will copy the length of the id, and then the contents of the id,
+ * to the message field
  */
 int sgs_msg_add_id(sgs_message *msg, const sgs_id *id) {
-    int result = sgs_id_impl_write(id, msg->buf + msg->len,
-        msg->capacity - msg->len);
-    
-    if (result == -1) return -1;
-    
-    msg->len += result;
-    return 0;
+    return sgs_msg_add_fixed_content(msg, sgs_id_get_bytes(id), sgs_id_get_byte_len(id));
+}
+
+/*
+ * sgs_msg_add_uint16
+ */
+int sgs_msg_add_uint16(sgs_message *pmsg, uint16_t val){
+	uint16_t converted = htons(val);
+	return sgs_msg_add_arb_content(pmsg, (uint8_t*)&converted, 2);
 }
 
 /*
@@ -148,12 +150,12 @@ int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
 int sgs_msg_deserialize(sgs_message* pmsg, uint8_t *buffer, size_t buflen) {
     uint32_t net_len;
     
-    /** read message-length-field (first 4 bytes) */
-    net_len = *((uint32_t*)buffer);
-    pmsg->len = ntohl(net_len);
+    /** read message-length-field (first 2 bytes) */
+    net_len = *((uint16_t*)buffer);
+    pmsg->len = ntohs(net_len);
   
-    /** account for the 4-bytes holding the length itself */
-    pmsg->len += 4;
+    /** account for the 2-bytes holding the length itself */
+    pmsg->len += 2;
   
     /** check if buffer is long enough to contain this whole message. */
     if (buflen < pmsg->len) {
@@ -163,12 +165,6 @@ int sgs_msg_deserialize(sgs_message* pmsg, uint8_t *buffer, size_t buflen) {
   
     pmsg->buf = buffer;
     pmsg->capacity = buflen;
-  
-    /** invalid message: too big */
-    if (pmsg->len > SGS_MSG_MAX_LENGTH) {
-        errno = EMSGSIZE;
-        return -1;
-    }
   
     return pmsg->len;
 }
@@ -184,63 +180,51 @@ const uint8_t *sgs_msg_get_bytes(const sgs_message *pmsg) {
  * sgs_msg_get_data()
  */
 const uint8_t *sgs_msg_get_data(const sgs_message *pmsg) {
-    return pmsg->buf + 7;
+    return pmsg->buf + SGS_MSG_INIT_LEN;
 }
 
 /*
  * sgs_msg_get_datalen()
  */
-size_t sgs_msg_get_datalen(const sgs_message *pmsg) {
-    return pmsg->len - 7;
+uint16_t sgs_msg_get_datalen(const sgs_message *pmsg) {
+    return pmsg->len - SGS_MSG_INIT_LEN;
 }
 
 /*
  * sgs_msg_get_opcode()
  */
 uint8_t sgs_msg_get_opcode(const sgs_message *pmsg) {
-    return pmsg->buf[6];
-}
-
-/*
- * sgs_msg_get_service()
- */
-uint8_t sgs_msg_get_service(const sgs_message *pmsg) {
-    return pmsg->buf[5];
+    return pmsg->buf[SGS_OPCODE_OFFSET];
 }
 
 /*
  * sgs_msg_get_size()
  */
-size_t sgs_msg_get_size(const sgs_message *pmsg) {
+uint16_t sgs_msg_get_size(const sgs_message *pmsg) {
     return pmsg->len;
 }
 
-/*
- * sgs_msg_get_version()
- */
-uint8_t sgs_msg_get_version(const sgs_message *pmsg) {
-    return pmsg->buf[4];
-}
 
 /*
  * sgs_msg_create()
  */
 int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
-    sgs_opcode opcode, sgs_service_id service_id)
+    sgs_opcode opcode)
 {
     /** Buffer is too small to hold any messages (even w/o any payload). */
-    if (buflen < 7) {
+    if (buflen < SGS_MSG_INIT_LEN) {
         errno = ENOBUFS;
         return -1;
     }
 
+	if (buflen > SGS_MSG_MAX_LENGTH)
+		return -1;
+	
     pmsg->buf = buffer;
     pmsg->capacity = buflen;
-    pmsg->len = 7;
-  
-    pmsg->buf[4] = SGS_MSG_VERSION;
-    pmsg->buf[5] = service_id;
-    pmsg->buf[6] = opcode;
+    pmsg->len = 1;
+
+    pmsg->buf[SGS_OPCODE_OFFSET] = opcode;
     update_msg_len(pmsg);
   
     return 0;
@@ -271,6 +255,6 @@ void sgs_msg_dump(const sgs_message* msg) { }
  * update_msg_len()
  */
 static void update_msg_len(sgs_message *pmsg) {
-    uint32_t _uint32_tmp = htonl(pmsg->len - 4);
-    memcpy(pmsg->buf, &_uint32_tmp, 4);
+    uint16_t _uint16_tmp = htons(pmsg->len);
+    memcpy(pmsg->buf, &_uint16_tmp, 2);
 }

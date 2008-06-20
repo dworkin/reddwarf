@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -38,6 +38,8 @@ extern "C" {
 #endif
 
 #include "sgs/config.h"
+#include "sgs/connection.h"
+#include "sgs/socket.h"
 
 typedef struct sgs_connection_impl sgs_connection_impl;
 
@@ -53,7 +55,7 @@ typedef enum {
 
 struct sgs_connection_impl {
     /** File descriptor for the network socket to the server. */
-    int socket_fd;
+    sgs_socket_t socket_fd;
   
     /** The current state of the connection. */
     sgs_connection_state state;
@@ -71,6 +73,8 @@ struct sgs_connection_impl {
 
     /** Whether we expect the server to close the socket: 1 = yes, 0 = no */
     int expecting_disconnect;
+	/** Whether we expect a disconnect from part of a redirect: 1 = yes, 0 = no*/
+	int in_redirect;
 };
 
 

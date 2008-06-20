@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -41,12 +41,12 @@
 /*
  * sgs_impl_read_from_fd()
  */
-ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, int fd) {
+ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, sgs_socket_t fd) {
     ssize_t result, total = 0;
     ssize_t writable = writable_len(buffer);
     
     while (writable > 0) {
-        result = read(fd, buffer->buf + tailpos(buffer), writable);
+        result = sgs_socket_read(fd, buffer->buf + tailpos(buffer), writable);
         if (result == -1) return -1;  /* error */
         
         if (result == 0) {   /* EOF */
@@ -65,12 +65,12 @@ ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, int fd) {
 /*
  * sgs_impl_write_to_fd()
  */
-ssize_t sgs_impl_write_to_fd(sgs_buffer_impl *buffer, int fd) {
+ssize_t sgs_impl_write_to_fd(sgs_buffer_impl *buffer, sgs_socket_t fd) {
     ssize_t result, total = 0;
     ssize_t readable = readable_len(buffer);
   
     while (readable > 0) {
-        result = write(fd, buffer->buf + buffer->position, readable);
+        result = sgs_socket_write(fd, buffer->buf + buffer->position, readable);
         if (result == -1) return -1;  /* error */
         total += result;
         buffer->position = (buffer->position + result) % buffer->capacity;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -39,6 +39,7 @@ extern "C" {
 
 #include "sgs/config.h"
 #include "sgs/buffer.h"
+#include "sgs/socket.h"
 
 /*
  * function: sgs_impl_read_from_fd()
@@ -53,7 +54,7 @@ extern "C" {
  * it may indicate that the buffer is full, or that read() returned 0,
  * indicating that end-of-file was read.
  */
-ssize_t sgs_impl_read_from_fd(sgs_buffer* buffer, int fd);
+ssize_t sgs_impl_read_from_fd(sgs_buffer* buffer, sgs_socket_t fd);
 
 /*
  * function: sgs_impl_write_to_fd()
@@ -64,7 +65,7 @@ ssize_t sgs_impl_read_from_fd(sgs_buffer* buffer, int fd);
  * requested length.  Returns -1 if an error occurs; otherwise returns the total
  * number of bytes written to the file descriptor.
  */
-ssize_t sgs_impl_write_to_fd(sgs_buffer* buffer, int fd);
+ssize_t sgs_impl_write_to_fd(sgs_buffer* buffer, sgs_socket_t fd);
 
 #ifdef __cplusplus
 }

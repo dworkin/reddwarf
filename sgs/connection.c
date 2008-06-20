@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -68,7 +68,7 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     fd_set readset, writeset, exceptset;
     struct timeval timeout_tv;
     int result;
-    int sockfd;
+    sgs_socket_t sockfd;
     socklen_t optlen;
 
     sockfd = connection->socket_fd;
@@ -95,7 +95,7 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     
     if (FD_ISSET(sockfd, &exceptset)) {
         optlen = sizeof(errno);  /* SO_ERROR should return an int */
-        if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &errno, &optlen) == -1) {
+        if (sgs_socket_getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &errno, &optlen) == -1) {
             return -1;
         }
         
@@ -148,9 +148,15 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
  * sgs_connection_destroy()
  */
 void sgs_connection_destroy(sgs_connection_impl *connection) {
-    sgs_session_impl_destroy(connection->session);
     sgs_buffer_destroy(connection->inbuf);
     sgs_buffer_destroy(connection->outbuf);
+	
+	/*if this isn't part of a redirect, free up the session and context*/
+	if (connection->in_redirect == 0){
+		sgs_session_impl_destroy(connection->session);
+		sgs_ctx_destroy(connection->ctx);
+	}
+
     free(connection);
 }
 
@@ -160,17 +166,15 @@ void sgs_connection_destroy(sgs_connection_impl *connection) {
 int sgs_connection_login(sgs_connection_impl *connection, const char *login,
     const char *password)
 {
-    int ioflags;
     struct hostent *server;
     struct sockaddr_in serv_addr;
   
     /** create the TCP socket (not connected yet). */
-    connection->socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (connection->socket_fd == -1) return -1;
-  
+    connection->socket_fd = sgs_socket_create(AF_INET, SOCK_STREAM, 0);
+    if (connection->socket_fd == SGS_SOCKET_INVALID) return -1;
+ 
     /** Set socket to non-blocking mode. */
-    if ((ioflags = fcntl(connection->socket_fd, F_GETFL, 0)) == -1) return -1;
-    if (fcntl(connection->socket_fd, F_SETFL, ioflags | O_NONBLOCK) == -1)
+    if (sgs_socket_set_nonblocking(connection->socket_fd) == -1)
         return -1;
   
     /** Resolve hostname to IP(s).  This works even if hostname *is* an IP. */
@@ -200,8 +204,8 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
      * Try to connect to server.  (note, ok to cast sockaddr_in* to sockaddr*
      * according to http://retran.com/beej/sockaddr_inman.html )
      */
-    if (connect(connection->socket_fd, (const struct sockaddr*) &serv_addr,
-            sizeof(serv_addr)) != 0) {
+    if (sgs_socket_connect(connection->socket_fd, (const struct sockaddr*) &serv_addr,
+            sizeof(serv_addr)) == -1) {
     
         if (errno == EINPROGRESS) {
             /**
@@ -211,6 +215,15 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
              */
             connection->ctx->reg_fd_cb(connection, connection->socket_fd,
                 POLLOUT);
+
+            /*
+             * Under Windows we also registerinterest in error checking the socket
+             * because that's how some connect errors are reported.
+             */
+#ifdef WIN32
+            connection->ctx->reg_fd_cb(connection, connection->socket_fd,
+                POLLERR);
+#endif /* WIN32 */
             
             connection->state = SGS_CONNECTION_IMPL_CONNECTING;
             return 0;
@@ -236,7 +249,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
 /*
  * sgs_connection_logout()
  */
-int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
+int sgs_connection_logout(sgs_connection_impl *connection, int force) {
     if (force) {
         conn_closed(connection);
     }
@@ -247,6 +260,8 @@ int sgs_connection_logout(sgs_connection_impl *connection, const int force) {
         }
 
         connection->expecting_disconnect = 1;
+		if (connection->in_redirect)
+			return 0;
         sgs_session_impl_logout(connection->session);
     }
   
@@ -263,6 +278,7 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx) {
     if (connection == NULL) return NULL;
 
     connection->expecting_disconnect = 0;
+	connection->in_redirect = 0;
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
     connection->ctx = ctx;
     connection->session = sgs_session_impl_create(connection);
@@ -295,9 +311,11 @@ void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
     connection->ctx->unreg_fd_cb(connection, connection->socket_fd,
         POLLIN | POLLOUT | POLLERR);
     
-    close(connection->socket_fd);
+    sgs_socket_destroy(connection->socket_fd);
     connection->expecting_disconnect = 0;
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
+	if (connection->in_redirect == 1)
+		sgs_connection_destroy(connection);
 }
 
 
@@ -333,6 +351,9 @@ int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
  * Called whenever the connection is closed by the server.
  */
 static void conn_closed(sgs_connection_impl *connection) {
+	/**if this is part of a redirect sequence, do nothing*/
+	if (connection->in_redirect == 1)
+		return;
     if (connection->expecting_disconnect) {
         /** Expected close of connection... */
         sgs_connection_impl_disconnect(connection);

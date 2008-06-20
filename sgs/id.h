@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -43,7 +43,7 @@ extern "C" {
 
 #include "sgs/config.h"
 
-typedef struct sgs_compact_id sgs_id;
+typedef struct sgs_id_impl sgs_id;
 
 /*
  * function: sgs_id_create()
@@ -51,7 +51,7 @@ typedef struct sgs_compact_id sgs_id;
  * Creates an sgs_id from the specified byte array.
  * Returns the bytes of data used in rc, if rc not NULL.
  */
-sgs_id* sgs_id_create(const uint8_t* data, size_t len, ssize_t* rc);
+sgs_id* sgs_id_create(const uint8_t* data, size_t len);
 
 /*
  * function: sgs_id_duplicate()
@@ -75,14 +75,6 @@ void sgs_id_destroy(sgs_id* id);
  * greater than b.
  */
 int sgs_id_compare(const sgs_id* a, const sgs_id* b);
-
-/*
- * function: sgs_id_equals_server()
- *
- * Returns a non-zero value if and only if the specified sgs_id matches the ID
- * of the server (canonically 0).
- */
-int sgs_id_is_server(sgs_id* id);
 
 /*
  * function: sgs_id_get_bytes()

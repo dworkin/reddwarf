@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -49,6 +49,7 @@ typedef struct sgs_context_impl sgs_context;
 #include "sgs/id.h"
 #include "sgs/connection.h"
 #include "sgs/session.h"
+#include "sgs/socket.h"
 
 /*
  * function: sgs_ctx_destroy()
@@ -81,8 +82,8 @@ void sgs_ctx_destroy(sgs_context* ctx);
  * POLLOUT, and/or POLLERR.
  */
 sgs_context* sgs_ctx_create(const char* hostname, const int port,
-    void (*reg_fd)(sgs_connection*, int, short),
-    void (*unreg_fd)(sgs_connection*, int, short));
+    void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
+    void (*unreg_fd)(sgs_connection*, sgs_socket_t, short));
 
 /*
  * function: sgs_ctx_set_channel_joined_cb()
@@ -113,13 +114,11 @@ void sgs_ctx_set_channel_left_cb(sgs_context* ctx,
  * channel.  The function should take the following arguments:
  *   sgs_connection*: the connection making this callback
  *      sgs_channel*: the channel on which the message was received
- *     const sgs_id*: the ID of the sender of the message
  *    const uint8_t*: the received message (not null-terminated)
  *            size_t: the length of the received message
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context* ctx,
-    void (*callback)(sgs_connection*, sgs_channel*, const sgs_id*,
-        const uint8_t*, size_t));
+    void (*callback)(sgs_connection*, sgs_channel*, const uint8_t*, size_t));
 
 /*
  * function: sgs_ctx_set_disconnected_cb()

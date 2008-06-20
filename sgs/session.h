@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -71,13 +71,6 @@ int sgs_session_direct_send(sgs_session* session, const uint8_t* data,
  * Returns the reconnection-key for this session.
  */
 const sgs_id* sgs_session_get_reconnectkey(const sgs_session* session);
-
-/*
- * function: sgs_session_get_id()
- *
- * Returns this session's unique ID.
- */
-const sgs_id* sgs_session_get_id(const sgs_session* session);
 
 #ifdef __cplusplus
 }

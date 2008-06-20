@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -51,7 +51,7 @@ typedef struct {
     size_t capacity;
 
     /* Message length. */
-    size_t len;
+    uint16_t len;
 
 } sgs_message;
 
@@ -109,6 +109,15 @@ int sgs_msg_add_fixed_content(sgs_message* pmsg, const uint8_t* content,
  *   -1: failure (errno is set to specific error code)
  */
 int sgs_msg_add_id(sgs_message* pmsg, const sgs_id* id);
+	
+/*
+ * function: sgs_msg_add_uint16()
+ * 
+ * Writes a 16-bit int to an existing message (useful for lengths)
+ *
+ * returns 0 is successful, -1 on failure
+ */
+int sgs_msg_add_uint16(sgs_message *msg, uint16_t val);
 
 /*
  * function: sgs_msg_add_uint32()
@@ -151,7 +160,7 @@ const uint8_t* sgs_msg_get_data(const sgs_message* pmsg);
  * 
  * Returns the length of this message's data payload.
  */
-size_t sgs_msg_get_datalen(const sgs_message* pmsg);
+uint16_t sgs_msg_get_datalen(const sgs_message* pmsg);
 
 /*
  * function: sgs_msg_get_opcode()
@@ -161,26 +170,12 @@ size_t sgs_msg_get_datalen(const sgs_message* pmsg);
 uint8_t sgs_msg_get_opcode(const sgs_message* pmsg);
 
 /*
- * function: sgs_msg_get_service()
- * 
- * Returns the current service-id of this message.
- */
-uint8_t sgs_msg_get_service(const sgs_message* pmsg);
-
-/*
  * function: sgs_msg_get_size()
  *
  * Returns the total length of this message.
  */
-size_t sgs_msg_get_size(const sgs_message* pmsg);
-
-/*
- * function: sgs_msg_get_version()
- * 
- * Returns the current version-ID of this message.
- */
-uint8_t sgs_msg_get_version(const sgs_message* pmsg);
-
+uint16_t sgs_msg_get_size(const sgs_message* pmsg);
+		
 /*
  * function: sgs_msg_init()
  *
@@ -191,13 +186,12 @@ uint8_t sgs_msg_get_version(const sgs_message* pmsg);
  *      buffer: the backing buffer to write/read to/from
  *      buflen: size of backing buffer
  *      opcode: operation code for this message
- *  service_id: service id for this message
  *
  * returns:
  *  NULL: failure (errno is set to specific error code)
  */
 int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
-    sgs_opcode opcode, sgs_service_id service_id);
+    sgs_opcode opcode);
 
 /*
  * function: sgs_msg_dump()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -31,51 +31,35 @@
  */
 
 /*
- * FIXME
- * FIXME
- * FIXME
- *
- * This file is out-of-date with the new SGS protocol (post 0.9.5),
- * and needs to be updated along with the channel code (gone) and
- * details of protocol handling. -JM
+ * This file declares constants relevant to the SGS network wire protocol.
  */
 
-/*
+/**
  * SGS Protocol constants.
- *
+ * <p>
  * A protocol message is constructed as follows:
- *
- * (int)  payload length, not including this int
- * (byte) version number
- * (byte) service id
- * (byte) operation code
- * optional content, depending on the operation code.
- * 
- * A ByteArray is encoded as follows:
- *
- *   (unsigned short) number of bytes in the array
- *   (byte[])         the bytes in the array
- *
- * A String is encoded as follows:
- * 
- *   (unsigned short) number of bytes of modified UTF-8 encoded String
- *   (byte[])         String encoded in modified UTF-8 as described
- *                    in java.io.DataInput
- *
- * A CompactId is encoded as follows:
- *
- * The first byte of the ID's external form contains a length field
- * of variable size.  If the first two bits of the length byte are not
- * #b11, then the size of the ID is indicated as follows:
- *
- *   #b00: 14 bit ID (2 bytes total)
- *   #b01: 30 bit ID (4 bytes total)
- *   #b10: 62 bit ID (8 bytes total)
- *
- * If the first byte has the following format:
- *   1100nnnn
- * then the ID is contained in the next (8 + nnnn) bytes.
- *
+ * <ul>
+ * <li> (unsigend short) payload length, not including this field
+ * <li> (byte) operation code
+ * <li> optional content, depending on the operation code.
+ * </ul>
+ * <p>
+ * A {@code ByteArray} is encoded as follows:
+ * <ul>
+ * <li> (byte[]) the bytes in the array
+ * </ul>
+ * <b>Note:</b> Messages may need to include explicit array length fields if the include
+ * more than one ByteArray. If so, the length should preceed the ByteArray. None of the
+ * messages defined as part of the base protocol contain multiple ByteArrays except for the
+ * channel message, and so all have a length that is either the same as the payload length or 
+ * calculated from the payload length.
+ * <p>
+ * A {@code String} is encoded as follows:
+ * <ul>
+ * <li> (unsigned short) number of bytes of modified UTF-8 encoded String
+ * <li> (byte[]) String encoded in modified UTF-8 as described
+ * in {@link DataInput}
+ * </ul>
  */
 
 #ifndef SGS_PROTOCOL_H
@@ -85,197 +69,150 @@
 extern "C" {
 #endif
 
-/*
+/**
  * The maximum length of any protocol message field defined as a
  * String or byte[]: 65535 bytes
  */
 #define SGS_MSG_MAX_LENGTH 65535
 
-/*
- * The size of the static portion of a message (i.e. with a message
+/**
+ * The maximum payload length, in bytes
+ */
+#define SGS_MAX_PAYLOAD_LENGTH 65532
+
+/**
+ * This is the size of the static portion of a message (i.e. with a message
  * payload of 0 bytes).
  */
-#define SGS_MSG_INIT_LEN 7
+#define SGS_MSG_INIT_LEN (SGS_MSG_MAX_LENGTH - SGS_MAX_PAYLOAD_LENGTH)
 
-/* The version number, currently 0x03. */
-#define SGS_MSG_VERSION 0x03
-
-typedef enum sgs_service_id {
-    /* The Application service ID, 0x01. */
-    SGS_APPLICATION_SERVICE = 0x01,
-  
-    /* The Channel service ID, 0x02. */
-    SGS_CHANNEL_SERVICE = 0x02,
-} sgs_service_id;
+/* The version number */
+#define SGS_MSG_VERSION 0x04
+	
+/*The offset of the opcode in the messages*/
+#define SGS_OPCODE_OFFSET 2
 
 typedef enum sgs_opcode {
-    /*
-     * Login request from a client to a server.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x10
-     *
-     * Payload:
-     *    (String) name
-     *    (String) password
+    /**
+     * Login request from the client to the server.
+     * <ul>
+	 * <li> (byte) protocol version
+	 * <li> (unsighed short) name array length
+     * <li> (char[]) name
+	 * <li> (unsigned short) password array length
+     * <li> (char[]) password
+     * </ul>
      */
     SGS_OPCODE_LOGIN_REQUEST = 0x10,
 
-    /*
-     * Login success.  Server response to a client's LOGIN_REQUEST.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x11
-     *
-     * Payload:
-     *     (CompactId) sessionId
-     *     (CompactId) reconnectionKey
+    /**
+     * Login success (login request acknowledgment). Server response to the client's login request
+     * <ul>
+     * <li> (byte[]) reconnectionKey
+     * </ul>
      */
     SGS_OPCODE_LOGIN_SUCCESS = 0x11,
 
-    /*
-     * Login failure.  Server response to a client's LOGIN_REQUEST.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x12
-     *
-     * Payload:
-     *     (String) reason
+    /**
+     * Login failure (login request acknowledgment). Server response to the client's login request.
+     * <ul>
+	 * <li> (unsigned short) array length
+     * <li> (uint8_t[]) reason (note- the array can probably be cast to a char[], but is not null-terminated)
+     * </ul>
      */
     SGS_OPCODE_LOGIN_FAILURE = 0x12,
+	
+	/**
+	 * Login redirect. Server response to a client's login request
+	 * Payload:
+	 * <ul>
+	 * <li> (unsigned short) array length
+	 * <li> (uint8_t[]) hostname (note- the array can probably be cast to a char[], but is not null-terminated)
+	 * <li> (int) port
+	 */
+	SGS_OPCODE_LOGIN_REDIRECT = 0x13,
 
-    /*
-     * Login redirect.  Server response to a client's LOGIN_REQUEST.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x13
-     *
-     * Payload:
-     *     (String) hostname
-     */
-    SGS_OPCODE_LOGIN_REDIRECT = 0x13,
-
-    /*
-     * Reconnection request.  Client requesting reconnect to a server.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x20
-     *
-     * Payload:
-     *     (CompactId) reconnectionKey
+    /**
+     * Reconnection request. Client's request to the server
+     * <ul>
+	 * <li> byte protocol version
+     * <li> (byte[]) reconnectionKey
+     * </ul>
      */
     SGS_OPCODE_RECONNECT_REQUEST = 0x20,
 
-    /*
-     * Reconnect success.  Server response to a client's RECONNECT_REQUEST.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x21
-     *
-     * Payload:
-     *     (CompactId) reconnectionKey
+    /**
+     * Reconnect success (reconnection request acknowledgment). Sent from the server to the client.
+     * <ul>
+	 * <li> (unsigned short) array length
+     * <li> (byte[]) reconnectionKey
+     * </ul>
      */
     SGS_OPCODE_RECONNECT_SUCCESS = 0x21,
 
-    /*
-     * Reconnect failure.  Server response to a client's RECONNECT_REQUEST.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x22
-     *
-     * Payload:
-     *     (String) reason
+    /**
+     * Reconnect failure (reconnection request acknowledgment).
+     * <ul>
+	 * <li> (unisigned short) array length
+     * <li> (uint8_t[]) reason (note-- the array can probably be cast to a char[], but is not null-terminated)
+     * </ul>
      */
     SGS_OPCODE_RECONNECT_FAILURE = 0x22,
 
-    /*
-     * Session message.  May be sent by the client or the server.
-     * Maximum length is 64 KB minus one byte.
+    /**
+     * Session message. May be sent by the client or the server.
+	 * Maximum length is MAX_PAYLOAD_LENGTH, currently 65,532 bytes.
      * Larger messages require fragmentation and reassembly above
      * this protocol layer.
      *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x30
-     *
-     * Payload:
-     *     (long) sequence number
-     *     (ByteArray) message
+     * <ul>
+     * <li> (byte[]) message
+     * </ul>
      */
     SGS_OPCODE_SESSION_MESSAGE = 0x30,
 
-    /*
-     * Logout request from a client to a server.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x40
-     *
-     * No payload.
+    /**
+     * Logout request. Sent from a client to the server.
+	 * No payload.
      */
     SGS_OPCODE_LOGOUT_REQUEST = 0x40,
 
-    /*
-     * Logout success.  Server response to a client's LOGOUT_REQUEST.
-     *
-     * ServiceId: 0x01 (Application)
-     * Opcode: 0x41
-     *
-     * No payload.
+    /**
+     * Logout success (logout request acknowledgment). Server response to a logout request.
+	 * No payload.
      */
     SGS_OPCODE_LOGOUT_SUCCESS = 0x41,
 
-    /*
-     * Channel join.  Server notifying a client that it has joined a channel.
-     *
-     * ServiceId: 0x02 (Channel)
-     * Opcode: 0x50
-     *
-     * Payload:
-     *     (String) channel name
-     *     (CompactId) channel ID
+    /**
+     * Channel join. Server notifying the client that the client has joined a channel.
+     * <ul>
+	 * <li> (unsigned short) channel name length
+     * <li> (uint8_t[]) channel name (note-- the array can probably be cast to a char[], but is not null-terminated)
+     * <li> (byte[]) channel ID
+     * </ul>
      */
     SGS_OPCODE_CHANNEL_JOIN = 0x50,
 
     /**
-     * Channel leave.  Server notifying a client that it has left a channel.
-     *
-     * ServiceId: 0x02 (Channel)
-     * Opcode: 0x52
-     *
-     * Payload:
-     *     (CompactId) channel ID
+     * Channel leave. Server notifying a client that it ghas left a channel.
+     * <ul>
+     * <li> (byte[]) channel ID
+     * </ul>
      */
-    SGS_OPCODE_CHANNEL_LEAVE = 0x52,
+    SGS_OPCODE_CHANNEL_LEAVE = 0x51,
     
-    /*
-     * Channel send request from a client to a server.
-     *
-     * ServiceId: 0x02 (Channel)
-     * Opcode: 0x53
-     *
-     * Payload:
-     *     (CompactId) channel ID
-     *     (long) sequence number
-     *     (short) number of recipients (0 = all)
-     *   If number of recipients > 0, for each recipient:
-     *       (CompactId) sessionId
-     *       (ByteArray) message
+    /**
+     * Channel message. May be sent by the client or the server.
+	 * Maximum length is SGS_MAX_PAYLOAD_LENGTH bytes. Larger messages
+	 * require fragmentation and reassembly above the protocol layer<br>
+	 * Payload:
+     * <ul>
+     * <li> (unsigned short) channel ID size
+     * <li> (byte[]) channel ID
+     * <li> (byte[]) message
+     * </ul>
      */
-    SGS_OPCODE_CHANNEL_SEND_REQUEST = 0x53,
-
-    /*
-     * Channel message (sent from server to recipient on channel).
-     *
-     * ServiceId: 0x02 (Channel)
-     * Opcode: 0x54
-     *
-     * Payload:
-     *     (CompactId) channel ID
-     *     (long) sequence number
-     *     (CompactId) sender's sessionId
-     *		(canonical CompactId of zero if sent by server)
-     *     (ByteArray) message
-     */
-    SGS_OPCODE_CHANNEL_MESSAGE = 0x54,
+    SGS_OPCODE_CHANNEL_MESSAGE = 0x52
 } sgs_opcode;
 
 #ifdef __cplusplus

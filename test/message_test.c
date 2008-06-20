@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -46,7 +46,7 @@ static void printMsg(const sgs_message *pmsg) {
     }
   
     printf(" }\n");
-}
+   }
 
 /*
  * function: main()
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     int result;
   
     result = sgs_msg_init(&msg, buf, sizeof(buf),
-        SGS_OPCODE_LOGIN_REQUEST, SGS_APPLICATION_SERVICE);
+        SGS_OPCODE_LOGIN_REQUEST);
   
     printf("INIT() == %d\n", result);
   

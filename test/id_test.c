@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -41,7 +41,7 @@ void test1() {
     uint8_t bytes[] = { 1, 2, 3 };
     sgs_id* id;
     
-    id = sgs_id_create(bytes, sizeof(bytes), NULL);
+    id = sgs_id_create(bytes, sizeof(bytes));
     if (id == NULL) {
         sgs_id_destroy(id);
         perror("init()");
@@ -69,7 +69,7 @@ void test2() {
     
     printf("hextobytes() returned %d\n", result);
     
-    if ((id = sgs_id_create(bytebuf, strlen(hex)/2, NULL)) == NULL) {
+    if ((id = sgs_id_create(bytebuf, strlen(hex)/2)) == NULL) {
         printf("Error: invalid ID string (%s).\n", hex);
         return;
     }

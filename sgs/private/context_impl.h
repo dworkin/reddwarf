@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -43,6 +43,7 @@ extern "C" {
 #include "sgs/id.h"
 #include "sgs/session.h"
 #include "sgs/channel.h"
+#include "sgs/socket.h"
 
 typedef struct sgs_context_impl sgs_context_impl;
 
@@ -52,13 +53,12 @@ struct sgs_context_impl {
     int port;
   
     /** function pointers to callbacks: */
-    void (*reg_fd_cb)(sgs_connection*, int, short);
-    void (*unreg_fd_cb)(sgs_connection*, int, short);
+    void (*reg_fd_cb)(sgs_connection*, sgs_socket_t, short);
+    void (*unreg_fd_cb)(sgs_connection*, sgs_socket_t, short);
   
     void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
     void (*channel_left_cb)(sgs_connection*, sgs_channel*);
-    void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const sgs_id*,
-        const uint8_t*, size_t);
+    void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const uint8_t*, size_t);
     void (*disconnected_cb)(sgs_connection*);
     void (*logged_in_cb)(sgs_connection*, sgs_session*);
     void (*login_failed_cb)(sgs_connection*, const uint8_t*, size_t);
