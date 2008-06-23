@@ -122,7 +122,7 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
      * Updates the current character detail. Note that this may be removed,
      * since it isn't currently being used.
      */
-    public void updateCharacter(/*FIXME: define this type*/) {
+    public void updateCharacter() {
 
     }
 

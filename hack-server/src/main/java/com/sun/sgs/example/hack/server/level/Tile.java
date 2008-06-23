@@ -30,9 +30,10 @@ import java.io.Serializable;
 
 
 /**
- * This interface defines a single square on a board. It is used to maintain
- * internal state about what's in a level. Its is not a <code>GLO</code>
- * because it is private state for <code>GLO</code>s.
+ * This interface defines a single square on a board. It is used to
+ * maintain internal state about what's in a level. Instances of this
+ * interface are not a {@link ManagedObject}s because they are
+ * included as private state for other <code>ManagedObject</code>s.
  */
 public interface Tile extends Serializable {
 
@@ -64,7 +65,7 @@ public interface Tile extends Serializable {
      * to actually move to the space in its current state, use
      * <code>canOccupy</code>.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return whether or not the tile is passable
      */
@@ -77,7 +78,7 @@ public interface Tile extends Serializable {
      * occupy it. If you just want a simple test for tile passability,
      * use <code>isPassable</code>.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return whether or not the character can occupy this tile
      */
@@ -86,7 +87,7 @@ public interface Tile extends Serializable {
     /**
      * Adds the given character to this tile if possible.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return whether or not the character was added successfully
      */
@@ -96,7 +97,7 @@ public interface Tile extends Serializable {
      * Removes the given character from this tile, if and only if this
      * character is already on this tile.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return whether or not the character was removed successfully
      */
@@ -105,7 +106,7 @@ public interface Tile extends Serializable {
     /**
      * Adds the given item to this tile if possible.
      *
-     * @param itemRef the manager for the item
+     * @param item the manager for the item
      *
      * @return whether or not the item was added successfully
      */
@@ -115,7 +116,7 @@ public interface Tile extends Serializable {
      * Removes the given item from this tile, if and only if this item
      * is already on this tile.
      *
-     * @param itemRef the manager for the item
+     * @param item the manager for the item
      *
      * @return whether or not the item was removed successfully
      */

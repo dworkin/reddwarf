@@ -86,10 +86,6 @@ public class DungeonDataLoader
             new HashMap<Integer,Set<Integer>>();
         HashSet<Dungeon> dungeons = new HashSet<Dungeon>();
 
-        // FIXME: just for testing
-        /*com.sun.sgs.example.hack.server.level.DungeonFactory.EventAggregator
-          ag = new com.sun.sgs.example.hack.server.level.DungeonFactory.EventAggregator();*/
-
         // load the sprite maps and dungeons
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
             if (stok.sval.equals("SpriteMap")) {
@@ -125,7 +121,6 @@ public class DungeonDataLoader
         }
 
         // register each dungeon
-        // FIXME: do this in a getInstance on dungeon
         DataManager dataManager = AppContext.getDataManager();
         for (Dungeon dungeon : dungeons) {
             System.out.println("Registering dungeon: " + dungeon.getName());
@@ -133,9 +128,6 @@ public class DungeonDataLoader
                                    dungeon);
             gcm.notifyGameAdded(dungeon.getName());
         }
-
-        // FIXME: just for testing
-        //AppContext.getTaskManager().schedulePeriodicTask(ag, 0, 1000);
 
         System.out.println("finished loading files");
     }
@@ -162,7 +154,10 @@ public class DungeonDataLoader
         HashMap<Integer,byte[]> spriteMap = new HashMap<Integer,byte[]>();
 
         // now split up the image into its component sprites
-        // FIXME: this should check that the images are the right dimension
+
+        // REMINDER: In the event that we don't control the image
+        //           data, this method should check that the images
+        //           are the right dimension
         int identifier = 1;
         int totalSize = 0;
         for (int y = 0; y < image.getHeight() / spriteSize; y++) {
@@ -194,7 +189,8 @@ public class DungeonDataLoader
     }
 
     /**
-     *
+     * Returns the set of impassible tiles for the dungeon stored in
+     * the provided file.
      */
     public static Set<Integer> getImpassableSet(String filename)
         throws IOException

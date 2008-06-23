@@ -48,7 +48,7 @@ public class PassableTile extends BasicTile implements Serializable {
      * this doesn't mean that the space is un-occupied, but it means that
      * its general behavior is that characters can occupy it.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return true
      */

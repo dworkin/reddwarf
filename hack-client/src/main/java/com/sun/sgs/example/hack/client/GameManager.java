@@ -81,13 +81,13 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
-     * Sets the connection manager that this class uses for all communication
-     * with the game server. This method may only be called once during
-     * the lifetime of the client.
+     * Sets the client that this class uses for all communication with
+     * the game server. This method may only be called once during the
+     * lifetime of the client.
      *
-     * @param connManager the connection manager
+     * @param client the client
      */
-    public void setConnectionManager(SimpleClient simpleClient) {
+    public void setClient(SimpleClient simpleClient) {
         if (client == null)
             client = simpleClient;
     }
@@ -103,28 +103,27 @@ public class GameManager implements BoardListener, PlayerListener,
      */
     public void action(int key) {
         int messageType;
-        short message = KeyMessages.NONE;
+        KeyMessages.Type message = KeyMessages.Type.NONE;
 
         // figure out what key was pressed and whether we care about it, and
         // also what kind of message this requires (move, take, etc.)
         // Note: this could be done on the server, so that each game could
         // define what keys it uses, but then it would be harder to map
         // custom key bindings to each action
-        // FIXME: what's the right approach here?
         switch (key) {
-        case KeyEvent.VK_J: message = KeyMessages.LEFT;
+        case KeyEvent.VK_J: message = KeyMessages.Type.LEFT;
             messageType = 1;
             break;
-        case KeyEvent.VK_K: message = KeyMessages.DOWN;
+        case KeyEvent.VK_K: message = KeyMessages.Type.DOWN;
             messageType = 1;
             break;
-        case KeyEvent.VK_L: message = KeyMessages.RIGHT;
+        case KeyEvent.VK_L: message = KeyMessages.Type.RIGHT;
             messageType = 1;
             break;
-        case KeyEvent.VK_I: message = KeyMessages.UP;
+        case KeyEvent.VK_I: message = KeyMessages.Type.UP;
             messageType = 1;
             break;
-        case KeyEvent.VK_SEMICOLON: message = KeyMessages.TAKE;
+        case KeyEvent.VK_SEMICOLON: message = KeyMessages.Type.TAKE;
             messageType = 2;
             break;
         default:
@@ -132,10 +131,9 @@ public class GameManager implements BoardListener, PlayerListener,
             return;
         }
 
-        // FIXME: the message code should be enumerated
         ByteBuffer bb = ByteBuffer.allocate(5);
         bb.put((byte)messageType);
-        bb.putShort(message);
+        bb.putInt(KeyMessages.encode(message));
         bb.rewind();
 
         try {
@@ -206,7 +204,7 @@ public class GameManager implements BoardListener, PlayerListener,
      * Called to update aspects of the player's currrent character. This
      * notifies all of the registered listeners.
      */
-    public void updateCharacter(/*FIXME: define this type*/) {
+    public void updateCharacter() {
         for (PlayerListener listener : playerListeners)
             listener.updateCharacter();
     }

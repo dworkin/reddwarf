@@ -52,11 +52,7 @@ public interface Game extends ManagedObject {
 
     /**
      * Creates a new instance of a <code>MessageHandler</code> that will
-     * handle messages intended for this <code>Game</code>. The intent is
-     * that this instance can be part of some other <code>GLO</code>'s
-     * internal state, like a <code>Player</code>, so that contention is
-     * moved there but is still being driven by logic defined by this
-     * <code>Game</code> implementation.
+     * handle messages intended for this <code>Game</code>. 
      *
      * @return a new instance of <code>MessageHandler</code>
      */

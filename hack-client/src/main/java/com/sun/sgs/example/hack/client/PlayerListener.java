@@ -42,10 +42,10 @@ public interface PlayerListener
     /**
      * Called to update aspects of the player's currrent character.
      */
-    public void updateCharacter(/*FIXME: define this type*/);
+    public void updateCharacter();
 
-    /**
-     * FIXME: we also need some inventory methods
+    /*
+     * TODO: we also need some inventory methods
      */
 
 }

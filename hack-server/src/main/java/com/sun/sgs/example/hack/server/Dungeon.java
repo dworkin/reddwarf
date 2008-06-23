@@ -45,7 +45,8 @@ public class Dungeon implements Game, Serializable {
 
     private static final long serialVersionUID = 1;
 
-    // the channel used for all players currently in this dungeon
+    // a reference to the channel used for all players currently in
+    // this dungeon
     private ManagedReference<Channel> channelRef;
 
     // the name of this particular dungeon
@@ -60,17 +61,13 @@ public class Dungeon implements Game, Serializable {
     // the connection into the dungeon
     private ManagedReference<GameConnector> connectorRef;
 
-    // the set of players in the lobby, mapping from uid to account name
+    // the set of players in the lobby, mapping from a reference to
+    // the player's ClientSession to account name
     private HashMap<ManagedReference<ClientSession>,String> playerMap;
-
-    private Channel channel() {
-        return channelRef.get();
-    }
 
     /**
      * Creates a new instance of a <code>Dungeon</code>.
      *
-     * @param task the task that is running this game
      * @param name the name of this dungeon
      * @param spriteMapId the sprite map used by this dungeon
      * @param connectorRef the entry <code>Connector</code>
@@ -97,6 +94,16 @@ public class Dungeon implements Game, Serializable {
         gcmRef = dataManager.createReference(
 	    (GameChangeManager) dataManager.getBinding(
 		GameChangeManager.IDENTIFIER));
+    }
+
+    /**
+     * Gets the {@code Channel} associated with {@link #channelRef}.
+     *
+     * @return the channel or {@code null} if {@code channelRef} is
+     *         {@code null}.
+     */
+    private Channel channel() {
+        return channelRef.get();
     }
 
     /**
@@ -180,23 +187,6 @@ public class Dungeon implements Game, Serializable {
         GameMembershipDetail detail =
                 new GameMembershipDetail(getName(), numPlayers());
         gcmRef.get().notifyMembershipChanged(detail);
-
-        // FIXME: we used to do the following, but the classloader bug got
-        // tripped...now that classloading is fixed, should we go back
-        // to a task-based approach?
-        /*
-        try {
-            Method method =
-                MembershipChangeManager.class.
-                getMethod("notifyMembershipChanged",
-                          GameMembershipDetail.class);
-            GameMembershipDetail detail =
-                new GameMembershipDetail(getName(), numPlayers());
-            task.queueTask(mcmRef, method, new Object [] {detail});
-        } catch (NoSuchMethodException nsme) {
-            throw new IllegalStateException(nsme.getMessage());
-        }
-        */
     }
 
     /**

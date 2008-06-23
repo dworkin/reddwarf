@@ -50,7 +50,7 @@ public class CollectMonster extends MonsterCharacter implements Serializable {
      * Creates an instance of <code>CollectMonster</code> using the
      * default identifier.
      *
-     * @param mgrRef a reference to our manager
+     * @param mgr our manager
      */
     public CollectMonster(AICharacterManager mgr) {
         this(4, mgr);
@@ -61,7 +61,7 @@ public class CollectMonster extends MonsterCharacter implements Serializable {
      * given identifier.
      *
      * @param id the identifier for this monster
-     * @param mgrRef a reference to our manager
+     * @param mgr our manager
      */
     public CollectMonster(int id, AICharacterManager mgr) {
         super(id, "yellow thing", mgr);
@@ -124,7 +124,7 @@ public class CollectMonster extends MonsterCharacter implements Serializable {
     }
 
     /**
-     * This has no affect on <code>CollectMonster</code> since thyey have no
+     * This has no affect on <code>CollectMonster</code> since they have no
      * meaningful statistics.
      */
     public void regenerate() {

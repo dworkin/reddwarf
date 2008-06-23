@@ -51,7 +51,7 @@ public class RodentMonster extends MonsterCharacter implements Serializable {
      * Creates an instance of <code>RodentMonster</code> with the default
      * identifier.
      *
-     * @param mgrRef a reference to the manager
+     * @param mgr the manager
      */
     public RodentMonster(AICharacterManager mgr) {
         this(59, mgr);
@@ -61,7 +61,7 @@ public class RodentMonster extends MonsterCharacter implements Serializable {
      * Creates an instance of <code>RodentMonster</code>.
      *
      * @param id the rodent's identifier
-     * @param mgrRef a reference to the manager
+     * @param mgr the manager
      */
     public RodentMonster(int id, AICharacterManager mgr) {
         super(id, "rodent", mgr);
@@ -150,13 +150,13 @@ public class RodentMonster extends MonsterCharacter implements Serializable {
 
             // pick a direction, and try to move in that direction
             switch (NSidedDie.roll4Sided()) {
-            case 1: level.move(mgr, KeyMessages.UP);
+            case 1: level.move(mgr, KeyMessages.Type.UP);
                 break;
-            case 2: level.move(mgr, KeyMessages.DOWN);
+            case 2: level.move(mgr, KeyMessages.Type.DOWN);
                 break;
-            case 3: level.move(mgr, KeyMessages.LEFT);
+            case 3: level.move(mgr, KeyMessages.Type.LEFT);
                 break;
-            case 4: level.move(mgr, KeyMessages.RIGHT);
+            case 4: level.move(mgr, KeyMessages.Type.RIGHT);
                 break;
             }
         }

@@ -63,7 +63,7 @@ public class NPCharacter extends AICharacter implements Serializable {
      * @param id the identifier for this NPC
      * @param name the name for this NPC
      * @param messages the set of messages that this NPC says when hit
-     * @param mgrRef a reference to the contolling manager
+     * @param mgr the controlling manager
      */
     public NPCharacter(int id, String name, String [] messages,
                        AICharacterManager mgr) {
@@ -148,13 +148,13 @@ public class NPCharacter extends AICharacter implements Serializable {
 
             // pick a direction, and try to move in that direction
             switch (NSidedDie.roll4Sided()) {
-            case 1: level.move(mgr, KeyMessages.UP);
+            case 1: level.move(mgr, KeyMessages.Type.UP);
                 break;
-            case 2: level.move(mgr, KeyMessages.DOWN);
+            case 2: level.move(mgr, KeyMessages.Type.DOWN);
                 break;
-            case 3: level.move(mgr, KeyMessages.LEFT);
+            case 3: level.move(mgr, KeyMessages.Type.LEFT);
                 break;
-            case 4: level.move(mgr, KeyMessages.RIGHT);
+            case 4: level.move(mgr, KeyMessages.Type.RIGHT);
                 break;
             }
         }

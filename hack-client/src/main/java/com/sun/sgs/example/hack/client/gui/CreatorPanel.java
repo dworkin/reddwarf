@@ -52,14 +52,14 @@ public class CreatorPanel extends JPanel
     JComboBox characterClassPopup;
 
     // the names of the charcter classes
-    // FIXME: hard-coded for now, so we just include a few
+    // NOTE: hard-coded for now, so we just include a few
     private static final String [] classNames = { "Barbarian",
                                                   "Mexican Wrestler",
-                                                  "Priest", "Theif",
-                                                  "Warior", "Wizzard" };
+                                                  "Priest", "Thief",
+                                                  "Warrior", "Wizard" };
 
     // the identifiers for the character classes
-    // FIXME: hard-coded for now
+    // NOTE: hard-coded for now
     private static final int [] classIdentifiers = { 47, 3, 43, 44, 41, 42 };
 
     // the panel that displays character details

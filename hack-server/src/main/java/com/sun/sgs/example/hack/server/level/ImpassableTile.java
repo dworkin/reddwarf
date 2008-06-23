@@ -52,8 +52,9 @@ public class ImpassableTile extends BasicTile implements Serializable {
      * @param mgrRef the manager for a character
      */
     public boolean isPassable(CharacterManager mgr) {
-        // FIXME: we should check if the character overrides this behavior,
-        // and if it does whether there's already a character here
+        // NOTE: in future versions we should check if the character
+        // overrides this behavior, and if it does whether there's
+        // already a character here
         return false;
     }
 
@@ -66,8 +67,9 @@ public class ImpassableTile extends BasicTile implements Serializable {
      * @param characterManager the manager for a character
      */
     public ActionResult moveTo(CharacterManager characterManager) {
-        // FIXME: we should check if the character overrides this behavior,
-        // and if it does whether there's already a character here
+        // NOTE: in future versions we should check if the character
+        // overrides this behavior, and if it does whether there's
+        // already a character here
         return ActionResult.FAIL;
     }
 

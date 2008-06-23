@@ -1,0 +1,88 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.projectdarkstar.example.hack</groupId>
+    <artifactId>hack</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>hack-shared</artifactId>
+  <name>Hack Example Shared</name>
+  <packaging>jar</packaging>
+  <description>
+    Shared code module for the Project Darkstar Hack example.
+  </description>
+
+  <dependencies>
+  </dependencies>
+
+
+
+  <build>
+    <plugins>
+
+      <!-- The berkeleydb binary package must be retrieved and unpacked
+	   Before the test phase so that they are available during
+	   runtime of the unit tests and other executions-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>unpack-bdb-binaries</id>
+          </execution>
+        </executions>
+      </plugin>
+
+
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+	<executions>
+
+	  <!-- Cleans out the directories used to run the app
+	       Runs during the validate phase -->
+	  <execution>
+	    <id>clean-datastore</id>
+	    <phase>generate-test-resources</phase>
+	    <goals>
+              <goal>run</goal>
+            </goals>
+	    <configuration>
+              <tasks>
+		<delete dir="${project.build.directory}/dsdb/"/>
+              </tasks>
+            </configuration>
+	  </execution>
+
+	  <!-- Builds the directories necessary for running the app
+	       with the antrun configuration.  Runs in the
+	       generate-test-resources phase -->
+          <execution>
+            <id>make-datastore</id>
+            <phase>generate-test-resources</phase>
+	    <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <mkdir dir="${project.build.directory}/dsdb/"/>
+              </tasks>
+            </configuration>
+          </execution>
+	  
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+
+  <properties>
+  </properties>
+
+
+</project>

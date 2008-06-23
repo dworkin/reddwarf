@@ -42,7 +42,10 @@ import java.nio.ByteBuffer;
 import java.util.Timer;
 import java.util.TimerTask;
 
-
+/**
+ * A barebones reference implementation of an AI client.  Developers
+ * may extend this class as necessary to add additional features.
+ */
 public class AIClient implements SimpleClientListener {
 
     private final String name;
@@ -101,9 +104,9 @@ public class AIClient implements SimpleClientListener {
         dungeonManager.addPlayerListener(aiDungeonListener);
 
         simpleClient = new SimpleClient(this);
-        lobbyManager.setConnectionManager(simpleClient);
-        creatorManager.setConnectionManager(simpleClient);
-        dungeonManager.setConnectionManager(simpleClient);
+        lobbyManager.setClient(simpleClient);
+        creatorManager.setClient(simpleClient);
+        dungeonManager.setClient(simpleClient);
     }
 
     public PasswordAuthentication getPasswordAuthentication() {

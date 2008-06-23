@@ -17,16 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 package com.sun.sgs.example.hack.client;
 
-/*import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;*/
-
 import com.sun.sgs.impl.sharedutil.HexDumper;
-
-
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
@@ -60,16 +53,16 @@ public abstract class GameChannelListener implements ClientChannelListener
     }
 
     /**
-     * NOTE that this is part of the new API, but it was never needed
-     * under the EA APIs for this client, so for now it's just implemented
-     * here and ignored..
+     * {@inheritDoc}
      */
     public void leftChannel(ClientChannel channel) {
-        
+        // NOTE: the current architecture does nothing when this is
+        //       called but future revisions could provide addition
+        //       player notifications here
     }
 
     /**
-     *
+     * Notifies the game that a player has either joined or left.
      */
     protected void notifyJoinOrLeave(ByteBuffer data, boolean joined) {
         byte [] bytes = new byte[data.remaining()];
@@ -85,7 +78,6 @@ public abstract class GameChannelListener implements ClientChannelListener
      * Notifies this listener that a chat message arrived from the
      * given player.
      *
-     * @param playerID the player's identifier
      * @param data the chat message
      */
     protected void notifyChatMessage(ByteBuffer data) {

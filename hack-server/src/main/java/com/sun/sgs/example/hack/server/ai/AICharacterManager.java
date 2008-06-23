@@ -53,6 +53,10 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
     private AICharacterManager() {
         // since we need a unique identifier for all managers (which players
         // get through their login names), we just use a UUID
+
+	// NOTE: it might also be appropriate to instead use
+	//       DataManager.nextBoundName() to locate a unique name
+	//       for this entity
         super("ai:" + String.valueOf(Math.random()));
     }
 
@@ -61,7 +65,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * that is registered correctly. After calling this you still need to
      * call <code>setCharacter</code> to give this manager a character.
      *
-     * @return a reference to a new manager
+     * @return a new manager
      */
     public static AICharacterManager newInstance() {
         AICharacterManager mgr = new AICharacterManager();
@@ -103,10 +107,11 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * result in re-generation of the character after some period of time.
      */
     public void notifyCharacterDied() {
-        // FIXME: based on some aspect of the character's stats, and possibly
-        // other parameters that aren't here yet, we decide how and where to
-        // place a new character ... for now, we take the simple approach
-        // of just adding a new character
+        // NOTE: based on some aspect of the character's stats, and
+        //       possibly other parameters that aren't here yet, we
+        //       decide how and where to place a new character ... for
+        //       now, we take the simple approach of just adding a new
+        //       character
         character.regenerate();
         getCurrentLevel().addCharacter(this);
     }
@@ -118,7 +123,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * @param board the board to send
      */
     public void sendBoard(Board board) {
-        // FIXME: where do I connect this?
+        // not currently used
     }
 
     /**
@@ -128,7 +133,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * @param updates the updates to send
      */
     public void sendUpdate(Collection<BoardSpace> updates) {
-        // FIXME: where do I connect this?
+        // not currently used
     }
 
 }

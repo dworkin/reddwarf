@@ -66,7 +66,8 @@ public class Player
      */
     public static final String NAME_PREFIX = "player:";
 
-    // notes whether or not the player is current logged in and playing
+    // notes whether or not the player is current logged in and
+    // playing
     private boolean playing;
 
     // the user's name (login)
@@ -80,14 +81,13 @@ public class Player
 
     // the game the user is currently playing, and its message handler
     private ManagedReference<Game> gameRef;
+
+    // the handler that will interpret the messages sent to this
+    // player
     private MessageHandler messageHandler = null;
 
     // this player's character manager
     private ManagedReference<PlayerCharacterManager> characterManagerRef;
-
-    private Channel channel() {
-        return channelRef == null ? null : channelRef.get();
-    }
 
     /**
      * Creates a <code>Player</code> instance.
@@ -101,6 +101,16 @@ public class Player
         this.name = name;
         characterManagerRef = AppContext.getDataManager().
             createReference(new PlayerCharacterManager(this));
+    }
+
+    /**
+     * Gets the {@code Channel} associated with {@link #channelRef}.
+     *
+     * @return the channel or {@code null} if {@code channelRef} is
+     *         {@code null}.
+     */
+    private Channel channel() {
+        return channelRef == null ? null : channelRef.get();
     }
 
     /**
@@ -158,12 +168,12 @@ public class Player
     }
 
     /**
-     * Sets the current <code>UserID</code> for this <code>Player</code>,
-     * which changes from session to session. Typically this is called
-     * when the player first logs again, and not again until the player
+     * Sets the current {@code Session} for this {@code Player}, which
+     * changes from session to session. Typically this is called when
+     * the player first logs again, and not again until the player
      * logs out and logs back in.
      *
-     * @param uid the player's user identifier
+     * @param session the {@code Session} associated with the player.
      */
     public void setCurrentSession(ClientSession session) {
         DataManager dataMgr = AppContext.getDataManager();
@@ -183,27 +193,30 @@ public class Player
      * that this is only meaningful if <code>isPlaying</code> returns
      * true. Otherwise this will return null.
      *
-     * @return the current user identifier, or null if the player is not
-     *         currently playing
+     * @return the current player session, or {@code null} if the player is
+     *         not currently playing
      */
     public ClientSession getCurrentSession() {
         return currentSessionRef == null ? null : currentSessionRef.get();
     }
 
     /**
-     * Moves the player into the referenced <code>Game</code>. This causes
-     * the <code>Player</code> to leave the game they are currently playing
-     * (if they are currently playing a game) and notify the new game that
-     * they are joining. If the reference provided is null, then this
-     * <code>Player</code> is removed from the current game and sets itself
-     * as not playing any games.
-     * <p>
-     * When the <code>Player</code> is first started, it is not playing any
-     * games. In practice, this method is only called with a value of null
-     * when the associated client logs out of the server.
+     * Moves the player into the provided <code>Game</code>. This
+     * causes the <code>Player</code> to leave the game they are
+     * currently playing (if they are currently playing a game) and
+     * notify the new game that they are joining. If the reference
+     * provided is null, then this <code>Player</code> is removed from
+     * the current game and sets itself as not playing any games.
      *
-     * @param gameRef a reference to the new <code>Game</code>, or null
-     *                if the player is only being removed from a game
+     * <p>
+     *
+     * When the <code>Player</code> is first started, it is not
+     * playing any games. In practice, this method is only called with
+     * a value of null when the associated client logs out of the
+     * server.
+     *
+     * @param game the new <code>Game</code>, or null if the player is
+     *             only being removed from a game
      */
     public void moveToGame(Game game) {
         AppContext.getDataManager().markForUpdate(this);
@@ -253,7 +266,7 @@ public class Player
      * only joins a new channel in the context of joining a new game, and
      * the player is never on more than one channel.
      *
-     * @param cid the new channel
+     * @param newChannel the new channel
      */
     public void userJoinedChannel(Channel newChannel) {
         DataManager dataManager = AppContext.getDataManager();
@@ -268,15 +281,8 @@ public class Player
      * chat comment). This method, therefore, is the handler for all client
      * messages, and so we hold the lock on the <code>Player</code> and not
      * some more generally shared logic while we're processing messages.
-     * <p>
-     * Note that this method only gets called when the client sends messages
-     * via the <code>ClientConnectionManager.sendToServer</code> method. For
-     * details about broadcast messages, see this class' implementation of
-     * <code>dataArrivedFromChannel</code>
      *
-     * @param uid the user id, which is always this <code>Player</code>'s
-     *            current uid
-     * @param data the message
+     * @param message the data sent to the player
      */
     public void receivedMessage(ByteBuffer message) {
         // call the message handler to interpret the message ... note that the
@@ -287,6 +293,11 @@ public class Player
         messageHandler.handleMessage(this, messageBytes);
     }
 
+    /**
+     * Removes this {@code Player} from the current game.
+     *
+     * @param graceful whether the diconnection was graceful
+     */
     public void disconnected(boolean graceful) {
         moveToGame(null);
     }
@@ -294,7 +305,6 @@ public class Player
     /**
      * Sends a complete <code>Board</code> to the client.
      *
-     * @param task the task for this action
      * @param board the <code>Board</code> to send
      */
     public void sendBoard(Board board) {
@@ -304,7 +314,6 @@ public class Player
     /**
      * Sends a graphical update of specific spaces to the client.
      *
-     * @param task the task for this action
      * @param updates the updates to send
      */
     public void sendUpdate(Collection<BoardSpace> updates) {
@@ -315,7 +324,6 @@ public class Player
     /**
      * Sends the statistics of the given character to the client.
      *
-     * @param task the task for this action
      * @param character the character who's statistics will be sent
      */
     public void sendCharacter(PlayerCharacter character) {
@@ -326,7 +334,6 @@ public class Player
     /**
      * Sends a set of character statistics to the player.
      *
-     * @param task the task for this action
      * @param id the character's identifier
      * @param stats the character statistics
      */
@@ -338,7 +345,6 @@ public class Player
      * Sends a server text message (different from a client chat message) to
      * the client.
      *
-     * @param task the task for this action
      * @param message the message to send
      */
     public void sendTextMessage(String message) {

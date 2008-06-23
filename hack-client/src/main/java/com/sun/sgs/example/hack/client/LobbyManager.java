@@ -53,13 +53,13 @@ public class LobbyManager implements LobbyListener
     }
 
     /**
-     * Sets the connection manager that this class uses for all communication
+     * Sets the client that this class uses for all communication
      * with the game server. This method may only be called once during
      * the lifetime of the client.
      *
-     * @param connManager the connection manager
+     * @param client the client
      */
-    public void setConnectionManager(SimpleClient simpleClient) {
+    public void setClient(SimpleClient simpleClient) {
         if (client == null)
             client = simpleClient;
     }

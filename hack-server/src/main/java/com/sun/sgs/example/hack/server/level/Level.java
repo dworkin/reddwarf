@@ -25,6 +25,7 @@ import com.sun.sgs.example.hack.server.CharacterManager;
 import com.sun.sgs.example.hack.server.Item;
 
 import com.sun.sgs.example.hack.share.Board;
+import com.sun.sgs.example.hack.share.KeyMessages;
 
 
 /**
@@ -107,7 +108,7 @@ public interface Level extends ManagedObject {
      *
      * @return true if we moved in the requested direction, false otherwise
      */
-    public boolean move(CharacterManager mgr, int direction);
+    public boolean move(CharacterManager mgr, KeyMessages.Type direction);
 
     /**
      * Tries to take items at the character's current location.

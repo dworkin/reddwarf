@@ -27,6 +27,11 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.example.hack</groupId>
+      <artifactId>hack-shared</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
 
     <!-- Runtime dependencies -->
     <dependency>

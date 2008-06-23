@@ -149,8 +149,8 @@ class BoardPanel extends JPanel implements BoardListener
      * @param message the message sent from the server
      */
     public void hearMessage(String message) {
-        // FIXME: this should be painted on the board somewhere, but for
-        // now we'll just print it out
+        // NOTE: this should be painted on the board somewhere, but
+        //       for now we'll just print it out
         System.out.println(message);
     }
 

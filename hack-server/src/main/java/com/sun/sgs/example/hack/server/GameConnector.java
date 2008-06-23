@@ -52,8 +52,8 @@ public class GameConnector implements Connector, Serializable {
     /**
      * Creates an instance of <code>GameConnector</code>.
      *
-     * @param gameRef the game this connects to
-     * @param levelRef the level this connects to
+     * @param game the game this connects to
+     * @param level the level this connects to
      * @param startX the x-coodinate on the level
      * @param startY the y-coodinate on the level
      */
@@ -67,10 +67,10 @@ public class GameConnector implements Connector, Serializable {
     }
     
     /**
-     * Transitions the given character to the game if they're in the level,
-     * and to the level if they're in the game.
+     * Transitions the given character to the game if they're in the
+     * level, and to the level if they're in the game.
      *
-     * @param mgrRef a reference to the character's manager
+     * @param mgr a reference to the character's manager
      */
     public boolean enteredConnection(CharacterManager mgr) {
         Level level = mgr.getCurrentLevel();
@@ -78,24 +78,18 @@ public class GameConnector implements Connector, Serializable {
         // see what state the character is in, which tells us which direction
         // they're going in
         if (level == null) {
+
             // they're not currently on a level, which means that they're
             // not yet playing a game, so move them in
             connectedLevel.get().addCharacter(mgr, startX, startY);
-        } else {
+	    return true;
+        } 
+	else {
             // they're leaving the game for the lobby...only players can
             // move into the lobby, so make sure there are no AIs trying
             // to sneak through
             return false;
-            /*
-            if (! (mgr instanceof PlayerCharacterManager))
-                return false;
-
-            // FIXME: should this be queued?
-            Player player = ((PlayerCharacterManager)mgr).getPlayer();
-            player.moveToGame(connectedGame.get(Game.class));*/
         }
-
-        return true;
     }
 
 }

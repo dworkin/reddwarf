@@ -60,18 +60,18 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
         // the command identifier is always stored in the first byte
         int command = (int)(data.get());
 
-        // FIXME: we should use an enum to define the messages
-        //try {
-            switch (command) {
+        // NOTE: it would be more elegant to use an enum to define the
+        //       messages
+	switch (command) {
             case 1:
                 moveToGame(player, data);
                 break;
-            }
-            /*} catch (Exception e) {
-            // FIXME: here what we want to do is either log the error, or
-            // send back a generic error response
-            e.printStackTrace();
-            }*/
+	    default:
+		// NOTE: in a more robust production system what we
+		//       should to do is either log the error, or send
+		//       back a generic error response
+		System.out.println("unhandled lobby command: " + command);
+	}
     }
 
     /**
@@ -84,11 +84,12 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
         try {
             data.get(bytes);
         } catch (BufferUnderflowException bue) {
-            // NOTE: I think that this happens when the client thinks it's
-            // still in the game and tries to send a move command, but
-            // has actually just been bumped back to the lobby...so, for
-            // now, the idea is just to drop this message and assume
-            // that a valid lobby message will show up soon
+            // NOTE: I think that this happens when the client thinks
+            //       it's still in the game and tries to send a move
+            //       command, but has actually just been bumped back
+            //       to the lobby...so, for now, the idea is just to
+            //       drop this message and assume that a valid lobby
+            //       message will show up soon
             return;
         }
         String gameName = new String(bytes);
@@ -104,7 +105,8 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
         try {
             game = (Game) dataManager.getBinding(Game.NAME_PREFIX + gameName);
         } catch (NameNotBoundException e) {
-            // FIXME: we should send back some kind of error
+            // NOTE: in a more robust system we should send back some
+            //       kind of error
             System.out.println("Couldn't find game: " +
                                Game.NAME_PREFIX + gameName);
             return;
@@ -113,7 +115,8 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
         if (! player.getCharacterManager().
             setCurrentCharacter(characterName)) {
             // an invalid character name was provided
-            // FIXME: we should handle this better
+
+            // REMDINER: we should handle this case better
             System.out.println("Invalid character: " + characterName);
             return;
         }

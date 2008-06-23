@@ -60,9 +60,8 @@ public class LobbyChannelListener extends GameChannelListener
      * player. This should only be called with messages that pertain to
      * the lobby.
      *
-     * @param from the ID of the sending player.
-     * @param data the packet data
-     * @param reliable true if this packet was sent reliably
+     * @param channel the channel on which this data was received
+     * @param data the data received
      */
     public void receivedMessage(ClientChannel channel, ByteBuffer data) {
 
@@ -70,7 +69,8 @@ public class LobbyChannelListener extends GameChannelListener
 	// command that we need to process, so get the command code
 	int command = (int)(data.get());
 	
-	// FIXME: this should really be an enumeration
+	// NOTE: for added robustness, the list of commands should
+	//       really be an enumeration
 	try {
 	    switch (command) {
 	    case 0:
@@ -144,7 +144,7 @@ public class LobbyChannelListener extends GameChannelListener
 		notifyChatMessage(data);
 	    }
 	} catch (IOException ioe) {
-	    // FIXME: this should probably handle the error a little more
+	    // NOTE: this should probably handle the error a little more
 	    // gracefully, but it's unclear what the right approach is
 	    System.out.println("Failed to handle incoming Lobby object");
 	    ioe.printStackTrace();

@@ -58,11 +58,9 @@ public class CreatorChannelListener extends GameChannelListener
      * player. This should only be called with messages that pertain to
      * the creator.
      *
-     * @param from the ID of the sending player.
      * @param data the packet data
      * @param reliable true if this packet was sent reliably
      */
-    //public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
     public void receivedMessage(ClientChannel channel, 
                                 ByteBuffer data) {
 
@@ -70,7 +68,8 @@ public class CreatorChannelListener extends GameChannelListener
 	// command that we need to process, so get the command code
 	int command = (int)(data.get());
 
-	// FIXME: this should really be an enumeration
+	// NOTE: in a more robut system, the listing of commands
+	//       should really be an Enum
 	try {
 	    switch (command) {
 	    case 0:
@@ -97,8 +96,9 @@ public class CreatorChannelListener extends GameChannelListener
 		notifyChatMessage(data);
 	    }
 	} catch (IOException ioe) {
-	    // FIXME: this should probably handle the error a little more
-	    // gracefully, but it's unclear what the right approach is
+	    // NOTE: this should probably handle the error a little
+	    //       more gracefully, but it's unclear what the right
+	    //       approach is
 	    System.out.println("Failed to handle incoming creator object");
 	    ioe.printStackTrace();
 	}

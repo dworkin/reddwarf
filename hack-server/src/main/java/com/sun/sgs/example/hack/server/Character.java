@@ -25,11 +25,9 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 
 
 /**
- * The is the <code>Character</code> interface. All interactive things in a
- * game (players, NPCs, and monsters) are <code>Character</code>s. This
- * interface not extends <code>GLO</code> because the typical use of
- * <code>Character</code> implementations is as state associated with
- * <code>GLO</code> that is shared only for processing specific commands.
+ * The is the <code>Character</code> interface. All interactive things
+ * in a game (players, NPCs, and monsters) are
+ * <code>Character</code>s.
  */
 public interface Character {
 

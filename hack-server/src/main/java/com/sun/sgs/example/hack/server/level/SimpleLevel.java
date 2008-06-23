@@ -108,8 +108,9 @@ public class SimpleLevel implements Level, Serializable {
     /**
      * Adds a character to this level at some random point.
      *
-     * @param mgrRef a reference to the <code>CharacterManager</code> who's
-     *               <code>Character</code> is joining this <code>Level</code>
+     * @param mgr the <code>CharacterManager</code> who's
+     *            <code>Character</code> is joining this
+     *            <code>Level</code>
      */
     public void addCharacter(CharacterManager mgr) {
         int x, y;
@@ -127,19 +128,20 @@ public class SimpleLevel implements Level, Serializable {
 
     /**
      * Adds a character to this level at the given location.
-     * <p>
-     * FIXME: the ordering here should probably change, so we send the
-     * updates to other characters, and then send the board to the new
-     * characters, since the board will have the new character on it already
      *
-     * @param mgrRef a reference to the <code>CharacterManager</code> who's
-     *               <code>Character</code> is joining this <code>Level</code>
+     * @param mgr the <code>CharacterManager</code> who's
+     *            <code>Character</code> is joining this <code>Level</code>
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
      * 
      * @return true upon success, otherwise false.
      */
     public boolean addCharacter(CharacterManager mgr, int startX, int startY) {
+	// NOTE: the ordering here should probably change, so we send
+	//       the updates to other characters, and then send the
+	//       board to the new characters, since the board will
+	//       have the new character on it already
+
         // let the manager know what level it's on, and where on that
         // level it starts
         mgr.setCurrentLevel(this);
@@ -172,8 +174,8 @@ public class SimpleLevel implements Level, Serializable {
      * killed, or quit back to the lobby). Otherwise, characters are
      * removed naturally through other actions (like movement).
      *
-     * @param mgrRef a reference to the <code>CharacterManager</code> who's
-     *               <code>Character</code> is joining this <code>Level</code>
+     * @param mgr the <code>CharacterManager</code> who's
+     *            <code>Character</code> is joining this <code>Level</code>
      */
     public void removeCharacter(CharacterManager mgr) {
         // figure out where the character is now
@@ -195,7 +197,7 @@ public class SimpleLevel implements Level, Serializable {
     /**
      * Adds an item to this level at some random position.
      *
-     * @param itemRef a reference to the <code>Item</code>
+     * @param item the <code>Item</code>
      */
     public void addItem(Item item) {
         // FIXME: how should I actually pick this spot?
@@ -207,7 +209,7 @@ public class SimpleLevel implements Level, Serializable {
     /**
      * Adds an item to this level at the given position.
      *
-     * @param itemRef a reference to the <code>Item</code>
+     * @param item the <code>Item</code>
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
      */
@@ -227,8 +229,6 @@ public class SimpleLevel implements Level, Serializable {
 
     /**
      * Tries to move the given character in the given direction
-     * <p>
-     * FIXME: direction should be an enum
      *
      * @param mgr the manager for the <code>Character</code> that is trying
      *            to move
@@ -236,7 +236,7 @@ public class SimpleLevel implements Level, Serializable {
      *
      * @return true if we moved in the requested direction, false otherwise
      */
-    public boolean move(CharacterManager mgr, int direction) {
+    public boolean move(CharacterManager mgr, KeyMessages.Type direction) {
         // get the current position of the character...
         int x = mgr.getLevelXPos();
         int y = mgr.getLevelYPos();
@@ -245,17 +245,14 @@ public class SimpleLevel implements Level, Serializable {
 
         // ...and figure out where they're trying to go
         switch (direction) {
-        case KeyMessages.UP: y--;
+        case UP: y--;
             break;
-        case KeyMessages.DOWN: y++;
+        case DOWN: y++;
             break;
-        case KeyMessages.LEFT: x--;
+        case LEFT: x--;
             break;
-        case KeyMessages.RIGHT: x++;
+        case RIGHT: x++;
             break;
-        default:
-            // FIXME: when we setup an enum we won't need to check this
-            return false;
         }
 
         // make sure they're moving somewhere on the board
@@ -319,7 +316,9 @@ public class SimpleLevel implements Level, Serializable {
         // let everyone know that we got the item
         sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
 
-        // FIXME: we should let the character know that they got the item
+        // NOTE: for better reporting, we should add additional
+        //       messages to let the character know that they got the
+        //       item
 
         return true;
     }

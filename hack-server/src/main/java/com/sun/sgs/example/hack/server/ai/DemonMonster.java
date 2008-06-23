@@ -51,7 +51,7 @@ public class DemonMonster extends MonsterCharacter implements Serializable {
      * Creates an instance of <code>DemonMonster</code> using the default
      * identifier.
      *
-     * @param mgrRef a reference to this character's manager
+     * @param mgr this character's manager
      */
     public DemonMonster(AICharacterManager mgr) {
         this(68, mgr);
@@ -61,7 +61,7 @@ public class DemonMonster extends MonsterCharacter implements Serializable {
      * Creates an instance of <code>DemonMonster</code>.
      *
      * @param id the identifier for this character
-     * @param mgrRef a reference to this character's manager
+     * @param mgr this character's manager
      */
     public DemonMonster(int id, AICharacterManager mgr) {
         super(id, "demon", mgr);
@@ -119,7 +119,7 @@ public class DemonMonster extends MonsterCharacter implements Serializable {
      * actually inflicts that damage.
      */
     private void attack(Character character) {
-        // FIXME: for now, we just extract a bunch of hp
+        // REMINDER: for now, we just extract a bunch of hp
         int damage = NSidedDie.roll10Sided();
         CharacterStats theirStats = character.getStatistics();
         int newHp = (damage > theirStats.getHitPoints()) ? 0 :
@@ -149,13 +149,13 @@ public class DemonMonster extends MonsterCharacter implements Serializable {
 
             // pick a direction, and try to move in that direction
             switch (NSidedDie.roll4Sided()) {
-            case 1: level.move(mgr, KeyMessages.UP);
+            case 1: level.move(mgr, KeyMessages.Type.UP);
                 break;
-            case 2: level.move(mgr, KeyMessages.DOWN);
+            case 2: level.move(mgr, KeyMessages.Type.DOWN);
                 break;
-            case 3: level.move(mgr, KeyMessages.LEFT);
+            case 3: level.move(mgr, KeyMessages.Type.LEFT);
                 break;
-            case 4: level.move(mgr, KeyMessages.RIGHT);
+            case 4: level.move(mgr, KeyMessages.Type.RIGHT);
                 break;
             }
         }

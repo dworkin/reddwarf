@@ -40,7 +40,7 @@ public interface LevelBoard extends Board {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -51,7 +51,7 @@ public interface LevelBoard extends Board {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -62,7 +62,7 @@ public interface LevelBoard extends Board {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param itemRef a reference to the item's manager
+     * @param item the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -73,7 +73,7 @@ public interface LevelBoard extends Board {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param itemRef a reference to the item's manager
+     * @param item the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -85,7 +85,7 @@ public interface LevelBoard extends Board {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      *
      * @return true if the operation would succeed, false otherwise
      */

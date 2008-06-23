@@ -69,24 +69,21 @@ public class DungeonChannelListener extends GameChannelListener
     }
 
     /**
-     * Notifies this listener that some data has arrived from a given
-     * player. This should only be called with messages that pertain to
-     * a dungeon.
+     * Notifies this listener that some data has arrived.  This should
+     * only be called with messages that pertain to a dungeon.
      *
-     * @param from the ID of the sending player.
-     * @param data the packet data
-     * @param reliable true if this packet was sent reliably
+     * @param channel the channel on which the data arrive
+     * @param data the data sent on the channel
      */
-    //public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
     public void receivedMessage(ClientChannel channel, 
-				//BigInteger sender,
                                 ByteBuffer data) {
 
 	// if this is a message from the server, then it's some
 	// command that we need to process, so get the command code
 	int command = (int)(data.get());
 
-	// FIXME: this should really be an enumeration
+	// NOTE: in a more robust implementation, the commands used
+	//       should really be an enumeration
 	try {
 	    switch (command) {
 	    case 0:
@@ -141,7 +138,7 @@ public class DungeonChannelListener extends GameChannelListener
 		notifyChatMessage(data);
 	    }
 	} catch (IOException ioe) {
-	    // FIXME: this should probably handle the error a little more
+	    // NOTE: this should probably handle the error a little more
 	    // gracefully, but it's unclear what the right approach is
 	    System.out.println("Failed to handle incoming Dungeon object");
 	    ioe.printStackTrace();
@@ -149,10 +146,10 @@ public class DungeonChannelListener extends GameChannelListener
     }
 
     /**
-     * A private helper that converts the map from the server (that maps
-     * integers to byte arrays) into the form needed on the clie (that
-     * maps integers to images). The server sends the byte array form
-     * because images aren't serializable.
+     * A private helper that converts the map from the server (that
+     * maps integers to byte arrays) into the form needed on the
+     * client (that maps integers to images). The server sends the
+     * byte array form because images aren't serializable.
      */
     private Map<Integer,Image> convertMap(Map<Integer,byte[]> map) {
         Map<Integer,Image> newMap = new HashMap<Integer,Image>();

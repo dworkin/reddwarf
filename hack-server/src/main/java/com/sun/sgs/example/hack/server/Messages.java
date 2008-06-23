@@ -48,16 +48,12 @@ import java.util.HashSet;
  * the client. This is provided both as a convenience, and also as a way
  * to keep all message formatting in one place. All message formatting and
  * message code definition is done here.
- * <p>
- * FIXME: All the messages codes are fixed numbers. This should actually be
- * using some enumeration.
  */
 public class Messages {
 
     /**
      * Generic method to send data to a set of users on a given channel.
      *
-     * @param task the task
      * @param data the message
      * @param channel the channel to send the message on
      * @param users the set of users to send to
@@ -65,9 +61,7 @@ public class Messages {
     public static void sendToClient(ByteBuffer data, 
 				    Channel channel,
                                     ClientSession[] users) {
-        /*for (UserId uid : users)
-            task.sendData(channel, uid, data, true);*/
-        // FIXME: Actually send the message here
+
         HashSet<ClientSession> recipients = new HashSet<ClientSession>();
         for (ClientSession session : users)
             recipients.add(session);
@@ -83,7 +77,6 @@ public class Messages {
      * Generic method to send data to a set of users on a given channel. This
      * serializes the data and sends the object to the client.
      *
-     * @param task the task
      * @param command the message code, which will be included before the data
      * @param data the message, which must be <code>Serializable</code>
      * @param channel the channel to send the message on
@@ -120,7 +113,7 @@ public class Messages {
     }
 
     /**
-     *
+     * Sends whether a client has joined or left a channel.
      */
     private static void sendChannelNotice(ClientSession sender,
 					  byte [] session, Channel channel,
@@ -132,13 +125,18 @@ public class Messages {
         channel.send(sender, ByteBuffer.wrap(message));
     }
 
+    /**
+     * Returns the byte array representat of the id of the provided
+     * session.
+     */
     private static byte[] getSessionIdBytes(ClientSession session) {
         return AppContext.getDataManager().
             createReference(session).getId().toByteArray();
     }
 
     /**
-     *
+     * Notifies all the sessons on the channel that the provided
+     * {@code ClientSession} has joined.
      */
     public static void sendPlayerJoined(ClientSession session,
                                         Channel channel) {
@@ -146,7 +144,8 @@ public class Messages {
     }
 
     /**
-     *
+     * Notifies all the sessons on the channel that the provided
+     * {@code ClientSession} has left.
      */
     public static void sendPlayerLeft(ClientSession session,
                                       Channel channel) {
@@ -157,8 +156,8 @@ public class Messages {
      * Sends uid-to-name mapping. This bulk version is typically used when
      * a player first joins a game, though it may be used at any point.
      *
-     * @param task the task
-     * @param uidMap the <code>Map</code> of UserIDs to login names
+     * @param uidMap the <code>Map</code> of references to client
+     *               sessions to login names
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
@@ -175,46 +174,44 @@ public class Messages {
     /**
      * Sends a single uid-to-name mapping.
      *
-     * @param task the task
-     * @param uid the user's identifier
+     * @param sesion the user's session
      * @param name the user's login name
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendUidMap(ClientSession uid, String name,
+    public static void sendUidMap(ClientSession session, String name,
                                   Channel channel, ClientSession [] users) {
         Map<String,String> map = new HashMap<String,String>();
-        map.put(HexDumper.toHexString(getSessionIdBytes(uid)),name);
+        map.put(HexDumper.toHexString(getSessionIdBytes(session)),name);
         sendToClient(0, map, channel, users);
     }
 
 
-    /**
+    /*
      * START LOBBY MESSAGES
      */
 
     /**
-     * Sends the initial welcome message when a client enters the lobby. This
-     * just sends the set of game names to the client. The correct lobby
-     * and game counts come from other messages.
+     * Sends the initial welcome message when a client enters the
+     * lobby. This just sends the set of game names to the client. The
+     * correct lobby and game counts come from other messages.
      *
-     * @param task the task
      * @param games the <code>Collection</code> of games and their detail
      * @param channel the channel to send the message on
-     * @param uid the users to send to
+     * @param session the user to send to
      */
     public static void sendLobbyWelcome(Collection<GameMembershipDetail> games,
-                                        Channel channel, ClientSession uid) {
-        ClientSession [] uids = new ClientSession[] {uid};
+                                        Channel channel, 
+					ClientSession session) {
+        ClientSession [] sessions = new ClientSession[] {session};
 
-        sendToClient(11, games, channel, uids);
+        sendToClient(11, games, channel, sessions);
     }
 
     /**
      * Sends notice to a set of clients that the membership of a given
      * game has changed.
      *
-     * @param task the task
      * @param name the name of the game that changed
      * @param count the updated membership count
      * @param channel the channel to send the message on
@@ -235,7 +232,6 @@ public class Messages {
     /**
      * Sends notice to a set of clients that a game has been added.
      *
-     * @param task the task
      * @param name the name of the game that was added
      * @param channel the channel to send the message on
      * @param users the users to send to
@@ -253,7 +249,6 @@ public class Messages {
     /**
      * Sends notice to a set of clients that a game has been removed.
      *
-     * @param task the task
      * @param name the name of the game that was added
      * @param channel the channel to send the message on
      * @param users the users to send to
@@ -271,19 +266,18 @@ public class Messages {
     /**
      * Sends a <code>Collection</code> of player statistics.
      *
-     * @param task the task
      * @param stats the collection of character statistics
      * @param channel the channel to send the message on
-     * @param uid the user to send to
+     * @param session the user to send to
      */
     public static void sendPlayerCharacters(Collection<CharacterStats> stats,
                                             Channel channel,
-                                            ClientSession uid) {
+                                            ClientSession session) {
 
-        sendToClient(15, stats, channel, new ClientSession [] {uid});
+        sendToClient(15, stats, channel, new ClientSession [] {session});
     }
 
-    /**
+    /*
      * START DUNGEON MESSAGES
      */
 
@@ -291,13 +285,12 @@ public class Messages {
      * Sends a new mapping from identifiers to sprite images. This is
      * typically done with each level.
      *
-     * @param task the task
      * @param spriteMap the mapping from identifier to sprite
      * @param channel the channel to send the message on
-     * @param uid the user to send to
+     * @param session the user to send to
      */
     public static void sendSpriteMap(SpriteMap spriteMap, Channel channel,
-                                     ClientSession uid) {
+                                     ClientSession session) {
         // get the bytes
         byte [] bytes = encodeObject(spriteMap.getSpriteMap());
         ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
@@ -306,69 +299,65 @@ public class Messages {
         bb.putInt(spriteMap.getSpriteSize());
         bb.put(bytes);
 
-        sendToClient(bb, channel, new ClientSession [] {uid});
+        sendToClient(bb, channel, new ClientSession [] {session});
     }
     
     /**
      * Sends a complete <code>Board</code> to a client.
      *
-     * @param task the task
      * @param board the <code>Board</code> to send
      * @param channel the channel to send the message on
-     * @param uid the user to send to
+     * @param session the user to send to
      */
     public static void sendBoard(Board board, Channel channel,
-                                 ClientSession uid) {
-        sendToClient(22, board, channel, new ClientSession [] {uid});
+                                 ClientSession session) {
+        sendToClient(22, board, channel, new ClientSession [] {session});
     }
 
     /**
      * Sends updates about a <code>Collection</code> of spaces.
      *
-     * @param task the task
      * @param spaces the spaces that are being updated
      * @param channel the channel to send the message on
-     * @param users the users to send to
+     * @param sessions the users to send to
      */
     public static void sendUpdate(Collection<BoardSpace> spaces,
-                                  Channel channel, ClientSession [] users) {
-        sendToClient(23, spaces, channel, users);
+                                  Channel channel, ClientSession [] sessions) {
+        sendToClient(23, spaces, channel, sessions);
     }
 
     /**
      * Sends a text message to the client. These are messages generated by
      * the game logic, not chat messages from other clients.
      *
-     * @param task the task
      * @param message the message to send
      * @param channel the channel to send the message on
-     * @param uid the user to send to
+     * @param session the user to send to
      */
     public static void sendTextMessage(String message, Channel channel,
-                                       ClientSession uid) {
+                                       ClientSession session) {
         ByteBuffer bb = ByteBuffer.allocate(message.length() + 1);
 
         bb.put((byte)24);
         bb.put(message.getBytes());
 
-        sendToClient(bb, channel, new ClientSession [] {uid});
+        sendToClient(bb, channel, new ClientSession [] {session});
     }
 
-    /**
+    /*
      * START CHARACTER MESSAGES
      */
     
     /**
      * Sends detail about a single character.
      *
-     * @param task the task
      * @param id the character's id
      * @param stats the character's statistics
      * @param channel the channel to send the message on
-     * @param uid the user to send to
+     * @param session the user to send to
      */
     public static void sendCharacter(int id, CharacterStats stats,
-                                     Channel channel, ClientSession uid) {
+                                     Channel channel, ClientSession session) {
         byte [] bytes = encodeObject(stats);
         ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
 
@@ -376,7 +365,7 @@ public class Messages {
         bb.putInt(id);
         bb.put(bytes);
 
-        sendToClient(bb, channel, new ClientSession [] {uid});
+        sendToClient(bb, channel, new ClientSession [] {session});
     }
 
 }

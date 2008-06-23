@@ -43,7 +43,8 @@ public abstract class BasicTile implements Tile, Serializable {
     // the id of this tile
     private int id;
 
-    // the character that is currently on this space, if any
+    // the character manager for any character that is currently on
+    // this space
     private ManagedReference<CharacterManager> mgrRef;
 
     // the item on this space, if any
@@ -107,7 +108,7 @@ public abstract class BasicTile implements Tile, Serializable {
      * Checks if the there is anything currently occupying this tile that
      * would keep the character from occupying it.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return whether or not the character can occupy this tile
      */
@@ -157,14 +158,13 @@ public abstract class BasicTile implements Tile, Serializable {
     public boolean removeCharacter(CharacterManager mgr) {
         // make sure that there's a character here
         if (this.mgrRef == null) {
-            //System.out.println("tried to remove a null char from a tile");
-            //Thread.dumpStack();
             return false;
         }
 
         // make sure that the character here is the one being removed
         if (! this.mgrRef.equals(AppContext.getDataManager().
                                  createReference(mgr))) {
+	    // debugging output
             System.out.println("not equal on removal: " +
                                mgrRef.get().toString() +
                                " != " + mgr.toString());
@@ -180,7 +180,7 @@ public abstract class BasicTile implements Tile, Serializable {
      * Adds the given item to this tile if possible. This succeeds
      * if there isn't currently an item on this tile.
      *
-     * @param itemRef the manager for the item
+     * @param item the item
      *
      * @return whether or not the item was added successfully
      */
@@ -198,7 +198,7 @@ public abstract class BasicTile implements Tile, Serializable {
      * Removes the given item from this tile, if and only if this item
      * is already on this tile.
      *
-     * @param itemRef the manager for the item
+     * @param item the item
      *
      * @return whether or not the item was removed successfully
      */

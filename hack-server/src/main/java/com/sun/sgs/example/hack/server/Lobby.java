@@ -68,7 +68,8 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     // the channel used for all players currently in the lobby
     private ManagedReference<Channel> channelRef;
 
-    // the set of players in the lobby, mapping from uid to account name
+    // the set of players in the lobby, mapping from the reference to
+    // player's session to account name
     private HashMap<ManagedReference<ClientSession>,String> playerMap;
 
     // the map for player counts in each game
@@ -106,23 +107,25 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     }
 
     /**
-     * Provides access to the single instance of <code>Lobby</code>. If
-     * the lobby hasn't already been created, then a new instance is
-     * created and added as a registered <code>GLO</code>. If the lobby
-     * already exists then nothing new is created.
+     * Provides access to the single instance of {@code Lobby}. If the
+     * lobby hasn't already been created, then a new instance is
+     * created and added as a registered {@code ManagedObject}. If the
+     * lobby already exists then nothing new is created.
+     *
      * <p>
-     * This method implements the pattern described in the programmer's
-     * notes document, so that it's safe against multiple simultaneous
-     * accesses when the lobby doesn't already exist. In practice, this
-     * isn't actually a concern in this app, because this method is never
-     * called by more than once party. Still, it's good defensive
-     * programming to protect against future models that may change our
-     * current access assumptions.
      *
-     * @param gcmRef a reference to the manager we'll notify when lobby
-     *               membership counts change
+     * This method implements the pattern described in the
+     * programmer's notes document, so that it's safe against multiple
+     * simultaneous accesses when the lobby doesn't already exist. In
+     * practice, this isn't actually a concern in this app, because
+     * this method is never called by more than once party. Still,
+     * it's good defensive programming to protect against future
+     * models that may change our current access assumptions.
      *
-     * @return a reference to the single <code>Lobby</code>
+     * @param gcm the manager we'll notify when lobby membership
+     *            counts change
+     *
+     * @return the single <code>Lobby</code>
      */
     public static Lobby getInstance(GameChangeManager gcm) {
         DataManager dataManager = AppContext.getDataManager();
@@ -149,9 +152,6 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         AppContext.getDataManager().markForUpdate(this);
 
         // send an update about the new lobby membership count
-        // FIXME: this was going to be a queued task, but that tripped the
-        // classloading bug that has now been fixed...should we go back to
-        // the queue model?
         GameMembershipDetail detail =
             new GameMembershipDetail(IDENTIFIER, numPlayers() + 1);
         gcmRef.get().notifyMembershipChanged(detail);
@@ -303,8 +303,10 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         // for each change, track the detail locally (to send in welcome
         // messages when players first join) and send a message to all
         // current lobby members
-        // FIXME: should we just send the collection, instead of sending
-        // each change separately?
+
+        // NOTE: depending on how the application treats individual
+        //       transmissions, the collection could be sent at once,
+        //       instead of sending each change separately
         for (GameMembershipDetail detail : details) {
             countMap.put(detail.getGame(), detail);
             Messages.sendGameCountChanged(detail.getGame(), detail.getCount(),

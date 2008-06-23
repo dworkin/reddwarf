@@ -22,10 +22,11 @@ package com.sun.sgs.example.hack.share;
 
 /**
  * A simple set of identifiesd for all the sprites in the default map.
- * <p>
- * FIXME: This should be an enumeration. Also, it should probably be removed,
- * because while it provides some convenience, it's just the name mapping
- * for one sprite map, and should never be referenced directly.
+ *
+ * In the future, this class should converted to an Enum. Also, it
+ * might also be considered for removal, because while it provides
+ * some convenience, it's just the name mapping for one sprite map,
+ * and should never be referenced directly.
  */
 public class GameIdentifiers {
 

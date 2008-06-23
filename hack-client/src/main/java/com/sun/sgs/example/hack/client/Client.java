@@ -19,16 +19,6 @@
 
 package com.sun.sgs.example.hack.client;
 
-/*import com.sun.gi.comm.discovery.impl.URLDiscoverer;
-
-import com.sun.gi.comm.users.client.ClientChannel;
-import com.sun.gi.comm.users.client.ClientConnectionManager;
-import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
-
-import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
-
-import com.sun.gi.utils.SGSUUID;*/
-
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 
@@ -54,12 +44,6 @@ import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 
 import java.util.Properties;
-
-/*import java.net.URL;
-
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.NameCallback;
-import javax.security.auth.callback.PasswordCallback;*/
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -146,7 +130,7 @@ public class Client extends JFrame implements SimpleClientListener {
      * @throws Exception if there is any problem with the initial setup
      */
     public Client() throws Exception {
-        super("SGS Demo Game 0.1");
+        super("Hack 0.4");
 
         // listen for events on the root window
         addWindowListener(new BasicWindowMonitor());
@@ -185,9 +169,9 @@ public class Client extends JFrame implements SimpleClientListener {
 
         // setup the client connection
         client = new SimpleClient(this);
-        lmanager.setConnectionManager(client);
-        crmanager.setConnectionManager(client);
-        gmanager.setConnectionManager(client);
+        lmanager.setClient(client);
+        crmanager.setClient(client);
+        gmanager.setClient(client);
 	
 	// we start off the client in the create state
 	state = State.CREATE;
@@ -305,7 +289,9 @@ public class Client extends JFrame implements SimpleClientListener {
 		dlistener.receivedMessage(null, message);
 		break;
 	    default:
-		// FIXME: error out more gracefully
+		// NOTE: in the event of an unknown message type, the
+		//       client should handle the message more
+		//       gracefully.
 		System.out.println("unhandled state: " + state);
 	    }
 	}

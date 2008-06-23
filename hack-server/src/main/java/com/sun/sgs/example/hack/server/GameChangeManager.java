@@ -85,15 +85,18 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
 
     /**
      * Provides access to the single instance of
-     * <code>GameChangeManager</code>. If a manager hasn't already been
-     * created, then a new instance is created and added as a registered
-     * <code>GLO</code>. If the manager already exists then nothing new is
-     * created.
+     * <code>GameChangeManager</code>. If a manager hasn't already
+     * been created, then a new instance is created and added as a
+     * registered <code>ManagedObject</code>. If the manager already
+     * exists then nothing new is created.
+     *
      * <p>
+     *
      * See the comment in <code>Lobby.getInstance</code> for more about the
      * pattern used by these <code>getInstance</code> methods.
      *
-     * @return a reference to the single <code>GameChangeManager</code>
+     * @return a reference to the singleton
+     *         <code>GameChangeManager</code>
      */
     public static GameChangeManager getInstance() {
         DataManager dataManager = AppContext.getDataManager();
@@ -160,8 +163,6 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
      * Called at periodic intervals by the system, this method notifies
      * all registered listeners if there have been any updates since the
      * last notification.
-     *
-     * @param eventID the event identifier
      */
     public void run() throws Exception {
         // for each notice type, see if we have anything to report, and if

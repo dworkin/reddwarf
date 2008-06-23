@@ -66,9 +66,9 @@ public class DungeonMessageHandler implements MessageHandler, Serializable {
         // the command identifier is always stored in the first byte
         int command = (int)(data.get());
 
-        // FIXME: we should use an enum to define the messages
-        //try {
-            switch (command) {
+        // NOTE: it would be more elegant to use an enum to define the
+        //       messages
+	switch (command) {
             case 1:
                 movePlayer(player, data);
                 break;
@@ -81,56 +81,56 @@ public class DungeonMessageHandler implements MessageHandler, Serializable {
             case 4:
                 useItem(player, data);
                 break;
-            }
-            /*} catch (Exception e) {
-            // FIXME: here what we want to do is either log the error, or
-            // send back a generic error response
-            System.out.println("Error in handling dungeon message");
-            e.printStackTrace();
-            }*/
+	    default: 
+		// NOTE: in a robust production system, we should
+		// either log the error, or send back a generic error
+		// response
+		System.out.println("unrecognized dungeon command:" + command);
+	}
     }
 
     /**
-     * Used to handle a key-press message.
+     * Handles the player even where a key-press triggers a movement.
      */
     private void movePlayer(Player player, ByteBuffer data) {
-        short message = data.getShort();
+        int encoded = data.getInt();
+	KeyMessages.Type message = KeyMessages.decode(encoded);
         CharacterManager mgr = player.getCharacterManager();
         Level level = mgr.getCurrentLevel();
 
-        // we have to do this check, 'cause we may have just left the level
-        // (eg, because we were killed), but not quite have grabbed the
-        // queued task to move us into our new state
+        // we have to do this check, because we may have just left the
+        // level (eg, because we were killed), but not quite have
+        // grabbed the queued task to move us into our new state
         if (level != null)
-            level.move(mgr, (int)message);
+            level.move(mgr, message);
     }
 
     /**
-     *
+     * Handles a player taking an item.
      */
     private void takeItem(Player player, ByteBuffer data) {
         CharacterManager mgr = player.getCharacterManager();
         Level level = mgr.getCurrentLevel();
 
-        // we have to do this check, 'cause we may have just left the level
-        // (eg, because we were killed), but not quite have grabbed the
-        // queued task to move us into our new state
+        // we have to do this check, because we may have just left the
+        // level (eg, because we were killed), but not quite have
+        // grabbed the queued task to move us into our new state
         if (level != null)
             level.take(mgr);
     }
 
     /**
-     *
+     * Not currently implemented.
      */
     private void equipItem(Player player, ByteBuffer data) {
-        // FIXME: implement
+        // TODO: implement
     }
 
     /**
-     *
+     * Not currently implemented.
      */
     private void useItem(Player player, ByteBuffer data) {
-        // FIXME: implement
+        // TODO: implement
     }
 
 }

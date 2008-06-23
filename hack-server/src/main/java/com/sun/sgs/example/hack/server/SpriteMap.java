@@ -27,10 +27,11 @@ import java.util.Map;
 
 
 /**
- * This represents a single sprite map. It's here mostly because we can't
- * put a <code>HashMap</code> (or similar) into a GLO directly, so we need
- * some intermediate structure. It also, as a utility, provides the side
- * of the sprites (which are of uniform height and width).
+ * This represents a single sprite map. It's here mostly because we
+ * can't put a {@code HashMap} (or similar) into a {@code
+ * ManagedObject} directly, so we need some intermediate structure. It
+ * also, as a utility, provides the side of the sprites (which are of
+ * uniform height and width).
  */
 public class SpriteMap implements ManagedObject, Serializable {
 

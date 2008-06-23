@@ -100,7 +100,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     }
 
     /**
-     *
+     * Sets the session id for the client.
      */
     public void setSessionId(BigInteger session) {
         uidMap.remove(currentSession);
@@ -108,6 +108,9 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
         currentSession = session;
     }
 
+    /**
+     * Returns the current session id for the client.
+     */
     public BigInteger getSessionId() {
 	return currentSession;
     }
@@ -159,7 +162,6 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     /**
      * Callback that is invoked when a message arrives.
      *
-     * @param sender the name of the sender
      * @param message the message itself
      */
     public void messageArrived(String message) {

@@ -52,10 +52,10 @@ public class SimpleConnector implements Connector, Serializable {
     /**
      * Creates an instance of <code>SimpleConnector</code>.
      *
-     * @param level1Ref a reference to a level
+     * @param level1 a level
      * @param level1X the x-coord on the first level
      * @param level1Y the y-coord on the first level
-     * @param level2Ref a reference to another level
+     * @param level2 another level
      * @param level2X the x-coord on the second level
      * @param level2Y the y-coord on the second level
      */
@@ -83,7 +83,7 @@ public class SimpleConnector implements Connector, Serializable {
      * Transitions the given character to the other point connected to
      * their current location.
      *
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      */
     public boolean enteredConnection(CharacterManager mgr) {
         handleEntered(mgr);
@@ -95,7 +95,7 @@ public class SimpleConnector implements Connector, Serializable {
      * Figures out which end to send the character to, based on which end
      * they're on right now, and moves the character.
      *
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      */
     protected void handleEntered(CharacterManager mgr) {
         // see if we can use the level ref info

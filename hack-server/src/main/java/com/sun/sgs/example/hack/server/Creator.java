@@ -48,23 +48,19 @@ public class Creator implements Game, Serializable {
      */
     public static final String IDENTIFIER = NAME_PREFIX + "creator";
 
-    // the channel used for all players currently in the lobby
+    // a reference to the channel used for all players currently in
+    // the lobby
     private ManagedReference<Channel> channelRef;
 
     // the number of players interacting with the creator
     private int playerCount = 0;
 
-    private Channel channel() {
-	return channelRef.get();
-    }
 
     /**
      * Creates an instance of <code>Creator</code>. In practice there should
      * only ever be one of these, so we don't all direct access to the
      * constructor. Instead, you get access through <code>getInstance</code>
      * and that enforces the singleton.
-     *
-     * @param task the task this is running in
      */
     private Creator() {
         DataManager dataManager = AppContext.getDataManager();
@@ -77,6 +73,16 @@ public class Creator implements Game, Serializable {
     }
 
     /**
+     * Gets the {@code Channel} associated with {@link #channelRef}.
+     *
+     * @return the channel or {@code null} if {@code channelRef} is
+     *         {@code null}.
+     */
+    private Channel channel() {
+	return channelRef.get();
+    }
+
+    /**
      * Provides access to the single instance of <code>Creator</code>. If
      * the creator hasn't already been created, then a new instance is
      * created and added as a registered <code>GLO</code>. If the creator
@@ -84,7 +90,7 @@ public class Creator implements Game, Serializable {
      * <p>
      * See the comments in <code>Lobby</code> for details on this pattern.
      *
-     * @return a reference to the single <code>Creator</code>
+     * @return the single <code>Creator</code> instance
      */
     public static Creator getInstance() {
         DataManager dataManager = AppContext.getDataManager();

@@ -23,9 +23,9 @@ import java.util.Random;
 
 
 /**
- * This is a simple utility class that simulates rolling common dies. Note
- * that this is not a <code>GLO</code> since there is no persistant state
- * and no need to lock any accesses.
+ * This is a simple utility class that simulates rolling common
+ * dies. Note that this is not a <code>ManagedObject</code> since
+ * there is no persistant state and no need to lock any accesses.
  */
 public class NSidedDie {
 

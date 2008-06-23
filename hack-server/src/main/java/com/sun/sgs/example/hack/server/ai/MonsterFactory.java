@@ -25,19 +25,26 @@ import com.sun.sgs.app.ManagedReference;
 
 
 /**
- * NOTE: This should be some kind of pluggable thing, so you can introduce
- * new kinds of monsters and reference them, but for now just making sure
- * that we use a factory gives us that flexability in the future.
- * FIME: this is a work in progress
+ * This class is a prototype example of a pluggable object creator; so
+ * you can easily introduce new kinds of monsters and reference them,
+ * but for now just making sure that we use a factory gives us that
+ * flexability in the future.
+ *
+ * Note that the implementation of this class is rudamentary and is
+ * provided as an example of where to start in future implementations
+ * or revisions.
  */
 public class MonsterFactory {
 
     /**
-     * Creates an instance of <code>AICharacterManager</code< and returns
-     * a reference to the new instance
+     * Creates an instance of {@code AICharacterManager} and returns a
+     * reference to the new instance
      *
      * @param id the character's identifier
      * @param type the chatacter's name
+     *
+     * @throws IllegalArgumentException if {@code type} is not a
+     *         recognized character type.
      */
     public static AICharacterManager getMonster(int id, String type) {
         // create a manager

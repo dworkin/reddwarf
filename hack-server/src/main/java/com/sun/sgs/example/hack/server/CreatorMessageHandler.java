@@ -62,8 +62,8 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
         // the command identifier is always stored in the first byte
         int command = (int)(data.get());
 
-        // FIXME: we should use an enum to define the messages
-        //try {
+        // NOTE: it would be more elegant to use an enum to define the
+        //       messages
 	switch (command) {
             case 1:
                 // get the id and create the stats
@@ -90,19 +90,22 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
                 break;
 	    default:
 		System.out.println("unknown command: " + command);
+		// NOTE: in a robust production system, what we should
+		//       do here is either log the error, or send back
+		//       a generic error response
 	}
-            /*} catch (Exception e) {
-            // FIXME: here what we want to do is either log the error, or
-            // send back a generic error response
-            }*/
     }
 
     /**
+     * Creates new stats for the provided character
      *
+     * @param id the id of the character
+     *
+     * @return the new stats for the character
      */
     private CharacterStats getNewStats(int id) {
-        // FIXME: this should change based on the character class, but for
-        // now it's purely random
+        // NOTE: this should change based on the character class, but
+        //       for now it's purely random
         int hp = NSidedDie.roll20Sided() + NSidedDie.roll20Sided();
         return new CharacterStats("", NSidedDie.roll20Sided(),
                                   NSidedDie.roll20Sided(),
@@ -113,7 +116,13 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
     }
 
     /**
+     * Creates a new {@code PlayerCharacter} with the provided {@code
+     * name} and a randomly initialized {@link CharacterStats}.
      *
+     * @param player the player instance
+     * @param name the name of the player
+     *
+     * @return an initialized {@code PlayerCharacter}.
      */
     private PlayerCharacter setupCharacter(Player player, String name) {
         CharacterStats stats =
@@ -130,7 +139,10 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
     }
 
     /**
+     * Schedules a {@code Task} to move the provided {@code Player} to
+     * the {@link Lobby}.
      *
+     * @param player the player to be moved
      */
     private void moveToLobby(Player player) {
         Lobby lobby = (Lobby) AppContext.getDataManager().

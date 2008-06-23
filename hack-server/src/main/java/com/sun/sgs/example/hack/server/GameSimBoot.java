@@ -42,11 +42,6 @@ import java.util.Properties;
  * when the server is starting up, and is responsible for setting up the
  * rest of the game. Other than acting as a boot-strap service, it does
  * little except listen for joining and leaving connections.
- * <p>
- * Note that when you write your implementation of <code>SimBoot</code>
- * you don't have to also implement <code>SimUserListener</code> in the
- * same class. Because the two interfaces do very little, however, this
- * is an easy way to start building your game.
  */
 public class GameSimBoot implements AppListener, Serializable {
 
@@ -60,8 +55,8 @@ public class GameSimBoot implements AppListener, Serializable {
         "gameData/dungeons";
 
     /**
-     * The property you define to override the standard dungeons file location.
-     * FIXME: what should this be?
+     * The property you define to override the standard dungeons file
+     * location.
      */
     public static final String DUNGEON_FILE_PROPERTY =
         "com.sun.sgs.example.hack.server.DungeonFile";
@@ -83,8 +78,9 @@ public class GameSimBoot implements AppListener, Serializable {
      * This method will install the initial listeners and create the basic
      * logic held throughout the lifetime of the game app.
      *
-     * @param thisGLO a reference to this boot object
-     * @param firstBoot true if this is the first time the app has been booted
+     * @param properties the application properties loaded from the
+     *                   application's configuration file
+     * 
      */
     public void initialize(Properties properties) {
         DataManager dataManager = AppContext.getDataManager();
@@ -125,8 +121,7 @@ public class GameSimBoot implements AppListener, Serializable {
     /**
      * Called when a new user joins the game app.
      *
-     * @param uid the user's identifier
-     * @param subject the user's credentials and other details
+     * @param session the user's client session
      */
     public ClientSessionListener loggedIn(ClientSession session) {
         // get a reference to the player, creating the object if needed
@@ -134,7 +129,11 @@ public class GameSimBoot implements AppListener, Serializable {
 
         // make sure that the player isn't already logged in and playing
         if (player.isPlaying()) {
-            // FIXME: how do we close this connection and return?
+            // NOTE: we currently don't handle this case, but in a
+            //       more robust system, the application should take a
+            //       specific action to either disconnect the extra
+            //       session, or to perform some application-specific
+            //       logic for handling a client with two session
         }
 
         // let the player know what their new session is

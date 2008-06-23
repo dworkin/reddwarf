@@ -49,8 +49,7 @@ public class PlayerCharacter implements Character, Serializable {
     /**
      * Creates an instance of <code>PlayerCharacter</code>.
      *
-     * @param playerRef a reference to the <code>Player</code> that owns
-     *                  this character
+     * @param player the <code>Player</code> that owns this character
      * @param id the identifier for this character
      * @param stats the statistics for this character
      */
@@ -107,10 +106,10 @@ public class PlayerCharacter implements Character, Serializable {
             // back to do the removal...
             player.leaveCurrentLevel();
 
-            // FIXME: just for testing, we'll reset the hit-points here
             stats.setHitPoints(stats.getMaxHitPoints());
 
-            // NOTE: we could add some message screen here, if we wanted
+            // NOTE: we could add some message screen here, if we
+            //       wanted
 
             // finally, throw the players into the lobby
             Game lobby = (Lobby) AppContext.getDataManager().

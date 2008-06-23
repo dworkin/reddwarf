@@ -42,15 +42,18 @@ import java.util.Set;
 
 
 /**
- * This is a fairly simple static factory class that handles loading the
- * contents of a single <code>Dungeon</code>. All AI, levels, etc. are
- * correctly registered as part of the process.
+ * This is a fairly simple static factory class that handles loading
+ * the contents of a single <code>Dungeon</code>. All AI, levels,
+ * etc. are correctly registered as part of the process.
+ *
  * <p>
+ *
  * Note that in a richer app this would be an interface and provide a
- * way to define multiple factories. These would be identified by some naming
- * scheme, and then multiple file formats could be used. This would also
- * make it easy to support different underlying representation of the levels
- * (as opposed to the exclusive use of <code>SimpleBoard</code>).
+ * way to define multiple factories. These would be identified by some
+ * naming scheme, and then multiple file formats could be used. This
+ * would also make it easy to support different underlying
+ * representation of the levels (as opposed to the exclusive use of
+ * <code>SimpleBoard</code>).
  */
 public class DungeonFactory {
 
@@ -60,17 +63,13 @@ public class DungeonFactory {
      * the AIs, stitching together all connectors between levels, etc. At
      * the end a single <code>Connector</code> is provded as an entry
      * point to the dungeon.
-     * <p>
-     * FIXME: we should make the aggregator real, or remove it and go
-     * back to use of the PDTimer directly.
      *
      * @param stok the stream to tokenize
      * @param gameName the name of the dungeon this is being loaded into
      * @param impassableSprites the set of identifiers that are impassable
-     * @param lobbyRef a reference to the lobby
-     * @param eventAg an aggreagator for all AI tasks
+     * @param lobby the lobby
      *
-     * @return a reference to a <code>GameConnector</code> that is the
+     * @return a <code>GameConnector</code> that is the
      *         connection between the dungeon and the lobby
      *
      * @throws IOException if the stream isn't formatted correctly
@@ -192,7 +191,7 @@ public class DungeonFactory {
             }
         }
 
-        // next, create a GLO for each of the levels
+        // next, create a ManagedObject for each of the levels
         for (String levelName : boards.keySet()) {
             SimpleLevel level = new SimpleLevel(levelName, gameName);
             String gloName = Game.NAME_PREFIX + levelName;
@@ -287,7 +286,9 @@ public class DungeonFactory {
         }
         
         // finally add, the items
-        // FIXME: support items in file format
+        
+	// TODO: support items in file format; currently there are no
+	//       items.
 
         // return the game connector, which is all the Dungeon needs to
         // interact with everything we've setup here
@@ -326,22 +327,6 @@ public class DungeonFactory {
     static class ConnectionData {
         public String level1, level2;
         public int level1X, level1Y, level2X, level2Y;
-    }
-
-    /**
-     * FIXME: just for testing (or it should be made into a real class)
-     */
-    public static class EventAggregator implements Task, Serializable {
-        private static final long serialVersionUID = 1;
-        HashSet<ManagedReference<AICharacterManager>> mgrs =
-	    new HashSet<ManagedReference<AICharacterManager>>();
-        public void addCharacterMgr(AICharacterManager mgr) {
-            mgrs.add(AppContext.getDataManager().createReference(mgr));
-        }
-        public void run() throws Exception {
-            for (ManagedReference<AICharacterManager> mgrRef : mgrs)
-                mgrRef.get().run();
-        }
     }
 
 }

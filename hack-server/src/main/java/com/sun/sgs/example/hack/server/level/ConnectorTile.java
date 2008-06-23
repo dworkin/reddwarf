@@ -81,7 +81,7 @@ public class ConnectorTile implements Tile, Serializable {
      * Always returns true, because connection points are, by definition,
      * passable.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return true
      */
@@ -93,7 +93,7 @@ public class ConnectorTile implements Tile, Serializable {
      * Always returns true, because connection points are, by definition,
      * spaces you can occupy.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      *
      * @return true
      */

@@ -39,7 +39,7 @@ public interface Connector extends ManagedObject {
      * stairs on two connected levels) or providing one-way tunnels, or
      * it may be randomized.
      *
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      */
     public boolean enteredConnection(CharacterManager mgr);
 

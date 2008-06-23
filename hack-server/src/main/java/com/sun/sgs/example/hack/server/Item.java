@@ -37,9 +37,14 @@ public interface Item extends ManagedObject {
     public int getID();
 
     /**
-     * Called when this <code>Item</code> is being given to the character.
-     * This is useful if you want interactive items (eg, cursing the user
-     * as soon as they pickup a talisman).
+     * Called when this {@code Item} is being given to the character.
+     * This is useful if you want interactive items (eg, cursing the
+     * user as soon as they pickup a talisman).
+     *
+     * @param characterManager the character to whom this {@code Item}
+     *                         will be given.
+     *
+     * @return the resulting status of the {@code giveTo} action
      */
     public ActionResult giveTo(CharacterManager characterManager);
 

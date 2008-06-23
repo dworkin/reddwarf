@@ -20,8 +20,6 @@
 
 package com.sun.sgs.example.hack.client;
 
-//import com.sun.gi.comm.users.client.ClientConnectionManager;
-
 import com.sun.sgs.client.simple.SimpleClient;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
@@ -37,8 +35,6 @@ import java.util.HashSet;
 public class CreatorManager implements CreatorListener
 {
 
-    // the connection manager, used to send messages to the server
-    //private ClientConnectionManager connManager = null;
     private SimpleClient client = null;
 
     // the listeners
@@ -52,20 +48,23 @@ public class CreatorManager implements CreatorListener
     }
 
     /**
+     * Adds a listener that will receive any changes made by the
+     * {@code CreatorManager}.
      *
+     * @param listener the listener to add
      */
     public void addCreatorListener(CreatorListener listener) {
         listeners.add(listener);
     }
 
     /**
-     * Sets the connection manager that this class uses for all communication
-     * with the game server. This method may only be called once during
-     * the lifetime of the client.
+     * Sets the client that this class uses for all communication with
+     * the game server. This method may only be called once during the
+     * lifetime of the client.
      *
-     * @param connManager the connection manager
+     * @param simpleClient the client that will use this class
      */
-    public void setConnectionManager(SimpleClient simpleClient) {
+    public void setClient(SimpleClient simpleClient) {
         if (client == null)
             client = simpleClient;
     }

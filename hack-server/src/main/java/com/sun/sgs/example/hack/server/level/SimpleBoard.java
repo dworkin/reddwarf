@@ -30,10 +30,10 @@ import java.util.HashSet;
 
 
 /**
- * This is a simple implementation of <code>LevelBoard</code> that is used
- * as the default mechanism to store level state. Note that this class is
- * not a <code>GLO</code>. It must be managed as private state with something
- * that is a <code>GLO</code>.
+ * This is a simple implementation of <code>LevelBoard</code> that is
+ * used as the default mechanism to store level state. Note that this
+ * class is not a {@link ManagedObject}. It must be managed as private
+ * state as a part of something that is a <code>ManagedObject</code>.
  */
 public class SimpleBoard implements LevelBoard {
 
@@ -92,7 +92,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param connectorRef a reference to the <code>Connector</code>
+     * @param connector the <code>Connector</code>
      */
     public void setAsConnector(int x, int y, Connector connector) {
         Tile tile = tiles[x][y];
@@ -144,7 +144,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -157,7 +157,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -171,7 +171,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param itemRef a reference to the item's manager
+     * @param item the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -184,7 +184,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param itemRef a reference to the item's manager
+     * @param item the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -198,7 +198,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the character's manager
+     * @param mgr the character's manager
      *
      * @return true if the operation would succeed, false otherwise
      */

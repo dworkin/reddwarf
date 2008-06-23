@@ -31,13 +31,14 @@ import java.util.Collection;
 
 
 /**
- * This interface defines all classes that manage <code>Character</code>s.
- * In essence, a <code>Character</code> represents a single avitar in the
- * game, but not the way that it's moved around between elements of the
- * world, the way in which it communicates with its master (eg, a player
- * or some AI timing loop), etc. Throughout the code, especially when
- * we need to track references, <code>CharacterManager</code>s are used to
- * manage <code>Character</code> interaction.
+ * This interface defines all classes that manage {@link Character}
+ * instances.  In essence, a <code>Character</code> represents a
+ * single avitar in the game, but not the way that it's moved around
+ * between elements of the world, the way in which it communicates
+ * with its master (e.g., a player or some AI timing loop),
+ * etc. Throughout the code, especially when we need to track
+ * references, <code>CharacterManager</code>s are used to manage
+ * <code>Character</code> interaction.
  */
 public interface CharacterManager extends ManagedObject {
 
@@ -58,7 +59,7 @@ public interface CharacterManager extends ManagedObject {
     /**
      * Sets the current level.
      *
-     * @param levelRef a reference to a level
+     * @param level the current level
      */
     public void setCurrentLevel(Level level);
 
