@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>4</version>
+  <version>5</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -202,6 +202,17 @@
       </plugin>
 
     </plugins>
+
+    <!-- Include the wagon-svn extension so we can deploy
+	 to Maven2 repositories hosted in SVN repositories
+	 on java.net -->
+    <extensions>
+      <extension>
+        <groupId>org.jvnet.wagon-svn</groupId>
+        <artifactId>wagon-svn</artifactId>
+        <version>RELEASE</version>
+      </extension>
+    </extensions>
 
   </build>
 
@@ -486,17 +497,34 @@
     
   </profiles>
 
-  <!-- Currently artifacts can be deployed to the
-       Maven repository on sunlabs.east
-       This will change to the java.net repository when
-       we move to the outside -->
+  <!-- Release artifacts should be deployed to the java.net
+       Maven2 repository
+       SNAPSHOT artifacts should be deployed to the
+       repository hosted in the games-darkstar java.net project -->
   <distributionManagement>
     <repository>
-      <id>sunlabs.maven.ssh</id>
-      <name>Sun Labs Maven Repository</name>
-      <url>scp://sunlabs.east.sun.com/export/darkstar/web/maven</url>
+      <id>java.net-maven2-repository</id>
+      <name>java.net Maven2 Repository</name>
+      <url>java-net:/maven2-repository/trunk/www/repository/</url>
     </repository>
+    <snapshotRepository>
+      <id>games-darkstar-snapshot-repository</id>
+      <name>games-darkstar SNAPSHOT Repository</name>
+      <url>java-net:/games-darkstar/trunk/www/snapshots/</url>
+      <uniqueVersion>false</uniqueVersion>
+    </snapshotRepository>
   </distributionManagement>
+
+  <!-- Include the java.net repository to retrieve dependent
+       artifacts (such as wagon-svn) -->
+  <repositories>
+    <repository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
   
   <!-- Configuration properties which should be consistent
        across all children POMS -->
