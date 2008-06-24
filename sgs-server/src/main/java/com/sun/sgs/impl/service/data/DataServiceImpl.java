@@ -24,6 +24,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -113,9 +114,10 @@ import java.util.logging.Logger;
  * <li> {@link Level#SEVERE SEVERE} - Initialization failures
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data service
  *	headers
- * <li> {@link Level#FINE FINE} - Task scheduling operations
+ * <li> {@link Level#FINE FINE} - Task scheduling operations, managed reference
+ *	table checks
  * <li> {@link Level#FINER FINER} - Transaction operations
- * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * <li> {@link Level#FINEST FINEST} - Name, object, and reference operations
  * </ul> <p>
  *
  * It also uses an additional {@code Logger} named {@code
@@ -130,15 +132,10 @@ import java.util.logging.Logger;
  * <li> {@code FINEST} - Modified object was not marked for update
  * </ul> <p>
  *
- * Instances of {@link ManagedReference} returned by the {@link
- * #createReference createReference} method use the <code>Logger</code> named
- * <code>com.sun.sgs.impl.service.data.ManagedReferenceImpl</code> to log
- * information at the following logging levels: <p>
- *
- * <ul>
- * <li> {@link Level#FINE FINE} - Managed reference table checks
- * <li> <code>FINEST</code> - Reference operations
- * </ul>
+ * In addition, operations that throw a {@link TransactionAbortedException}
+ * will log the failure to the {@code Logger} named {@code
+ * com.sun.sgs.impl.service.data.DataServiceImpl.abort}, to make it easier to
+ * debug concurrency conflicts by just logging aborts.
  */
 public final class DataServiceImpl implements DataService, ProfileProducer {
 
@@ -168,8 +165,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	CLASSNAME + ".data.store.class";
 
     /** The logger for this class. */
-    private static final LoggerWrapper logger =
+    static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /** The logger for transaction abort exceptions. */
+    private static final LoggerWrapper abortLogger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort"));
 
     /** Synchronize on this object when accessing the contextMap field. */
     private static final Object contextMapLock = new Object();
@@ -430,7 +431,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    },
 		taskOwner);
 	} catch (RuntimeException e) {
-	    logger.logThrow(
+	    getExceptionLogger(e).logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
 	} catch (Error e) {
@@ -500,8 +501,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    refId(ref));
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "removeObject tid:{0,number,#}, object:{1}," +
 		    " oid:{2,number,#} throws",
@@ -532,8 +534,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    refId(ref));
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "markForUpdate tid:{0,number,#}, object:{1}," +
 		    " oid:{2,number,#} throws",
@@ -561,8 +564,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "createReference tid:{0,number,#}, object:{1} throws",
 		    contextTxnId(context), Objects.fastToString(object));
@@ -607,11 +611,13 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e,
-				"createReferenceForId tid:{0,number,#}," +
-				" oid:{1,number,#} throws",
-				contextTxnId(context), id);
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
+		    Level.FINEST, e,
+		    "createReferenceForId tid:{0,number,#}," +
+		    " oid:{1,number,#} throws",
+		    contextTxnId(context), id);
 	    }
 	    throw e;
 	}
@@ -632,7 +638,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(
+	    getExceptionLogger(e).logThrow(
 		Level.FINEST, e, "nextObjectId objectId:{0} throws", objectId);
 	    throw e;
 	}
@@ -667,8 +673,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
@@ -698,8 +705,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    contextTxnId(context), name, Objects.fastToString(object));
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e,
 		    "{0} tid:{1,number,#}, name:{2}, object:{3} throws",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
@@ -730,8 +738,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    contextTxnId(context), name);
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e, "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    contextTxnId(context), name);
@@ -756,8 +765,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
 		    Level.FINEST, e, "{0} tid:{1,number,#}, name:{2} throws",
 		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
 		    contextTxnId(context), name);
@@ -1022,5 +1032,15 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    throw new IllegalArgumentException(
 		"The object must implement ManagedObject: " + object);
 	}
+    }
+
+    /**
+     * Returns the logger that should be used to log the specified exception.
+     * In particular, use the abortLogger for TransactionAbortedException, and
+     * the class logger for other runtime exceptions.
+     */
+    static LoggerWrapper getExceptionLogger(RuntimeException exception) {
+	return exception instanceof TransactionAbortedException
+	    ? abortLogger : logger;
     }
 }

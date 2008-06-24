@@ -94,6 +94,18 @@ import java.util.Stack;
  *
  * <p>
  *
+ * Applications must make sure that objects used as keys in maps of this class
+ * have {@code equals} and {@code hashCode} methods that return the same values
+ * after the keys have been serialized and deserialized.  In particular, keys
+ * that use {@link Object#equals Object.equals} and {@link Object#hashCode
+ * Object.hashCode} will typically not be equal, and will have different hash
+ * codes, each time they are deserialized, and so are probably not suitable for
+ * use with this class.  The same requirements apply to objects used as values
+ * if the application intends to use {@link #containsValue containsValue} or to
+ * compare map entries.
+ *
+ * <p>
+ *
  * This class marks itself for update as necessary; no additional calls to the
  * {@link DataManager} are necessary when modifying the map.  Developers do not
  * need to call {@code markForUpdate} or {@code getForUpdate} on this map, as

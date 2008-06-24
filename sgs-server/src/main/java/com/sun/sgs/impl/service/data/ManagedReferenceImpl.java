@@ -46,9 +46,7 @@ final class ManagedReferenceImpl<T>
     private static final long serialVersionUID = 1;
 
     /** The logger for this class. */
-    private static final LoggerWrapper logger =
-	new LoggerWrapper(
-	    Logger.getLogger(ManagedReferenceImpl.class.getName()));
+    private static final LoggerWrapper logger = DataServiceImpl.logger;
 
     /**
      * The logger for messages about managed objects that are modified but for
@@ -369,9 +367,10 @@ final class ManagedReferenceImpl<T>
 		"reference that was created in another transaction",
 		e);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e,
-			    "get tid:{0,number,#}, oid:{1,number,#} throws",
-			    context.getTxnId(), oid);
+	    DataServiceImpl.getExceptionLogger(e).logThrow(
+		Level.FINEST, e,
+		"get tid:{0,number,#}, oid:{1,number,#} throws",
+		context.getTxnId(), oid);
 	    throw e;
 	}
     }
@@ -428,7 +427,7 @@ final class ManagedReferenceImpl<T>
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(
+	DataServiceImpl.getExceptionLogger(exception).logThrow(
 	    Level.FINEST, exception,
 	    "getForUpdate tid:{0,number,#}, object:{1}, oid:{2,number,#}" +
 	    " throws",
