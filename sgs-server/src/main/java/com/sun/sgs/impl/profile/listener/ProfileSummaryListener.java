@@ -44,7 +44,7 @@ import java.util.Properties;
  * past 5000 tasks:
  *   mean runtime: 1.21ms,  max:    216ms,  failed: 33 (0.17%)
  *   mean ready count: 1.64,  mean lag time: 0.18ms
- *   parallelism factor: 1.05
+ *   mean tasks running concurrently: 1.05
  *   mean throughput: 861.46 txn/sec,  mean latency: 1.39 ms/txn
  * past 25000 tasks:
  *   mean runtime: 1.24ms,  failed: 0.99%
@@ -200,7 +200,7 @@ public class ProfileSummaryListener implements ProfileListener {
 			      + "  failed: %d (%2.2f%%)" 
 			      + "%n  mean ready count: %.2f,"
 			      + "  mean lag time: %.2fms"
-			      + "%n  parallelism factor: %.2f"
+			      + "%n  mean tasks running concurrently: %.2f"
 			      + "%n  mean throughput: %.2f txn/sec,"
 			      + "  mean latency: %.2f ms/txn%n",
 			      taskCount, 
