@@ -34,8 +34,8 @@ import javax.persistence.Version;
 import javax.persistence.ManyToOne;
 
 /**
- *
- * @author owen
+ * Represents a collection of tests in the form of @link{TestSpec} objects
+ * that are to be run in succession as a suite.
  */
 @Entity
 @Table(name = "TestSuite")
@@ -56,11 +56,23 @@ public class TestSuite implements Serializable
         this.setDescription(description);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -74,11 +86,23 @@ public class TestSuite implements Serializable
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     
+    /**
+     * Returns the {@link PkgLibrary} object that represents the binary
+     * darkstar package that is to be used in this test suite.
+     * 
+     * @return darkstar package library
+     */
     @ManyToOne
     @JoinColumn(name = "darkstarPkg", nullable = false)
     public PkgLibrary getDarkstarPkg() { return darkstarPkg; }
     public void setDarkstarPkg(PkgLibrary darkstarPkg) { this.darkstarPkg = darkstarPkg; }
     
+    /**
+     * Returns the list of {@link TestSpec} objects that are to be run
+     * in succession 
+     * 
+     * @return list of tests
+     */
     @ManyToMany
     @JoinTable(name = "testSuiteTestSpecs",
                joinColumns = @JoinColumn(name = "testSuiteId"),

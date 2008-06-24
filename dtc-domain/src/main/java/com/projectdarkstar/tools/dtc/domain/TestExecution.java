@@ -40,8 +40,12 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents an instance of an execution of a {@link TestSuite}.
+ * A TestExecution also retains all of the configuration options,
+ * parameters, and names of the {@link TestSuite} as it was
+ * at the point in time that the TestExecution was created.  Additionally,
+ * complete result information and log files for the executed test
+ * are stored.
  */
 @Entity
 @Table(name = "TestExecution")
@@ -75,11 +79,23 @@ public class TestExecution implements Serializable
         this.setOriginalTestSuite(originalTestSuite);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -99,6 +115,12 @@ public class TestExecution implements Serializable
     public Date getDateFinished() { return dateFinished; } 
     public void setDateFinished(Date dateFinished) { this.dateFinished = dateFinished; }
     
+    /**
+     * Returns a list of {@link TestExecutionTag} objects that are used
+     * to categorize test executions into groups.
+     * 
+     * @return list of tags for this test execution
+     */
     @ManyToMany
     @OrderBy("tag")
     @JoinTable(name = "testExecutionTags",
@@ -107,10 +129,24 @@ public class TestExecution implements Serializable
     public List<TestExecutionTag> getTags() { return tags; }
     public void setTags(List<TestExecutionTag> tags) { this.tags = tags; }
     
+    /**
+     * Returns a list of {@link TestExecutionResult} objects that were executed
+     * as part of this test execution.
+     * 
+     * @return list of results
+     */
     @OneToMany(mappedBy = "parentExecution", cascade=CascadeType.REMOVE)
     public List<TestExecutionResult> getResults() { return results; }
     public void setResults(List<TestExecutionResult> results) { this.results = results; }
     
+    /**
+     * Returns the original {@link PkgLibrary} for the
+     * {@link TestSuite#getDarkstarPkg darkstar package} required to run the
+     * tests.  This attribute can be customized to run this test execution
+     * against a different darkstar package if required.
+     * 
+     * @return original darkstar package required to run the tests
+     */
     @ManyToOne
     @JoinColumn(name = "originalTestSuiteDarkstarPkg", nullable = false)
     public PkgLibrary getOriginalTestSuiteDarkstarPkg() { return originalTestSuiteDarkstarPkg; }
@@ -124,6 +160,12 @@ public class TestExecution implements Serializable
     public String getOriginalTestSuiteDescription() { return originalTestSuiteDescription; }
     private void setOriginalTestSuiteDescription(String originalTestSuiteDescription) { this.originalTestSuiteDescription = originalTestSuiteDescription; }
     
+    /**
+     * Returns the original {@link TestSuite} that this test execution
+     * is based on.
+     * 
+     * @return original {@link TestSuite} used to create the test execution
+     */
     @ManyToOne
     @JoinColumn(name = "originalTestSuite", nullable = false)
     public TestSuite getOriginalTestSuite() { return originalTestSuite; }

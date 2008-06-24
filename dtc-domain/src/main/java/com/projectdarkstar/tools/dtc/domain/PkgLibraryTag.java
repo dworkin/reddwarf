@@ -31,11 +31,11 @@ import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 
 /**
- *
- * @author owen
+ * Represents a tag entity used to categorize {@link PkgLibrary}
+ * objects.
  */
 @Entity
-@Table(name = "TestExecutionTag")
+@Table(name = "PkgLibraryTag")
 public class PkgLibraryTag implements Serializable
 {
     private Long id;
@@ -48,6 +48,11 @@ public class PkgLibraryTag implements Serializable
         this.setTag(tag);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
@@ -57,6 +62,12 @@ public class PkgLibraryTag implements Serializable
     public String getTag() { return tag; }
     public void setTag(String tag) { this.tag = tag; }
     
+    /**
+     * Returns the list of {@link PkgLibrary} objects that are tagged
+     * with this tag.
+     * 
+     * @return libraries tagged with this tag.
+     */
     @ManyToMany(mappedBy = "tags")
     @OrderBy("name")
     public List<PkgLibrary> getLibraries() { return libraries; }

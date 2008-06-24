@@ -32,8 +32,8 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Represents a family of resources.  Each resource in the family should
+ * have a common set of attributes.
  */
 @Entity
 @Table(name = "HardwareResourceFamily")
@@ -62,11 +62,23 @@ public class HardwareResourceFamily implements Serializable
         this.setMemory(memory);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }

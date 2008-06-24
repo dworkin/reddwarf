@@ -38,8 +38,8 @@ import javax.persistence.Version;
 
 
 /**
- * 
- * @author Owen Kellett
+ * Represents a physical hardware resource that can be used during
+ * a DTC test.
  */
 @Entity
 @Table(name="HardwareResource")
@@ -67,33 +67,74 @@ public class HardwareResource implements Serializable
         this.setEnabled(enabled);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
     protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
+    /**
+     * Returns the hostname of the resource
+     * 
+     * @return hostname of the resource
+     */
     @Column(name="hostname", nullable=false)
     public String getHostname() { return hostname; }
     public void setHostname(String hostname) { this.hostname = hostname; }
 
+    /**
+     * Returns the identifier of the entity which currently has a lock
+     * on this resource.  If the resource is not locked, returns null.
+     * 
+     * @return the identifier of the locking entity
+     */
     @Column(name="lockedBy", nullable=true)
     public String getLockedBy() { return lockedBy; }
     public void setLockedBy(String lockedBy) { this.lockedBy = lockedBy; }
     
+    /**
+     * Returns a {@link Date} object representing the time that this resource
+     * was locked.  If the resource is not locked, returns null.
+     * 
+     * @return the time that this resource was locked
+     */
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name="lockedAt", nullable=true)
     public Date getLockedAt() { return lockedAt; }
     public void setLockedAt(Date lockedAt) { this.lockedAt = lockedAt; }
     
+    /**
+     * Returns true if this resource is available for use during tests.
+     * If it is not enabled, no tests may acquire a lock on it.
+     * 
+     * @return whether or not this resource is enabled for testing
+     */
     @Column(name = "enabled", nullable = false)
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
     
+    /**
+     * Returns a list of {@link HardwareResourceFamily} objects that
+     * represents the set of families that this resource is a member of.
+     * 
+     * @return list of families for this resource
+     */
     @ManyToMany
     @OrderBy("name")
     @JoinTable(name = "hardwareResourceFamilies",

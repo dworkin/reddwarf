@@ -20,8 +20,8 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 /**
- *
- * @author owen
+ * Enumeration type representing each of the possible states
+ * that a test in the queue can be in.
  */
 public enum TestQueueStatus
 {

@@ -37,8 +37,9 @@ import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
 
 /**
- *
- * @author owen
+ * Represents a binary package library which is required for either
+ * a {@link ClientApp}, {@link ServerApp}, or {@link SystemProbe} to
+ * execute.
  */
 @Entity
 @Table(name = "PkgLibrary")
@@ -59,11 +60,23 @@ public class PkgLibrary implements Serializable
         this.setFile(file);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
@@ -73,12 +86,24 @@ public class PkgLibrary implements Serializable
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     
+    /**
+     * Returns the contents of the actual package library file as an
+     * array of bytes.
+     * 
+     * @return the package library file
+     */
     @Lob
     @Basic(fetch = FetchType.LAZY)
     @Column(name = "file", nullable = false)
     public byte[] getFile() { return file; }
     public void setFile(byte[] file) { this.file = file; }
     
+    /**
+     * Returns a list of {@link PkgLibraryTag} objects that are used
+     * to categorize libraries into groups.
+     * 
+     * @return list of tags
+     */
     @ManyToMany
     @OrderBy("tag")
     @JoinTable(name = "pkgLibraryTags",

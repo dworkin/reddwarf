@@ -37,8 +37,9 @@ import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
 /**
- *
- * @author owen
+ * Captures complete runtime configuration, hardware resource executed on,
+ * and result log file for the execution of a {@link ClientAppConfig}
+ * client application simulator.
  */
 @Entity
 @Table(name = "TestExecutionResultClientLog")
@@ -75,11 +76,23 @@ public class TestExecutionResultClientLog implements Serializable
         this.setOriginalClientAppConfig(originalClientAppConfig);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
+    /**
+     * Returns the version number in the data store that this entity represents.
+     * Whenever an update to an object is pushed to the persistent data
+     * store, the version number is incremented.
+     * 
+     * @return version number of the entity
+     */
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }

@@ -30,8 +30,9 @@ import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 
 /**
- *
- * @author owen
+ * Represents a snapshot of the number of clients in the system at runtime
+ * at a specific point in time during the execution for a specific type
+ * of {@link ClientAppConfig}.
  */
 @Entity
 @Table(name = "TestExecutionResultClientDataTuple")
@@ -53,6 +54,11 @@ public class TestExecutionResultClientDataTuple implements Serializable
         this.setNumClients(numClients);
     }
     
+    /**
+     * Returns the id of the entity in persistent storage
+     * 
+     * @return id of the entity
+     */
     @Id
     @GeneratedValue
     public Long getId() { return id; }

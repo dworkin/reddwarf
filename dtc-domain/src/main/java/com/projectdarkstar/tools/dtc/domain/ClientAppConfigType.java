@@ -20,12 +20,23 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 /**
- *
- * @author owen
+ * Enumeration type representing each of the possible mechanisms allowed
+ * to pass arguments to a client executable.
  */
 public enum ClientAppConfigType 
 {
+    /**
+     * Arguments are passed via a properties file
+     */
     PROPERTIES,
+    
+    /**
+     * Arguments are passed via the command line
+     */
     CLI,
+    
+    /**
+     * Arguments are passed via environment variables
+     */
     ENV
 }
