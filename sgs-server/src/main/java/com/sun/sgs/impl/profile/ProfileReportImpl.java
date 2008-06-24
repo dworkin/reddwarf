@@ -360,7 +360,7 @@ class ProfileReportImpl implements ProfileReport {
 
 	if (report.ops != null) {
 	    if (ops == null) {
-		ops = new LinekdList<ProfileOperation>(report.ops);
+		ops = new LinkedList<ProfileOperation>(report.ops);
 	    }
 	    else {
 		ops.addAll(report.ops);
