@@ -19,6 +19,8 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+
 
 /**
  * This interface represents a single operation that can be reported as
@@ -41,12 +43,14 @@ public interface ProfileOperation {
     public int getId();
 
     /**
-     * Tells this operation to report that it is happening. This may be
-     * called any number of times during a single task.
+     * Tells this operation to report that it is happening if profiling is
+     * enabled at the given level. This may be called any number of times 
+     * during a single task.
      *
+     * @param level the profiling level
      * @throws IllegalStateException if this is called outside the scope
      *                               of a task run through the scheduler
      */
-    public void report();
+    public void report(ProfileLevel level);
 
 }

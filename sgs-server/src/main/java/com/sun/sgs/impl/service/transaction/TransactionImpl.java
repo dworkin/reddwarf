@@ -19,13 +19,13 @@
 
 package com.sun.sgs.impl.service.transaction;
 
-import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -191,7 +191,7 @@ final class TransactionImpl implements Transaction {
 		throw new UnsupportedOperationException(
 		    "Attempt to add multiple durable participants");
 	    }
-	    if (collector != null) {
+	    if (collector.willProfile(ProfileLevel.ON)) {
 		String name = participant.getTypeName();
 		detailMap.put(name, new ProfileParticipantDetailImpl(name));
 	    }
@@ -220,6 +220,7 @@ final class TransactionImpl implements Transaction {
 	default:
 	    throw new AssertionError();
 	}
+        boolean profile = collector.willProfile(ProfileLevel.ON);
 	state = State.ABORTING;
 	abortCause = cause;
 	long startTime = 0;
@@ -228,7 +229,7 @@ final class TransactionImpl implements Transaction {
 		logger.log(Level.FINEST, "abort {0} participant:{1}",
 			   this, participant);
 	    }
-	    if (collector != null) {
+	    if (profile) {
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
@@ -240,7 +241,7 @@ final class TransactionImpl implements Transaction {
 			this, participant);
 		}
 	    }
-	    if (collector != null) {
+	    if (profile) {
 		long finishTime = System.currentTimeMillis();
 		ProfileParticipantDetailImpl detail =
 		    detailMap.get(participant.getTypeName());
@@ -324,6 +325,7 @@ final class TransactionImpl implements Transaction {
 	    throw new IllegalStateException(
 		"Transaction is not active: " + state);
 	}
+        boolean profile = collector.willProfile(ProfileLevel.ON);
 	state = State.PREPARING;
 	long startTime = 0;
 	ProfileParticipantDetailImpl detail = null;
@@ -331,20 +333,20 @@ final class TransactionImpl implements Transaction {
 	     iter.hasNext(); )
 	{
 	    TransactionParticipant participant = iter.next();
-	    if (collector != null) {
+	    if (profile) {
 		detail = detailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
 		if (iter.hasNext()) {
 		    boolean readOnly = participant.prepare(this);
-		    if (collector != null) {
+		    if (profile) {
 			detail.setPrepared(System.currentTimeMillis() -
 					   startTime, readOnly);
 		    }
 		    if (readOnly) {
 			iter.remove();
-			if (collector != null)
+			if (profile)
 			    collector.addParticipant(detail);
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -354,7 +356,7 @@ final class TransactionImpl implements Transaction {
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
-		    if (collector != null) {
+		    if (profile) {
 			detail.
 			    setCommittedDirectly(System.currentTimeMillis() -
 						 startTime);
@@ -391,13 +393,13 @@ final class TransactionImpl implements Transaction {
 		logger.log(Level.FINEST, "commit {0} participant:{1}",
 			   this, participant);
 	    }
-	    if (collector != null) {
+	    if (profile) {
 		detail = detailMap.get(participant.getTypeName());
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
 		participant.commit(this);
-		if (collector != null) {
+		if (profile) {
 		    detail.setCommitted(System.currentTimeMillis() -
 					startTime);
 		    collector.addParticipant(detail);

@@ -33,6 +33,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import java.util.LinkedList;
 import java.util.Properties;
 
@@ -108,6 +109,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
 
         if (properties == null)
             throw new NullPointerException("Properties cannot be null");
+        if (profileCollector == null)
+            throw new NullPointerException("Collector cannot be null");
 
         this.profileCollector = profileCollector;
 
@@ -375,9 +378,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
 
             int queueSize = (taskDetail.isRecurring() ? waitingSize.get() :
                              waitingSize.decrementAndGet());
-            if (profileCollector != null)
-                profileCollector.startTask(taskDetail.task, taskDetail.owner,
-                                           taskDetail.startTime, queueSize);
+            profileCollector.startTask(taskDetail.task, taskDetail.owner,
+                                       taskDetail.startTime, queueSize);
             if (taskDetail.isRecurring())
                 taskDetail.startTime += taskDetail.period;
 
@@ -387,11 +389,9 @@ final class TaskSchedulerImpl implements TaskScheduler {
 
             try {
                 taskDetail.task.run();
-                if (profileCollector != null)
-                    profileCollector.finishTask(1);
+                profileCollector.finishTask(1);
             } catch (Exception e) {
-                if (profileCollector != null)
-                    profileCollector.finishTask(1, e);
+                profileCollector.finishTask(1, e);
                 if (logger.isLoggable(Level.WARNING)) {
                     if (taskDetail.isRecurring())
                         logger.logThrow(Level.WARNING, e, "failed to run " +

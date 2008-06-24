@@ -19,6 +19,8 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+
 
 /**
  * A profile sample is a list of data points that are accumulated
@@ -47,10 +49,12 @@ public interface ProfileSample {
     public boolean isTaskLocal();
 
     /**
-     * Adds a new sample to the end of the current list of samples.
+     * Adds a new sample to the end of the current list of samples if
+     * profiling is enabled at the given level.
      *
+     * @param level the profiling level
      * @param value the amount to increment the counter
      */
-    public void addSample(long value);
+    public void addSample(ProfileLevel level, long value);
     
 }

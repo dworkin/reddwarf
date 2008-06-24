@@ -83,6 +83,16 @@
     <Bug pattern="IS2_INCONSISTENT_SYNC"/>
   </Match>
 
+  <!-- Package com.sun.sgs.impl.profile -->
+
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.profile.ProfileCollectorImpl$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.nio -->
 
   <!-- It is OK to pass null to FutureTask.set to mark the future as
@@ -128,14 +138,6 @@
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
-      <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
-      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
   </Match>

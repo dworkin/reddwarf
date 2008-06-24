@@ -23,6 +23,7 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
@@ -92,7 +93,7 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
      */
     public void scheduleTask(Task task) {
         if (scheduleTaskOp != null)
-            scheduleTaskOp.report();
+            scheduleTaskOp.report(ProfileLevel.ON);
         backingManager.scheduleTask(task);
     }
 
@@ -101,7 +102,7 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
      */
     public void scheduleTask(Task task, long delay) {
         if (scheduleTaskDelayedOp != null)
-            scheduleTaskDelayedOp.report();
+            scheduleTaskDelayedOp.report(ProfileLevel.ON);
         backingManager.scheduleTask(task, delay);
     }
 
@@ -111,7 +112,7 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
     public PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
                                                    long period) {
         if (scheduleTaskPeriodicOp != null)
-            scheduleTaskPeriodicOp.report();
+            scheduleTaskPeriodicOp.report(ProfileLevel.ON);
         return backingManager.schedulePeriodicTask(task, delay, period);
     }
 

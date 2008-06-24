@@ -43,6 +43,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
@@ -535,7 +536,7 @@ public class TaskServiceImpl
         if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskOp != null)
-            scheduleNDTaskOp.report();
+            scheduleNDTaskOp.report(ProfileLevel.ON);
 
         Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
@@ -554,7 +555,7 @@ public class TaskServiceImpl
         if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
         if (scheduleNDTaskDelayedOp != null)
-            scheduleNDTaskDelayedOp.report();
+            scheduleNDTaskDelayedOp.report(ProfileLevel.ON);
 
         Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,

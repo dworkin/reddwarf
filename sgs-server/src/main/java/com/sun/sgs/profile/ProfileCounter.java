@@ -19,6 +19,8 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+
 
 /**
  * Interface that represents a counter used in profiling tasks run through
@@ -46,15 +48,19 @@ public interface ProfileCounter {
     public boolean isTaskLocal();
 
     /**
-     * Increments the counter by <code>1</code>.
+     * Increments the counter by <code>1</code> if profiling is enabled for
+     * the given level.
+     * 
+     * @param level the profiling level
      */
-    public void incrementCount();
+    public void incrementCount(ProfileLevel level);
 
     /**
      * Increments the counter by the given value.
      *
+     * @param level the profiling level
      * @param value the amount to increment the counter
      */
-    public void incrementCount(long value);
+    public void incrementCount(ProfileLevel level, long value);
 
 }

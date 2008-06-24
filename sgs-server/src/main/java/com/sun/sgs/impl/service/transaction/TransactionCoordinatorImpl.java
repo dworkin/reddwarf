@@ -120,6 +120,9 @@ public final class TransactionCoordinatorImpl
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
 	}
+        if (collector == null) {
+            throw new NullPointerException("Collector must not be null");
+        }
 	this.collector = collector;
 
 	PropertiesWrapper props = new PropertiesWrapper(properties);

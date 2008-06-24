@@ -36,6 +36,7 @@ import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
@@ -819,9 +820,9 @@ public class DataStoreImpl
 	    throw new ObjectNotFoundException("Object not found: " + oid);
 	}
 	if (readBytesCounter != null) {
-	    readBytesCounter.incrementCount(result.length);
-	    readBytesSample.addSample(result.length);
-	    readObjectsCounter.incrementCount();
+	    readBytesCounter.incrementCount(ProfileLevel.ON, result.length);
+	    readBytesSample.addSample(ProfileLevel.ON, result.length);
+	    readObjectsCounter.incrementCount(ProfileLevel.ON);
 	}
 	return result;
     }
@@ -840,9 +841,10 @@ public class DataStoreImpl
 	    TxnInfo txnInfo = checkTxn(txn, setObjectOp);
 	    oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
 	    if (writtenBytesCounter != null) {
-		writtenBytesCounter.incrementCount(data.length);
-		writtenObjectsCounter.incrementCount();
-		writtenBytesSample.addSample(data.length);
+		writtenBytesCounter.incrementCount(ProfileLevel.ON, 
+                                                   data.length);
+		writtenObjectsCounter.incrementCount(ProfileLevel.ON);
+		writtenBytesSample.addSample(ProfileLevel.ON, data.length);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -884,9 +886,10 @@ public class DataStoreImpl
 		}
 		oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
 		if (writtenBytesCounter != null) {
-		    writtenBytesCounter.incrementCount(data.length);
-		    writtenObjectsCounter.incrementCount();
-		    writtenBytesSample.addSample(data.length);
+		    writtenBytesCounter.incrementCount(ProfileLevel.ON, 
+                                                       data.length);
+		    writtenObjectsCounter.incrementCount(ProfileLevel.ON);
+		    writtenBytesSample.addSample(ProfileLevel.ON, data.length);
 		}
 	    }
 	    txnInfo.modified = true;
@@ -1478,7 +1481,7 @@ public class DataStoreImpl
 		"Transaction has been prepared");
 	}
         if (op != null) {
-            op.report();
+            op.report(ProfileLevel.ON);
 	}
 	return txnInfo;
     }

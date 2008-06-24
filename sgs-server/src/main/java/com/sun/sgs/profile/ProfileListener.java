@@ -101,7 +101,8 @@ public interface ProfileListener {
     public void report(ProfileReport profileReport);
 
     /**
-     * Tells this listener that the system is shutting down.
+     * Tells this listener it will no longer be used, and should clean up
+     * any resources it has used.
      */
     public void shutdown();
 

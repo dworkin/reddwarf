@@ -46,6 +46,7 @@ import com.sun.sgs.impl.util.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
@@ -89,7 +90,7 @@ class Kernel {
         new LoggerWrapper(Logger.getLogger(Kernel.class.getName()));
 
     // the property for setting profiling levels
-    private static final String PROFILE_PROPERTY =
+    public static final String PROFILE_PROPERTY =
         "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
     private static final String PROFILE_LISTENERS =
@@ -166,28 +167,26 @@ class Kernel {
         try {
             // see if we're doing any level of profiling, which for the
             // current version is as simple as "on" or "off"
-            String profileLevel = appProperties.getProperty(PROFILE_PROPERTY);
-            if (profileLevel != null) {
-                if (profileLevel.equals("on")) {
-                    logger.log(Level.CONFIG, "System profiling is on");
-                    profileCollector =
-                        new ProfileCollectorImpl();
-                    profileRegistrar =
-                        new ProfileRegistrarImpl(profileCollector);
-                } else {
-                    profileCollector = null;
-                    profileRegistrar = null;
-                    if (! profileLevel.equals("off")) {
-                        if (logger.isLoggable(Level.WARNING))
+            // default is "off"
+            String level = appProperties.getProperty(PROFILE_PROPERTY,
+                    ProfileLevel.OFF.name());
+            ProfileLevel profileLevel;
+            try {
+                profileLevel =  ProfileLevel.valueOf(level);
+            } catch (IllegalArgumentException iae) {
+                profileLevel = ProfileLevel.OFF;
+                if (logger.isLoggable(Level.WARNING)) {
                             logger.log(Level.WARNING, "Unknown profile " +
                                        "level {0} ... all profiling will be " +
-                                       "turned off", profileLevel);
-                    }
+                                       "turned off", level);
                 }
-            } else {
-                profileCollector = null;
-                profileRegistrar = null;
             }
+
+            profileCollector = new ProfileCollectorImpl();
+            profileCollector.setProfileLevel(profileLevel);
+            profileRegistrar = new ProfileRegistrarImpl(profileCollector);
+            logger.log(Level.CONFIG, 
+                       "Profiling level is " + profileLevel.name());
 
             // create the authenticators and identity coordinator
             ArrayList<IdentityAuthenticator> authenticators =
@@ -225,9 +224,8 @@ class Kernel {
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
 
-            // if profiling is on then create the profiling listeners
-            if (profileCollector != null)
-                loadProfileListeners(profileCollector);
+            // create the profiling listeners
+            loadProfileListeners(profileCollector);
 
             if (logger.isLoggable(Level.INFO))
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
@@ -250,43 +248,48 @@ class Kernel {
      * for profiling data.
      */
     private void loadProfileListeners(ProfileCollector profileCollector) {
-        String listenerList =
-            appProperties.getProperty(PROFILE_LISTENERS,
-                                      DEFAULT_PROFILE_LISTENERS);
+        String listenerList = appProperties.getProperty(PROFILE_LISTENERS);
+        
+        // If profiling is set to anything other than OFF, provide a default
+        // listener.
+        if (listenerList == null && 
+                profileCollector.getProfileLevel() != ProfileLevel.OFF) {
+            listenerList = DEFAULT_PROFILE_LISTENERS;
+        }
+        if (listenerList != null) {
+            for (String listenerClassName : listenerList.split(":")) {
+                try {
+                    // make sure we can resolve the listener
+                    Class<?> listenerClass = Class.forName(listenerClassName);
+                    Constructor<?> listenerConstructor =
+                        listenerClass.getConstructor(Properties.class,
+                                                     Identity.class,
+                                                     ComponentRegistry.class);
 
-        for (String listenerClassName : listenerList.split(":")) {
-            try {
-                // make sure we can resolve the listener
-                Class<?> listenerClass = Class.forName(listenerClassName);
-                Constructor<?> listenerConstructor =
-                    listenerClass.getConstructor(Properties.class,
-                                                 Identity.class,
-                                                 ComponentRegistry.class);
+                    // create a new identity for the listener
+                    IdentityImpl owner = new IdentityImpl(listenerClassName);
 
-                // create a new identity for the listener
-                IdentityImpl owner = new IdentityImpl(listenerClassName);
-
-                // try to create and register the listener
-                Object obj =
-                    listenerConstructor.newInstance(appProperties, owner,
-                                                    systemRegistry);
-                ProfileListener listener = (ProfileListener)obj;
-                profileCollector.addListener(listener);
-            } catch (InvocationTargetException e) {
-                if (logger.isLoggable(Level.WARNING))
-                    logger.logThrow(Level.WARNING, e.getCause(), 
-                            "Failed to load ProfileListener {0} ... " +
-                            "it will not be available for profiling",
-                            listenerClassName);
-            } catch (Exception e) {
-                if (logger.isLoggable(Level.WARNING))
-                    logger.logThrow(Level.WARNING, e, "Failed to load " +
-                                    "ProfileListener {0} ... it will not " +
-                                    "be available for profiling",
-                                    listenerClassName);
+                    // try to create and register the listener
+                    Object obj =
+                        listenerConstructor.newInstance(appProperties, owner,
+                                                        systemRegistry);
+                    ProfileListener listener = (ProfileListener)obj;
+                    profileCollector.addListener(listener);
+                } catch (InvocationTargetException e) {
+                    if (logger.isLoggable(Level.WARNING))
+                        logger.logThrow(Level.WARNING, e.getCause(), 
+                                "Failed to load ProfileListener {0} ... " +
+                                "it will not be available for profiling",
+                                listenerClassName);
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.WARNING))
+                        logger.logThrow(Level.WARNING, e, "Failed to load " +
+                                        "ProfileListener {0} ... it will not " +
+                                        "be available for profiling",
+                                        listenerClassName);
+                }
             }
         }
-
         // finally, register the scheduler as a listener too
         // NOTE: if we make the schedulers pluggable, or add other components
         // that are listeners, then we should scan through all of the system
@@ -572,7 +575,7 @@ class Kernel {
      * {@code ProfileProducer} and profiling is enabled.
      */
     private void registerProducer(Object obj) {
-        if ((profileRegistrar != null) && (obj instanceof ProfileProducer))
+        if (obj instanceof ProfileProducer)
             ((ProfileProducer)obj).setProfileRegistrar(profileRegistrar);
     }
 

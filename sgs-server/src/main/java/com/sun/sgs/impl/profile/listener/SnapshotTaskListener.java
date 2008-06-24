@@ -155,10 +155,10 @@ public class SnapshotTaskListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-	// unused
+	networkReporter.shutdown();
     }
 
-    private class TaskDetail {
+    private static class TaskDetail {
         long count = 0;
         long time = 0;
         long opCount = 0;

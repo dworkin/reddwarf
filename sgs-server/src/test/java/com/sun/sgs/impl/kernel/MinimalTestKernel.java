@@ -23,9 +23,11 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyIdentity;
@@ -47,15 +49,16 @@ public final class MinimalTestKernel {
 	ComponentRegistryImpl registry = new ComponentRegistryImpl();
 	MinimalTestKernel.ctx = new SimpleAppContext(registry);
 
+        ProfileCollector collector = new ProfileCollectorImpl();
 	TransactionSchedulerImpl txnScheduler =
 	    new TransactionSchedulerImpl(new Properties(),
 					 new TestTransactionCoordinator(),
-					 null);
+					 collector);
 	txnScheduler.setContext(ctx);
 	registry.addComponent(txnScheduler);
 
 	TaskSchedulerImpl taskScheduler =
-	    new TaskSchedulerImpl(new Properties(), null);
+	    new TaskSchedulerImpl(new Properties(), collector);
 	taskScheduler.setContext(ctx);
 	registry.addComponent(taskScheduler);
 

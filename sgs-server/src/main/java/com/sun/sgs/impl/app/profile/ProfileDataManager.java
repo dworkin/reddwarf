@@ -23,6 +23,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
@@ -128,7 +129,7 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
      */
     public <T> ManagedReference<T> createReference(T object) {
         if (createReferenceOp != null)
-            createReferenceOp.report();
+            createReferenceOp.report(ProfileLevel.ON);
         return backingManager.createReference(object);
     }
 

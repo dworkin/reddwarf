@@ -32,13 +32,14 @@ import com.sun.sgs.profile.ProfileSample;
 
 import java.beans.PropertyChangeEvent;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,7 +51,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * kernel to collect and report profiling data. It uses a single thread to
  * consume and report profiling data.
  */
-public class ProfileCollectorImpl implements ProfileCollector {
+public final class ProfileCollectorImpl implements ProfileCollector {
 
     private final AtomicInteger opIdCounter;
 
@@ -68,7 +69,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     private volatile int schedulerThreadCount;
 
     // the set of registered listeners
-    private ArrayList<ProfileListener> listeners;
+    private List<ProfileListener> listeners;
 
     // thread-local detail about the current task, used to let us
     // aggregate data across all participants in a given task
@@ -84,13 +85,18 @@ public class ProfileCollectorImpl implements ProfileCollector {
 
     // long-running thread to report data
     private final Thread reporterThread;
+    
+    // The current profiling level.  This is initially set from properties
+    // at startup, but can be changed dynamically.
+    private ProfileLevel profileLevel = ProfileLevel.OFF;
+    
     /**
      * Creates an instance of <code>ProfileCollectorImpl</code>.
      */
     public ProfileCollectorImpl() {
         schedulerThreadCount = 0;
         ops = new ConcurrentHashMap<String,ProfileOperationImpl>();
-        listeners = new ArrayList<ProfileListener>();
+        listeners = new CopyOnWriteArrayList<ProfileListener>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
         opIdCounter = new AtomicInteger(0);
 
@@ -105,6 +111,21 @@ public class ProfileCollectorImpl implements ProfileCollector {
         reporterThread.start();
      }
 
+    /** {@inheritDoc} */
+    public ProfileLevel getProfileLevel() {
+        return profileLevel;
+    }
+     
+    /** {@inheritDoc} */
+    public void setProfileLevel(ProfileLevel level) {
+        profileLevel = level;
+    }
+    
+    /** {@inheritDoc} */
+    public boolean willProfile(ProfileLevel level) {
+        return profileLevel.ordinal() >= level.ordinal();
+    }
+    
     /** {@inheritDoc} */
     public void shutdown() {
         // Shut down the reporterThread, waiting for it to finish what
@@ -129,6 +150,12 @@ public class ProfileCollectorImpl implements ProfileCollector {
 					    null, p);
 	    listener.propertyChange(event);
 	}
+    }
+    
+    /** {@inheritDoc} */
+    public void removeListener(ProfileListener listener) {
+        listeners.remove(listener);
+        listener.shutdown();
     }
 
     /** {@inheritDoc} */
@@ -280,13 +307,16 @@ public class ProfileCollectorImpl implements ProfileCollector {
          * Note that this throws <code>IllegalStateException</code> if called
          * outside the scope of a started task.
          */
-        public void report() {
-            try {
-                ProfileReportImpl profileReport = profileReports.get().peek();
-                profileReport.ops.add(this);
-            } catch (EmptyStackException ese) {
-                throw new IllegalStateException("Cannot report operation " +
+        public void report(ProfileLevel level) {
+            if (willProfile(level)) {
+                try {
+                    ProfileReportImpl profileReport = 
+                            profileReports.get().peek();
+                    profileReport.ops.add(this);
+                } catch (EmptyStackException ese) {
+                    throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
+                }
             }
         }
     }
@@ -369,16 +399,20 @@ public class ProfileCollectorImpl implements ProfileCollector {
             super(name, false);
             count = new AtomicLong();
         }
-        public void incrementCount() {
-            getReport().updateAggregateCounter(getCounterName(),
+        public void incrementCount(ProfileLevel level) {
+            if (willProfile(level)) {
+                getReport().updateAggregateCounter(getCounterName(),
                                                count.incrementAndGet());
+            }
         }
-        public void incrementCount(long value) {
-            if (value < 0)
-                throw new IllegalArgumentException("Increment value must be " +
-                                                   "greater than zero");
-            getReport().updateAggregateCounter(getCounterName(),
+        public void incrementCount(ProfileLevel level, long value) {
+            if (willProfile(level)) {
+                if (value < 0)
+                    throw new IllegalArgumentException("Increment value " +
+                            "must be greater than zero");
+                getReport().updateAggregateCounter(getCounterName(),
                                                count.addAndGet(value));
+            }
         }
     }
 
@@ -391,14 +425,19 @@ public class ProfileCollectorImpl implements ProfileCollector {
         TaskLocalProfileCounter(String name) {
             super(name, true);
         }
-        public void incrementCount() {
-            getReport().incrementTaskCounter(getCounterName(), 1L);
+        public void incrementCount(ProfileLevel level) {
+            if (willProfile(level)) {
+                getReport().incrementTaskCounter(getCounterName(), 1L);
+            }
         }
-        public void incrementCount(long value) {
-            if (value < 0)
-                throw new IllegalArgumentException("Increment value must be " +
-                                                   "greater than zero");
-            getReport().incrementTaskCounter(getCounterName(), value);
+        public void incrementCount(ProfileLevel level, long value) {
+            if (willProfile(level)) {
+                if (value < 0)
+                    throw new IllegalArgumentException("Increment value " +
+                            "must be greater than zero");
+            
+                getReport().incrementTaskCounter(getCounterName(), value);
+            }
         }
     }
 
@@ -482,8 +521,10 @@ public class ProfileCollectorImpl implements ProfileCollector {
 	TaskLocalProfileSample(String name) {
             super(name, true);
         }
-        public void addSample(long value) {
-            getReport().addLocalSample(getSampleName(), value);
+        public void addSample(ProfileLevel level, long value) {
+            if (willProfile(level)) {
+                getReport().addLocalSample(getSampleName(), value);
+            }
         }
 
     }
@@ -505,22 +546,24 @@ public class ProfileCollectorImpl implements ProfileCollector {
 	    samples = new LinkedList<Long>();
         }
 
-        public void addSample(long value) {
-	    if (samples.size() == maxSamples)
-		samples.removeFirst(); // remove oldest
-	    samples.add(value);
-	    // NOTE: we return a sub-list view to ensure that the
-	    // ProfileReport only sees the samples that were added,
-	    // during its lifetime.  Creating a sub-list view is much
-	    // faster than copying the list, and is suitable for this
-	    // situation.  However, we still rely on the the
-	    // ProfileReport to make the view unmodifyable.  This
-	    // isn't done here since we can avoid doing that operation
-	    // until the getSamples() call, instead of having to do it
-	    // for each sample addition
-	    getReport().
-		registerAggregateSamples(getSampleName(), 
-					 samples.subList(0, samples.size()));
+        public void addSample(ProfileLevel level, long value) {
+            if (willProfile(level)) {
+                if (samples.size() == maxSamples)
+                    samples.removeFirst(); // remove oldest
+                samples.add(value);
+                // NOTE: we return a sub-list view to ensure that the
+                // ProfileReport only sees the samples that were added,
+                // during its lifetime.  Creating a sub-list view is much
+                // faster than copying the list, and is suitable for this
+                // situation.  However, we still rely on the the
+                // ProfileReport to make the view unmodifyable.  This
+                // isn't done here since we can avoid doing that operation
+                // until the getSamples() call, instead of having to do it
+                // for each sample addition
+                getReport().
+                    registerAggregateSamples(getSampleName(), 
+                                             samples.subList(0, samples.size()));
+            }
         }
 
     }
