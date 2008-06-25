@@ -166,6 +166,24 @@
             </configuration>
           </execution>
 
+	  <!-- Copies the Hack game data (dungeons, items, monsters,
+	       etc.) to the build directory.  Runs in the
+	       generate-test-resources phase -->
+          <execution>
+            <id>copy-game-data</id>
+            <phase>generate-test-resources</phase>
+	    <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <copy todir="${project.build.directory}/gameData">
+		  <fileset dir="${basedir}/gameData"/>
+		</copy>
+              </tasks>
+            </configuration>
+          </execution>
+
 	  <!-- The test-run profile execution of the antrun plugin
 	       is configured to run the application
 	       In order to bind it to a lifecycle phase and 
