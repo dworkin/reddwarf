@@ -24,7 +24,6 @@
       <artifactId>sgs-server-api</artifactId>
     </dependency>
 
-
     <!-- Runtime dependencies -->
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
@@ -37,7 +36,6 @@
       <type>zip</type>
     </dependency>
   </dependencies>
-
 
   <!-- Profiles setup to execute the server
        Enabling these profiles will bind the antrun test-run execution
@@ -104,8 +102,6 @@
 
   </profiles>
 
-
-
   <build>
     <plugins>
 
@@ -122,7 +118,6 @@
         </executions>
       </plugin>
 
-
       <plugin>
         <artifactId>maven-antrun-plugin</artifactId>
 	<executions>
@@ -137,7 +132,7 @@
             </goals>
 	    <configuration>
               <tasks>
-		<delete dir="${project.build.directory}/dsdb/"/>
+		<delete dir="${datastore.dir}"/>
               </tasks>
             </configuration>
 	  </execution>
@@ -153,7 +148,7 @@
             </goals>
             <configuration>
               <tasks>
-                <mkdir dir="${project.build.directory}/dsdb/"/>
+                <mkdir dir="${datastore.dir}"/>
               </tasks>
             </configuration>
           </execution>
@@ -182,6 +177,10 @@
 			       file="${run.logging}"/>
 		  <sysproperty key="com.sun.sgs.impl.service.data.store.db.environment.class"
 			       value="${run.bdb.env}"/>
+		  <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.directory"
+			       value="${datastore.dir}"/>
+		  <sysproperty key="com.sun.sgs.server.host"
+			       value="${core.server.host}"/>
 		  <classpath>
 		    <path refid="maven.test.classpath"/>
 		  </classpath>
@@ -190,8 +189,6 @@
 	      </tasks>
 	    </configuration>
 	  </execution>
-
-
 	  
         </executions>
       </plugin>
@@ -199,17 +196,26 @@
     </plugins>
   </build>
 
-
   <properties>
-    <run.jvm.args></run.jvm.args>
+    <run.jvm.args>-Xmx1g</run.jvm.args>
     <run.jvm.args.profile></run.jvm.args.profile>
 
-    <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
-    <run.properties.single>src/test/properties/RequestSingle.properties</run.properties.single>
-    <run.properties.multi.core>src/test/properties/RequestCore.properties</run.properties.multi.core>
-    <run.properties.multi.app>src/test/properties/RequestApp.properties</run.properties.multi.app>
+    <run.logging>
+      ${basedir}/src/test/properties/logging.properties
+    </run.logging>
+    <run.properties.single>
+      src/test/properties/RequestSingle.properties
+    </run.properties.single>
+    <run.properties.multi.core>
+      src/test/properties/RequestCore.properties
+    </run.properties.multi.core>
+    <run.properties.multi.app>
+      src/test/properties/RequestApp.properties
+    </run.properties.multi.app>
+
+    <datastore.dir>${project.build.directory}/dsdb</datastore.dir>
+    <core.server.host>localhost</core.server.host>
 
   </properties>
-
 
 </project>
