@@ -59,6 +59,9 @@
       </properties>
     </profile>
 
+    <!-- Remember to set the com.sun.sgs.server.host property to the
+	 host running the core server if it is running on a different
+	 host -->
     <profile>
       <id>multi-node-server-app</id>
       <properties>
@@ -180,7 +183,7 @@
 		  <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.directory"
 			       value="${datastore.dir}"/>
 		  <sysproperty key="com.sun.sgs.server.host"
-			       value="${core.server.host}"/>
+			       value="${com.sun.sgs.server.host}"/>
 		  <classpath>
 		    <path refid="maven.test.classpath"/>
 		  </classpath>
@@ -214,7 +217,7 @@
     </run.properties.multi.app>
 
     <datastore.dir>${project.build.directory}/dsdb</datastore.dir>
-    <core.server.host>localhost</core.server.host>
+    <com.sun.sgs.server.host>localhost</com.sun.sgs.server.host>
 
   </properties>
 
