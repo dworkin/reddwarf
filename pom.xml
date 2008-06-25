@@ -8,7 +8,7 @@
   <artifactId>dtc</artifactId>
   <name>dtc</name>
   <packaging>pom</packaging>
-  <version>0.1.SNAPSHOT</version>
+  <version>0.1-SNAPSHOT</version>
   <url>http://www.projectdarkstar.com</url>
 
   <modules>
@@ -135,8 +135,6 @@
 
 
   <properties>
-    <dtc.version>0.1.SNAPSHOT</dtc.version>
-
     <junit.version>4.2</junit.version>
     <persistence-api.version>1.0</persistence-api.version>
   </properties>

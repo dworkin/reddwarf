@@ -7,14 +7,13 @@
   <parent>
     <groupId>com.projectdarkstar.tools.dtc</groupId>
     <artifactId>dtc</artifactId>
-    <version>0.1.SNAPSHOT</version>
+    <version>0.1-SNAPSHOT</version>
   </parent>
 
   <groupId>com.projectdarkstar.tools.dtc</groupId>
   <artifactId>dtc-domain</artifactId>
   <name>dtc-domain</name>
   <packaging>jar</packaging>
-  <version>${dtc.version}</version>
 
   <dependencies>
     <dependency>
