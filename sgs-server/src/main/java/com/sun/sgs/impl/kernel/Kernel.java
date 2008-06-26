@@ -166,13 +166,13 @@ class Kernel {
 
         try {
             // see if we're doing any level of profiling, which for the
-            // current version is as simple as "on" or "off"
-            // default is "off"
+            // current version is as simple as "ON" or "OFF"
+            // default is "OFF"
             String level = appProperties.getProperty(PROFILE_PROPERTY,
                     ProfileLevel.OFF.name());
             ProfileLevel profileLevel;
             try {
-                profileLevel =  ProfileLevel.valueOf(level);
+                profileLevel =  ProfileLevel.valueOf(level.toUpperCase());
             } catch (IllegalArgumentException iae) {
                 profileLevel = ProfileLevel.OFF;
                 if (logger.isLoggable(Level.WARNING)) {
