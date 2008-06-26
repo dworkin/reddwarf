@@ -60,10 +60,12 @@
   </Match>
 
   <!-- Return value can be ignored, since it always true. -->
+  <!-- NOTE THAT FINDBUGS 1.2.1 appears to code bug as below, 
+      Findbugs 1.3.0 wants RV_RETURN_VALUE_IGNORED_BAD_PRACTICE -->
   <Match>
     <Class name="com.sun.sgs.impl.kernel.TransactionSchedulerImpl$TaskQueueImpl"/>
     <Method name="addTask"/>
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
   </Match>
 
   <!-- Package com.sun.sgs.impl.kernel.schedule -->

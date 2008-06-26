@@ -242,11 +242,13 @@ final class TransactionImpl implements Transaction {
 		}
 	    }
 	    if (profile) {
-		long finishTime = System.currentTimeMillis();
 		ProfileParticipantDetailImpl detail =
 		    detailMap.get(participant.getTypeName());
-		detail.setAborted(finishTime - startTime);
-		collector.addParticipant(detail);
+                if (detail != null) {
+                    long finishTime = System.currentTimeMillis();
+                    detail.setAborted(finishTime - startTime);
+                    collector.addParticipant(detail);
+                }
 	    }
 	}
 	state = State.ABORTED;
@@ -340,13 +342,13 @@ final class TransactionImpl implements Transaction {
 	    try {
 		if (iter.hasNext()) {
 		    boolean readOnly = participant.prepare(this);
-		    if (profile) {
+		    if (detail != null) {
 			detail.setPrepared(System.currentTimeMillis() -
 					   startTime, readOnly);
 		    }
 		    if (readOnly) {
 			iter.remove();
-			if (profile)
+			if (detail != null)
 			    collector.addParticipant(detail);
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -356,7 +358,7 @@ final class TransactionImpl implements Transaction {
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
-		    if (profile) {
+		    if (detail != null) {
 			detail.
 			    setCommittedDirectly(System.currentTimeMillis() -
 						 startTime);
@@ -399,7 +401,7 @@ final class TransactionImpl implements Transaction {
 	    }
 	    try {
 		participant.commit(this);
-		if (profile) {
+		if (detail != null) {
 		    detail.setCommitted(System.currentTimeMillis() -
 					startTime);
 		    collector.addParticipant(detail);

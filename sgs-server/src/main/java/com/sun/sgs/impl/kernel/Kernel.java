@@ -62,6 +62,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -172,7 +173,8 @@ class Kernel {
                     ProfileLevel.OFF.name());
             ProfileLevel profileLevel;
             try {
-                profileLevel =  ProfileLevel.valueOf(level.toUpperCase());
+                profileLevel =
+                        ProfileLevel.valueOf(level.toUpperCase(Locale.ENGLISH));
             } catch (IllegalArgumentException iae) {
                 profileLevel = ProfileLevel.OFF;
                 if (logger.isLoggable(Level.WARNING)) {
