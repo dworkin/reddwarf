@@ -290,7 +290,7 @@ public class ScalableHashSet<E>
      * @return {@code true} if the element was initially present in this set
      */
     public boolean remove(Object o) {
-	return map.get().remove(o) == PRESENT;
+	return PRESENT.equals(map.get().remove(o));
     }
 
     /**
@@ -358,7 +358,7 @@ public class ScalableHashSet<E>
 	}
 
 	public boolean equals(Object o) {
-	    return o instanceof Marker;
+	    return o != null && o instanceof Marker;
 	}
     }
 }
