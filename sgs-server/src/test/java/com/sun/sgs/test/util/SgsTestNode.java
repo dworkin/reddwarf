@@ -31,6 +31,7 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
@@ -67,7 +68,8 @@ public class SgsTestNode {
     private static Field kernelProxy;
     /** system registry */
     private static Field kernelReg;
-
+    /** profile collector, perhaps should be in system registry? */
+    private static Field kernelProfileCollector;
     static {
         try {
             kernelClass =
@@ -85,6 +87,9 @@ public class SgsTestNode {
 
             kernelReg = kernelClass.getDeclaredField("systemRegistry");
             kernelReg.setAccessible(true);
+            
+            kernelProfileCollector = kernelClass.getDeclaredField("profileCollector");
+            kernelProfileCollector.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -316,6 +321,15 @@ public class SgsTestNode {
         return systemRegistry;
     }
 
+    /**
+     * Returns the profile collector.
+     */
+    public ProfileCollector getProfileCollector() 
+            throws IllegalAccessException 
+    {
+        return (ProfileCollector) kernelProfileCollector.get(kernel);
+    }
+    
     /**
      * Returns the data service.
      */

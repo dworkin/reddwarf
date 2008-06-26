@@ -136,7 +136,22 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 	} catch (InterruptedException e) {
 	    // do nothing
 	}
+        
+        // Shut down each of the listeners, but don't be alarmed if they've
+        // already been shut down.  Some system components are also listeners,
+        // so they will be shut down twice.
+        // TODO - perhaps this means that those components should not be 
+        // listeners in the same sense as the listeners that can be dynamically
+        // added and removed.  We might need another type here.
+        for (ProfileListener listener : listeners) {
+            try {
+                listener.shutdown();
+            } catch (IllegalStateException e) {
+                // Ignore the second shutdown attempt
+            }
+        }
     }
+    
     /** {@inheritDoc} */
     public void addListener(ProfileListener listener) {
         listeners.add(listener);

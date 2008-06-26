@@ -33,7 +33,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileCollector;
 
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import java.util.LinkedList;
 import java.util.Properties;
 
