@@ -596,6 +596,44 @@ public class TestScalableHashSet extends Assert {
 	    }), taskOwner);
     }
 
+    @Test public void testRemoveAfterSerialization() throws Exception {
+	
+	final String SET_NAME = "test.remove.after.serialization";
+	
+	// store the set in the db
+
+	txnScheduler.runTask(
+	    new TestTask(new AbstractKernelRunnable() {
+		public void run() {
+		    assertFalse(set.remove(1));
+		    assertFalse(set.remove(null));
+		    set.add(1);
+		    set.add(null);
+		    dataService.setBinding(SET_NAME, set);
+		}
+	    }), taskOwner);
+
+	// next reload the set from the db to test for the correct 
+	// handling of the Marker flag.
+
+	txnScheduler.runTask(
+	    new TestTask(new AbstractKernelRunnable() {
+		public void run() {
+
+		    ScalableHashSet deserialized = 
+			(ScalableHashSet)(dataService.getBinding(SET_NAME));
+		    
+		    assertTrue(deserialized.remove(1));
+		    assertFalse(deserialized.contains(1));
+		    assertFalse(deserialized.remove(1));
+		    assertTrue(deserialized.remove(null));
+		    assertFalse(deserialized.contains(null));
+		    assertFalse(deserialized.remove(null));
+		}
+	    }), taskOwner);
+    }
+
+
     @Test public void testRemoveObjectNotFound() throws Exception {
 	txnScheduler.runTask(
 	    new TestTask(new AbstractKernelRunnable() {
