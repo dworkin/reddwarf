@@ -26,6 +26,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.contention.ContentionManagementComponent;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -225,6 +226,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
+    private ContentionManagementComponent contentionMgmt;
+
     /**
      * Defines the transaction context map for this class.  This class checks
      * the service state and the reference table whenever the context is
@@ -274,7 +277,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    }
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
-		detectModifications, classesTable);
+		detectModifications, classesTable, contentionMgmt);
 	}
 	@Override protected TransactionParticipant createParticipant() {
 	    /* Create a durable participant */
@@ -386,6 +389,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		DATA_STORE_CLASS_PROPERTY);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
+	    contentionMgmt = systemRegistry.
+		getComponent(ContentionManagementComponent.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
 	    boolean serverStart = wrappedProps.getBooleanProperty(
@@ -396,7 +401,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    new Class[] { Properties.class }, properties);
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    } else if (serverStart) {
-		store = new DataStoreImpl(properties, scheduler);
+		store = new DataStoreImpl(properties, scheduler, 
+					  contentionMgmt);
 	    } else {
 		store = new DataStoreClient(properties);
 	    }

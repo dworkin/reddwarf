@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
+import com.sun.sgs.impl.contention.ContentionManagementComponent;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
@@ -90,6 +91,11 @@ final class Context extends TransactionContext {
      * equals methods.
      */
     private IdentityHashMap<ManagedObjectRemoval, Boolean> removing = null;
+    
+    /**
+     * TODO
+     */
+    final ContentionManagementComponent contentionMgmt;
 
     /** Creates an instance of this class. */
     Context(DataServiceImpl service,
@@ -97,16 +103,18 @@ final class Context extends TransactionContext {
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
-	    ClassesTable classesTable)
+	    ClassesTable classesTable,
+	    ContentionManagementComponent contentionMgmt)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
-	    classesTable != null;
+	    classesTable != null && contentionMgmt != null;
 	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	this.contentionMgmt = contentionMgmt;
 	classSerial = classesTable.createClassSerialization(this.txn);
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",

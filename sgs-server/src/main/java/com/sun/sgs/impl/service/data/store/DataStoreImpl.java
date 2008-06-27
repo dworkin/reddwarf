@@ -25,6 +25,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.contention.ContentionManagementComponent;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.db.DataEncoding;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
@@ -242,6 +243,12 @@ public class DataStoreImpl
     private ProfileCounter writtenObjectsCounter = null;
     private ProfileSample readBytesSample = null;
     private ProfileSample writtenBytesSample = null;
+
+    /**
+     * TODO
+     */
+    private ContentionManagementComponent contentionMgmt;
+
     /**
      * Records information about all active transactions.
      *
@@ -607,7 +614,7 @@ public class DataStoreImpl
      *		as specified in the class documentation
      */
     public DataStoreImpl(Properties properties) {
-	this(properties, new BasicScheduler());
+	this(properties, new BasicScheduler(), null);
     }
 
     /**
@@ -617,11 +624,13 @@ public class DataStoreImpl
      *
      * @param	properties the properties for configuring this instance
      * @param	scheduler the scheduler used to schedule periodic tasks
+     * @param   contentionMgmt TODO
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if any of the properties are invalid,
      *		as specified in the class documentation}
      */
-    public DataStoreImpl(Properties properties, Scheduler scheduler) {
+    public DataStoreImpl(Properties properties, Scheduler scheduler,
+			 ContentionManagementComponent contentionMgmt) {
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -652,6 +661,7 @@ public class DataStoreImpl
 	    env = DbEnvironmentFactory.getEnvironment(
 		directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
+	    this.contentionMgmt = contentionMgmt;
 	    Databases dbs = getDatabases(dbTxn);
 	    infoDb = dbs.info;
 	    classesDb = dbs.classes;
@@ -823,6 +833,12 @@ public class DataStoreImpl
 	    readBytesSample.addSample(result.length);
 	    readObjectsCounter.incrementCount();
 	}
+	if (contentionMgmt != null) {
+	    if (forUpdate)
+		contentionMgmt.registerWriteLock(oid);
+	    else
+		contentionMgmt.registerReadLock(oid);
+	}
 	return result;
     }
 
@@ -844,6 +860,8 @@ public class DataStoreImpl
 		writtenObjectsCounter.incrementCount();
 		writtenBytesSample.addSample(data.length);
 	    }
+	    if (contentionMgmt != null)
+		contentionMgmt.registerWriteLock(oid);
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -888,6 +906,8 @@ public class DataStoreImpl
 		    writtenObjectsCounter.incrementCount();
 		    writtenBytesSample.addSample(data.length);
 		}
+		if (contentionMgmt != null)
+		    contentionMgmt.registerWriteLock(oid);
 	    }
 	    txnInfo.modified = true;
 	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
@@ -913,6 +933,9 @@ public class DataStoreImpl
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    }
 	    txnInfo.modified = true;
+	    if (contentionMgmt != null)
+		contentionMgmt.registerWriteLock(oid);
+	    
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "removeObject txn:{0}, oid:{1,number,#} returns",
@@ -947,6 +970,7 @@ public class DataStoreImpl
 		    "getBinding txn:{0}, name:{1} returns oid:{2,number,#}",
 		    txn, name, result);
 	    }
+	    contentionMgmt.registerReadLockOnName(name);
 	    return result;
 	} catch (RuntimeException e) {
 	    throw convertException(txn, Level.FINEST, e,
@@ -976,6 +1000,7 @@ public class DataStoreImpl
 		    "setBinding txn:{0}, name:{1}, oid:{2,number,#} returns",
 		    txn, name, oid);
 	    }
+	    contentionMgmt.registerWriteLockOnName(name);
 	} catch (RuntimeException e) {
 	    throw convertException(
 		txn, Level.FINEST, e,
@@ -1000,6 +1025,7 @@ public class DataStoreImpl
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
 	    txnInfo.modified = true;
+	    contentionMgmt.registerWriteLockOnName(name);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "removeBinding txn:{0}, name:{1} returns",

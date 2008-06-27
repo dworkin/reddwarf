@@ -24,6 +24,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.contention.ContentionManagementComponent;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ObjectStreamException;
@@ -224,6 +225,7 @@ final class ManagedReferenceImpl<T>
     private ManagedReferenceImpl(Context context, T object) {
 	this.context = context;
 	oid = context.store.createObject(context.txn);
+	context.contentionMgmt.bind(oid, object);
 	this.object = (ManagedObject) object;
 	state = State.NEW;
 	validate();
@@ -249,12 +251,14 @@ final class ManagedReferenceImpl<T>
 	case MAYBE_MODIFIED:
 	    /* Call store before modifying fields, in case the call fails */
 	    context.store.removeObject(context.txn, oid);
+	    context.contentionMgmt.bind(oid, object);
 	    unmodifiedBytes = null;
 	    state = State.REMOVED_FETCHED;
 	    break;
 	case NOT_MODIFIED:
 	case MODIFIED:
 	    context.store.removeObject(context.txn, oid);
+	    context.contentionMgmt.bind(oid, object);
 	    /* Fall through */
 	case NEW:
 	    state = State.REMOVED_FETCHED;
@@ -281,15 +285,18 @@ final class ManagedReferenceImpl<T>
 	    object = deserialize(
 		context.store.getObject(context.txn, oid, true));
 	    context.refs.registerObject(this);
+	    context.contentionMgmt.bind(oid, object);
 	    state = State.MODIFIED;
 	    break;
 	case MAYBE_MODIFIED:
 	    context.store.markForUpdate(context.txn, oid);
+	    context.contentionMgmt.bind(oid, object);
 	    unmodifiedBytes = null;
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
 	    context.store.markForUpdate(context.txn, oid);
+	    context.contentionMgmt.bind(oid, object);
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -337,6 +344,7 @@ final class ManagedReferenceImpl<T>
 		/* Do after creating unmodified bytes, in case that fails */
 		object = tempObject;
 		context.refs.registerObject(this);
+		context.contentionMgmt.bind(oid, object);
 		break;
 	    case NEW:
 	    case NOT_MODIFIED:
@@ -386,15 +394,18 @@ final class ManagedReferenceImpl<T>
 		object = deserialize(
 		    context.store.getObject(context.txn, oid, true));
 		context.refs.registerObject(this);
+		context.contentionMgmt.bind(oid, object);
 		state = State.MODIFIED;
 		break;
 	    case MAYBE_MODIFIED:
 		context.store.markForUpdate(context.txn, oid);
 		unmodifiedBytes = null;
+		context.contentionMgmt.bind(oid, object);
 		state = State.MODIFIED;
 		break;
 	    case NOT_MODIFIED:
 		context.store.markForUpdate(context.txn, oid);
+		context.contentionMgmt.bind(oid, object);
 		state = State.MODIFIED;
 		break;
 	    case FLUSHED:

@@ -28,6 +28,8 @@ import com.sun.sgs.auth.IdentityCoordinator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
+import com.sun.sgs.impl.contention.ContentionManagementComponent;
+
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
@@ -206,12 +208,16 @@ class Kernel {
             TransactionCoordinator transactionCoordinator =
                 new TransactionCoordinatorImpl(appProperties, profileCollector);
 
+	    ContentionManagementComponent contentionMgmt = 
+		new ContentionManagementComponent(proxy);
+	    
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
             transactionScheduler =
                 new TransactionSchedulerImpl(appProperties,
                                              transactionCoordinator,
-                                             profileCollector);
+                                             profileCollector,
+					     contentionMgmt);
             taskScheduler =
                 new TaskSchedulerImpl(appProperties, profileCollector);
                         
@@ -224,6 +230,7 @@ class Kernel {
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
+	    systemRegistry.addComponent(contentionMgmt);
 
             // if profiling is on then create the profiling listeners
             if (profileCollector != null)

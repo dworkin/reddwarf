@@ -24,6 +24,8 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.contention.ContentionManagementComponent;
+
 import com.sun.sgs.impl.kernel.schedule.SchedulerQueue;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -109,6 +111,8 @@ final class TransactionSchedulerImpl
     // the collector used for profiling data
     private final ProfileCollector profileCollector;
 
+    private final ContentionManagementComponent contentionMgmt;
+
     // the executor service used to manage our threads
     private final ExecutorService executor;
 
@@ -125,7 +129,10 @@ final class TransactionSchedulerImpl
     private final AtomicInteger dependencyCount = new AtomicInteger(0);
 
     /**
-     * Creates an instance of {@code TransactionSchedulerImpl}.
+     * Creates an instance of {@code TransactionSchedulerImpl} with a
+     * {@code null} {@link ContentionManagementComponent}.  This
+     * constructor should be used only be the testing code when
+     * contention management is not necessary.
      *
      * @param properties the {@code Properties} for the system
      * @param transactionCoordinator the {@code TransactionCoordinator} used
@@ -140,7 +147,32 @@ final class TransactionSchedulerImpl
      */
     TransactionSchedulerImpl(Properties properties,
                              TransactionCoordinator transactionCoordinator,
-                             ProfileCollector profileCollector)
+                             ProfileCollector profileCollector) 
+	throws Exception 
+    {
+	this(properties, transactionCoordinator, profileCollector, null);
+    }
+    
+
+    /**
+     * Creates an instance of {@code TransactionSchedulerImpl}.
+     *
+     * @param properties the {@code Properties} for the system
+     * @param transactionCoordinator the {@code TransactionCoordinator} used
+     *                               by the system to manage transactions
+     * @param profileCollector the {@code ProfileCollector} used by the
+     *                         system to collect profiling data, or
+     *                         {@code null} if profiling is disabled
+     * @param contentionMgmt TODO
+     *
+     * @throws InvocationTargetException if there is a failure initializing
+     *                                   the {@code SchedulerQueue}
+     * @throws Exception if there is any failure creating the scheduler
+     */
+    TransactionSchedulerImpl(Properties properties,
+                             TransactionCoordinator transactionCoordinator,
+                             ProfileCollector profileCollector,
+			     ContentionManagementComponent contentionMgmt)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating a Transaction Scheduler");
@@ -149,9 +181,13 @@ final class TransactionSchedulerImpl
             throw new NullPointerException("Properties cannot be null");
         if (transactionCoordinator == null)
             throw new NullPointerException("Coordinator cannot be null");
+        if (contentionMgmt == null)
+            throw new NullPointerException("Contention Management cannot " + 
+					   "be null");
 
         this.transactionCoordinator = transactionCoordinator;
         this.profileCollector = profileCollector;
+	this.contentionMgmt = contentionMgmt;
 
         String queueName = properties.getProperty(SCHEDULER_QUEUE_PROPERTY,
                                                   DEFAULT_SCHEDULER_QUEUE);
@@ -537,6 +573,10 @@ final class TransactionSchedulerImpl
                         transactionCoordinator.createTransaction(unbounded);
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
+		    if (contentionMgmt != null)
+			contentionMgmt.registerTransaction(transaction, 
+							   task.getTask().
+							   getBaseTaskType());
 
                     task.incrementTryCount();
                     try {
