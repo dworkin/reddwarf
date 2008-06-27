@@ -170,6 +170,20 @@ final class ManagedReferenceImpl<T>
      }
 
     /**
+     * Returns the reference associated with a context and object, or null if
+     * the reference is not found or the object has been removed.
+     */
+    static <T> ManagedReferenceImpl<T> safeFindReference(
+	Context context, T object)
+    {
+	if (object instanceof ManagedObject) {
+	    return Objects.uncheckedCast(context.refs.find(object));
+	} else {
+	    return null;
+	}
+     }
+
+    /**
      * Returns the reference associated with a context and object, creating a
      * NEW reference if none is found.
      */
@@ -189,9 +203,9 @@ final class ManagedReferenceImpl<T>
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
-		       "getReference tid:{0,number,#}, object:{1}" +
+		       "getReference tid:{0,number,#}, type:{1}" +
 		       " returns oid:{2,number,#}",
-		       context.getTxnId(), Objects.fastToString(object),
+		       context.getTxnId(), DataServiceImpl.typeName(object),
 		       ref.getId());
 	}
 	return ref;
@@ -429,9 +443,9 @@ final class ManagedReferenceImpl<T>
 	}
 	DataServiceImpl.getExceptionLogger(exception).logThrow(
 	    Level.FINEST, exception,
-	    "getForUpdate tid:{0,number,#}, object:{1}, oid:{2,number,#}" +
+	    "getForUpdate tid:{0,number,#}, type:{1}, oid:{2,number,#}" +
 	    " throws",
-	    context.getTxnId(), Objects.fastToString(object), oid);
+	    context.getTxnId(), DataServiceImpl.typeName(object), oid);
 	throw exception;
     }
 
