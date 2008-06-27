@@ -48,11 +48,12 @@
  * <ul>
  * <li> (byte[]) the bytes in the array
  * </ul>
- * <b>Note:</b> Messages may need to include explicit array length fields if the include
- * more than one ByteArray. If so, the length should preceed the ByteArray. None of the
- * messages defined as part of the base protocol contain multiple ByteArrays except for the
- * channel message, and so all have a length that is either the same as the payload length or 
- * calculated from the payload length.
+ * <b>Note:</b> Messages may need to include explicit array length fields if 
+ * the include more than one ByteArray. If so, the length should preceed the 
+ * ByteArray. None of the messages defined as part of the base protocol contain 
+ * multiple ByteArrays except for the channel message, and so all have a length 
+ * that is either the same as the payload length or calculated from the 
+ * payload length.
  * <p>
  * A {@code String} is encoded as follows:
  * <ul>
@@ -69,151 +70,160 @@
 extern "C" {
 #endif
 
-/**
- * The maximum length of any protocol message field defined as a
- * String or byte[]: 65535 bytes
- */
+    /**
+     * The maximum length of any protocol message field defined as a
+     * String or byte[]: 65535 bytes
+     */
 #define SGS_MSG_MAX_LENGTH 65535
 
-/**
- * The maximum payload length, in bytes
- */
+    /**
+     * The maximum payload length, in bytes
+     */
 #define SGS_MAX_PAYLOAD_LENGTH 65532
 
-/**
- * This is the size of the static portion of a message (i.e. with a message
- * payload of 0 bytes).
- */
+    /**
+     * This is the size of the static portion of a message (i.e. with a message
+     * payload of 0 bytes).
+     */
 #define SGS_MSG_INIT_LEN (SGS_MSG_MAX_LENGTH - SGS_MAX_PAYLOAD_LENGTH)
 
-/* The version number */
+    /* The version number */
 #define SGS_MSG_VERSION 0x04
-	
-/*The offset of the opcode in the messages*/
+
+    /*The offset of the opcode in the messages*/
 #define SGS_OPCODE_OFFSET 2
 
-typedef enum sgs_opcode {
-    /**
-     * Login request from the client to the server.
-     * <ul>
-	 * <li> (byte) protocol version
-	 * <li> (unsighed short) name array length
-     * <li> (char[]) name
-	 * <li> (unsigned short) password array length
-     * <li> (char[]) password
-     * </ul>
-     */
-    SGS_OPCODE_LOGIN_REQUEST = 0x10,
+    typedef enum sgs_opcode {
+        /**
+         * Login request from the client to the server.
+         * <ul>
+         * <li> (byte) protocol version
+         * <li> (unsighed short) name array length
+         * <li> (char[]) name
+         * <li> (unsigned short) password array length
+         * <li> (char[]) password
+         * </ul>
+         */
+        SGS_OPCODE_LOGIN_REQUEST = 0x10,
 
-    /**
-     * Login success (login request acknowledgment). Server response to the client's login request
-     * <ul>
-     * <li> (byte[]) reconnectionKey
-     * </ul>
-     */
-    SGS_OPCODE_LOGIN_SUCCESS = 0x11,
+        /**
+         * Login success (login request acknowledgment). Server response 
+         * to the client's login request
+         * <ul>
+         * <li> (byte[]) reconnectionKey
+         * </ul>
+         */
+        SGS_OPCODE_LOGIN_SUCCESS = 0x11,
 
-    /**
-     * Login failure (login request acknowledgment). Server response to the client's login request.
-     * <ul>
-	 * <li> (unsigned short) array length
-     * <li> (uint8_t[]) reason (note- the array can probably be cast to a char[], but is not null-terminated)
-     * </ul>
-     */
-    SGS_OPCODE_LOGIN_FAILURE = 0x12,
-	
-	/**
-	 * Login redirect. Server response to a client's login request
-	 * Payload:
-	 * <ul>
-	 * <li> (unsigned short) array length
-	 * <li> (uint8_t[]) hostname (note- the array can probably be cast to a char[], but is not null-terminated)
-	 * <li> (int) port
-	 */
-	SGS_OPCODE_LOGIN_REDIRECT = 0x13,
+        /**
+         * Login failure (login request acknowledgment). Server response 
+         * to the client's login request.
+         * <ul>
+         * <li> (unsigned short) array length
+         * <li> (uint8_t[]) reason (note- the array can probably be cast to a 
+         * char[], but may not null-terminated)
+         * </ul>
+         */
+        SGS_OPCODE_LOGIN_FAILURE = 0x12,
 
-    /**
-     * Reconnection request. Client's request to the server
-     * <ul>
-	 * <li> byte protocol version
-     * <li> (byte[]) reconnectionKey
-     * </ul>
-     */
-    SGS_OPCODE_RECONNECT_REQUEST = 0x20,
+        /**
+         * Login redirect. Server response to a client's login request
+         * Payload:
+         * <ul>
+         * <li> (unsigned short) array length
+         * <li> (uint8_t[]) hostname (note- the array can 
+         * probably be cast to a char[], but is not null-terminated)
+         * <li> (int) port
+         */
+        SGS_OPCODE_LOGIN_REDIRECT = 0x13,
 
-    /**
-     * Reconnect success (reconnection request acknowledgment). Sent from the server to the client.
-     * <ul>
-	 * <li> (unsigned short) array length
-     * <li> (byte[]) reconnectionKey
-     * </ul>
-     */
-    SGS_OPCODE_RECONNECT_SUCCESS = 0x21,
+        /**
+         * Reconnection request. Client's request to the server
+         * <ul>
+         * <li> byte protocol version
+         * <li> (byte[]) reconnectionKey
+         * </ul>
+         */
+        SGS_OPCODE_RECONNECT_REQUEST = 0x20,
 
-    /**
-     * Reconnect failure (reconnection request acknowledgment).
-     * <ul>
-	 * <li> (unisigned short) array length
-     * <li> (uint8_t[]) reason (note-- the array can probably be cast to a char[], but is not null-terminated)
-     * </ul>
-     */
-    SGS_OPCODE_RECONNECT_FAILURE = 0x22,
+        /**
+         * Reconnect success (reconnection request acknowledgment). 
+         * Sent from the server to the client.
+         * <ul>
+         * <li> (unsigned short) array length
+         * <li> (byte[]) reconnectionKey
+         * </ul>
+         */
+        SGS_OPCODE_RECONNECT_SUCCESS = 0x21,
 
-    /**
-     * Session message. May be sent by the client or the server.
-	 * Maximum length is MAX_PAYLOAD_LENGTH, currently 65,532 bytes.
-     * Larger messages require fragmentation and reassembly above
-     * this protocol layer.
-     *
-     * <ul>
-     * <li> (byte[]) message
-     * </ul>
-     */
-    SGS_OPCODE_SESSION_MESSAGE = 0x30,
+        /**
+         * Reconnect failure (reconnection request acknowledgment).
+         * <ul>
+         * <li> (unisigned short) array length
+         * <li> (uint8_t[]) reason (note-- the array can probably be cast to 
+         * a char[], but is not null-terminated)
+         * </ul>
+         */
+        SGS_OPCODE_RECONNECT_FAILURE = 0x22,
 
-    /**
-     * Logout request. Sent from a client to the server.
-	 * No payload.
-     */
-    SGS_OPCODE_LOGOUT_REQUEST = 0x40,
+        /**
+         * Session message. May be sent by the client or the server.
+         * Maximum length is MAX_PAYLOAD_LENGTH, currently 65,532 bytes.
+         * Larger messages require fragmentation and reassembly above
+         * this protocol layer.
+         *
+         * <ul>
+         * <li> (byte[]) message
+         * </ul>
+         */
+        SGS_OPCODE_SESSION_MESSAGE = 0x30,
 
-    /**
-     * Logout success (logout request acknowledgment). Server response to a logout request.
-	 * No payload.
-     */
-    SGS_OPCODE_LOGOUT_SUCCESS = 0x41,
+        /**
+         * Logout request. Sent from a client to the server.
+         * No payload.
+         */
+        SGS_OPCODE_LOGOUT_REQUEST = 0x40,
 
-    /**
-     * Channel join. Server notifying the client that the client has joined a channel.
-     * <ul>
-	 * <li> (unsigned short) channel name length
-     * <li> (uint8_t[]) channel name (note-- the array can probably be cast to a char[], but is not null-terminated)
-     * <li> (byte[]) channel ID
-     * </ul>
-     */
-    SGS_OPCODE_CHANNEL_JOIN = 0x50,
+        /**
+         * Logout success (logout request acknowledgment). 
+         * Server response to a logout request.
+         * No payload.
+         */
+        SGS_OPCODE_LOGOUT_SUCCESS = 0x41,
 
-    /**
-     * Channel leave. Server notifying a client that it ghas left a channel.
-     * <ul>
-     * <li> (byte[]) channel ID
-     * </ul>
-     */
-    SGS_OPCODE_CHANNEL_LEAVE = 0x51,
-    
-    /**
-     * Channel message. May be sent by the client or the server.
-	 * Maximum length is SGS_MAX_PAYLOAD_LENGTH bytes. Larger messages
-	 * require fragmentation and reassembly above the protocol layer<br>
-	 * Payload:
-     * <ul>
-     * <li> (unsigned short) channel ID size
-     * <li> (byte[]) channel ID
-     * <li> (byte[]) message
-     * </ul>
-     */
-    SGS_OPCODE_CHANNEL_MESSAGE = 0x52
-} sgs_opcode;
+        /**
+         * Channel join. Server notifying the client that the client 
+         * has joined a channel.
+         * <ul>
+         * <li> (unsigned short) channel name length
+         * <li> (uint8_t[]) channel name (note-- the array can probably be cast 
+         * to a char[], but is not null-terminated)
+         * <li> (byte[]) channel ID
+         * </ul>
+         */
+        SGS_OPCODE_CHANNEL_JOIN = 0x50,
+
+        /**
+         * Channel leave. Server notifying a client that it ghas left a channel.
+         * <ul>
+         * <li> (byte[]) channel ID
+         * </ul>
+         */
+        SGS_OPCODE_CHANNEL_LEAVE = 0x51,
+
+        /**
+         * Channel message. May be sent by the client or the server.
+         * Maximum length is SGS_MAX_PAYLOAD_LENGTH bytes. Larger messages
+         * require fragmentation and reassembly above the protocol layer<br>
+         * Payload:
+         * <ul>
+         * <li> (unsigned short) channel ID size
+         * <li> (byte[]) channel ID
+         * <li> (byte[]) message
+         * </ul>
+         */
+        SGS_OPCODE_CHANNEL_MESSAGE = 0x52
+    } sgs_opcode;
 
 #ifdef __cplusplus
 }
