@@ -8,12 +8,17 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>5</version>
+  <version>6</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
     It defines settings common to all projects
   </description>
+
+  <!-- Require at least Maven version 2.0.8 to build -->
+  <prerequisites>
+    <maven>2.0.8</maven>
+  </prerequisites>
 
   <build>
 
@@ -164,6 +169,7 @@
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-compiler-plugin</artifactId>
 	<configuration>
+	  <compilerArgument>-Xlint</compilerArgument>
 	  <source>1.5</source>
 	  <target>1.5</target>
 	</configuration>
