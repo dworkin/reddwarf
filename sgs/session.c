@@ -254,7 +254,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
                     null_offset = 0;
             else
                 null_offset = 1;
-            free(session->connection->ctx->hostname);
+            if (session->connection->ctx->hostname != NULL) {
+                free(session->connection->ctx->hostname);
+            }
             session->connection->ctx->hostname = malloc(namelen + null_offset);
             if (session->connection->ctx->hostname == NULL)
                 return -1;
