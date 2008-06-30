@@ -1,0 +1,49 @@
+<!-- This file is included solely as a workaround to package
+     up the sources for this module.  When appropriate, this
+     should go away in favor of the maven-source-plugin -->
+<assembly>
+  <id>sources</id>
+
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <formats>
+    <format>jar</format>
+  </formats>
+  
+  <fileSets>
+    
+    <!-- Include the top level java source directory -->
+    <fileSet>
+      <directory>src/main/java</directory>
+      <outputDirectory></outputDirectory>
+    </fileSet>
+
+    <!-- Include the top level resources directory --> 
+    <fileSet>
+      <directory>src/main/resources</directory>
+      <outputDirectory></outputDirectory>
+      <excludes>
+	<exclude>src/main/resources/com/sun/sgs/sgs.version</exclude>
+	<exclude>src/main/resources/com/sun/sgs/app/doc-files/config-properties.html</exclude>
+      </excludes>
+    </fileSet>
+
+  </fileSets>
+
+  <!-- Filtering properties is only available
+       on a per file basis.  Filter the files
+       that require it -->
+  <files>
+    <file>
+      <source>src/main/resources/com/sun/sgs/sgs.version</source>
+      <outputDirectory>com/sun/sgs</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+    <file>
+      <source>src/main/resources/com/sun/sgs/app/doc-files/config-properties.html</source>
+      <outputDirectory>com/sun/sgs/app/doc-files</outputDirectory>
+      <filtered>true</filtered>
+      <fileMode>644</fileMode>
+    </file>
+  </files>
+</assembly>

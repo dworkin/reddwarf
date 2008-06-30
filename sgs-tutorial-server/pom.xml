@@ -1,0 +1,70 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.projectdarkstar.server</groupId>
+    <artifactId>sgs-server-parent</artifactId>
+    <version>0.9.7-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>sgs-tutorial-server</artifactId>
+  <name>Project Darkstar Server Tutorial</name>
+  <packaging>jar</packaging>
+  <url>http://www.projectdarkstar.com</url>
+  <description>
+    The sgs-tutorial-server generates a jar artifact of the classes
+    of the server side of the tutorial 
+  </description>
+
+
+  <dependencies>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- Always attach a sources jar (with the assembly plugin)
+	   Normally the maven-source-plugin should be used for this.
+	   However, that plugin currently does not attach classifier
+	   artifacts that are consumable by other modules in the reactor
+	   (i.e. the javadoc module).  Using this as a workaround -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-assembly-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <phase>package</phase>
+	    <goals>
+              <goal>attached</goal>
+	    </goals>
+	    <configuration>
+	      <descriptors>
+		<descriptor>src/main/assembly/sources.xml</descriptor>
+              </descriptors>
+	      <attach>true</attach>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Activate the resource bundle plugin to include the license
+	   file in the jar -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+      </plugin>
+
+    </plugins>
+  </build>
+
+
+</project>

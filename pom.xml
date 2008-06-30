@@ -1,0 +1,75 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Inherit from the global SGS super POM -->
+  <parent>
+    <groupId>com.projectdarkstar</groupId>
+    <artifactId>sgs</artifactId>
+    <version>5</version>
+  </parent>
+
+  <groupId>com.projectdarkstar.server</groupId>
+  <artifactId>sgs-server-parent</artifactId>
+  <name>Project Darkstar Server Parent POM</name>
+  <packaging>pom</packaging>
+  <version>0.9.7-SNAPSHOT</version>
+  <inceptionYear>2007</inceptionYear>
+  <url>http://www.projectdarkstar.com</url>
+  <description>
+    Parent POM of the Project Darkstar Server
+  </description>
+
+  <modules>
+    <module>sgs-server</module>
+    <module>sgs-server-api</module>
+    <module>sgs-server-dist</module>
+    <module>sgs-server-javadoc</module>
+    <module>sgs-tutorial-server</module>
+    <module>sgs-tutorial-server-dist</module>
+  </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+	
+	<!-- The resource bundle executions should be activated in modules
+	     that produce jars that require the license to be bundled
+	     in the jar -->
+	<plugin>
+	  <groupId>org.apache.maven.plugins</groupId>
+	  <artifactId>maven-remote-resources-plugin</artifactId>
+	  <executions>
+	    <execution>
+	      <id>include-gpl-license</id>
+	      <phase>generate-resources</phase>
+	      <configuration>
+		<properties>
+		  <projectName>Project Darkstar Server</projectName>
+		</properties>
+	      </configuration>
+	    </execution>
+	  </executions>
+	</plugin>
+	
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <repositories>
+    <repository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+  <properties>
+    <sgs.version>${version}</sgs.version>
+    <sgs-shared.version>1.0</sgs-shared.version>
+  </properties>
+
+</project>

@@ -1,4 +1,0 @@
-.level = WARNING
-handlers = java.util.logging.ConsoleHandler
-java.util.logging.ConsoleHandler.formatter = java.util.logging.SimpleFormatter
-java.util.logging.ConsoleHandler.level = WARNING
