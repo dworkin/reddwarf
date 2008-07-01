@@ -369,8 +369,9 @@ final class ManagedReferenceImpl<T>
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "get tid:{0,number,#}, oid:{1,number,#} returns {2}",
-		    context.getTxnId(), oid, Objects.fastToString(object));
+		    "get tid:{0,number,#}, oid:{1,number,#} returns" +
+		    " type:{2}",
+		    context.getTxnId(), oid, DataServiceImpl.typeName(object));
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
@@ -426,9 +427,9 @@ final class ManagedReferenceImpl<T>
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "getForUpdate tid:{0,number,#}, oid:{1,number,#}" +
-			   " returns {2}",
+			   " returns type:{2}",
 			   context.getTxnId(), oid,
-			   Objects.fastToString(object));
+			   DataServiceImpl.typeName(object));
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
