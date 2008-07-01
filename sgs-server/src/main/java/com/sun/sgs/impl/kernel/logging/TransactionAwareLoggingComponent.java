@@ -32,12 +32,10 @@ import java.util.logging.Logger;
 
 
 /**
- * TODO
- * 
- * <p>
- * 
- * This implementation supports three properties in the constructor,
- * which are set in the system properties file
+ * A start-up component in the system that provides transactional
+ * semantics to an application's loggers.  This component supports two
+ * configurable properties for determining which {@code Logger}
+ * instances will become transactional.
  *
  * <p><dl style="margin-left: 1em">
  *
