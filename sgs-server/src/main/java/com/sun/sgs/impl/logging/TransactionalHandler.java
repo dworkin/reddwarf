@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.logging;
+package com.sun.sgs.impl.logging;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
@@ -25,10 +25,11 @@ import com.sun.sgs.service.TransactionProxy;
 
 import java.io.IOException;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.ArrayDeque;
+import java.util.Queue;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import java.util.logging.ErrorManager;
 import java.util.logging.Filter;
@@ -50,11 +51,15 @@ import java.util.logging.LogRecord;
 public class TransactionalHandler extends Handler
     implements NonDurableTransactionParticipant {
 
+    public static final String NAME = 
+	TransactionalHandler.class.getName();
+
     /**
      * A mapping from transaction to the list of records waiting to be
      * published on transaction commit.
      */
-    private final Map<Transaction,List<LogRecord>> bufferedRecords;
+    private final ConcurrentMap<Transaction,Queue<LogRecord>> 
+	bufferedRecords;
     
     /**
      * The proxy used to join transactions upon the first {@link
@@ -80,7 +85,7 @@ public class TransactionalHandler extends Handler
     TransactionalHandler(TransactionProxy proxy, Handler backingHandler) {
 	this.proxy = proxy;
 	this.handler = backingHandler;
-	bufferedRecords = new HashMap<Transaction,List<LogRecord>>();
+	bufferedRecords = new ConcurrentHashMap<Transaction,Queue<LogRecord>>();
     }
 
     /**
@@ -109,7 +114,7 @@ public class TransactionalHandler extends Handler
      *        performed some logging operation
      */
     public void commit(Transaction txn) { 
-	List<LogRecord> records = bufferedRecords.remove(txn);
+	Queue<LogRecord> records = bufferedRecords.remove(txn);
 	for (LogRecord r : records) {
 	    handler.publish(r);
 	}
@@ -170,6 +175,13 @@ public class TransactionalHandler extends Handler
     /**
      * {@inheritDoc}
      */
+    public String getTypeName() {
+	return NAME;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public boolean isLoggable(LogRecord record) {
 	return handler.isLoggable(record);
     }
@@ -205,10 +217,14 @@ public class TransactionalHandler extends Handler
      */
     public void publish(LogRecord record) {
 	Transaction txn = proxy.getCurrentTransaction();
-	List<LogRecord> records = bufferedRecords.get(txn);
+	Queue<LogRecord> records = bufferedRecords.get(txn);
 	if (records == null) {
 	    txn.join(this);
-	    records = new LinkedList<LogRecord>();
+	    records = new ArrayDeque<LogRecord>();
+	    // this code path is guaranteed to be unique by way of the
+	    // transaction's uniqueness, so we don't need to worry
+	    // about a race condition with putting the queue into the
+	    // map
 	    bufferedRecords.put(txn, records);
 	}
 	records.add(record);
@@ -224,7 +240,7 @@ public class TransactionalHandler extends Handler
 	try {
 	    handler.getErrorManager().error(msg,ex,code);
 	} catch (Exception ex2) {
-	    System.err.println("TransactionalHandler.reportError caught:");
+	    System.err.println("TransactionalHandler.reportError() caught:");
 	    ex2.printStackTrace();
 	}
     }

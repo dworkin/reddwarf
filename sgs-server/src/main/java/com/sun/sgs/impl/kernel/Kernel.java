@@ -30,6 +30,8 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
+import com.sun.sgs.impl.logging.TransactionAwareLoggingComponent;
+
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
@@ -205,6 +207,10 @@ class Kernel {
             // initialize the transaction coordinator
             TransactionCoordinator transactionCoordinator =
                 new TransactionCoordinatorImpl(appProperties, profileCollector);
+
+	    // upgrade loggers to be transactional
+	    TransactionAwareLoggingComponent txnAwareLoggingComponent =
+		new TransactionAwareLoggingComponent(appProperties, proxy);
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work

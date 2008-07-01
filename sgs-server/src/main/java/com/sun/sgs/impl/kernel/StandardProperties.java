@@ -89,6 +89,7 @@ public class StandardProperties {
      */
     public static final String NODE_MAPPING_SERVICE =
         NS + "nodeMappingService";
+
     /**
      * An optional key specifying a specific class to use for the
      * <code>TaskService</code>.
