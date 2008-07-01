@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.logging;
+package com.sun.sgs.impl.kernel.logging;
 
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
@@ -51,7 +51,7 @@ import java.util.logging.Logger;
  * have transactional-semantics.  If this propert is left unset the
  * system will use the namespace specified in the {@code
  * com.sun.sgs.app.listener} property value.  The {@code
- * com.sun.sgs.impl.logging.nontransactional.namespaces} property may
+ * com.sun.sgs.logging.nontransactional.namespaces} property may
  * be used to mark some sub-namespaces under this root as being
  * non-transactional. <p></dd>
  * 

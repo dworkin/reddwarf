@@ -1,4 +1,4 @@
-/*
+x/*
  * Copyright 2007 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.logging;
+package com.sun.sgs.impl.kernel.logging;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
