@@ -75,7 +75,7 @@ import java.util.logging.Logger;
  * infers a namespace from the namespace specified by the {@code
  * com.sun.sgs.app.listener} property.
  *
- * @see TransactionalHandler
+ * @see com.sun.sgs.impl.kernel.logging.TransactionalHandler
  */
 public final class TransactionAwareLoggingComponent {
 

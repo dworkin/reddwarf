@@ -46,7 +46,7 @@ import java.util.logging.LogRecord;
  * LoggingServiceImpl} to wrap existing handlers as specificed by the
  * application.
  *
- * @see com.sun.sgs.service.LoggingService
+ * @see com.sun.sgs.impl.kernel.logging.TransactionAwareLoggingComponent
  */
 public class TransactionalHandler extends Handler
     implements NonDurableTransactionParticipant {
@@ -234,8 +234,8 @@ public class TransactionalHandler extends Handler
      * {@inheritDoc}
      */
     public void reportError(String msg, Exception ex, int code) {
-	// we can't call report error on the handler directly because
-	// it has protected access, so we emulate the code in
+	// NOTE: we can't call report error on the handler directly
+	// because it has protected access, so we emulate the code in
 	// Hander.java directly here, including the catch block
 	try {
 	    handler.getErrorManager().error(msg,ex,code);
