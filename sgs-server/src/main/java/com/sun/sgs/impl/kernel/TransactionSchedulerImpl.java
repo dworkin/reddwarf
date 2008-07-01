@@ -576,7 +576,8 @@ final class TransactionSchedulerImpl
 		    if (contentionMgmt != null)
 			contentionMgmt.registerTransaction(transaction, 
 							   task.getTask().
-							   getBaseTaskType());
+							   getBaseTaskType(),
+							   task.getTryCount());
 
                     task.incrementTryCount();
                     try {

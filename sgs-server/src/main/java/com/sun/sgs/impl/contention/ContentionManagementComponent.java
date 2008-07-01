@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
 
@@ -33,30 +34,59 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.sleepycat.db.DeadlockException;
+import com.sleepycat.db.LockNotGrantedException;
+
+import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
+
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
+
+
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
 
+
 public class ContentionManagementComponent 
     implements NonDurableTransactionParticipant {
 
-    public static final int OLD_TXNS_TO_KEEP = 200;
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(ContentionManagementComponent.
+					   class.getName()));
 
+    public static final int DEFAULT_TXNS_TO_KEEP = 200;
+
+    private final long txnTimeout;
+    
     Map<Transaction,TxnInfo> openTxns;
 
     ConcurrentBoundedMap<Transaction,TxnInfo> finishedTxns;
     
+
     TransactionProxy txnProxy;
     
-    public ContentionManagementComponent(TransactionProxy txnProxy) {
+    public ContentionManagementComponent(Properties appProperties,
+					 TransactionProxy txnProxy) {
 	this.txnProxy = txnProxy;
-		
+	PropertiesWrapper props = new PropertiesWrapper(appProperties);
+	txnTimeout = props.getLongProperty(TransactionCoordinator.
+					   TXN_TIMEOUT_PROPERTY,
+					   TransactionCoordinatorImpl.
+					   BOUNDED_TIMEOUT_DEFAULT);
+
 	openTxns = new ConcurrentHashMap<Transaction,TxnInfo>();
 	finishedTxns = 
-	    new ConcurrentBoundedMap<Transaction,TxnInfo>(OLD_TXNS_TO_KEEP);
+	    new ConcurrentBoundedMap<Transaction,TxnInfo>(DEFAULT_TXNS_TO_KEEP);
 
 	System.out.println(this + " created!");
     }
@@ -69,35 +99,120 @@ public class ContentionManagementComponent
 	TxnInfo info = openTxns.remove(txn);
 	info.end();
 
-	if (info.getRunTime() > 100) {
-	    System.out.printf("%s probably timed out for running %dms\n",
-			      txn, info.getRunTime());
+	String reason = null;
+
+	if (info.getRunTime() > txnTimeout) {
+	    reason = String.format("%s probably timed out for running %dms\n",
+				   txn, info.getRunTime());
 	}
 
-	HashMap<Transaction,TxnInfo> openAtAbort = 
-	    new HashMap<Transaction,TxnInfo>(openTxns);
-
 	
+	// keep a reference to the last transaction we saw in case we
+	// need to determine the lag between the current transaction
+	// and the newest one in the queue
+	TxnInfo otherInfo = null;
 
 	// see if any transactions intersect with this one
 	for (Map.Entry<Transaction,TxnInfo> other : finishedTxns.entrySet()) {
 	    // did any of them have shared resources?
 	    
-	    TxnInfo otherInfo = other.getValue();
+	    otherInfo = other.getValue();
 
 	    if (info.contendsWith(otherInfo)) {
 
-		System.out.printf("Task type %s with Transaction (id: %d) \n%scontended with with" +
-				  " was ABORTED due to conflicts with\nTask type %s Transaction (id: %d) \n%s\n",
-				  info.taskType,
-				  getID(txn), info, 
-				  otherInfo.taskType,
-				  getID(other.getKey()), otherInfo);
+		reason = String.format("Task type %s with Transaction (id: %d) "
+				       + "(try count %d) details:\n%s" 
+				       + "was ABORTED due to conflicts with:\n"
+				       + "Task type %s Transaction (id: %d) "
+				       + "(try count: %d)\n%s\n",
+				       info.taskType,
+				       getID(txn), 
+				       info.tryCount, 
+				       info, 
+				       otherInfo.taskType,
+				       getID(other.getKey()), 
+				       otherInfo.tryCount, 
+				       otherInfo);
 		break;
 	    }
 	}
 	
-	finishedTxns.put(txn, info);
+	if (reason == null) {
+	    Throwable t = txn.getAbortCause();
+	    boolean wasLockRelated = false;
+	    do {
+
+		wasLockRelated =
+		    t instanceof TransactionConflictException ||
+		    t instanceof DeadlockException ||
+		    t instanceof LockNotGrantedException ||
+
+		    // NOTE: due a the contents of the LNGE containing
+		    // a non-serializable Environment object, the TTE
+		    // does not report it as the cause.  Therefore, we
+		    // have to search the string for its name as a
+		    // kludge.  See BdbEnvironment.convertException()
+		    // for details.
+		    (t instanceof TransactionTimeoutException &&
+		     t.getMessage().contains("LockNotGrantedException"));
+
+		t = t.getCause();
+	    } while (!wasLockRelated && t != null);
+
+
+	    if (wasLockRelated) {
+		// if we saw a lock-related exception but somehow missed
+		// finding out what other transaction caused it, then we
+		// probably need to increase the bound on the number of
+		// finished transactions.
+		boolean increased = finishedTxns.adjustBound(10);
+
+		reason = String.format("Task type %s with Transaction (id: %d) "
+				       + "(try count %d) details:\n%swas "
+				       + "aborted due to "
+				       + "a data conflict with another " 
+				       + "undetermined transaction%s\n",
+				       info.taskType,
+				       getID(txn), 
+				       info.tryCount,
+				       info,
+				       (increased) ? 
+				       " (increased txn backlog)" : "");
+	    }
+	    else {		
+		reason = String.format("Task type %s with Transaction (id: %d) "
+				       + "(try count %d) was aborted with "
+				       + "exception:\n\t%s\n",
+				       info.taskType,
+				       getID(txn), 
+				       info.tryCount, 				   
+				       txn.getAbortCause());
+	    }				   
+	}
+
+	// NOTE: It might be good to throw in some adaptive code here
+	// to adjust the size of the bounded queue.  When the
+	// application isn't doing much, 200 might be a waste.
+	// However, when the application is overloaded, 200 might be
+	// far to few to find the actual source of contention
+
+	if (reason == null) {
+	    System.out.printf("Task type %s with Transaction (id: %d) "
+			      + "(try count %d) was aborted for reasons "
+			      + "unknown to this component.\n",
+			      info.taskType,
+			      getID(txn), 
+			      info.tryCount);
+	}
+	else {
+	    // NOTE: perhaps decrease the bound by something related
+	    //       to the difference in time between the last
+	    //       transactionad this one?
+	    System.out.println(reason);
+	}
+
+    
+    
     }
 
     public void bind(Long oid, Object o) {
@@ -139,10 +254,11 @@ public class ContentionManagementComponent
 	commit(txn);
     }
 
-    public void registerTransaction(Transaction txn, String taskType) {
+    public void registerTransaction(Transaction txn, String taskType,
+				    int tryCount) {
 	txn.join(this);
 	// System.out.println(txn + " joined");
-	openTxns.put(txn, new TxnInfo(taskType));
+	openTxns.put(txn, new TxnInfo(taskType, tryCount));
     }
 
     public void registerReadLock(long oid) {
@@ -197,21 +313,35 @@ public class ContentionManagementComponent
  	info.addWriteLockOnName(name);
      }    
 
+    // NOTE: This class probably isn't completely thread safe anymore,
+    //       but still works for the purposes of this component
+    //       regardless
     private static class ConcurrentBoundedMap<K,V> {
 
 	Queue<K> keys;
 	
 	Map<K,V> backingMap;
 
-	final int sizeBound;
+	int sizeBound;
 
 	AtomicInteger size;
+
+	static final int ABSOLUTE_MAX_SIZE = 1000; 
 
 	public ConcurrentBoundedMap(int sizeBound) {
 	    this.sizeBound = sizeBound;
 	    size = new AtomicInteger(0);
 	    keys = new ConcurrentLinkedQueue<K>();
 	    backingMap = new ConcurrentHashMap<K,V>();
+	}
+
+	public boolean adjustBound(int delta) {
+	    int i = sizeBound + delta;
+	    if (i >= 0 && i <= ABSOLUTE_MAX_SIZE) {
+		sizeBound = i;
+		return true;
+	    }
+	    return false;
 	}
 
 	public V get(Object o) {
@@ -261,8 +391,12 @@ public class ContentionManagementComponent
 
 	String taskType;
 
-	public TxnInfo(String taskType) {
+	int tryCount;
+
+	public TxnInfo(String taskType, int tryCount) {
 	    this.taskType = taskType;
+	    this.tryCount = tryCount;
+
 	    startTime = System.currentTimeMillis();
 	    endTime = -1;
 	    
@@ -338,7 +472,7 @@ public class ContentionManagementComponent
 	}
 
 	private String setToString(Set<Long> oids, Set<String> names) {
-	    String objs = (oids.isEmpty()) ? "\n\toids: [NONE]\n" : "\n";
+	    String objs = (oids.isEmpty()) ? "\n   oids: [NONE]\n" : "\n";
 
 	    for (Long oid : oids) {
 		Object o = oidsToManagedObjects.get(oid);
@@ -354,25 +488,32 @@ public class ContentionManagementComponent
 		// therefore throws a TransactionNotActiveException
 		// when called.
 		catch (Throwable t) {
-		    toString = ".toString() threw " + t;
+		    toString = ".toString() threw " + t.getClass().getName();
 		}
 		
-		objs += "\t" + oid +  ":" +  o.getClass().getName() + " -> " 
-		    + toString + "\n";
+		objs += 
+		    String.format("%6d: %-30s desc: %-30s\n",
+				  oid,
+				  o.getClass().getSimpleName(),
+				  toString);
 	    }
-	    String nms = (names.isEmpty()) ? "\tnames: [NONE]" : "";
-	    for (String name : names) {
-		nms += "\tname: " + name + "\n";
-	    } 
+	    String nms = (names.isEmpty()) ? "  names: [NONE]\n" : "";
+	    if (names.size () > 20) {
+		nms = names.size() + " names (elided)";
+	    }
+	    else {
+		for (String name : names) {
+		    nms += "  name: " + name + "\n";
+		}
+	    }
 
 	    return objs + nms;
 	}
 
 	public String toString() {
-	    return "Read Locks Held:" + readLockedObjects() +
-		//"\tnames: " + nameReadLocks +"\n" +
-		"Write Locks Held:" + writeLockedObjects() + "\n"; // +
-	    //"\tnames: " + nameWriteLocks +"\n";
+	    return "Read Locks Held:" + readLockedObjects() 
+		+ "Write Locks Held:" + writeLockedObjects(); 
+
 	}
 
     }
