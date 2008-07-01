@@ -147,6 +147,10 @@
 	      <value>${run.javapath}</value>
 	    </property>
 	    <property>
+	      <name>java.util.logging.config.file</name>
+	      <value>${run.logging}</value>
+	    </property>
+	    <property>
 	      <name>
 		com.sun.sgs.impl.service.data.store.db.environment.class
 	      </name>
@@ -232,6 +236,9 @@
 	 tests, for storing database files, etc.  The directory is
 	 removed and recreated for each test run. -->
     <test.output>target/test-output</test.output>
+    <run.logging>
+      ${basedir}/src/test/properties/logging.properties
+    </run.logging>
   </properties>
 
 </project>
