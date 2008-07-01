@@ -1,4 +1,4 @@
-x/*
+/*
  * Copyright 2007 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
