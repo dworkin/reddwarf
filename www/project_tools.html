@@ -1,0 +1,67 @@
+</dd>
+<script id="eraser">
+// hide all default navigation bars
+
+// get to the block
+var dd = document.getElementById("eraser").previousSibling;
+for( n=dd; n!=null; n=n.previousSibling ) {
+  if(n.nodeType==1) { // if element
+    if(n.tagName=="DD") { // kill all the link items
+      n.style.display = "none";
+    }
+    if(n.tagName=="DT") { // change the title
+      n.innerHTML = "<strong>Project Darkstar Request Example</strong>";
+    }
+  }
+}
+
+// delete the "get involved" block
+for( n=dd.parentNode.previousSibling; n!=null; n=n.previousSibling ) {
+  if(n.nodeType==1) { // if element
+    if(n.tagName=="DL") {
+      n.style.display = "none";
+    }
+  }
+}
+</script>
+
+<dd>
+  <ul>
+    <li> <b><a href="https://darkstar-request.dev.java.net/servlets/ProjectHome">darkstar-request</a></b> </li>
+  </ul>
+</dd>
+<dd>
+  <ul>
+    <li> <a href="https://darkstar-request.dev.java.net/source/browse/darkstar-request">Source Code (SVN)</a> </li>
+    <li> <a href="https://darkstar-request.dev.java.net/servlets/ProjectIssues">Issue tracker</a> </li>
+    <li> <a href="https://darkstar-request.dev.java.net/servlets/ProjectMailingListList">Mailing lists</a> </li>
+  </ul>
+</dd>
+</dl>
+
+
+
+<dl class="navgroup">
+  <dt>Project Darkstar Community</dt>
+  <dd> 
+    <ul>
+      <li> <b><a href="https://games-darkstar.dev.java.net">Project Darkstar</a></b> </li>
+      <li> <a href="https://games-darkstar.dev.java.net/servlets/ProjectMailingListList">Mailing Lists</a> </li>
+    </ul>
+  <dd> 
+    <ul>
+      <li> <b>Core Technology</b> </li>
+      <li> <a href="https://sgs.dev.java.net">Server Distribution</a> </li>
+    </ul>
+  <dd>
+    <ul>
+      <li> <b>Projects and Apps</b> </li>
+      <li> <a href="https://sgs-client-apis.dev.java.net">Client APIs</a> </li>
+      <li> <a href="https://sgs-utilities.dev.java.net">Development Tools</a> </li>
+      <li> <a href="https://sgs-libraries.dev.java.net">Application Libraries</a> </li>
+      <li> <a href="https://sgs-demos.dev.java.net">Demo Applications</a> </li>
+    </ul>
+  <dd>
+
+
+
