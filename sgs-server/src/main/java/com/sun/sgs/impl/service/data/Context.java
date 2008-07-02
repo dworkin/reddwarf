@@ -212,10 +212,19 @@ final class Context extends TransactionContext {
 
     /**
      * Finds the existing reference associated with the specified object,
-     * returning null if it is not found.
+     * returning null if it is not found.  Throws ObjectNotFoundException if
+     * the object has been removed.
      */
     <T> ManagedReferenceImpl<T> findReference(T object) {
 	return ManagedReferenceImpl.findReference(this, object);
+    }
+
+    /**
+     * Finds the existing reference associated with the specified object,
+     * returning null if it is not found or has been removed.
+     */
+    <T> ManagedReferenceImpl<T> safeFindReference(T object) {
+	return ManagedReferenceImpl.safeFindReference(this, object);
     }
 
     /** Obtains the reference associated with the specified ID. */
