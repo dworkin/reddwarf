@@ -1028,8 +1028,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      * not assigned an ID.  Returns an ID even if the object is removed.
      */
     private static BigInteger objectId(Context context, Object object) {
-	ManagedReference<?> ref = context.safeFindReference(object);
-	return (ref != null) ? ref.getId() : null;
+	return refId(context.safeFindReference(object));
     }
 
     /**
