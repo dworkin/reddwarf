@@ -59,19 +59,21 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
     void (*unreg_fd)(sgs_connection*, sgs_socket_t, short))
 {
+    int name_len;
     
     sgs_context_impl *ctx = NULL;
   
     ctx = malloc(sizeof(struct sgs_context_impl));
     if (ctx == NULL) return NULL;
-	
-    ctx->hostname = malloc(strlen(hostname));
+
+    name_len = strlen(hostname);
+    ctx->hostname = malloc(name_len);
     if (ctx->hostname == NULL) {
         free(ctx);
         return NULL;
     }
 
-    strncpy(ctx->hostname, hostname, sizeof(ctx->hostname));
+    strncpy(ctx->hostname, hostname, name_len);
 	
     ctx->port = port;
   
