@@ -88,10 +88,14 @@ extern "C" {
 #define SGS_MSG_INIT_LEN (SGS_MSG_MAX_LENGTH - SGS_MAX_PAYLOAD_LENGTH)
 
     /* The version number */
-#define SGS_MSG_VERSION 0x04
+#define SGS_MSG_VERSION '\004'
 
     /*The offset of the opcode in the messages*/
 #define SGS_OPCODE_OFFSET 2
+    /*The constant used to account for the 2 byte length field at the
+     *beginning of every message buffer 
+     */
+#define SGS_MSG_LENGTH_OFFSET 2
 
     typedef enum sgs_opcode {
         /**

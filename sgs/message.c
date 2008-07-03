@@ -69,8 +69,8 @@ int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
         return -1;
     }
   
-    /** copy the content over */
-    memcpy(pmsg->buf + pmsg->len, content, clen);
+    /** copy the content over, accounting for the first two bytes for the length*/
+    memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, content, clen);
   
     /** update the message size fields (both in the struct and in the data) */
     pmsg->len += clen;
@@ -107,10 +107,10 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
   
     /** copy the content's length over */
     _uint16_tmp = htons(clen);
-    memcpy(pmsg->buf + pmsg->len, &_uint16_tmp, 2);
+    memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, &_uint16_tmp, 2);
   
     /** copy the content over */
-    memcpy(pmsg->buf + pmsg->len + 2, content, clen);
+    memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET + 2, content, clen);
   
     /** update the message size fields (both in the struct and in the data) */
     pmsg->len += clen + 2;
@@ -206,7 +206,7 @@ uint16_t sgs_msg_get_size(const sgs_message *pmsg) {
 
 
 /*
- * sgs_msg_create()
+ * sgs_msg_init()
  */
 int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
     sgs_opcode opcode)
@@ -217,9 +217,9 @@ int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
         return -1;
     }
 
-	if (buflen > SGS_MSG_MAX_LENGTH)
-		return -1;
-	
+    if (buflen > SGS_MSG_MAX_LENGTH)
+        return -1;
+   	
     pmsg->buf = buffer;
     pmsg->capacity = buflen;
     pmsg->len = 1;
