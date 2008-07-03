@@ -49,7 +49,7 @@ typedef struct sgs_context_impl sgs_context_impl;
 
 struct sgs_context_impl {
     /** Hostname and port number (of server) to connect to: */
-    char hostname[100];
+    char *hostname;
     int port;
   
     /** function pointers to callbacks: */

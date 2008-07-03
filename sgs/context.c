@@ -52,24 +52,29 @@ void sgs_ctx_destroy(sgs_context_impl *ctx) {
 
 /*
  * sgs_ctx_create()
+ * Note that this function assumes that the first argument, hostname, points
+ * to a null-terminated character array. 
  */
 sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
     void (*unreg_fd)(sgs_connection*, sgs_socket_t, short))
 {
+    int name_len;
+    
     sgs_context_impl *ctx = NULL;
   
     ctx = malloc(sizeof(struct sgs_context_impl));
     if (ctx == NULL) return NULL;
-  
-    if (strlen(hostname) + 1 > sizeof(ctx->hostname)) {
-        /** Hostname is too big. */
+
+    name_len = strlen(hostname);
+    ctx->hostname = malloc(name_len);
+    if (ctx->hostname == NULL) {
         free(ctx);
-        errno = ENOBUFS;
         return NULL;
     }
-  
-    strncpy(ctx->hostname, hostname, sizeof(ctx->hostname));
+
+    strncpy(ctx->hostname, hostname, name_len);
+	
     ctx->port = port;
   
     ctx->reg_fd_cb = reg_fd;

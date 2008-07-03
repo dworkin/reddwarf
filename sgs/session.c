@@ -56,7 +56,6 @@
  * (can only be called by functions in this file)
  */
 static uint16_t read_len_header(const uint8_t *data);
-static void clear_buffer(char *buffer, int start);
 static uint32_t read_uint32(const uint8_t *data);
 
 
@@ -68,22 +67,21 @@ static uint32_t read_uint32(const uint8_t *data);
  * sgs_session_direct_send()
  */
 int sgs_session_direct_send(sgs_session_impl *session, const uint8_t *data,
-							size_t datalen)
-{
+        size_t datalen) {
     sgs_message msg;
-	
-    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
-					 SGS_OPCODE_SESSION_MESSAGE) == -1)
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof (session->msg_buf),
+            SGS_OPCODE_SESSION_MESSAGE) == -1)
         return -1;
-	
+
     /** Add message payload to message. */
     if (sgs_msg_add_arb_content(&msg, data, datalen) == -1) return -1;
-	
+
     /** Done assembling message; send message buffer to connection to be sent. */
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-									 sgs_msg_get_size(&msg)) == -1)
+            sgs_msg_get_size(&msg)) == -1)
         return -1;
-	
+
     return 0;
 }
 
@@ -103,9 +101,9 @@ const sgs_id *sgs_session_get_reconnectkey(const sgs_session_impl *session) {
  */
 void sgs_session_impl_destroy(sgs_session_impl *session) {
     sgs_id_destroy(session->reconnect_key);
-	sgs_map_destroy(session->channels);
-	free(session->login);
-	free(session->password);
+    sgs_map_destroy(session->channels);
+    free(session->login);
+    free(session->password);
     free(session);
 }
 
@@ -113,44 +111,43 @@ void sgs_session_impl_destroy(sgs_session_impl *session) {
  * sgs_session_impl_login()
  */
 int sgs_session_impl_login(sgs_session_impl *session, const char *login,
-						   const char *password)
-{
+        const char *password) {
     sgs_message msg;
-	uint8_t protocolVersion = SGS_MSG_VERSION;
-	
-    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
-					 SGS_OPCODE_LOGIN_REQUEST) == -1)
+    uint8_t protocolVersion = SGS_MSG_VERSION;
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof (session->msg_buf),
+            SGS_OPCODE_LOGIN_REQUEST) == -1)
         return -1;
-	
-	/** Add protocol version field to message */
-	if (sgs_msg_add_arb_content(&msg, &protocolVersion, 1) == -1)
-		return -1;
-	
+
+    /** Add protocol version field to message */
+    if (sgs_msg_add_arb_content(&msg, &protocolVersion, 1) == -1)
+        return -1;
+
     /** Add "login" data field to message. */
-    if (sgs_msg_add_fixed_content(&msg, (uint8_t*)login, strlen(login)) == -1)
+    if (sgs_msg_add_fixed_content(&msg, (uint8_t*) login, strlen(login)) == -1)
         return -1;
-	
-	/** Add "password" data field to message. */
-    if (sgs_msg_add_fixed_content(&msg, (uint8_t*)password,
-								  strlen(password)) == -1)
+
+    /** Add "password" data field to message. */
+    if (sgs_msg_add_fixed_content(&msg, (uint8_t*) password,
+            strlen(password)) == -1)
         return -1;
-	
-	/**store the "login" and "password" fields in case there is a reconnect*/
-	if ((session->login = malloc(strlen(login))) == NULL)
-		return -1;
-	memcpy(session->login, login, strlen(login));
-	
-	if ((session->password = malloc(strlen(password))) == NULL){
-		free(session->login);
-		return -1;
-	}
-	memcpy(session->password, password, strlen(password));
-	
+
+    /**store the "login" and "password" fields in case there is a reconnect*/
+    if ((session->login = malloc(strlen(login))) == NULL)
+        return -1;
+    memcpy(session->login, login, strlen(login));
+
+    if ((session->password = malloc(strlen(password))) == NULL) {
+        free(session->login);
+        return -1;
+    }
+    memcpy(session->password, password, strlen(password));
+
     /** Done assembling message; send message buffer to connection to be sent. */
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-									 sgs_msg_get_size(&msg)) == -1)
+            sgs_msg_get_size(&msg)) == -1)
         return -1;
-	
+
     return 0;
 }
 
@@ -159,16 +156,16 @@ int sgs_session_impl_login(sgs_session_impl *session, const char *login,
  */
 int sgs_session_impl_logout(sgs_session_impl *session) {
     sgs_message msg;
-	
-    if (sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
-					 SGS_OPCODE_LOGOUT_REQUEST) == -1)
+
+    if (sgs_msg_init(&msg, session->msg_buf, sizeof (session->msg_buf),
+            SGS_OPCODE_LOGOUT_REQUEST) == -1)
         return -1;
-	
+
     // Done assembling message; send message buffer to connection to be sent.
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-									 sgs_msg_get_size(&msg)) == -1)
+            sgs_msg_get_size(&msg)) == -1)
         return -1;
-	
+
     return 0;
 }
 
@@ -177,10 +174,10 @@ int sgs_session_impl_logout(sgs_session_impl *session) {
  */
 sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
     sgs_session_impl *session;
-    
-    session = malloc(sizeof(struct sgs_session_impl));
+
+    session = malloc(sizeof (struct sgs_session_impl));
     if (session == NULL) return NULL;
-    
+
     /**
      * The map key (a channel ID) is just a pointer into the map value (an
      * sgs_channel struct), so we don't need an explicit deallocation function
@@ -189,17 +186,17 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
      * their usual argument types.
      */
     session->channels =
-	sgs_map_create((int(*)(const void*, const void*))sgs_id_compare);
-    
+            sgs_map_create((int(*)(const void*, const void*))sgs_id_compare);
+
     if (session->channels == NULL) {
         /** roll back allocation of session */
         free(session);
         return NULL;
     }
-    
+
     session->connection = connection;
     session->reconnect_key = NULL;
-	
+
     return session;
 }
 
@@ -208,209 +205,217 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
  */
 int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     int8_t result;
-    ssize_t namelen, offset;
+    ssize_t namelen, offset, null_offset;
     sgs_id* channel_id;
     sgs_message msg;
     const uint8_t* msg_data;
     sgs_channel* channel;
     size_t msg_datalen;
-	sgs_connection_impl *old_connection;
-    
+    sgs_connection_impl *old_connection;
+
     if (sgs_msg_deserialize(&msg, session->msg_buf,
-							sizeof(session->msg_buf)) == -1)
+            sizeof (session->msg_buf)) == -1)
         return -1;
-	
+
     //sgs_msg_dump(&msg);
-    
-	/** Get the length of the payload, and a pointer to the beginning of the 
-	 *  payload
-	 */
+
+    /** Get the length of the payload, and a pointer to the beginning of the 
+     *  payload
+     */
     msg_datalen = sgs_msg_get_datalen(&msg);
     msg_data = sgs_msg_get_data(&msg);
-	offset = 0;
-	
-	switch (sgs_msg_get_opcode(&msg)) {
-        case SGS_OPCODE_LOGIN_SUCCESS:            
+    offset = 0;
+
+    switch (sgs_msg_get_opcode(&msg)) {
+        case SGS_OPCODE_LOGIN_SUCCESS:
             /** reconnection-key; the key is a byte[] and, since it is the only 
-			 *  payload, the length of the array is the same as the payload length
-			 */
+             *  payload, the length of the array is the same as the payload length
+             */
             session->reconnect_key = sgs_id_create(msg_data, msg_datalen);
             if (session->reconnect_key == NULL) return -1;
-            
+
             if (session->connection->ctx->logged_in_cb != NULL)
                 session->connection->ctx->logged_in_cb(session->connection,
-													   session);
+                    session);
             return 0;
-            
-			case SGS_OPCODE_LOGIN_FAILURE:
+
+        case SGS_OPCODE_LOGIN_FAILURE:
             /** error string (first 2 bytes = length of string) */
             if (session->connection->ctx->login_failed_cb != NULL)
                 session->connection->ctx->login_failed_cb(session->connection,
-														  msg_data + 2, read_len_header(msg_data));
+                    msg_data + 2, read_len_header(msg_data));
             return 0;
-			
-			case SGS_OPCODE_LOGIN_REDIRECT:
-			/** start by getting the redirect host and port*/
-			namelen = read_len_header(msg_data);
-			if (namelen>= sizeof(session->connection->ctx->hostname))
-				return -1;
-			memcpy(session->connection->ctx->hostname, msg_data+2, namelen);
-			/**clear any contents of the hostname buffer, since it is fixed size*/
-			clear_buffer(session->connection->ctx->hostname, namelen);
-			
-			session->connection->ctx->port = read_uint32(msg_data+2+namelen);
-			
-			old_connection = session->connection;
-			old_connection->in_redirect = 1;
-			
-			session->connection = sgs_connection_create(old_connection->ctx);
-			sgs_connection_impl_disconnect(old_connection);
-			
-			/**finally, try to login on this connection, using the login information
-			 * that was stored on the initial login attempt
-			 */
-			return sgs_connection_login(session->connection, session->login, session->password);
-			
-			case SGS_OPCODE_SESSION_MESSAGE:
-			
+
+        case SGS_OPCODE_LOGIN_REDIRECT:
+            /** start by getting the redirect host and port*/
+            namelen = read_len_header(msg_data);
+            /** see if the string is already null terminated*/
+            if (*(msg_data+2+namelen) == '\0')
+                    null_offset = 0;
+            else
+                null_offset = 1;
+            if (session->connection->ctx->hostname != NULL) {
+                free(session->connection->ctx->hostname);
+            }
+            session->connection->ctx->hostname = malloc(namelen + null_offset);
+            if (session->connection->ctx->hostname == NULL)
+                return -1;
+            memcpy(session->connection->ctx->hostname, msg_data + 2, namelen);
+            if (null_offset == 1)
+                session->connection->ctx->hostname[namelen + 1] = '\0';
+
+            session->connection->ctx->port = read_uint32(msg_data + 2 + namelen);
+
+            old_connection = session->connection;
+            old_connection->in_redirect = 1;
+
+            session->connection = sgs_connection_create(old_connection->ctx);
+            sgs_connection_impl_disconnect(old_connection);
+
+            /**finally, try to login on this connection, using the login information
+             * that was stored on the initial login attempt
+             */
+            return sgs_connection_login(session->connection, session->login, session->password);
+
+        case SGS_OPCODE_SESSION_MESSAGE:
+
             /** field 1: message (first 2 bytes = length of message) */
             if (session->connection->ctx->recv_message_cb != NULL)
                 session->connection->ctx->recv_message_cb(session->connection,
-														  msg_data, msg_datalen);
-			
+                    msg_data, msg_datalen);
+
             return 0;
-			
-			case SGS_OPCODE_RECONNECT_SUCCESS:
+
+        case SGS_OPCODE_RECONNECT_SUCCESS:
             if (session->connection->ctx->reconnected_cb != NULL)
                 session->connection->ctx->reconnected_cb(session->connection);
-			
+
             return 0;
-			
-			case SGS_OPCODE_RECONNECT_FAILURE:
+
+        case SGS_OPCODE_RECONNECT_FAILURE:
             sgs_connection_impl_disconnect(session->connection);
             return 0;
-			
-			case SGS_OPCODE_LOGOUT_SUCCESS:
+
+        case SGS_OPCODE_LOGOUT_SUCCESS:
             session->connection->expecting_disconnect = 1;
             return 0;
-			
-			case SGS_OPCODE_CHANNEL_JOIN:
+
+        case SGS_OPCODE_CHANNEL_JOIN:
             /** field 1: channel name (first 2 bytes = length of string) 
-			 *  We get this so we can skip over the channel name and get the channel id,
-			 *  which is the rest of the payload; we use the channel name once we have
-			 *  obtained the id
-			 */
+             *  We get this so we can skip over the channel name and get the channel id,
+             *  which is the rest of the payload; we use the channel name once we have
+             *  obtained the id
+             */
             namelen = read_len_header(msg_data);
-            
+
             /** field 2: channel-id  */
             channel_id =
-			sgs_id_create(msg_data + namelen + 2,
-						  msg_datalen - namelen - 2);
+                    sgs_id_create(msg_data + namelen + 2,
+                    msg_datalen - namelen - 2);
             if (channel_id == NULL) return -1;
-            
+
             if (sgs_map_contains(session->channels, channel_id)) {
                 errno = SGS_ERR_ILLEGAL_STATE;
                 sgs_id_destroy(channel_id);
                 return -1;
             }
-            
+
             channel = sgs_channel_impl_create(session, channel_id,
-											  (const char*)(msg_data + 2), namelen);
-            
+                    (const char*) (msg_data + 2), namelen);
+
             if (channel == NULL) {
-				sgs_id_destroy(channel_id);
-				return -1;
-				}
-			
+                sgs_id_destroy(channel_id);
+                return -1;
+            }
+
             result = sgs_map_put(session->channels, channel_id, channel);
-            
+
             if (result == -1) {
-				sgs_id_destroy(channel_id);
-				return -1;
-				}
-            
+                sgs_id_destroy(channel_id);
+                return -1;
+            }
+
             if (session->connection->ctx->channel_joined_cb != NULL)
                 session->connection->ctx->channel_joined_cb(session->connection,
-															channel);
-            
+                    channel);
+
             return 0;
-			
-			case SGS_OPCODE_CHANNEL_LEAVE:
+
+        case SGS_OPCODE_CHANNEL_LEAVE:
             /** field 1: channel-id */
             channel_id = sgs_id_create(msg_data, msg_datalen);
             if (channel_id == NULL) return -1;
-            
+
             channel = sgs_map_get(session->channels, channel_id);
             sgs_id_destroy(channel_id);
-			
+
             if (channel == NULL) {
                 errno = SGS_ERR_UNKNOWN_CHANNEL;
                 return -1;
             }
-			
+
             if (session->connection->ctx->channel_left_cb != NULL)
                 session->connection->ctx->channel_left_cb(session->connection,
-														  channel);
-            
+                    channel);
+
             sgs_map_remove(session->channels,
-						   sgs_channel_impl_get_id(channel));
-			
+                    sgs_channel_impl_get_id(channel));
+
             sgs_channel_impl_destroy(channel);
-            
+
             return 0;
-            
-			case SGS_OPCODE_CHANNEL_MESSAGE:
+
+        case SGS_OPCODE_CHANNEL_MESSAGE:
             /** field 1: channel-id 
-			 *  The first two bytes are the length of the byte array containing
-			 *  the ID, and the remainder is the id itself
-			 */
-			offset = read_len_header(msg_data);
+             *  The first two bytes are the length of the byte array containing
+             *  the ID, and the remainder is the id itself
+             */
+            offset = read_len_header(msg_data);
             channel_id = sgs_id_create(msg_data + 2, offset);
             if (channel_id == NULL) return -1;
-			offset += 2;
-			
+            offset += 2;
+
             channel = sgs_map_get(session->channels, channel_id);
             sgs_id_destroy(channel_id);
-			
+
             if (channel == NULL) {
                 errno = SGS_ERR_UNKNOWN_CHANNEL;
                 return -1;
             }
-            
+
             if (session->connection->ctx->channel_recv_msg_cb != NULL) {
                 /** field 2: message, which is from the end of the id to the end of the payload*/
                 session->connection->ctx->channel_recv_msg_cb(session->connection,
-															  channel, 
-															  msg_data + offset,
-															  msg_datalen - offset);
+                        channel,
+                        msg_data + offset,
+                        msg_datalen - offset);
             }
-			
+
             return 0;
-			
-			default:
+
+        default:
             errno = SGS_ERR_BAD_MSG_OPCODE;
             return -1;
-	}
+    }
 }
 
 int sgs_session_impl_send_msg(sgs_session_impl *session) {
     size_t msg_size;
     sgs_message msg;
-	
+
     if (sgs_msg_deserialize(&msg, session->msg_buf,
-							sizeof(session->msg_buf)) == -1)
+            sizeof (session->msg_buf)) == -1)
         return -1;
-	
+
     msg_size = sgs_msg_get_size(&msg);
-    
+
     /** Send message buffer to connection to be sent. */
     if (sgs_connection_impl_io_write(session->connection, session->msg_buf,
-									 msg_size) == -1)
+            msg_size) == -1)
         return -1;
-	
+
     return 0;
 }
-
 
 /*
  * function: read_len_header()
@@ -421,28 +426,15 @@ int sgs_session_impl_send_msg(sgs_session_impl *session) {
 static uint16_t read_len_header(const uint8_t *data) {
     uint16_t tmp;
     tmp = data[0];
-    tmp = tmp<<8;
-	tmp += data[1];
+    tmp = tmp << 8;
+    tmp += data[1];
     return ntohs(tmp);
 }
 
-static uint32_t read_uint32(const uint8_t *data){
-	uint32_t value;
-	value = *(uint8_t *)data;
-	return (ntohl(value));
+static uint32_t read_uint32(const uint8_t *data) {
+    uint32_t value;
+    value = *(uint8_t *) data;
+    return (ntohl(value));
 }
-	
 
-/**
- * function clear_buffer
- *
- * fills a character buffer from the starting point to a point count later with null
- */
-static void clear_buffer(char *buffer, int start){
-	int i, end;
-	
-	end = sizeof(buffer);
-	for (i = start; i < end; i++){
-		buffer[i] = '\0';
-	}
-}
+
