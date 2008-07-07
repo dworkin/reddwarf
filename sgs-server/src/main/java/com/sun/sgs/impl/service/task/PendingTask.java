@@ -20,14 +20,13 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 
 import com.sun.sgs.auth.Identity;
-
-import com.sun.sgs.service.DataService;
 
 import java.io.Serializable;
 
@@ -37,7 +36,12 @@ import java.io.Serializable;
  * {@code Task} that have been scheduled through the {@code TaskService} but
  * have not yet run to completion or been dropped. This class maintains all
  * of the meta-data associated with these pending tasks, and if needed, makes
- * sure that the {@code Task} itself is persisted.
+ * sure that the {@code Task} itself is persisted. This meta-data classs
+ * can be flagged as available, so that a single instance can be persisted
+ * and then re-used as needed.
+ * <p>
+ * FIXME: there are now two notions of "available" so one of those names
+ * should be changed.
  */
 class PendingTask implements ManagedObject, Serializable {
 
@@ -45,64 +49,85 @@ class PendingTask implements ManagedObject, Serializable {
 
     // the task that is pending, one of which is null based on whether the
     // task was managed by the caller (see docs on constructor)
-    private final Task task;
-    private final ManagedReference<Task> taskRef;
+    private Task task;
+    private ManagedReference<Task> taskRef;
 
-    // the task's meta-data
-    private final String taskType;
-    private final long startTime;
-    private final long period;
+    // the owner of this task
     private final Identity identity;
 
-    // whether this task has been marked as cancelled
-    private boolean cancelled = false;
+    // the task's re-assignable meta-data
+    private String taskType;
+    private long startTime;
+    private long period;
+    
+    // identiifies whether this instance is available for re-use
+    private boolean available;
 
     // if this is a periodic task, where it's currently running
-    private long runningNode = -1;
+    private long runningNode;
 
     /**
-     * Creates an instance of {@code PendingTask}, handling the task
-     * reference correctly. As described on {@code TaskManager}, any
-     * {@code Task} may or may not implement {@code ManagedObject} and
+     * Creates an instance of {@code PendingTask}.
+     *
+     * @param identity the {@code Identity} of the owner of the task
+     */
+    PendingTask(Identity identity) {
+        this.identity = identity;
+
+        this.available = true;
+        this.runningNode = -1;
+    }
+
+    /**
+     * Re-sets this {@code PendingTask} with the given values, and marks
+     * it as unavailable. This can now be used to represent a durable
+     * task that needs to be run. As described on {@code TaskManager}, any
+     * {@code Task} may optionally implement {@code ManagedObject} and
      * this affects how the task is handled by the system. {@code PendingTask}
      * takes care of the task's durability, and how the task is eventually
      * run, in both situations.
-     * <p>
-     * Note that the {@code DataService} parameter is not kept as state. It
-     * is just used (if needed) to resolve a reference in the constructor.
-     * This does mean that this constructor should always be invoked in a
-     * valid transactional context.
      *
-     * @param task the {@code Task} that is pending
-     * @param startTime the starting time for the task, in milliseconds
-     *                  since January 1, 1970, or
-     *                  {@code TaskServiceImpl.START_NOW}
-     * @param period the period between recurrences, or
-     *               {@code TaskServiceImpl.PERIOD_NONE}
-     * @param identity the {@code Identity} of the owner of the task
-     * @param dataService the {@code DataService} used to manage the task
+     * @param t the {@code Task} that is pending
+     * @param s the starting time for the task, in milliseconds since
+     *          January 1, 1970, or {@code TaskServiceImpl.START_NOW}
+     * @param p the period between recurrences, or
+     *          {@code TaskServiceImpl.PERIOD_NONE}
      */
-    PendingTask(Task task, long startTime, long period, Identity identity,
-                DataService dataService) {
-        // If the Task is also a ManagedObject then the assumption is
-        // that the object was already managed by the application so we
-        // just keep a reference...otherwise, we make it part of our
-        // state, which has the effect of persisting the task. In either
-        // case we set one of the two fields to null to disambiguate
-        // what the situation is.
-        if (task instanceof ManagedObject) {
-            taskRef = dataService.createReference(task); 
-            this.task = null;
+    void resetValues(Task t, long s, long p) {
+        DataManager dm = AppContext.getDataManager();
+        dm.markForUpdate(this);
+
+        /* If the Task is also a ManagedObject then the assumption is
+           that the object was already managed by the application so we
+           just keep a reference...otherwise, we make it part of our
+           state, which has the effect of persisting the task. In either
+           case we set one of the two fields to null to disambiguate
+           what the situation is. */
+        if (t instanceof ManagedObject) {
+            taskRef = dm.createReference(t); 
+            task = null;
         } else {
-            this.task = task;
+            task = t;
             taskRef = null;
         }
 
-        // keep track of the meta-data
-        this.taskType = task.getClass().getName();
-        this.startTime = startTime;
-        this.period = period;
-        this.identity = identity;
+        this.taskType = t.getClass().getName();
+        this.startTime = s;
+        this.period = p;
+
+        this.available = false;
+        this.runningNode = -1;
+    }
+
+    /** Returns whether this {@code PendingTask} is available for re-use. */
+    boolean isAvailable() {
+        return available;
+    }
+
+    /** Sets this {@code PendingTask} as available for re-use. */
+    void setAvailable() {
+        AppContext.getDataManager().markForUpdate(this);
+        available = true;
     }
 
     /** Returns the type of the pending task. */
@@ -126,12 +151,6 @@ class PendingTask implements ManagedObject, Serializable {
         return period;
     }
 
-    /** Marks this task as cancelled. Must be called in a transaction. */
-    void markCanceled() {
-        AppContext.getDataManager().markForUpdate(this);
-        cancelled = true;
-    }
-
     /**
      * Returns the node where the associated task is running if the task
      * is periodic, or -1 if the task is non-periodic or the node hasn't
@@ -150,12 +169,8 @@ class PendingTask implements ManagedObject, Serializable {
         if (! isPeriodic())
             throw new IllegalStateException("Cannot assign running node " +
                                             "for a non-periodic task");
+        AppContext.getDataManager().markForUpdate(this);
         runningNode = nodeId;
-    }
-
-    /** Checks if this task has been marked as cancelled. */
-    boolean isCancelled() {
-        return cancelled;
     }
 
     /** Checks if this is a periodic task. */
