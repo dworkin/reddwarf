@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.domain;
+package com.projectdarkstar.tools.dtc.data;
 
 /**
  * Enumeration type representing each of the possible results
  * of a specific test.
  */
-public enum TestExecutionResultValue
+public enum TestExecutionResultValueDTO
 {
     PASS,
     FAIL

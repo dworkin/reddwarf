@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.domain;
 
-import java.util.SortedSet;
+import java.util.List;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -60,7 +60,7 @@ public class TestExecutionResultClientLog implements Serializable
     private ClientAppConfigType originalClientAppConfigPropertyMethod;
     private ClientAppConfig originalClientAppConfig;
     
-    private SortedSet<Property> properties;
+    private List<Property> properties;
     private TestExecutionResult parentResult;
     
     
@@ -146,8 +146,8 @@ public class TestExecutionResultClientLog implements Serializable
     @JoinTable(name = "testExecutionResultClientLogProperties",
                joinColumns = @JoinColumn(name = "testExecutionResultClientLogId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public SortedSet<Property> getProperties() { return properties; }
-    public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
+    public List<Property> getProperties() { return properties; }
+    public void setProperties(List<Property> properties) { this.properties = properties; }
     
     @ManyToOne
     @JoinColumn(name = "parentResult", nullable = false)

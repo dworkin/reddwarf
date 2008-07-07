@@ -23,17 +23,17 @@ import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 
 /**
- * Represents a tag entity used to categorize {@link SystemProbeDTO}
+ * Represents a tag entity used to categorize {@link TestExecutionDTO}
  * objects.
  */
-public class SystemProbeTagDTO extends AbstractDTO
+public class TestExecutionTagDTO extends AbstractDTO
 {
     private Long id;
     private String tag;
     
-    private List<SystemProbeDTO> probes;
+    private List<TestExecutionDTO> executions;
     
-    public SystemProbeTagDTO(String tag)
+    public TestExecutionTagDTO(String tag)
     {
         this.setTag(tag);
     }
@@ -54,13 +54,17 @@ public class SystemProbeTagDTO extends AbstractDTO
     }
     
     /**
-     * Returns the list of {@link SystemProbeDTO} objects that are tagged
+     * Returns the list of {@link TestExecutionDTO} objects that are tagged
      * with this tag.
      * 
-     * @return probes tagged with this tag.
+     * @return test executions tagged with this tag.
      */
-    public List<SystemProbeDTO> getProbes() { return probes; }
-    protected void setProbes(List<SystemProbeDTO> probes) { this.probes = probes; }
+    public List<TestExecutionDTO> getExecutions() { return executions; }
+    protected void setExecutions(List<TestExecutionDTO> executions) { this.executions = executions; }
+    public void updateExecutions(List<TestExecutionDTO> executions)
+            throws DTCInvalidDataException {
+        this.updateAttribute("executions", executions);
+    }
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}

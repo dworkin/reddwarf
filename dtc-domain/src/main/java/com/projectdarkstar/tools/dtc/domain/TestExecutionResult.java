@@ -20,7 +20,6 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
-import java.util.SortedSet;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -53,7 +52,7 @@ public class TestExecutionResult implements Serializable
     private TestExecutionResultValue result;
     private LogFile resultSummary;
     
-    private SortedSet<Property> properties;
+    private List<Property> properties;
     private List<TestExecutionResultServerLog> serverLogs;
     private List<TestExecutionResultClientLog> clientLogs;
     private List<TestExecutionResultProbeLog> probeLogs;
@@ -131,8 +130,8 @@ public class TestExecutionResult implements Serializable
     @JoinTable(name = "testExecutionResultProperties",
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public SortedSet<Property> getProperties() { return properties; }
-    public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
+    public List<Property> getProperties() { return properties; }
+    public void setProperties(List<Property> properties) { this.properties = properties; }
     
     /**
      * A {@link TestExecutionResultServerLog} is generated for each
@@ -216,7 +215,7 @@ public class TestExecutionResult implements Serializable
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
     public List<HardwareResourceFamily> getOriginalServerResources() { return originalServerResources; }
-    public void setOriginalServerResources(List<HardwareResourceFamily> originalServerResources) { this.originalServerResources = originalServerResources; }
+    private void setOriginalServerResources(List<HardwareResourceFamily> originalServerResources) { this.originalServerResources = originalServerResources; }
     
     @ManyToMany
     @OrderBy("hostname")
@@ -224,35 +223,35 @@ public class TestExecutionResult implements Serializable
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
     public List<HardwareResourceFamily> getOriginalClientResources() { return originalClientResources; }
-    public void setOriginalClientResources(List<HardwareResourceFamily> originalClientResources) { this.originalClientResources = originalClientResources; }
+    private void setOriginalClientResources(List<HardwareResourceFamily> originalClientResources) { this.originalClientResources = originalClientResources; }
     
     
     
     
     @Column(name = "originalTestSpecName", nullable = false)
     public String getOriginalTestSpecName() { return originalTestSpecName; }
-    public void setOriginalTestSpecName(String originalTestSpecName) { this.originalTestSpecName = originalTestSpecName; }
+    private void setOriginalTestSpecName(String originalTestSpecName) { this.originalTestSpecName = originalTestSpecName; }
     
     @Column(name = "originalTestSpecDescription", nullable = false)
     public String getOriginalTestSpecDescription() { return originalTestSpecDescription; }
-    public void setOriginalTestSpecDescription(String originalTestSpecDescription) { this.originalTestSpecDescription = originalTestSpecDescription; }
+    private void setOriginalTestSpecDescription(String originalTestSpecDescription) { this.originalTestSpecDescription = originalTestSpecDescription; }
     
     @Column(name = "originalTestSpecTestRunner", nullable = false)
     public String getOriginalTestSpecTestRunner() { return originalTestSpecTestRunner; }
-    public void setOriginalTestSpecTestRunner(String originalTestSpecTestRunner) { this.originalTestSpecTestRunner = originalTestSpecTestRunner; }
+    private void setOriginalTestSpecTestRunner(String originalTestSpecTestRunner) { this.originalTestSpecTestRunner = originalTestSpecTestRunner; }
     
     @Column(name = "originalTestSpecTimeLimit", nullable = false)
     public Long getOriginalTestSpecTimeLimit() { return originalTestSpecTimeLimit; }
-    public void setOriginalTestSpecTimeLimit(Long originalTestSpecTimeLimit) { this.originalTestSpecTimeLimit = originalTestSpecTimeLimit; }
+    private void setOriginalTestSpecTimeLimit(Long originalTestSpecTimeLimit) { this.originalTestSpecTimeLimit = originalTestSpecTimeLimit; }
     
     @Column(name = "originalTestSpecMaxClients", nullable = false)
     public Long getOriginalTestSpecMaxClients() { return originalTestSpecMaxClients; }
-    public void setOriginalTestSpecMaxClients(Long originalTestSpecMaxClients) { this.originalTestSpecMaxClients = originalTestSpecMaxClients; }
+    private void setOriginalTestSpecMaxClients(Long originalTestSpecMaxClients) { this.originalTestSpecMaxClients = originalTestSpecMaxClients; }
     
     @ManyToOne
     @JoinColumn(name = "originalTestSpec", nullable = false)
     public TestSpec getOriginalTestSpec() { return originalTestSpec; }
-    public void setOriginalTestSpec(TestSpec originalTestSpec) { this.originalTestSpec = originalTestSpec; }
+    private void setOriginalTestSpec(TestSpec originalTestSpec) { this.originalTestSpec = originalTestSpec; }
     
     @ManyToOne
     @JoinColumn(name = "parentExecution", nullable = false)
