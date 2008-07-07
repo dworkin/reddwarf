@@ -17,30 +17,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.domain;
+package com.projectdarkstar.tools.dtc.data;
 
+import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
-import java.io.Serializable;
-
-import javax.persistence.Entity;
-import javax.persistence.Table;
-import javax.persistence.Id;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Column;
-import javax.persistence.ManyToMany;
-import javax.persistence.JoinTable;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.OrderBy;
-import javax.persistence.Version;
 
 /**
  * Represents a complete test specification that pulls together all of the
  * details and parameters necessary to run a DTC test.
  */
-@Entity
-@Table(name = "TestSpec")
-public class TestSpec implements Serializable
+public class TestSpecDTO extends AbstractDTO
 {
     private Long id;
     private Long versionNumber;
@@ -50,20 +36,20 @@ public class TestSpec implements Serializable
     private Long timeLimit;
     private Long maxClients;
     
-    private List<Property> properties;
+    private List<PropertyDTO> properties;
     
-    private ServerAppConfig serverAppConfig;
-    private List<ClientAppConfig> clientAppConfigs;
-    private List<SystemProbe> systemProbes;
+    private ServerAppConfigDTO serverAppConfig;
+    private List<ClientAppConfigDTO> clientAppConfigs;
+    private List<SystemProbeDTO> systemProbes;
     
-    private List<HardwareResourceFamily> serverResources;
-    private List<HardwareResourceFamily> clientResources;
+    private List<HardwareResourceFamilyDTO> serverResources;
+    private List<HardwareResourceFamilyDTO> clientResources;
     
-    public TestSpec(String name,
-                    String description,
-                    String testRunner,
-                    Long timeLimit,
-                    Long maxClients)
+    public TestSpecDTO(String name,
+                       String description,
+                       String testRunner,
+                       Long timeLimit,
+                       Long maxClients)
     {
         this.setName(name);
         this.setDescription(description);
@@ -77,8 +63,6 @@ public class TestSpec implements Serializable
      * 
      * @return id of the entity
      */
-    @Id
-    @GeneratedValue
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
@@ -89,18 +73,21 @@ public class TestSpec implements Serializable
      * 
      * @return version number of the entity
      */
-    @Version
-    @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
-    @Column(name = "name", nullable = false)
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    protected void setName(String name) { this.name = name; }
+    public void updateName(String name)
+            throws DTCInvalidDataException {
+        this.updateAttribute("name", name);
+    }
     
-    @Column(name = "description", nullable = false, length = 1024)
     public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    protected void setDescription(String description) { this.description = description; }
+    public void updateDescription(String description)
+            throws DTCInvalidDataException {
+        this.updateAttribute("description", description);
+    }
     
     /**
      * <p>
@@ -128,9 +115,12 @@ public class TestSpec implements Serializable
      * 
      * @return test runner to be used for the tests
      */
-    @Column(name = "testRunner", nullable = false)
     public String getTestRunner() { return testRunner; }
-    public void setTestRunner(String testRunner) { this.testRunner = testRunner; }
+    protected void setTestRunner(String testRunner) { this.testRunner = testRunner; }
+    public void updateTestRunner(String testRunner)
+            throws DTCInvalidDataException {
+        this.updateAttribute("testRunner", testRunner);
+    }
     
     /**
      * Time limit in seconds to allow the test to run.  If the test
@@ -138,27 +128,32 @@ public class TestSpec implements Serializable
      * 
      * @return time limit of test
      */
-    @Column(name = "timeLimit", nullable = false)
     public Long getTimeLimit() { return timeLimit; }
-    public void setTimeLimit(Long timeLimit) { this.timeLimit = timeLimit; }
+    protected void setTimeLimit(Long timeLimit) { this.timeLimit = timeLimit; }
+    public void updateTimeLimit(Long timeLimit)
+            throws DTCInvalidDataException {
+        this.updateAttribute("timeLimit", timeLimit);
+    }
     
-    @Column(name = "maxClients", nullable = false)
     public Long getMaxClients() { return maxClients; }
-    public void setMaxClients(Long maxClients) { this.maxClients = maxClients; }
+    protected void setMaxClients(Long maxClients) { this.maxClients = maxClients; }
+    public void updateMaxClient(Long maxClients)
+            throws DTCInvalidDataException {
+        this.updateAttribute("maxClients", maxClients);
+    }
     
     /**
-     * Returns a list of arguments in the form of {@link Property} objects
+     * Returns a list of arguments in the form of {@link PropertyDTO} objects
      * to be passed to the TestRunner during run time.
      * 
      * @return list of arguments
      */
-    @ManyToMany
-    @OrderBy("property")
-    @JoinTable(name = "testSpecProperties",
-               joinColumns = @JoinColumn(name = "testSpecId"),
-               inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public List<Property> getProperties() { return properties; }
-    public void setProperties(List<Property> properties) { this.properties = properties; }
+    public List<PropertyDTO> getProperties() { return properties; }
+    protected void setProperties(List<PropertyDTO> properties) { this.properties = properties; }
+    public void updateProperties(List<PropertyDTO> properties)
+            throws DTCInvalidDataException {
+        this.updateAttribute("properties", properties);
+    }
     
     /**
      * Returns the complete configuration required to run the server
@@ -166,10 +161,12 @@ public class TestSpec implements Serializable
      * 
      * @return the server application configuration
      */
-    @ManyToOne
-    @JoinColumn(name = "serverAppConfig", nullable = false)
-    public ServerAppConfig getServerAppConfig() { return serverAppConfig; }
-    public void setServerAppConfig(ServerAppConfig serverAppConfig) { this.serverAppConfig = serverAppConfig; }
+    public ServerAppConfigDTO getServerAppConfig() { return serverAppConfig; }
+    protected void setServerAppConfig(ServerAppConfigDTO serverAppConfig) { this.serverAppConfig = serverAppConfig; }
+    public void updateServerAppConfig(ServerAppConfigDTO serverAppConfig)
+            throws DTCInvalidDataException {
+        this.updateAttribute("serverAppConfig", serverAppConfig);
+    }
     
     /**
      * Returns the list of client application simulator configurations
@@ -177,13 +174,12 @@ public class TestSpec implements Serializable
      * 
      * @return the client application simulator configurations
      */
-    @ManyToMany
-    @OrderBy("name")
-    @JoinTable(name = "testSpecClientAppConfigs",
-               joinColumns = @JoinColumn(name = "testSpecId"),
-               inverseJoinColumns = @JoinColumn(name = "clientAppConfigId"))
-    public List<ClientAppConfig> getClientAppConfigs() { return clientAppConfigs; }
-    public void setClientAppConfigs(List<ClientAppConfig> clientAppConfigs) { this.clientAppConfigs = clientAppConfigs; }
+    public List<ClientAppConfigDTO> getClientAppConfigs() { return clientAppConfigs; }
+    protected void setClientAppConfigs(List<ClientAppConfigDTO> clientAppConfigs) { this.clientAppConfigs = clientAppConfigs; }
+    public void updateClientAppConfigs(List<ClientAppConfigDTO> clientAppConfigs)
+            throws DTCInvalidDataException {
+        this.updateAttribute("clientAppConfigs", clientAppConfigs);
+    }
     
     /**
      * Returns the list of system probes that are to be used to monitor
@@ -191,17 +187,16 @@ public class TestSpec implements Serializable
      * 
      * @return the system probes used to monitor the system during testing
      */
-    @ManyToMany
-    @OrderBy("name")
-    @JoinTable(name = "testSpecSystemProbes",
-               joinColumns = @JoinColumn(name = "testSpecId"),
-               inverseJoinColumns = @JoinColumn(name = "systemProbeId"))
-    public List<SystemProbe> getSystemProbes() { return systemProbes; }
-    public void setSystemProbes(List<SystemProbe> systemProbes) { this.systemProbes = systemProbes; }
+    public List<SystemProbeDTO> getSystemProbes() { return systemProbes; }
+    protected void setSystemProbes(List<SystemProbeDTO> systemProbes) { this.systemProbes = systemProbes; }
+    public void updateSystemProbes(List<SystemProbeDTO> systemProbes)
+            throws DTCInvalidDataException {
+        this.updateAttribute("systemProbes", systemProbes);
+    }
     
     /**
      * <p>
-     * Returns a list of {@link HardwareResourceFamily} objects representing
+     * Returns a list of {@link HardwareResourceFamilyDTO} objects representing
      * the class of hardware resources that the server application should
      * be run on.  Before running a test, one resource of each family type
      * must be locked.
@@ -215,17 +210,16 @@ public class TestSpec implements Serializable
      * </p>
      * @return list of server resources
      */
-    @ManyToMany
-    @OrderBy("name")
-    @JoinTable(name = "testSpecServerResources",
-               joinColumns = @JoinColumn(name = "testSpecId"),
-               inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
-    public List<HardwareResourceFamily> getServerResources() { return serverResources; }
-    public void setServerResources(List<HardwareResourceFamily> serverResources) { this.serverResources = serverResources; }
+    public List<HardwareResourceFamilyDTO> getServerResources() { return serverResources; }
+    protected void setServerResources(List<HardwareResourceFamilyDTO> serverResources) { this.serverResources = serverResources; }
+    public void updateServerResources(List<HardwareResourceFamilyDTO> serverResources)
+            throws DTCInvalidDataException {
+        this.updateAttribute("serverResources", serverResources);
+    }
     
     /**
      * <p>
-     * Returns a list of {@link HardwareResourceFamily} objects representing
+     * Returns a list of {@link HardwareResourceFamilyDTO} objects representing
      * the class of hardware resources that the client application simulators
      * should be run on.  Before running a test, one resource of each
      * family type must be locked.
@@ -238,11 +232,13 @@ public class TestSpec implements Serializable
      * 
      * @return list of client resources
      */
-    @ManyToMany
-    @OrderBy("name")
-    @JoinTable(name = "testSpecClientResources",
-               joinColumns = @JoinColumn(name = "testSpecId"),
-               inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
-    public List<HardwareResourceFamily> getClientResources() { return clientResources; }
-    public void setClientResources(List<HardwareResourceFamily> clientResources) { this.clientResources = clientResources; }
+    public List<HardwareResourceFamilyDTO> getClientResources() { return clientResources; }
+    protected void setClientResources(List<HardwareResourceFamilyDTO> clientResources) { this.clientResources = clientResources; }
+    public void updateClientResources(List<HardwareResourceFamilyDTO> clientResources)
+            throws DTCInvalidDataException {
+        this.updateAttribute("clientResources", clientResources);
+    }
+
+    /** @inheritDoc */
+    public void validate() throws DTCInvalidDataException {}
 }

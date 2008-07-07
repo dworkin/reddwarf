@@ -17,14 +17,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.domain;
+package com.projectdarkstar.tools.dtc.service;
 
 /**
- * Enumeration type representing each of the possible results
- * of a specific test.
+ * Thrown whenever data validation occurs for a DTC service
  */
-public enum TestExecutionResultValue
+public class DTCInvalidDataException extends DTCServiceException
 {
-    PASS,
-    FAIL
+    public DTCInvalidDataException(String message) {
+        super(message);
+    }
+    
+    public DTCInvalidDataException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
 }

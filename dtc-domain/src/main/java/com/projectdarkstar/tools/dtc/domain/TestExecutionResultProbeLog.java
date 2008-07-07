@@ -20,7 +20,6 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
-import java.util.SortedSet;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -59,7 +58,7 @@ public class TestExecutionResultProbeLog implements Serializable
     private PkgLibrary originalSystemProbeRequiredPkg;
     private SystemProbe originalSystemProbe;
     
-    private SortedSet<Property> properties;
+    private List<Property> properties;
     private TestExecutionResult parentResult;
     
     private List<TestExecutionResultProbeData> data;
@@ -136,7 +135,7 @@ public class TestExecutionResultProbeLog implements Serializable
     @ManyToOne
     @JoinColumn(name = "originalSystemProbe", nullable = false)
     public SystemProbe getOriginalSystemProbe() { return originalSystemProbe; }
-    public void setOriginalSystemProbe(SystemProbe originalSystemProbe) { this.originalSystemProbe = originalSystemProbe; }
+    private void setOriginalSystemProbe(SystemProbe originalSystemProbe) { this.originalSystemProbe = originalSystemProbe; }
     
     
     
@@ -146,8 +145,8 @@ public class TestExecutionResultProbeLog implements Serializable
     @JoinTable(name = "testExecutionResultProbeLogProperties",
                joinColumns = @JoinColumn(name = "testExecutionResultProbeLogId"),
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
-    public SortedSet<Property> getProperties() { return properties; }
-    public void setProperties(SortedSet<Property> properties) { this.properties = properties; }
+    public List<Property> getProperties() { return properties; }
+    public void setProperties(List<Property> properties) { this.properties = properties; }
     
     @ManyToOne
     @JoinColumn(name = "parentResult", nullable = false)

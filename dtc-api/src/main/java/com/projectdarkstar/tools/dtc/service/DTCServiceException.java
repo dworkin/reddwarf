@@ -17,14 +17,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.domain;
+package com.projectdarkstar.tools.dtc.service;
 
 /**
- * Enumeration type representing each of the possible results
- * of a specific test.
+ * A generic exception type that should be thrown whenever there is a
+ * business logic error or data validation error related to processing
+ * data sent to a DTC service
  */
-public enum TestExecutionResultValue
+public class DTCServiceException extends Exception
 {
-    PASS,
-    FAIL
+    public DTCServiceException() {
+        super();
+    }
+    
+    public DTCServiceException(String message) {
+        super(message);
+    }
+    
+    public DTCServiceException(String message, Throwable cause) {
+        super(message, cause);
+    }
+    
+    public DTCServiceException(Throwable cause) {
+        super(cause);
+    }
+
 }
