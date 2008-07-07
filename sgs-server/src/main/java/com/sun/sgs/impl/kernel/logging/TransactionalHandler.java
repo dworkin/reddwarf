@@ -23,8 +23,6 @@ import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
-import java.io.IOException;
-
 import java.util.ArrayDeque;
 import java.util.Queue;
 
@@ -50,9 +48,6 @@ import java.util.logging.LogRecord;
  */
 public class TransactionalHandler extends Handler
     implements NonDurableTransactionParticipant {
-
-    public static final String NAME = 
-	TransactionalHandler.class.getName();
 
     /**
      * A mapping from transaction to the list of records waiting to be
@@ -81,10 +76,16 @@ public class TransactionalHandler extends Handler
      * @param proxy the proxy used to join transactions
      * @param backingHandler the handler used to perform the actual
      *        logging at commit time
+     *
+     * @throws NullPointerException if the {@code backingHandler} or
+     *         {@code proxy} is {@code null}.
      */
     TransactionalHandler(TransactionProxy proxy, Handler backingHandler) {
+	if (proxy == null || backingHandler == null)
+	    throw new NullPointerException();
+
 	this.proxy = proxy;
-	this.handler = backingHandler;
+	this.handler = backingHandler;	
 	bufferedRecords = new ConcurrentHashMap<Transaction,Queue<LogRecord>>();
     }
 
@@ -173,10 +174,20 @@ public class TransactionalHandler extends Handler
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the class name of the {@code Handler} that this
+     * instance wraps.
+     *
+     * @return the class name of the wrapped {@code Handler}
      */
+    // NOTE: This name is may not be unique for all the participants.
+    // By using the backing handler's name, we increase the chance of
+    // it being unique, but it is feasible that some application could
+    // have two Handlers of the same type for the same Logger.  As of
+    // 07/06/08, no code relies on these names being unique, so this
+    // is not a problem.  However if in the future they are required
+    // then a new naming scheme should be devised. -dj202934
     public String getTypeName() {
-	return NAME;
+	return handler.getClass().getName();
     }
 
     /**
@@ -217,17 +228,27 @@ public class TransactionalHandler extends Handler
      */
     public void publish(LogRecord record) {
 	Transaction txn = proxy.getCurrentTransaction();
-	Queue<LogRecord> records = bufferedRecords.get(txn);
-	if (records == null) {
-	    txn.join(this);
-	    records = new ArrayDeque<LogRecord>();
-	    // this code path is guaranteed to be unique by way of the
-	    // transaction's uniqueness, so we don't need to worry
-	    // about a race condition with putting the queue into the
-	    // map
-	    bufferedRecords.put(txn, records);
+	if (txn == null) {
+	    // in the event that a TransactionalHandler is used
+	    // outside the scope of a transaction (which could happen
+	    // if it is used by certain classes like DataStoreImpl),
+	    // then we just pass the log record on through without
+	    // buffering
+	    handler.publish(record);
 	}
-	records.add(record);
+	else {
+	    Queue<LogRecord> records = bufferedRecords.get(txn);
+	    if (records == null) {
+		txn.join(this);
+		records = new ArrayDeque<LogRecord>();
+		// this code path is guaranteed to be unique by way of
+		// the transaction's uniqueness, so we don't need to
+		// worry about a race condition with putting the queue
+		// into the map
+		bufferedRecords.put(txn, records);
+	    }
+	    records.add(record);
+	}
     }
 
     /**
