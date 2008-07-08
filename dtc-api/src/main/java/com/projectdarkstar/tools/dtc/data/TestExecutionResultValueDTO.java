@@ -26,5 +26,6 @@ package com.projectdarkstar.tools.dtc.data;
 public enum TestExecutionResultValueDTO
 {
     PASS,
-    FAIL
+    FAIL,
+    NOTRUN
 }

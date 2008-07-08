@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 import java.sql.Date;
 
@@ -49,9 +50,15 @@ public class TestExecutionResultClientData implements Serializable
     
     private TestExecutionResult parentResult;
     
-    public TestExecutionResultClientData(Date timestamp)
+    public TestExecutionResultClientData() {}
+    
+    public TestExecutionResultClientData(Date timestamp,
+                                         TestExecutionResult parentResult)
     {
         this.setTimestamp(timestamp);
+        this.setParentResult(parentResult);
+        
+        this.setValues(new ArrayList<TestExecutionResultClientDataTuple>());
     }
     
     /**

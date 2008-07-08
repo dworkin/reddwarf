@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -49,11 +50,17 @@ public class TestSuite implements Serializable
     private PkgLibrary darkstarPkg;
     private List<TestSpec> testSpecs;
     
+    public TestSuite() {}
+    
     public TestSuite(String name,
-                     String description)
+                     String description,
+                     PkgLibrary darkstarPkg)
     {
         this.setName(name);
         this.setDescription(description);
+        this.setDarkstarPkg(darkstarPkg);
+        
+        this.setTestSpecs(new ArrayList<TestSpec>());
     }
     
     /**

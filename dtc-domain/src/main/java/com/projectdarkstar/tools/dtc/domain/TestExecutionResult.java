@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -73,8 +74,23 @@ public class TestExecutionResult implements Serializable
     
     private TestExecution parentExecution;
     
-    public TestExecutionResult(TestSpec originalTestSpec)
+    public TestExecutionResult() {}
+    
+    public TestExecutionResult(TestSpec originalTestSpec,
+                               TestExecution parentExecution)
     {
+        this.setResult(TestExecutionResultValue.NOTRUN);
+        this.setResultSummary(new LogFile(""));
+        
+        this.setProperties(new ArrayList<Property>());
+        this.setServerLogs(new ArrayList<TestExecutionResultServerLog>());
+        this.setClientLogs(new ArrayList<TestExecutionResultClientLog>());
+        this.setProbeLogs(new ArrayList<TestExecutionResultProbeLog>());
+        
+        this.setClientData(new ArrayList<TestExecutionResultClientData>());
+        this.setServerResources(new ArrayList<HardwareResource>());
+        this.setClientResources(new ArrayList<HardwareResource>());
+        
         this.setOriginalServerResources(originalTestSpec.getServerResources());
         this.setOriginalClientResources(originalTestSpec.getClientResources());
         this.setOriginalTestSpecName(originalTestSpec.getName());
@@ -83,6 +99,8 @@ public class TestExecutionResult implements Serializable
         this.setOriginalTestSpecTimeLimit(originalTestSpec.getTimeLimit());
         this.setOriginalTestSpecMaxClients(originalTestSpec.getMaxClients());
         this.setOriginalTestSpec(originalTestSpec);
+        
+        this.setParentExecution(parentExecution);
     }
     
     /**

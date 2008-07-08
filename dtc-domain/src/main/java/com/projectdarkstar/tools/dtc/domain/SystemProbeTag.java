@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -43,9 +44,13 @@ public class SystemProbeTag implements Serializable
     
     private List<SystemProbe> probes;
     
+    public SystemProbeTag() {}
+    
     public SystemProbeTag(String tag)
     {
         this.setTag(tag);
+        
+        this.setProbes(new ArrayList<SystemProbe>());
     }
     
     /**

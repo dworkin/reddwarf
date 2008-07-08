@@ -45,13 +45,17 @@ public class TestExecutionResultClientDataTuple implements Serializable
     
     private TestExecutionResultClientData clientData;
     
-    public TestExecutionResultClientDataTuple(ClientAppConfig client,
-                                              String originalClientName,
-                                              Long numClients)
+    public TestExecutionResultClientDataTuple() {}
+    
+    public TestExecutionResultClientDataTuple(String originalClientName,
+                                              Long numClients,
+                                              ClientAppConfig client,
+                                              TestExecutionResultClientData clientData)
     {
-        this.setClient(client);
         this.setOriginalClientName(originalClientName);
         this.setNumClients(numClients);
+        this.setClient(client);
+        this.setClientData(clientData);
     }
     
     /**

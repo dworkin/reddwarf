@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -55,17 +56,24 @@ public class SystemProbe implements Serializable
     private List<Property> properties;
     private PkgLibrary requiredPkg;
     
+    public SystemProbe() {}
+    
     public SystemProbe(String name,
                        String className,
                        String classPath,
                        String metric,
-                       String units)
+                       String units,
+                       PkgLibrary requiredPkg)
     {
         this.setName(name);
         this.setClassName(className);
         this.setClassPath(classPath);
         this.setMetric(metric);
         this.setUnits(units);
+        this.setRequiredPkg(requiredPkg);
+        
+        this.setTags(new ArrayList<SystemProbeTag>());
+        this.setProperties(new ArrayList<Property>());
     }
     
     /**

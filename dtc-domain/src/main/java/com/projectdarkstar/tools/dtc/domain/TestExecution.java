@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 import java.sql.Date;
 
@@ -65,6 +66,7 @@ public class TestExecution implements Serializable
     private String originalTestSuiteDescription;
     private TestSuite originalTestSuite;
 
+    public TestExecution() {}
     
     public TestExecution(String name,
                          Date dateStarted,
@@ -72,11 +74,15 @@ public class TestExecution implements Serializable
     {
         this.setName(name);
         this.setDateStarted(dateStarted);
+        this.setDateFinished(null);
         
         this.setOriginalTestSuiteDarkstarPkg(originalTestSuite.getDarkstarPkg());
         this.setOriginalTestSuiteName(originalTestSuite.getName());
         this.setOriginalTestSuiteDescription(originalTestSuite.getDescription());
         this.setOriginalTestSuite(originalTestSuite);
+        
+        this.setTags(new ArrayList<TestExecutionTag>());
+        this.setResults(new ArrayList<TestExecutionResult>());
     }
     
     /**

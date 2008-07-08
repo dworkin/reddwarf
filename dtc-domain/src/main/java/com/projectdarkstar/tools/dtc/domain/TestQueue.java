@@ -53,13 +53,17 @@ public class TestQueue implements Serializable
     private TestExecution execution;
     private TestExecutionResult currentlyRunning;
     
+    public TestQueue() {}
+    
     public TestQueue(Date dateQueued,
                      TestExecution execution)
     {
-        this.dateQueued = dateQueued;
-        this.execution = execution;
+        this.setDateQueued(dateQueued);
+        this.setDateStarted(null);
+        this.setStatus(TestQueueStatus.WAITING);
         
-        this.status = TestQueueStatus.WAITING;
+        this.setExecution(execution);
+        this.setCurrentlyRunning(null);
     }
     
     /**

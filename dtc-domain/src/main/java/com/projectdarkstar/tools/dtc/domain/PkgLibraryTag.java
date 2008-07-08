@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -43,9 +44,13 @@ public class PkgLibraryTag implements Serializable
     
     private List<PkgLibrary> libraries;
     
+    public PkgLibraryTag() {}
+    
     public PkgLibraryTag(String tag)
     {
         this.setTag(tag);
+        
+        this.setLibraries(new ArrayList<PkgLibrary>());
     }
     
     /**

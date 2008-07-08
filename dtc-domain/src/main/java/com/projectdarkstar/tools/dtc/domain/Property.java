@@ -41,6 +41,7 @@ public class Property implements Serializable
     private String property;
     private String value;
     
+    public Property() {}
 
     public Property(String description,
                     String property,

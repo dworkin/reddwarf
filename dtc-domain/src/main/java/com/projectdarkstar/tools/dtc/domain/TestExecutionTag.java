@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -46,6 +47,7 @@ public class TestExecutionTag implements Serializable
     public TestExecutionTag(String tag)
     {
         this.setTag(tag);
+        this.setExecutions(new ArrayList<TestExecution>());
     }
     
     /**
