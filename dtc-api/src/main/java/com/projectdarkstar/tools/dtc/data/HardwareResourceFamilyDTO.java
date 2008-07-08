@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a family of resources.  Each resource in the family should
@@ -38,17 +39,24 @@ public class HardwareResourceFamilyDTO extends AbstractDTO
     
     private List<HardwareResourceDTO> members;
     
-    public HardwareResourceFamilyDTO(String name,
-                                  String description,
-                                  String system,
-                                  String os,
-                                  String memory)
+    public HardwareResourceFamilyDTO(Long id,
+                                     Long versionNumber,
+                                     String name,
+                                     String description,
+                                     String system,
+                                     String os,
+                                     String memory)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setDescription(description);
         this.setSystem(system);
         this.setOs(os);
         this.setMemory(memory);
+        
+        this.setMembers(new ArrayList<HardwareResourceDTO>());
     }
     
     /**
@@ -67,6 +75,7 @@ public class HardwareResourceFamilyDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

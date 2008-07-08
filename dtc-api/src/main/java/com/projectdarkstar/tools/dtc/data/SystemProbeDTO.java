@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a system probe application used to monitor and collect
@@ -41,17 +42,26 @@ public class SystemProbeDTO extends AbstractDTO
     private List<PropertyDTO> properties;
     private PkgLibraryDTO requiredPkg;
     
-    public SystemProbeDTO(String name,
+    public SystemProbeDTO(Long id,
+                          Long versionNumber,
+                          String name,
                           String className,
                           String classPath,
                           String metric,
                           String units)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setClassName(className);
         this.setClassPath(classPath);
         this.setMetric(metric);
         this.setUnits(units);
+        
+        this.setTags(new ArrayList<SystemProbeTagDTO>());
+        this.setProperties(new ArrayList<PropertyDTO>());
+        this.setRequiredPkg(null);
     }
     
     /**
@@ -70,6 +80,7 @@ public class SystemProbeDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

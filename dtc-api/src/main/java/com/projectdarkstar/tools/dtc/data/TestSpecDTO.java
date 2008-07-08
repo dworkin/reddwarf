@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a complete test specification that pulls together all of the
@@ -45,17 +46,30 @@ public class TestSpecDTO extends AbstractDTO
     private List<HardwareResourceFamilyDTO> serverResources;
     private List<HardwareResourceFamilyDTO> clientResources;
     
-    public TestSpecDTO(String name,
+    public TestSpecDTO(Long id,
+                       Long versionNumber,
+                       String name,
                        String description,
                        String testRunner,
                        Long timeLimit,
                        Long maxClients)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setDescription(description);
         this.setTestRunner(testRunner);
         this.setTimeLimit(timeLimit);
         this.setMaxClients(maxClients);
+        
+        this.setProperties(new ArrayList<PropertyDTO>());
+        this.setServerAppConfig(null);
+        this.setClientAppConfigs(new ArrayList<ClientAppConfigDTO>());
+        this.setSystemProbes(new ArrayList<SystemProbeDTO>());
+        
+        this.setServerResources(new ArrayList<HardwareResourceFamilyDTO>());
+        this.setClientResources(new ArrayList<HardwareResourceFamilyDTO>());
     }
     
     /**
@@ -74,6 +88,7 @@ public class TestSpecDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

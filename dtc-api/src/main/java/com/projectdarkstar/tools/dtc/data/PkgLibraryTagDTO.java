@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a tag entity used to categorize {@link PkgLibraryDTO}
@@ -33,9 +34,14 @@ public class PkgLibraryTagDTO extends AbstractDTO
     
     private List<PkgLibraryDTO> libraries;
     
-    public PkgLibraryTagDTO(String tag)
+    public PkgLibraryTagDTO(Long id,
+                            String tag)
     {
+        this.setId(id);
+        
         this.setTag(tag);
+        
+        this.setLibraries(new ArrayList<PkgLibraryDTO>());
     }
     
     /**

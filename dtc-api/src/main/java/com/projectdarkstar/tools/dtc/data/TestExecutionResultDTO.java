@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents the results for a specific instance of a {@link TestSpecDTO}.
@@ -56,7 +57,42 @@ public class TestExecutionResultDTO extends AbstractDTO
     
     private TestExecutionDTO parentExecution;
     
-    public TestExecutionResultDTO() {}
+    public TestExecutionResultDTO(Long id,
+                                  Long versionNumber,
+                                  TestExecutionResultValueDTO result,
+                                  String originalTestSpecName,
+                                  String originalTestSpecDescription,
+                                  String originalTestSpecTestRunner,
+                                  Long originalTestSpecTimeLimit,
+                                  Long originalTestSpecMaxClients)
+    {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
+        this.setResult(result);
+        this.setResultSummary(null);
+        
+        this.setProperties(new ArrayList<PropertyDTO>());
+        this.setServerLogs(new ArrayList<TestExecutionResultServerLogDTO>());
+        this.setClientLogs(new ArrayList<TestExecutionResultClientLogDTO>());
+        this.setProbeLogs(new ArrayList<TestExecutionResultProbeLogDTO>());
+        
+        this.setClientData(new ArrayList<TestExecutionResultClientDataDTO>());
+        
+        this.setServerResources(new ArrayList<HardwareResourceDTO>());
+        this.setClientResources(new ArrayList<HardwareResourceDTO>());
+        
+        this.setOriginalServerResources(new ArrayList<HardwareResourceFamilyDTO>());
+        this.setOriginalClientResources(new ArrayList<HardwareResourceFamilyDTO>());
+        this.setOriginalTestSpecName(originalTestSpecName);
+        this.setOriginalTestSpecDescription(originalTestSpecDescription);
+        this.setOriginalTestSpecTestRunner(originalTestSpecTestRunner);
+        this.setOriginalTestSpecTimeLimit(originalTestSpecTimeLimit);
+        this.setOriginalTestSpecMaxClients(originalTestSpecMaxClients);
+        
+        this.setOriginalTestSpec(null);
+        this.setParentExecution(null);
+    }
     
     /**
      * Returns the id of the entity in persistent storage
@@ -74,6 +110,7 @@ public class TestExecutionResultDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public TestExecutionResultValueDTO getResult() { return result; }
     protected void setResult(TestExecutionResultValueDTO result) { this.result = result; }

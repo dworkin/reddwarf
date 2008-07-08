@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a client application simulator
@@ -36,11 +37,19 @@ public class ClientAppDTO extends AbstractDTO
     private List<ClientAppConfigDTO> configs;
     private PkgLibraryDTO requiredPkg;
     
-    public ClientAppDTO(String name,
+    public ClientAppDTO(Long id,
+                        Long versionNumber, 
+                        String name,
                         String description)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setDescription(description);
+        
+        this.setConfigs(new ArrayList<ClientAppConfigDTO>());
+        this.setRequiredPkg(null);
     }
     
     /**
@@ -59,6 +68,7 @@ public class ClientAppDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

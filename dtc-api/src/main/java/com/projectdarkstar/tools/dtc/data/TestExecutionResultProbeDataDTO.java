@@ -34,11 +34,16 @@ public class TestExecutionResultProbeDataDTO extends AbstractDTO
     
     private TestExecutionResultProbeLogDTO parentProbe;
     
-    public TestExecutionResultProbeDataDTO(Date timestamp,
+    public TestExecutionResultProbeDataDTO(Long id,
+                                           Date timestamp,
                                            Long value)
     {
+        this.setId(id);
+        
         this.setTimestamp(timestamp);
         this.setValue(value);
+        
+        this.setParentProbe(null);
     }
     
     /**

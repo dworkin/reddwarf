@@ -33,10 +33,15 @@ public class PropertyDTO extends AbstractDTO
     private String value;
     
 
-    public PropertyDTO(String description,
+    public PropertyDTO(Long id,
+                       Long versionNumber,
+                       String description,
                        String property,
                        String value)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setDescription(description);
         this.setProperty(property);
         this.setValue(value);
@@ -58,6 +63,7 @@ public class PropertyDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getDescription() { return description; }
     protected void setDescription(String description) { this.description = description; }
