@@ -26,6 +26,10 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.QUOTE_OBJ_VALUE;
 import com.sun.sgs.impl.service.data.store.db.DataEncoding;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
 import com.sun.sgs.impl.service.data.store.db.DbDatabase;
@@ -242,6 +246,7 @@ public class DataStoreImpl
     private ProfileCounter writtenObjectsCounter = null;
     private ProfileSample readBytesSample = null;
     private ProfileSample writtenBytesSample = null;
+
     /**
      * Records information about all active transactions.
      *
@@ -464,6 +469,13 @@ public class DataStoreImpl
 		    lastOidsCursorKey = oidsCursor.findNext()
 			? DataEncoding.decodeLong(oidsCursor.getKey()) : -1;
 		}
+	    }
+	    /* Skip placeholders */
+	    while (lastOidsCursorKey != -1 &&
+		   isPlaceholderValue(oidsCursor.getValue()))
+	    {
+		lastOidsCursorKey = oidsCursor.findNext()
+		    ? DataEncoding.decodeLong(oidsCursor.getKey()) : -1;
 	    }
 	    return lastOidsCursorKey;
 	}
@@ -742,6 +754,15 @@ public class DataStoreImpl
 		objectIdInfo.setObjectIds(
 		    newNextObjectId,
 		    newNextObjectId + allocationBlockSize - 1);
+		/*
+		 * XXX: Experiment with improving JE concurrency by allocating
+		 * the last object in the block, if not already present.
+		 * -tjb@sun.com (07/07/2008)
+		 */
+		oidsDb.put(txnInfo.dbTxn,
+			   DataEncoding.encodeLong(
+			       newNextObjectId + allocationBlockSize - 1),
+			   new byte[] { PLACEHOLDER_OBJ_VALUE });
 	    }
 	    long result = objectIdInfo.next();
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -789,9 +810,10 @@ public class DataStoreImpl
 		       txn, oid, forUpdate);
 	}
 	try {
-	    byte[] result = getObjectInternal(
-		txn, oid, forUpdate,
-		forUpdate ? getObjectForUpdateOp : getObjectOp);
+	    byte[] result = decodeValue(
+		getObjectInternal(
+		    txn, oid, forUpdate,
+		    forUpdate ? getObjectForUpdateOp : getObjectOp));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -815,7 +837,7 @@ public class DataStoreImpl
 	TxnInfo txnInfo = checkTxn(txn, op);
 	byte[] result = oidsDb.get(
 	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
-	if (result == null) {
+	if (result == null || isPlaceholderValue(result)) {
 	    throw new ObjectNotFoundException("Object not found: " + oid);
 	}
 	if (readBytesCounter != null) {
@@ -833,17 +855,8 @@ public class DataStoreImpl
 		       txn, oid);
 	}
 	try {
-	    checkId(oid);
-	    if (data == null) {
-		throw new NullPointerException("The data must not be null");
-	    }
 	    TxnInfo txnInfo = checkTxn(txn, setObjectOp);
-	    oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
-	    if (writtenBytesCounter != null) {
-		writtenBytesCounter.incrementCount(data.length);
-		writtenObjectsCounter.incrementCount();
-		writtenBytesSample.addSample(data.length);
-	    }
+	    setObjectInternal(txnInfo, oid, data);
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -876,18 +889,7 @@ public class DataStoreImpl
 			       "setObjects txn:{0}, oid:{1,number,#}",
 			       txn, oid);
 		}
-		checkId(oid);
-		byte[] data = dataArray[i];
-		if (data == null) {
-		    throw new NullPointerException(
-			"The data must not be null");
-		}
-		oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
-		if (writtenBytesCounter != null) {
-		    writtenBytesCounter.incrementCount(data.length);
-		    writtenObjectsCounter.incrementCount();
-		    writtenBytesSample.addSample(data.length);
-		}
+		setObjectInternal(txnInfo, oid, dataArray[i]);
 	    }
 	    txnInfo.modified = true;
 	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
@@ -895,6 +897,25 @@ public class DataStoreImpl
 	    throw convertException(
 		txn, Level.FINEST, e,
 		"setObjects txn:" + txn + (oidSet ? ", oid:" + oid : ""));
+	}
+    }
+
+    /**
+     * Store the value of a single object, without logging.  Don't check the
+     * transaction here, so we can use this method for setting multiple
+     * objects.
+     */
+    private void setObjectInternal(TxnInfo txnInfo, long oid, byte[] data) {
+	checkId(oid);
+	if (data == null) {
+	    throw new NullPointerException("The data must not be null");
+	}
+	byte[] encodedData = encodeValue(data);
+	oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), encodedData);
+	if (writtenBytesCounter != null) {
+	    writtenBytesCounter.incrementCount(encodedData.length);
+	    writtenObjectsCounter.incrementCount();
+	    writtenBytesSample.addSample(encodedData.length);
 	}
     }
 
@@ -907,11 +928,13 @@ public class DataStoreImpl
 	try {
 	    checkId(oid);
 	    TxnInfo txnInfo = checkTxn(txn, removeObjectOp);
-	    boolean found = oidsDb.delete(
-		txnInfo.dbTxn, DataEncoding.encodeLong(oid));
-	    if (!found) {
+	    byte[] key = DataEncoding.encodeLong(oid);
+	    byte[] value = oidsDb.get(txnInfo.dbTxn, key, true);
+	    if (value == null || isPlaceholderValue(value)) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    }
+	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
+	    assert found : "Object not found during delete";
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -1640,5 +1663,50 @@ public class DataStoreImpl
 	} catch (DigestException e) {
 	    throw new AssertionError(e);
 	}
+    }
+
+    /**
+     * Checks if an object value read from the database is from a placeholder,
+     * meaning there is no object present.
+     */
+    private static boolean isPlaceholderValue(byte[] value) {
+	return value.length > 0 && value[0] == PLACEHOLDER_OBJ_VALUE;
+    }
+
+    /**
+     * Encodes an object value for writing to the database to quote it's first
+     * byte if it would conflict with PLACEHOLDER_OBJ_VALUE or QUOTE_OBJ_VALUE.
+     */
+    private static byte[] encodeValue(byte[] value) {
+	if (value.length > 0) {
+	    if (value[0] == PLACEHOLDER_OBJ_VALUE ||
+		value[0] == QUOTE_OBJ_VALUE)
+	    {
+		byte[] result = new byte[value.length + 1];
+		result[0] = QUOTE_OBJ_VALUE;
+		System.arraycopy(result, 1, value, 0, value.length);
+		return result;
+	    }
+	}
+	return value;
+    }
+
+    /**
+     * Decodes an object value read from the database to account for quoting of
+     * its first byte.  Throws an exception if the value represents a
+     * placeholder.
+     */
+    private static byte[] decodeValue(byte[] value) {
+	if (value.length > 0) {
+	    if (value[0] == PLACEHOLDER_OBJ_VALUE) {
+		throw new IllegalArgumentException(
+		    "Attempt to decode a placeholder as an object value");
+	    } else if (value[0] == QUOTE_OBJ_VALUE) {
+		byte[] result = new byte[value.length - 1];
+		System.arraycopy(result, 0, value, 1, value.length - 1);
+		return result;
+	    }
+	}
+	return value;
     }
 }

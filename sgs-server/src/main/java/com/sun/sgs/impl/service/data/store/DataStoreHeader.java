@@ -75,6 +75,7 @@ import java.math.BigInteger;
  * Version 1.0: Initial version, 11/3/2006
  * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
  * Version 3.0: Add classes DB, compress object values, 5/18/2007
+ * Version 3.1: Add placeholders, 7/8/2008
  */
 final class DataStoreHeader {
 
@@ -103,7 +104,7 @@ final class DataStoreHeader {
     static final short MAJOR_VERSION = 3;
 
     /** The minor version number. */
-    static final short MINOR_VERSION = 0;
+    static final short MINOR_VERSION = 1;
 
     /** The first free object ID. */
     static final long INITIAL_NEXT_OBJ_ID = 1;
@@ -120,6 +121,25 @@ final class DataStoreHeader {
      * hash ones.
      */
     static final byte CLASS_ID_PREFIX = 2;
+
+    /**
+     * The first byte stored in the object value for a placeholder -- a
+     * key/value pair that appears physically but should not be considered to
+     * represent an object that is present.  Placeholders are used to create a
+     * physical object to improve locking for new object allocations when using
+     * BDB Java Edition.
+     */
+    static final byte PLACEHOLDER_OBJ_VALUE = 3;
+
+    /**
+     * The first byte stored in an object value in order to ignore the meaning
+     * of the first byte, in particular if it is {@link PLACEHOLDER_OBJ_VALUE}
+     * or this value.  When this is the first byte of object data, the actual
+     * data consists of the second and following bytes.  Because object data is
+     * always serialized data, which uses a specialized encoding that starts
+     * with either 1 or 2, this value should not be used in practice.
+     */
+    static final byte QUOTE_OBJ_VALUE = 4;
 
     /** This class cannot be instantiated. */
     private DataStoreHeader() {
