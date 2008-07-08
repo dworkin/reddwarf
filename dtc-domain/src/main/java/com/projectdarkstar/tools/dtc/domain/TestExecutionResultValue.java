@@ -26,5 +26,6 @@ package com.projectdarkstar.tools.dtc.domain;
 public enum TestExecutionResultValue
 {
     PASS,
-    FAIL
+    FAIL,
+    NOTRUN
 }

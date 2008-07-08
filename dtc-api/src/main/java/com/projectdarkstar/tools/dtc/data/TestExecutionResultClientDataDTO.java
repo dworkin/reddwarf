@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 import java.sql.Date;
 
 /**
@@ -35,9 +36,15 @@ public class TestExecutionResultClientDataDTO extends AbstractDTO
     
     private TestExecutionResultDTO parentResult;
     
-    public TestExecutionResultClientDataDTO(Date timestamp)
+    public TestExecutionResultClientDataDTO(Long id,
+                                            Date timestamp)
     {
+        this.setId(id);
+        
         this.setTimestamp(timestamp);
+        
+        this.setValues(new ArrayList<TestExecutionResultClientDataTupleDTO>());
+        this.setParentResult(null);
     }
     
     /**

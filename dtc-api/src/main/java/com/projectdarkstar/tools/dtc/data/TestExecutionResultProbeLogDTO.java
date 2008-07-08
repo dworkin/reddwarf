@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Captures complete runtime configuration, hardware resource executed on,
@@ -48,9 +49,30 @@ public class TestExecutionResultProbeLogDTO extends AbstractDTO
     
     private List<TestExecutionResultProbeDataDTO> data;
     
-    public TestExecutionResultProbeLogDTO()
+    public TestExecutionResultProbeLogDTO(Long id,
+                                          Long versionNumber,
+                                          String originalSystemProbeName,
+                                          String originalSystemProbeClassName,
+                                          String originalSystemProbeClassPath,
+                                          String originalSystemProbeMetric,
+                                          String originalSystemProbeUnits)
     {
-
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
+        this.setOriginalSystemProbeName(originalSystemProbeName);
+        this.setOriginalSystemProbeClassName(originalSystemProbeClassName);
+        this.setOriginalSystemProbeClassPath(originalSystemProbeClassPath);
+        this.setOriginalSystemProbeMetric(originalSystemProbeMetric);
+        this.setOriginalSystemProbeUnits(originalSystemProbeUnits);
+        
+        this.setOriginalSystemProbeRequiredPkg(null);
+        this.setOriginalSystemProbe(null);
+        
+        this.setProperties(new ArrayList<PropertyDTO>());
+        this.setParentResult(null);
+        
+        this.setData(new ArrayList<TestExecutionResultProbeDataDTO>());
     }
     
     /**
@@ -69,6 +91,7 @@ public class TestExecutionResultProbeLogDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public HardwareResourceDTO getResource() { return resource; }
     protected void setResource(HardwareResourceDTO resource) { this.resource = resource; }

@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -49,11 +50,17 @@ public class ClientApp implements Serializable
     private List<ClientAppConfig> configs;
     private PkgLibrary requiredPkg;
     
+    public ClientApp() {}
+    
     public ClientApp(String name,
-                     String description)
+                     String description,
+                     PkgLibrary requiredPkg)
     {
         this.setName(name);
         this.setDescription(description);
+        this.setRequiredPkg(requiredPkg);
+        
+        this.setConfigs(new ArrayList<ClientAppConfig>());
     }
     
     /**

@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Captures complete runtime configuration and result log file for the
@@ -29,7 +30,7 @@ import java.util.List;
  */
 public class TestExecutionResultServerLogDTO extends AbstractDTO
 {
-     private Long id;
+    private Long id;
     private Long versionNumber;
     
     private HardwareResourceDTO resource;
@@ -48,9 +49,30 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
     private List<PropertyDTO> properties;
     private TestExecutionResultDTO parentResult;
     
-    public TestExecutionResultServerLogDTO()
+    public TestExecutionResultServerLogDTO(Long id,
+                                           Long versionNumber,
+                                           String originalServerAppName,
+                                           String originalServerAppDescription,
+                                           String originalServerAppClassName,
+                                           String originalServerAppClassPath,
+                                           String originalServerAppConfigName,
+                                           String originalServerAppConfigAdditionalCommandLine)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
         
+        this.setOriginalServerAppName(originalServerAppName);
+        this.setOriginalServerAppDescription(originalServerAppDescription);
+        this.setOriginalServerAppClassName(originalServerAppClassName);
+        this.setOriginalServerAppClassPath(originalServerAppClassPath);
+        this.setOriginalServerAppRequiredPkg(null);
+        
+        this.setOriginalServerAppConfigName(originalServerAppConfigName);
+        this.setOriginalServerAppConfigAdditionalCommandLine(originalServerAppConfigAdditionalCommandLine);
+        this.setOriginalServerAppConfig(null);
+        
+        this.setProperties(new ArrayList<PropertyDTO>());
+        this.setParentResult(null);
     }
     
     /**
@@ -69,6 +91,7 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public HardwareResourceDTO getResource() { return resource; }
     protected void setResource(HardwareResourceDTO resource) { this.resource = resource; }

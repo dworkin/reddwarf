@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -59,17 +60,29 @@ public class TestSpec implements Serializable
     private List<HardwareResourceFamily> serverResources;
     private List<HardwareResourceFamily> clientResources;
     
+    public TestSpec() {}
+    
     public TestSpec(String name,
                     String description,
                     String testRunner,
                     Long timeLimit,
-                    Long maxClients)
+                    Long maxClients,
+                    ServerAppConfig serverAppConfig)
     {
         this.setName(name);
         this.setDescription(description);
         this.setTestRunner(testRunner);
         this.setTimeLimit(timeLimit);
         this.setMaxClients(maxClients);
+        
+        this.setProperties(new ArrayList<Property>());
+        
+        this.setServerAppConfig(serverAppConfig);
+        this.setClientAppConfigs(new ArrayList<ClientAppConfig>());
+        this.setSystemProbes(new ArrayList<SystemProbe>());
+        
+        this.setServerResources(new ArrayList<HardwareResourceFamily>());
+        this.setClientResources(new ArrayList<HardwareResourceFamily>());
     }
     
     /**

@@ -39,13 +39,19 @@ public class TestQueueDTO extends AbstractDTO
     private TestExecutionDTO execution;
     private TestExecutionResultDTO currentlyRunning;
     
-    public TestQueueDTO(Date dateQueued,
-                        TestExecutionDTO execution)
+    public TestQueueDTO(Long id,
+                        Date dateQueued,
+                        Date dateStarted,
+                        TestQueueStatusDTO status)
     {
-        this.dateQueued = dateQueued;
-        this.execution = execution;
+        this.setId(id);
         
-        this.status = TestQueueStatusDTO.WAITING;
+        this.setDateQueued(dateQueued);
+        this.setDateStarted(dateStarted);
+        this.setStatus(status);
+        
+        this.setExecution(null);
+        this.setCurrentlyRunning(null);
     }
     
     /**

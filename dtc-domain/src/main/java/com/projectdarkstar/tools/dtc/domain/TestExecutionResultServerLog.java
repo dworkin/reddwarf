@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -62,8 +63,15 @@ public class TestExecutionResultServerLog implements Serializable
     private List<Property> properties;
     private TestExecutionResult parentResult;
     
-    public TestExecutionResultServerLog(ServerAppConfig originalServerAppConfig)
+    public TestExecutionResultServerLog() {}
+    
+    public TestExecutionResultServerLog(HardwareResource resource,
+                                        ServerAppConfig originalServerAppConfig,
+                                        TestExecutionResult parentResult)
     {
+        this.setResource(resource);
+        this.setLogFile(new LogFile(""));
+        
         this.setOriginalServerAppName(originalServerAppConfig.getServerApp().getName());
         this.setOriginalServerAppDescription(originalServerAppConfig.getServerApp().getDescription());
         this.setOriginalServerAppClassName(originalServerAppConfig.getServerApp().getClassName());
@@ -73,6 +81,9 @@ public class TestExecutionResultServerLog implements Serializable
         this.setOriginalServerAppConfigName(originalServerAppConfig.getName());
         this.setOriginalServerAppConfigAdditionalCommandLine(originalServerAppConfig.getAdditionalCommandLine());
         this.setOriginalServerAppConfig(originalServerAppConfig);
+        
+        this.setParentResult(parentResult);
+        this.setProperties(new ArrayList<Property>());
     }
     
     /**

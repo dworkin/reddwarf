@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a tag entity used to categorize {@link TestExecutionDTO}
@@ -33,9 +34,14 @@ public class TestExecutionTagDTO extends AbstractDTO
     
     private List<TestExecutionDTO> executions;
     
-    public TestExecutionTagDTO(String tag)
+    public TestExecutionTagDTO(Long id,
+                               String tag)
     {
+        this.setId(id);
+        
         this.setTag(tag);
+        
+        this.setExecutions(new ArrayList<TestExecutionDTO>());
     }
     
     /**

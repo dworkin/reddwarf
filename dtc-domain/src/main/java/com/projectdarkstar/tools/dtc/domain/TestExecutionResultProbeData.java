@@ -46,11 +46,16 @@ public class TestExecutionResultProbeData implements Serializable
     
     private TestExecutionResultProbeLog parentProbe;
     
+    public TestExecutionResultProbeData() {}
+    
     public TestExecutionResultProbeData(Date timestamp,
-                                        Long value)
+                                        Long value,
+                                        TestExecutionResultProbeLog parentProbe)
     {
         this.setTimestamp(timestamp);
         this.setValue(value);
+        
+        this.setParentProbe(parentProbe);
     }
     
     /**

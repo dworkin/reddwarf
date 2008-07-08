@@ -30,8 +30,13 @@ public class LogFileDTO extends AbstractDTO
     private Long versionNumber;
     private String log;
     
-    public LogFileDTO(String log)
+    public LogFileDTO(Long id,
+                      Long versionNumber,
+                      String log)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setLog(log);
     }
     
@@ -51,6 +56,7 @@ public class LogFileDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getLog() { return log; }
     protected void setLog(String log) { this.log = log; }

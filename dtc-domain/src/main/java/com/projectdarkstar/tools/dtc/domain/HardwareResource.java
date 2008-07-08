@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.domain;
 
 import java.sql.Date;
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -65,6 +66,8 @@ public class HardwareResource implements Serializable
         this.setLockedBy(lockedBy);
         this.setLockedAt(lockedAt);
         this.setEnabled(enabled);
+        
+        this.setFamilies(new ArrayList<HardwareResourceFamily>());
     }
     
     /**

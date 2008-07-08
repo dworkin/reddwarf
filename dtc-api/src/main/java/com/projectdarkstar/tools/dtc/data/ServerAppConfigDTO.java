@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a runtime configuration for a {@link ServerAppDTO}
@@ -35,11 +36,19 @@ public class ServerAppConfigDTO extends AbstractDTO
     private ServerAppDTO serverApp;
     private List<PropertyDTO> properties;
     
-    public ServerAppConfigDTO(String name,
+    public ServerAppConfigDTO(Long id,
+                              Long versionNumber,
+                              String name,
                               String additionalCommandLine)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setAdditionalCommandLine(additionalCommandLine);
+        
+        this.setServerApp(null);
+        this.setProperties(new ArrayList<PropertyDTO>());
     }
     
     /**
@@ -58,6 +67,7 @@ public class ServerAppConfigDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

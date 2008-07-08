@@ -35,13 +35,17 @@ public class TestExecutionResultClientDataTupleDTO extends AbstractDTO
     
     private TestExecutionResultClientDataDTO clientData;
     
-    public TestExecutionResultClientDataTupleDTO(ClientAppConfigDTO client,
+    public TestExecutionResultClientDataTupleDTO(Long id,
                                                  String originalClientName,
                                                  Long numClients)
     {
-        this.setClient(client);
+        this.setId(id);
+        
         this.setOriginalClientName(originalClientName);
         this.setNumClients(numClients);
+        
+        this.setClient(null);
+        this.setClientData(null);
     }
     
     /**

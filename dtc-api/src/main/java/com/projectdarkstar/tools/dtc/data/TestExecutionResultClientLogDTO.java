@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Captures complete runtime configuration, hardware resource executed on,
@@ -47,10 +48,30 @@ public class TestExecutionResultClientLogDTO extends AbstractDTO
     private List<PropertyDTO> properties;
     private TestExecutionResultDTO parentResult;
     
-    
-    public TestExecutionResultClientLogDTO()
+    public TestExecutionResultClientLogDTO(Long id,
+                                           Long versionNumber,
+                                           String originalClientAppName,
+                                           String originalClientAppDescription,
+                                           String originalClientAppConfigName,
+                                           String originalClientAppConfigPath,
+                                           ClientAppConfigTypeDTO originalClientAppConfigPropertyMethod)
     {
-
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
+        this.setResource(null);
+        this.setLogFile(null);
+        
+        this.setOriginalClientAppName(originalClientAppName);
+        this.setOriginalClientAppDescription(originalClientAppDescription);
+        this.setOriginalClientAppRequiredPkg(null);
+        this.setOriginalClientAppConfigName(originalClientAppConfigName);
+        this.setOriginalClientAppConfigPath(originalClientAppConfigPath);
+        this.setOriginalClientAppConfigPropertyMethod(originalClientAppConfigPropertyMethod);
+        this.setOriginalClientAppConfig(null);
+        
+        this.setProperties(new ArrayList<PropertyDTO>());
+        this.setParentResult(null);
     }
     
     /**
@@ -69,6 +90,7 @@ public class TestExecutionResultClientLogDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public HardwareResourceDTO getResource() { return resource; }
     protected void setResource(HardwareResourceDTO resource) { this.resource = resource; }

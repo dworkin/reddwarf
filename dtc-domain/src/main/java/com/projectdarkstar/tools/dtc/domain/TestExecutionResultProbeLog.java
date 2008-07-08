@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -63,8 +64,15 @@ public class TestExecutionResultProbeLog implements Serializable
     
     private List<TestExecutionResultProbeData> data;
     
-    public TestExecutionResultProbeLog(SystemProbe originalSystemProbe)
+    public TestExecutionResultProbeLog() {}
+    
+    public TestExecutionResultProbeLog(HardwareResource resource,
+                                       SystemProbe originalSystemProbe,
+                                       TestExecutionResult parentResult)
     {
+        this.setResource(resource);
+        this.setLogFile(new LogFile(""));
+        
         this.setOriginalSystemProbeName(originalSystemProbe.getName());
         this.setOriginalSystemProbeClassName(originalSystemProbe.getClassName());
         this.setOriginalSystemProbeClassPath(originalSystemProbe.getClassPath());
@@ -72,6 +80,9 @@ public class TestExecutionResultProbeLog implements Serializable
         this.setOriginalSystemProbeUnits(originalSystemProbe.getUnits());
         this.setOriginalSystemProbeRequiredPkg(originalSystemProbe.getRequiredPkg());
         this.setOriginalSystemProbe(originalSystemProbe);
+        
+        this.setParentResult(parentResult);
+        this.setProperties(new ArrayList<Property>());
     }
     
     /**

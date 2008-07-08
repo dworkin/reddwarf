@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 import java.sql.Date;
 
 /**
@@ -48,17 +49,28 @@ public class TestExecutionDTO extends AbstractDTO
     private TestSuiteDTO originalTestSuite;
 
     
-    public TestExecutionDTO(String name,
+    public TestExecutionDTO(Long id,
+                            Long versionNumber,
+                            String name,
                             Date dateStarted,
-                            TestSuiteDTO originalTestSuite)
+                            Date dateFinished,
+                            String originalTestSuiteName,
+                            String originalTestSuiteDescription)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setDateStarted(dateStarted);
+        this.setDateFinished(dateFinished);
         
-        this.setOriginalTestSuiteDarkstarPkg(originalTestSuite.getDarkstarPkg());
-        this.setOriginalTestSuiteName(originalTestSuite.getName());
-        this.setOriginalTestSuiteDescription(originalTestSuite.getDescription());
-        this.setOriginalTestSuite(originalTestSuite);
+        this.setOriginalTestSuiteDarkstarPkg(null);
+        this.setOriginalTestSuiteName(originalTestSuiteName);
+        this.setOriginalTestSuiteDescription(originalTestSuiteDescription);
+        this.setOriginalTestSuite(null);
+        
+        this.setTags(new ArrayList<TestExecutionTagDTO>());
+        this.setResults(new ArrayList<TestExecutionResultDTO>());
     }
     
     /**
@@ -77,6 +89,7 @@ public class TestExecutionDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

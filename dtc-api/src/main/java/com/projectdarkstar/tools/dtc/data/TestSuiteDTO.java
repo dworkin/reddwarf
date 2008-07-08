@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a collection of tests in the form of @link{TestSpecDTO} objects
@@ -36,11 +37,19 @@ public class TestSuiteDTO extends AbstractDTO
     private PkgLibraryDTO darkstarPkg;
     private List<TestSpecDTO> testSpecs;
     
-    public TestSuiteDTO(String name,
+    public TestSuiteDTO(Long id,
+                        Long versionNumber,
+                        String name,
                         String description)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setDescription(description);
+        
+        this.setDarkstarPkg(null);
+        this.setTestSpecs(new ArrayList<TestSpecDTO>());
     }
     
     /**
@@ -59,6 +68,7 @@ public class TestSuiteDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -49,6 +50,8 @@ public class HardwareResourceFamily implements Serializable
     
     private List<HardwareResource> members;
     
+    public HardwareResourceFamily() {}
+    
     public HardwareResourceFamily(String name,
                                   String description,
                                   String system,
@@ -60,6 +63,8 @@ public class HardwareResourceFamily implements Serializable
         this.setSystem(system);
         this.setOs(os);
         this.setMemory(memory);
+        
+        this.setMembers(new ArrayList<HardwareResource>());
     }
     
     /**

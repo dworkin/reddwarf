@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.sql.Date;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a physical hardware resource that can be used during
@@ -38,17 +39,22 @@ public class HardwareResourceDTO extends AbstractDTO
     
     private List<HardwareResourceFamilyDTO> families;
 
-    public HardwareResourceDTO() {}
-    
-    public HardwareResourceDTO(String hostname,
+    public HardwareResourceDTO(Long id,
+                               Long versionNumber,
+                               String hostname,
                                String lockedBy,
                                Date lockedAt,
                                Boolean enabled)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setHostname(hostname);
         this.setLockedBy(lockedBy);
         this.setLockedAt(lockedAt);
         this.setEnabled(enabled);
+        
+        this.setFamilies(new ArrayList<HardwareResourceFamilyDTO>());
     }
     
     /**
@@ -67,6 +73,7 @@ public class HardwareResourceDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     /**
      * Returns the hostname of the resource

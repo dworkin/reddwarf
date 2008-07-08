@@ -42,6 +42,8 @@ public class LogFile implements Serializable
     private Long versionNumber;
     private String log;
     
+    public LogFile() {}
+    
     public LogFile(String log)
     {
         this.setLog(log);

@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Represents a binary package library which is required for either
@@ -37,11 +38,18 @@ public class PkgLibraryDTO extends AbstractDTO
     
     private List<PkgLibraryTagDTO> tags;
     
-    public PkgLibraryDTO(String name,
-                      byte[] file)
+    public PkgLibraryDTO(Long id,
+                         Long versionNumber,
+                         String name,
+                         byte[] file)
     {
+        this.setId(id);
+        this.setVersionNumber(versionNumber);
+        
         this.setName(name);
         this.setFile(file);
+        
+        this.setTags(new ArrayList<PkgLibraryTagDTO>());
     }
     
     /**
@@ -60,6 +68,7 @@ public class PkgLibraryDTO extends AbstractDTO
      * @return version number of the entity
      */
     public Long getVersionNumber() { return versionNumber; }
+    private void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     public String getName() { return name; }
     protected void setName(String name) { this.name = name; }

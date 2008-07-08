@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.domain;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -49,11 +50,17 @@ public class ServerAppConfig implements Serializable
     private ServerApp serverApp;
     private List<Property> properties;
     
+    public ServerAppConfig() {}
+    
     public ServerAppConfig(String name,
-                           String additionalCommandLine)
+                           String additionalCommandLine,
+                           ServerApp serverApp)
     {
         this.setName(name);
         this.setAdditionalCommandLine(additionalCommandLine);
+        this.setServerApp(serverApp);
+        
+        this.setProperties(new ArrayList<Property>());
     }
     
     /**
