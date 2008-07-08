@@ -131,8 +131,7 @@ final class TransactionSchedulerImpl
      * @param transactionCoordinator the {@code TransactionCoordinator} used
      *                               by the system to manage transactions
      * @param profileCollector the {@code ProfileCollector} used by the
-     *                         system to collect profiling data, or
-     *                         {@code null} if profiling is disabled
+     *                         system to collect profiling data
      *
      * @throws InvocationTargetException if there is a failure initializing
      *                                   the {@code SchedulerQueue}
@@ -149,6 +148,8 @@ final class TransactionSchedulerImpl
             throw new NullPointerException("Properties cannot be null");
         if (transactionCoordinator == null)
             throw new NullPointerException("Coordinator cannot be null");
+        if (profileCollector == null)
+            throw new NullPointerException("Collector cannot be null");
 
         this.transactionCoordinator = transactionCoordinator;
         this.profileCollector = profileCollector;
@@ -416,8 +417,7 @@ final class TransactionSchedulerImpl
      * tasks as they become ready.
      */
     private void notifyThreadJoining() {
-        if (profileCollector != null)
-            profileCollector.notifyThreadAdded();
+        profileCollector.notifyThreadAdded();
         threadCount.incrementAndGet();
     }
 
@@ -426,8 +426,7 @@ final class TransactionSchedulerImpl
      * finishing its work.
      */
     private void notifyThreadLeaving() {
-        if (profileCollector != null)
-            profileCollector.notifyThreadRemoved();
+        profileCollector.notifyThreadRemoved();
         // NOTE: we're not yet trying to adapt the number of threads being
         // used, so we assume that threads are only lost when the system
         // wants to shutdown...in practice, this should look at some
@@ -519,15 +518,13 @@ final class TransactionSchedulerImpl
                     return true;
                 }
 
-                if (profileCollector != null) {
-                    // NOTE: We could report the two queue sizes separately,
-                    // so we should figure out how we want to represent these
-                    int waitSize =
-                        backingQueue.getReadyCount() + dependencyCount.get();
-                    profileCollector.startTask(task.getTask(), task.getOwner(),
-                                               task.getStartTime(), waitSize);
-                    profileCollector.noteTransactional();
-                }
+                // NOTE: We could report the two queue sizes separately,
+                // so we should figure out how we want to represent these
+                int waitSize =
+                    backingQueue.getReadyCount() + dependencyCount.get();
+                profileCollector.startTask(task.getTask(), task.getOwner(),
+                                           task.getStartTime(), waitSize);
+                profileCollector.noteTransactional();
 
                 Transaction transaction = null;
 
@@ -557,16 +554,14 @@ final class TransactionSchedulerImpl
                     handle.commit();
 
                     // the task completed successfully, so we're done
-                    if (profileCollector != null)
-                        profileCollector.finishTask(task.getTryCount());
+                    profileCollector.finishTask(task.getTryCount());
                     task.setDone(null);
                     return true;
                 } catch (InterruptedException ie) {
                     // make sure the transaction was aborted
                     if (! transaction.isAborted())
                         transaction.abort(ie);
-                    if (profileCollector != null)
-                        profileCollector.finishTask(task.getTryCount(), ie);
+                    profileCollector.finishTask(task.getTryCount(), ie);
                     // if the task didn't finish because of the interruption
                     // then we want to re-queue it to run in a usable thread
                     if (! task.isDone()) {
@@ -588,8 +583,7 @@ final class TransactionSchedulerImpl
                     // make sure the transaction was aborted
                     if (! transaction.isAborted())
                         transaction.abort(t);
-                    if (profileCollector != null)
-                        profileCollector.finishTask(task.getTryCount(), t);
+                    profileCollector.finishTask(task.getTryCount(), t);
                     // some error occurred, so see if we should re-try
                     if (! shouldRetry(task, t)) {
                         // the task is not being re-tried

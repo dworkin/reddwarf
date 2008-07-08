@@ -36,11 +36,12 @@ import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -1362,35 +1363,38 @@ public class DataStoreImpl
     /* -- Implements ProfileProducer -- */
 
     /** {@inheritDoc} */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+    public void setProfileRegistrar(ProfileCollector profileCollector) {
         ProfileConsumer consumer =
-            profileRegistrar.registerProfileProducer(this);
+            profileCollector.registerProfileProducer(this.getClass().getName());
 
-	createObjectOp = consumer.registerOperation("createObject");
-	markForUpdateOp = consumer.registerOperation("markForUpdate");
-	getObjectOp = consumer.registerOperation("getObject");
+        ProfileLevel level = ProfileLevel.MAX;
+	createObjectOp = consumer.registerOperation("createObject", level);
+	markForUpdateOp = consumer.registerOperation("markForUpdate", level);
+	getObjectOp = consumer.registerOperation("getObject", level);
 	getObjectForUpdateOp =
-	    consumer.registerOperation("getObjectForUpdate");
-	setObjectOp = consumer.registerOperation("setObject");
-	setObjectsOp = consumer.registerOperation("setObjects");
-	removeObjectOp = consumer.registerOperation("removeObject");
-	getBindingOp = consumer.registerOperation("getBinding");
-	setBindingOp = consumer.registerOperation("setBinding");
-	removeBindingOp = consumer.registerOperation("removeBinding");
-	nextBoundNameOp = consumer.registerOperation("nextBoundName");
-	getClassIdOp = consumer.registerOperation("getClassId");
-	getClassInfoOp = consumer.registerOperation("getClassInfo");
-	nextObjectIdOp = consumer.registerOperation("nextObjectIdOp");
+	    consumer.registerOperation("getObjectForUpdate", level);
+	setObjectOp = consumer.registerOperation("setObject", level);
+	setObjectsOp = consumer.registerOperation("setObjects", level);
+	removeObjectOp = consumer.registerOperation("removeObject", level);
+	getBindingOp = consumer.registerOperation("getBinding", level);
+	setBindingOp = consumer.registerOperation("setBinding", level);
+	removeBindingOp = consumer.registerOperation("removeBinding", level);
+	nextBoundNameOp = consumer.registerOperation("nextBoundName", level);
+	getClassIdOp = consumer.registerOperation("getClassId", level);
+	getClassInfoOp = consumer.registerOperation("getClassInfo", level);
+	nextObjectIdOp = consumer.registerOperation("nextObjectIdOp", level);
 
-	readBytesCounter = consumer.registerCounter("readBytes", true);
-	readObjectsCounter = consumer.registerCounter("readObjects", true);
-	writtenBytesCounter = consumer.registerCounter("writtenBytes", true);
+	readBytesCounter = consumer.registerCounter("readBytes", true, level);
+	readObjectsCounter = 
+                consumer.registerCounter("readObjects", true, level);
+	writtenBytesCounter = 
+                consumer.registerCounter("writtenBytes", true, level);
 	writtenObjectsCounter =
-	    consumer.registerCounter("writtenObjects", true);
+	    consumer.registerCounter("writtenObjects", true, level);
 	readBytesSample = consumer.registerSampleSource("readBytes", true,
-							Integer.MAX_VALUE);
+					Integer.MAX_VALUE, level);
 	writtenBytesSample = consumer.registerSampleSource("writtenBytes", true,
-							   Integer.MAX_VALUE);
+					Integer.MAX_VALUE, level);
 
     }
 

@@ -166,6 +166,10 @@
 	      <name>java.io.tmpdir</name>
 	      <value>${test.output}</value>
 	    </property>
+	    <property>
+	      <name>com.sun.sgs.txn.timeout</name>
+	      <value>${com.sun.sgs.txn.timeout}</value>
+	    </property>
 	  </systemProperties>
 	  <argLine>
 	    ${test.jvm.args} -Djava.library.path=${run.javapath}

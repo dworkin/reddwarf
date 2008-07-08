@@ -43,10 +43,11 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
@@ -431,15 +432,17 @@ public class TaskServiceImpl
     /**
      * {@inheritDoc}
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+    public void setProfileRegistrar(ProfileCollector profileCollector) {
         ProfileConsumer consumer =
-            profileRegistrar.registerProfileProducer(this);
+            profileCollector.registerProfileProducer(this.getClass().getName());
 
+        ProfileLevel level = ProfileLevel.MAX;
         if (consumer != null) {
             scheduleNDTaskOp =
-                consumer.registerOperation("scheduleNonDurableTask");
+                consumer.registerOperation("scheduleNonDurableTask", level);
             scheduleNDTaskDelayedOp =
-                consumer.registerOperation("scheduleNonDurableTaskDelayed");
+                consumer.registerOperation("scheduleNonDurableTaskDelayed", 
+                                           level);
         }
     }
 

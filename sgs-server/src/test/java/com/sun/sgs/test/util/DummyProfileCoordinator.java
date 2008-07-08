@@ -22,12 +22,12 @@ package com.sun.sgs.test.util;
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
-import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
 import com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileProducer;
 
 
@@ -36,9 +36,6 @@ public class DummyProfileCoordinator {
 
     // the production collector
     private final ProfileCollectorImpl collector;
-
-    // the production registrar
-    private final ProfileRegistrarImpl registrar;
 
     // a dummy task that represents all reports
     private static final KernelRunnable task = new DummyKernelRunnable();
@@ -54,8 +51,7 @@ public class DummyProfileCoordinator {
 
     /** Creates an instance of DummyProfileCoordinator */
     private DummyProfileCoordinator() {
-        collector = new ProfileCollectorImpl();
-        registrar = new ProfileRegistrarImpl(collector);
+        collector = new ProfileCollectorImpl(ProfileLevel.MIN);
         OperationLoggingProfileOpListener listener =
             new OperationLoggingProfileOpListener(System.getProperties(),
                                                   owner, null);
@@ -67,7 +63,7 @@ public class DummyProfileCoordinator {
         synchronized (lockObject) {
             if (instance == null)
                 instance = new DummyProfileCoordinator();
-            producer.setProfileRegistrar(instance.registrar);
+            producer.setProfileRegistrar(instance.collector);
         }
     }
 

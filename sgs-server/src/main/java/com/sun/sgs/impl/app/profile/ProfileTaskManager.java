@@ -23,10 +23,11 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /**
@@ -69,22 +70,23 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
      * <code>setProfileRegistrar</code> will be invoked when this method
      * is called.
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+    public void setProfileRegistrar(ProfileCollector profileCollector) {
         ProfileConsumer consumer =
-            profileRegistrar.registerProfileProducer(this);
+            profileCollector.registerProfileProducer(this.getClass().getName());
 
+        ProfileLevel level = ProfileLevel.MAX;
 	if (consumer != null) {
-	    scheduleTaskOp = consumer.registerOperation("scheduleTask");
+	    scheduleTaskOp = consumer.registerOperation("scheduleTask", level);
 	    scheduleTaskDelayedOp =
-		consumer.registerOperation("scheduleDelayedTask");
+		consumer.registerOperation("scheduleDelayedTask", level);
 	    scheduleTaskPeriodicOp =
-		consumer.registerOperation("schedulePeriodicTask");
+		consumer.registerOperation("schedulePeriodicTask", level);
 	}
 
         // call on the backing manager, if it's also profiling
         if (backingManager instanceof ProfileProducer)
             ((ProfileProducer)backingManager).
-                setProfileRegistrar(profileRegistrar);
+                setProfileRegistrar(profileCollector);
     }
 
     /**

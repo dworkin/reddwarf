@@ -23,10 +23,11 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /**
@@ -64,18 +65,19 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
      * <code>setProfileRegistrar</code> will be invoked when this method
      * is called.
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+    public void setProfileRegistrar(ProfileCollector profileCollector) {
         ProfileConsumer consumer =
-            profileRegistrar.registerProfileProducer(this);
+            profileCollector.registerProfileProducer(this.getClass().getName());
 
 	if (consumer != null) {
-	    createReferenceOp = consumer.registerOperation("createReference");
+	    createReferenceOp = consumer.registerOperation("createReference", 
+                                                            ProfileLevel.MAX);
 	}
 
         // call on the backing manager, if it's also profiling
         if (backingManager instanceof ProfileProducer)
             ((ProfileProducer)backingManager).
-                setProfileRegistrar(profileRegistrar);
+                setProfileRegistrar(profileCollector);
     }
 
     /**

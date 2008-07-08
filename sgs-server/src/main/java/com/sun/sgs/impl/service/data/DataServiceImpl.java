@@ -42,8 +42,8 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -817,9 +817,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /**
      * {@inheritDoc}
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+    public void setProfileRegistrar(ProfileCollector profileCollector) {
         if (store instanceof ProfileProducer)
-            ((ProfileProducer) store).setProfileRegistrar(profileRegistrar);
+            ((ProfileProducer) store).setProfileRegistrar(profileCollector);
     }
 
     /* -- Other methods -- */

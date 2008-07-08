@@ -24,8 +24,8 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /**
@@ -62,10 +62,10 @@ public class ProfileChannelManager implements ChannelManager, ProfileProducer {
      * <code>setProfileRegistrar</code> will be invoked when this method
      * is called.
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+    public void setProfileRegistrar(ProfileCollector profileCollector) {
         if (backingManager instanceof ProfileProducer)
             ((ProfileProducer)backingManager).
-                setProfileRegistrar(profileRegistrar);
+                setProfileRegistrar(profileCollector);
     }
 
     /**

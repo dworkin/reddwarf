@@ -35,9 +35,9 @@ public interface ProfileProducer {
      * Tells this <code>ProfileProducer</code> where to register to report
      * its profiling data.
      *
-     * @param profileRegistrar the {@code ProfileRegistrar} to use in
+     * @param profileCollector the {@code ProfileCollector} to use in
      *                        reporting data to the system
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar);
+    public void setProfileRegistrar(ProfileCollector profileCollector);
 
 }

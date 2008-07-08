@@ -29,13 +29,38 @@ import com.sun.sgs.kernel.KernelRunnable;
  * <code>ProfileConsumer</code>s or the scheduler itself) and keep
  * track of which tasks are generating which data.
  * <p>
- * This interface allows instances of <code>ProfileOperationListener</code>
+ * This interface allows instances of <code>ProfileListener</code>
  * to register as listeners for reported data. All reporting to these
  * listeners is done synchronously, such that listeners do not need to worry
  * about being called concurrently. Listeners should be efficient in handling
  * reports, since they may be blocking all other listeners.
  */
 public interface ProfileCollector {
+
+    /**
+     *  The valid choices for
+     * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.
+     */
+    public enum ProfileLevel {
+        /**  No profiling is collected, other than that used internally. */
+        MIN,
+        /** A happy medium. */
+        MEDIUM,
+        /** Enable all profiling. */
+        MAX,
+    }
+    
+    /** 
+     * The current global profiling level.
+     * @return the current profiling level
+     */
+    public ProfileLevel getGlobalProfileLevel();
+    
+    /**
+     * Set the current global profiling level.
+     * @param level the profiling level
+     */
+    public void setGlobalProfileLevel(ProfileLevel level);
 
     /** 
      * Shuts down the ProfileCollector, reclaiming resources as necessary.
@@ -44,7 +69,7 @@ public interface ProfileCollector {
     public void shutdown();
     
     /**
-     * Adds a <code>ProfileOperationListener</code> as a listener for
+     * Adds a <code>ProfileListener</code> as a listener for
      * profiling data reports. The listener is immediately updated on
      * the current set of operations and the number of scheduler
      * threads.
@@ -52,7 +77,27 @@ public interface ProfileCollector {
      * @param listener the <code>ProfileOperationListener</code> to add
      */
     public void addListener(ProfileListener listener);
+    
+    /**
+     * Removes a {@code ProfileListener} and calls
+     * {@link ProfileListener#shutdown} on the listener.  If the
+     * {@code listener} has never been added with {@link #addListener}, no
+     * action is taken.
+     *
+     * @param listener the listener to remove
+     */
+    public void removeListener(ProfileListener listener);
 
+    /**
+     * Registers the given <code>ProfileProducer</code>.
+     *
+     * @param name a unique identifier for the consumer
+     *
+     * @return a <code>ProfileConsumer</code> that will consume profiling
+     *         data from the provided <code>ProfileProducer</code>
+     */
+    public ProfileConsumer registerProfileProducer(String name);
+    
     /**
      * Notifies the collector that a thread has been added to the scheduler.
      */
