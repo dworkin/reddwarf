@@ -32,6 +32,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
@@ -1158,7 +1159,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers(channelName, sevenDwarfs);
-	    sendMessagesToChannel(channelName, group, 5);
+	    sendMessagesToChannel(channelName, group, 3);
 	} finally {
 	    group.disconnect(false);
 	}
@@ -1181,7 +1182,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers("test", sevenDwarfs);
-	    sendMessagesToChannel("test", group, 3);
+	    sendMessagesToChannel("test", group, 2);
 	} finally {
 	    group.disconnect(false);
 	}
@@ -1197,7 +1198,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers(channelName, sevenDwarfs);
-	    sendMessagesToChannel(channelName, group, 5);
+	    sendMessagesToChannel(channelName, group, 3);
 	    printServiceBindings();
 	    // nuke coordinator node
 	    System.err.println("shutting down node 'a'");
@@ -1393,6 +1394,55 @@ public class TestChannelServiceImpl extends TestCase {
 	} finally {
 	    group.disconnect(false);
 	}
+    }
+
+    public void testClientSendToChannelValidatingWrappedClientSession()
+	throws Exception
+    {
+	final String channelName = "foo";
+	final String user = "dummy";
+	final String listenerName = "ValidatingChannelListener";
+	DummyClient client =
+	    (new DummyClient()).connect(port).login(user, "password");
+
+	/*
+	 * Create a channel with a ValidatingChannelListener and join the
+	 * client to the channel.
+	 */
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() {
+		ChannelListener listener =
+		    new ValidatingChannelListener();
+		dataService.setBinding(listenerName, listener);
+		ClientSession session =
+		    (ClientSession) dataService.getBinding(user);
+		Channel channel =
+		    channelService.createChannel(
+			channelName, listener, Delivery.RELIABLE);
+		channel.join(session);
+	    }
+	}, taskOwner);
+
+	/*
+	 * Wait for the client to join, and then send a channel message.
+	 */
+	client.waitForJoin(channelName);
+	client.sendChannelMessage(channelName, 0);
+
+	/*
+	 * Validate that the session passed to the handleChannelMessage
+	 * method was a wrapped ClientSession.
+	 */
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() {
+		ValidatingChannelListener listener = (ValidatingChannelListener)
+		    dataService.getBinding(listenerName);
+		ClientSession session =
+		    (ClientSession) dataService.getBinding(user + ".wrapped");
+		listener.validateSession(session);
+		System.err.println("sessions are equal");
+	    }
+	}, taskOwner);
     }
 
     public void testJoinLeavePerformance() throws Exception {
@@ -1936,6 +1986,46 @@ public class TestChannelServiceImpl extends TestCase {
 	    if (message.getInt() % 2 == 0) {
 		message.flip();
 		channel.send(session, message);
+	    }
+	}
+    }
+
+    private static class ValidatingChannelListener
+	implements ChannelListener, Serializable, ManagedObject
+    {
+	private final static long serialVersionUID = 1L;
+
+	private ManagedReference<ClientSession> sessionRef = null;
+	
+	ValidatingChannelListener() {
+	}
+
+	/** {@inheritDoc} */
+	public void receivedMessage(
+	    Channel channel, ClientSession session, ByteBuffer message)
+	{
+	    System.err.println(
+		"ValidatingChannelListener.receivedMessage: session = " +
+		session);
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(this);
+	    sessionRef = dm.createReference(session);
+	}
+
+	public void validateSession(ClientSession session) {
+	    if (this.sessionRef == null) {
+		throw new ResourceUnavailableException("sessionRef is null");
+	    } else {
+		System.err.println(
+		    "ValidatingChannelListener.validateSession: session = " +
+		    session);
+		ClientSession thisSession = sessionRef.get();
+		if (! (thisSession instanceof ClientSessionWrapper)) {
+		    fail("unwrapped session: " + thisSession);
+		} else if (! thisSession.equals(session)) {
+		    fail("sessions not equal: thisSession: " +
+			 thisSession + ", session: " + session);
+		}
 	    }
 	}
     }
