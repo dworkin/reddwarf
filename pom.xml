@@ -14,6 +14,7 @@
   <modules>
     <module>dtc-domain</module>
     <module>dtc-api</module>
+    <module>dtc-beans</module>
   </modules>
 
   <!-- Require at least Maven version 2.0.8 to build -->
@@ -120,9 +121,15 @@
       </dependency>
       
       <dependency>
-	<groupId>javax.persistence</groupId>
-	<artifactId>persistence-api</artifactId>
-	<version>${persistence-api.version}</version>
+	<groupId>org.apache.geronimo.specs</groupId>
+	<artifactId>geronimo-jpa_3.0_spec</artifactId>
+	<version>${geronimo-jpa_3.0_spec.version}</version>
+	<scope>provided</scope>
+      </dependency>
+      <dependency>
+	<groupId>org.apache.geronimo.specs</groupId>
+	<artifactId>geronimo-ejb_3.0_spec</artifactId>
+	<version>${geronimo-ejb_3.0_spec.version}</version>
 	<scope>provided</scope>
       </dependency>
 
@@ -149,7 +156,8 @@
 
   <properties>
     <junit.version>4.2</junit.version>
-    <persistence-api.version>1.0</persistence-api.version>
+    <geronimo-jpa_3.0_spec.version>1.1.1</geronimo-jpa_3.0_spec.version>
+    <geronimo-ejb_3.0_spec.version>1.0.1</geronimo-ejb_3.0_spec.version>
     <commons-beanutils-core.version>1.7.0</commons-beanutils-core.version>
   </properties>
 
