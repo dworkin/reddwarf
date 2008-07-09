@@ -27,26 +27,77 @@ import java.util.Map;
 /**
  * This interface exposes the operations that allow creating, updating,
  * and deleting the test suite specifications in the database.
+ * 
+ * It is intended to be a remote interface exposing a stateless session
+ * EJB3.0 bean.
  */
 public interface ConfigTestsService 
 {
+    /**
+     * Creates a TestSuite object based on the given testSuite and
+     * persists it to the database backed persistent storage.
+     * 
+     * @param testSuite
+     * @return id of the newly persisted TestSuite
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
     public Long addTestSuite(TestSuiteDTO testSuite)
             throws DTCServiceException;
     
+    /**
+     * Updates a TestSuite object in persistent storage with the given id.
+     * The given Map of updates maps bean attribute names to values that
+     * are to be updated.
+     * 
+     * @param id id of the TestSuite to update
+     * @param updates map of updates to update the TestSuite
+     * @return the new versionNumber attribute of the updated TestSuite
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
     public Long updateTestSuite(Long id,
                                 Map<String, Object> updates)
             throws DTCServiceException;
     
+    /**
+     * Remove the TestSuite with the given id from persistent storage.
+     * 
+     * @param id id of the TestSuite to remove
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
     public void deleteTestSuite(Long id)
             throws DTCServiceException;
     
+    /**
+     * Creates a TestSpec object based on the given testSpec and
+     * persists it to the database backed persistent storage.
+     * 
+     * @param testSpec
+     * @return id of the newly persisted TestSpec
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
     public Long addTestSpec(TestSpecDTO testSpec)
             throws DTCServiceException;
     
+    /**
+     * Updates a TestSpec object in persistent storage with the given id.
+     * The given Map of updates maps bean attribute names to values that are
+     * to be updated.
+     * 
+     * @param id id of the TestSpec to update
+     * @param updates map of updates to update the TestSpec
+     * @return the new versionNumber attribute of the updated TestSpec
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
     public Long updateTestSpec(Long id,
                                Map<String, Object> updates)
             throws DTCServiceException;
     
+    /**
+     * Remove the TestSpec object with the given id from persistent storage.
+     * 
+     * @param id id of the TestSpec object to remove
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
     public void deleteTestSpec(Long id)
             throws DTCServiceException;
 }

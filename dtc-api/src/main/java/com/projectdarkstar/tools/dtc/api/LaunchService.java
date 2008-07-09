@@ -26,8 +26,11 @@ import com.projectdarkstar.tools.dtc.data.PkgLibraryDTO;
  * This interface is the central API used by clients to load test
  * suites into the execution queue to be picked and executed by
  * the test cluster execution daemon.
+ * 
+ * It is intended to be a remote interface exposing a stateless session
+ * EJB3.0 bean.
  */
-public interface RunService
+public interface LaunchService
 {
     /**
      * <p>
@@ -53,10 +56,23 @@ public interface RunService
      * load it into the execution queue as a TestQueue object.
      * </p>
      * 
+     * <p>
+     * The newly created TestExecution will be assigned the given name
+     * as its name attribute.  It will also be associated with a set of
+     * tags represented by the comma/space separated list of given tags.
+     * For each tag in the list, either a new TestExecutionTag entity
+     * will be created, or the corresponding entity from persistent
+     * storage will be used.
+     * </p>
+     * 
      * @param testSuiteId id of the TestSuite to execute
+     * @param name name to assign to the new TestExecution
+     * @param tags comma/space separated list of tags to assign to the new TestExecution
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public void runTestSuite(Long testSuiteId)
+    public void runTestSuite(Long testSuiteId,
+                             String name,
+                             String tags)
             throws DTCServiceException;
     
     /**
@@ -69,11 +85,24 @@ public interface RunService
      * TestQueue will then be created to schedule this suite for execution.
      * </p>
      * 
+     * <p>
+     * The newly created TestExecution will be assigned the given name
+     * as its name attribute.  It will also be associated with a set of
+     * tags represented by the comma/space separated list of given tags.
+     * For each tag in the list, either a new TestExecutionTag entity
+     * will be created, or the corresponding entity from persistent
+     * storage will be used.
+     * </p>
+     * 
      * @param testSuiteId id of the TestSuite to execute
+     * @param name name to assign to the new TestExecution
+     * @param tags comma/space separated list of tags to assign to the new TestExecution
      * @param darkstarPkg package library of the darkstar package to test
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
     public void runTestSuiteAgainstNewDarkstar(Long testSuiteId,
+                                               String name,
+                                               String tags,
                                                PkgLibraryDTO darkstarPkg)
             throws DTCServiceException;
     
@@ -89,6 +118,15 @@ public interface RunService
      * </p>
      * 
      * <p>
+     * The newly created TestExecution will be assigned the given name
+     * as its name attribute.  It will also be associated with a set of
+     * tags represented by the comma/space separated list of given tags.
+     * For each tag in the list, either a new TestExecutionTag entity
+     * will be created, or the corresponding entity from persistent
+     * storage will be used.
+     * </p>
+     * 
+     * <p>
      * Note that the assumption made with this method is that the TestSpec
      * objects of the given TestSuite are <em>all</em> associated with the
      * same server application.  If they are not, the results may be 
@@ -96,10 +134,14 @@ public interface RunService
      * </p>
      * 
      * @param testSuiteId id of the TestSuite to execute
+     * @param name name to assign to the new TestExecution
+     * @param tags comma/space separated list of tags to assign to the new TestExecution
      * @param serverPkg package library of the server application to test
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
     public void runTestSuiteAgainstNewServerApp(Long testSuiteId,
+                                                String name,
+                                                String tags,
                                                 PkgLibraryDTO serverPkg)
             throws DTCServiceException;
 
@@ -114,8 +156,17 @@ public interface RunService
      * </p>
      * 
      * <p>
+     * The newly created TestExecution will be assigned the given name
+     * as its name attribute.  It will also be associated with a set of
+     * tags represented by the comma/space separated list of given tags.
+     * For each tag in the list, either a new TestExecutionTag entity
+     * will be created, or the corresponding entity from persistent
+     * storage will be used.
+     * </p>
+     * 
+     * <p>
      * Note that there is a distinction between using this method and 
-     * simply using the {@link #runTestSuite(Long testSuiteId)} method against
+     * simply using the {@link #runTestSuite} method against
      * the TestSuite id from the given TestExecution.  The difference is that
      * this method guarantees that the execution configuration will be
      * completely duplicated.  This is not the case when running against
@@ -123,9 +174,13 @@ public interface RunService
      * </p>
      * 
      * @param testExecutionId id of the TestExecution to rerun
+     * @param name name to assign to the new TestExecution
+     * @param tags comma/space separated list of tags to assign to the new TestExecution
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public void rerunTestExecution(Long testExecutionId)
+    public void rerunTestExecution(Long testExecutionId,
+                                   String name,
+                                   String tags)
             throws DTCServiceException;
     
     /**
@@ -138,11 +193,24 @@ public interface RunService
      * package and schedule the test to be run by creating a TestQueue object.
      * </p>
      * 
+     * <p>
+     * The newly created TestExecution will be assigned the given name
+     * as its name attribute.  It will also be associated with a set of
+     * tags represented by the comma/space separated list of given tags.
+     * For each tag in the list, either a new TestExecutionTag entity
+     * will be created, or the corresponding entity from persistent
+     * storage will be used.
+     * </p>
+     * 
      * @param testExecutionId id of the TestExecution to rerun
+     * @param name name to assign to the new TestExecution
+     * @param tags comma/space separated list of tags to assign to the new TestExecution
      * @param darkstarPkg package library of the darkstar package to test
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
     public void rerunTestExecutionAgainstNewDarkstar(Long testExecutionId,
+                                                     String name,
+                                                     String tags,
                                                      PkgLibraryDTO darkstarPkg)
             throws DTCServiceException;
     
@@ -157,11 +225,24 @@ public interface RunService
      * by creating a TestQueue object.
      * </p>
      * 
+     * <p>
+     * The newly created TestExecution will be assigned the given name
+     * as its name attribute.  It will also be associated with a set of
+     * tags represented by the comma/space separated list of given tags.
+     * For each tag in the list, either a new TestExecutionTag entity
+     * will be created, or the corresponding entity from persistent
+     * storage will be used.
+     * </p>
+     * 
      * @param testExecutionId id of the TestExecution to rerun
+     * @param name name to assign to the new TestExecution
+     * @param tags comma/space separated list of tags to assign to the new TestExecution
      * @param darkstarPkg library of the server application package to test
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
     public void rerunTestExecutionAgainstNewServerApp(Long testExecutionId,
+                                                      String name,
+                                                      String tags,
                                                       PkgLibraryDTO darkstarPkg)
             throws DTCServiceException;
 }
