@@ -69,11 +69,10 @@ public class TestExecution implements Serializable
     public TestExecution() {}
     
     public TestExecution(String name,
-                         Date dateStarted,
                          TestSuite originalTestSuite)
     {
         this.setName(name);
-        this.setDateStarted(dateStarted);
+        this.setDateStarted(null);
         this.setDateFinished(null);
         
         this.setOriginalTestSuiteDarkstarPkg(originalTestSuite.getDarkstarPkg());
@@ -112,7 +111,7 @@ public class TestExecution implements Serializable
     public void setName(String name) { this.name = name; }
     
     @Temporal(TemporalType.TIMESTAMP)
-    @Column(name = "dateStarted", nullable = false)
+    @Column(name = "dateStarted", nullable = true)
     public Date getDateStarted() { return dateStarted; }
     public void setDateStarted(Date dateStarted) { this.dateStarted = dateStarted; }
     
