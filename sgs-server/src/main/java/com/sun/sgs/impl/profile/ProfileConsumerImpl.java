@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileContention;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileProducer;
@@ -79,6 +80,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
 					       long maxSamples) {
 	return profileCollector.registerSampleSource(name, taskLocal, 
 						     maxSamples);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public ProfileContention registerContentionReporter(Class reporterType) {
+	return profileCollector.registerContentionReporter(reporterType);
     }
 
 }

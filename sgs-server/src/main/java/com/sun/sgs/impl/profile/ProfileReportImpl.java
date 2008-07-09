@@ -21,6 +21,8 @@ package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.contention.ContentionReport;
+
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileOperation;
@@ -70,7 +72,7 @@ class ProfileReportImpl implements ProfileReport {
     long runningTime = 0;
     int tryCount = 0;
     Throwable throwable = null;
-
+    ContentionReport contentionReport = null;
 
     Set<ProfileParticipantDetail> participants;
 
@@ -110,6 +112,7 @@ class ProfileReportImpl implements ProfileReport {
 	taskCounters = null;
 	localSamples = null;
 	aggregateSamples = null;
+	contentionReport = null;
     }
 
     /**
@@ -303,6 +306,17 @@ class ProfileReportImpl implements ProfileReport {
      */
     public Throwable getFailureCause() {
 	return throwable;
+    }
+
+    void setContentionReport(ContentionReport contentionReport) {
+	this.contentionReport = contentionReport;
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public ContentionReport getContentionReport() {
+	return contentionReport;
     }
 
     /**

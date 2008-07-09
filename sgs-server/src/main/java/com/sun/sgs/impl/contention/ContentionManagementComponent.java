@@ -21,8 +21,13 @@ package com.sun.sgs.impl.contention;
 
 import java.math.BigInteger;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -44,185 +49,217 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 
+import com.sun.sgs.contention.ContentionReport;
+import com.sun.sgs.contention.ContentionReport.ConflictType;
+import com.sun.sgs.contention.LockInfo;
+import com.sun.sgs.contention.LockInfo.LockType;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
-
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.profile.ProfileContention;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
-
-
+/**
+ * TODO.
+ *
+ * This class detects contention by maintaining a backlog of recently
+ * committed transactions.  When a running transaction aborts, this
+ * backlog is searched to find the most recent transaction that has
+ * any overlapping source of contention.  This class supports two
+ * configurable properties with respect to this backlog:
+ *
+ * <p><dl style="margin-left: 1em">                                                             
+ *                                                                                              
+ * <dt> <i>Property:</i> <b>                                                                    
+ *      {@code com.sun.sgs.impl.contention.txn.buffer.size}                                               
+ *      </b><br>                                                                                
+ *      <i>Default:</i> 200.                                                     
+ *                                                                                              
+ * <dd style="padding-top: .5em"> This properties specifies the
+ * initial buffer size for transactions to keep in the backlog.  The
+ * actual size of the buffer may increase over time; a high system
+ * throughput requires that a larger number of transaction be stored
+ * at one time.<p></dd></dl>
+ *                                                                                              
+ * <p><dl style="margin-left: 1em">                                                             
+ *                                                                                              
+ * <dt> <i>Property:</i> <b>                                                                    
+ *      {@code com.sun.sgs.impl.contention.max.txn.buffer.size}                                               
+ *      </b><br>                                                                                
+ *      <i>Default:</i> 1000.
+ *                                                                                              
+ * <dd style="padding-top: .5em"> This property specifies the absolute
+ * maximum number of transactions to keep in the backlog.  Setting
+ * this number too high will cause an increased search time for any
+ * spurious aborts for whom a source of contention cannot be found.
+ * Setting the bound too low can cause the contention manager to be
+ * unable to find the conflicting transaction during a high-throughput
+ * processing period.  If this property is set lower than {@code
+ * com.sun.sgs.impl.contention.txn.buffer.size} then the larger value
+ * is used as the maximum.<p></dd></dl>
+ *                                                                                              
+ * @see ProfileReport#getContentionReport()
+ * @see ContentionReport
+ */
 public class ContentionManagementComponent 
     implements NonDurableTransactionParticipant {
 
-    private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(ContentionManagementComponent.
-					   class.getName()));
+    public static final String TXN_BUFFER_SIZE_PROPERTY =
+	"com.sun.sgs.impl.contention.txn.buffer.size";
 
-    public static final int DEFAULT_TXNS_TO_KEEP = 200;
+    public static final String MAX_TXN_BUFFER_SIZE_PROPERTY =
+	"com.sun.sgs.impl.contention.max.txn.buffer.size";
 
-    private final long txnTimeout;
+    private static final Logger logger =
+        Logger.getLogger(ContentionManagementComponent.class.getName());
+
+    private static final int DEFAULT_TXN_BUFFER_SIZE = 200;
+
+    private static final int DEFAULT_MAX_TXN_BUFFER_SIZE = 1000;
     
     Map<Transaction,TxnInfo> openTxns;
 
     ConcurrentBoundedMap<Transaction,TxnInfo> finishedTxns;
     
+    ProfileContention contentionReporter;
+    
 
     TransactionProxy txnProxy;
     
     public ContentionManagementComponent(Properties appProperties,
-					 TransactionProxy txnProxy) {
+					 TransactionProxy txnProxy,
+					 ProfileCollectorImpl profileConsumer) {
 	this.txnProxy = txnProxy;
 	PropertiesWrapper props = new PropertiesWrapper(appProperties);
-	txnTimeout = props.getLongProperty(TransactionCoordinator.
-					   TXN_TIMEOUT_PROPERTY,
-					   TransactionCoordinatorImpl.
-					   BOUNDED_TIMEOUT_DEFAULT);
+	
+	int txnBufferSize = props.getIntProperty(TXN_BUFFER_SIZE_PROPERTY,
+						 DEFAULT_TXN_BUFFER_SIZE);
+	
+	// use the larger of the two values for the upper bound
+	int maxTxnBufferSize = 
+	    Math.max(props.getIntProperty(MAX_TXN_BUFFER_SIZE_PROPERTY,
+					  DEFAULT_MAX_TXN_BUFFER_SIZE),
+		     txnBufferSize);	       
 
 	openTxns = new ConcurrentHashMap<Transaction,TxnInfo>();
+		
 	finishedTxns = 
-	    new ConcurrentBoundedMap<Transaction,TxnInfo>(DEFAULT_TXNS_TO_KEEP);
-
-	System.out.println(this + " created!");
+	    new ConcurrentBoundedMap<Transaction,TxnInfo>(txnBufferSize,
+							  maxTxnBufferSize);	
+	contentionReporter = 
+	    profileConsumer.registerContentionReporter(this.getClass());
     }
 
     public void abort(Transaction txn) { 
-	// determin why
 	
-	//System.out.println(txn + " aborted");
-
 	TxnInfo info = openTxns.remove(txn);
 	info.end();
-
-	String reason = null;
-
-	if (info.getRunTime() > txnTimeout) {
-	    reason = String.format("%s probably timed out for running %dms\n",
-				   txn, info.getRunTime());
-	}
-
 	
-	// keep a reference to the last transaction we saw in case we
-	// need to determine the lag between the current transaction
-	// and the newest one in the queue
+	Transaction conflicting = null;
 	TxnInfo otherInfo = null;
+	Set<LockInfo> contendedLocks = new HashSet<LockInfo>();
 
-	// see if any transactions intersect with this one
+	// see if any of the buffered transactions have locks that
+	// overlap with this one
 	for (Map.Entry<Transaction,TxnInfo> other : finishedTxns.entrySet()) {
-	    // did any of them have shared resources?
-	    
+	 
 	    otherInfo = other.getValue();
-
 	    if (info.contendsWith(otherInfo)) {
-
-		reason = String.format("Task type %s with Transaction (id: %d) "
-				       + "(try count %d) details:\n%s" 
-				       + "was ABORTED due to conflicts with:\n"
-				       + "Task type %s Transaction (id: %d) "
-				       + "(try count: %d)\n%s\n",
-				       info.taskType,
-				       getID(txn), 
-				       info.tryCount, 
-				       info, 
-				       otherInfo.taskType,
-				       getID(other.getKey()), 
-				       otherInfo.tryCount, 
-				       otherInfo);
-		break;
+		conflicting = other.getKey();		
+		contendedLocks = info.getContendedLocks(otherInfo);
+		break;	    
 	    }
-	}
-	
-	if (reason == null) {
-	    Throwable t = txn.getAbortCause();
-	    boolean wasLockRelated = false;
-	    do {
+	}       
 
-		wasLockRelated =
-		    t instanceof TransactionConflictException ||
-		    t instanceof DeadlockException ||
-		    t instanceof LockNotGrantedException ||
+	// examine the cause of the abort to see if we can figure out
+	// what caused the conflict
+	Throwable t = txn.getAbortCause();
+	ConflictType abortReason = ConflictType.UNKNOWN;
+	    
+	// NOTE: due to the nest nature of the transaction exceptions,
+	// we need search up the chain them to find the root cause.
+	// In practice, this is never more than 2-3 Exceptions
+	do {	    	    
+	    // NOTE: due a the contents of the LNGE and DE containing
+	    // a non-serializable Environment object, the TTE does not
+	    // report it as the cause.  Therefore, we have to search
+	    // the string for its name as a kludge.  See
+	    // BdbEnvironment.convertException() for details.
+	    if (t.getMessage().contains("DeadlockException"))
+		abortReason = ConflictType.DEADLOCK;
+	    else if (t.getMessage().contains("LockNotGrantedException"))
+		abortReason = ConflictType.LOCK_NOT_GRANTED;
+	    
+	    t = t.getCause();
+	} while (abortReason.equals(ConflictType.UNKNOWN) && t != null);
+    
 
-		    // NOTE: due a the contents of the LNGE containing
-		    // a non-serializable Environment object, the TTE
-		    // does not report it as the cause.  Therefore, we
-		    // have to search the string for its name as a
-		    // kludge.  See BdbEnvironment.convertException()
-		    // for details.
-		    (t instanceof TransactionTimeoutException &&
-		     t.getMessage().contains("LockNotGrantedException"));
-
-		t = t.getCause();
-	    } while (!wasLockRelated && t != null);
-
-
-	    if (wasLockRelated) {
-		// if we saw a lock-related exception but somehow missed
-		// finding out what other transaction caused it, then we
-		// probably need to increase the bound on the number of
-		// finished transactions.
-		boolean increased = finishedTxns.adjustBound(10);
-
-		reason = String.format("Task type %s with Transaction (id: %d) "
-				       + "(try count %d) details:\n%swas "
-				       + "aborted due to "
-				       + "a data conflict with another " 
-				       + "undetermined transaction%s\n",
-				       info.taskType,
-				       getID(txn), 
-				       info.tryCount,
-				       info,
-				       (increased) ? 
-				       " (increased txn backlog)" : "");
-	    }
-	    else {		
-		reason = String.format("Task type %s with Transaction (id: %d) "
-				       + "(try count %d) was aborted with "
-				       + "exception:\n\t%s\n",
-				       info.taskType,
-				       getID(txn), 
-				       info.tryCount, 				   
-				       txn.getAbortCause());
-	    }				   
+	// if we saw a lock-related exception but somehow missed
+	// finding out what other transaction caused it, then we
+	// probably need to increase the bound on the number of
+	// finished transactions.
+	if (conflicting == null && 
+	    !(abortReason.equals(ConflictType.UNKNOWN))) {
+	    
+	    boolean increased = finishedTxns.adjustBound(10);
+	    
+	    if (increased)
+		logger.fine("increased size of transaction backlog for the "
+			    + "contention managament to " 
+			    + finishedTxns.getBound());
 	}
 
-	// NOTE: It might be good to throw in some adaptive code here
-	// to adjust the size of the bounded queue.  When the
+	// REMINDER: It might be good to throw in some adaptive code
+	// here to reduce the size of the bounded queue.  When the
 	// application isn't doing much, 200 might be a waste.
 	// However, when the application is overloaded, 200 might be
 	// far to few to find the actual source of contention
 
-	if (reason == null) {
-	    System.out.printf("Task type %s with Transaction (id: %d) "
-			      + "(try count %d) was aborted for reasons "
-			      + "unknown to this component.\n",
-			      info.taskType,
-			      getID(txn), 
-			      info.tryCount);
-	}
-	else {
-	    // NOTE: perhaps decrease the bound by something related
-	    //       to the difference in time between the last
-	    //       transactionad this one?
-	    System.out.println(reason);
-	}
+	// If we were able to find a conflicting transaction, report
+	// the data about it, otherwise insert dummy data to indicate
+	// a lack of information
+	ContentionReport report = (conflicting != null) 
+	    ? new ContentionReportImpl(getID(txn),
+				       info.taskType,
+				       info.getAcquiredLocks(),
+				       contendedLocks,
+				       abortReason,
+				       getID(conflicting),
+				       otherInfo.taskType)
+	    : new ContentionReportImpl(getID(txn),
+				       info.taskType,
+				       info.getAcquiredLocks(),
+				       contendedLocks,
+				       abortReason,
+				       -1,
+				       "Unknown");	
 
-    
-    
+	contentionReporter.addReport(report);    
     }
 
-    public void bind(Long oid, Object o) {
+    public void associate(Long oid, Object o) {
 	Transaction txn = getCurrentTransaction();
 	if (txn == null)
 	    return;
 	TxnInfo info = openTxns.get(txn);
-	info.bind(oid, o);
+	info.associate(oid, o);
     }
        
+    public void associate(String name, Object o) {
+	Transaction txn = getCurrentTransaction();
+	if (txn == null)
+	    return;
+	TxnInfo info = openTxns.get(txn);
+	info.associate(name, o);
+    }
+
     public void commit(Transaction txn) { 
 	// remove from current listing of transactions
 	TxnInfo info = openTxns.remove(txn);
@@ -244,7 +281,9 @@ public class ContentionManagementComponent
 	return new BigInteger(txn.getId()).longValue();
     }    
 
-    public String getTypeName() { return "mgmt"; } 
+    public String getTypeName() { 
+	return ContentionManagementComponent.class.getName();
+    } 
 
     public boolean prepare(Transaction txn) {
 	return false;
@@ -318,18 +357,19 @@ public class ContentionManagementComponent
     //       regardless
     private static class ConcurrentBoundedMap<K,V> {
 
-	Queue<K> keys;
+	private final Queue<K> keys;
 	
-	Map<K,V> backingMap;
+	private final Map<K,V> backingMap;
 
-	int sizeBound;
+	private final AtomicInteger size;
 
-	AtomicInteger size;
+	private int sizeBound;
 
-	static final int ABSOLUTE_MAX_SIZE = 1000; 
+	private final int maxSizeBound;
 
-	public ConcurrentBoundedMap(int sizeBound) {
+	public ConcurrentBoundedMap(int sizeBound, int maxSizeBound) {
 	    this.sizeBound = sizeBound;
+	    this.maxSizeBound = maxSizeBound;
 	    size = new AtomicInteger(0);
 	    keys = new ConcurrentLinkedQueue<K>();
 	    backingMap = new ConcurrentHashMap<K,V>();
@@ -337,7 +377,7 @@ public class ContentionManagementComponent
 
 	public boolean adjustBound(int delta) {
 	    int i = sizeBound + delta;
-	    if (i >= 0 && i <= ABSOLUTE_MAX_SIZE) {
+	    if (i >= 0 && i <= maxSizeBound) {
 		sizeBound = i;
 		return true;
 	    }
@@ -346,6 +386,10 @@ public class ContentionManagementComponent
 
 	public V get(Object o) {
 	    return backingMap.get(o);
+	}
+
+	public int getBound() {
+	    return sizeBound;
 	}
 
 	public void put(K key, V value) {
@@ -369,29 +413,39 @@ public class ContentionManagementComponent
 	
 	public int size() {
 	    return size.get();
-	}
+	}	
 	
     }
 
+    /**
+     *
+     *
+     */
     private static class TxnInfo {
 
 	private long startTime;
 	
 	private long endTime;
-
-	Set<Long> readLocks;
 	
-	Set<Long> writeLocks;
+	private final Set<LockInfoImpl> acquiredLocksInOrder;
 
-	Set<String> nameReadLocks;
+	private final List<LockInfoImpl> allLocks;
 
-	Set<String> nameWriteLocks;
+	private final Map<Long,LockInfoImpl> readLocks;
+	
+	private final Map<Long,LockInfoImpl> writeLocks;
 
-	Map<Long,Object> oidsToManagedObjects;
+	private final Map<String,LockInfoImpl> nameReadLocks;
 
-	String taskType;
+	private final Map<String,LockInfoImpl> nameWriteLocks;
+	
+	private final Map<Long,Object> oidsToManagedObjects;
 
-	int tryCount;
+	private final Map<String,Object> namesToManagedObjects;
+
+	private final String taskType;
+
+	private final int tryCount;
 
 	public TxnInfo(String taskType, int tryCount) {
 	    this.taskType = taskType;
@@ -400,31 +454,60 @@ public class ContentionManagementComponent
 	    startTime = System.currentTimeMillis();
 	    endTime = -1;
 	    
-	    readLocks = new HashSet<Long>();
-	    writeLocks = new HashSet<Long>();
-	    nameReadLocks = new HashSet<String>();
-	    nameWriteLocks = new HashSet<String>();
+	    readLocks = new HashMap<Long,LockInfoImpl>();
+	    writeLocks = new HashMap<Long,LockInfoImpl>();
+	    nameReadLocks = new HashMap<String,LockInfoImpl>();
+	    nameWriteLocks = new HashMap<String,LockInfoImpl>();
 	    oidsToManagedObjects = new HashMap<Long,Object>();
+	    namesToManagedObjects = new HashMap<String,Object>();
+	    acquiredLocksInOrder = new LinkedHashSet<LockInfoImpl>();
+	    allLocks = new LinkedList<LockInfoImpl>();
 	}
 
 	public void addReadLock(Long oid) {
-	    readLocks.add(oid);
+	    LockInfoImpl readLock = new LockInfoImpl(LockType.READ,
+						     BigInteger.valueOf(oid));
+	    readLocks.put(oid, readLock);
+	    acquiredLocksInOrder.add(readLock);
 	}
 
 	public void addWriteLock(Long oid) {
-	    writeLocks.add(oid);
+	    LockInfoImpl writeLock = new LockInfoImpl(LockType.WRITE, 
+						      BigInteger.valueOf(oid));
+	    writeLocks.put(oid, writeLock);
+	    acquiredLocksInOrder.add(writeLock);
 	}
 
 	public void addReadLockOnName(String name) {
-	    nameReadLocks.add(name);
+	    LockInfoImpl readLock = new LockInfoImpl(LockType.READ, name);
+	    nameReadLocks.put(name, readLock);
+	    acquiredLocksInOrder.add(readLock);
 	}
 
 	public void addWriteLockOnName(String name) {
-	    nameWriteLocks.add(name);
+	    LockInfoImpl writeLock = new LockInfoImpl(LockType.WRITE, name);
+	    nameWriteLocks.put(name, writeLock);
+	    acquiredLocksInOrder.add(writeLock);
 	}
 
-	public void bind(Long oid, Object o) {
+	public void associate(Long oid, Object o) {
 	    oidsToManagedObjects.put(oid, o);
+	    LockInfoImpl info = readLocks.get(oid);
+	    if (info != null)
+		info.setObject(o);
+	    info = writeLocks.get(oid);
+	    if (info != null)
+		info.setObject(o);
+	}
+
+	public void associate(String name, Object o) {
+	    namesToManagedObjects.put(name, o);
+	    LockInfoImpl info = nameReadLocks.get(name);
+	    if (info != null)
+		info.setObject(o);
+	    info = nameWriteLocks.get(name);
+	    if (info != null)
+		info.setObject(o);
 	}
 
 	public void end() {
@@ -434,85 +517,79 @@ public class ContentionManagementComponent
 	public long getRunTime() {
 	    return endTime - startTime;
 	}
+
+	public List<LockInfo> getAcquiredLocks() {	    	    
+	    return new ArrayList<LockInfo>(acquiredLocksInOrder);
+	}
 	
 	public boolean contendsWith(TxnInfo other) {
 
-	    for (Long oid : readLocks) {
-		if (other.writeLocks.contains(oid))
-		    return true;
-	    }
-	    for (Long oid : other.readLocks) {
-		if (writeLocks.contains(oid))
-		    return true;
-	    }
-	    for (Long oid : writeLocks) {
-		if (other.writeLocks.contains(oid))
+	    // REMINDER: this might be sped up a little by ordering
+	    // the sets according to which is smaller
+	    for (Long oid : other.writeLocks.keySet()) {
+		if (readLocks.containsKey(oid) ||
+		    writeLocks.containsKey(oid))
 		    return true;
 	    }
 
-	    for (String name : nameReadLocks) {
-		if (other.nameWriteLocks.contains(name))
+	    for (Long oid : writeLocks.keySet()) {
+		if (other.readLocks.containsKey(oid))
 		    return true;
 	    }
 
-	    for (String name : other.nameReadLocks) {
-		if (nameWriteLocks.contains(name))
+	    for (String name : other.nameWriteLocks.keySet()) {
+		if (nameReadLocks.containsKey(name) ||
+		    nameWriteLocks.containsKey(name))
+		    return true;
+	    }
+
+	    for (String name : nameWriteLocks.keySet()) {
+		if (other.nameReadLocks.containsKey(name))
 		    return true;
 	    }
 
 	    return false;
 	}
 
-	private String readLockedObjects() {
-	    return setToString(readLocks, nameReadLocks);
-	}
+	public Set<LockInfo> getContendedLocks(TxnInfo other) {
 
-	private String writeLockedObjects() {
-	    return setToString(writeLocks, nameWriteLocks);
-	}
+	    Set<LockInfo> contended = new HashSet<LockInfo>();
 
-	private String setToString(Set<Long> oids, Set<String> names) {
-	    String objs = (oids.isEmpty()) ? "\n   oids: [NONE]\n" : "\n";
-
-	    for (Long oid : oids) {
-		Object o = oidsToManagedObjects.get(oid);
-		String toString = "";
-		try {
-		    toString = o.toString();
-		}
-		// We know that o cannot be null.  However its
-		// toString might cause some exception, which we want
-		// to avoid propagating.  For example, this case
-		// happens in a ClientSessionWrapper, whose toString
-		// relies on the transaction being active and
-		// therefore throws a TransactionNotActiveException
-		// when called.
-		catch (Throwable t) {
-		    toString = ".toString() threw " + t.getClass().getName();
-		}
-		
-		objs += 
-		    String.format("%6d: %-30s desc: %-30s\n",
-				  oid,
-				  o.getClass().getSimpleName(),
-				  toString);
-	    }
-	    String nms = (names.isEmpty()) ? "  names: [NONE]\n" : "";
-	    if (names.size () > 20) {
-		nms = names.size() + " names (elided)";
-	    }
-	    else {
-		for (String name : names) {
-		    nms += "  name: " + name + "\n";
-		}
+	    for (Long oid : readLocks.keySet()) {
+		if (other.writeLocks.containsKey(oid))
+		    contended.add(readLocks.get(oid));
 	    }
 
-	    return objs + nms;
+	    for (Long oid : other.readLocks.keySet()) {
+		if (writeLocks.containsKey(oid))
+		    contended.add(writeLocks.get(oid));
+	    }
+
+	    for (Long oid : writeLocks.keySet()) {
+		if (other.writeLocks.containsKey(oid))
+		    contended.add(writeLocks.get(oid));
+	    }
+
+	    for (String name : nameReadLocks.keySet()) {
+		if (other.nameWriteLocks.containsKey(name))
+		    contended.add(nameReadLocks.get(name));
+	    }
+
+	    for (String name : other.nameReadLocks.keySet()) {
+		if (nameWriteLocks.containsKey(name))
+		    contended.add(nameWriteLocks.get(name));
+	    }
+
+	    for (String name : other.nameWriteLocks.keySet()) {
+		if (nameWriteLocks.containsKey(name))
+		    contended.add(nameWriteLocks.get(name));
+	    }
+
+	    return contended;
 	}
 
 	public String toString() {
-	    return "Read Locks Held:" + readLockedObjects() 
-		+ "Write Locks Held:" + writeLockedObjects(); 
+	    return "TxnInfo(type: " + taskType + ")";
 
 	}
 

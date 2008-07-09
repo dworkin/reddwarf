@@ -23,6 +23,8 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.contention.ContentionReport;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -181,7 +183,6 @@ public interface ProfileReport {
      */
     public int getReadyCount();
 
-
     /**
      * Returns any failure that occurred during the execution of
      * this report's task, or <code>null</code> if no failure
@@ -194,4 +195,10 @@ public interface ProfileReport {
      */
     public Throwable getFailureCause();
 
+    /**
+     * TODO
+     *
+     * @return TODO
+     */
+    public ContentionReport getContentionReport();
 }

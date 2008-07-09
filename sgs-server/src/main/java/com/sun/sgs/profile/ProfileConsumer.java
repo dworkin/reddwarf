@@ -90,4 +90,13 @@ public interface ProfileConsumer {
     public ProfileSample registerSampleSource(String name, boolean taskLocal,
 					       long maxSamples);
 
+    
+    /**
+     * TODO
+     *
+     * @param reporterType TODO
+     *
+     * @return TODO
+     */
+    public ProfileContention registerContentionReporter(Class reporterType);
 }

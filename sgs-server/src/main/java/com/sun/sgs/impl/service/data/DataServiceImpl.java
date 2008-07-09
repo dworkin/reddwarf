@@ -677,6 +677,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    contextTxnId(context), name, Objects.fastToString(result));
 	    }
+	    contentionMgmt.associate(name, result);
 	    return result;
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
@@ -710,6 +711,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    serviceBinding ? "setServiceBinding" : "setBinding",
 		    contextTxnId(context), name, Objects.fastToString(object));
 	    }
+	    contentionMgmt.associate(name, object);
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {

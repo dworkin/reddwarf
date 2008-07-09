@@ -209,7 +209,8 @@ class Kernel {
                 new TransactionCoordinatorImpl(appProperties, profileCollector);
 
 	    ContentionManagementComponent contentionMgmt = 
-		new ContentionManagementComponent(appProperties, proxy);
+		new ContentionManagementComponent(appProperties, proxy, 
+						  profileCollector);
 	    
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work

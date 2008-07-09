@@ -21,9 +21,12 @@ package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.contention.ContentionReport;
+
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileContention;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileOperation;
@@ -39,6 +42,7 @@ import java.util.LinkedList;
 import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,6 +67,8 @@ public class ProfileCollectorImpl implements ProfileCollector {
     private final ConcurrentHashMap<String,ProfileCounter> taskLocalCounters;
 
     private final ConcurrentHashMap<String,ProfileCounter> aggregateCounters;
+
+    private final ConcurrentMap<Class,ProfileContention> reporterToContention;
     
     // the number of threads currently in the scheduler
     private volatile int schedulerThreadCount;
@@ -99,6 +105,8 @@ public class ProfileCollectorImpl implements ProfileCollector {
 
         aggregateCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
         taskLocalCounters = new ConcurrentHashMap<String,ProfileCounter>(); 
+
+	reporterToContention = new ConcurrentHashMap<Class,ProfileContention>();
 
         // start a long-lived task to consume the other end of the queue
         reporterThread = new Thread(new CollectorRunnable());
@@ -525,6 +533,30 @@ public class ProfileCollectorImpl implements ProfileCollector {
 
     }
 
+    /**
+     * TODO
+     *
+     * @param reporterType TODO
+     *
+     * @return TODO
+     */
+    public ProfileContention registerContentionReporter(Class reporterType) {
+	reporterToContention.putIfAbsent(reporterType,
+					 new ProfileContentionImpl());
+	return reporterToContention.get(reporterType);
+    }
+
+    private class ProfileContentionImpl implements ProfileContention {
+
+	public void addReport(ContentionReport report) {
+            try {
+                profileReports.get().peek().setContentionReport(report);
+            } catch (EmptyStackException ese) {
+                throw new IllegalStateException("Cannot report operation " +
+                                                "because no task is active");
+            }	   
+	}
+    }
 
 
     /**
