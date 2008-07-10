@@ -32,6 +32,8 @@ import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a family of resources.  Each resource in the family should
  * have a common set of attributes.
@@ -114,5 +116,26 @@ public class HardwareResourceFamily implements Serializable
     public List<HardwareResource> getMembers() { return members; }
     public void setMembers(List<HardwareResource> members) { this.members = members; }
     
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof HardwareResourceFamily) || o == null) return false;
+
+        HardwareResourceFamily other = (HardwareResourceFamily)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getSystem(), other.getSystem()) &&
+                ObjectUtils.equals(this.getOs(), other.getOs()) &&
+                ObjectUtils.equals(this.getMemory(), other.getMemory());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
     
 }

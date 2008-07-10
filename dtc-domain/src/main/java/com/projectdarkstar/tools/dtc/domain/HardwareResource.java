@@ -37,6 +37,8 @@ import javax.persistence.JoinTable;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 
 /**
  * Represents a physical hardware resource that can be used during
@@ -145,4 +147,25 @@ public class HardwareResource implements Serializable
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
     public List<HardwareResourceFamily> getFamilies() { return families; }
     public void setFamilies(List<HardwareResourceFamily> families) { this.families = families; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof HardwareResource) || o == null) return false;
+
+        HardwareResource other = (HardwareResource)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getHostname(), other.getHostname()) &&
+                ObjectUtils.equals(this.getLockedBy(), other.getLockedBy()) &&
+                ObjectUtils.equals(this.getLockedAt(), other.getLockedAt()) &&
+                ObjectUtils.equals(this.getEnabled(), other.getEnabled()) &&
+                ObjectUtils.equals(this.getFamilies(), other.getFamilies());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashHostname = 31*hash + ObjectUtils.hashCode(this.getHostname());
+        return hashId + hashHostname;
+    }
 }

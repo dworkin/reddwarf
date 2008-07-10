@@ -35,6 +35,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a system probe application used to monitor and collect
  * statistics during a DTC test.
@@ -180,4 +182,29 @@ public class SystemProbe implements Serializable
     @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }
     public void setRequiredPkg(PkgLibrary requiredPkg) { this.requiredPkg = requiredPkg; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof SystemProbe) || o == null) return false;
+
+        SystemProbe other = (SystemProbe)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getClassName(), other.getClassName()) &&
+                ObjectUtils.equals(this.getClassPath(), other.getClassPath()) &&
+                ObjectUtils.equals(this.getMetric(), other.getMetric()) &&
+                ObjectUtils.equals(this.getUnits(), other.getUnits()) &&
+                ObjectUtils.equals(this.getTags(), other.getTags()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getRequiredPkg(), other.getRequiredPkg());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

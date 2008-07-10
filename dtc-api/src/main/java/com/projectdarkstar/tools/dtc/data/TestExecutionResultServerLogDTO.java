@@ -122,7 +122,7 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
     public PkgLibraryDTO getOriginalServerAppRequiredPkg() { return originalServerAppRequiredPkg; }
     private void setOriginalServerAppRequiredPkg(PkgLibraryDTO originalServerAppRequiredPkg) { this.originalServerAppRequiredPkg = originalServerAppRequiredPkg; }
     
-    public String originalServerAppConfigName() { return originalServerAppConfigName; }
+    public String getOriginalServerAppConfigName() { return originalServerAppConfigName; }
     private void setOriginalServerAppConfigName(String originalServerAppConfigName) { this.originalServerAppConfigName = originalServerAppConfigName; }
     
     public String getOriginalServerAppConfigAdditionalCommandLine() { return originalServerAppConfigAdditionalCommandLine; }

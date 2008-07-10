@@ -31,6 +31,8 @@ import javax.persistence.Column;
 import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a tag entity used to categorize {@link TestExecution}
  * objects.
@@ -74,4 +76,21 @@ public class TestExecutionTag implements Serializable
     @OrderBy("dateFinished")
     public List<TestExecution> getExecutions() { return executions; }
     public void setExecutions(List<TestExecution> executions) { this.executions = executions; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionTag) || o == null) return false;
+
+        TestExecutionTag other = (TestExecutionTag)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTag(), other.getTag()) &&
+                ObjectUtils.equals(this.getExecutions(), other.getExecutions());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTag = 31*hash + ObjectUtils.hashCode(this.getTag());
+        return hashId + hashTag;
+    }
 }

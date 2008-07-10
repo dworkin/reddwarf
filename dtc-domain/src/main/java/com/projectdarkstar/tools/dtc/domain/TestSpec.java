@@ -35,6 +35,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a complete test specification that pulls together all of the
  * details and parameters necessary to run a DTC test.
@@ -258,4 +260,32 @@ public class TestSpec implements Serializable
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
     public List<HardwareResourceFamily> getClientResources() { return clientResources; }
     public void setClientResources(List<HardwareResourceFamily> clientResources) { this.clientResources = clientResources; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestSpec) || o == null) return false;
+
+        TestSpec other = (TestSpec)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getTestRunner(), other.getTestRunner()) &&
+                ObjectUtils.equals(this.getTimeLimit(), other.getTimeLimit()) &&
+                ObjectUtils.equals(this.getMaxClients(), other.getMaxClients()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getServerAppConfig(), other.getServerAppConfig()) &&
+                ObjectUtils.equals(this.getClientAppConfigs(), other.getClientAppConfigs()) &&
+                ObjectUtils.equals(this.getSystemProbes(), other.getSystemProbes()) &&
+                ObjectUtils.equals(this.getServerResources(), other.getServerResources()) &&
+                ObjectUtils.equals(this.getClientResources(), other.getClientResources());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

@@ -36,6 +36,8 @@ import javax.persistence.OrderBy;
 import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a snapshot of the number of clients in the system at runtime
  * at a specific point in time during the execution.
@@ -85,5 +87,24 @@ public class TestExecutionResultClientData implements Serializable
     @JoinColumn(name = "parentResult", nullable = false)
     public TestExecutionResult getParentResult() { return parentResult; }
     public void setParentResult(TestExecutionResult parentResult) { this.parentResult = parentResult; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultClientData) || o == null) return false;
+
+        TestExecutionResultClientData other = (TestExecutionResultClientData)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTimestamp(), other.getTimestamp()) &&
+                ObjectUtils.equals(this.getValues(), other.getValues()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTimestamp = 31*hash + ObjectUtils.hashCode(this.getTimestamp());
+        return hashId + hashTimestamp;
+    }
 
 }

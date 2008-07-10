@@ -138,6 +138,11 @@
 	<artifactId>commons-beanutils-core</artifactId>
 	<version>${commons-beanutils-core.version}</version>
       </dependency>
+      <dependency>
+	<groupId>commons-lang</groupId>
+	<artifactId>commons-lang</artifactId>
+	<version>${commons-lang.version}</version>
+      </dependency>
 
     </dependencies>
   </dependencyManagement>
@@ -159,6 +164,7 @@
     <geronimo-jpa_3.0_spec.version>1.1.1</geronimo-jpa_3.0_spec.version>
     <geronimo-ejb_3.0_spec.version>1.0.1</geronimo-ejb_3.0_spec.version>
     <commons-beanutils-core.version>1.7.0</commons-beanutils-core.version>
+    <commons-lang.version>2.4</commons-lang.version>
   </properties>
 
 </project>

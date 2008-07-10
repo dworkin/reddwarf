@@ -28,6 +28,8 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Column;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a property by mapping a property name to a value.
  */
@@ -85,4 +87,23 @@ public class Property implements Serializable
     @Column(name = "value")
     public String getValue() { return value; }
     public void setValue(String value) { this.value = value; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof Property) || o == null) return false;
+
+        Property other = (Property)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getProperty(), other.getProperty()) &&
+                ObjectUtils.equals(this.getValue(), other.getValue());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashProperty = 31*hash + ObjectUtils.hashCode(this.getProperty());
+        return hashId + hashProperty;
+    }
 }
