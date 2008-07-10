@@ -38,8 +38,27 @@ import javax.persistence.EntityManager;
 @Remote(RuntimeExecutionsService.class)
 public class RuntimeExecutionsServiceBean implements RuntimeExecutionsService
 {
+    
     @PersistenceContext(unitName = "dtc")
     private EntityManager em;
+
+    public void appendClientLog(Long clientLogId,
+                                String chunk)
+            throws DTCServiceException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    public void appendProbeLog(Long probeLogId,
+                               String chunk)
+            throws DTCServiceException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    public void appendServerLog(Long serverLogId,
+                                String chunk)
+            throws DTCServiceException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 
     public void addClientDataPoint(Long testExecutionResultId, 
                                    TestExecutionResultClientDataDTO data)
