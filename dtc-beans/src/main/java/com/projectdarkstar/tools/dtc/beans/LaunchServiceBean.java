@@ -1,6 +1,20 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright 2008 Sun Microsystems, Inc.
+ *
+ * This file is part of the Darkstar Test Cluster
+ *
+ * Darkstar Test Cluster is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Darkstar Test Cluster is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package com.projectdarkstar.tools.dtc.beans;
@@ -14,7 +28,8 @@ import javax.persistence.PersistenceContext;
 import javax.persistence.EntityManager;
 
 /**
- * 
+ * This bean implements the LaunchService providing operations to load
+ * tests into the execution queue of the database.
  */
 @Stateless
 @Remote(LaunchService.class)
