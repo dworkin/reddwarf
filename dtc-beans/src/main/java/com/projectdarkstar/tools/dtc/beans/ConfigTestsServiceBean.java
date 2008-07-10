@@ -22,7 +22,7 @@ package com.projectdarkstar.tools.dtc.beans;
 import com.projectdarkstar.tools.dtc.api.ConfigTestsService;
 import com.projectdarkstar.tools.dtc.data.TestSpecDTO;
 import com.projectdarkstar.tools.dtc.data.TestSuiteDTO;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import java.util.Map;
 import javax.ejb.Stateless;
 import javax.ejb.Remote;

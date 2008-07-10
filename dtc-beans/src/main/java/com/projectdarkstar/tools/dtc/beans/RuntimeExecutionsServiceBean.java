@@ -24,7 +24,7 @@ import com.projectdarkstar.tools.dtc.data.LogFileDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultClientDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultProbeDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultValueDTO;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import javax.ejb.Stateless;
 import javax.ejb.Remote;
 import javax.persistence.PersistenceContext;

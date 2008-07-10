@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.service;
+package com.projectdarkstar.tools.dtc.exceptions;
 
 /**
  * A generic exception type that should be thrown whenever there is a

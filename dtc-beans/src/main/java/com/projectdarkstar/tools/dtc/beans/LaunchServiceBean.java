@@ -21,7 +21,7 @@ package com.projectdarkstar.tools.dtc.beans;
 
 import com.projectdarkstar.tools.dtc.api.LaunchService;
 import com.projectdarkstar.tools.dtc.data.PkgLibraryDTO;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import javax.ejb.Stateless;
 import javax.ejb.Remote;
 import javax.persistence.PersistenceContext;

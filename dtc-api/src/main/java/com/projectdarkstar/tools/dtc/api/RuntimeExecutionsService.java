@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.api;
 
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import com.projectdarkstar.tools.dtc.data.LogFileDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultClientDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultProbeDataDTO;

@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.api;
 
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import java.util.Map;
 
 /**

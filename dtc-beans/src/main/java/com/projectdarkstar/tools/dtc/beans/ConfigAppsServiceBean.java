@@ -25,7 +25,7 @@ import com.projectdarkstar.tools.dtc.data.ClientAppDTO;
 import com.projectdarkstar.tools.dtc.data.ServerAppConfigDTO;
 import com.projectdarkstar.tools.dtc.data.ServerAppDTO;
 import com.projectdarkstar.tools.dtc.data.SystemProbeDTO;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import java.util.Map;
 import javax.ejb.Remote;
 import javax.ejb.Stateless;

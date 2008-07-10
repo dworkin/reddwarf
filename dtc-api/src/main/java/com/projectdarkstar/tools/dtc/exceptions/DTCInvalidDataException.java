@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.service;
+package com.projectdarkstar.tools.dtc.exceptions;
 
 /**
  * Thrown whenever data validation occurs for a DTC service

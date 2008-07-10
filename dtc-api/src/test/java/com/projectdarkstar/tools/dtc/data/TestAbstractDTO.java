@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.data;
 
-import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCInvalidDataException;
 import org.junit.Test;
 import org.junit.Assert;
 
