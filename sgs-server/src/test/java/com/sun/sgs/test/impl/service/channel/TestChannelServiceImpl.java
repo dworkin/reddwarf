@@ -100,7 +100,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private static final String APP_NAME = "TestChannelServiceImpl";
     
-    private static final int WAIT_TIME = 3000;
+    private static final int WAIT_TIME = 2000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -207,7 +207,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     protected void tearDown(boolean clean) throws Exception {
 	// This sleep cuts down on the exceptions output due to shutdwon.
-	Thread.sleep(750);
+	Thread.sleep(500);
 	if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
@@ -1238,7 +1238,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    moe.waitForJoin(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() != null) {
 		    fail(client.name + " received message!");
@@ -1263,7 +1263,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    moe.waitForJoin(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() != null) {
 		    fail(client.name + " received message!");
@@ -1284,7 +1284,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient moe = group.getClient("moe");
 	    moe.waitForJoin(channelName);
 	    moe.sendChannelMessage(channelName, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() == null) {
@@ -1311,7 +1311,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient moe = group.getClient("moe");
 	    moe.waitForJoin(channelName);
 	    moe.sendChannelMessage(channelName, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() == null) {
@@ -1338,7 +1338,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient moe = group.getClient("moe");
 	    moe.waitForJoin(channelName);
 	    moe.sendChannelMessage(channelName, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() != null) {
@@ -1368,7 +1368,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    for (int i = 0; i < numMessages; i++) {
 		moe.sendChannelMessage(channelName, i);
 	    }
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (int i = 0; i < numMessages / 2; i++) {
 		for (DummyClient client : group.getClients()) {
@@ -1438,7 +1438,7 @@ public class TestChannelServiceImpl extends TestCase {
 		ValidatingChannelListener listener = (ValidatingChannelListener)
 		    dataService.getBinding(listenerName);
 		ClientSession session =
-		    (ClientSession) dataService.getBinding(user + ".wrapped");
+		    (ClientSession) dataService.getBinding(user);
 		listener.validateSession(session);
 		System.err.println("sessions are equal");
 	    }
@@ -1452,7 +1452,7 @@ public class TestChannelServiceImpl extends TestCase {
 	DummyClient client =
 	    (new DummyClient()).connect(port).login(user, "password");
 
-	final String sessionKey = user + ".wrapped";
+	final String sessionKey = user;
 	isPerformanceTest = true;
 	int numIterations = 100;
 	long startTime = System.currentTimeMillis();
@@ -1509,7 +1509,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    }, taskOwner);
 	    }
 
-	    Thread.sleep(5000);
+	    Thread.sleep(3000);
 	    for (DummyClient client : group.getClients()) {
 		for (int i = 0; i < numMessages; i++) {
 		    MessageInfo info = client.nextChannelMessage();
@@ -2257,7 +2257,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    synchronized (lock) {
 		if (channelMessages.isEmpty()) {
 		    try {
-			lock.wait(WAIT_TIME * 2);
+			lock.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
 		}
@@ -2603,8 +2603,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.setBinding(session.getName(), unwrapSession(session));
-	    dataManager.setBinding(session.getName() + ".wrapped", session);
+	    dataManager.setBinding(session.getName(), session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}
