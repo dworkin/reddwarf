@@ -75,6 +75,62 @@ public abstract class AbstractDTO implements Serializable
         }
     }
     
+    /**
+     * Returns the value to validate for a particular attribute.
+     * If the attribute has a pending update via a call to {@link #updateAttribute(String,Object)}
+     * then that value is returned.  Otherwise the current value of the attribute
+     * is returned
+     *
+     * @param key the attribute name to get the value for
+     * @return the value to validate
+     * @throws DTCInvalidDataException if the attribute with the specified key cannot be retrieved
+     */
+    protected Object valueToValidate(String key)
+            throws DTCInvalidDataException
+    {
+        try {
+            if (this.getUpdatedAttributes().keySet().contains(key))
+                return this.getUpdatedAttributes().get(key);
+            else
+                return PropertyUtils.getProperty(this, key);
+        } catch(Exception e) {
+            throw new DTCInvalidDataException(
+                    "Error retrieving current value of attribute "+key,
+                    e);
+        }
+    }
+    
+    /**
+     * Checks if the given attribute is blank or null.
+     *
+     * @param key the attribute name to check
+     * @throws DTCInvalidDataException if the attribute with the given name is a blank string
+     */
+    protected void checkBlank(String key) throws DTCInvalidDataException
+    {
+        //check that attribute is not blank
+        Object checkValue = valueToValidate(key);
+        
+        if(checkValue == null || checkValue.equals(""))
+            throw new DTCInvalidDataException("Value for "+key+" attribute cannot be left blank");
+    }
+    /**
+     * Checks if the given attribute is null.
+     *
+     * @param key the attribute name to check
+     * @throws DTCInvalidDataException if the attribute with the given name is a null
+     */
+    protected void checkNull(String key) throws DTCInvalidDataException
+    {
+        //check that attribute is not blank
+        Object checkValue = valueToValidate(key);
+        
+        if(checkValue == null)
+            throw new DTCInvalidDataException("Value for "+key+" attribute cannot be null");
+    }
+
+
+    
     
     /**
      * Validates that each attribute and pending updated attribute (from the

@@ -183,7 +183,17 @@ public class SystemProbeDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkBlank("name");
+        this.checkNull("className");
+        this.checkNull("classPath");
+        this.checkNull("metric");
+        this.checkNull("units");
+        this.checkNull("tags");
+        this.checkNull("properties");
+        this.checkNull("requiredPkg");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

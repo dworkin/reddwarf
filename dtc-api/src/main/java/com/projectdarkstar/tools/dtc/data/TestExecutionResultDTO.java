@@ -261,7 +261,19 @@ public class TestExecutionResultDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkNull("result");
+        this.checkNull("resultSummary");
+        this.checkNull("properties");
+        this.checkNull("serverLogs");
+        this.checkNull("clientLogs");
+        this.checkNull("probeLogs");
+        this.checkNull("clientData");
+        this.checkNull("serverResources");
+        this.checkNull("clientResources");
+        this.checkNull("parentExecution");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

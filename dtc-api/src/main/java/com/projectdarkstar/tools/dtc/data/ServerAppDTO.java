@@ -146,7 +146,15 @@ public class ServerAppDTO extends AbstractDTO
     }
     
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("name");
+        this.checkNull("description");
+        this.checkNull("className");
+        this.checkNull("classPath");
+        this.checkNull("configs");
+        this.checkNull("requiredPkg");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

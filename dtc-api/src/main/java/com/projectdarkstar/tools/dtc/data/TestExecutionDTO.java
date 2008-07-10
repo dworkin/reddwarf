@@ -166,7 +166,12 @@ public class TestExecutionDTO extends AbstractDTO
     private void setOriginalTestSuite(TestSuiteDTO originalTestSuite) { this.originalTestSuite = originalTestSuite; }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkBlank("name");
+        this.checkNull("tags");
+        this.checkNull("results");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

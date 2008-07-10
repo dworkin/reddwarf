@@ -78,7 +78,12 @@ public class TestExecutionResultClientDataDTO extends AbstractDTO
     }
     
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkNull("timestamp");
+        this.checkNull("values");
+        this.checkNull("parentResult");
+    }
     
     
     public boolean equals(Object o) {

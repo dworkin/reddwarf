@@ -144,7 +144,13 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkNull("resource");
+        this.checkNull("logFile");
+        this.checkNull("properties");
+        this.checkNull("parentResult");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

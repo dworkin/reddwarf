@@ -74,7 +74,11 @@ public class TestExecutionTagDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkBlank("tag");
+        this.checkNull("executions");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

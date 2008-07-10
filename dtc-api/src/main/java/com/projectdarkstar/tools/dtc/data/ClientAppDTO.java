@@ -95,7 +95,7 @@ public class ClientAppDTO extends AbstractDTO
     protected void setConfigs(List<ClientAppConfigDTO> configs) { this.configs = configs; }
     public void updateConfigs(List<ClientAppConfigDTO> configs)
             throws DTCInvalidDataException {
-        this.updateAttribute("description", description);
+        this.updateAttribute("configs", description);
     }
     
     /**
@@ -111,7 +111,13 @@ public class ClientAppDTO extends AbstractDTO
     }
     
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkBlank("name");
+        this.checkNull("description");
+        this.checkNull("requiredPkg");
+        this.checkNull("configs");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

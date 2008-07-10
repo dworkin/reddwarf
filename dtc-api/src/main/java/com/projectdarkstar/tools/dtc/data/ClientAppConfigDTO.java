@@ -135,7 +135,14 @@ public class ClientAppConfigDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("name");
+        this.checkNull("path");
+        this.checkNull("propertyMethod");
+        this.checkNull("clientApp");
+        this.checkNull("properties");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

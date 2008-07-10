@@ -67,7 +67,10 @@ public class LogFileDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkNull("log");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;
