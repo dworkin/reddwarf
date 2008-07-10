@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.beans;
 
-import com.projectdarkstar.tools.dtc.api.RuntimeExecutionsService;
+import com.projectdarkstar.tools.dtc.service.RuntimeExecutionsService;
 import com.projectdarkstar.tools.dtc.data.LogFileDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultClientDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultProbeDataDTO;

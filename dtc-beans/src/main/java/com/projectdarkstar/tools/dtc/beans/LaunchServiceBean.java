@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.beans;
 
-import com.projectdarkstar.tools.dtc.api.LaunchService;
+import com.projectdarkstar.tools.dtc.service.LaunchService;
 import com.projectdarkstar.tools.dtc.data.PkgLibraryDTO;
 import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import javax.ejb.Stateless;

@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.beans;
 
-import com.projectdarkstar.tools.dtc.api.ConfigAppsService;
+import com.projectdarkstar.tools.dtc.service.ConfigAppsService;
 import com.projectdarkstar.tools.dtc.data.ClientAppConfigDTO;
 import com.projectdarkstar.tools.dtc.data.ClientAppDTO;
 import com.projectdarkstar.tools.dtc.data.ServerAppConfigDTO;

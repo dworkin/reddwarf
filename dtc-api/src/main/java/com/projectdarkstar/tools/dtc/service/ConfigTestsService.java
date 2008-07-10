@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.api;
+package com.projectdarkstar.tools.dtc.service;
 
 import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import com.projectdarkstar.tools.dtc.data.TestSuiteDTO;
