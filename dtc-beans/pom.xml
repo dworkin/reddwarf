@@ -11,8 +11,8 @@
   </parent>
 
   <groupId>com.projectdarkstar.tools.dtc</groupId>
-  <artifactId>dtc-domain</artifactId>
-  <name>dtc-domain</name>
+  <artifactId>dtc-beans</artifactId>
+  <name>dtc-beans</name>
   <packaging>jar</packaging>
 
   <dependencies>
@@ -22,7 +22,22 @@
     </dependency>
     <dependency>
       <groupId>org.apache.geronimo.specs</groupId>
+      <artifactId>geronimo-ejb_3.0_spec</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.geronimo.specs</groupId>
       <artifactId>geronimo-jpa_3.0_spec</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.tools.dtc</groupId>
+      <artifactId>dtc-api</artifactId>
+      <version>${version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.tools.dtc</groupId>
+      <artifactId>dtc-domain</artifactId>
+      <version>${version}</version>
     </dependency>
   </dependencies>
 
