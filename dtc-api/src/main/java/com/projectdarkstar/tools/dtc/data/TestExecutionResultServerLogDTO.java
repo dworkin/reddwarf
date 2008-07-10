@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Captures complete runtime configuration and result log file for the
@@ -144,4 +145,32 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultServerLogDTO) || o == null) return false;
+
+        TestExecutionResultServerLogDTO other = (TestExecutionResultServerLogDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getResource(), other.getResource()) &&
+                ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
+                ObjectUtils.equals(this.getOriginalServerAppName(), other.getOriginalServerAppName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppDescription(), other.getOriginalServerAppDescription()) &&
+                ObjectUtils.equals(this.getOriginalServerAppClassName(), other.getOriginalServerAppClassName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppClassPath(), other.getOriginalServerAppClassPath()) &&
+                ObjectUtils.equals(this.getOriginalServerAppRequiredPkg(), other.getOriginalServerAppRequiredPkg()) &&
+                ObjectUtils.equals(this.getOriginalServerAppConfigName(), other.getOriginalServerAppConfigName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppConfigAdditionalCommandLine(), other.getOriginalServerAppConfigAdditionalCommandLine()) &&
+                ObjectUtils.equals(this.getOriginalServerAppConfig(), other.getOriginalServerAppConfig()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashOriginalServerAppName = 31*hash + ObjectUtils.hashCode(this.getOriginalServerAppName());
+        return hashId + hashOriginalServerAppName;
+    }
 }

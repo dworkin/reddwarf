@@ -23,6 +23,7 @@ import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
 import java.sql.Date;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents an instance of an execution of a {@link TestSuiteDTO}.
@@ -166,4 +167,29 @@ public class TestExecutionDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionDTO) || o == null) return false;
+
+        TestExecutionDTO other = (TestExecutionDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDateStarted(), other.getDateStarted()) &&
+                ObjectUtils.equals(this.getDateFinished(), other.getDateFinished()) &&
+                ObjectUtils.equals(this.getTags(), other.getTags()) &&
+                ObjectUtils.equals(this.getResults(), other.getResults()) &&
+                ObjectUtils.equals(this.getOriginalTestSuiteDarkstarPkg(), other.getOriginalTestSuiteDarkstarPkg()) &&
+                ObjectUtils.equals(this.getOriginalTestSuiteName(), other.getOriginalTestSuiteName()) &&
+                ObjectUtils.equals(this.getOriginalTestSuiteDescription(), other.getOriginalTestSuiteDescription()) &&
+                ObjectUtils.equals(this.getOriginalTestSuite(), other.getOriginalTestSuite());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

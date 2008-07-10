@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents the results for a specific instance of a {@link TestSpecDTO}.
@@ -261,4 +262,37 @@ public class TestExecutionResultDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultDTO) || o == null) return false;
+
+        TestExecutionResultDTO other = (TestExecutionResultDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getResult(), other.getResult()) &&
+                ObjectUtils.equals(this.getResultSummary(), other.getResultSummary()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getServerLogs(), other.getServerLogs()) &&
+                ObjectUtils.equals(this.getClientLogs(), other.getClientLogs()) &&
+                ObjectUtils.equals(this.getProbeLogs(), other.getProbeLogs()) &&
+                ObjectUtils.equals(this.getClientData(), other.getClientData()) &&
+                ObjectUtils.equals(this.getServerResources(), other.getServerResources()) &&
+                ObjectUtils.equals(this.getClientResources(), other.getClientResources()) &&
+                ObjectUtils.equals(this.getOriginalServerResources(), other.getOriginalServerResources()) &&
+                ObjectUtils.equals(this.getOriginalClientResources(), other.getOriginalClientResources()) &&
+                ObjectUtils.equals(this.getOriginalTestSpecName(), other.getOriginalTestSpecName()) &&
+                ObjectUtils.equals(this.getOriginalTestSpecDescription(), other.getOriginalTestSpecDescription()) &&
+                ObjectUtils.equals(this.getOriginalTestSpecTestRunner(), other.getOriginalTestSpecTestRunner()) &&
+                ObjectUtils.equals(this.getOriginalTestSpecTimeLimit(), other.getOriginalTestSpecTimeLimit()) &&
+                ObjectUtils.equals(this.getOriginalTestSpecMaxClients(), other.getOriginalTestSpecMaxClients()) &&
+                ObjectUtils.equals(this.getOriginalTestSpec(), other.getOriginalTestSpec()) &&
+                ObjectUtils.equals(this.getParentExecution(), other.getParentExecution());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        return hashId;
+    }
 }

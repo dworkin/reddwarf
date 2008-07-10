@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a collection of tests in the form of @link{TestSpecDTO} objects
@@ -112,4 +113,24 @@ public class TestSuiteDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestSuiteDTO) || o == null) return false;
+
+        TestSuiteDTO other = (TestSuiteDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getDarkstarPkg(), other.getDarkstarPkg()) &&
+                ObjectUtils.equals(this.getTestSpecs(), other.getTestSpecs());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

@@ -23,6 +23,7 @@ import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.sql.Date;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a physical hardware resource that can be used during
@@ -141,4 +142,25 @@ public class HardwareResourceDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof HardwareResourceDTO) || o == null) return false;
+
+        HardwareResourceDTO other = (HardwareResourceDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getHostname(), other.getHostname()) &&
+                ObjectUtils.equals(this.getLockedBy(), other.getLockedBy()) &&
+                ObjectUtils.equals(this.getLockedAt(), other.getLockedAt()) &&
+                ObjectUtils.equals(this.getEnabled(), other.getEnabled()) &&
+                ObjectUtils.equals(this.getFamilies(), other.getFamilies());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashHostname = 31*hash + ObjectUtils.hashCode(this.getHostname());
+        return hashId + hashHostname;
+    }
 }

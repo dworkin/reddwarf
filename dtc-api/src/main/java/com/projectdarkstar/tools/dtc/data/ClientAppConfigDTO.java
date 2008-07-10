@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a runtime configuration for a {@link ClientAppDTO}.
@@ -135,4 +136,25 @@ public class ClientAppConfigDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof ClientAppConfigDTO) || o == null) return false;
+
+        ClientAppConfigDTO other = (ClientAppConfigDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getPath(), other.getPath()) &&
+                ObjectUtils.equals(this.getPropertyMethod(), other.getPropertyMethod()) &&
+                ObjectUtils.equals(this.getClientApp(), other.getClientApp()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Captures complete runtime configuration, hardware resource executed on,
@@ -164,4 +165,32 @@ public class TestExecutionResultProbeLogDTO extends AbstractDTO
     
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultProbeLogDTO) || o == null) return false;
+
+        TestExecutionResultProbeLogDTO other = (TestExecutionResultProbeLogDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getResource(), other.getResource()) &&
+                ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeName(), other.getOriginalSystemProbeName()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeClassName(), other.getOriginalSystemProbeClassName()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeClassPath(), other.getOriginalSystemProbeClassPath()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeMetric(), other.getOriginalSystemProbeMetric()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeUnits(), other.getOriginalSystemProbeUnits()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeRequiredPkg(), other.getOriginalSystemProbeRequiredPkg()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbe(), other.getOriginalSystemProbe()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult()) &&
+                ObjectUtils.equals(this.getData(), other.getData());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashOriginalSystemProbeName = 31*hash + ObjectUtils.hashCode(this.getOriginalSystemProbeName());
+        return hashId + hashOriginalSystemProbeName;
+    }
 }

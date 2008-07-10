@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.sql.Date;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Wrapper object for a {@link TestExecutionDTO} that is currently running, or is
@@ -99,4 +100,23 @@ public class TestQueueDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestQueueDTO) || o == null) return false;
+
+        TestQueueDTO other = (TestQueueDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getDateQueued(), other.getDateQueued()) &&
+                ObjectUtils.equals(this.getDateStarted(), other.getDateStarted()) &&
+                ObjectUtils.equals(this.getStatus(), other.getStatus()) &&
+                ObjectUtils.equals(this.getExecution(), other.getExecution()) &&
+                ObjectUtils.equals(this.getCurrentlyRunning(), other.getCurrentlyRunning());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        return hashId;
+    }
 }
