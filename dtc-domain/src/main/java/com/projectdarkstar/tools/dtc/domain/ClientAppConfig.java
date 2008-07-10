@@ -37,6 +37,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a runtime configuration for a {@link ClientApp}.
  */
@@ -141,4 +143,25 @@ public class ClientAppConfig implements Serializable
                inverseJoinColumns = @JoinColumn(name = "propertyId"))
     public List<Property> getProperties() { return properties; }
     public void setProperties(List<Property> properties) { this.properties = properties; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof ClientAppConfig) || o == null) return false;
+
+        ClientAppConfig other = (ClientAppConfig)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getPath(), other.getPath()) &&
+                ObjectUtils.equals(this.getPropertyMethod(), other.getPropertyMethod()) &&
+                ObjectUtils.equals(this.getClientApp(), other.getClientApp()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

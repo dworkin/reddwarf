@@ -29,6 +29,8 @@ import javax.persistence.Column;
 import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a snapshot of the number of clients in the system at runtime
  * at a specific point in time during the execution for a specific type
@@ -85,5 +87,24 @@ public class TestExecutionResultClientDataTuple implements Serializable
     @JoinColumn(name = "clientData", nullable = false)
     public TestExecutionResultClientData getClientData() { return clientData; }
     public void setClientData(TestExecutionResultClientData clientData) { this.clientData = clientData; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultClientDataTuple) || o == null) return false;
+
+        TestExecutionResultClientDataTuple other = (TestExecutionResultClientDataTuple)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getOriginalClientName(), other.getOriginalClientName()) &&
+                ObjectUtils.equals(this.getNumClients(), other.getNumClients()) &&
+                ObjectUtils.equals(this.getClient(), other.getClient()) &&
+                ObjectUtils.equals(this.getClientData(), other.getClientData());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashOriginalClientName = 31*hash + ObjectUtils.hashCode(this.getOriginalClientName());
+        return hashId + hashOriginalClientName;
+    }
     
 }

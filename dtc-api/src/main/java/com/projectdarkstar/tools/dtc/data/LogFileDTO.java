@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a log file
@@ -67,4 +68,19 @@ public class LogFileDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof LogFileDTO) || o == null) return false;
+
+        LogFileDTO other = (LogFileDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getLog(), other.getLog());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        return hashId;
+    }
 }

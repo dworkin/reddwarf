@@ -31,6 +31,8 @@ import javax.persistence.Basic;
 import javax.persistence.FetchType;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a log file
  */
@@ -77,4 +79,18 @@ public class LogFile implements Serializable
     public String getLog() { return log; }
     public void setLog(String log) { this.log = log; }
 
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof LogFile) || o == null) return false;
+
+        LogFile other = (LogFile)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getLog(), other.getLog());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        return hashId;
+    }
 }

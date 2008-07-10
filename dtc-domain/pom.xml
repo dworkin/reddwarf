@@ -24,6 +24,11 @@
       <groupId>org.apache.geronimo.specs</groupId>
       <artifactId>geronimo-jpa_3.0_spec</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>commons-lang</groupId>
+      <artifactId>commons-lang</artifactId>
+    </dependency>
   </dependencies>
 
 </project>

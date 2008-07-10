@@ -34,6 +34,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a client application simulator
  * package to be run against a {@link ServerApp} in a DTC test.
@@ -113,4 +115,24 @@ public class ClientApp implements Serializable
     @JoinColumn(name = "requiredPkg", nullable = false)
     public PkgLibrary getRequiredPkg() { return requiredPkg; }
     public void setRequiredPkg(PkgLibrary requiredPkg) { this.requiredPkg = requiredPkg; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof ClientApp) || o == null) return false;
+
+        ClientApp other = (ClientApp)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getConfigs(), other.getConfigs()) &&
+                ObjectUtils.equals(this.getRequiredPkg(), other.getRequiredPkg());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

@@ -40,6 +40,8 @@ import javax.persistence.CascadeType;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents an instance of an execution of a {@link TestSuite}.
  * A TestExecution also retains all of the configuration options,
@@ -175,5 +177,31 @@ public class TestExecution implements Serializable
     @JoinColumn(name = "originalTestSuite", nullable = false)
     public TestSuite getOriginalTestSuite() { return originalTestSuite; }
     public void setOriginalTestSuite(TestSuite originalTestSuite) { this.originalTestSuite = originalTestSuite; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecution) || o == null) return false;
+
+        TestExecution other = (TestExecution)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDateStarted(), other.getDateStarted()) &&
+                ObjectUtils.equals(this.getDateFinished(), other.getDateFinished()) &&
+                ObjectUtils.equals(this.getTags(), other.getTags()) &&
+                ObjectUtils.equals(this.getResults(), other.getResults()) &&
+                ObjectUtils.equals(this.getOriginalTestSuiteDarkstarPkg(), other.getOriginalTestSuiteDarkstarPkg()) &&
+                ObjectUtils.equals(this.getOriginalTestSuiteName(), other.getOriginalTestSuiteName()) &&
+                ObjectUtils.equals(this.getOriginalTestSuiteDescription(), other.getOriginalTestSuiteDescription()) &&
+                ObjectUtils.equals(this.getOriginalTestSuite(), other.getOriginalTestSuite());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
     
 }

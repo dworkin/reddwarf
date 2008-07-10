@@ -34,6 +34,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.Version;
 import javax.persistence.ManyToOne;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a collection of tests in the form of @link{TestSpec} objects
  * that are to be run in succession as a suite.
@@ -116,4 +118,25 @@ public class TestSuite implements Serializable
                inverseJoinColumns = @JoinColumn(name = "testSpecId"))
     public List<TestSpec> getTestSpecs() { return testSpecs; }
     public void setTestSpecs(List<TestSpec> testSpecs) { this.testSpecs = testSpecs; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestSuite) || o == null) return false;
+
+        TestSuite other = (TestSuite)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getDarkstarPkg(), other.getDarkstarPkg()) &&
+                ObjectUtils.equals(this.getTestSpecs(), other.getTestSpecs());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

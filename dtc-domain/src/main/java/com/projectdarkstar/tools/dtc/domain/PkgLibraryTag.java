@@ -31,6 +31,8 @@ import javax.persistence.Column;
 import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a tag entity used to categorize {@link PkgLibrary}
  * objects.
@@ -77,5 +79,22 @@ public class PkgLibraryTag implements Serializable
     @OrderBy("name")
     public List<PkgLibrary> getLibraries() { return libraries; }
     public void setLibraries(List<PkgLibrary> libraries) { this.libraries = libraries; }
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof PkgLibraryTag) || o == null) return false;
+
+        PkgLibraryTag other = (PkgLibraryTag)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTag(), other.getTag()) &&
+                ObjectUtils.equals(this.getLibraries(), other.getLibraries());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTag = 31*hash + ObjectUtils.hashCode(this.getTag());
+        return hashId + hashTag;
+    }
 }
 

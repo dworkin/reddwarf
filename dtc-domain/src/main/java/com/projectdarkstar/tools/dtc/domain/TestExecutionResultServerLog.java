@@ -35,6 +35,8 @@ import javax.persistence.JoinTable;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Captures complete runtime configuration and result log file for the
  * execution of the server application on a specific resource during
@@ -140,7 +142,7 @@ public class TestExecutionResultServerLog implements Serializable
     private void setOriginalServerAppRequiredPkg(PkgLibrary originalServerAppRequiredPkg) { this.originalServerAppRequiredPkg = originalServerAppRequiredPkg; }
     
     @Column(name = "originalServerAppConfigName", nullable = false)
-    public String originalServerAppConfigName() { return originalServerAppConfigName; }
+    public String getOriginalServerAppConfigName() { return originalServerAppConfigName; }
     private void setOriginalServerAppConfigName(String originalServerAppConfigName) { this.originalServerAppConfigName = originalServerAppConfigName; }
     
     @Column(name = "originalServerAppConfigAdditionalCommandLine", nullable = false)
@@ -165,5 +167,34 @@ public class TestExecutionResultServerLog implements Serializable
     @JoinColumn(name = "parentResult", nullable = false)
     public TestExecutionResult getParentResult() { return parentResult; }
     public void setParentResult(TestExecutionResult parentResult) { this.parentResult = parentResult; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultServerLog) || o == null) return false;
+
+        TestExecutionResultServerLog other = (TestExecutionResultServerLog)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getResource(), other.getResource()) &&
+                ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
+                ObjectUtils.equals(this.getOriginalServerAppName(), other.getOriginalServerAppName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppDescription(), other.getOriginalServerAppDescription()) &&
+                ObjectUtils.equals(this.getOriginalServerAppClassName(), other.getOriginalServerAppClassName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppClassPath(), other.getOriginalServerAppClassPath()) &&
+                ObjectUtils.equals(this.getOriginalServerAppRequiredPkg(), other.getOriginalServerAppRequiredPkg()) &&
+                ObjectUtils.equals(this.getOriginalServerAppConfigName(), other.getOriginalServerAppConfigName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppConfigAdditionalCommandLine(), other.getOriginalServerAppConfigAdditionalCommandLine()) &&
+                ObjectUtils.equals(this.getOriginalServerAppConfig(), other.getOriginalServerAppConfig()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashOriginalServerAppName = 31*hash + ObjectUtils.hashCode(this.getOriginalServerAppName());
+        return hashId + hashOriginalServerAppName;
+    }
     
 }

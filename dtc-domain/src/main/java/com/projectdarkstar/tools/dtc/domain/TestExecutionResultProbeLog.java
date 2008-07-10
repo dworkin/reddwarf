@@ -36,6 +36,8 @@ import javax.persistence.OneToMany;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Captures complete runtime configuration, hardware resource executed on,
  * and result log file for the execution of a {@link SystemProbe}
@@ -176,4 +178,33 @@ public class TestExecutionResultProbeLog implements Serializable
     @OrderBy("timestamp")
     public List<TestExecutionResultProbeData> getData() { return data; }
     public void setData(List<TestExecutionResultProbeData> data) { this.data = data; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultProbeLog) || o == null) return false;
+
+        TestExecutionResultProbeLog other = (TestExecutionResultProbeLog)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getResource(), other.getResource()) &&
+                ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeName(), other.getOriginalSystemProbeName()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeClassName(), other.getOriginalSystemProbeClassName()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeClassPath(), other.getOriginalSystemProbeClassPath()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeMetric(), other.getOriginalSystemProbeMetric()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeUnits(), other.getOriginalSystemProbeUnits()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbeRequiredPkg(), other.getOriginalSystemProbeRequiredPkg()) &&
+                ObjectUtils.equals(this.getOriginalSystemProbe(), other.getOriginalSystemProbe()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult()) &&
+                ObjectUtils.equals(this.getData(), other.getData());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashOriginalSystemProbeName = 31*hash + ObjectUtils.hashCode(this.getOriginalSystemProbeName());
+        return hashId + hashOriginalSystemProbeName;
+    }
 }

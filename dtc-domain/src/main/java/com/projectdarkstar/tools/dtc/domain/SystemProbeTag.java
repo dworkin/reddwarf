@@ -31,6 +31,8 @@ import javax.persistence.Column;
 import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a tag entity used to categorize {@link SystemProbe}
  * objects.
@@ -77,4 +79,22 @@ public class SystemProbeTag implements Serializable
     @OrderBy("name")
     public List<SystemProbe> getProbes() { return probes; }
     public void setProbes(List<SystemProbe> probes) { this.probes = probes; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof SystemProbeTag) || o == null) return false;
+
+        SystemProbeTag other = (SystemProbeTag)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTag(), other.getTag()) &&
+                ObjectUtils.equals(this.getProbes(), other.getProbes());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTag = 31*hash + ObjectUtils.hashCode(this.getTag());
+        return hashId + hashTag;
+    }
 }

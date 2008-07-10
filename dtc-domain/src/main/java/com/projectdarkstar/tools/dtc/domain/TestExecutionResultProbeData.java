@@ -32,6 +32,8 @@ import javax.persistence.TemporalType;
 import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a snapshot of the data collected by a specific {@link SystemProbe}
  * at a specific point in time.
@@ -81,4 +83,23 @@ public class TestExecutionResultProbeData implements Serializable
     @JoinColumn(name = "parentProbe", nullable = false)
     public TestExecutionResultProbeLog getParentProbe() { return parentProbe; }
     public void setParentProbe(TestExecutionResultProbeLog parentProbe) { this.parentProbe = parentProbe; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultProbeData) || o == null) return false;
+
+        TestExecutionResultProbeData other = (TestExecutionResultProbeData)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTimestamp(), other.getTimestamp()) &&
+                ObjectUtils.equals(this.getValue(), other.getValue()) &&
+                ObjectUtils.equals(this.getParentProbe(), other.getParentProbe());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTimestamp = 31*hash + ObjectUtils.hashCode(this.getTimestamp());
+        return hashId + hashTimestamp;
+    }
 }

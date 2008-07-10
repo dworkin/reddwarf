@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a complete test specification that pulls together all of the
@@ -256,4 +257,31 @@ public class TestSpecDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestSpecDTO) || o == null) return false;
+
+        TestSpecDTO other = (TestSpecDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getTestRunner(), other.getTestRunner()) &&
+                ObjectUtils.equals(this.getTimeLimit(), other.getTimeLimit()) &&
+                ObjectUtils.equals(this.getMaxClients(), other.getMaxClients()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getServerAppConfig(), other.getServerAppConfig()) &&
+                ObjectUtils.equals(this.getClientAppConfigs(), other.getClientAppConfigs()) &&
+                ObjectUtils.equals(this.getSystemProbes(), other.getSystemProbes()) &&
+                ObjectUtils.equals(this.getServerResources(), other.getServerResources()) &&
+                ObjectUtils.equals(this.getClientResources(), other.getClientResources());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

@@ -23,6 +23,7 @@ import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
 import java.sql.Date;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a snapshot of the number of clients in the system at runtime
@@ -78,4 +79,23 @@ public class TestExecutionResultClientDataDTO extends AbstractDTO
     
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultClientDataDTO) || o == null) return false;
+
+        TestExecutionResultClientDataDTO other = (TestExecutionResultClientDataDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTimestamp(), other.getTimestamp()) &&
+                ObjectUtils.equals(this.getValues(), other.getValues()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTimestamp = 31*hash + ObjectUtils.hashCode(this.getTimestamp());
+        return hashId + hashTimestamp;
+    }
 }

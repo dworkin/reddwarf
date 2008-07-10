@@ -21,6 +21,7 @@ package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.sql.Date;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a snapshot of the data collected by a specific {@link SystemProbeDTO}
@@ -77,4 +78,22 @@ public class TestExecutionResultProbeDataDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultProbeDataDTO) || o == null) return false;
+
+        TestExecutionResultProbeDataDTO other = (TestExecutionResultProbeDataDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTimestamp(), other.getTimestamp()) &&
+                ObjectUtils.equals(this.getValue(), other.getValue()) &&
+                ObjectUtils.equals(this.getParentProbe(), other.getParentProbe());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTimestamp = 31*hash + ObjectUtils.hashCode(this.getTimestamp());
+        return hashId + hashTimestamp;
+    }
 }

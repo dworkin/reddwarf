@@ -20,6 +20,7 @@
 package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a property by mapping a property name to a value.
@@ -88,4 +89,23 @@ public class PropertyDTO extends AbstractDTO
     
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof PropertyDTO) || o == null) return false;
+
+        PropertyDTO other = (PropertyDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getProperty(), other.getProperty()) &&
+                ObjectUtils.equals(this.getValue(), other.getValue());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashProperty = 31*hash + ObjectUtils.hashCode(this.getProperty());
+        return hashId + hashProperty;
+    }
 }

@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Represents a tag entity used to categorize {@link TestExecutionDTO}
@@ -74,4 +75,21 @@ public class TestExecutionTagDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionTagDTO) || o == null) return false;
+
+        TestExecutionTagDTO other = (TestExecutionTagDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getTag(), other.getTag()) &&
+                ObjectUtils.equals(this.getExecutions(), other.getExecutions());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashTag = 31*hash + ObjectUtils.hashCode(this.getTag());
+        return hashId + hashTag;
+    }
 }

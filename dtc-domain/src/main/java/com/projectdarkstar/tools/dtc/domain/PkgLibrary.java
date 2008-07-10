@@ -37,6 +37,8 @@ import javax.persistence.OrderBy;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Represents a binary package library which is required for either
  * a {@link ClientApp}, {@link ServerApp}, or {@link SystemProbe} to
@@ -116,4 +118,24 @@ public class PkgLibrary implements Serializable
                inverseJoinColumns = @JoinColumn(name = "pkgLibraryTagId"))
     public List<PkgLibraryTag> getTags() { return tags; }
     public void setTags(List<PkgLibraryTag> tags) { this.tags = tags; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof PkgLibrary) || o == null) return false;
+
+        PkgLibrary other = (PkgLibrary)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getName(), other.getName()) &&
+                ObjectUtils.equals(this.getFile(), other.getFile()) &&
+                ObjectUtils.equals(this.getTags(), other.getTags());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashName = 31*hash + ObjectUtils.hashCode(this.getName());
+        return hashId + hashName;
+    }
 }

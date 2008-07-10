@@ -22,6 +22,7 @@ package com.projectdarkstar.tools.dtc.data;
 import com.projectdarkstar.tools.dtc.service.DTCInvalidDataException;
 import java.util.List;
 import java.util.ArrayList;
+import org.apache.commons.lang.ObjectUtils;
 
 /**
  * Captures complete runtime configuration, hardware resource executed on,
@@ -144,4 +145,31 @@ public class TestExecutionResultClientLogDTO extends AbstractDTO
 
     /** @inheritDoc */
     public void validate() throws DTCInvalidDataException {}
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestExecutionResultClientLogDTO) || o == null) return false;
+
+        TestExecutionResultClientLogDTO other = (TestExecutionResultClientLogDTO)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
+                ObjectUtils.equals(this.getResource(), other.getResource()) &&
+                ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
+                ObjectUtils.equals(this.getOriginalClientAppName(), other.getOriginalClientAppName()) &&
+                ObjectUtils.equals(this.getOriginalClientAppDescription(), other.getOriginalClientAppDescription()) &&
+                ObjectUtils.equals(this.getOriginalClientAppRequiredPkg(), other.getOriginalClientAppRequiredPkg()) &&
+                ObjectUtils.equals(this.getOriginalClientAppConfigName(), other.getOriginalClientAppConfigName()) &&
+                ObjectUtils.equals(this.getOriginalClientAppConfigPath(), other.getOriginalClientAppConfigPath()) &&
+                ObjectUtils.equals(this.getOriginalClientAppConfigPropertyMethod(), other.getOriginalClientAppConfigPropertyMethod()) &&
+                ObjectUtils.equals(this.getOriginalClientAppConfig(), other.getOriginalClientAppConfig()) &&
+                ObjectUtils.equals(this.getProperties(), other.getProperties()) &&
+                ObjectUtils.equals(this.getParentResult(), other.getParentResult());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        int hashOriginalClientAppName = 31*hash + ObjectUtils.hashCode(this.getOriginalClientAppName());
+        return hashId + hashOriginalClientAppName;
+    }
 }

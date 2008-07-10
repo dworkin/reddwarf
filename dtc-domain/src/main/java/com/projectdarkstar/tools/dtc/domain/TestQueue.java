@@ -34,6 +34,8 @@ import javax.persistence.EnumType;
 import javax.persistence.OneToOne;
 import javax.persistence.JoinColumn;
 
+import org.apache.commons.lang.ObjectUtils;
+
 /**
  * Wrapper object for a {@link TestExecution} that is currently running, or is
  * waiting to be run.  TestQueue objects are intended to be picked up by
@@ -100,5 +102,25 @@ public class TestQueue implements Serializable
     @JoinColumn(name = "currentlyRunning")
     public TestExecutionResult getCurrentlyRunning() { return currentlyRunning; }
     public void setCurrentlyRunning(TestExecutionResult currentlyRunning) { this.currentlyRunning = currentlyRunning; }
+    
+    
+    public boolean equals(Object o) {
+        if(this == o) return true;
+	if(!(o instanceof TestQueue) || o == null) return false;
+
+        TestQueue other = (TestQueue)o;
+        return ObjectUtils.equals(this.getId(), other.getId()) &&
+                ObjectUtils.equals(this.getDateQueued(), other.getDateQueued()) &&
+                ObjectUtils.equals(this.getDateStarted(), other.getDateStarted()) &&
+                ObjectUtils.equals(this.getStatus(), other.getStatus()) &&
+                ObjectUtils.equals(this.getExecution(), other.getExecution()) &&
+                ObjectUtils.equals(this.getCurrentlyRunning(), other.getCurrentlyRunning());
+    }
+    
+    public int hashCode() {
+        int hash = 7;
+        int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
+        return hashId;
+    }
     
 }
