@@ -77,7 +77,12 @@ public class TestExecutionResultProbeDataDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkNull("timestamp");
+        this.checkNull("value");
+        this.checkNull("parentProbe");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

@@ -82,7 +82,13 @@ public class TestExecutionResultClientDataTupleDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkNull("originalClientName");
+        this.checkNull("numClients");
+        this.checkNull("client");
+        this.checkNull("clientData");
+    }
     
     
     public boolean equals(Object o) {

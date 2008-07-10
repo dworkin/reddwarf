@@ -122,7 +122,15 @@ public class HardwareResourceFamilyDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("name");
+        this.checkNull("description");
+        this.checkNull("system");
+        this.checkNull("memory");
+        this.checkNull("os");
+        this.checkNull("families");
+    }
     
     
     public boolean equals(Object o) {

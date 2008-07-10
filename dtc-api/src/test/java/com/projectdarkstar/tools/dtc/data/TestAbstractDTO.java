@@ -83,6 +83,79 @@ public class TestAbstractDTO
         exceptionGetter.updateAttribute("attribute", "test2");
     }
     
+    
+    @Test
+    public void testValueToValidateUpdated() throws DTCInvalidDataException
+    {
+        //ensure that valueToValidate returns the value of the
+        //attribute in the updates map if an
+        //update has been made
+        NormalDTO object = new NormalDTO("test");
+        object.updateAttribute("attribute", "test2");
+        Object value = object.valueToValidate("attribute");
+        Assert.assertEquals(value, "test2");
+    }
+    
+    @Test
+    public void testValueToValidateNotUpdated() throws DTCInvalidDataException
+    {
+        //ensure that valueToValidate returns the current attribute
+        //if not update has been made
+        NormalDTO object = new NormalDTO("test");
+        Object value = object.valueToValidate("attribute");
+        Assert.assertEquals(value, "test");
+    }
+    
+    @Test (expected=DTCInvalidDataException.class)
+    public void testValueToValidateNonAttribute() throws DTCInvalidDataException
+    {
+        //ensure that valueToValidate throws the appropriate exception
+        //when trying to retrieve an attribute that doesn not exist
+        NormalDTO object = new NormalDTO("test");
+        Object value = object.valueToValidate("nothing");
+    }
+    
+    @Test
+    public void testCheckBlankNotBlank() throws DTCInvalidDataException
+    {
+        NormalDTO object = new NormalDTO("test");
+        object.checkBlank("attribute");
+    }
+    
+    @Test (expected=DTCInvalidDataException.class)
+    public void testCheckBlankBlank() throws DTCInvalidDataException
+    {
+        //ensure an exception is thrown when checking if a blank attribute
+        //is blank
+        NormalDTO object = new NormalDTO("");
+        object.checkBlank("attribute");
+    }
+    
+    @Test (expected=DTCInvalidDataException.class)
+    public void testCheckBlankNull() throws DTCInvalidDataException
+    {
+        //ensure an exception is thrown when checking if a blank attribute
+        //is null
+        NormalDTO object = new NormalDTO(null);
+        object.checkBlank("attribute");
+    }
+    
+    @Test
+    public void testCheckNullNotNull() throws DTCInvalidDataException
+    {
+        NormalDTO object = new NormalDTO("test");
+        object.checkNull("attribute");
+    }
+    
+    @Test (expected=DTCInvalidDataException.class)
+    public void testCheckNullNull() throws DTCInvalidDataException
+    {
+        //ensure an exception is thrown when checking if a null attribute
+        //is null
+        NormalDTO object = new NormalDTO(null);
+        object.checkNull("attribute");
+    }
+    
     public class NormalDTO extends AbstractDTO
     {
         private Object attribute;

@@ -70,7 +70,11 @@ public class SystemProbeTagDTO extends AbstractDTO
     protected void setProbes(List<SystemProbeDTO> probes) { this.probes = probes; }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("tag");
+        this.checkNull("probes");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

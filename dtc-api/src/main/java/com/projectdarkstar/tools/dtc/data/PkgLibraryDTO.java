@@ -105,7 +105,12 @@ public class PkgLibraryDTO extends AbstractDTO
     }
     
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("name");
+        this.checkNull("file");
+        this.checkNull("tags");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

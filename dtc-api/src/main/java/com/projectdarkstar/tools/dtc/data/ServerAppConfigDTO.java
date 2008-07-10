@@ -106,7 +106,13 @@ public class ServerAppConfigDTO extends AbstractDTO
     protected void setProperties(List<PropertyDTO> properties) { this.properties = properties; }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("name");
+        this.checkNull("additionalCommandLine");
+        this.checkNull("serverApp");
+        this.checkNull("properties");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

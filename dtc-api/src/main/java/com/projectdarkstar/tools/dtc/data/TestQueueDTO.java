@@ -99,7 +99,12 @@ public class TestQueueDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkNull("dateQueued");
+        this.checkNull("status");
+        this.checkNull("execution");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

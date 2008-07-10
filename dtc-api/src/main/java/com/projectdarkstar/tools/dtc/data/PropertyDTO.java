@@ -88,7 +88,12 @@ public class PropertyDTO extends AbstractDTO
     }
     
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkNull("description");
+        this.checkBlank("property");
+        this.checkNull("value");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

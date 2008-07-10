@@ -112,7 +112,13 @@ public class TestSuiteDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException
+    {
+        this.checkBlank("name");
+        this.checkNull("description");
+        this.checkNull("darkstarPkg");
+        this.checkNull("testSpecs");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;

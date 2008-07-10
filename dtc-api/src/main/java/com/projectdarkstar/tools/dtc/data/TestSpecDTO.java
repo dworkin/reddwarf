@@ -256,7 +256,20 @@ public class TestSpecDTO extends AbstractDTO
     }
 
     /** @inheritDoc */
-    public void validate() throws DTCInvalidDataException {}
+    public void validate() throws DTCInvalidDataException 
+    {
+        this.checkBlank("name");
+        this.checkNull("description");
+        this.checkBlank("testRunner");
+        this.checkNull("timeLimit");
+        this.checkNull("maxClients");
+        this.checkNull("properties");
+        this.checkNull("serverAppConfig");
+        this.checkNull("clientAppConfigs");
+        this.checkNull("systemProbes");
+        this.checkNull("serverResources");
+        this.checkNull("clientResources");
+    }
     
     public boolean equals(Object o) {
         if(this == o) return true;
