@@ -94,7 +94,6 @@ public final class TransactionAwareLogManager extends LogManager {
 	super();
 	unconfiguredLoggers = new ArrayDeque<TransactionalLogger>();
 	appNamespace = null;
-	System.out.println(this + " was created!");
     }
 
     /**
@@ -105,22 +104,18 @@ public final class TransactionAwareLogManager extends LogManager {
      *
      * <p>
      *
-     * Note that prior to this call, some {@code Logger} instances may
-     * have been statically created.  However, because the {@code
-     * TransactionProxy} isn't available until the {@code Kernel}
-     * boots, these instances remain in an inconsistent state where
-     * any that are supposed to have transactional semantics will not.
-     * After this call returns all inconsistencies will have been
-     * resolved an any new instances will have the correct semantics.
+     * Note that prior to this call, the application's namespace is
+     * not known so any {@code Logger} instances will be of type
+     * {@link TransactionalLogger}, but will be configured as
+     * non-transactional.  After this call, any of these instances
+     * that were in the application's namespace will be transactional.
      *
      * @param properties the properties for configuring this component
      * @param txnProxy the transaction proxy     
      */
-    public void configure(Properties properties,
-			  TransactionProxy txnProxy) {
+    public synchronized void configure(Properties properties,
+				       TransactionProxy txnProxy) {
 	this.txnProxy = txnProxy;
-
-	System.out.println(this + " is now configure with the TxnProxy");
 
 	String appListener = 
 	    properties.getProperty(StandardProperties.APP_LISTENER);
@@ -131,29 +126,26 @@ public final class TransactionAwareLogManager extends LogManager {
 	// use the namespace provided by the application listener.
 	appNamespace = properties.getProperty(APP_NAMESPACE_PROPERTY,
 					      defaultAppNamespace);
-
 	
-	synchronized(this) {
-	    // reconfigure any inconsistent Loggers that were created
-	    // prior to this LogManager being configured.  This could
-	    // have happened if the Loggers were created statically
-	    // when the application's classes were loaded.  
+	// Now that the namespace is known, check any non-transaction
+	// TransactionalLoggers that were created prior to this
+	// LogManager being configured.  This could have happened if
+	// the Loggers were created statically when the application's
+	// classes were loaded.  If any of these Loggers are in the
+	// application's namespace, have them configured to be
+	// transactional.
+	for (TransactionalLogger lgr : unconfiguredLoggers) {
 	    
-	    for (TransactionalLogger lgr : unconfiguredLoggers) {
-		
-		// This list will likely include any of the servers
-		// loggers that were created statically, so we test to
-		// see whether the Logger belongs to the app's
-		// namespace before configuring its handlers
-		if (lgr.getName().startsWith(appNamespace)) {
-		    System.out.println("Configured to be transactional: " +
-				       lgr.getName());
-		    lgr.reconfigure(txnProxy);
-		    lgr.config("This logger now has transactional semantics");
-		}
+	    // This list will likely include any of the servers
+	    // loggers that were created statically, so we test to see
+	    // whether the Logger belongs to the app's namespace
+	    // before configuring its handlers
+	    if (lgr.getName().startsWith(appNamespace)) {
+		lgr.reconfigure(txnProxy);
+		lgr.config("This logger now has transactional semantics");
 	    }
-	    unconfiguredLoggers.clear();
 	}
+	unconfiguredLoggers.clear();	
     }
 
     /**
@@ -183,8 +175,8 @@ public final class TransactionAwareLogManager extends LogManager {
 	    // if no current Logger associated with that name, create
 	    // the appropriate type of Logger.  If the
 	    // transactionProxy is null, we haven't been configured
-	    // yet, so create a TransactionalLogger with an
-	    // inconsistent state.  
+	    // yet, so create a TransactionalLogger but mark it
+	    // non-transactional.
 	    //
 	    // If we have been configured (txnProxy and name will be
 	    // non-null), see if the requested Logger's name is in the
@@ -225,20 +217,6 @@ public final class TransactionAwareLogManager extends LogManager {
 	public SimpleLogger(String name, String resourceBundleName) {
 	    super(name, resourceBundleName);
 	}
-
-	/**
-	 * Returns the default {@code Logger} toString() value.
-	 */
-	public String toString() {
-	    // return the original toString() to avoid having the
-	    // developer see the type of this class if they were to
-	    // print out the Logger, since this class exists solely as
-	    // a kludge for creating new Logger instances.  Of course
-	    // they can always call getClass() to find out the actual
-	    // type, but we want this to be as indistinguishable as
-	    // possible.
-	    return "java.util.logging.Logger@" + hashCode();
-	}
     }
 
     /**
@@ -260,7 +238,12 @@ public final class TransactionAwareLogManager extends LogManager {
     private static final class TransactionalLogger extends Logger {
 
 	/**
-	 * The proxy used to 
+	 * The proxy that allows any {@link TransactionalHandler}
+	 * associated with this {@code Logger} to join the current
+	 * transaction.  Note that if this {@code Logger} was created
+	 * before the {@link
+	 * TransactionAwareLogManager#configure(Properties,TransactionProxy}}
+	 * has been called, this will be {@code null}.
 	 */
 	private TransactionProxy txnProxy;
 
@@ -285,7 +268,6 @@ public final class TransactionAwareLogManager extends LogManager {
 				   TransactionProxy txnProxy) {
 	    super(name, resourceBundleName);
 	    this.txnProxy = txnProxy;
-	    System.out.println(this + " was created!");
 	}
 				      
 	/**
@@ -345,8 +327,6 @@ public final class TransactionAwareLogManager extends LogManager {
 		// feasibly adjust some settings so that the RootLogger
 		// had no handler and none of the child Loggers did as
 		// well.
-		System.err.printf("Could not find parent for logger %s that " 
-				  + "had a handler!\n", this);
 		return;
 	    }
 	    
@@ -354,7 +334,6 @@ public final class TransactionAwareLogManager extends LogManager {
 	    // can later wrap it.
 	    Handler[] arr = parent.getHandlers();
 	    for (Handler h : arr) {
-		System.out.println(this + " wrapped parent Hander: " + h);
 		addHandler(h);
 	    }
 	    
@@ -383,7 +362,7 @@ public final class TransactionAwareLogManager extends LogManager {
 	// acquired lock a on the TxnAwareLogManager.  Therefore
 	// neither methods of this class require locks
 	void reconfigure(TransactionProxy txnProxy) {
-	    if (this.txnProxy != null)
+	    if (this.txnProxy != null || txnProxy == null)
 		return;
 	    
 	    this.txnProxy = txnProxy;
@@ -413,17 +392,23 @@ public final class TransactionAwareLogManager extends LogManager {
 		    // could result in non-transactional logging
 		    setUseParentHandlers(false);
 		}
-	    }	    
+	    }
+	    
+	    // lastly, note in the logging stream that this Logger is
+	    // now transactional.
+	    config("This logger now has transactional semantics");
 	}
 
 	/**
 	 * Returns the type and name of this {@code Logger} if this
 	 * instance has transaction semantics, or otherwise returns
 	 * the default {@link Logger#toString()}.
+	 *
+	 * @return a description of this logger
 	 */
 	public String toString() {
 	    return (txnProxy == null)
-		? "java.util.logging.Logger@" + hashCode()
+		? "Non-transactional Logger:" + getName()
 		: "TransactionalLogger:" + getName();
 	}
 
