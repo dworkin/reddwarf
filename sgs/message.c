@@ -150,12 +150,13 @@ int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
 int sgs_msg_deserialize(sgs_message* pmsg, uint8_t *buffer, size_t buflen) {
     uint32_t net_len;
     
-    /** read message-length-field (first 2 bytes) */
+    /** read message-length-field (first 2 bytes). This is the payload
+     *  length, not the length of the entire buffer*/
     net_len = *((uint16_t*)buffer);
     pmsg->len = ntohs(net_len);
   
     /** account for the 2-bytes holding the length itself */
-    pmsg->len += 2;
+   // pmsg->len += 2;
   
     /** check if buffer is long enough to contain this whole message. */
     if (buflen < pmsg->len) {
@@ -187,7 +188,7 @@ const uint8_t *sgs_msg_get_data(const sgs_message *pmsg) {
  * sgs_msg_get_datalen()
  */
 uint16_t sgs_msg_get_datalen(const sgs_message *pmsg) {
-    return pmsg->len - SGS_MSG_INIT_LEN;
+    return pmsg->len;
 }
 
 /*
@@ -201,7 +202,7 @@ uint8_t sgs_msg_get_opcode(const sgs_message *pmsg) {
  * sgs_msg_get_size()
  */
 uint16_t sgs_msg_get_size(const sgs_message *pmsg) {
-    return pmsg->len;
+    return pmsg->len + SGS_MSG_INIT_LEN;
 }
 
 

@@ -50,7 +50,7 @@ typedef struct {
     /* Buffer capacity. */
     size_t capacity;
 
-    /* Message length. */
+    /* Message length. This includes the 2-byte payload length*/
     uint16_t len;
 
 } sgs_message;
