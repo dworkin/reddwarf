@@ -748,6 +748,9 @@ public class ClientSessionImpl
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
+	/** Constructs a disconnect event. */
+	DisconnectEvent() {}
+
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();

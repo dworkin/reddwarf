@@ -254,7 +254,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
 	     */
-	    assert session instanceof ClientSessionWrapper;
 	    addEvent(new JoinEvent(unwrapSession(session)));
 
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
@@ -285,7 +284,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
-		assert session instanceof ClientSessionWrapper;
 		addEvent(new JoinEvent(unwrapSession(session)));
 	    }
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
@@ -400,7 +398,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue leave request with underlying (unwrapped) client
 	     * session object.
 	     */
-	    assert session instanceof ClientSessionWrapper;
 	    addEvent(new LeaveEvent(unwrapSession(session)));
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
 
@@ -430,7 +427,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
-		assert session instanceof ClientSessionWrapper;
 		addEvent(new LeaveEvent(unwrapSession(session)));
 	    }
 	    logger.log(Level.FINEST, "leave sessions:{0} returns", sessions);
@@ -468,7 +464,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * this channel's coordinator to service the event.
      */
     void send(ClientSession sender, ByteBuffer message) {
-	assert sender == null || sender instanceof ClientSessionWrapper;
 	try {
 	    checkClosed();
 	    if (message == null) {
