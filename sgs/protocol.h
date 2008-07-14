@@ -72,14 +72,16 @@ extern "C" {
 
     /**
      * The maximum length of any protocol message field defined as a
-     * String or byte[]: 65535 bytes
+     * String or byte[]: 65535 bytes. This includes the two bytes at the
+     * beginning of the message, which give the length of the rest.
      */
 #define SGS_MSG_MAX_LENGTH 65535
 
     /**
-     * The maximum payload length, in bytes
+     * The maximum payload length, in bytes. The payload includes the opcode,
+     * which is always the first byte.
      */
-#define SGS_MAX_PAYLOAD_LENGTH 65532
+#define SGS_MAX_PAYLOAD_LENGTH 65533
 
     /**
      * This is the size of the static portion of a message (i.e. with a message

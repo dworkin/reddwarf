@@ -217,15 +217,20 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             sizeof (session->msg_buf)) == -1)
         return -1;
 
-    //sgs_msg_dump(&msg);
+    sgs_msg_dump(&msg);
 
     /** Get the length of the payload, and a pointer to the beginning of the 
      *  payload
      */
     msg_datalen = sgs_msg_get_datalen(&msg);
     msg_data = sgs_msg_get_data(&msg);
+    
+    /* set the offset to account for the opcode, which is the first byte
+     * of the payload
+     */
     offset = 1;
 
+    printf ("data length = %d, opcode = %c\n", msg_datalen, sgs_msg_get_opcode(&msg));
     switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
             /** reconnection-key; the key is a byte[] and, since it is the only 
@@ -312,6 +317,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              */
 
             namelen = read_len_header(msg_data + offset);
+            printf("namelen = %d\n", namelen);
             offset += 2;
 
             /** field 2: channel-id  */
@@ -432,8 +438,9 @@ int sgs_session_impl_send_msg(sgs_session_impl *session) {
  */
 static uint16_t read_len_header(const uint8_t *data) {
     uint16_t tmp;
-    memcpy(&tmp, data, 2);
+    tmp = *((uint16_t*)data);
     return ntohs(tmp);
+    //return tmp;
 }
 
 static uint32_t read_uint32(const uint8_t *data) {
