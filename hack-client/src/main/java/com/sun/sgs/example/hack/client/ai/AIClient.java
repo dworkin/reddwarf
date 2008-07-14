@@ -25,6 +25,8 @@ import com.sun.sgs.example.hack.client.LobbyManager;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 
+import java.math.BigInteger;
+
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 
@@ -36,6 +38,46 @@ import java.util.TimerTask;
  * may extend this class as necessary to add additional features.
  */
 public class AIClient implements SimpleClientListener {
+
+
+    /**
+     * The possible states the client could be in.  
+     */
+    private enum State {
+	CREATE,
+	LOBBY,
+	DUNGEON
+    }
+
+    /**
+     * The current state of the server which determine the handler
+     * that gets the incoming message from the server
+     */
+    private State state;
+
+    /**
+     * A lookup table for determining the state based on the type of
+     * message seen.
+     */
+    private static final State[] stateTable = new State[25];
+
+    static {
+	// NOTE: we start in state CREATE, and once we transition from
+	// there, we can never go back, so no lookup should result in
+	// State.CREATE.
+
+	stateTable[11] = State.LOBBY;
+	stateTable[12] = State.LOBBY;
+	stateTable[13] = State.LOBBY;
+	stateTable[14] = State.LOBBY;
+	stateTable[15] = State.LOBBY;
+
+	stateTable[21] = State.DUNGEON;
+	stateTable[22] = State.DUNGEON;
+	stateTable[23] = State.DUNGEON;
+	stateTable[24] = State.DUNGEON;
+    }
+
 
     private final String name;
 
@@ -55,6 +97,8 @@ public class AIClient implements SimpleClientListener {
     private final SimpleClient simpleClient;
 
     private static final Timer timer = new Timer();
+
+    private BigInteger sessionId = null;
 
     private final CreatorListener creatorListener =
         new CreatorListener() {
@@ -96,6 +140,8 @@ public class AIClient implements SimpleClientListener {
         lobbyManager.setClient(simpleClient);
         creatorManager.setClient(simpleClient);
         dungeonManager.setClient(simpleClient);
+
+	state = State.CREATE;
     }
 
     public PasswordAuthentication getPasswordAuthentication() {
@@ -113,7 +159,7 @@ public class AIClient implements SimpleClientListener {
                     public void run() {
                         creatorManager.rollForStats(42);
                     }
-                }, 750);
+                }, 250);
             return creatorChannelListener;
         } else {
             aiDungeonListener.enteredDungeon();
@@ -135,12 +181,61 @@ public class AIClient implements SimpleClientListener {
         }
     }
 
-    public void loggedIn() {}
-    public void loginFailed(String reason) {}
-    public void disconnected(boolean graceful, String reason) {}
+    public void loggedIn() {
+        System.out.println(name + ": logged in");
+    }
+
+    public void loginFailed(String reason) {
+        System.out.println(name + ": login failed: " + reason);
+    }
+
+    public void disconnected(boolean graceful, String reason) {
+	System.out.println(name + ": disconnected: " + reason);
+    }
+
     public void reconnecting() {}
     public void reconnected() {}
-    public void receivedMessage(ByteBuffer message) {}
+
+    public void receivedMessage(ByteBuffer message) {
+
+	if (sessionId == null) {
+	    byte[] bytes = new byte[message.remaining()];
+	    message.get(bytes);
+	    sessionId = new BigInteger(1, bytes);
+	}
+	else {
+	    // peek at the command byte to determine what game state
+	    // we're in
+	    int command = (int)(message.get());
+
+	    // rewind the mark so the listeners can't tell we peeked.
+	    message.rewind();
+
+	    if (command == 0 || command == 1 ||
+		command == 8 || command == 9) {
+		// stay in the current state
+	    }
+	    else 
+		state = stateTable[command];	    
+
+	    switch (state) {
+	    case CREATE:		
+		creatorChannelListener.receivedMessage(null, message);
+		break;
+	    case LOBBY:
+		lobbyChannelListener.receivedMessage(null, message);
+		break;
+	    case DUNGEON:
+		dungeonChannelListener.receivedMessage(null, message);
+		break;
+	    default:
+		// NOTE: in the event of an unknown message type, the
+		//       client should handle the message more
+		//       gracefully.
+		System.out.println("unhandled state: " + state);
+	    }
+	}
+    }
 
     public static void main(String [] args) throws Exception {
         if (args.length != 1) {
@@ -149,8 +244,17 @@ public class AIClient implements SimpleClientListener {
         }
 
         for (int i = 0; i < Integer.valueOf(args[0]); i++) {
-            AIClient client = new AIClient(String.valueOf(Math.random()));
-            client.simpleClient.login(System.getProperties());
+
+	    // choose a unique identifier that reflects both its
+	    // creation order and has some random element to in in the
+	    // even that multiple JVMs running this code are started
+	    // and connect to the same host.
+	    AIClient client = new AIClient("AIClient-" + i + "-" + 
+					   (int)(Math.random() * 100));
+	    client.simpleClient.login(System.getProperties());
+	    // Sleep briefly to avoid possibly overwhelming the server
+	    // with simultaneous connections.
+	    Thread.sleep(100); 
         }
     }
 
