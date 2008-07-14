@@ -24,23 +24,11 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileProducer;
-
-
 /**
- * This is an implementation of <code>ChannelManager</code> used to support
- * profiling. It simply calls its backing manager for each manager method. If
- * no <code>ProfileRegistrar</code> is provided via
- * <code>setProfileRegistrar</code> then this manager does no reporting, and
- * only calls through to the backing manager. If the backing manager is also
- * an instance of <code>ProfileProducer</code> then it too will be supplied
- * with the <code>ProfileRegistrar</code> as described in
- * <code>setProfileRegistrar</code>.
- * <p>
- * Note that at present no operations are directly profiled by this class.
+ * This is implementation of {@code ChannelManager} simply calls its 
+ * backing manager for each manager method. 
  */
-public class ProfileChannelManager implements ChannelManager, ProfileProducer {
+public class ProfileChannelManager implements ChannelManager {
 
     // the channel manager that this manager calls through to
     private final ChannelManager backingManager;
@@ -52,20 +40,6 @@ public class ProfileChannelManager implements ChannelManager, ProfileProducer {
      */
     public ProfileChannelManager(ChannelManager backingManager) {
         this.backingManager = backingManager;
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note that if the backing manager supplied to the constructor is also
-     * an instance of <code>ProfileProducer</code> then its
-     * <code>setProfileRegistrar</code> will be invoked when this method
-     * is called.
-     */
-    public void setProfileRegistrar(ProfileCollector profileCollector) {
-        if (backingManager instanceof ProfileProducer)
-            ((ProfileProducer)backingManager).
-                setProfileRegistrar(profileCollector);
     }
 
     /**

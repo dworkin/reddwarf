@@ -58,7 +58,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * Creates an instance of <code>ProfileConsumerImpl</code>.
      *
      * @param profileCollector the backing <code>ProfileCollectorImpl</code>
-     * @param an identifier for this consumer
+     * @param name an identifier for this consumer
      */
     ProfileConsumerImpl(ProfileCollectorImpl profileCollector,
                         String name) {
@@ -338,8 +338,8 @@ class ProfileConsumerImpl implements ProfileConsumer {
             super(name, true, minLevel);
         }
         public void addSample(long value) {
-            // JANE if level is OK for this producer AND we're profiling ops
-            // then do this work...
+            // If the minimum level we want to profile at is greater than
+            // the current level, just return.
             if (minLevel.ordinal() > profileLevel.ordinal()) return;
             
             getReport().addLocalSample(getSampleName(), value);
@@ -363,8 +363,8 @@ class ProfileConsumerImpl implements ProfileConsumer {
         }
 
         public void addSample(long value) {
-            // JANE if level is OK for this producer AND we're profiling ops
-            // then do this work...
+            // If the minimum level we want to profile at is greater than
+            // the current level, just return.
             if (minLevel.ordinal() > profileLevel.ordinal()) return;
             
 	    if (samples.size() == maxSamples)

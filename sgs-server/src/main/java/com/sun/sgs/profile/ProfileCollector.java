@@ -87,16 +87,6 @@ public interface ProfileCollector {
      * @param listener the listener to remove
      */
     public void removeListener(ProfileListener listener);
-
-    /**
-     * Registers the given <code>ProfileProducer</code>.
-     *
-     * @param name a unique identifier for the consumer
-     *
-     * @return a <code>ProfileConsumer</code> that will consume profiling
-     *         data from the provided <code>ProfileProducer</code>
-     */
-    public ProfileConsumer registerProfileProducer(String name);
     
     /**
      * Notifies the collector that a thread has been added to the scheduler.

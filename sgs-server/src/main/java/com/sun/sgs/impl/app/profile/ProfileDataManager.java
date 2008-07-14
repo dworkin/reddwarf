@@ -23,30 +23,15 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileProducer;
-
 
 /**
- * This is an implementation of <code>DataManager</code> used to suport
- * profiling. It simply calls its backing manager for each manager method. If
- * no <code>ProfileRegistrar</code> is provided via
- * <code>setProfileRegistrar</code> then this manager does no reporting, and
- * only calls through to the backing manager. If the backing manager is also
- * an instance of <code>ProfileProducer</code> then it too will be supplied
- * with the <code>ProfileRegistrar</code> as described in
- * <code>setProfileRegistrar</code>.
+ * This implementation of {@code DataManager} simply calls its 
+ * backing manager for each manager method.
  */
-public class ProfileDataManager implements DataManager, ProfileProducer {
+public class ProfileDataManager implements DataManager {
 
     // the data manager that this manager calls through to
     private final DataManager backingManager;
-
-    // the operations being profiled
-    private ProfileOperation createReferenceOp = null;
 
     /**
      * Creates an instance of <code>ProfileDataManager</code>.
@@ -55,29 +40,6 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
      */
     public ProfileDataManager(DataManager backingManager) {
         this.backingManager = backingManager;
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Note that if the backing manager supplied to the constructor is also
-     * an instance of <code>ProfileProducer</code> then its
-     * <code>setProfileRegistrar</code> will be invoked when this method
-     * is called.
-     */
-    public void setProfileRegistrar(ProfileCollector profileCollector) {
-        ProfileConsumer consumer =
-            profileCollector.registerProfileProducer(this.getClass().getName());
-
-	if (consumer != null) {
-	    createReferenceOp = consumer.registerOperation("createReference", 
-                                                            ProfileLevel.MAX);
-	}
-
-        // call on the backing manager, if it's also profiling
-        if (backingManager instanceof ProfileProducer)
-            ((ProfileProducer)backingManager).
-                setProfileRegistrar(profileCollector);
     }
 
     /**
@@ -124,13 +86,8 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
 
     /**
      * {@inheritDoc}
-     * <p>
-     * Note that this method is the only one that is directly reported by
-     * this manager, if profiling is enabled.
      */
     public <T> ManagedReference<T> createReference(T object) {
-        if (createReferenceOp != null)
-            createReferenceOp.report();
         return backingManager.createReference(object);
     }
 

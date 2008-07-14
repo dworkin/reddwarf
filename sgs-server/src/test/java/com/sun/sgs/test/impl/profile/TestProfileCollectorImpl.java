@@ -22,7 +22,10 @@ package com.sun.sgs.test.impl.profile;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.UtilReflection;
+import java.lang.reflect.Field;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -33,6 +36,10 @@ public class TestProfileCollectorImpl extends TestCase {
     private SgsTestNode additionalNodes[];
     private ProfileCollector profileCollector;
     
+    private Field profileCollectorField = 
+            UtilReflection.getField(
+                com.sun.sgs.impl.profile.ProfileRegistrarImpl.class, 
+                "profileCollector");
     
     /** Constructs a test instance. */
     public TestProfileCollectorImpl(String name) throws Exception {
@@ -47,7 +54,8 @@ public class TestProfileCollectorImpl extends TestCase {
 
     protected void setUp(Properties props) throws Exception {
         serverNode = new SgsTestNode(APP_NAME, null, props);
-        profileCollector = serverNode.getProfileCollector();
+        profileCollector = getCollector(serverNode);
+        
     }
   
     /** Shut down the nodes. */
@@ -77,6 +85,14 @@ public class TestProfileCollectorImpl extends TestCase {
             additionalNodes[i] = node;
         }
     }
+    
+    /** Returns the profile collector for a given node */
+    private ProfileCollector getCollector(SgsTestNode node) throws Exception {
+        ProfileRegistrar registrar = 
+            node.getSystemRegistry().getComponent(
+                com.sun.sgs.profile.ProfileRegistrar.class);
+        return (ProfileCollector) profileCollectorField.get(registrar);
+    }
         ////////     The tests     /////////
     public void testDefaultKernel() {
         // The profile collector must not be null and the level must be "off"
@@ -93,7 +109,7 @@ public class TestProfileCollectorImpl extends TestCase {
                 "com.sun.sgs.impl.kernel.profile.level", "MIN");
         addNodes(serviceProps, 1);
 
-        ProfileCollector collector = additionalNodes[0].getProfileCollector();
+        ProfileCollector collector = getCollector(additionalNodes[0]);
         assertNotNull(collector);
         assertSame(ProfileLevel.MIN, collector.getGlobalProfileLevel());
 
@@ -107,7 +123,7 @@ public class TestProfileCollectorImpl extends TestCase {
         serviceProps.setProperty(
                 "com.sun.sgs.impl.kernel.profile.level", "JUNKJUNK");
         addNodes(serviceProps, 1);
-        ProfileCollector collector = additionalNodes[0].getProfileCollector();
+        ProfileCollector collector = getCollector(additionalNodes[0]);
         assertNotNull(collector);
         assertSame(ProfileLevel.MIN, collector.getGlobalProfileLevel());
     }
@@ -119,7 +135,7 @@ public class TestProfileCollectorImpl extends TestCase {
         serviceProps.setProperty(
                 "com.sun.sgs.impl.kernel.profile.level", "medium");
         addNodes(serviceProps, 1);
-        ProfileCollector collector = additionalNodes[0].getProfileCollector();
+        ProfileCollector collector = getCollector(additionalNodes[0]);
         assertNotNull(collector);
         assertSame(ProfileLevel.MEDIUM, collector.getGlobalProfileLevel());
     }
@@ -139,7 +155,10 @@ public class TestProfileCollectorImpl extends TestCase {
     }
     
     public void testSetGlobalLevel() {
-        ProfileConsumer pc = profileCollector.registerProfileProducer("unique");
+        ProfileRegistrar registrar = 
+            serverNode.getSystemRegistry().getComponent(
+                com.sun.sgs.profile.ProfileRegistrar.class);
+        ProfileConsumer pc = registrar.registerProfileProducer("unique");
         assertEquals(ProfileLevel.MIN, 
                      profileCollector.getGlobalProfileLevel());
         assertEquals(pc.getProfileLevel(), 

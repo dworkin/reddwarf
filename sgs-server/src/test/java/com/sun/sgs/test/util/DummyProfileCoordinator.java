@@ -23,12 +23,13 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
+import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 import com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /** Simple profiling utility to support tests. */
@@ -36,6 +37,8 @@ public class DummyProfileCoordinator {
 
     // the production collector
     private final ProfileCollectorImpl collector;
+    // and registrar
+    private final ProfileRegistrarImpl registrar;
 
     // a dummy task that represents all reports
     private static final KernelRunnable task = new DummyKernelRunnable();
@@ -44,7 +47,8 @@ public class DummyProfileCoordinator {
     private static final Identity owner = new DummyIdentity();
 
     // a single instance that will be non-null if we're profiling
-    private static DummyProfileCoordinator instance = null;
+    private static DummyProfileCoordinator instance = 
+            new DummyProfileCoordinator();
 
     // a lock to ensure shutdown is done correctly
     private static final Object lockObject = new String("lock");
@@ -52,27 +56,29 @@ public class DummyProfileCoordinator {
     /** Creates an instance of DummyProfileCoordinator */
     private DummyProfileCoordinator() {
         collector = new ProfileCollectorImpl(ProfileLevel.MIN);
+        registrar = new ProfileRegistrarImpl(collector);
         OperationLoggingProfileOpListener listener =
             new OperationLoggingProfileOpListener(System.getProperties(),
                                                   owner, null);
         collector.addListener(listener);
     }
 
-    /** Profiles the given producer, starting profiling if not started */
-    public static void startProfiling(ProfileProducer producer) {
+    /** Get the singleton registrar, used for creating services. */
+    public static ProfileRegistrar getRegistrar() {
+        return instance.registrar;
+    }
+
+    /** Starts profiling */
+    public static void startProfiling() {
         synchronized (lockObject) {
-            if (instance == null)
-                instance = new DummyProfileCoordinator();
-            producer.setProfileRegistrar(instance.collector);
+            instance.collector.setGlobalProfileLevel(ProfileLevel.MAX);
         }
     }
 
     /** Stops all profiling */
     public static void stopProfiling() {
         synchronized (lockObject) {
-            if (instance != null)
-                instance.shutdown();
-            instance = null;
+            instance.collector.setGlobalProfileLevel(ProfileLevel.MIN);
         }
     }
 
@@ -104,6 +110,7 @@ public class DummyProfileCoordinator {
     /** Shuts down the associated resource coordinator */
     public void shutdown() {
         synchronized (lockObject) {
+            instance.shutdown();
             instance = null;
         }
     }

@@ -316,14 +316,7 @@ public class SgsTestNode {
     public ComponentRegistry getSystemRegistry() {
         return systemRegistry;
     }
-
-    /**
-     * Returns the profile collector.
-     */
-    public ProfileCollector getProfileCollector() {
-        return systemRegistry.getComponent(com.sun.sgs.profile.ProfileCollector.class);
-    }
-    
+  
     /**
      * Returns the data service.
      */

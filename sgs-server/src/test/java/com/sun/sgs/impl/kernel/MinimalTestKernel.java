@@ -32,6 +32,7 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyIdentity;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.util.Properties;
@@ -63,6 +64,7 @@ public final class MinimalTestKernel {
 	taskScheduler.setContext(ctx);
 	registry.addComponent(taskScheduler);
 
+        registry.addComponent(DummyProfileCoordinator.getRegistrar());
 	ContextResolver.setTaskState(ctx, new DummyIdentity());
     }
 

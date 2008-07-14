@@ -23,35 +23,16 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileProducer;
-
 
 /**
- * This is an implementation of <code>TaskManager</code> used to support
- * profiling. It simply calls its backing manager for each manager method
- * after first reporting the call. If no <code>ProfileRegistrar</code> is
- * provided via <code>setProfileRegistrar</code> then this manager does no
- * reporting, and only calls through to the backing manager. If the backing
- * manager is also an instance of <code>ProfileProducer</code> then it too
- * will be supplied with the <code>ProfileRegistrar</code> as described in
- * <code>setProfileRegistrar</code>.
- * <p>
- * All of the standard Manager methods implemented here are profiled
- * directly.
+ * This is implementation of {@code TaskManager} simply calls its backing 
+ * manager for each manager method.
  */
-public class ProfileTaskManager implements TaskManager, ProfileProducer {
+public class ProfileTaskManager implements TaskManager {
 
     // the task manager that this manager calls through to
     private final TaskManager backingManager;
 
-    // the operations being profiled
-    private ProfileOperation scheduleTaskOp = null;
-    private ProfileOperation scheduleTaskDelayedOp = null;
-    private ProfileOperation scheduleTaskPeriodicOp = null;
 
     /**
      * Creates an instance of <code>ProfileTaskManager</code>.
@@ -64,37 +45,8 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
 
     /**
      * {@inheritDoc}
-     * <p>
-     * Note that if the backing manager supplied to the constructor is also
-     * an instance of <code>ProfileProducer</code> then its
-     * <code>setProfileRegistrar</code> will be invoked when this method
-     * is called.
-     */
-    public void setProfileRegistrar(ProfileCollector profileCollector) {
-        ProfileConsumer consumer =
-            profileCollector.registerProfileProducer(this.getClass().getName());
-
-        ProfileLevel level = ProfileLevel.MAX;
-	if (consumer != null) {
-	    scheduleTaskOp = consumer.registerOperation("scheduleTask", level);
-	    scheduleTaskDelayedOp =
-		consumer.registerOperation("scheduleDelayedTask", level);
-	    scheduleTaskPeriodicOp =
-		consumer.registerOperation("schedulePeriodicTask", level);
-	}
-
-        // call on the backing manager, if it's also profiling
-        if (backingManager instanceof ProfileProducer)
-            ((ProfileProducer)backingManager).
-                setProfileRegistrar(profileCollector);
-    }
-
-    /**
-     * {@inheritDoc}
      */
     public void scheduleTask(Task task) {
-        if (scheduleTaskOp != null)
-            scheduleTaskOp.report();
         backingManager.scheduleTask(task);
     }
 
@@ -102,8 +54,6 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
      * {@inheritDoc}
      */
     public void scheduleTask(Task task, long delay) {
-        if (scheduleTaskDelayedOp != null)
-            scheduleTaskDelayedOp.report();
         backingManager.scheduleTask(task, delay);
     }
 
@@ -112,8 +62,6 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
      */
     public PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
                                                    long period) {
-        if (scheduleTaskPeriodicOp != null)
-            scheduleTaskPeriodicOp.report();
         return backingManager.schedulePeriodicTask(task, delay, period);
     }
 

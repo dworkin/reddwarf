@@ -133,8 +133,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
-    /** {@inheritDoc} */
-    public ProfileConsumer registerProfileProducer(String name) {
+    /** Called by the profile registrar */
+    ProfileConsumer registerProfileProducer(String name) {
         ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
         consumers.put(pc.getName(), pc);
         return pc;

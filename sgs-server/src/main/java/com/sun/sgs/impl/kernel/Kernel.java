@@ -32,6 +32,7 @@ import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
+import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -47,8 +48,8 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileProducer;
 
+import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
@@ -141,7 +142,11 @@ class Kernel {
     private final ComponentRegistryImpl systemRegistry;
     
     // collector and reporter of profile information
+    // note that this object should never escape this kernel, as it contains
+    // methods that should only be called by objects created by this kernel
     private final ProfileCollectorImpl profileCollector;
+    // the registry object for creating profiling content objects
+    private final ProfileRegistrar profileRegistrar;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -172,8 +177,6 @@ class Kernel {
             try {
                 profileLevel = 
                         ProfileLevel.valueOf(level.toUpperCase(Locale.ENGLISH));
-                //JANE FOR NOW
-                logger.log(Level.INFO, "Profiling level is {0}", level);
                 if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(Level.CONFIG, "Profiling level is {0}", level);
                 }
@@ -187,6 +190,7 @@ class Kernel {
             }
             
             profileCollector = new ProfileCollectorImpl(profileLevel);
+            profileRegistrar = new ProfileRegistrarImpl(profileCollector);
 
             // create the authenticators and identity coordinator
             ArrayList<IdentityAuthenticator> authenticators =
@@ -223,7 +227,7 @@ class Kernel {
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
-            systemRegistry.addComponent(profileCollector);
+            systemRegistry.addComponent(profileRegistrar);
 
             // create the profiling listeners
             loadProfileListeners(profileCollector);
@@ -509,7 +513,6 @@ class Kernel {
     {
         Class<?> serviceClass = Class.forName(className);
         Service service = createService(serviceClass);
-        registerProducer(service);
         startupContext.addService(service);
     }
 
@@ -548,7 +551,6 @@ class Kernel {
         // create the manager and put it and the service in the collections
         // and the temporary startup context
         Object manager = managerConstructor.newInstance(service);
-        registerProducer(manager);
         startupContext.addService(service);
         startupContext.addManager(manager);
     }
@@ -569,16 +571,6 @@ class Kernel {
         // return a new instance
         return (Service)(serviceConstructor.
                          newInstance(appProperties, systemRegistry, proxy));
-    }
-    
-    /**
-     * Private helper that notifies the given {@code Object} of the
-     * {@code ProfileRegistrar} if the {@code Object} is an instance of
-     * {@code ProfileProducer} and profiling is enabled.
-     */
-    private void registerProducer(Object obj) {
-        if (obj instanceof ProfileProducer)
-            ((ProfileProducer)obj).setProfileRegistrar(profileCollector);
     }
 
     /** Start the application, throwing an exception if there is a problem. */
