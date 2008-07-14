@@ -64,6 +64,21 @@
 	 host -->
     <profile>
       <id>multi-node-server-app</id>
+      <!-- Never recreate the data store, the core node will do this 
+           if necessary. -->
+      <build>
+	<plugins>
+	  <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+	    <executions>
+	      <execution>
+		<id>clean-datastore</id>
+		<phase></phase>
+	      </execution>
+	    </executions>
+	  </plugin>
+	</plugins>
+      </build>
       <properties>
 	<run.phase>process-test-resources</run.phase>
 	<run.properties>${run.properties.multi.app}</run.properties>
