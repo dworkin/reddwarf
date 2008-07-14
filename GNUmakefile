@@ -25,7 +25,7 @@ $(LIB): $(OBJS)
 	$(AR) $@ $(OBJS)
 
 clean:
-	-/bin/rm -rf $(OBJDIR)
+	-/bin/rm -rf $(OBJDIR)/sgs
 	-@cd $(TOPDIR)/test && $(MAKE) $@
 	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
 
