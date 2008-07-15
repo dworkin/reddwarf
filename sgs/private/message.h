@@ -46,14 +46,14 @@
  * passed in prefixed with a two byte (unsigned short) length of the content.
  * Adding content will also update the size of the payload.
  *
- * Received messages are parsed by first calling sgs_message_deserialize, which
+ * Received messages are parsed by first calling sgs_msg_deserialize, which
  * determines the overall length of the incoming message and sets up the
  * sgs_message object that can be used to read the message. The buffer that
  * contains only the payload (that is, the opcode and any other content) can
  * be obtained by a call to sgs_msg_get_data, while the opcode can be obtained
  * by a call to sgs_msg_get_opcode. In all of the functions for getting 
- * information out of the buffer, the beginning of the part of the buffer that
- * is to be read must be passed to the reading function. 
+ * information out of the buffer, the start point for reading the buffer
+ * is passed to the reading function. 
  */
 
 #ifndef SGS_MESSAGE_H
