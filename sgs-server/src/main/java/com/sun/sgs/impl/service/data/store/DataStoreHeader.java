@@ -43,6 +43,12 @@ import java.math.BigInteger;
  * Key 4 stores the ID of the next free transaction ID number for the network
  * version to use in allocating transactions.
  *
+ * Key 5 stores the ID of the lowest allocation block placeholder, or -1 if
+ * there are no placeholders.  This field is used during initialization to
+ * remove any existing placeholders which were created for allocation blocks
+ * that are no longer in use.  Placeholders always appear at the end of each
+ * allocation block, whose size is fixed (as of version 4.0) at 1024 bytes.
+ *
  * In the classes database, keys whose initial byte is 1 map the SHA-1 hash of
  * the serialized form of a class descriptor (a ObjectStreamClass) to the class
  * ID, which is 4 byte integer.
@@ -58,24 +64,36 @@ import java.math.BigInteger;
  * In the oids database, keys are object IDs, and values are the bytes
  * representing the associated objects.
  *
- * As of version 3, the serialized forms used for the object values are
- * compressed as follows:
+ * The serialized forms used for the object values are compressed as follows:
  *
  * - If the first byte is 1, then the value was created by serialization
  *   protocol version 2, and the 4 bytes at the start of that format have been
- *   elided.  Otherwise, the first byte is 2, and is followed by the
- *   uncompressed data.
+ *   elided.
+ *
+ * - If the first byte is 2, then the subsequent bytes represent the
+ *   uncompressed object data.
  *
  * - Class descriptors in the serialized form have been replaced by an integer
  *   which refers to a class ID stored in the classes database.  The class IDs
  *   themselves have been compressed using the Int30 class
+ *
+ * Object values also have two additional, distinguished initial byte values
+ * to support placeholders:
+ *
+ * - If the first byte is 3, then the entry represents a placeholder.
+ *
+ * - If the first byte is 4, then the actual data value is represented by the
+ *   remaining bytes.  This "quoting" value can be used to represent data that
+ *   starts with the 3 that marks placeholders, or the 4 used for quoting.
+ *   Since serialized data will always start with 1 or 2, though, this value
+ *   should not be used in practice.
  *
  * Version history:
  *
  * Version 1.0: Initial version, 11/3/2006
  * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
  * Version 3.0: Add classes DB, compress object values, 5/18/2007
- * Version 3.1: Add placeholders, 7/8/2008
+ * Version 4.0: Add placeholders, 7/8/2008
  */
 final class DataStoreHeader {
 
@@ -97,14 +115,20 @@ final class DataStoreHeader {
      */
     static final long NEXT_TXN_ID_KEY = 4;
 
+    /**
+     * The key for the value of the first allocation block placeholder ID, used
+     * to cleanup unused placeholders at startup time.
+     */
+    static final long FIRST_PLACEHOLDER_ID_KEY = 5;
+
     /** The magic number: DaRkStAr. */
     static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
-    static final short MAJOR_VERSION = 3;
+    static final short MAJOR_VERSION = 4;
 
     /** The minor version number. */
-    static final short MINOR_VERSION = 1;
+    static final short MINOR_VERSION = 0;
 
     /** The first free object ID. */
     static final long INITIAL_NEXT_OBJ_ID = 1;
@@ -141,6 +165,14 @@ final class DataStoreHeader {
      */
     static final byte QUOTE_OBJ_VALUE = 4;
 
+    /**
+     * The size of allocation blocks.  The size is fixed so that it can be used
+     * at initialization time to find allocation block placeholders that appear
+     * at multiples of this size after the offset is stored under the
+     * FIRST_PLACEHOLDER_ID_KEY key.
+     */
+    static final int ALLOCATION_BLOCK_SIZE = 1024;
+
     /** This class cannot be instantiated. */
     private DataStoreHeader() {
 	throw new AssertionError();
@@ -174,7 +206,9 @@ final class DataStoreHeader {
 	    throw new DataStoreException("Major version number not found");
 	}
 	short majorVersion = DataEncoding.decodeShort(value);
-	if (majorVersion != MAJOR_VERSION) {
+	if (majorVersion < MAJOR_VERSION) {
+	    upgrade(db, dbTxn, majorVersion);
+	} else if (majorVersion > MAJOR_VERSION) {
 	    throw new DataStoreException(
 		"Wrong major version number: expected " + MAJOR_VERSION +
 		", found " + majorVersion);
@@ -184,6 +218,47 @@ final class DataStoreHeader {
 	    throw new DataStoreException("Minor version number not found");
 	}
 	return DataEncoding.decodeShort(value);
+    }
+
+    /**
+     * Upgrades a database with a lower major version to the current version if
+     * possible, and otherwise throws an exception.
+     */
+    private static void upgrade(
+	DbDatabase db, DbTransaction dbTxn, int majorVersion)
+	throws DataStoreException
+    {
+	switch (majorVersion) {
+	case 1:
+	case 2:
+	    throw new DataStoreException(
+		"Database version number " + majorVersion +
+		" is not supported");
+	case 3:
+	    upgrade3to4(db, dbTxn);
+	    break;
+	default:
+	    throw new AssertionError();
+	}
+    }
+
+    /**
+     * Updates database version 3 to version 4.  Although it would be
+     * theoretically possible for a version 3 database to contain data that
+     * could be mistaken for a placeholder or a quoted value, in practice all
+     * object values started with the two serialized version values (1 and 2).
+     * So, just update the major version number and add an entry for the first
+     * placeholder.
+     */
+    private static void upgrade3to4(DbDatabase db, DbTransaction dbTxn)
+	throws DataStoreException
+    {
+	db.put(dbTxn, DataEncoding.encodeLong(MAJOR_KEY),
+	       DataEncoding.encodeShort((short) 4));
+	boolean success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
+	    DataEncoding.encodeLong(-1));
+	assert success;
     }
 
     /**
@@ -214,12 +289,16 @@ final class DataStoreHeader {
 	    dbTxn, DataEncoding.encodeLong(NEXT_TXN_ID_KEY),
 	    DataEncoding.encodeLong(INITIAL_NEXT_TXN_ID));
 	assert success;
+	success = db.putNoOverwrite(
+	    dbTxn, DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
+	    DataEncoding.encodeLong(-1));
+	assert success;
     }
 
     /**
      * Returns the next available ID stored under the specified key, and
-     * increments the stored value by the specified amount.  The return value
-     * will be a positive number.
+     * increments the stored value by the specified amount, which must be
+     * greater than zero.  The return value will be a positive number.
      *
      * @param	key the key under which the ID is stored
      * @param	db the database
@@ -227,12 +306,17 @@ final class DataStoreHeader {
      * @param	increment the amount to increment the stored amount
      * @return	the next available ID
      * @throws	DbDatabaseException if a problem occurs accessing the database
+     * @throws	IllegalArgumentException if increment is not greater than zero
      */
     static long getNextId(long key,
 			  DbDatabase db,
 			  DbTransaction dbTxn,
 			  long increment)
     {
+	if (increment <= 0) {
+	    throw new IllegalArgumentException(
+		"The increment must be greater than zero");
+	}
 	byte[] keyBytes = DataEncoding.encodeLong(key);
 	byte[] valueBytes = db.get(dbTxn, keyBytes, true);
 	if (valueBytes == null) {

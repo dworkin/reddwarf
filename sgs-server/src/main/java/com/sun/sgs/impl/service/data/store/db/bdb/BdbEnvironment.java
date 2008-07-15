@@ -388,4 +388,14 @@ public class BdbEnvironment implements DbEnvironment {
 	    throw convertException(e, false);
 	}
     }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation returns {@code false} to specify that this
+     * environment does not require the use of allocation block placeholders.
+     */
+    public boolean useAllocationBlockPlaceholders() {
+	return false;
+    }
 }
