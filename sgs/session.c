@@ -230,7 +230,6 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
      */
     offset = 1;
 
-    printf ("data length = %d, opcode = %c\n", msg_datalen, sgs_msg_get_opcode(&msg));
     switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
             /** reconnection-key; the key is a byte[] and, since it is the only 
@@ -317,7 +316,6 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              */
 
             namelen = read_len_header(msg_data + offset);
-            printf("namelen = %d\n", namelen);
             offset += 2;
 
             /** field 2: channel-id  */
