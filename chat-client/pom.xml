@@ -64,6 +64,7 @@
 		      <jvmarg line="${run.jvm.args}"/>
 		      <sysproperty key="java.util.logging.config.file"
 				   file="${run.logging}"/>
+                      <sysproperty key="ChatClient.host" value="${chat.host}"/>
 		      <classpath>
 			<path refid="maven.test.classpath"/>
 		      </classpath>
@@ -82,6 +83,7 @@
   <properties>
     <run.jvm.args></run.jvm.args>
     <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
+    <chat.host>localhost</chat.host>
   </properties>
 
 
