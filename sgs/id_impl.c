@@ -78,7 +78,6 @@ size_t sgs_id_get_byte_len(const sgs_id_impl *id) {
     return id->buf_len;
 }
 
-
 /*
  * sgs_id_create()
  * creates a sgs_id_impl from the data stream. The argument data points
@@ -88,25 +87,26 @@ size_t sgs_id_get_byte_len(const sgs_id_impl *id) {
  */
 sgs_id_impl* sgs_id_create(const uint8_t* data, size_t len) {
     sgs_id_impl* id;
-    
-	id = malloc(sizeof(sgs_id_impl));
+
+    id = malloc(sizeof (sgs_id_impl));
     if (id == NULL) return NULL;
 
     id->buf_len = len;
 
     id->buf = malloc(len);
-	if (id->buf == NULL) {
-		free(id);
-		return NULL;
-		}
-	
-	memcpy(id->buf, data, len);
-	    
+    if (id->buf == NULL) {
+        free(id);
+        return NULL;
+    }
+
+    memcpy(id->buf, data, len);
+
     return id;
 }
 
 #ifndef NDEBUG
-# include <stdio.h>
+#include <stdio.h>
+
 void sgs_id_dump(const sgs_id_impl* id) {
     size_t i;
     for (i = 0; i < id->buf_len; ++i) {
@@ -115,13 +115,15 @@ void sgs_id_dump(const sgs_id_impl* id) {
     printf("\n");
 }
 #else /* NDEBUG */
-void sgs_id_dump(const sgs_id_impl* id) { }
+
+void sgs_id_dump(const sgs_id_impl* id) {
+}
 #endif /* NDEBUG */
 
 sgs_id_impl* sgs_id_duplicate(const sgs_id_impl* id) {
     sgs_id_impl* result;
-    
-    result = malloc(sizeof(sgs_id_impl));
+
+    result = malloc(sizeof (sgs_id_impl));
     if (result == NULL) return NULL;
 
     result->buf_len = id->buf_len;
@@ -131,7 +133,9 @@ sgs_id_impl* sgs_id_duplicate(const sgs_id_impl* id) {
 }
 
 void sgs_id_destroy(sgs_id_impl* id) {
-	free(id->buf);
-    free(id);
+    if (id != NULL){
+        free(id->buf);
+        free(id);
+    }
 }
 

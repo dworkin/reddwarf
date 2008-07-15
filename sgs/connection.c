@@ -382,9 +382,9 @@ static int consume_data(sgs_connection_impl *connection) {
     uint8_t *msgbuf = connection->session->msg_buf;
     uint32_t len;
   
-    while (sgs_buffer_peek(connection->inbuf, (uint8_t*)&len, 4) != -1) {
-        len = ntohl(len);
-        if (sgs_buffer_read(connection->inbuf, msgbuf, len + 4) == -1)
+    while (sgs_buffer_peek(connection->inbuf, (uint8_t*)&len, SGS_MSG_LENGTH_OFFSET) != -1) {
+        len = ntohs(len);
+        if (sgs_buffer_read(connection->inbuf, msgbuf, len + SGS_MSG_LENGTH_OFFSET) == -1)
             break;  /* not enough data in buffer (not a complete message) */
     
         if (sgs_session_impl_recv_msg(connection->session) == -1) return -1;

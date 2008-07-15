@@ -49,6 +49,33 @@
 
 static void update_msg_len(sgs_message *pmsg);
 
+
+/*
+ * sgs_msg_init()
+ */
+int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
+    sgs_opcode opcode)
+{
+    /** Buffer is too small to hold any messages (even w/o any payload). */
+    if (buflen < SGS_MSG_INIT_LEN) {
+        errno = ENOBUFS;
+        return -1;
+    }
+
+    if (buflen > SGS_MSG_MAX_LENGTH)
+        return -1;
+   	
+    pmsg->buf = buffer;
+    pmsg->capacity = buflen;
+    pmsg->len = 1;
+
+    pmsg->buf[SGS_OPCODE_OFFSET] = opcode;
+    update_msg_len(pmsg);
+  
+    return 0;
+}
+
+
 /*
  * sgs_msg_add_arb_content()
  */
@@ -105,15 +132,16 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
         return -1;
     }
   
-    /** copy the content's length over */
+    /** copy the content's length over, and update the length */
     _uint16_tmp = htons(clen);
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, &_uint16_tmp, 2);
-  
-    /** copy the content over */
-    memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET + 2, content, clen);
-  
-    /** update the message size fields (both in the struct and in the data) */
-    pmsg->len += clen + 2;
+    pmsg->len += 2;
+    
+    /** copy the content over, and update the length */
+    memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, content, clen);
+    pmsg->len += clen;
+    
+    /*update the overall length of the message*/
     update_msg_len(pmsg);
   
     return 0;
@@ -125,7 +153,8 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
  * to the message field
  */
 int sgs_msg_add_id(sgs_message *msg, const sgs_id *id) {
-    return sgs_msg_add_fixed_content(msg, sgs_id_get_bytes(id), sgs_id_get_byte_len(id));
+    return sgs_msg_add_fixed_content(msg, sgs_id_get_bytes(id), 
+            sgs_id_get_byte_len(id));
 }
 
 /*
@@ -150,12 +179,12 @@ int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
 int sgs_msg_deserialize(sgs_message* pmsg, uint8_t *buffer, size_t buflen) {
     uint32_t net_len;
     
-    /** read message-length-field (first 2 bytes) */
+    /** read message-length-field (first 2 bytes). This is the payload
+     *  length, not the length of the entire buffer*/
     net_len = *((uint16_t*)buffer);
     pmsg->len = ntohs(net_len);
   
-    /** account for the 2-bytes holding the length itself */
-    pmsg->len += 2;
+
   
     /** check if buffer is long enough to contain this whole message. */
     if (buflen < pmsg->len) {
@@ -187,7 +216,7 @@ const uint8_t *sgs_msg_get_data(const sgs_message *pmsg) {
  * sgs_msg_get_datalen()
  */
 uint16_t sgs_msg_get_datalen(const sgs_message *pmsg) {
-    return pmsg->len - SGS_MSG_INIT_LEN;
+    return pmsg->len;
 }
 
 /*
@@ -199,36 +228,12 @@ uint8_t sgs_msg_get_opcode(const sgs_message *pmsg) {
 
 /*
  * sgs_msg_get_size()
+ * 
  */
 uint16_t sgs_msg_get_size(const sgs_message *pmsg) {
-    return pmsg->len;
+    return pmsg->len + SGS_MSG_INIT_LEN;
 }
 
-
-/*
- * sgs_msg_init()
- */
-int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
-    sgs_opcode opcode)
-{
-    /** Buffer is too small to hold any messages (even w/o any payload). */
-    if (buflen < SGS_MSG_INIT_LEN) {
-        errno = ENOBUFS;
-        return -1;
-    }
-
-    if (buflen > SGS_MSG_MAX_LENGTH)
-        return -1;
-   	
-    pmsg->buf = buffer;
-    pmsg->capacity = buflen;
-    pmsg->len = 1;
-
-    pmsg->buf[SGS_OPCODE_OFFSET] = opcode;
-    update_msg_len(pmsg);
-  
-    return 0;
-}
 
 #ifndef NDEBUG
 void sgs_msg_dump(const sgs_message* msg) {

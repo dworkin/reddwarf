@@ -31,7 +31,29 @@
  */
 
 /*
- * This file provides declarations relating to network messages.
+ * This file provides declarations relating to network messages. The functions
+ * declared in this file are used to build messages sent to the server and 
+ * decode messages sent from the server. The protocol used to define these
+ * messages can be found in protocol.h, which also contains a number of
+ * constants that are used to build and parse these messages.
+ *
+ * Messages are built by calling sgs_msg_init, passing in a pointer to the
+ * message buffer, a pointer to the backing buffer, the size of the backing
+ * buffer, and the opcode of the message to be constructed. The rest of the
+ * message is constructed by calls to the sgs_msg_add* functions. These in 
+ * turn are grounded in either sgs_msg_add_arb_content(), which will add the bytes
+ * passed into the buffer, or sgs_msg_add_fixed_content, which will add the bytes
+ * passed in prefixed with a two byte (unsigned short) length of the content.
+ * Adding content will also update the size of the payload.
+ *
+ * Received messages are parsed by first calling sgs_msg_deserialize, which
+ * determines the overall length of the incoming message and sets up the
+ * sgs_message object that can be used to read the message. The buffer that
+ * contains only the payload (that is, the opcode and any other content) can
+ * be obtained by a call to sgs_msg_get_data, while the opcode can be obtained
+ * by a call to sgs_msg_get_opcode. In all of the functions for getting 
+ * information out of the buffer, the start point for reading the buffer
+ * is passed to the reading function. 
  */
 
 #ifndef SGS_MESSAGE_H
@@ -50,7 +72,7 @@ typedef struct {
     /* Buffer capacity. */
     size_t capacity;
 
-    /* Message length. */
+    /* Message length. This includes the 2-byte payload length*/
     uint16_t len;
 
 } sgs_message;
