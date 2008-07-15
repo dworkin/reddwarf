@@ -163,7 +163,7 @@
             </goals>
 	    <configuration>
               <tasks>
-		<delete dir="${project.build.directory}/dsdb/"/>
+		<delete dir="${datastore.dir}"/>
               </tasks>
             </configuration>
 	  </execution>
@@ -179,7 +179,7 @@
             </goals>
             <configuration>
               <tasks>
-                <mkdir dir="${project.build.directory}/dsdb/"/>
+                <mkdir dir="${datastore.dir}"/>
               </tasks>
             </configuration>
           </execution>
@@ -226,6 +226,8 @@
 			       file="${run.logging}"/>
 		  <sysproperty key="com.sun.sgs.impl.service.data.store.db.environment.class"
 			       value="${run.bdb.env}"/>
+                  <sysproperty key="com.sun.sgs.impl.service.data.store.DataStoreImpl.directory"
+                               value="${datastore.dir}"/>
                   <sysproperty key="com.sun.sgs.server.host"
                                value="${com.sun.sgs.server.host}"/>
 		  <classpath>
@@ -254,6 +256,7 @@
     <run.properties.single>src/test/properties/HackSingle.properties</run.properties.single>
     <run.properties.multi.core>src/test/properties/HackMulti.properties</run.properties.multi.core>
     <run.properties.multi.app>src/test/properties/HackApp.properties</run.properties.multi.app>
+    <datastore.dir>${project.build.directory}/dsdb</datastore.dir>
     <com.sun.sgs.server.host>localhost</com.sun.sgs.server.host>
   </properties>
 
