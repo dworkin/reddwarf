@@ -217,7 +217,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             sizeof (session->msg_buf)) == -1)
         return -1;
 
-    sgs_msg_dump(&msg);
+    //sgs_msg_dump(&msg);
 
     /** Get the length of the payload, and a pointer to the beginning of the 
      *  payload
