@@ -31,7 +31,6 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
@@ -316,7 +315,7 @@ public class SgsTestNode {
     public ComponentRegistry getSystemRegistry() {
         return systemRegistry;
     }
-  
+
     /**
      * Returns the data service.
      */
