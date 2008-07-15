@@ -250,11 +250,11 @@ sub read_line_if_exists {
     if (is_repository_url($file)) {
 	chomp($result = `$svn cat $file 2>&1`);
 	if ($? != 0) {
-	    if ($result =~ /^svn: File not found/) {
+	    if ($result =~ /^svn: (File|.*\n.* path) not found/) {
 		$result = "";
 	    } else {
 		my $message = $result || $!;
-		die "Error: Commmand failed: /'$svn cat $file/': $message\n";
+		die "Error: Command failed: \'$svn cat $file\': $message\n";
 	    }
 	}
     } elsif (-e $file) {
