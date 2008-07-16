@@ -1938,6 +1938,15 @@ public class TestDataStoreImpl extends TestCase {
 
     /** Test that allocation block placeholders get removed at startup. */
     public void testRemoveAllocationPlaceholders() throws Exception {
+	/*
+	 * Only run this test against a local data store because it requires
+	 * shutting the data store down, and we can only do that with a local
+	 * one.  -tjb@sun.com (07/16/2008)
+	 */
+	if (!(store instanceof DataStoreImpl)) {
+	    System.err.println("Not a local store, skipping");
+	    return;
+	}
 	/* Create objects but don't create data */
 	for (int i = 0; i < 1025; i++) {
 	    if (i % 25 == 0) {
