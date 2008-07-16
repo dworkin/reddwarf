@@ -220,7 +220,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     //sgs_msg_dump(&msg);
 
     /** Get the length of the payload, and a pointer to the beginning of the 
-     *  payload
+     *  payload. The payload includes the opcode, so we will have to set an
+     *  offset to insure that we pass in the beginning of the part of the 
+     *  buffer that we need read to the appropriate functions
      */
     msg_datalen = sgs_msg_get_datalen(&msg);
     msg_data = sgs_msg_get_data(&msg);
