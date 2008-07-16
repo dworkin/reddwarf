@@ -191,6 +191,27 @@ int sgs_msg_add_uint16(sgs_message *msg, uint16_t val);
 int sgs_msg_add_uint32(sgs_message* pmsg, uint32_t val);
 
 /*
+ * function: sgss_msg_add_string()
+ *
+ * Writes a string to an existing message. It will first write the length of 
+ * the string, then the contents of the character array, stripping off the
+ * null terminating byte. It will then update the overall length of the message
+ * payload by the length of the string less the null termination plus two bytes 
+ * (for the length). The length will be written in a form that is appropriate
+ * for transmission over the network.
+ *
+ *  args:
+ *      pmsg: pointer to the message to which the string is added
+ *      content: pointer to the string to be added
+ *
+ *  returns:
+ *      0: success
+ *     -1: failure
+ *
+ */
+int sgs_msg_add_string(sgs_message* pmsg, const char* content);
+
+/*
  * function: sgs_msg_deserialize()
  *
  * Initializes a message from a byte-array. The function first determines the
@@ -297,7 +318,7 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char * re
  * message buffer, whichever comes first. The results buffer must be allocated 
  * by the caller. Returns the number of bytes transferred, or -1 on failure
  */
-int sgs_msg_read_bytes(const sgs_message *pmst, const uint16_t start, uint8_t *result, int count);
+int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t *result, uint16_t count);
 
 /*
  * function: sgs_msg_dump()
