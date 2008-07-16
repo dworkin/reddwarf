@@ -181,7 +181,7 @@ public class DataStoreImpl
     private final DbDatabase classesDb;
 
     /** The database that maps object IDs to object bytes. */
-    private final DbDatabase oidsDb;
+    final DbDatabase oidsDb;
 
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
@@ -191,7 +191,7 @@ public class DataStoreImpl
      * each allocation block.  These placeholders help to avoid allocation
      * concurrency conflicts when using BDB Java edition.
      */
-    private final boolean useAllocationBlockPlaceholders;
+    final boolean useAllocationBlockPlaceholders;
 
     /** Information about free object IDs. */
     final FreeObjectIds freeObjectIds;
@@ -366,10 +366,10 @@ public class DataStoreImpl
 	private ObjectIdInfo objectIdInfo = null;
 
 	/**
-	 * Object ID blocks whose last ID was used during this transaction, or
-	 * null if no blocks were made empty.  The empty blocks will be rolled
-	 * back on an abort, and their placeholders removed at commit time if
-	 * needed.
+	 * Object ID blocks whose last IDs were used during this transaction,
+	 * or null if there were no such blocks.  The empty blocks will be
+	 * rolled back on abort, and will have their placeholders removed on
+	 * commit.
 	 */
 	private List<ObjectIdInfo> emptyObjectIdInfo = null;
 
@@ -379,7 +379,7 @@ public class DataStoreImpl
 
 	/**
 	 * Prepares the transaction, first updating object ID information and
-	 * closing the cursors.
+	 * closing cursors.
 	 */
 	void prepare(byte[] gid) {
 	    prepareFreeObjectIds();
@@ -398,13 +398,13 @@ public class DataStoreImpl
 	}
 
 	/**
-	 * Updates free object ID information for a transaction that is going
-	 * to be committed.  Return object ID blocks that have more IDs, and
-	 * update allocation block placeholders for blocks that are empty, if
-	 * needed.
+	 * Updates object ID information for a transaction that is going to be
+	 * committed.  Returns object ID blocks that have more IDs to the free
+	 * list, and updates allocation block placeholders for blocks that are
+	 * empty.
 	 */
 	private void prepareFreeObjectIds() {
-	    /* Move objectIdInfo to emptyObjectIdInfo if it is now empty */
+	    /* Move an empty objectIdInfo to emptyObjectIdInfo */
 	    if (objectIdInfo != null && !objectIdInfo.hasNext()) {
 		if (emptyObjectIdInfo == null) {
 		    emptyObjectIdInfo = new LinkedList<ObjectIdInfo>();
@@ -413,9 +413,9 @@ public class DataStoreImpl
 		objectIdInfo = null;
 	    }
 	    /*
-	     * Remove placeholders for empty blocks, if needed.  Note that this
-	     * operation may fail, because it operates on the database, so do
-	     * it first and without holding the lock on the free object IDs.
+	     * Remove placeholders for empty blocks.  Note that this operation
+	     * may fail, because it operates on the database, so do it first
+	     * and without holding the lock on the free object IDs.
 	     */
 	    if (useAllocationBlockPlaceholders && emptyObjectIdInfo != null) {
 		for (ObjectIdInfo empty : emptyObjectIdInfo) {
@@ -596,7 +596,7 @@ public class DataStoreImpl
      * store.
      */
     private static class Databases {
-	private DbDatabase info, classes, oids, names;
+	DbDatabase info, classes, oids, names;
     }
 
     /** Stores information about free object IDs. */
@@ -630,8 +630,7 @@ public class DataStoreImpl
 	/**
 	 * Updates object ID information for a transaction that is going to be
 	 * committed.  Returns the object ID block, if not null, to the free
-	 * list, if not null, and updates placeholders for the empty blocks, if
-	 * needed.
+	 * list, and updates placeholders for the empty blocks.
 	 */
 	synchronized void prepare(ObjectIdInfo info,
 				  List<ObjectIdInfo> emptyObjectIdInfo)
@@ -1878,7 +1877,7 @@ public class DataStoreImpl
      * Checks if an object value read from the database is from a placeholder,
      * meaning there is no object present.
      */
-    private static boolean isPlaceholderValue(byte[] value) {
+    static boolean isPlaceholderValue(byte[] value) {
 	return value.length > 0 && value[0] == PLACEHOLDER_OBJ_VALUE;
     }
 
@@ -1893,7 +1892,7 @@ public class DataStoreImpl
 	    {
 		byte[] result = new byte[value.length + 1];
 		result[0] = QUOTE_OBJ_VALUE;
-		System.arraycopy(result, 1, value, 0, value.length);
+		System.arraycopy(value, 0, result, 1, value.length);
 		return result;
 	    }
 	}
@@ -1912,7 +1911,7 @@ public class DataStoreImpl
 		    "Attempt to decode a placeholder as an object value");
 	    } else if (value[0] == QUOTE_OBJ_VALUE) {
 		byte[] result = new byte[value.length - 1];
-		System.arraycopy(result, 0, value, 1, value.length - 1);
+		System.arraycopy(value, 1, result, 0, value.length - 1);
 		return result;
 	    }
 	}
@@ -1927,8 +1926,7 @@ public class DataStoreImpl
 	DbTransaction dbTxn, long placeholderOid)
     {
 	if (useAllocationBlockPlaceholders) {
-	    long firstPlaceholderOid =
-		freeObjectIds.getFirstPlaceholder();
+	    long firstPlaceholderOid = freeObjectIds.getFirstPlaceholder();
 	    if (firstPlaceholderOid == -1) {
 		firstPlaceholderOid = placeholderOid;
 	    }
@@ -1949,9 +1947,9 @@ public class DataStoreImpl
     }
 
     /**
-     * Store raw data for the specified object ID.  The value is used
-     * literally, so this method can be used to specify a placeholder or quoted
-     * value.  This method is intended for testing.
+     * Store raw data for the specified object ID.  The value is used as the
+     * literal data, without checking for placeholders or quoted values.  This
+     * method is intended for testing.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
