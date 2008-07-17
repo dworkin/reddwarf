@@ -20,22 +20,42 @@ import com.sun.sgs.example.hack.client.gui.GamePanel;
 import com.sun.sgs.example.hack.client.gui.LobbyPanel;
 import com.sun.sgs.example.hack.client.gui.PasswordDialog;
 
+
+import com.sun.sgs.example.hack.share.Board;
+import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
+import com.sun.sgs.example.hack.share.GameMembershipDetail;
+
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Container;
+import java.awt.Image;
 import java.awt.Window;
 
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+
 import java.math.BigInteger;
+
 import java.net.PasswordAuthentication;
+
 import java.nio.ByteBuffer;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.imageio.ImageIO;
+
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -46,44 +66,6 @@ import javax.swing.JPanel;
  * events from the server game app.
  */
 public class Client extends JFrame implements SimpleClientListener {
-
-    /**
-     * The possible states the client could be in.  
-     */
-    private enum State {
-	CREATE,
-	LOBBY,
-	DUNGEON
-    }
-
-    /**
-     * The current state of the server which determine the handler
-     * that gets the incoming message from the server
-     */
-    private State state;
-
-    /**
-     * A lookup table for determining the state based on the type of
-     * message seen.
-     */
-    private static final State[] stateTable = new State[25];
-
-    static {
-	// NOTE: we start in state CREATE, and once we transition from
-	// there, we can never go back, so no lookup should result in
-	// State.CREATE.
-
-	stateTable[11] = State.LOBBY;
-	stateTable[12] = State.LOBBY;
-	stateTable[13] = State.LOBBY;
-	stateTable[14] = State.LOBBY;
-	stateTable[15] = State.LOBBY;
-
-	stateTable[21] = State.DUNGEON;
-	stateTable[22] = State.DUNGEON;
-	stateTable[23] = State.DUNGEON;
-	stateTable[24] = State.DUNGEON;
-    }
 
     private static final long serialVersionUID = 1;
 
@@ -131,7 +113,7 @@ public class Client extends JFrame implements SimpleClientListener {
         crmanager = new CreatorManager();
         cmanager = new ChatManager();
         gmanager = new GameManager();
-
+	
         // setup the listeners to handle communication from the game app
         llistener = new LobbyChannelListener(lmanager, cmanager);
         crListener = new CreatorChannelListener(crmanager, cmanager);
@@ -157,9 +139,6 @@ public class Client extends JFrame implements SimpleClientListener {
 
         c.add(managerPanel, BorderLayout.CENTER);
         c.add(chatPanel, BorderLayout.SOUTH);
-
-	// we start off the client in the create state
-	state = State.CREATE;
     }
 
     /**
@@ -168,24 +147,24 @@ public class Client extends JFrame implements SimpleClientListener {
      * @throws Exception if the connection fails
      */
     public void connect() throws Exception {
-      pd = new PasswordDialog(this, "Name", "Password") {
+	pd = new PasswordDialog(this, "Name", "Password") {
 
-      @Override
-      public void connect(String login, char[] pass) {
-          try {
-            setupClient();
-            client.login(System.getProperties());
-          } catch (IOException ex) {
-            throw new RuntimeException(ex);
-          }
-        }
-      };
-      pd.pack();
-      pd.setVisible(true);
-      if (pd.isCancel()) {
-        setVisible(false);
-        dispose();
-      }
+		@Override
+		    public void connect(String login, char[] pass) {
+		    try {
+			setupClient();
+			client.login(System.getProperties());
+		    } catch (IOException ex) {
+			throw new RuntimeException(ex);
+		    }
+		}
+	    };
+	pd.pack();
+	pd.setVisible(true);
+	if (pd.isCancel()) {
+	    setVisible(false);
+	    dispose();
+	}
     }
 
     private void setupClient() {
@@ -201,17 +180,17 @@ public class Client extends JFrame implements SimpleClientListener {
     }
 
     public void loggedIn() {
-      pd.setVisible(false);
-      pd.dispose();
-      pd = null;
+	pd.setVisible(false);
+	pd.dispose();
+	pd = null;
     }
 
     public void loginFailed(String reason) {
-      pd.setConnectionFailed(reason);
+	pd.setConnectionFailed(reason);
     }
 
     public void disconnected(boolean graceful, String reason) {
-      pd.setConnectionFailed(reason);
+	pd.setConnectionFailed(reason);
     }
     public void reconnecting() {}
     public void reconnected() {}
@@ -225,6 +204,7 @@ public class Client extends JFrame implements SimpleClientListener {
      * @param channel the channel that we joined
      */
     public ClientChannelListener joinedChannel(ClientChannel channel) {
+
         // clear the chat area each time we join a new area
         chatPanel.clearMessages();
 
@@ -237,17 +217,21 @@ public class Client extends JFrame implements SimpleClientListener {
         // messages from the server
         if (channel.getName().equals("game:lobby")) {
             // we joined the lobby
-            lobbyPanel.clearList();
+            // lobbyPanel.clearList();
+            System.out.println("joined lobby channel");
             managerLayout.show(managerPanel, "lobby");
             return llistener;
-        } else if (channel.getName().equals("game:creator")) {
+        } 
+	else if (channel.getName().equals("game:creator")) {
             // we joined the creator
             System.out.println("joined creator channel");
             managerLayout.show(managerPanel, "creator");
             return crListener;
-        } else {
+        } 
+	else {
             // we joined some dungeon
             gamePanel.showLoadingScreen();
+	    System.out.println("joined " + channel.getName() + " channel");
             managerLayout.show(managerPanel, "game");
             // request focus so all key presses are captured
             gamePanel.requestFocusInWindow();
@@ -257,78 +241,205 @@ public class Client extends JFrame implements SimpleClientListener {
     }
 
     public void receivedMessage(ByteBuffer message) {
-        // NOTE: This wasn't available in the EA API, so the Hack code
-        // currently sends almost all messages from server to client on a
-        // specific channel, but that design should probably change now
 
-        // The only "direct" message is sent to the client to inform it
-        // that of its session id. -JM
 
 	if (chatPanel.getSessionId() == null) {
-
 	    byte[] bytes = new byte[message.remaining()];
 	    message.get(bytes);
 	    BigInteger sessionId = new BigInteger(1, bytes);
 	    chatPanel.setSessionId(sessionId);
 	}
 	else {
-	    // peek at the command byte to determine what game state
-	    // we're in
-	    int command = (int)(message.get());
+	    try {
+		int encodedCmd = (int)(message.getInt());
+		Command cmd = Commands.decode(encodedCmd);
+		
+		switch(cmd) {
 
-	    // rewind the mark so the listeners can't tell we peeked.
-	    message.rewind();
+		/*
+		 * When entering a new game state, the server will send us
+		 * a bulk mapping of all the player-ids to their names.
+		*/
+		case ADD_BULK_PLAYER_IDS:
+		    @SuppressWarnings("unchecked")
+			Map<BigInteger,String> playerIdsToNames = 
+			(Map<BigInteger,String>)(getObject(message));
+		    
+		    chatPanel.addPlayerIdMappings(playerIdsToNames);
+		    break;
+	    
+		/*
+		 * When creating a new character, the server will send us
+		 * new stats for the character.
+		 */
+		case NEW_CHARACTER_STATS:
+		    Object[] idAndStats = (Object[])(getObject(message));
+		    Integer id = (Integer)(idAndStats[0]);
+		    CharacterStats stats = (CharacterStats)(idAndStats[1]);
+		    crmanager.changeStatistics(id, stats);
+		    System.out.println("changed stats");		
+		    break;
 
-	    if (command == 0 || command == 1 ||
-		command == 8 || command == 9) {
-		// stay in the current state
+		/*
+		 * When we join the Lobby, the server will send us a
+		 * message of all the available games
+		 */
+		case UPDATE_AVAILABLE_GAMES: 
+		    // we were sent game membership updates
+		    @SuppressWarnings("unchecked")
+			Collection<GameMembershipDetail> details =
+			(Collection<GameMembershipDetail>)(getObject(message));
+		    for (GameMembershipDetail detail : details) {
+			// for each update, see if it's about the lobby
+			// or some specific dungeon
+			if (! detail.getGame().equals("game:lobby")) {
+			    // it's a specific dungeon, so add the game and
+			    // set the initial count
+			    lmanager.gameAdded(detail.getGame());
+			    lmanager.playerCountUpdated(detail.getGame(),
+							detail.getCount());
+			} else {
+			    // it's the lobby, so update the count
+			    lmanager.playerCountUpdated(detail.getCount());
+			}
+		    }		    
+		    break;
+
+		/*
+		 * When we join the lobby, the server will send us a
+		 * message with all the characters that our player has.
+		 */
+		case NOTIFY_PLAYABLE_CHARACTERS: 
+		    // we got updated with some character statistics...these
+		    // are characters that the client is allowed to play
+		    @SuppressWarnings("unchecked")
+			Collection<CharacterStats> characters =
+			(Collection<CharacterStats>)(getObject(message));
+		    lmanager.setCharacters(characters);		    
+		    break; 
+
+		/*
+		 * When we first join a dungeon, the server will send us
+		 * the sprite map that is used by the dungeon.
+		 */
+		case NEW_SPRITE_MAP:
+		    // we were sent game membership updates
+		    Object[] sizeAndSprites = (Object[])(getObject(message));
+		    Integer spriteSize = (Integer)(sizeAndSprites[0]);
+		    @SuppressWarnings("unchecked")
+			Map<Integer,byte[]> spriteMap =
+			(Map<Integer,byte[]>)(sizeAndSprites[1]);
+		    gmanager.setSpriteMap(spriteSize,
+					  convertMap(spriteMap));
+		    break;
+
+		/*
+		 * When we join a dungeon or move between levels in a
+		 * dungeon, the server will send us a full listing of all
+		 * the board spaces for the current dungeon level .  This
+		 * is essentially a client-directed, bulk update method
+		 * similar to the UPDATE_BOARD_SPACES command.
+		 */		
+		case NEW_BOARD:
+		    // we got a complete board update
+		    Board board = (Board)(getObject(message));
+		    gmanager.changeBoard(board);
+		    break;
+
+		/*
+		 * The server will occassionaly send us text messages
+		 * regarding the players state in the game.
+		 */
+		case NEW_SERVER_MESSAGE:
+		    // we heard some message from the server
+		    byte [] bytes = new byte[message.remaining()];
+		    message.get(bytes);
+		    String msg = new String(bytes);
+		    gmanager.hearMessage(msg);
+		    break;
+
+		default:
+		    System.out.printf("Received unknown command %s (%d) from the " +
+				      "server%n", cmd, encodedCmd);	
+
+		}
 	    }
-	    else 
-		state = stateTable[command];	    
-
-	    switch (state) {
-	    case CREATE:		
-		crListener.receivedMessage(null, message);
-		break;
-	    case LOBBY:
-		llistener.receivedMessage(null, message);
-		break;
-	    case DUNGEON:
-		dlistener.receivedMessage(null, message);
-		break;
-	    default:
-		// NOTE: in the event of an unknown message type, the
-		//       client should handle the message more
-		//       gracefully.
-		System.out.println("unhandled state: " + state);
+	    catch (IOException ioe) {
+		System.out.println("IOException caught while processing " + 
+				   "message from server");
+		ioe.printStackTrace();
 	    }
 	}
     }
 
+    /**
+     * Retrieves a serialized object from the given buffer.
+     *
+     * @param data the encoded object to retrieve
+     */
+    private static Object getObject(ByteBuffer data) throws IOException {
+	try {
+	    byte [] bytes = new byte[data.remaining()];
+	    data.get(bytes);
+	    
+	    ByteArrayInputStream bin = new ByteArrayInputStream(bytes);
+	    ObjectInputStream ois = new ObjectInputStream(bin);
+	    return ois.readObject();
+	} catch (ClassNotFoundException cnfe) {
+	    throw new IOException(cnfe.getMessage());
+	}
+    }
+    
+    /**
+     * A private helper that converts the map from the server (that
+     * maps integers to byte arrays) into the form needed on the
+     * client (that maps integers to images). The server sends the
+     * byte array form because images aren't serializable.
+     */
+    private static Map<Integer,Image> convertMap(Map<Integer,byte[]> map) {
+	Map<Integer,Image> newMap = new HashMap<Integer,Image>();
+	
+	// for each of the identified sprites, try to load the bytes
+	// as a recognizable image format and store in the new map
+	for (int identifier : map.keySet()) {
+	    try {
+		ByteArrayInputStream in =
+		    new ByteArrayInputStream(map.get(identifier));
+		newMap.put(identifier, ImageIO.read(in));
+	    } catch (IOException ioe) {
+		System.out.println("Failed to convert image: " + identifier);
+		ioe.printStackTrace();
+	    }
+	}
+	
+	return newMap;
+    }
+    
+    
+    
     /**
      * The main-line for the client app.
      *
      * @param args command-line arguments, which are ignored
      */
     public static void main(String [] args) throws Exception {
-        Client client = new Client();
-        client.pack();
-        client.setVisible(true);
-
-        client.connect();
+	Client client = new Client();
+	client.pack();
+	client.setVisible(true);
+	
+	client.connect();
     }
-
+    
     /**
      * Simple window monitor that quits the program when the main window
      * is closed.
      */
     class BasicWindowMonitor extends WindowAdapter {
-        public void windowClosing(WindowEvent e) {
-			Window w = e.getWindow();
-			w.setVisible(false);
-			w.dispose();
-			System.exit(0);
-		}
-    }
-
+	public void windowClosing(WindowEvent e) {
+	    Window w = e.getWindow();
+	    w.setVisible(false);
+	    w.dispose();
+	    System.exit(0);
+	}
+    }    
 }

@@ -112,9 +112,14 @@ public class ChatManager implements ChatListener
      * Notifies the manager about some set of mappings from identifier
      * to user name. This notifies all of the registered listeners.
      */
-    public void addUidMappings(Map<BigInteger,String> uidMap) {
+    public void addPlayerIdMappings(Map<BigInteger,String> uidMap) {
         for (ChatListener listener : listeners)
-            listener.addUidMappings(uidMap);
+            listener.addPlayerIdMappings(uidMap);
+    }
+
+    public void addPlayerIdMapping(BigInteger playerID, String playerName) {
+	for (ChatListener listener : listeners)
+            listener.addPlayerIdMapping(playerID, playerName);
     }
 
 }

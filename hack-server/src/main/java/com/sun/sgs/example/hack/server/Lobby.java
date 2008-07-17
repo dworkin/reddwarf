@@ -22,10 +22,13 @@ import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
 import java.io.Serializable;
 
+import java.math.BigInteger;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -55,7 +58,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     private ManagedReference<GameChangeManager> gcmRef;
 
     // the channel used for all players currently in the lobby
-    private ManagedReference<Channel> channelRef;
+    private ManagedReference<Channel> lobbyCommandsChannel;
 
     // the set of players in the lobby, mapping from the reference to
     // player's session to account name
@@ -83,7 +86,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
 	Channel channel = AppContext.getChannelManager().
             createChannel(IDENTIFIER, null, Delivery.RELIABLE);
 
-        channelRef = dataManager.createReference(channel);
+        lobbyCommandsChannel = dataManager.createReference(channel);
 
         // keep track of the MembershipChangeManager ref
         gcmRef = dataManager.createReference(gcm);
@@ -149,31 +152,44 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         ClientSession session = player.getCurrentSession();
 	ManagedReference<ClientSession> sessionRef = 
 	    AppContext.getDataManager().createReference(session);
+	BigInteger playerID = sessionRef.getId();
+
         String playerName = player.getName();
-        Messages.sendUidMap(session, playerName, channelRef.get(), 
-			    getCurrentUsers());
+	Messages.broadcastPlayerID(lobbyCommandsChannel.get(), playerName, 
+				   playerID);
 
         // add the player to the lobby channel and the player map
-        channelRef.get().join(session);
+        lobbyCommandsChannel.get().join(session);
         playerMap.put(sessionRef, playerName);
-        player.userJoinedChannel(channelRef.get());
+        player.userJoinedChannel(lobbyCommandsChannel.get());
 	
         // update the player about all uid to name mappings on the channel
-        Messages.sendUidMap(playerMap, channelRef.get(), session);
+	Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
+	for (Map.Entry<ManagedReference<ClientSession>,String> e :
+		 playerMap.entrySet()) {
 
-        Messages.sendPlayerJoined(player.getCurrentSession(), channelRef.get());
+	    idsToNames.put(e.getKey().getId(), e.getValue());
+	}
+	
+        Messages.sendBulkPlayerIDs(session, idsToNames);
 
-        // finally, send the player a welcome message...we need to create
-        // a new set around the details because the backing collection
-        // provided by Map.values() isn't serializable
-        HashSet<GameMembershipDetail> set =
+	// Let the other players in the lobby know that the new player
+	// has joined the lobby
+        Messages.broadcastPlayerJoined(lobbyCommandsChannel.get(), playerID);
+
+	// Send the current listing of available games to the new player
+        HashSet<GameMembershipDetail> availableGames =
             new HashSet<GameMembershipDetail>(countMap.values());
-        Messages.sendLobbyWelcome(set, channelRef.get(), session);
+
+        Messages.sendGameListing(session, availableGames);
+
+	// Send the player a current listing of the CharacterStats for
+	// each character assocated with this player.
         HashSet<CharacterStats> characters = new HashSet<CharacterStats>();
         for (Character character :
                  player.getCharacterManager().getCharacters())
             characters.add(character.getStatistics());
-        Messages.sendPlayerCharacters(characters, channelRef.get(), session);
+        Messages.sendPlayableCharacters(session, characters);
     }
 
     /**
@@ -184,14 +200,15 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     public void leave(Player player) {
         AppContext.getDataManager().markForUpdate(this);
 
-        Messages.sendPlayerLeft(player.getCurrentSession(), channelRef.get());
-
         // remove the player from the lobby channel and the local map
         ClientSession session = player.getCurrentSession();
 	ManagedReference<ClientSession> sessionRef = 
 	    AppContext.getDataManager().createReference(session);
+	BigInteger playerID = sessionRef.getId();
 
-        channelRef.get().leave(session);
+        Messages.broadcastPlayerLeft(lobbyCommandsChannel.get(), playerID);
+
+        lobbyCommandsChannel.get().leave(session);
         playerMap.remove(sessionRef);
 
         // send an update about the new lobby membership count
@@ -232,32 +249,17 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     }
 
     /**
-     * Private helper method that bundles the current set of player's UserIDs
-     * into an array to use in broadcasting messages.
-     */
-    private ClientSession [] getCurrentUsers() {
-	ClientSession[] users = new ClientSession[playerMap.size()];
-	int i = 0;
-        for (ManagedReference<ClientSession> sessionRef :  playerMap.keySet()) {
-	    users[i++] = sessionRef.get();
-	}
-	return users;
-    }
-
-    /**
      * Notifies the listener that some games were added to the app.
      *
      * @param games the games that were added
      */
-    public void gameAdded(Collection<String> games) {
+    public void gameAdded(Collection<String> added) {
         AppContext.getDataManager().markForUpdate(this);
 
-        ClientSession [] users = getCurrentUsers();
-
         // send out notice of the new games
-        for (String game : games) {
+        for (String game : added) {
             countMap.put(game, new GameMembershipDetail(game, 0));
-            Messages.sendGameAdded(game, channelRef.get(), users);
+            Messages.broadcastGameAdded(lobbyCommandsChannel.get(), game);
         }
     }
 
@@ -266,14 +268,12 @@ public class Lobby implements Game, GameChangeListener, Serializable {
      *
      * @param games the games that were removed
      */
-    public void gameRemoved(Collection<String> games) {
+    public void gameRemoved(Collection<String> removed) {
         AppContext.getDataManager().markForUpdate(this);
 
-        ClientSession [] users = getCurrentUsers();
-
         // send out notice of the removed games
-        for (String game : games) {
-            Messages.sendGameRemoved(game, channelRef.get(), users);
+        for (String game : removed) {
+            Messages.broadcastGameRemoved(lobbyCommandsChannel.get(), game);
             countMap.remove(game);
         }
     }
@@ -287,19 +287,16 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     public void membershipChanged(Collection<GameMembershipDetail> details) {
         AppContext.getDataManager().markForUpdate(this);
 
-        ClientSession [] users = getCurrentUsers();
-
         // for each change, track the detail locally (to send in welcome
         // messages when players first join) and send a message to all
         // current lobby members
 
-        // NOTE: depending on how the application treats individual
-        //       transmissions, the collection could be sent at once,
-        //       instead of sending each change separately
         for (GameMembershipDetail detail : details) {
             countMap.put(detail.getGame(), detail);
-            Messages.sendGameCountChanged(detail.getGame(), detail.getCount(),
-                                          channelRef.get(), users);
+
+            Messages.broadcastGameCountChanged(lobbyCommandsChannel.get(), 
+					       detail.getCount(),
+					       detail.getGame());
         }
     }
 

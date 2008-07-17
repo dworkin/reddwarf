@@ -15,6 +15,8 @@ import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
@@ -24,6 +26,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 
+import java.math.BigInteger;
+
 import java.nio.ByteBuffer;
 
 import java.util.Collection;
@@ -31,150 +35,143 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
 
-
 /**
  * This class provides a single point for static methods that send messages
  * the client. This is provided both as a convenience, and also as a way
  * to keep all message formatting in one place. All message formatting and
  * message code definition is done here.
  */
-public class Messages {
+public final class Messages {
 
     /**
-     * Generic method to send data to a set of users on a given channel.
-     *
-     * @param data the message
-     * @param channel the channel to send the message on
-     * @param users the set of users to send to
+     * Private constructor for preventing instantiation.
      */
-    public static void sendToClient(ByteBuffer data, 
-				    Channel channel,
-                                    ClientSession[] users) {
+    private Messages() { }
 
-        HashSet<ClientSession> recipients = new HashSet<ClientSession>();
-        for (ClientSession session : users)
-            recipients.add(session);
-        data.rewind();
-        byte [] bytes = new byte[data.remaining()];
-        data.get(bytes);
-	for (ClientSession user : users) {
-	    user.send(ByteBuffer.wrap(bytes));
-	}
-    }
+    //
+    // Actual data-sending methods
+    //
 
-    /**
-     * Generic method to send data to a set of users on a given channel. This
-     * serializes the data and sends the object to the client.
-     *
-     * @param command the message code, which will be included before the data
-     * @param data the message, which must be <code>Serializable</code>
-     * @param channel the channel to send the message on
-     * @param users the set of users to send to
-     */
-    public static void sendToClient(int command, Object data, Channel channel,
-                                    ClientSession [] users) {
-        // get the bytes
-        byte [] bytes = encodeObject(data);
+    private static void broadcastToClients(Channel channel,
+					   Command command,
+					   Object... args) {
+	byte [] bytes = encodeObjects(args);
+
+	System.out.printf("broadcasting command %s on channel %s%n",
+			   command, channel.getName());
         
         // create a buffer for the message code and the object bytes
-        ByteBuffer bb = ByteBuffer.allocate(bytes.length + 1);
-        bb.put((byte)command);
-        bb.put(bytes);
+	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
+	bb.putInt(Commands.encode(command));
+	bb.put(bytes);
+	bb.rewind();
 	
-	sendToClient(bb, channel, users);
+	channel.send(null, bb);	
+    }
+    
+    
+    private static void sendToClient(ClientSession session,
+				     Command command,
+				     Object... args) {
+	byte [] bytes = encodeObjects(args);
+        
+	System.out.printf("sending command %s to session %s%n",
+			  command, session.getName());
+
+        // create a buffer for the message code and the object bytes
+	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
+	bb.putInt(Commands.encode(command));
+	bb.put(bytes);
+	bb.rewind();
+	
+	session.send(bb);
     }
 
-    /**
-     * Private helper that encodes the data into an array of bytes
-     */
-    private static byte [] encodeObject(Object data) {
-        try {
-            // serialize the object to a stream
-            ByteArrayOutputStream bout = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(bout);
-            oos.writeObject(data);
 
-            // return the bytes
-            return bout.toByteArray();
+    //
+    // Helper methods
+    //
+
+    /**
+     * Encodes the provided arguments as bytes.  If the number of
+     * arguments is 1, then that argument is serialized by itself.
+     * Otherwise, the entire list of arguements is serialized withing
+     * an {@code Object[]}.
+     *
+     * @param args one or more arguments
+     *
+     * @return the serialized byte representation of the argument if
+     *         only one was provided, or of an {@Object[]} containing
+     *         all the arguments if more than one was provided.
+     */
+    private static byte [] encodeObjects(Object... args) {
+	try {
+	    // serialize each object to a stream
+	    ByteArrayOutputStream bout = new ByteArrayOutputStream();
+	    ObjectOutputStream oos = new ObjectOutputStream(bout);
+	    
+	    if (args.length == 1)
+		oos.writeObject(args[0]);
+	    else
+		oos.writeObject(args);
+	    oos.close();
+	    
+	    // return the bytes
+	    return bout.toByteArray();
         } catch (IOException ioe) {
             throw new IllegalArgumentException("couldn't encode object", ioe);
         }
     }
 
-    /**
-     * Sends whether a client has joined or left a channel.
-     */
-    private static void sendChannelNotice(ClientSession sender,
-					  byte [] session, Channel channel,
-                                          boolean joining) {
-        byte [] message = new byte[session.length + 1];
-        message[0] = joining ? (byte)8 : (byte)9;
-        for (int i = 0; i < session.length; i++)
-            message[i+1] = session[i];
-        channel.send(sender, ByteBuffer.wrap(message));
-    }
-
-    /**
-     * Returns the byte array representat of the id of the provided
-     * session.
-     */
-    private static byte[] getSessionIdBytes(ClientSession session) {
-        return AppContext.getDataManager().
-            createReference(session).getId().toByteArray();
-    }
+    
+    //
+    // Game-state notification methods
+    //
 
     /**
      * Notifies all the sessons on the channel that the provided
      * {@code ClientSession} has joined.
      */
-    public static void sendPlayerJoined(ClientSession session,
-                                        Channel channel) {
-        sendChannelNotice(session, getSessionIdBytes(session), channel, true);
+    public static void broadcastPlayerJoined(Channel channel,
+					     BigInteger playerID) {
+        broadcastToClients(channel, Command.PLAYER_JOINED,
+			   playerID);
     }
 
     /**
      * Notifies all the sessons on the channel that the provided
      * {@code ClientSession} has left.
      */
-    public static void sendPlayerLeft(ClientSession session,
-                                      Channel channel) {
-        sendChannelNotice(session, getSessionIdBytes(session), channel, false);
+    public static void broadcastPlayerLeft(Channel channel,
+					   BigInteger playerID) {
+        broadcastToClients(channel, Command.PLAYER_LEFT, 
+			   playerID);
     }
 
     /**
-     * Sends uid-to-name mapping. This bulk version is typically used when
-     * a player first joins a game, though it may be used at any point.
-     *
-     * @param uidMap the <code>Map</code> of references to client
-     *               sessions to login names
-     * @param channel the channel to send the message on
-     * @param uid the user to send to
+     * Sends the command to add the mapping from player ID to player
+     * name to all the clients on the provided channel.
      */
-    public static void sendUidMap(Map<ManagedReference<ClientSession>,String> uidMap,
-                                  Channel channel, ClientSession uid) {
-        Map<String,String> map = new HashMap<String,String>();
-        for (ManagedReference<ClientSession> sessionRef : uidMap.keySet()) {
-	    ClientSession session = sessionRef.get();
-            map.put(HexDumper.toHexString(getSessionIdBytes(session)), uidMap.get(session));
-	}
-        sendToClient(0, map, channel, new ClientSession [] {uid});
+    public static void broadcastPlayerID(Channel channel,
+					 String playerName,
+					 BigInteger playerID) {
+	broadcastToClients(channel, Command.ADD_PLAYER_ID, playerName,
+			   playerID);
     }
 
     /**
-     * Sends a single uid-to-name mapping.
-     *
-     * @param sesion the user's session
-     * @param name the user's login name
-     * @param channel the channel to send the message on
-     * @param users the users to send to
+     * Sends the command to add the all of the provided mappings from
+     * player ID to player name to all the clients on the provided
+     * channel.
      */
-    public static void sendUidMap(ClientSession session, String name,
-                                  Channel channel, ClientSession [] users) {
-        Map<String,String> map = new HashMap<String,String>();
-        map.put(HexDumper.toHexString(getSessionIdBytes(session)),name);
-        sendToClient(0, map, channel, users);
-    }
+    public static void sendBulkPlayerIDs(ClientSession session,
+					 Map<BigInteger,String> 
+					 idsToNames) {
 
+	sendToClient(session, Command.ADD_BULK_PLAYER_IDS,
+		     idsToNames);
+    }
+					  
 
     /*
      * START LOBBY MESSAGES
@@ -186,15 +183,12 @@ public class Messages {
      * correct lobby and game counts come from other messages.
      *
      * @param games the <code>Collection</code> of games and their detail
-     * @param channel the channel to send the message on
-     * @param session the user to send to
      */
-    public static void sendLobbyWelcome(Collection<GameMembershipDetail> games,
-                                        Channel channel, 
-					ClientSession session) {
-        ClientSession [] sessions = new ClientSession[] {session};
+    public static void sendGameListing(ClientSession session, 
+				       Collection<GameMembershipDetail> games) 
+    {
 
-        sendToClient(11, games, channel, sessions);
+        sendToClient(session, Command.UPDATE_AVAILABLE_GAMES, games);
     }
 
     /**
@@ -203,67 +197,42 @@ public class Messages {
      *
      * @param name the name of the game that changed
      * @param count the updated membership count
-     * @param channel the channel to send the message on
-     * @param users the users to send to
      */
-    public static void sendGameCountChanged(String name, int count,
-                                            Channel channel,
-                                            ClientSession [] users) {
-        ByteBuffer bb = ByteBuffer.allocate(5 + name.length());
+    public static void broadcastGameCountChanged(Channel channel,
+						 int count, String name) {
 
-        bb.put((byte)12);
-        bb.putInt(count);
-        bb.put(name.getBytes());
-
-        sendToClient(bb, channel, users);
+	broadcastToClients(channel, Command.UPDATE_GAME_MEMBER_COUNT, 
+			   new Integer(count), name);
     }
 
     /**
      * Sends notice to a set of clients that a game has been added.
      *
      * @param name the name of the game that was added
-     * @param channel the channel to send the message on
-     * @param users the users to send to
      */
-    public static void sendGameAdded(String name, Channel channel,
-                                     ClientSession [] users) {
-        ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
+    public static void broadcastGameAdded(Channel channel, String name) {
 
-        bb.put((byte)13);
-        bb.put(name.getBytes());
-
-        sendToClient(bb, channel, users);
+        broadcastToClients(channel, Command.GAME_ADDED, name);
     }
 
     /**
      * Sends notice to a set of clients that a game has been removed.
      *
      * @param name the name of the game that was added
-     * @param channel the channel to send the message on
-     * @param users the users to send to
      */
-    public static void sendGameRemoved(String name, Channel channel,
-                                       ClientSession [] users) {
-        ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
+    public static void broadcastGameRemoved(Channel channel, String name) {
 
-        bb.put((byte)14);
-        bb.put(name.getBytes());
-
-        sendToClient(bb, channel, users);
+        broadcastToClients(channel, Command.GAME_REMOVED, name);
     }
 
     /**
      * Sends a <code>Collection</code> of player statistics.
      *
      * @param stats the collection of character statistics
-     * @param channel the channel to send the message on
-     * @param session the user to send to
      */
-    public static void sendPlayerCharacters(Collection<CharacterStats> stats,
-                                            Channel channel,
-                                            ClientSession session) {
-
-        sendToClient(15, stats, channel, new ClientSession [] {session});
+    public static void sendPlayableCharacters(ClientSession session,
+					    Collection<CharacterStats> stats) {
+        sendToClient(session, Command.NOTIFY_PLAYABLE_CHARACTERS, stats);
     }
 
     /*
@@ -275,44 +244,34 @@ public class Messages {
      * typically done with each level.
      *
      * @param spriteMap the mapping from identifier to sprite
-     * @param channel the channel to send the message on
-     * @param session the user to send to
      */
-    public static void sendSpriteMap(SpriteMap spriteMap, Channel channel,
-                                     ClientSession session) {
-        // get the bytes
-        byte [] bytes = encodeObject(spriteMap.getSpriteMap());
-        ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
+    public static void sendSpriteMap(ClientSession session, 
+				     SpriteMap spriteMap) {
 
-        bb.put((byte)21);
-        bb.putInt(spriteMap.getSpriteSize());
-        bb.put(bytes);
-
-        sendToClient(bb, channel, new ClientSession [] {session});
+        sendToClient(session, Command.NEW_SPRITE_MAP, 
+		     new Integer(spriteMap.getSpriteSize()), 
+		     spriteMap.getSpriteMap());
     }
     
     /**
      * Sends a complete <code>Board</code> to a client.
      *
      * @param board the <code>Board</code> to send
-     * @param channel the channel to send the message on
-     * @param session the user to send to
      */
-    public static void sendBoard(Board board, Channel channel,
-                                 ClientSession session) {
-        sendToClient(22, board, channel, new ClientSession [] {session});
+    public static void sendBoard(ClientSession session, Board board) {
+	
+        sendToClient(session, Command.NEW_BOARD, board);
     }
 
     /**
      * Sends updates about a <code>Collection</code> of spaces.
      *
      * @param spaces the spaces that are being updated
-     * @param channel the channel to send the message on
-     * @param sessions the users to send to
      */
-    public static void sendUpdate(Collection<BoardSpace> spaces,
-                                  Channel channel, ClientSession [] sessions) {
-        sendToClient(23, spaces, channel, sessions);
+    public static void broadcastBoardUpdate(Channel channel,
+					    Collection<BoardSpace> spaces) 
+    {					    
+        broadcastToClients(channel, Command.UPDATE_BOARD_SPACES, spaces);
     }
 
     /**
@@ -320,17 +279,10 @@ public class Messages {
      * the game logic, not chat messages from other clients.
      *
      * @param message the message to send
-     * @param channel the channel to send the message on
-     * @param session the user to send to
      */
-    public static void sendTextMessage(String message, Channel channel,
-                                       ClientSession session) {
-        ByteBuffer bb = ByteBuffer.allocate(message.length() + 1);
+    public static void sendServerMessage(ClientSession session, String message) {
 
-        bb.put((byte)24);
-        bb.put(message.getBytes());
-
-        sendToClient(bb, channel, new ClientSession [] {session});
+        sendToClient(session, Command.NEW_SERVER_MESSAGE, message);
     }
 
     /*
@@ -342,19 +294,12 @@ public class Messages {
      *
      * @param id the character's id
      * @param stats the character's statistics
-     * @param channel the channel to send the message on
-     * @param session the user to send to
      */
-    public static void sendCharacter(int id, CharacterStats stats,
-                                     Channel channel, ClientSession session) {
-        byte [] bytes = encodeObject(stats);
-        ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
+    public static void sendCharacter(ClientSession session, int id,
+				     CharacterStats stats) {
 
-        bb.put((byte)1);
-        bb.putInt(id);
-        bb.put(bytes);
-
-        sendToClient(bb, channel, new ClientSession [] {session});
+        sendToClient(session, Command.NEW_CHARACTER_STATS, new Integer(id), 
+		     stats);
     }
 
 }

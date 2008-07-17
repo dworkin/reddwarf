@@ -13,6 +13,9 @@ import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
+
 import java.io.IOException;
 
 import java.math.BigInteger;
@@ -25,8 +28,7 @@ import java.util.Map;
 /**
  * This class listens for all messages from the lobby.
  */
-public class LobbyChannelListener extends GameChannelListener
-{
+public class LobbyChannelListener extends GameChannelListener {
 
     // the listener that gets notified on incoming messages
     private LobbyListener llistener;
@@ -54,83 +56,62 @@ public class LobbyChannelListener extends GameChannelListener
      */
     public void receivedMessage(ClientChannel channel, ByteBuffer data) {
 
-	// if this is a message from the server, then it's some
-	// command that we need to process, so get the command code
-	int command = (int)(data.get());
-	
-	// NOTE: for added robustness, the list of commands should
-	//       really be an enumeration
+	int encodedCmd = (int)(data.getInt());
+	Command cmd = Commands.decode(encodedCmd);
+
 	try {
-	    switch (command) {
-	    case 0:
-		// we got some uid to player name mapping
-		addUidMappings(data);
-		break;
-	    case 8:
-		notifyJoinOrLeave(data, true);
-		break;
-	    case 9:
-		notifyJoinOrLeave(data, true);
-		break;
-	    case 11:
-		// we were sent game membership updates
+	    switch (cmd) {
+
+	    case ADD_PLAYER_ID:
 		@SuppressWarnings("unchecked")
-                    Collection<GameMembershipDetail> details =
-		    (Collection<GameMembershipDetail>)(getObject(data));
-		for (GameMembershipDetail detail : details) {
-		    // for each update, see if it's about the lobby
-		    // or some specific dungeon
-		    if (! detail.getGame().equals("game:lobby")) {
-			// it's a specific dungeon, so add the game and
-			// set the initial count
-			llistener.gameAdded(detail.getGame());
-			llistener.playerCountUpdated(detail.getGame(),
-						     detail.getCount());
-		    } else {
-			// it's the lobby, so update the count
-			llistener.playerCountUpdated(detail.getCount());
-		    }
-		}
+		BigInteger playerID = (BigInteger)(getObject(data));
+		@SuppressWarnings("unchecked")
+		String playerName = (String)(getObject(data));
+		addPlayerIdMapping(playerID, playerName);
 		break;
-	    case 12: {
+
+	    case PLAYER_JOINED:
+		notifyJoin(data);
+		break;
+		
+	    case PLAYER_LEFT:
+		notifyLeave(data);
+		break;
+				
+	    case UPDATE_GAME_MEMBER_COUNT: {
+
 		// we got a membership count update for some game
-		int count = data.getInt();
-		byte [] bytes = new byte[data.remaining()];
-		data.get(bytes);
-		String name = new String(bytes);
-                    
+		Object[] countAndName = (Object[])(getObject(data));
+		Integer count = (Integer)(countAndName[0]);
+		String name = (String)(countAndName[1]);
+                
 		// see if it's the lobby or some specific dungeon, and
 		// update the count appropriately
 		if (name.equals("game:lobby"))
 		    llistener.playerCountUpdated(count);
-		else
-		    llistener.playerCountUpdated(name, count);
-		break; }
-	    case 13: {
+		    else
+			llistener.playerCountUpdated(name, count);
+	    }
+
+	    case GAME_ADDED: {
 		// we heard about a new game
 		byte [] bytes = new byte[data.remaining()];
 		data.get(bytes);
 		llistener.gameAdded(new String(bytes));
-		break; }
-	    case 14: {
+		break; 
+	    }
+
+	    case GAME_REMOVED: {
 		// we heard that a game was removed
 		byte [] bytes = new byte[data.remaining()];
 		data.get(bytes);
 		llistener.gameRemoved(new String(bytes));
-		break; }
-	    case 15: {
-		// we got updated with some character statistics...these
-		// are characters that the client is allowed to play
-		@SuppressWarnings("unchecked")
-                    Collection<CharacterStats> characters =
-		    (Collection<CharacterStats>)(getObject(data));
-		llistener.setCharacters(characters);
-		break; }
-	    default:		    
-		// someone must have sent us a chat message since
-		// the first byte didn't start with a known
-		// command
-		notifyChatMessage(data);
+		break; 
+	    }
+
+	    default:
+		System.out.printf("Received unknown command %s (%d) on the " + 
+				  "Lobby channel%n", cmd, encodedCmd);		
 	    }
 	} catch (IOException ioe) {
 	    // NOTE: this should probably handle the error a little more
