@@ -218,9 +218,10 @@ class Kernel {
             KernelContext ctx = new StartupKernelContext("Kernel");
             transactionScheduler.setContext(ctx);
             taskScheduler.setContext(ctx);
-
+               
             // collect the shared system components into a registry
             systemRegistry = new ComponentRegistryImpl();
+            systemRegistry.addComponent(new TransportManagerImpl(appProperties));
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
