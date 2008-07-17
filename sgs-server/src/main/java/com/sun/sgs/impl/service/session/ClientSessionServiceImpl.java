@@ -80,9 +80,9 @@ import java.util.logging.Logger;
  *
  * The {@link #ClientSessionServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> and <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.port">
- * <code>com.sun.sgs.app.port</code></a> configuration properties and supports
+ * <code>com.sun.sgs.app.name</code></a> and
+ * <code>com.sun.sgs.impl.service.session.transport</code> configuration
+ * properties and supports
  * these public configuration <a
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
@@ -111,6 +111,7 @@ public final class ClientSessionServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
     
+    /** The transport to use for incomming client connections. */
     private static final String TRANSPORT_PROPERTY =
         PKG_NAME + ".transport";
     

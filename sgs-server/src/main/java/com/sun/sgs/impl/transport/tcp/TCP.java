@@ -1,3 +1,22 @@
+/*
+ * Copyright 2007-2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.sun.sgs.impl.transport.tcp;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -22,7 +41,40 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of a TCP transport.
+ * Implementation of a TCP {@link Transport}.
+ * The {@link #TCP constructor} supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.transport.tcp.listen.address
+ *	</b></code><br>
+ *	<i>Default:</i> Listen on all network interfaces
+ *
+ * <dd style="padding-top: .5em">Specifies the network address the transport
+ *      will listen on.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.app.port
+ *	</b></code><br>
+ *	<i>Default:</i> Required property<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the network port that the transport instance will listen on.
+ *      This property is required. The value must be between 1 and 65535.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.transport.tcp.acceptor.backlog
+ *	</b></code><br>
+ *	<i>Default:</i> 0<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the acceptor backlog. This value is passed as the second
+ *      argument to the
+ *      {@link AsynchronousServerSocketChannel#bind(SocketAddress,int)
+ *      AsynchronousServerSocketChannel.bind} method.
+ * </dl> <p>
  */
 public class TCP implements Transport {
  
@@ -59,6 +111,7 @@ public class TCP implements Transport {
     /** The currently-active accept operation, or {@code null} if none. */
     volatile IoFuture<?, ?> acceptFuture;
 
+    /** The connection handler. */
     private ConnectionHandler handler;
     
     /**

@@ -1,5 +1,25 @@
+/*
+ * Copyright 2007-2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.sun.sgs.impl.transport.udp;
 
+import com.sun.sgs.impl.nio.AttachedFuture;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.transport.ConnectionHandler;
@@ -18,17 +38,40 @@ import java.util.Properties;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of a UDP transport.
+ * Implementation of a UDP {@link Transport}.
+ * The {@link #UDP constructor} supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.transport.udp.listen.address
+ *	</b></code><br>
+ *	<i>Default:</i> Listen on all network interfaces
+ *
+ * <dd style="padding-top: .5em">Specifies the network address the transport
+ *      will listen on.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.app.port
+ *	</b></code><br>
+ *	<i>Default:</i> Required property<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the network port that the transport instance will listen on.
+ *      This property is required. The value must be between 1 and 65535.
+ * </dl> <p>
  */
 public class UDP implements Transport {
     
-    public static final String PKG_NAME = "com.sun.sgs.impl.transport.udp";
+    private static final String PKG_NAME = "com.sun.sgs.impl.transport.udp";
     
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
@@ -139,8 +182,6 @@ public class UDP implements Transport {
     }
 
     private void receive(CompletionHandler<SocketAddress, ByteBuffer> listener) {
-        System.out.println("calling receive with buffer size of " + 512);
-        
         ByteBuffer buffer = ByteBuffer.allocateDirect(512);
         acceptor.receive(buffer, buffer, listener);
     }
@@ -201,8 +242,6 @@ public class UDP implements Transport {
                     logger.log(Level.INFO, "Accepted {0}", newAddress);
                     
                     ByteBuffer buffer = result.attachment();
-                    System.out.println("msg size(position)= "+buffer.position());
-
                     final byte[] firstMessage = new byte[buffer.position()];
                     buffer.position(0);
                     buffer.get(firstMessage, 0, firstMessage.length);
@@ -227,9 +266,7 @@ public class UDP implements Transport {
                 SocketAddress addr = null;
                 try {
                     addr = acceptor.getLocalAddress();
-                } catch (IOException ioe) {
-                    // ignore
-                }
+                } catch (IOException ignore) {}
 
                 logger.logThrow(
 		    Level.SEVERE, e, "acceptor error on {0}", addr);
@@ -254,7 +291,7 @@ public class UDP implements Transport {
         }
         
         public void completed(IoFuture<Void, Void> result) {
-            System.out.println("Completed connection ");
+            logger.log(Level.FINEST, "Completed connection ");
             try {
                 handler.newConnection(new ChannelWrapper(newChannel,
                                                          firstMessage));
@@ -270,12 +307,14 @@ public class UDP implements Transport {
 
                 logger.logThrow(
 		    Level.SEVERE, e, "connect error on {0}", addr);
-
-                // TBD: take other actions, such as restarting acceptor?
             }
 	}
     }
     
+    /*
+     * Wrapper class which returns the initial datagram in the first call
+     * to read. Subsequent reads will call through to the wrapped channel.
+     */
     private static class ChannelWrapper implements AsynchronousByteChannel {
 
         private final AsynchronousByteChannel channel;
@@ -293,18 +332,33 @@ public class UDP implements Transport {
             synchronized (lock) {
                 if (firstMessage != null) {
                     dst.put(firstMessage);
-                    IoFuture<Integer, A> result =
-                            new FirstMessageFuture<Integer, A>(firstMessage.length,
-                                                               attachment);
-//                    handler.completed(result);
-                    throw new RuntimeException("need to fix this");
-//                    firstMessage = null;
-//                    return result;
+                    int length = firstMessage.length;
+                    firstMessage = null;
+                    Future<Integer> future =
+                            new FirstMessageFuture<Integer>(length);
+                    callCompletion(handler, attachment, future);
+                    return AttachedFuture.wrap(new FirstMessageFuture<Integer>(length),
+                                               attachment);
                 }
             }
             return channel.read(dst, attachment, handler);
         }
 
+        // Terrible hack to get around some generics weirdness. Note that
+        // the CompletionHandler parameter type no longer includes the
+        // "? super" that the read method does above. This removes a
+        // complier error when calling handler.completed. Turns out this
+        // is what happens in the bowels of the sgs nio implementation, either
+        // by design or by accident. I'm not inclined to rip the nio code
+        // apart to fix it.
+        //
+        private <R, A> void callCompletion(CompletionHandler<R, A> handler,
+                                           A attachment,
+                                           Future<R> future)
+        {
+            handler.completed(AttachedFuture.wrap(future, attachment));
+        }
+            
         public <A> IoFuture<Integer, A> read(ByteBuffer dst,
                                              CompletionHandler<Integer, ? super A> handler) {
             return read(dst, null, handler);
@@ -330,32 +384,16 @@ public class UDP implements Transport {
         }
     }
     
-    private static class FirstMessageFuture<Integer, A> implements IoFuture<Integer, A> {
+    private static class FirstMessageFuture<Integer> implements Future<Integer> {
 
-        private volatile A attachment;
         private final Integer size;
 
-        FirstMessageFuture(Integer size, A attachment) {
-            this.attachment = attachment;
+        FirstMessageFuture(Integer size) {
             this.size = size;
-        }
-        
-       public Integer getNow() throws ExecutionException {
-            return size;
         }
 
         public boolean cancel(boolean mayInterruptIfRunning) {
             throw new UnsupportedOperationException("Not supported yet.");
-        }
-
-        public A attachment() {
-            return attachment;
-        }
-
-        public A attach(A ob) {
-            A previous = attachment;
-            attachment = ob;
-            return previous;
         }
 
         public boolean isCancelled() {
