@@ -26,7 +26,7 @@ import javax.swing.JTextField;
 /**
  * This is a dialog used to prompt the user for a login name and password.
  */
-public class PasswordDialog extends JDialog implements ActionListener
+public abstract class PasswordDialog extends JDialog implements ActionListener
 {
 
     private static final long serialVersionUID = 1;
@@ -38,7 +38,9 @@ public class PasswordDialog extends JDialog implements ActionListener
     // the password elements
     private JPasswordField passField;
     private char [] pass = null;
-
+    private boolean cancel = true;
+    // the status element
+    private JLabel statusField;
     /**
      * Creates an instance of <code>PasswordDialog</code>.
      *
@@ -51,13 +53,14 @@ public class PasswordDialog extends JDialog implements ActionListener
 
         loginField = new JTextField(20);
         passField = new JPasswordField(20);
-
-        JPanel entryPanel = new JPanel(new GridLayout(2, 2));
+        statusField = new JLabel();
+        JPanel entryPanel = new JPanel(new GridLayout(3, 2));
         entryPanel.add(new JLabel(loginLabel + ":"));
         entryPanel.add(loginField);
         entryPanel.add(new JLabel(passLabel + ":"));
         entryPanel.add(passField);
-
+        entryPanel.add(statusField);
+        
         JButton okButton = new JButton("OK");
         okButton.addActionListener(this);
         JButton cancelButton = new JButton("Cancel");
@@ -82,13 +85,27 @@ public class PasswordDialog extends JDialog implements ActionListener
         if (ae.getActionCommand().equals("OK")) {
             login = loginField.getText();
             pass = passField.getPassword();
+            statusField.setText("connecting...");
+            connect(login,pass);
+            cancel = false;
         }
-
-        // regarldess, dispose of the dialog
-        setVisible(false);
-        dispose();
+        else {
+          cancel = true;
+          setVisible(false);
+          dispose();
+        }
     }
-
+    
+    public void setConnectionFailed(String reason) {
+      String connectionFailed = "Connection failed";
+      if (reason!=null) {
+        connectionFailed = connectionFailed+": "+reason;
+      }
+      statusField.setText(connectionFailed);
+    }
+    
+    public abstract void connect(String login,char[] pass);
+    
     /**
      * Returns the login name that the user provided.
      *
@@ -106,5 +123,9 @@ public class PasswordDialog extends JDialog implements ActionListener
     public char [] getPassword() {
         return pass;
     }
+
+  public boolean isCancel() {
+    return cancel;
+  }
 
 }

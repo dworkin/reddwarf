@@ -28,12 +28,14 @@ import java.awt.Window;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 
-import java.util.Properties;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
@@ -110,7 +112,7 @@ public class Client extends JFrame implements SimpleClientListener {
     // the card layout manager for swapping between different panels
     private CardLayout managerLayout;
     private JPanel managerPanel;
-
+    private PasswordDialog pd;
     /**
      * Creates an instance of <code>Client</code>. This sets up the GUI
      * elements and the state for talking with the game server, but does not
@@ -156,12 +158,6 @@ public class Client extends JFrame implements SimpleClientListener {
         c.add(managerPanel, BorderLayout.CENTER);
         c.add(chatPanel, BorderLayout.SOUTH);
 
-        // setup the client connection
-        client = new SimpleClient(this);
-        lmanager.setClient(client);
-        crmanager.setClient(client);
-        gmanager.setClient(client);
-	
 	// we start off the client in the create state
 	state = State.CREATE;
     }
@@ -172,27 +168,50 @@ public class Client extends JFrame implements SimpleClientListener {
      * @throws Exception if the connection fails
      */
     public void connect() throws Exception {
-        client.login(System.getProperties());
+      pd = new PasswordDialog(this, "Name", "Password") {
+
+      @Override
+      public void connect(String login, char[] pass) {
+          try {
+            setupClient();
+            client.login(System.getProperties());
+          } catch (IOException ex) {
+            throw new RuntimeException(ex);
+          }
+        }
+      };
+      pd.pack();
+      pd.setVisible(true);
+      if (pd.isCancel()) {
+        setVisible(false);
+        dispose();
+      }
     }
 
+    private void setupClient() {
+        // setup the client connection
+        client = new SimpleClient(this);
+        lmanager.setClient(client);
+        crmanager.setClient(client);
+        gmanager.setClient(client);
+    }
+    
     public PasswordAuthentication getPasswordAuthentication() {
-        PasswordDialog pd = new PasswordDialog(this, "Name", "Password");
-        pd.pack();
-        pd.setVisible(true);
-
         return new PasswordAuthentication(pd.getLogin(), pd.getPassword());
     }
 
     public void loggedIn() {
-        System.out.println("logged in");
+      pd.setVisible(false);
+      pd.dispose();
+      pd = null;
     }
 
     public void loginFailed(String reason) {
-        System.out.println("Login failed: " + reason);
+      pd.setConnectionFailed(reason);
     }
 
     public void disconnected(boolean graceful, String reason) {
-	System.out.println("disconnected: " + reason);
+      pd.setConnectionFailed(reason);
     }
     public void reconnecting() {}
     public void reconnected() {}
