@@ -303,4 +303,8 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         }
     }
 
+    public String toString() {
+	return getName();
+    }
+
 }

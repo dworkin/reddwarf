@@ -129,7 +129,8 @@ public class DungeonChannelListener extends GameChannelListener
 	} catch (IOException ioe) {
 	    // NOTE: this should probably handle the error a little more
 	    // gracefully, but it's unclear what the right approach is
-	    System.out.println("Failed to handle incoming Dungeon object");
+	    System.out.println("Failed to handle incoming Dungeon object "
+			       + "for command " + command);
 	    ioe.printStackTrace();
 	}
     }

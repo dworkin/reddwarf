@@ -148,23 +148,38 @@ public class AIClient implements SimpleClientListener {
         return new PasswordAuthentication(name, "".toCharArray());
     }
 
+    private static final class DummyClientChannelListener 
+	implements ClientChannelListener {
+
+	public void leftChannel(ClientChannel channel) {
+
+	}
+
+	public void receivedMessage(ClientChannel c, ByteBuffer mesg) {
+// 	    System.out.printf("Receved %d bytes on %s%n",
+// 			      mesg.remaining(), c.getName());
+	}
+
+    }
+
     public ClientChannelListener joinedChannel(ClientChannel channel) {
         chatManager.setChannel(channel);
         if (channel.getName().equals("game:lobby")) {
             aiDungeonListener.leftDungeon();
             aiLobbyListener.enteredLobby();
-            return lobbyChannelListener;
+            //return lobbyChannelListener;
         } else if (channel.getName().equals("game:creator")) {
             runDelayed(new Runnable() {
                     public void run() {
                         creatorManager.rollForStats(42);
                     }
                 }, 250);
-            return creatorChannelListener;
+            //return creatorChannelListener;
         } else {
             aiDungeonListener.enteredDungeon();
-            return dungeonChannelListener;
+            //return dungeonChannelListener;
         }
+	return new DummyClientChannelListener();
     }
 
     static void runDelayed(Runnable task, int delay) {
@@ -198,6 +213,8 @@ public class AIClient implements SimpleClientListener {
 
     public void receivedMessage(ByteBuffer message) {
 
+// 	System.out.printf("%n%s received %d bytes%n", this, message.remaining());
+
 	if (sessionId == null) {
 	    byte[] bytes = new byte[message.remaining()];
 	    message.get(bytes);
@@ -206,10 +223,11 @@ public class AIClient implements SimpleClientListener {
 	else {
 	    // peek at the command byte to determine what game state
 	    // we're in
-	    int command = (int)(message.get());
+// 	    int command = (int)(message.get());
 
-	    // rewind the mark so the listeners can't tell we peeked.
-	    message.rewind();
+// 	    // rewind the mark so the listeners can't tell we peeked.
+// 	    message.rewind();
+	    int command = message.get(message.position());
 
 	    if (command == 0 || command == 1 ||
 		command == 8 || command == 9) {
@@ -217,6 +235,9 @@ public class AIClient implements SimpleClientListener {
 	    }
 	    else 
 		state = stateTable[command];	    
+
+//   	    System.out.printf("%s received command %d, and is now in state %s%n",
+//   			      this, command, state);
 
 	    switch (state) {
 	    case CREATE:		
@@ -236,6 +257,10 @@ public class AIClient implements SimpleClientListener {
 	    }
 	}
     }
+    
+    public String toString() {
+	return name;
+    }
 
     public static void main(String [] args) throws Exception {
         if (args.length != 1) {
@@ -243,18 +268,20 @@ public class AIClient implements SimpleClientListener {
             System.exit(0);
         }
 
-        for (int i = 0; i < Integer.valueOf(args[0]); i++) {
+	int numClients = Integer.valueOf(args[0]);
+
+        for (int i = 0; i < numClients; i++) {
 
 	    // choose a unique identifier that reflects both its
 	    // creation order and has some random element to in in the
 	    // even that multiple JVMs running this code are started
 	    // and connect to the same host.
 	    AIClient client = new AIClient("AIClient-" + i + "-" + 
-					   (int)(Math.random() * 100));
+					   (int)(Math.random() * 1000));
 	    client.simpleClient.login(System.getProperties());
 	    // Sleep briefly to avoid possibly overwhelming the server
 	    // with simultaneous connections.
-	    Thread.sleep(100); 
+	    Thread.sleep(1000); 
         }
     }
 

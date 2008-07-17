@@ -205,4 +205,8 @@ public class Dungeon implements Game, Serializable {
         return playerMap.size();
     }
 
+    public String toString() {
+	return getName();
+    }
+
 }

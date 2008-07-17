@@ -70,15 +70,19 @@ public class LobbyManager implements LobbyListener
      * @param characterName the name of the character to join as
      */
     public void joinGame(String gameName, String characterName) {
-        ByteBuffer bb = ByteBuffer.allocate(5 + gameName.length() +
-                                            characterName.length());
+
+	byte[] gameBytes = gameName.getBytes();
+	byte[] charBytes = characterName.getBytes();
+
+        ByteBuffer bb = ByteBuffer.allocate(5 + gameBytes.length +
+					    charBytes.length);
 
         // FIXME: the message codes should be enumerated somewhere
         // the message format is: 1 GameNameLength GameName CharacterName
         bb.put((byte)1);
-        bb.putInt(gameName.length());
-        bb.put(gameName.getBytes());
-        bb.put(characterName.getBytes());
+        bb.putInt(gameBytes.length);
+        bb.put(gameBytes);
+        bb.put(charBytes);
         bb.rewind();
 
         try {

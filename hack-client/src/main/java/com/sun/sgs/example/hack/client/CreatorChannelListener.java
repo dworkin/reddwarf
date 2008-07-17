@@ -69,7 +69,6 @@ public class CreatorChannelListener extends GameChannelListener
 		int id = data.getInt();
 		CharacterStats stats = (CharacterStats)(getObject(data));
 		clistener.changeStatistics(id, stats);
-		System.out.println("changed stats");
 		break;
 	    case 9:
 		notifyJoinOrLeave(data, true);

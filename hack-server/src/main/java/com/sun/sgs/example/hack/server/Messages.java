@@ -71,14 +71,14 @@ public class Messages {
      * @param channel the channel to send the message on
      * @param users the set of users to send to
      */
-    public static void sendToClient(int command, Object data, Channel channel,
+    public static void sendToClient(byte command, Object data, Channel channel,
                                     ClientSession [] users) {
         // get the bytes
         byte [] bytes = encodeObject(data);
         
         // create a buffer for the message code and the object bytes
         ByteBuffer bb = ByteBuffer.allocate(bytes.length + 1);
-        bb.put((byte)command);
+        bb.put(command);
         bb.put(bytes);
 	
 	sendToClient(bb, channel, users);
@@ -93,7 +93,8 @@ public class Messages {
             ByteArrayOutputStream bout = new ByteArrayOutputStream();
             ObjectOutputStream oos = new ObjectOutputStream(bout);
             oos.writeObject(data);
-
+	    oos.close();
+	    
             // return the bytes
             return bout.toByteArray();
         } catch (IOException ioe) {
@@ -157,7 +158,7 @@ public class Messages {
 	    ClientSession session = sessionRef.get();
             map.put(HexDumper.toHexString(getSessionIdBytes(session)), uidMap.get(session));
 	}
-        sendToClient(0, map, channel, new ClientSession [] {uid});
+        sendToClient((byte)0, map, channel, new ClientSession [] {uid});
     }
 
     /**
@@ -172,7 +173,7 @@ public class Messages {
                                   Channel channel, ClientSession [] users) {
         Map<String,String> map = new HashMap<String,String>();
         map.put(HexDumper.toHexString(getSessionIdBytes(session)),name);
-        sendToClient(0, map, channel, users);
+        sendToClient((byte)0, map, channel, users);
     }
 
 
@@ -194,7 +195,7 @@ public class Messages {
 					ClientSession session) {
         ClientSession [] sessions = new ClientSession[] {session};
 
-        sendToClient(11, games, channel, sessions);
+        sendToClient((byte)11, games, channel, sessions);
     }
 
     /**
@@ -263,7 +264,7 @@ public class Messages {
                                             Channel channel,
                                             ClientSession session) {
 
-        sendToClient(15, stats, channel, new ClientSession [] {session});
+        sendToClient((byte)15, stats, channel, new ClientSession [] {session});
     }
 
     /*
@@ -300,7 +301,7 @@ public class Messages {
      */
     public static void sendBoard(Board board, Channel channel,
                                  ClientSession session) {
-        sendToClient(22, board, channel, new ClientSession [] {session});
+        sendToClient((byte)22, board, channel, new ClientSession [] {session});
     }
 
     /**
@@ -312,7 +313,7 @@ public class Messages {
      */
     public static void sendUpdate(Collection<BoardSpace> spaces,
                                   Channel channel, ClientSession [] sessions) {
-        sendToClient(23, spaces, channel, sessions);
+        sendToClient((byte)23, spaces, channel, sessions);
     }
 
     /**

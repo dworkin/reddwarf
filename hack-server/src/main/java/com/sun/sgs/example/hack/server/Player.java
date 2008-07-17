@@ -340,4 +340,8 @@ public class Player
         Messages.sendTextMessage(message, channel(), getCurrentSession());
     }
 
+    public String toString() {
+	return name;
+    }
+
 }

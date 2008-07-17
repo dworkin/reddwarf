@@ -164,4 +164,8 @@ public class Creator implements Game, Serializable {
         return playerCount;
     }
 
+    public String toString() {
+	return getName();
+    }
+
 }
