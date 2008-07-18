@@ -102,6 +102,11 @@ public class LobbyPanel extends JPanel
         updateLobbyCount(0);
     }
 
+    public int getGameCount() {
+	return list.getSize();
+    }
+
+
     /**
      * Called when the user clicks on the join button.
      *

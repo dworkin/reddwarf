@@ -16,10 +16,14 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.app.util.ScalableHashMap;
+
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
 import java.io.Serializable;
+
+import java.math.BigInteger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,9 +38,9 @@ public class Dungeon implements Game, Serializable {
 
     private static final long serialVersionUID = 1;
 
-    // a reference to the channel used for all players currently in
-    // this dungeon
-    private ManagedReference<Channel> channelRef;
+    // a reference to the channel used for sending commands to all
+    // players currently in this dungeon
+    private ManagedReference<Channel> dungeonCommandsChannel;    
 
     // the name of this particular dungeon
     private String name;
@@ -50,9 +54,22 @@ public class Dungeon implements Game, Serializable {
     // the connection into the dungeon
     private ManagedReference<GameConnector> connectorRef;
 
-    // the set of players in the lobby, mapping from a reference to
-    // the player's ClientSession to account name
-    private HashMap<ManagedReference<ClientSession>,String> playerMap;
+    /**
+     * The a mapping of players currently the dungeon to account name.
+     * This map is will grow with the number of players and therefore
+     * needs to be adaptive.
+     */
+    private ManagedReference<? extends Map<ManagedReference<ClientSession>,String>>
+	playerMapRef;
+
+    /**
+     * The number of players currently in the Dungeon.  Because we are
+     * using a {@code ScalableHashMap} to keep track of the members,
+     * we need to keep track of the size ourselves.
+     *
+     * @see ScalableHashMap#size()
+     */
+    private int numPlayers;
 
     /**
      * Creates a new instance of a <code>Dungeon</code>.
@@ -73,11 +90,16 @@ public class Dungeon implements Game, Serializable {
         Channel channel = // ChannelManager.instance().
 	    AppContext.getChannelManager().
             createChannel(NAME_PREFIX + name, null, Delivery.RELIABLE);
-
-        channelRef = dataManager.createReference(channel);
+	
+        dungeonCommandsChannel = dataManager.createReference(channel);
 
         // initialize the player list
-        playerMap = new HashMap<ManagedReference<ClientSession>,String>();
+	ScalableHashMap<ManagedReference<ClientSession>,String> playerMap = 
+	    new ScalableHashMap<ManagedReference<ClientSession>,String>();
+	
+	playerMapRef = dataManager.createReference(playerMap);
+
+	numPlayers = 0;
 
         // get a reference to the membership change manager
         gcmRef = dataManager.createReference(
@@ -85,15 +107,6 @@ public class Dungeon implements Game, Serializable {
 		GameChangeManager.IDENTIFIER));
     }
 
-    /**
-     * Gets the {@code Channel} associated with {@link #channelRef}.
-     *
-     * @return the channel or {@code null} if {@code channelRef} is
-     *         {@code null}.
-     */
-    private Channel channel() {
-        return channelRef.get();
-    }
 
     /**
      * Adds the given <code>Player</code> to this <code>Game</code>.
@@ -101,47 +114,52 @@ public class Dungeon implements Game, Serializable {
      * @param player the <code>Player</code> that is joining
      */
     public void join(Player player) {
+
         DataManager dataManager = AppContext.getDataManager();
         dataManager.markForUpdate(this);
 
-        // update all existing members about the new uid's name
-        ClientSession session = player.getCurrentSession();
-        String playerName = player.getName();
-	ClientSession [] users = new ClientSession[playerMap.size()];
-	int i = 0;
-	for (ManagedReference<ClientSession> sessionRef : playerMap.keySet()) {
-	    users[i++] = sessionRef.get();
-	}
-        Messages.sendUidMap(session, playerName, channel(), users);
+	ClientSession session = player.getCurrentSession();
+	String playerName = player.getName();
+	BigInteger playerID = dataManager.createReference(session).getId();
+	 
+        // Update all existing members about the new uid's name
+	Messages.broadcastPlayerID(dungeonCommandsChannel.get(), playerName, 
+				   playerID);
+	
+        // Add the player to the dungeon channel and the local map
+        dungeonCommandsChannel.get().join(session);
+        playerMapRef.get().put(dataManager.createReference(session), playerName);
 
-        // add the player to the dungeon channel and the local map
-        channel().join(session);
-        playerMap.put(dataManager.createReference(session), playerName);
+        // Update the player about all uid to name mappings on the
+        // channel.  We'll use each of the client's session's ids for
+        // the unique identifier.
+	Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
+	Messages.sendBulkPlayerIDs(session, playerMapRef.get());
 
-        // update the player about all uid to name mappings on the channel
-        Messages.sendUidMap(playerMap, channel(), session);
-
-        // notify the manager that our membership count changed
+        // Notify the manager that our membership count changed
         sendCountChanged();
 
-        // notify the client of the sprites we're using
+        // Notify the client of the sprites we're using
         SpriteMap spriteMap = (SpriteMap) dataManager.getBinding(
 	    SpriteMap.NAME_PREFIX + spriteMapId);
-        Messages.sendSpriteMap(spriteMap, channel(), session);
 
-        Messages.sendPlayerJoined(player.getCurrentSession(), channel());
+        Messages.sendSpriteMap(session, spriteMap);
 
-        // finally, throw the player into the game through the starting
+        Messages.broadcastPlayerJoined(dungeonCommandsChannel.get(), playerID);
+
+        // Finally, throw the player into the game through the starting
         // connection point ... the only problem is that the channel info
         // won't be there when we try to send a board (because we still have
         // the lock on the Player, so its userJoinedChannel method can't
         // have been called yet), so set the channel directly
-        player.userJoinedChannel(channel());
+        player.userJoinedChannel(dungeonCommandsChannel.get());
         PlayerCharacter pc =
             (PlayerCharacter)(player.getCharacterManager().
                               getCurrentCharacter());
         player.sendCharacter(pc);
         connectorRef.get().enteredConnection(player.getCharacterManager());
+
+	numPlayers++;
     }
 
     /**
@@ -150,14 +168,19 @@ public class Dungeon implements Game, Serializable {
      * @param player the <code>Player</code> that is leaving
      */
     public void leave(Player player) {
-        AppContext.getDataManager().markForUpdate(this);
+	DataManager dataManager = AppContext.getDataManager();
+        dataManager.markForUpdate(this);
 
-        Messages.sendPlayerLeft(player.getCurrentSession(), channel());
+	ClientSession session = player.getCurrentSession();
+	ManagedReference<ClientSession> sessionRef = 
+	    dataManager.createReference(session);
+	BigInteger playerID = sessionRef.getId();
+
+        Messages.broadcastPlayerLeft(dungeonCommandsChannel.get(), playerID);
 
         // remove the player from the dungeon channel and the player map
-        ClientSession session = player.getCurrentSession();
-        channel().leave(player.getCurrentSession());
-        playerMap.remove(AppContext.getDataManager().createReference(session));
+        dungeonCommandsChannel.get().leave(session);
+        playerMapRef.get().remove(sessionRef);
 
         // just to be paranoid, we should make sure that they're out of
         // their current level...for instance, if we got called because the
@@ -166,6 +189,8 @@ public class Dungeon implements Game, Serializable {
 
         // notify the manager that our membership count changed
         sendCountChanged();
+
+	numPlayers--;
     }
 
     /**
@@ -202,7 +227,7 @@ public class Dungeon implements Game, Serializable {
      * @return the number of players in this dungeon
      */
     public int numPlayers() {
-        return playerMap.size();
+        return numPlayers;
     }
 
     public String toString() {

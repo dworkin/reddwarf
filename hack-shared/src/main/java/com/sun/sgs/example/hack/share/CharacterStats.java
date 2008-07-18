@@ -59,6 +59,13 @@ public class CharacterStats implements Serializable {
         this.maxHitPoints = maxHitPoints;
     }
 
+    public String toString() {
+	return String.format("%s [str:%d, int:%d, dex: %d, wis: %d, con: %d, " +
+			     "chr: %d, %d/%dhp]", name, strength, intelligence,
+			     dexterity, wisdom, constitution, charisma, 
+			     hitPoints, maxHitPoints);
+    }
+
     /**
      *
      */

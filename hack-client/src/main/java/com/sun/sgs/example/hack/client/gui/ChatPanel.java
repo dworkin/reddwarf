@@ -52,7 +52,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     private JComponent focusPanel;
 
     // the mapping from uid to name
-    private Map<BigInteger,String> uidMap;
+    private Map<BigInteger,String> playerIdToName;
 
     // the client's current session id
     private BigInteger currentSession;
@@ -66,7 +66,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     public ChatPanel(ChatManager chatManager, JComponent focusPanel) {
         super(new BorderLayout(4, 4));
 
-        uidMap = new HashMap<BigInteger,String>();
+        playerIdToName = new HashMap<BigInteger,String>();
 
         // track the manager, and add ourselves as a listener
         this.chatManager = chatManager;
@@ -92,8 +92,8 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      * Sets the session id for the client.
      */
     public void setSessionId(BigInteger session) {
-        uidMap.remove(currentSession);
-        uidMap.put(session, "[You]");
+        playerIdToName.remove(currentSession);
+        playerIdToName.put(session, "[You]");
         currentSession = session;
     }
 
@@ -134,8 +134,8 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      * @param uid the identifier of the player that joined
      */
     public void playerJoined(BigInteger uid) {
-        if (uidMap.containsKey(uid))
-            textArea.append(uidMap.get(uid) + ": *joined*\n");
+        if (playerIdToName.containsKey(uid))
+            textArea.append(playerIdToName.get(uid) + ": *joined*\n");
     }
 
     /**
@@ -144,8 +144,8 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      * @param uid the identifier of the player that left
      */
     public void playerLeft(BigInteger uid) {
-        if (uidMap.containsKey(uid))
-            textArea.append(uidMap.get(uid) + ": *left*\n");
+        if (playerIdToName.containsKey(uid))
+            textArea.append(playerIdToName.get(uid) + ": *left*\n");
     }
 
     /**
@@ -161,10 +161,14 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      * Called when there is new information about the mapping from user
      * identifiers to user names.
      *
-     * @param uidMap the mapping from identifiers to names
+     * @param playerIdToName the mapping from identifiers to names
      */
-    public void addUidMappings(Map<BigInteger,String> uidMap) {
-        this.uidMap.putAll(uidMap);
+    public void addPlayerIdMappings(Map<BigInteger,String> playerIdToName) {
+        playerIdToName.putAll(playerIdToName);
+    }
+
+    public void addPlayerIdMapping(BigInteger playerID, String playerName) {
+	playerIdToName.put(playerID, playerName);
     }
 
 }

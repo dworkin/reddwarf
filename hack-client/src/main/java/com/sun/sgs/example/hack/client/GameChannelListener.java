@@ -47,20 +47,27 @@ public abstract class GameChannelListener implements ClientChannelListener
     public void leftChannel(ClientChannel channel) {
         // NOTE: the current architecture does nothing when this is
         //       called but future revisions could provide addition
-        //       player notifications here
+        //       player notifications here	
     }
 
     /**
      * Notifies the game that a player has either joined or left.
      */
-    protected void notifyJoinOrLeave(ByteBuffer data, boolean joined) {
+    protected void notifyJoin(ByteBuffer data) {
         byte [] bytes = new byte[data.remaining()];
         data.get(bytes);
         BigInteger sessionId = new BigInteger(1, bytes);
-        if (joined)
-            chatListener.playerJoined(sessionId);
-        else
-            chatListener.playerLeft(sessionId);
+	chatListener.playerJoined(sessionId);
+    }
+
+    /**
+     * Notifies the game that a player has either joined or left.
+     */
+    protected void notifyLeave(ByteBuffer data) {
+        byte [] bytes = new byte[data.remaining()];
+        data.get(bytes);
+        BigInteger sessionId = new BigInteger(1, bytes);
+	chatListener.playerLeft(sessionId);
     }
 
     /**
@@ -81,16 +88,9 @@ public abstract class GameChannelListener implements ClientChannelListener
      *
      * @param data encoded mapping from user identifier to string
      */
-    protected void addUidMappings(ByteBuffer data) throws IOException {
-        @SuppressWarnings("unchecked")
-        Map<String,String> map = (Map<String,String>)(getObject(data));
-        HashMap<BigInteger,String> sessionMap = new HashMap<BigInteger,String>();
-        for (String hexString : map.keySet()) {
-            BigInteger sessionId =
-                new BigInteger(1, HexDumper.fromHexString(hexString));
-            sessionMap.put(sessionId, map.get(hexString));
-        }
-        chatListener.addUidMappings(sessionMap);
+    protected void addPlayerIdMapping(BigInteger playerID, 
+				      String playerName) throws IOException {
+        chatListener.addPlayerIdMapping(playerID, playerName);
     }
 
     /**
@@ -98,7 +98,7 @@ public abstract class GameChannelListener implements ClientChannelListener
      *
      * @param data the encoded object to retrieve
      */
-    protected Object getObject(ByteBuffer data) throws IOException {
+    protected static Object getObject(ByteBuffer data) throws IOException {
         try {
             byte [] bytes = new byte[data.remaining()];
             data.get(bytes);

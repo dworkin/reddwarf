@@ -67,6 +67,7 @@
 		    <java classname="com.sun.sgs.example.hack.client.ai.AIClient"
 			  fork="true">
 		      <jvmarg line="${run.jvm.args}"/>
+		      <jvmarg line="-server"/>
 		      <sysproperty key="java.util.logging.config.file"
 				   file="${run.logging}"/>
 		      <sysproperty key="host"

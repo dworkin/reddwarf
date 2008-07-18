@@ -13,6 +13,8 @@ import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.level.Level;
 
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 import com.sun.sgs.example.hack.share.KeyMessages;
 
 import java.io.Serializable;
@@ -48,33 +50,33 @@ public class DungeonMessageHandler implements MessageHandler, Serializable {
      * @param data the message to handle
      */
     public void handleMessage(Player player, byte [] message) {
+
         ByteBuffer data = ByteBuffer.allocate(message.length);
         data.put(message);
         data.rewind();
 
         // the command identifier is always stored in the first byte
-        int command = (int)(data.get());
+        int encodedCommand = data.getInt();
+	Command command = Commands.decode(encodedCommand);
 
         // NOTE: it would be more elegant to use an enum to define the
         //       messages
 	switch (command) {
-            case 1:
+            case MOVE_PLAYER:
                 movePlayer(player, data);
                 break;
-            case 2:
+            case TAKE_ITEM:
                 takeItem(player, data);
                 break;
-            case 3:
+            case EQUIP_ITEM:
                 equipItem(player, data);
                 break;
-            case 4:
+            case USE_ITEM:
                 useItem(player, data);
                 break;
 	    default: 
-		// NOTE: in a robust production system, we should
-		// either log the error, or send back a generic error
-		// response
-		System.out.println("unrecognized dungeon command:" + command);
+		player.notifyUnhandledCommand(dungeonRef.get().getName(), 
+					      command);
 	}
     }
 

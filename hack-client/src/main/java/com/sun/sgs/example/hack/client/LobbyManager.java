@@ -12,7 +12,10 @@ package com.sun.sgs.example.hack.client;
 
 import com.sun.sgs.client.simple.SimpleClient;
 
+
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.nio.ByteBuffer;
 
@@ -74,12 +77,13 @@ public class LobbyManager implements LobbyListener
 	byte[] gameBytes = gameName.getBytes();
 	byte[] charBytes = characterName.getBytes();
 
-        ByteBuffer bb = ByteBuffer.allocate(5 + gameBytes.length +
+        ByteBuffer bb = ByteBuffer.allocate(8 + gameBytes.length +
 					    charBytes.length);
 
         // FIXME: the message codes should be enumerated somewhere
-        // the message format is: 1 GameNameLength GameName CharacterName
-        bb.put((byte)1);
+        // the message format is: 
+	//   MOVE_CLIENT_TO_GAME GameNameLength GameName CharacterName
+        bb.putInt(Commands.encode(Command.MOVE_CLIENT_TO_GAME));
         bb.putInt(gameBytes.length);
         bb.put(gameBytes);
         bb.put(charBytes);
@@ -98,7 +102,7 @@ public class LobbyManager implements LobbyListener
      *
      * @param game the name of the game
      */
-    public void gameAdded(String game) {
+    public void gameAdded(String game) {	
         for (LobbyListener listener : listeners)
             listener.gameAdded(game);
     }

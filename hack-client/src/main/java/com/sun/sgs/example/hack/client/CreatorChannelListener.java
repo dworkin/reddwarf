@@ -10,6 +10,8 @@ package com.sun.sgs.example.hack.client;
 
 import com.sun.sgs.client.ClientChannel;
 
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
@@ -52,43 +54,45 @@ public class CreatorChannelListener extends GameChannelListener
     public void receivedMessage(ClientChannel channel, 
                                 ByteBuffer data) {
 
-	// if this is a message from the server, then it's some
-	// command that we need to process, so get the command code
-	int command = (int)(data.get());
 
-	// NOTE: in a more robut system, the listing of commands
-	//       should really be an Enum
+	int encodedCmd = (int)(data.getInt());
+	Command cmd = Commands.decode(encodedCmd);
+
 	try {
-	    switch (command) {
-	    case 0:
-		// we got some uid to player name mapping
-		addUidMappings(data);
+	    switch(cmd) {
+	    case ADD_PLAYER_ID:
+		@SuppressWarnings("unchecked")
+		BigInteger playerID = (BigInteger)(getObject(data));
+		@SuppressWarnings("unchecked")
+		String playerName = (String)(getObject(data));
+		addPlayerIdMapping(playerID, playerName);
 		break;
-	    case 1:
-		// we got some new character stats
-		int id = data.getInt();
-		CharacterStats stats = (CharacterStats)(getObject(data));
-		clistener.changeStatistics(id, stats);
+
+	    case PLAYER_JOINED:
+		notifyJoin(data);
 		break;
-	    case 9:
-		notifyJoinOrLeave(data, true);
+		
+	    case PLAYER_LEFT:
+		notifyLeave(data);
 		break;
-	    case 8:
-		notifyJoinOrLeave(data, true);
-		break;
+
+	    /*
+	     * NOTE: During the charactor creation state, the server
+	     * does not broadcast any player-specific messages on the
+	     * channel.  These are instead sent directly to the client.
+	     */
+
 	    default:
-		// someone must have sent us a chat message since
-		// the first byte didn't start with a known
-		// command
-		notifyChatMessage(data);
+		System.out.printf("Received unknown command %s (%d) on the " + 
+				  "Creator channel%n", cmd, encodedCmd);
 	    }
-	} catch (IOException ioe) {
-	    // NOTE: this should probably handle the error a little
-	    //       more gracefully, but it's unclear what the right
-	    //       approach is
-	    System.out.println("Failed to handle incoming creator object");
-	    ioe.printStackTrace();
-	}
+	}	
+	catch (IOException ioe) {
+ 	    // NOTE: this should probably handle the error a little
+ 	    //       more gracefully, but it's unclear what the right
+ 	    //       approach is
+ 	    ioe.printStackTrace();
+ 	}
     }
 
 }
