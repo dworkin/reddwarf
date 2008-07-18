@@ -58,7 +58,7 @@ static void printMsg(const sgs_message *pmsg) {
  */
 int main(int argc, char *argv[]) {
     sgs_message msg;
-    uint8_t buf[4096];
+    uint8_t buf[8192];
     uint8_t content[100];
     int result;
   
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
         printf("%d failures in testUint32\n", result);
     
     result = sgs_msg_init(&msg, buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST);
-    if ((result = testStrings(&msg, 20, 0)) == 0){
+    if ((result = testStrings(&msg, 200, 1)) == 0){
         printf("test Strings passed\n");
     } else 
         printf("%d failures in testStrings\n", result);
@@ -203,11 +203,9 @@ int testUint32(sgs_message *pmsg, int numTests, int silent){
     free(writenums);
     return check;
 }
+int testStrings(sgs_message *pmsg, int numTests, int silent) {
+    int i, j, incheck, check, offset;
 
-
-int testStrings(sgs_message *pmsg, int numTests, int silent){
-    int i, check, offset;
-    
     char *inBuffer[] = {
         "A day for firm decisions!!!!!  Or is it?",
         "A few hours grace before the madness begins again.",
@@ -220,33 +218,42 @@ int testStrings(sgs_message *pmsg, int numTests, int silent){
         "Today's weirdness is tomorrow's reason why.-- Hunter S. Thompson",
         "You are confused; but this is your normal state."
     };
-    
-    printf("made it to allocation of outbuffer\n");
-    char **outbuffer = malloc (sizeof(char *) * numTests);
-    printf("allocated outbuffer\n");
-    for (i = 0; i < numTests; i++){
-        check = sgs_msg_add_string(pmsg, inBuffer[i%10]);
-        if (check < 0)
-            printf ("Unable to add %dth string %s\n", i, inBuffer[i%10]);
-    }
-    printf("loaded the output buffer\n");
-    offset = 3;
-    for (i = 0; i < numTests; i++){
-        check = sgs_msg_read_string(pmsg, offset, outbuffer[i]);
-        if (check < 0){
-            printf ("unable to read the %dth string\n", i);
+
+    char **outbuffer = malloc(sizeof(char *) * 10);
+
+    incheck = 0;
+    for (i = 0; i < numTests; i+= 10){
+        for (j = 0; j < 10; j++) {
+            check = sgs_msg_add_string(pmsg, *(inBuffer + j));
+            if (check < 0)
+                printf("Unable to add %dth string %s\n", j, *(inBuffer +j));
         }
-        offset += check;    
-    }
-    printf("read the message buffers\n");
-    
-    check = offset = 0;
-    for (i = 0; i < numTests; i++){
-        offset = strcmp(inBuffer+[i%10], outbuffer[i]);
-        if (silent == 0){
-            printf("input string = %s\noutput string = %s\n", inBuffer[i%10], outbuffer[i]);
+        
+        offset = 3;
+        for (j = 0; j < 10; j++) {
+            check = sgs_msg_read_string(pmsg, offset, &(outbuffer[j]));
+            if (check < 0) {
+                printf("unable to read the %dth string\n", j);
+                return -1;
+            }
+            offset += check;
         }
-        if (offset != 0) check++;
+
+        check = offset = 0;
+        for (j = 0; j < 10; j++) {
+            offset = strcmp(inBuffer[j], outbuffer[j]);
+            if (silent == 0) {
+                printf("input string = %s\noutput string = %s\n", *(inBuffer+j), *(outbuffer+j));
+            }
+            if (offset != 0) {
+                incheck++;
+                printf("input string = %s\noutput string = %s\n", *(inBuffer+j), *(outbuffer+j));
+                printf("failure at position %d on iteration %d of loop %d\n", offset, i, j);
+            }
+            free(*(outbuffer + j));
+        }
+        pmsg->len = 1;
     }
-    return check;
+    free(outbuffer);
+    return incheck;
 }

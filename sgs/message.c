@@ -136,7 +136,6 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
     _uint16_tmp = htons(clen);
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, &_uint16_tmp, 2);
     pmsg->len += 2;
-    
     /** copy the content over, and update the length */
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, content, clen);
     pmsg->len += clen;
@@ -180,7 +179,7 @@ int sgs_msg_add_string(sgs_message *pmsg, const char *content){
     int16_t stringlen;
     
     stringlen = strlen(content);
-    stringlen -= 1; //account for the null-terminator
+    //stringlen -= 1; //account for the null-terminator
     return(sgs_msg_add_fixed_content(pmsg, (uint8_t *)content, stringlen));
 }
 
@@ -253,7 +252,7 @@ int sgs_msg_read_uint16(const sgs_message *pmsg, const uint16_t start, uint16_t 
         return -1;
     }
     memcpy(result, pmsg->buf + start, 2);
-    ntohs(*result);
+    *result = ntohs(*result);
     return 2;
 }
 
@@ -264,25 +263,28 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
     if (start + 2 > pmsg->len){
         return -1;
     }
-    memcpy(result, pmsg->buf + start, 4);
-    ntohl(*result);
+    memcpy(result, pmsg->buf + start, 4);    
+    *result = ntohl(*result);
     return 4;
 }
 
 /*
  * sgs_msg_read_string
  */
-int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char *result){
+int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **result) {
     uint16_t strsize;
     int incr;
+
     incr = sgs_msg_read_uint16(pmsg, start, &strsize);
     if (incr < 0)
         return incr;
-    result = malloc(strsize + 1);
-    if (result == NULL)
+    *result = malloc(sizeof (char) * (strsize + 1));
+
+    if (*result == NULL)
         return -1;
-    memcpy(result, pmsg->buf + start + incr, strsize);
-    *(result + 1) = '\0';
+    memcpy(*result, pmsg->buf + start + incr, strsize);
+    *((*result) + strsize) = '\0';
+
     return (strsize + incr);
 }
 

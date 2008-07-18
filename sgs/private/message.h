@@ -307,7 +307,7 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
  * Returns the total number of bytes in the buffer that contained the combination
  * of the string and the length if successful. On failure, returns -1.
  */
-int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char * result);
+int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **result);
 
 /*
  * function sgs_msg_read_bytes()
