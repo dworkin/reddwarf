@@ -32,6 +32,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
@@ -99,7 +100,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     private static final String APP_NAME = "TestChannelServiceImpl";
     
-    private static final int WAIT_TIME = 3000;
+    private static final int WAIT_TIME = 2000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -206,7 +207,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     protected void tearDown(boolean clean) throws Exception {
 	// This sleep cuts down on the exceptions output due to shutdwon.
-	Thread.sleep(750);
+	Thread.sleep(500);
 	if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes.values()) {
                 node.shutdown(false);
@@ -1158,7 +1159,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers(channelName, sevenDwarfs);
-	    sendMessagesToChannel(channelName, group, 5);
+	    sendMessagesToChannel(channelName, group, 3);
 	} finally {
 	    group.disconnect(false);
 	}
@@ -1181,7 +1182,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers("test", sevenDwarfs);
-	    sendMessagesToChannel("test", group, 3);
+	    sendMessagesToChannel("test", group, 2);
 	} finally {
 	    group.disconnect(false);
 	}
@@ -1197,7 +1198,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    joinUsers(channelName, sevenDwarfs);
-	    sendMessagesToChannel(channelName, group, 5);
+	    sendMessagesToChannel(channelName, group, 3);
 	    printServiceBindings();
 	    // nuke coordinator node
 	    System.err.println("shutting down node 'a'");
@@ -1237,7 +1238,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    moe.waitForJoin(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() != null) {
 		    fail(client.name + " received message!");
@@ -1262,7 +1263,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    moe.waitForJoin(channelName);
 	    BigInteger channelId = moe.channelNameToId.get(channelName);
 	    nonMember.sendChannelMessage(channelId, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() != null) {
 		    fail(client.name + " received message!");
@@ -1283,7 +1284,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient moe = group.getClient("moe");
 	    moe.waitForJoin(channelName);
 	    moe.sendChannelMessage(channelName, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() == null) {
@@ -1310,7 +1311,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient moe = group.getClient("moe");
 	    moe.waitForJoin(channelName);
 	    moe.sendChannelMessage(channelName, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() == null) {
@@ -1337,7 +1338,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient moe = group.getClient("moe");
 	    moe.waitForJoin(channelName);
 	    moe.sendChannelMessage(channelName, 0);
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (DummyClient client : group.getClients()) {
 		if (client.nextChannelMessage() != null) {
@@ -1367,7 +1368,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    for (int i = 0; i < numMessages; i++) {
 		moe.sendChannelMessage(channelName, i);
 	    }
-	    Thread.sleep(5000);
+	    Thread.sleep(2000);
 	    boolean fail = false;
 	    for (int i = 0; i < numMessages / 2; i++) {
 		for (DummyClient client : group.getClients()) {
@@ -1395,6 +1396,55 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    public void testClientSendToChannelValidatingWrappedClientSession()
+	throws Exception
+    {
+	final String channelName = "foo";
+	final String user = "dummy";
+	final String listenerName = "ValidatingChannelListener";
+	DummyClient client =
+	    (new DummyClient()).connect(port).login(user, "password");
+
+	/*
+	 * Create a channel with a ValidatingChannelListener and join the
+	 * client to the channel.
+	 */
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() {
+		ChannelListener listener =
+		    new ValidatingChannelListener();
+		dataService.setBinding(listenerName, listener);
+		ClientSession session =
+		    (ClientSession) dataService.getBinding(user);
+		Channel channel =
+		    channelService.createChannel(
+			channelName, listener, Delivery.RELIABLE);
+		channel.join(session);
+	    }
+	}, taskOwner);
+
+	/*
+	 * Wait for the client to join, and then send a channel message.
+	 */
+	client.waitForJoin(channelName);
+	client.sendChannelMessage(channelName, 0);
+
+	/*
+	 * Validate that the session passed to the handleChannelMessage
+	 * method was a wrapped ClientSession.
+	 */
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() {
+		ValidatingChannelListener listener = (ValidatingChannelListener)
+		    dataService.getBinding(listenerName);
+		ClientSession session =
+		    (ClientSession) dataService.getBinding(user);
+		listener.validateSession(session);
+		System.err.println("sessions are equal");
+	    }
+	}, taskOwner);
+    }
+
     public void testJoinLeavePerformance() throws Exception {
 	final String channelName = "perf";
 	createChannel(channelName);
@@ -1402,7 +1452,7 @@ public class TestChannelServiceImpl extends TestCase {
 	DummyClient client =
 	    (new DummyClient()).connect(port).login(user, "password");
 
-	final String sessionKey = user + ".wrapped";
+	final String sessionKey = user;
 	isPerformanceTest = true;
 	int numIterations = 100;
 	long startTime = System.currentTimeMillis();
@@ -1459,7 +1509,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    }, taskOwner);
 	    }
 
-	    Thread.sleep(5000);
+	    Thread.sleep(3000);
 	    for (DummyClient client : group.getClients()) {
 		for (int i = 0; i < numMessages; i++) {
 		    MessageInfo info = client.nextChannelMessage();
@@ -1939,6 +1989,46 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
     }
+
+    private static class ValidatingChannelListener
+	implements ChannelListener, Serializable, ManagedObject
+    {
+	private final static long serialVersionUID = 1L;
+
+	private ManagedReference<ClientSession> sessionRef = null;
+	
+	ValidatingChannelListener() {
+	}
+
+	/** {@inheritDoc} */
+	public void receivedMessage(
+	    Channel channel, ClientSession session, ByteBuffer message)
+	{
+	    System.err.println(
+		"ValidatingChannelListener.receivedMessage: session = " +
+		session);
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(this);
+	    sessionRef = dm.createReference(session);
+	}
+
+	public void validateSession(ClientSession session) {
+	    if (this.sessionRef == null) {
+		throw new ResourceUnavailableException("sessionRef is null");
+	    } else {
+		System.err.println(
+		    "ValidatingChannelListener.validateSession: session = " +
+		    session);
+		ClientSession thisSession = sessionRef.get();
+		if (! (thisSession instanceof ClientSessionWrapper)) {
+		    fail("unwrapped session: " + thisSession);
+		} else if (! thisSession.equals(session)) {
+		    fail("sessions not equal: thisSession: " +
+			 thisSession + ", session: " + session);
+		}
+	    }
+	}
+    }
     
     /**
      * Dummy client code for testing purposes.
@@ -2167,7 +2257,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    synchronized (lock) {
 		if (channelMessages.isEmpty()) {
 		    try {
-			lock.wait(WAIT_TIME * 2);
+			lock.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
 		}
@@ -2513,8 +2603,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.setBinding(session.getName(), unwrapSession(session));
-	    dataManager.setBinding(session.getName() + ".wrapped", session);
+	    dataManager.setBinding(session.getName(), session);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}
