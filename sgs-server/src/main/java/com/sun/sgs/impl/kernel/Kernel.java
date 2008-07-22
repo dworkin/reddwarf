@@ -58,7 +58,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -74,14 +73,15 @@ import java.util.logging.Logger;
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
  * <p>
- * By default, profiling is not turned on. To enable profiling, the kernel
- * property <code>com.sun.sgs.impl.kernel.profile.level</code> must
- * be given the value "on". If no profile listeners are specified, then the
- * default <code>AggregateProfileListener</code> is enabled. To specify that a
- * different set of <code>ProfileListener</code>s should be used,
- * the <code>com.sun.sgs.impl.kernel.profile.listeners</code>
- * property must be specified with a colon-separated list of fully-qualified
- * classes, each of which implements <code>ProfileListener</code>.
+ * By default, the minimal amount of profiling which is used internally by
+ * the system is enabled.  To enable more profiling, the kernel property
+ * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY} must be set to 
+ * a valid level for {@link 
+ * com.sun.sgs.profile.ProfileCollector#setGlobalProfileLevel(ProfileLevel)}.
+ * By default, no profile listeners are enabled.  Set the 
+ * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
+ * a colon-separated list of fully-qualified class names, each of which 
+ * implements {@link ProfileListener}.
  */
 class Kernel {
 
@@ -93,9 +93,9 @@ class Kernel {
     public static final String PROFILE_PROPERTY =
         "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
-    private static final String PROFILE_LISTENERS =
+    public static final String PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.listeners";
-    // the default profile listeners
+    // the default profile listeners .. currently not used
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
 
@@ -181,15 +181,18 @@ class Kernel {
                     logger.log(Level.CONFIG, "Profiling level is {0}", level);
                 }
             } catch (IllegalArgumentException iae) {
-                profileLevel = ProfileLevel.MIN;
                 if (logger.isLoggable(Level.WARNING)) {
-                    logger.log(Level.WARNING, "Unknown profile " +
-                               "level {0} ... all profiling will be " +
-                               "set to MIN", level);
+                    logger.log(Level.WARNING, "Unknown profile level {0}", 
+                               level);
                 }
+                throw iae;
             }
             
-            profileCollector = new ProfileCollectorImpl(profileLevel);
+            // Create the system registry
+            systemRegistry = new ComponentRegistryImpl();
+            
+            profileCollector = new ProfileCollectorImpl(profileLevel, 
+                                              appProperties, systemRegistry);
             profileRegistrar = new ProfileRegistrarImpl(profileCollector);
 
             // create the authenticators and identity coordinator
@@ -223,13 +226,14 @@ class Kernel {
             taskScheduler.setContext(ctx);
 
             // collect the shared system components into a registry
-            systemRegistry = new ComponentRegistryImpl();
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
             systemRegistry.addComponent(profileRegistrar);
 
-            // create the profiling listeners
+            // create the profiling listeners.  It is important to not
+            // do this until we've finished adding components to the
+            // system registry, as some listeners use those components.
             loadProfileListeners(profileCollector);
 
             if (logger.isLoggable(Level.INFO))
@@ -252,46 +256,15 @@ class Kernel {
      * Private helper routine that loads all of the requested listeners
      * for profiling data.
      */
-    private void loadProfileListeners(ProfileCollector profileCollector) {
+     private void loadProfileListeners(ProfileCollector profileCollector) {
         String listenerList = appProperties.getProperty(PROFILE_LISTENERS);
 
-        // If profiling is set to anything other than MIN, provide a default
-        // listener.
-        if (listenerList == null && 
-                profileCollector.getGlobalProfileLevel() != ProfileLevel.MIN) {
-            listenerList = DEFAULT_PROFILE_LISTENERS;
-        }
         if (listenerList != null) {
             for (String listenerClassName : listenerList.split(":")) {
-                try {
-                    // make sure we can resolve the listener
-                    Class<?> listenerClass = Class.forName(listenerClassName);
-                    Constructor<?> listenerConstructor =
-                        listenerClass.getConstructor(Properties.class,
-                                                     Identity.class,
-                                                     ComponentRegistry.class);
-
-                    // create a new identity for the listener
-                    IdentityImpl owner = new IdentityImpl(listenerClassName);
-
-                    // try to create and register the listener
-                    Object obj =
-                        listenerConstructor.newInstance(appProperties, owner,
-                                                        systemRegistry);
-                    ProfileListener listener = (ProfileListener)obj;
+                ProfileListener listener = 
+                    profileCollector.instantiateListener(listenerClassName);
+                if (listener != null) {
                     profileCollector.addListener(listener);
-                } catch (InvocationTargetException e) {
-                    if (logger.isLoggable(Level.WARNING))
-                        logger.logThrow(Level.WARNING, e.getCause(), 
-                                "Failed to load ProfileListener {0} ... " +
-                                "it will not be available for profiling",
-                                listenerClassName);
-                } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING))
-                        logger.logThrow(Level.WARNING, e, "Failed to load " +
-                                        "ProfileListener {0} ... it will not " +
-                                        "be available for profiling",
-                                        listenerClassName);
                 }
             }
         }

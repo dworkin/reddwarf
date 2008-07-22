@@ -306,7 +306,7 @@ public class TaskServiceImpl
         ProfileRegistrar registrar = 
             systemRegistry.getComponent(ProfileRegistrar.class);
         ProfileConsumer consumer =
-            registrar.registerProfileProducer(this.getClass().getName());
+            registrar.registerProfileProducer(getName());
 
         ProfileLevel level = ProfileLevel.MAX;
         scheduleNDTaskOp =

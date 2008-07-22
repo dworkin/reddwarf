@@ -559,8 +559,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public <T> ManagedReference<T> createReference(T object) {
-        if (createReferenceOp != null)
-            createReferenceOp.report();
+        createReferenceOp.report();
 	Context context = null;
 	try {
 	    checkManagedObject(object);

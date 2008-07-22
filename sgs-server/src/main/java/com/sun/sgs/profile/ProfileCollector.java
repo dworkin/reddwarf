@@ -22,6 +22,7 @@ package com.sun.sgs.profile;
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
+import java.util.List;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -42,22 +43,28 @@ public interface ProfileCollector {
      * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.
      */
     public enum ProfileLevel {
-        /**  No profiling is collected, other than that used internally. */
+        /** Collect minimal profiling data. */
         MIN,
-        /** A happy medium. */
+        /** Collect a medium amount of profiling data. */
         MEDIUM,
-        /** Enable all profiling. */
+        /** Collect all profiling data available. */
         MAX,
     }
     
     /** 
-     * The current global profiling level.
+     * The current global profiling level, which is the default level
+     * for any newly created {@code ProfileConsumer} and can be set at
+     * startup with the property 
+     * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.  
      * @return the current profiling level
      */
     public ProfileLevel getGlobalProfileLevel();
     
     /**
-     * Set the current global profiling level.
+     * Set the current global profiling level.  Setting this level will 
+     * set each of the {@code ProfileConsumer} profile levels, making this
+     * method a convient way to enable or disable all profiling.
+     * 
      * @param level the profiling level
      */
     public void setGlobalProfileLevel(ProfileLevel level);
@@ -74,9 +81,31 @@ public interface ProfileCollector {
      * the current set of operations and the number of scheduler
      * threads.
      *
-     * @param listener the <code>ProfileOperationListener</code> to add
+     * @param listener the {@code ProfileListener} to add
      */
     public void addListener(ProfileListener listener);
+    
+    /**
+     * Instantiates a {@code ProfileListener}.  The listener must
+     * implement a constructor of the form ({@code java.util.Properties},
+     * {@code com.sun.sgs.kernel.TaskOwner},
+     * {@code com.sun.sgs.kernel.ComponentRegistry}). 
+     * 
+     * @param listenerClassName the fully qualified class name of the 
+     *                          listener to instantiate.
+     * 
+     * @return the instantiated listener or null if there was an error
+     */
+    public ProfileListener instantiateListener(String listenerClassName);
+    
+
+    /**
+     * Returns a read-only list of {@code ProfileListener}s which have been
+     * added.
+     * 
+     * @return the list of listeners
+     */
+    public List<ProfileListener> getListeners();
     
     /**
      * Removes a {@code ProfileListener} and calls

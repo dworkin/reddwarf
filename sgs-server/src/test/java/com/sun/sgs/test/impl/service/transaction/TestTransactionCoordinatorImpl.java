@@ -62,7 +62,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     /** A profile collector. */
     private final ProfileCollector collector = 
-            new ProfileCollectorImpl(ProfileLevel.MIN);
+            new ProfileCollectorImpl(ProfileLevel.MIN, null, null);
     
     /** The instance to test. */
     private final TransactionCoordinator coordinator =

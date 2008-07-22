@@ -55,7 +55,8 @@ public class DummyProfileCoordinator {
 
     /** Creates an instance of DummyProfileCoordinator */
     private DummyProfileCoordinator() {
-        collector = new ProfileCollectorImpl(ProfileLevel.MIN);
+        collector = new ProfileCollectorImpl(ProfileLevel.MIN, 
+                                             System.getProperties(), null);
         registrar = new ProfileRegistrarImpl(collector);
         OperationLoggingProfileOpListener listener =
             new OperationLoggingProfileOpListener(System.getProperties(),

@@ -51,7 +51,8 @@ public final class MinimalTestKernel {
 	ComponentRegistryImpl registry = new ComponentRegistryImpl();
 	MinimalTestKernel.ctx = new SimpleAppContext(registry);
 
-        ProfileCollector collector = new ProfileCollectorImpl(ProfileLevel.MIN);
+        ProfileCollector collector = 
+            new ProfileCollectorImpl(ProfileLevel.MIN, null, registry);
 	TransactionSchedulerImpl txnScheduler =
 	    new TransactionSchedulerImpl(new Properties(),
 					 new TestTransactionCoordinator(),

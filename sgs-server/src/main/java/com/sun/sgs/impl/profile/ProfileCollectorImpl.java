@@ -21,6 +21,9 @@ package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileCollector;
@@ -31,14 +34,19 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 
 import java.beans.PropertyChangeEvent;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.List;
+import java.util.Properties;
 import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -47,6 +55,10 @@ import java.util.concurrent.LinkedBlockingQueue;
  * consume and report profiling data.
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
+    
+    // logger for this class
+    private static final LoggerWrapper logger = new LoggerWrapper(
+                  Logger.getLogger(ProfileCollectorImpl.class.getName()));
     
     // A map from profile consumer name to profile consumer object
     private final ConcurrentHashMap<String, ProfileConsumerImpl> consumers;
@@ -76,11 +88,27 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     // properties at startup, but can be changed dynamically.
     private ProfileLevel globalProfileLevel;
     
+    // The application properties, used to instantiate {@code ProfileListener}s
+    private final Properties appProperties;
+    
+    // The system registry, used to instantiate {@code ProfileListener}s
+    private final ComponentRegistry systemRegistry;
+    
     /**
      * Creates an instance of {@code ProfileCollectorImpl}.
      * @param level the default global profiling level
+     * @param appProperties the application properties, used for instantiating
+     *          {@code ProfileListener}s
+     * @param systemRegistry the system registry, used for instantiating
+     *          {@code ProfileListener}s
      */
-    public ProfileCollectorImpl(ProfileLevel level) {
+    public ProfileCollectorImpl(ProfileLevel level, 
+                                Properties appProperties, 
+                                ComponentRegistry systemRegistry) 
+    {
+        this.appProperties = appProperties;
+        this.systemRegistry = systemRegistry;
+        
         schedulerThreadCount = 0;
         listeners = new CopyOnWriteArrayList<ProfileListener>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
@@ -158,10 +186,56 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
  
+    /** 
+     * {@inheritDoc} 
+     * <p>
+     * If there is an error, it is logged at Level.WARNING.
+     */
+    public ProfileListener instantiateListener(String listenerClassName) {
+        try {                  
+            // make sure we can resolve the listener
+            Class<?> listenerClass = Class.forName(listenerClassName);
+            Constructor<?> listenerConstructor =
+                listenerClass.getConstructor(Properties.class,
+                                             Identity.class,
+                                             ComponentRegistry.class);
+
+            // create a new identity for the listener
+            IdentityImpl owner = new IdentityImpl(listenerClassName);
+
+            // try to create and register the listener
+            Object obj =
+                listenerConstructor.newInstance(appProperties, owner,
+                                                systemRegistry);
+            return (ProfileListener)obj;
+        } catch (InvocationTargetException e) {
+            if (logger.isLoggable(Level.WARNING))
+                logger.logThrow(Level.WARNING, e.getCause(), 
+                        "Failed to load ProfileListener {0} ... " +
+                        "it will not be available for profiling",
+                        listenerClassName);
+            return null;
+        } catch (Exception e) {
+            if (logger.isLoggable(Level.WARNING))
+                logger.logThrow(Level.WARNING, e, "Failed to load " +
+                                "ProfileListener {0} ... it will not " +
+                                "be available for profiling",
+                                listenerClassName);
+            return null;
+        }
+    }
+    
+    /** {@inheritDoc} */
+    public List<ProfileListener> getListeners() {
+        return Collections.unmodifiableList(listeners);
+    }
+    
     /** {@inheritDoc} */
     public void removeListener(ProfileListener listener) {
-        listeners.remove(listener);
-        listener.shutdown();
+        boolean registered = listeners.remove(listener);
+        if (registered) {
+            listener.shutdown();
+        }
     }
 
     /** {@inheritDoc} */

@@ -26,6 +26,7 @@ import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -62,7 +63,9 @@ public class TestProfileCollectorImpl extends TestCase {
     protected void tearDown() throws Exception {
         if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes) {
-                node.shutdown(false);
+                if (node != null) {
+                    node.shutdown(false);
+                }
             }
             additionalNodes = null;
         }
@@ -116,16 +119,20 @@ public class TestProfileCollectorImpl extends TestCase {
     }
 
     public void testKernelBadProfileLevel() throws Exception {
-        // Even if the user gives a nonsense profile level, the collector must
-        // not be null.
+        // The kernel won't start if a bad profile level is provided.
         Properties serviceProps = 
                 SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
         serviceProps.setProperty(
                 "com.sun.sgs.impl.kernel.profile.level", "JUNKJUNK");
-        addNodes(serviceProps, 1);
-        ProfileCollector collector = getCollector(additionalNodes[0]);
-        assertNotNull(collector);
-        assertSame(ProfileLevel.MIN, collector.getGlobalProfileLevel());
+        try {
+            addNodes(serviceProps, 1);
+            fail("Excpected kernel to not start up");
+        } catch (InvocationTargetException e) {
+            Throwable t = e.getCause();
+            assertEquals("Expected IllegalArgumentException",
+                         IllegalArgumentException.class.getName(), 
+                         t.getClass().getName());
+        }
     }
 
     public void testKernelLowerCaseLevel() throws Exception {
