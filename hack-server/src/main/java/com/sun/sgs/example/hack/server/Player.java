@@ -22,6 +22,7 @@ import com.sun.sgs.example.hack.server.level.Level;
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -310,6 +311,20 @@ public class Player
     }
 
     /**
+     * Notifies the client that they have sent an unhandled command to
+     * the specified channel.
+     *
+     * @param channelName the name of the channel that the unhandled
+     * command was sent on
+     *
+     * @param command the unhandled command
+     */
+    public void notifyUnhandledCommand(String channelName, Command command) {
+	Messages.sendNotificationOfUnhandledCommand(getCurrentSession(),
+						    channelName, command);
+    }
+
+    /**
      * Sends the statistics of the given character to the client.
      *
      * @param character the character who's statistics will be sent
@@ -337,6 +352,10 @@ public class Player
      */
     public void sendServerMessage(String message) {
         Messages.sendServerMessage(getCurrentSession(), message);
+    }
+
+    public String toString() {
+	return name;
     }
 
 }

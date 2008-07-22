@@ -95,7 +95,6 @@ public class Creator implements Game, Serializable {
      * @param player the <code>Player</code> joining the creator
      */
     public void join(Player player) {
-	System.out.println(player + " joined the creator channel");
 
         DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
@@ -165,6 +164,10 @@ public class Creator implements Game, Serializable {
      */
     public int numPlayers() {
         return playerCount;
+    }
+
+    public String toString() {
+	return getName();
     }
 
 }

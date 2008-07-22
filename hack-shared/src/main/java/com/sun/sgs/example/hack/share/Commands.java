@@ -27,13 +27,22 @@ public final class Commands {
     }
 
     public static Commands.Command decode(int encodedType) {
-	return ordinalToEnum.get(encodedType);
+	Command cmd = ordinalToEnum.get(encodedType);
+	if (cmd == null) {
+	    throw new IllegalArgumentException("Unknown encoding of command: " +
+					       encodedType);
+	}
+	return cmd;
     }
 
 
     private Commands() { }
 
     public static enum Command {
+
+	/*
+	 * Server-to-client commands
+	 */
 
 	// game-state commands
 	PLAYER_JOINED,
@@ -55,7 +64,28 @@ public final class Commands {
 	    NEW_SERVER_MESSAGE,
 
 	    // character (creator?) messages
-	    NEW_CHARACTER_STATS
+	    NEW_CHARACTER_STATS,
+
+	    // sent to client after the client sends an unhandled
+	    // command to channel on the server.
+	    UNHANDLED_COMMAND,
+
+	    /*
+	     * Client-to-server commands
+	     */
+	    // lobby commands
+	    MOVE_CLIENT_TO_GAME,
+
+	    // character creation commands
+	    ROLL_FOR_STATS,
+	    CREATE_CURRENT_CLIENT_CHARACTER,
+	    CANCEL_CURRENT_CHARACTER_CREATION,
+
+	    // dungeon commands
+	    MOVE_PLAYER,
+	    TAKE_ITEM,
+	    EQUIP_ITEM,
+	    USE_ITEM
     }
     
 }

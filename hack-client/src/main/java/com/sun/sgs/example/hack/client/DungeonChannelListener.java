@@ -13,7 +13,6 @@ import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
-
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
 
@@ -112,7 +111,8 @@ public class DungeonChannelListener extends GameChannelListener
 	} catch (IOException ioe) {
 	    // NOTE: this should probably handle the error a little more
 	    // gracefully, but it's unclear what the right approach is
-	    System.out.println("Failed to handle incoming Dungeon object");
+	    System.out.println("Failed to handle incoming Dungeon object "
+			       + "for command " + cmd);
 	    ioe.printStackTrace();
 	}
     }

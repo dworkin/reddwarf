@@ -13,6 +13,8 @@ import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 import com.sun.sgs.example.hack.share.KeyMessages;
 
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -91,7 +93,8 @@ public class GameManager implements BoardListener, PlayerListener,
      * @param key the key, as defined in <code>java.awt.event.KeyEvent</code>
      */
     public void action(int key) {
-        int messageType;
+        
+	Command command;
         KeyMessages.Type message = KeyMessages.Type.NONE;
 
         // figure out what key was pressed and whether we care about it, and
@@ -100,28 +103,33 @@ public class GameManager implements BoardListener, PlayerListener,
         // define what keys it uses, but then it would be harder to map
         // custom key bindings to each action
         switch (key) {
-        case KeyEvent.VK_J: message = KeyMessages.Type.LEFT;
-            messageType = 1;
+        case KeyEvent.VK_J: 
+	    message = KeyMessages.Type.LEFT;
+            command = Command.MOVE_PLAYER;
             break;
-        case KeyEvent.VK_K: message = KeyMessages.Type.DOWN;
-            messageType = 1;
+        case KeyEvent.VK_K: 
+	    message = KeyMessages.Type.DOWN;
+            command = Command.MOVE_PLAYER;
             break;
-        case KeyEvent.VK_L: message = KeyMessages.Type.RIGHT;
-            messageType = 1;
+        case KeyEvent.VK_L: 
+	    message = KeyMessages.Type.RIGHT;
+            command = Command.MOVE_PLAYER;
             break;
-        case KeyEvent.VK_I: message = KeyMessages.Type.UP;
-            messageType = 1;
+        case KeyEvent.VK_I: 
+	    message = KeyMessages.Type.UP;
+            command = Command.MOVE_PLAYER;
             break;
-        case KeyEvent.VK_SEMICOLON: message = KeyMessages.Type.TAKE;
-            messageType = 2;
+        case KeyEvent.VK_SEMICOLON: 
+	    message = KeyMessages.Type.TAKE;
+            command = Command.TAKE_ITEM;
             break;
         default:
             // if we got here, this is a key we don't handle, so ignore it
             return;
         }
 
-        ByteBuffer bb = ByteBuffer.allocate(5);
-        bb.put((byte)messageType);
+        ByteBuffer bb = ByteBuffer.allocate(8);
+        bb.putInt(Commands.encode(command));
         bb.putInt(KeyMessages.encode(message));
         bb.rewind();
 

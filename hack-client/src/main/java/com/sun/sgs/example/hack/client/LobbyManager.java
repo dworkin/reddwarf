@@ -12,7 +12,10 @@ package com.sun.sgs.example.hack.client;
 
 import com.sun.sgs.client.simple.SimpleClient;
 
+
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.nio.ByteBuffer;
 
@@ -70,15 +73,20 @@ public class LobbyManager implements LobbyListener
      * @param characterName the name of the character to join as
      */
     public void joinGame(String gameName, String characterName) {
-        ByteBuffer bb = ByteBuffer.allocate(5 + gameName.length() +
-                                            characterName.length());
+
+	byte[] gameBytes = gameName.getBytes();
+	byte[] charBytes = characterName.getBytes();
+
+        ByteBuffer bb = ByteBuffer.allocate(8 + gameBytes.length +
+					    charBytes.length);
 
         // FIXME: the message codes should be enumerated somewhere
-        // the message format is: 1 GameNameLength GameName CharacterName
-        bb.put((byte)1);
-        bb.putInt(gameName.length());
-        bb.put(gameName.getBytes());
-        bb.put(characterName.getBytes());
+        // the message format is: 
+	//   MOVE_CLIENT_TO_GAME GameNameLength GameName CharacterName
+        bb.putInt(Commands.encode(Command.MOVE_CLIENT_TO_GAME));
+        bb.putInt(gameBytes.length);
+        bb.put(gameBytes);
+        bb.put(charBytes);
         bb.rewind();
 
         try {
@@ -94,7 +102,7 @@ public class LobbyManager implements LobbyListener
      *
      * @param game the name of the game
      */
-    public void gameAdded(String game) {
+    public void gameAdded(String game) {	
         for (LobbyListener listener : listeners)
             listener.gameAdded(game);
     }
