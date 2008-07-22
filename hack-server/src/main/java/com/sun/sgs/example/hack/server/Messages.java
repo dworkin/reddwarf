@@ -173,20 +173,12 @@ public final class Messages {
 			   playerID);
     }
 
-//     /**
-//      * Sends the command to add the all of the provided mappings from
-//      * player ID to player name to all the clients on the provided
-//      * channel.
-//      */
-//     public static void sendBulkPlayerIDs(ClientSession session,
-// 					 Map<BigInteger,String> 
-// 					 idsToNames) {
-
-// 	sendToClient(session, Command.ADD_BULK_PLAYER_IDS,
-// 		     idsToNames);
-//     }
-    
-
+    /**	
+     * Sends the command to add the all of the provided mappings from
+     * player ID to player name to the specified client. If the
+     * provided map is too large, it will be sent in parts through
+     * mutliple messages.
+     */
     public static void sendBulkPlayerIDs(ClientSession session,
 	Map<ManagedReference<ClientSession>,String> playerToName) 
     {
