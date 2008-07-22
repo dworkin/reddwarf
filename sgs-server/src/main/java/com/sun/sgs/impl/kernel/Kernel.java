@@ -30,6 +30,8 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
+import com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager;
+
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
@@ -65,7 +67,7 @@ import java.util.Properties;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import java.util.logging.LogManager;
 
 /**
  * This is the core class for the server. It is the first class that is
@@ -205,6 +207,18 @@ class Kernel {
             // initialize the transaction coordinator
             TransactionCoordinator transactionCoordinator =
                 new TransactionCoordinatorImpl(appProperties, profileCollector);
+
+	    // possibly upgrade loggers to be transactional
+	    LogManager logManager = LogManager.getLogManager();
+
+	    // if the logging system has been configured to be
+	    // transactional, the LogManager installed should be an
+	    // instance of TransactionAwareLogManager
+	    if (logManager instanceof TransactionAwareLogManager) {
+		TransactionAwareLogManager txnAwareLogManager =
+		    (TransactionAwareLogManager)logManager;
+		txnAwareLogManager.configure(appProperties, proxy);
+	    }
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
