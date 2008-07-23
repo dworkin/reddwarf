@@ -293,6 +293,21 @@ int sgs_msg_read_uint16(const sgs_message *pmsg, const uint16_t start, uint16_t 
 int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t *result);
 
 /*
+ * function sgs_msg_read_id()
+ *
+ * Reads and returns an sgs_id from the message passed in, beginning the
+ * interpretation with the position start. The result is passed back in the 
+ * caller-supplied pointer to an sgs_id; the memory for this structure 
+ * will be allocated by this call, but freeing this memory will be the 
+ * responsibility of the caller (or subsequent code).
+ *
+ * Returns the total number of bytes read from the starting point on success,
+ * or -1 on failure.
+ */
+
+int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **result);
+
+/*
  * function sgs_msg_read_string()
  *
  * Reads and returns a string from the message passed in, beginning its 
@@ -313,12 +328,11 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **re
  * function sgs_msg_read_bytes()
  * 
  * Reads the indicated set of bytes from the message, starting with the position 
- * start, and copies them into the
- * buffer supplied, up to the number of bytes requested or the end of the
- * message buffer, whichever comes first. The results buffer must be allocated 
- * by the caller. Returns the number of bytes transferred, or -1 on failure
+ * start, and copies them into the buffer pointed to by result. The space for
+ * the buffer will be allocated by this function, but will need to be freed by the
+ * calling function. Returns the number of bytes transferred, or -1 on failure
  */
-int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t *result, uint16_t count);
+int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **result, uint16_t count);
 
 /*
  * function: sgs_msg_dump()

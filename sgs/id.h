@@ -43,7 +43,12 @@ extern "C" {
 
 #include "sgs/config.h"
 
-typedef struct sgs_id_impl sgs_id;
+
+typedef struct sgs_id {
+    /** buf form */
+    uint8_t *buf;
+    uint8_t buf_len;
+} sgs_id;
 
 /*
  * function: sgs_id_create()

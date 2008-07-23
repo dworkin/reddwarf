@@ -269,6 +269,26 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
 }
 
 /*
+ * sgs_msg_read_id()
+ */
+int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **result){
+    uint16_t length;
+    uint8_t *buffer;
+    int incr, incr1;
+    
+    incr = sgs_msg_read_uint16(pmsg, start, &length);
+    if (incr < 1)
+        return -1;
+
+    incr1 = sgs_msg_read_bytes(pmsg, start+ incr, &buffer, length);
+    if (incr1 != length){
+        return -1;
+    }
+    
+    *result = sgs_id_create(buffer, length);
+    return (incr + incr1);
+}
+/*
  * sgs_msg_read_string
  */
 int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **result) {
@@ -291,13 +311,15 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **re
 /*
  * sgs_msg_read_bytes
  */
-int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t *result, uint16_t count){
+int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **result, uint16_t count){
     int retcount;
-    if (sizeof(result) < count){
+    
+    *result = malloc(count);
+    if (*result == NULL){
         return -1;
     }
-    retcount = (pmsg->len < (start + count))? pmsg->len - start : count;
-    memcpy(result, pmsg->buf + start, retcount);
+    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? pmsg->len - start : count;
+    memcpy(*result, pmsg->buf + start, retcount);
     return retcount;
 }
 
