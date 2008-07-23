@@ -24,7 +24,7 @@ LIBS += -lsgsclient
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS) $(LDLIBS)
 
 clean:
-	-/bin/rm -rf $(OBJDIR)
+	-/bin/rm -rf $(OBJDIR)/*.o
 
 realclean: clean
 	-/bin/rm -f $(EXES)

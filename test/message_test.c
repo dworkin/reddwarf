@@ -31,10 +31,12 @@
  */
 
 #include "sgs/private/message.h"
+#include "sgs/id.h"
 
 static int testUint16(sgs_message *pmsg, int numTests, int silent);
 static int testUint32(sgs_message *pmsg, int numTests, int silent);
 static int testStrings(sgs_message *pmsg, int numTests, int silent);
+static int testIds(sgs_message *pmsg, int numTests, int silent);
 
 
 /*
@@ -85,6 +87,12 @@ int main(int argc, char *argv[]) {
         printf("test Strings passed\n");
     } else 
         printf("%d failures in testStrings\n", result);
+    
+    result = sgs_msg_init(&msg, buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST);
+    if ((result = testIds(&msg, 200, 0)) == 0){
+        printf("test Ids passed\n");
+    } else 
+        printf("%d failures in testIds\n", result);
   
     printf("Goodbye!\n");
   
@@ -231,7 +239,7 @@ int testStrings(sgs_message *pmsg, int numTests, int silent) {
         
         offset = 3;
         for (j = 0; j < 10; j++) {
-            check = sgs_msg_read_string(pmsg, offset, &(outbuffer[j]));
+            check = sgs_msg_read_string(pmsg, offset, outbuffer+j);
             if (check < 0) {
                 printf("unable to read the %dth string\n", j);
                 return -1;
@@ -257,3 +265,54 @@ int testStrings(sgs_message *pmsg, int numTests, int silent) {
     free(outbuffer);
     return incheck;
 }
+
+void generateIds(sgs_id **testIds){
+    int i, j, k, len;
+    uint8_t buffer[10];
+    long sourcebuf[3];
+    
+    for (i = 0; i < 10; i++){
+        len = random()%10;
+        len++;
+        for (k = 0; k < 3; k++){
+            sourcebuf[k] = random();
+        }
+        memcpy(buffer+i, sourcebuf, len);
+        *(testIds + i) = sgs_id_create(buffer+i, len);
+    }
+}
+
+int testIds(sgs_message *pmsg, int numTests, int silent){
+    sgs_id *testIds[10];
+    sgs_id *outIds[10];
+    int i, j, incr, result, totalBad;
+    
+    totalBad = 0;
+    generateIds(testIds);
+    
+    for (i = 0; i < numTests; i+=j){
+        for (j = 0; j < 10; j++){
+            sgs_msg_add_id(pmsg, testIds[j]);
+        }
+        incr = 3;
+        for (j = 0; j<10; j++){
+            result = sgs_msg_read_id(pmsg, incr, (outIds+j));
+            if (result < 1){
+                printf("error reading the %dth value\n", i+j);
+                return -1;
+            }
+            incr += result;
+        }
+        for (j = 0; j < 10; j++){
+            result = sgs_id_compare(*(testIds+j), *(outIds+j));
+            if (result != 0){
+                totalBad++;
+                if (silent == 0){
+                    printf("%dth ids differ\n", j);
+                }
+            }
+        }
+    }
+    return totalBad;
+}
+
