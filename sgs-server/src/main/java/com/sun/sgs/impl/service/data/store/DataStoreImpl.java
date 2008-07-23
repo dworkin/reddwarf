@@ -693,6 +693,9 @@ public class DataStoreImpl
     private static final class ObjectIdInfo
 	implements Comparable<ObjectIdInfo>
     {
+	/** The first object ID in this block. */
+	private long firstObjectId = 0;
+
 	/**
 	 * The next object ID to use for creating an object.  Valid if not
 	 * greater than lastObjectId.
@@ -727,9 +730,10 @@ public class DataStoreImpl
 	    abortNextObjectId = nextObjectId;
 	}
 
-	/** Updates the next and last object IDs. */
-	void setObjectIds(long nextObjectId, long lastObjectId) {
-	    this.nextObjectId = nextObjectId;
+	/** Updates the first, next, and last object IDs. */
+	void setObjectIds(long firstObjectId, long lastObjectId) {
+	    this.firstObjectId = firstObjectId;
+	    nextObjectId = firstObjectId;
 	    this.lastObjectId = lastObjectId;
 	    /*
 	     * Since blocks of object IDs may not be allocated contiguously,
@@ -755,6 +759,11 @@ public class DataStoreImpl
 	 */
 	void abort() {
 	    nextObjectId = abortNextObjectId;
+	}
+
+	/** Returns the first object ID in this block. */
+	long first() {
+	    return firstObjectId;
 	}
 
 	/** Returns the last object ID in this block. */
@@ -974,6 +983,20 @@ public class DataStoreImpl
 		    newNextObjectId, newLastObjectId);
 	    }
 	    long result = objectIdInfo.next();
+	    if (useAllocationBlockPlaceholders &&
+		result == objectIdInfo.first())
+	    {
+		/*
+		 * Create the placeholder when using the first ID in the block.
+		 * Don't do this when storing the allocation and placeholder
+		 * information in the info database because this transaction
+		 * may already be holding a lock on the location in the OIDs
+		 * database.
+		 */
+		oidsDb.put(txnInfo.dbTxn,
+			   DataEncoding.encodeLong(objectIdInfo.last()),
+			   PLACEHOLDER_DATA);
+	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createObject txn:{0} returns oid:{1,number,#}",
@@ -1919,8 +1942,9 @@ public class DataStoreImpl
     }
 
     /**
-     * Allocates a placeholder with the specified object ID for the end of an
-     * allocation block, if using allocation block placeholders.
+     * Notes the first placeholder when starting to use a new allocation block
+     * with the specified object ID at its end, if using allocation block
+     * placeholders.
      */
     private void maybeUpdateAllocationBlockPlaceholders(
 	DbTransaction dbTxn, long placeholderOid)
@@ -1933,12 +1957,7 @@ public class DataStoreImpl
 	    infoDb.put(dbTxn,
 		       DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
 		       DataEncoding.encodeLong(firstPlaceholderOid));
-	    oidsDb.put(dbTxn, DataEncoding.encodeLong(placeholderOid),
-		       PLACEHOLDER_DATA);
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "Created placeholder at oid:{0,number,#}",
-			   placeholderOid);
 		logger.log(Level.FINEST,
 			   "Note first placeholder oid:{0,number,#}",
 			   firstPlaceholderOid);
