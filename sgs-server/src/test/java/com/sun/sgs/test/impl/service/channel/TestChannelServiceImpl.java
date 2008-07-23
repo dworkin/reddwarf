@@ -1171,51 +1171,114 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelSendToNewMembersAfterAllNodesFail() throws Exception {
-	testChannelSendMultipleNodes();
+	addNodes("one", "two", "three");
+	String channelName = "test";
+	createChannel(channelName);
+	ClientGroup group1 = new ClientGroup(sevenDwarfs);
+	joinUsers(channelName, sevenDwarfs);
+	sendMessagesToChannel(channelName, group1, 3);
 	printServiceBindings();
 	System.err.println("simulate watchdog server crash...");
 	tearDown(false);
 	setUp(false);
 	//	Thread.sleep(WAIT_TIME);
 	printServiceBindings();
-	addNodes("ay", "bee", "sea");
-	ClientGroup group = new ClientGroup(sevenDwarfs);
+	addNodes("ay", "bee");
+	ClientGroup group2 = new ClientGroup(someUsers);
 	try {
-	    joinUsers("test", sevenDwarfs);
-	    sendMessagesToChannel("test", group, 2);
+	    joinUsers(channelName, someUsers);
+	    sendMessagesToChannel(channelName, group2, 2);
+	    group1.checkMembership(channelName, false);
 	} finally {
-	    group.disconnect(false);
+	    printServiceBindings();
+	    group2.disconnect(false);
 	}
     }
 
-    public void testChannelSendToExistingMembersAfterCoordinatorFailure()
+    public void testChannelSendToExistingMembersAfterNodeFailure()
 	throws Exception
     {
-	String channelName = "talk";
-	addNodes("a", "b");
-	// create channel on specific node which will be the coordinator node
-	createChannel(channelName, null, "a");
+	String coordinatorHost = "coordinatorNode";
+	String otherHost = "otherNode";
+	addNodes(coordinatorHost, otherHost);
+	
+	// create channels on specific node which will be the coordinator node
+	String[] channelNames = new String[] {"channel1", "channel2"};
+	for (String channelName : channelNames) {
+	    createChannel(channelName, null, coordinatorHost);
+	}
+	
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
-	    joinUsers(channelName, sevenDwarfs);
-	    sendMessagesToChannel(channelName, group, 3);
+	    for (String channelName : channelNames) {
+		joinUsers(channelName, sevenDwarfs);
+		sendMessagesToChannel(channelName, group, 2);
+	    }
 	    printServiceBindings();
 	    // nuke coordinator node
-	    System.err.println("shutting down node 'a'");
-	    shutdownNode("a");
+	    System.err.println("shutting down node: " + otherHost);
+	    shutdownNode(otherHost);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
-		group.removeSessionsFromGroup("a");
+		group.removeSessionsFromGroup(otherHost);
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
-	    sendMessagesToChannel(channelName, group, 2);
+	    for (String channelName : channelNames) {
+		sendMessagesToChannel(channelName, group, 2);
+	    }
 	    if (!disconnectedSessionsGroup.isDisconnectedGroup()) {
 		fail("expected disconnected client(s)");
 	    }
-		
-	    disconnectedSessionsGroup.checkMembership(channelName, false);
-	    disconnectedSessionsGroup.checkChannelSets(false);
+
+	    for (String channelName : channelNames) {
+		disconnectedSessionsGroup.checkMembership(channelName, false);
+	    }
+	    
+	} finally {
+	    printServiceBindings();
+	    group.disconnect(false);
+	}
+    }
+    
+    public void testChannelSendToExistingMembersAfterCoordinatorFailure()
+	throws Exception
+    {
+	String coordinatorHost = "coordinator";
+	addNodes(coordinatorHost, "otherNode");
+	
+	// create channels on specific node which will be the coordinator node
+	String[] channelNames = new String[] {"channel1", "channel2"};
+	for (String channelName : channelNames) {
+	    createChannel(channelName, null, coordinatorHost);
+	}
+	
+	ClientGroup group = new ClientGroup(sevenDwarfs);
+	try {
+	    for (String channelName : channelNames) {
+		joinUsers(channelName, sevenDwarfs);
+		sendMessagesToChannel(channelName, group, 2);
+	    }
+	    printServiceBindings();
+	    // nuke coordinator node
+	    System.err.println("shutting down node: " + coordinatorHost);
+	    shutdownNode(coordinatorHost);
+	    // remove disconnected sessions from client group
+	    System.err.println("remove disconnected sessions");
+	    ClientGroup disconnectedSessionsGroup =
+		group.removeSessionsFromGroup(coordinatorHost);
+	    // send messages to sessions that are left
+	    System.err.println("send messages to remaining members");
+	    for (String channelName : channelNames) {
+		sendMessagesToChannel(channelName, group, 2);
+	    }
+	    if (!disconnectedSessionsGroup.isDisconnectedGroup()) {
+		fail("expected disconnected client(s)");
+	    }
+
+	    for (String channelName : channelNames) {
+		disconnectedSessionsGroup.checkMembership(channelName, false);
+	    }
 	    
 	} finally {
 	    printServiceBindings();
@@ -1604,7 +1667,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelSetsRemovedOnLogout() throws Exception {
+    public void testSessionsRemovedOnRecovery() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
 	ClientGroup group = new ClientGroup(someUsers);
@@ -1613,33 +1676,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    joinUsers(channelName, someUsers);
 	    Thread.sleep(100);
 	    group.checkMembership(channelName, true);
-	    group.checkChannelSets(true);
-	    printServiceBindings();
-	    group.disconnect(true);
-	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
-	    group.checkMembership(channelName, false);
-	    group.checkChannelSets(false);
-	    
-	} catch (Exception e) {
-	    System.err.println("unexpected failure");
-	    e.printStackTrace();
-	    fail("unexpected failure: " + e);
-	} finally {
-	    printServiceBindings();
-	    group.disconnect(false);
-	}
-    }
-
-    public void testSessionsAndChannelSetsRemovedOnRecovery() throws Exception {
-	String channelName = "test";
-	createChannel(channelName);
-	ClientGroup group = new ClientGroup(someUsers);
-	
-	try {
-	    joinUsers(channelName, someUsers);
-	    Thread.sleep(100);
-	    group.checkMembership(channelName, true);
-	    group.checkChannelSets(true);
 	    printServiceBindings();
 
 	    // simulate crash
@@ -1649,7 +1685,6 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    Thread.sleep(WAIT_TIME); // await recovery actions
 	    group.checkMembership(channelName, false);
-	    group.checkChannelSets(false);
 	    printServiceBindings();
 
 	} catch (RuntimeException e) {
@@ -1763,30 +1798,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    }, taskOwner);
 	}
 
-	void checkChannelSets(final boolean exists) throws Exception {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
-		public void run() {
-		    for (DummyClient client : clients.values()) {
-			long nodeId = client.getNodeId();
-			String sessionKey =
-			    getChannelSetKey(nodeId, client.getSessionId());
-			try {
-			    dataService.getServiceBinding(sessionKey);
-			    if (!exists) {
-				fail("checkChannelSets: set exists: " +
-				     client.name);
-			    }
-			} catch (NameNotBoundException e) {
-			    if (exists) {
-				fail("checkChannelSets no channel set: " +
-				     client.name);
-			    }
-			}
-		    }
-		}
-	    }, taskOwner);
-	}
-
 	DummyClient getClient(String name) {
 	    return clients.get(name);
 	}
@@ -1814,13 +1825,6 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
-    }
-
-    private static final String CHANNEL_SET_PREFIX =
-	"com.sun.sgs.impl.service.channel.set.";
-    
-    private static String getChannelSetKey(long nodeId, byte[] sessionId) {
-	return CHANNEL_SET_PREFIX + nodeId + "." + HexDumper.toHexString(sessionId);
     }
 
     /**
