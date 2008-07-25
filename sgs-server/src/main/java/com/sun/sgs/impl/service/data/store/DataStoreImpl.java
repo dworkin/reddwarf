@@ -669,8 +669,7 @@ public class DataStoreImpl
 	ObjectIdInfo create(long firstObjectId, long lastObjectId) {
 	    assert firstObjectId >= 0;
 	    assert lastObjectId > firstObjectId;
-	    ObjectIdInfo info = new ObjectIdInfo();
-	    info.setObjectIds(firstObjectId, lastObjectId);
+	    ObjectIdInfo info = new ObjectIdInfo(firstObjectId, lastObjectId);
 	    if (placeholderOids != null) {
 		synchronized (this) {
 		    placeholderOids.add(lastObjectId);
@@ -694,28 +693,35 @@ public class DataStoreImpl
 	implements Comparable<ObjectIdInfo>
     {
 	/** The first object ID in this block. */
-	private long firstObjectId = 0;
+	private final long firstObjectId;
 
 	/**
 	 * The next object ID to use for creating an object.  Valid if not
 	 * greater than lastObjectId.
 	 */
-	private long nextObjectId = 0;
+	private long nextObjectId;
 
 	/**
 	 * The last object ID that is free for allocating an object before
 	 * needing to obtain more IDs from the database.
 	 */
-	private long lastObjectId = -1;
+	private final long lastObjectId;
 
 	/**
 	 * The value of nextObjectId at the start of the transaction, and which
 	 * it should be set to if the transaction aborts.
 	 */
-	private long abortNextObjectId = 0;
+	private long abortNextObjectId;
 
-	/** Creates an instance of this class. */
-	ObjectIdInfo() { }
+	/**
+	 * Creates an instance with the specified first and last object IDs.
+	 */
+	ObjectIdInfo(long firstObjectId, long lastObjectId) {
+	    this.firstObjectId = firstObjectId;
+	    nextObjectId = firstObjectId;
+	    this.lastObjectId = lastObjectId;
+	    abortNextObjectId = nextObjectId;
+	}
 
 	/** Implement Comparable<ObjectIdInfo>, ordered by object ID. */
 	public int compareTo(ObjectIdInfo other) {
@@ -728,18 +734,6 @@ public class DataStoreImpl
 	 */
 	void initTxn() {
 	    abortNextObjectId = nextObjectId;
-	}
-
-	/** Updates the first, next, and last object IDs. */
-	void setObjectIds(long firstObjectId, long lastObjectId) {
-	    this.firstObjectId = firstObjectId;
-	    nextObjectId = firstObjectId;
-	    this.lastObjectId = lastObjectId;
-	    /*
-	     * Since blocks of object IDs may not be allocated contiguously,
-	     * only back up to the start of the most recently allocated block.
-	     */
-	    this.abortNextObjectId = nextObjectId;
 	}
 
 	/** Returns whether there are more object IDs available. */
