@@ -15,7 +15,7 @@
   <artifactId>sgs-client-parent</artifactId>
   <name>Project Darkstar Client Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <version>0.9.6.1</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <description>
