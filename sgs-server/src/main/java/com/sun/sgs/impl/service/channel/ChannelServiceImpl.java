@@ -627,12 +627,6 @@ public final class ChannelServiceImpl
 		    flip();
 		    sessionService.sendProtocolMessageNonTransactional(
 		        sessionRefId, msg.asReadOnlyBuffer(), Delivery.RELIABLE);
-	    } catch (Exception e) {
-		logger.logThrow(
-			Level.WARNING, e,
-			"leave channelId:{0} sessionId:{1} throws",
-			HexDumper.toHexString(channelId),
-			HexDumper.toHexString(sessionId));
 	    } finally {
 		callFinished();
 	    }
@@ -1036,8 +1030,19 @@ public final class ChannelServiceImpl
      * Runs a transactional task to query the status of the node with the
      * specified {@code nodeId} and returns {@code true} if the node is alive
      * and {@code false} otherwise.
+     *
+     * This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown.
      */
     boolean isAlive(long nodeId) {
+	// Make sure that we're not in a transactional context.
+	try {
+	    getTransaction();
+	    throw new IllegalStateException(
+		"isAlive called from a transactional context");
+	} catch (TransactionNotActiveException e) {
+	}
+	
 	try {
 	    CheckNodeStatusTask nodeStatus =
 		new CheckNodeStatusTask(nodeId);
@@ -1078,15 +1083,17 @@ public final class ChannelServiceImpl
 	    if (channelServer != null) {
 		return channelServer;
 	    } else {
+		GetChannelServerTask task =
+		    new GetChannelServerTask(nodeId);
 		try {
-		    GetChannelServerTask task =
-			new GetChannelServerTask(nodeId);
 		    transactionScheduler.runTask(task, taskOwner);
 		    channelServer = task.channelServer;
 		    if (channelServer != null) {
 			channelServerMap.put(nodeId, channelServer);
 		    }
 		    return channelServer;
+		} catch (RuntimeException e) {
+		    throw e;
 		} catch (Exception e) {
 		    return null;
 		}

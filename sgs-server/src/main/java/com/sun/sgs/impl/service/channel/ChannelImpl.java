@@ -24,6 +24,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
@@ -54,7 +55,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -363,28 +363,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    final long coord = coordNodeId;
 	    ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable() {
-		    public void run() {
-			do {
-			    try {
-				coordinator.serviceEventQueue(channelId);
-				return;
-			    } catch (IOException e) {
-				/*
-				 * It is likely that the coordinator's node failed
-				 * and hasn't recovered yet.   When the
-				 * coordinator recovers, it will resume
-				 * servicing events, so ignore this exception.
-				 */
-				if (logger.isLoggable(Level.FINEST)) {
-				    logger.logThrow(
-				        Level.FINEST, e,
-					"serviceEventQueue channel:{0} coord:{1} " +
-					"throws", HexDumper.toHexString(channelId),
-					coord);
-				}
+		  public void run() {
+		    do {
+			try {
+			    coordinator.serviceEventQueue(channelId);
+			    return;
+			} catch (IOException e) {
+			    if (logger.isLoggable(Level.FINEST)) {
+				logger.logThrow(
+				    Level.FINEST, e,
+				    "serviceEventQueue channel:{0} coord:{1} " +
+				    "throws", HexDumper.toHexString(channelId),
+				    coord);
 			    }
-			} while (isAlive(coord));
-		    }
+			}
+		    } while (isAlive(coord));
+		  }
 		}, false);
 	}
     }
@@ -628,8 +622,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      *		session.<channelId>.
      */
     private String getSessionPrefix() {
-	return PKG_NAME +
-	    SESSION_COMPONENT + HexDumper.toHexString(channelId) + ".";
+	return getSessionPrefix(channelId);
     }
     
     /**
@@ -669,6 +662,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    HexDumper.toHexString(sessionIdBytes);
     }
 
+    /**
+     * Returns a prefix for accessing the event queues for channels
+     * coordinated on the given {@code nodeId}.  The prefix has the
+     * following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		eventq.<nodeId>.
+     */
     private static String getEventQueuePrefix(long nodeId) {
 	return PKG_NAME + QUEUE_COMPONENT + nodeId + ".";
     }
@@ -678,7 +679,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * coordinator.  The key has the following form:
      *
      * com.sun.sgs.impl.service.channel.
-     *		queue.<coordNodeId>.<channelId>
+     *		eventq.<coordNodeId>.<channelId>
      */
     private String getEventQueueKey() {
 	return getEventQueueKey(coordNodeId, channelId);
@@ -690,7 +691,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * nodeId}. The key has the following form:
      *
      * com.sun.sgs.impl.service.channel.
-     *		queue.<nodeId>.<channelId>
+     *		eventq.<nodeId>.<channelId>
      */
     private static String getEventQueueKey(long nodeId, byte[] channelId) {
 	return getEventQueuePrefix(nodeId) +
@@ -804,6 +805,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
+     * Removes the binding with the given {@code sessionKey} (and the
+     * associated object) and throws {@code NameNotBoundException} if the
+     * key is not bound.
+     */
+    private void removeSessionBinding(String sessionKey) {
+	ClientSessionInfo sessionInfo = (ClientSessionInfo)
+	    dataService.getServiceBinding(sessionKey);
+	dataService.removeServiceBinding(sessionKey);
+	dataService.removeObject(sessionInfo);
+    }
+
+    /**
      * Removes from this channel the member session with the specified
      * {@code sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId}, notifies the session's server that the
@@ -818,10 +831,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	// Remove session binding.
 	String sessionKey = getSessionKey(nodeId, sessionIdBytes);
 	try {
-	    ClientSessionInfo sessionInfo = (ClientSessionInfo)
-		dataService.getServiceBinding(sessionKey);
-	    dataService.removeServiceBinding(sessionKey);
-	    dataService.removeObject(sessionInfo);
+	    removeSessionBinding(sessionKey);
 	} catch (NameNotBoundException e) {
 	    return false;
 	}
@@ -854,12 +864,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				server.leave(channelId, sessionIdBytes);
 				return;
 			    } catch (IOException e) {
-				/*
-				 * If the channel server can't be contacted, it
-				 * has failed or is shut down, so there is no
-				 * need to contact it to update its membership
-				 * cache, so ignore this exception.
-				 */
 				logger.logThrow(
 			            Level.FINE, e,
 				    "unable to contact channel server:{0} to " +
@@ -966,7 +970,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * method is invoked when a session is disconnected from this node
      * (with the specified {@code nodeId}) gracefully or otherwise, or if
      * this node is recovering for a failed node whose sessions all became
-     * disconnected.
+     * disconnected.  The {@code nodeId} specifies the node that the
+     * session was previously connected to, which is not necessarily
+     * the local node's ID.
      *
      * This method should be called within a transaction.
      */
@@ -977,8 +983,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	if (channel != null) {
 	    channel.removeSession(nodeId, sessionIdBytes);
 	} else {
-	    logger.log(Level.FINE, "channel already removed:{0}",
-		       HexDumper.toHexString(channelRefId.toByteArray()));
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE, "channel already removed:{0}",
+		    HexDumper.toHexString(channelRefId.toByteArray()));
+	    }
 	}
     }
 
@@ -990,8 +998,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns {@code true} if the node with the associated {@code nodeId} is
-     * alive, otherwise returns {@code false}.
+     * Returns {@code true} if the node with the associated {@code nodeId}
+     * is alive, otherwise returns {@code false}.
+     *
+     * This method must be called from outside a transaction or an
+     * {@code IllegalStateException} will be thrown.
      */
     private static boolean isAlive(long nodeId) {
 	return ChannelServiceImpl.getChannelService().isAlive(nodeId);
@@ -1251,12 +1262,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return null;
 	    }
 	}
+
+	/** {@inheritDoc} */
+	@Override
+	public String toString() {
+	    return getClass().getName() +
+		"[" + HexDumper.toHexString(sessionIdBytes) + "]";
+	}
     }
     
     /**
      * The channel's event queue.
      */
-    private static class EventQueue implements ManagedObject, Serializable {
+    private static class EventQueue
+	implements ManagedObjectRemoval, Serializable
+    {
 
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -1422,12 +1442,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				  server.refresh(channelName, channelIdBytes);
 				  break;
 				} catch (IOException e) {
-				    /*
-				     * It is possible that the channel
-				     * server's node is no longer running
-				     * (because of shutdown/crash), so
-				     * ignore this exception and continue.
-				     */
 				    logger.log(
 				        Level.FINE,
 					"unable to contact server:{0}",
@@ -1468,6 +1482,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		event.serviceEvent(this);
 
 	    } while (serviceAllEvents || --eventsToService > 0);
+	}
+
+	/* -- Implement ManagedObjectRemoval -- */
+
+	/** {@inheritDoc} */
+	public void removingObject() {
+	    try {
+		DataService dataService = ChannelServiceImpl.getDataService();
+		dataService.removeObject(queueRef.get());
+	    } catch (ObjectNotFoundException e) {
+		// already removed.
+	    }
 	}
     }
 
@@ -1552,12 +1578,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 					    sessionId);
 				return;
 			    } catch (IOException e) {
-				/*
-				 * If the channel server can't be contacted, it
-				 * has failed or is shut down, so there is no
-				 * need to contact it to update its membership
-				 * cache, so ignore this exception.
-				 */
 				logger.logThrow(
 			            Level.FINE, e,
 				    "unable to contact channel server:{0} to " +
@@ -1649,13 +1669,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				server.leaveAll(channel.channelId);
 				break;
 			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted,
-				 * it has failed or is shut down, so there
-				 * is no need to contact it to update its
-				 * membership cache, so ignore this
-				 * exception and continue.
-				 */
 				logger.logThrow(
 				    Level.FINE, e,
 				    "unable to contact channel server:{0} " +
@@ -1737,15 +1750,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				server.send(channel.channelId, message);
 				break;
 			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted, it
-				 * has failed or is shut down and the sessions
-				 * connected to that node have been
-				 * disconnected, so there is no need to contact
-				 * it to forward the message to its local
-				 * member sessions, so ignore this exception
-				 * and continue.
-				 */
 				logger.logThrow(
 				    Level.FINE, e,
 				    "unable to contact channel server:{0} " +
@@ -1814,13 +1818,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				server.close(channel.channelId);
 				break;
 			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted,
-				 * it has failed or is shut down, so there
-				 * is no need to contact it to update its
-				 * membership cache, so ignore this
-				 * exception and continue.
-				 */
 				logger.logThrow(
 			            Level.FINE, e,
 				    "unable to contact channel server:{0} " +
@@ -1949,6 +1946,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * specified {@code nodeId}, then no action is taken.
 	 */
 	public void run() {
+	    WatchdogService watchdogService =
+		ChannelServiceImpl.getWatchdogService();
 	    DataService dataService = ChannelServiceImpl.getDataService();
 	    TaskService taskService = ChannelServiceImpl.getTaskService();
 	    String prefix = getEventQueuePrefix(nodeId);
@@ -1977,10 +1976,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 * during recovery).
 		 */
 		for (long serverNodeId : channel.servers) {
-		    if (serverNodeId != nodeId && !isAlive(serverNodeId)) {
-			taskService.scheduleTask(
-			    new RemoveFailedSessionsFromChannelTask(
-				channelId, serverNodeId, channelRefId));
+		    if (serverNodeId != nodeId) {
+			Node serverNode = watchdogService.getNode(serverNodeId);
+			if (serverNode == null || !serverNode.isAlive()) {
+			    taskService.scheduleTask(
+			        new RemoveFailedSessionsFromChannelTask(
+				    channelId, serverNodeId, channelRefId));
+			}
 		    }
 		}
 	    } else {
@@ -2075,6 +2077,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    this.failedNodeId = failedNodeId;
 	}
 
+	/** {@inheritDoc} */
 	public void run() {
 	    DataService dataService = ChannelServiceImpl.getDataService();
 	    sessionKey =
@@ -2089,9 +2092,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    channel.removeSession(
 			failedNodeId, sessionRefId.toByteArray());
 		} else {
-		    // TBD: just remove the binding?  Something is probably
-		    // wrong if the channel has been removed and there are
-		    // session bindings that still exist.
+		    // This shouldn't happen, but remove the binding anyway.
+		    channel.removeSessionBinding(sessionKey);
 		}	
 		ChannelServiceImpl.getTaskService().scheduleTask(this);
 	    }

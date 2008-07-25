@@ -777,13 +777,17 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelJoin() throws Exception {
 	String channelName = "joinTest";
-	createChannel(channelName);
 	ClientGroup group = new ClientGroup(someUsers);
+	Thread.sleep(1000);
+	int count = getObjectCount();
+	createChannel(channelName);
 	
 	try {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-
+	    closeChannel(channelName);
+	    Thread.sleep(1000);
+	    assertEquals(count, getObjectCount());
 	} finally {
 	    group.disconnect(false);
 	}
@@ -990,6 +994,8 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(someUsers);
 	
 	try {
+	    Thread.sleep(1000);
+	    int count = getObjectCount();
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
 
@@ -1013,6 +1019,9 @@ public class TestChannelServiceImpl extends TestCase {
 			}}}, taskOwner);
 	    }
 	    
+	    Thread.sleep(1000);
+	    assertEquals(count, getObjectCount());
+	    
 	    txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
@@ -1026,6 +1035,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    dataService.removeObject(channel);
 		}}, taskOwner);
 
+	    
 	} finally {
 	    group.disconnect(false);
 	}
@@ -1174,6 +1184,7 @@ public class TestChannelServiceImpl extends TestCase {
 	addNodes("one", "two", "three");
 	String channelName = "test";
 	createChannel(channelName);
+	int count = getObjectCount();
 	ClientGroup group1 = new ClientGroup(sevenDwarfs);
 	joinUsers(channelName, sevenDwarfs);
 	sendMessagesToChannel(channelName, group1, 3);
@@ -1183,7 +1194,10 @@ public class TestChannelServiceImpl extends TestCase {
 	setUp(false);
 	//	Thread.sleep(WAIT_TIME);
 	printServiceBindings();
-	addNodes("ay", "bee");
+	addNodes("ay", "bee", "sea");
+	Thread.sleep(1000);
+	// Make sure that previous sessions were cleaned up.
+	assertEquals(count, getObjectCount());
 	ClientGroup group2 = new ClientGroup(someUsers);
 	try {
 	    joinUsers(channelName, someUsers);
@@ -1215,7 +1229,7 @@ public class TestChannelServiceImpl extends TestCase {
 		sendMessagesToChannel(channelName, group, 2);
 	    }
 	    printServiceBindings();
-	    // nuke coordinator node
+	    // nuke non-coordinator node
 	    System.err.println("shutting down node: " + otherHost);
 	    shutdownNode(otherHost);
 	    // remove disconnected sessions from client group
@@ -1252,7 +1266,7 @@ public class TestChannelServiceImpl extends TestCase {
 	for (String channelName : channelNames) {
 	    createChannel(channelName, null, coordinatorHost);
 	}
-	
+
 	ClientGroup group = new ClientGroup(sevenDwarfs);
 	try {
 	    for (String channelName : channelNames) {
@@ -1647,6 +1661,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
+	int count = getObjectCount();
 	ClientGroup group = new ClientGroup(someUsers);
 
 	try {
@@ -1656,6 +1671,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(channelName, false);
+	    assertEquals(count, getObjectCount());
 	    
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
@@ -1670,6 +1686,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testSessionsRemovedOnRecovery() throws Exception {
 	String channelName = "test";
 	createChannel(channelName);
+	int count = getObjectCount();
 	ClientGroup group = new ClientGroup(someUsers);
 	
 	try {
@@ -1685,6 +1702,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    Thread.sleep(WAIT_TIME); // await recovery actions
 	    group.checkMembership(channelName, false);
+	    assertEquals(count, getObjectCount());
 	    printServiceBindings();
 
 	} catch (RuntimeException e) {
@@ -2150,9 +2168,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    loginAck = false;
 	    loginSuccess = false;
 	    loginRedirect = false;
-//            redirectHost = null;
-//            redirectPort = 0;
-            
 	}
 
 	DummyClient login(String user, String pass) {
@@ -2622,8 +2637,6 @@ public class TestChannelServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
-	boolean receivedDisconnectedCallback = false;
-	boolean wasGracefulDisconnect = false;
 	
 	private final ManagedReference<ClientSession> sessionRef;
 	
@@ -2635,14 +2648,7 @@ public class TestChannelServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void disconnected(boolean graceful) {
-	    System.err.println("DummyClientSessionListener[" + name +
-			       "] disconnected invoked with " + graceful);
-	    AppContext.getDataManager().markForUpdate(this);
-	    synchronized (disconnectedCallbackLock) {
-		receivedDisconnectedCallback = true;
-		this.wasGracefulDisconnect = graceful;
-		disconnectedCallbackLock.notifyAll();
-	    }
+	    AppContext.getDataManager().removeObject(this);
 	}
 
         /** {@inheritDoc} */
@@ -2695,5 +2701,43 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientSession getSession() {
 	    return session;
 	}
+    }
+
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetObjectCountTask extends AbstractKernelRunnable {
+
+	volatile int count = 0;
+	
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+		//ManagedReference ref = dataService.createReferenceForId(next);
+		//System.err.println(next + ": " + ref.get());
+		last = next;
+		count++;
+	    }
+	}
+    }
+
+    private void closeChannel(final String name) throws Exception {
+
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() {
+		Channel channel = channelService.getChannel(name);
+		dataService.removeObject(channel);
+	    }}, taskOwner);
     }
 }

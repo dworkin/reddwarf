@@ -157,6 +157,7 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
      * @return {@code true} if {@code o} is a {@code ManagedSerializable} that
      *         wraps an object equal to the object wrapped by this instance
      */
+    @Override
     public boolean equals(Object o) {
 	if (o instanceof ManagedSerializable) {
 	    ManagedSerializable m = (ManagedSerializable) o;
@@ -179,8 +180,18 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
 	return (object == null) ? 0 : object.hashCode();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+	return getClass().getName() +
+	    "[" + (object == null ? "null" : object.toString()) + "]";
     }
 
     /**
