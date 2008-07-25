@@ -494,7 +494,7 @@ public final class NodeMappingServerImpl
 	 * Override this method to set the interrupted flag.  The logging code
 	 * is known to swallow the interrupted exception sometimes.
 	 * InterruptedException clears the interrupt status, so checking
-	 * isInterrupted() doesn't tell us if the thread has <b>ever</b> been
+	 * isInterrupted doesn't tell us if the thread has ever been
 	 * interrupted.
 	 */
 	public synchronized void interrupt() {

@@ -1944,7 +1944,6 @@ public class TestDataStoreImpl extends TestCase {
 	 * one.  -tjb@sun.com (07/16/2008)
 	 */
 	if (!(store instanceof DataStoreImpl)) {
-	    System.err.println("Not a local store, skipping");
 	    return;
 	}
 	/* Create objects but don't create data */

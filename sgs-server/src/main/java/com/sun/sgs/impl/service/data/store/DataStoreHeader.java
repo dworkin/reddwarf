@@ -80,7 +80,11 @@ import java.math.BigInteger;
  * Object values also have two additional, distinguished initial byte values
  * to support placeholders:
  *
- * - If the first byte is 3, then the entry represents a placeholder.
+ * - If the first byte is 3, then the entry represents a placeholder, which
+ *   means that the entry appears within the database but should not be
+ *   considered to represent an object.  Placeholders are used to create a
+ *   barrier object in the database to improve concurrency for new object
+ *   allocations when using BDB Java Edition.
  *
  * - If the first byte is 4, then the actual data value is represented by the
  *   remaining bytes.  This "quoting" value can be used to represent data that
@@ -115,10 +119,7 @@ final class DataStoreHeader {
      */
     static final long NEXT_TXN_ID_KEY = 4;
 
-    /**
-     * The key for the value of the first allocation block placeholder ID, used
-     * to cleanup unused placeholders at startup time.
-     */
+    /** The key for the value of the first allocation block placeholder ID. */
     static final long FIRST_PLACEHOLDER_ID_KEY = 5;
 
     /** The magic number: DaRkStAr. */
@@ -146,13 +147,7 @@ final class DataStoreHeader {
      */
     static final byte CLASS_ID_PREFIX = 2;
 
-    /**
-     * The first byte stored in the object value for a placeholder -- a
-     * key/value pair that appears physically but should not be considered to
-     * represent an object that is present.  Placeholders are used to create a
-     * physical object to improve locking for new object allocations when using
-     * BDB Java Edition.
-     */
+    /** The first byte stored in the object value for a placeholder */
     static final byte PLACEHOLDER_OBJ_VALUE = 3;
 
     /**

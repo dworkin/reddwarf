@@ -604,7 +604,7 @@ public class DataStoreImpl
 
 	/**
 	 * Available allocation blocks, with the lowest ID block first.
-	 * Synchronize on the FreeObjectIds object when accessing this field.
+	 * Synchronize on the FreeObjectIds instance when accessing this field.
 	 */
 	private final Queue<ObjectIdInfo> freeObjectIdInfo =
 	    new PriorityQueue<ObjectIdInfo>();
@@ -612,8 +612,8 @@ public class DataStoreImpl
 	/**
 	 * The set of object IDs of placeholders for allocation blocks that are
 	 * still in use, or null if placeholders are not being used.
-	 * Synchronize on the FreeObjectIds when accessing the contents of this
-	 * field.
+	 * Synchronize on the FreeObjectIds instance when accessing the
+	 * contents of this field.
 	 */
 	private final SortedSet<Long> placeholderOids;
 
