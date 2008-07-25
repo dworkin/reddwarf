@@ -299,13 +299,16 @@ public class ScalableLinkedHashMap<K,V>
      */
     private static final int MAX_REMOVE_ENTRIES = 100;
 
-    private static final String CLASS_ENTRY_PREFIX = 
-	ScalableLinkedHashMap.class.getName() + "-entry-";
-
+    /**
+     * The name used to load a {@code ManagedSerializable<Integer>}
+     * that contains the most instance number of this map.  This
+     * instance value is used to create a unique map prefix for each
+     * instance.
+     *
+     * @see ScalableLinkedHashMap#findMapPrefix()
+     */
     private static final String CLASS_INSTANCE_COUNT = 
 	ScalableLinkedHashMap.class.getName() + "-map-num";    
-
-    private static final int FIXED_INT_WIDTH = 12;
 
     /**
      * If non-null, a runnable to call when a task that asynchronously removes
@@ -375,13 +378,14 @@ public class ScalableLinkedHashMap<K,V>
     private ManagedReference[] table;
 
     /**
-     * The monotonic counter that reflects the number of times this instance
-     * has been modified.  The counter is used by the {@code
-     * ConcurrentIterator} class to detect changes between transactions.
+     * The monotonic counter that reflects the number of times this
+     * instance has been cleared.  The counter is used by the {@code
+     * ConcurrentInsertionOrderIterator} class to detect changes
+     * between transactions.
      *
      * @serial
      */
-    int modifications;
+    private int clearCount;
 
     /**
      * The number of entries in this node's table.  Note that this is
@@ -392,11 +396,13 @@ public class ScalableLinkedHashMap<K,V>
      */
     private int size;
 
-    private ManagedReference<EntryNameFinder> nameFinderRef;
-    
-//     private String mapEntryPrefix;
-
-//     private ManagedReference<ManagedSerializable<String>> highestRemoved;
+    /**
+     * A reference to the name space manager that provides all the
+     * name bindings for {@code PrefixEntry} instances.  The names
+     * returned by the nameFinder all the iterator to walk the entries
+     * in insertion order.
+     */
+    private ManagedReference<NamespaceManager> nameFinderRef;
 
     /**
      * The maximum number of {@code PrefixEntry} entries in a leaf node before
@@ -450,6 +456,7 @@ public class ScalableLinkedHashMap<K,V>
      *        cause the leaf to split
      * @param directorySize the maximum number of children nodes of a directory
      *        node
+     * @param nameFinderRef the name finder used by all the nodes in this map
      *
      * @throws IllegalArgumentException if:
      *	       <ul>
@@ -464,9 +471,10 @@ public class ScalableLinkedHashMap<K,V>
     // implementations could expose some of these parameters for performance
     // optimization.  At no point should depth be exposed for public
     // modification.  directorySize should also not be directly exposed.
-    ScalableLinkedHashMap(int depth, int minDepth, int splitThreshold,
-			  int directorySize, 
-			  ManagedReference<EntryNameFinder> nameFinderRef) {
+    private ScalableLinkedHashMap(int depth, int minDepth, int splitThreshold,
+				  int directorySize, 
+				  ManagedReference<NamespaceManager> 
+				  nameFinderRef) {
 	this(depth, minDepth, splitThreshold, directorySize);
 
 	this.nameFinderRef = nameFinderRef;
@@ -520,13 +528,12 @@ public class ScalableLinkedHashMap<K,V>
 	this.minDepth = minDepth;
 
 	size = 0;
-	modifications = 0;
+	clearCount = 0;
 	parentRef = null;
 	leftLeafRef = null;
 	rightLeafRef = null;
 
 	leafCapacity = DEFAULT_LEAF_CAPACITY;
-	//table = new PrefixEntry[leafCapacity];
 	table = new ManagedReference[leafCapacity];
 	nodeDirectory = null;
 
@@ -543,7 +550,7 @@ public class ScalableLinkedHashMap<K,V>
 	    // all the entries in this map.
 	    String mapEntryPrefix = findMapPrefix();
 
-	    EntryNameFinder nameFinder = new EntryNameFinder(mapEntryPrefix);
+	    NamespaceManager nameFinder = new NamespaceManager(mapEntryPrefix);
 	    nameFinderRef = 
 		AppContext.getDataManager().createReference(nameFinder);
 
@@ -558,7 +565,7 @@ public class ScalableLinkedHashMap<K,V>
 	try {
 	    ManagedSerializable<Integer> mostRecentMapNum = 
 		uncheckedCast(dm.getBinding(CLASS_INSTANCE_COUNT));
-	    instanceNum = mostRecentMapNum.get().intValue();
+	    instanceNum = mostRecentMapNum.get().intValue() + 1;
 	} catch (NameNotBoundException nnbe) {
 	    // we must be the first instance
 	    instanceNum = 0;
@@ -574,7 +581,7 @@ public class ScalableLinkedHashMap<K,V>
 
 	// combine the common class prefix for entries with this
 	// instance's suffix to create a unique namespace for this map
-	return CLASS_ENTRY_PREFIX + mapSuffix;
+	return ScalableLinkedHashMap.class.getName() + mapSuffix + "-entry-";
     }
 
     /**
@@ -675,7 +682,7 @@ public class ScalableLinkedHashMap<K,V>
     // being called repeatedly, the leaves of the tree of the tree would have
     // their left and right reference improperly initialized.
     private void initDepth(int minDepth, 
-			   ManagedReference<EntryNameFinder> nameFinderRef) {
+			   ManagedReference<NamespaceManager> nameFinderRef) {
 
 	if (depth >= minDepth) {
 	    return;
@@ -779,8 +786,16 @@ public class ScalableLinkedHashMap<K,V>
 	size = 0;
 	leftLeafRef = null;
 	rightLeafRef = null;
-	// table = new PrefixEntry[leafCapacity];
 	table = new ManagedReference[leafCapacity];
+
+	// increment the version number to invalidate all the other
+	// names while they are being cleared.  This lets us continue
+	// to add name bindings with a unique prefix.  Also, any
+	// outstanding iterators will notice the change and no longer
+	// iterate over the cleared entries.
+	nameFinderRef.get().incrementVersion();
+	clearCount++;
+
 	if (depth == 0) {
 	    initDepth(minDepth, nameFinderRef);
 	}
@@ -1266,7 +1281,6 @@ public class ScalableLinkedHashMap<K,V>
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
 	ScalableLinkedHashMap<K,V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
-	leaf.modifications++;
 
 	int i = leaf.indexFor(hash);
 	PrefixEntry<K,V> newEntry = null;
@@ -1291,10 +1305,7 @@ public class ScalableLinkedHashMap<K,V>
 		keyMatches = false;
 	    }
 	    if (keyMatches) {
-		/* Remove the unused new entry, if any */
-		if (newEntry != null) {
-		    newEntry.unmanage();
-		}
+
 		// if the keys and hash match, swap the values and return the
 		// old value
 		if (returnOldValue) {
@@ -1330,11 +1341,34 @@ public class ScalableLinkedHashMap<K,V>
 
 	return null;
     }
-
+    
+    /**
+     * Returns the next unused name binding for a {@code PrefixEntry}.
+     *
+     * @return the name binding
+     */
     private String nextEntryName() {
-	String name = nameFinderRef.get().nextEntryName();
-// 	System.out.println("next entry named: " + name);
-	return name;
+	return nameFinderRef.get().nextEntryName();
+    }
+    
+    /**
+     * Returns the name past which starts all the entries for this
+     * map's name space.
+     *
+     * @return the start of the name space
+     */
+    private String getStartOfMapEntryNamespace() {
+	return nameFinderRef.get().getStartOfMapEntryNamespace();
+    }
+
+    /**
+     * Returns the prefix for all the current, valid names of entries
+     * in this map.  
+     *
+     * @return the prefix for all current, valid names
+     */ 
+    private String getMapEntryNamespacePrefix() {
+	return nameFinderRef.get().getMapEntryNamespacePrefix();
     }
 
     /**
@@ -1524,7 +1558,6 @@ public class ScalableLinkedHashMap<K,V>
 		    DataManager dm = AppContext.getDataManager();
 		    // mark that this table's state has changed
 		    dm.markForUpdate(leaf);
-		    leaf.modifications++;
 		    leaf.size--;
 
 		    // remove the value and reorder the chained keys
@@ -1561,7 +1594,7 @@ public class ScalableLinkedHashMap<K,V>
      * @param hash the hash code
      * @param keyRef the reference for the entry key
      *
-     * @see ConcurrentIterator#remove ConcurrentIterator.remove
+     * @see ConcurrentInsertionOrderIterator#remove ConcurrentInsertionOrderIterator.remove
      */
     void remove(int hash, ManagedReference<?> keyRef) {
 	int index = indexFor(hash);
@@ -1574,7 +1607,6 @@ public class ScalableLinkedHashMap<K,V>
 		// mark that this leaf table's state has changed
 		DataManager dm = AppContext.getDataManager();
 		dm.markForUpdate(this);
-		modifications++;
 		size--;
 
 		// update the prefix entry chain in the bucket
@@ -1596,31 +1628,6 @@ public class ScalableLinkedHashMap<K,V>
 	    }
 	    prev = e;
 	}
-    }
-
-    private static boolean firstNameIsUTF8LessThanSecond(String first, 
-							 String second) {
-	
-	byte[] firstBytes =  DataEncoding.encodeString(first);
-	byte[] secondBytes = DataEncoding.encodeString(second);	       
-
-	for (int i = 0; i < firstBytes.length; ++i) {
-	    if (i >= secondBytes.length)
-		return false;
-
-	    byte b1 = firstBytes[i];
-	    byte b2 = secondBytes[i];
-
-	    if (b1 == b2) 
-		continue;
-	    else  
-		return firstBytes[i] < secondBytes[i];
-	}
-
-	// if they were identical in every way for the length of the
-	// first string, the first string will be less if the second
-	// string has more characters
-	return firstBytes.length < secondBytes.length;
     }
 
     /**
@@ -1679,7 +1686,6 @@ public class ScalableLinkedHashMap<K,V>
      */
     private void removeChildrenAndEntries() {
 	AppContext.getDataManager().markForUpdate(this);
-	modifications++;
 	TaskManager taskManager = AppContext.getTaskManager();
 	if (isLeafNode()) {
 	    taskManager.scheduleTask(new RemoveNodeEntriesTask(this));
@@ -1697,7 +1703,6 @@ public class ScalableLinkedHashMap<K,V>
     boolean removeSomeLeafEntries() {
 	assert isLeafNode();
 	AppContext.getDataManager().markForUpdate(this);
-	modifications++;
 	int count = removeSomeLeafEntriesInternal(table);
 	if (count == -1) {
 	    size = 0;
@@ -1733,7 +1738,11 @@ public class ScalableLinkedHashMap<K,V>
 		PrefixEntry e = cur.get();
 
 		do {
+		    // free any resources created by the entry and
+		    // remove its name binding
 		    e.unmanage();
+		    AppContext.getDataManager().removeBinding(e.entryName);
+
 		    PrefixEntry next = e.next();
 		    table[i] = (next == null) ? null : dm.createReference(next);
 
@@ -2144,7 +2153,7 @@ public class ScalableLinkedHashMap<K,V>
 	 *
 	 * @return the {@code ManagedReference} for the key
 	 *
-	 * @see ConcurrentIterator
+	 * @see ConcurrentInsertionOrderIterator
 	 */
 	ManagedReference<?> keyRef() {
 	    return keyOrPairRef;
@@ -2357,23 +2366,109 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     *
+     * A utility class for managing the name spaces used by the {@code
+     * ScalableLinkedHashMap} instances.  This class issues names with
+     * a predictable, monotonically increasing iteration order.
      */
-    private static class EntryNameFinder 
+    private static class NamespaceManager 
 	implements ManagedObject, Serializable {
 
+	/**
+	 * The number of entries used in the current version
+	 */
 	private int entryCount;
+	
+	/**
+	 * The name space prefix for the map itself.
+	 */
+	private final String mapPrefix;
 
-	private String mapPrefix;
+	/**
+	 * The current name space prefix based on the map's prefix and
+	 * the current version number
+	 */
+	private String namespacePrefix;
 
-	public EntryNameFinder(String mapPrefix) {
+	/**
+	 * The name past which starts the first returned name.
+	 */
+	private String startOfNamespace;
+
+	/**
+	 * The current version number for this name space.
+	 *
+	 * @see ScalableLinkedHashSet#clearCount
+	 */
+	private int version;
+
+	/**
+	 * Constructs a name space manager with the map's provided
+	 * naming prefix.
+	 *
+	 * @param mapPrefix the name used to prefix all other names
+	 *        issued by this instance
+	 */
+	public NamespaceManager(String mapPrefix) {
+
 	    this.mapPrefix = mapPrefix;
-	    entryCount = 0;
+	    version = 0;
+	    entryCount = 1;
+	    
+	    String versionString = "ver-" + String.format("%05d",version);
+
+	    // set the prefix for this namespace based on the map's
+	    // prefix and the current version
+	    namespacePrefix = mapPrefix + versionString;
+
+	    // other entries will occur after this name
+	    startOfNamespace = namespacePrefix + "-" + String.format("%014d",0);
 	}
 
+	/**
+	 * Increments the version number of this map and updates the
+	 * start of this instance's name space.
+	 */
+	void incrementVersion() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    version++;
+
+	    // reset the start of the namespace and its prefix
+	    String versionString = "ver-" + String.format("%05d",version);
+	    namespacePrefix = mapPrefix + versionString;
+	    startOfNamespace = namespacePrefix + "-" + String.format("%014d",0);
+	}
+
+	/**
+	 * Returns the string that prefixes all the name in the
+	 * current name space.  This value can be used to check
+	 * whether a current name has the right version
+	 *
+	 * @return the string that prefixes all the name in the
+	 *         current name space.
+	 */
+	public String getMapEntryNamespacePrefix() {
+	    return namespacePrefix;
+	}
+
+	/**
+	 * The name past which starts the first returned name.
+	 * Callers can use {@link DataManager#nextBoundName(String)
+	 * nextBoundName} with this value to find the first name.	 
+	 *
+	 * @return the name after which starts the first returned name
+	 */
+	public String getStartOfMapEntryNamespace() {
+	    return startOfNamespace;
+	}
+
+	/**
+	 * Returns the next name in the name space.
+	 *
+	 * @return the next name
+	 */
 	public String nextEntryName() {
 	    DataManager dm = AppContext.getDataManager();
-	    String nextName = mapPrefix + 
+	    String nextName = namespacePrefix + 
 		String.format("%014d", entryCount);
 	    entryCount++;
 	    dm.markForUpdate(this);
@@ -2391,152 +2486,81 @@ public class ScalableLinkedHashMap<K,V>
      * additions and removals made to the collection during iteration, and may
      * also visit more than once a key value that is removed and re-added.
      */
-    abstract static class ConcurrentIterator<E,K,V>
+    abstract static class ConcurrentInsertionOrderIterator<E,K,V>
 	implements Iterator<E>, Serializable {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 2;
 
 	/**
-	 * A reference to the root node of the table, used to look up the
-	 * current leaf.
-	 *
-	 * @serial
+	 * The name of the current entry that was last iterated over.
 	 */
-	private final ManagedReference<ScalableLinkedHashMap<K,V>> rootRef;
+	private String curEntryName;
+	
+	/**
+	 * The name of the next entry
+	 */
+	private transient String nextEntryName;
 
 	/**
-	 * A reference to the leaf containing the current position of the
-	 * iterator, or null if the iteration has not returned any items.
-	 *
-	 * @serial
+	 * Whether the current entry has already been removed
 	 */
-	private ManagedReference<ScalableLinkedHashMap<K,V>> currentLeafRef = null;
+	private boolean currentRemoved;
 
 	/**
-	 * The hash code of the current entry, if any.
-	 *
-	 * @serial
+	 * A reference to the current entry
 	 */
-	private int currentHash = 0;
+	private ManagedReference<PrefixEntry<K,V>> curEntry;
 
 	/**
-	 * A reference to the managed object for the key of the current entry,
-	 * or null if the iteration has not returned any items.
-	 *
-	 * @serial
+	 * A reference to the backing map
 	 */
-	private ManagedReference<?> currentKeyRef = null;
+	private ManagedReference<ScalableLinkedHashMap<K,V>> backingMapRef;
 
 	/**
-	 * Whether the current entry has been removed.
-	 *
-	 * @serial
+	 * The current prefix used for all entry names.
 	 */
-	private boolean currentRemoved = false;
+	private String namespacePrefix;
 
 	/**
-	 * The value of the root node's modification count when currentLeafRef
-	 * was obtained.  Need to get a fresh leaf ref if the count changes in
-	 * case the map was cleared or removed, since then the leaf is no
-	 * longer part of the map.
-	 */
-	private int rootModifications;
-
-	/** The leaf containing the next entry, or null if not computed. */
-	private transient ScalableLinkedHashMap<K,V> nextLeaf = null;
-
+	 * The number of times the backing map has been cleared since
+	 * this instance was last deserialized.
+	 */ 
+	private int clearCount;
+	
 	/**
-	 * The next entry, or null if there is no next entry or if not
-	 * computed.
-	 */
-	private transient PrefixEntry<K,V> nextEntry = null;
-
-	/**
-	 * The value of the modification count when the nextLeaf and
-	 * nextEntry fields were computed.
-	 */
-	private transient int nextLeafModifications = 0;
-
-	/**
-	 * Whether currentLeafRef is known to be up-to-date with modifications
-	 * to the root node.
-	 */
-	private transient boolean checkedRootModifications = false;
-
-	/**
-	 * Constructs a new {@code ConcurrentIterator}.
+	 * Constructs a new {@code ConcurrentEntryOrderIterator}.
 	 *
 	 * @param root the root node of the {@code ScalableLinkedHashMap}
 	 */
-	ConcurrentIterator(ScalableLinkedHashMap<K,V> root) {
-	    rootRef = AppContext.getDataManager().createReference(root);
-	    getNext();
-	}
-
-	/** Makes sure that the next entry is up to date. */
-	private void checkNext() {
-	    if (nextLeaf == null ||
-		nextLeafModifications != nextLeaf.modifications)
-	    {
-		getNext();
-	    }
-	}
-
-	/**
-	 * Computes the next entry.
-	 */
-	private void getNext() {
-	    if (currentLeafRef == null) {
-		/* Find first entry */
-		nextLeaf = rootRef.get().leftMost();
-		nextEntry = nextLeaf.firstEntry();
-	    } else {
-		/* Find next entry */
-		nextLeaf = getCurrentLeaf();
-		nextEntry = nextLeaf.nextEntry(currentHash, currentKeyRef);
-	    }
-	    /* Find an entry in later leaves, if needed */
-	    while (nextEntry == null && nextLeaf.rightLeafRef != null) {
-		nextLeaf = nextLeaf.rightLeafRef.get();
-		nextEntry = nextLeaf.firstEntry();
-	    }
-	    nextLeafModifications = nextLeaf.modifications;
-	}
-
-	/** Returns the current leaf. */
-	private ScalableLinkedHashMap<K,V> getCurrentLeaf() {
-	    boolean rootChanged = false;
-	    if (!checkedRootModifications) {
-		int currentRootModifications = rootRef.get().modifications;
-		if (rootModifications != currentRootModifications) {
-		    rootChanged = true;
-		    rootModifications = currentRootModifications;
-		}
-		checkedRootModifications = true;
-	    }
-	    if (!rootChanged) {
-		try {
-		    ScalableLinkedHashMap<K,V> leaf = currentLeafRef.get();
-		    /* Check that leaf was not converted to a directory node */
-		    if (leaf.nodeDirectory == null) {
-			return leaf;
-		    }
-		} catch (ObjectNotFoundException e) {
-		    /* The leaf was removed */
-		}
-	    }
-	    ScalableLinkedHashMap<K,V> leaf = rootRef.get().lookup(currentHash);
-	    currentLeafRef = AppContext.getDataManager().createReference(leaf);
-	    return leaf;
+	ConcurrentInsertionOrderIterator(ScalableLinkedHashMap<K,V> backingMap) {
+	    curEntryName = backingMap.getStartOfMapEntryNamespace();
+	    namespacePrefix = backingMap.getMapEntryNamespacePrefix();
+	    clearCount = backingMap.clearCount;
+	    nextEntryName = null;
+	    currentRemoved = false;
+	    curEntry = null;
+	    backingMapRef = AppContext.getDataManager().createReference(backingMap);
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	public boolean hasNext() {
-	    checkNext();
-	    return nextEntry != null;
+	    if (nextEntryName != null)
+		return true;
+
+	    String nextName = AppContext.getDataManager().
+		nextBoundName(curEntryName);
+	    
+	    // check that the next name is in our namespace, as there
+	    // may be other names after this map's that shouldn't be
+	    // gotten
+	    if (nextName != null && nextName.startsWith(namespacePrefix)) {
+		nextEntryName = nextName;
+		return true;
+	    }
+	    return false;
 	}
 
 	/**
@@ -2560,14 +2584,22 @@ public class ScalableLinkedHashMap<K,V>
 	    if (!hasNext()) {
 		throw new NoSuchElementException();
 	    }
-	    currentLeafRef =
-		AppContext.getDataManager().createReference(nextLeaf);
-	    currentHash = nextEntry.hash;
-	    currentKeyRef = nextEntry.keyRef();
+	    DataManager dm = AppContext.getDataManager();
+	    Object o = dm.getBinding(nextEntryName);
+	    PrefixEntry<K,V> entry = uncheckedCast(o);
+	    
+	    // get a reference to the current entry so that we can
+	    // remove it later.  We can't keep a Java reference since
+	    // this iterator might get serialized.
+
+	    curEntry = dm.createReference(entry);
 	    currentRemoved = false;
-	    Entry<K,V> result = nextEntry;
-	    getNext();
-	    return result;
+
+	    // update the iterator state
+	    curEntryName = nextEntryName;
+	    nextEntryName = null;
+		
+	    return entry;
 	}
 
 	/**
@@ -2577,23 +2609,36 @@ public class ScalableLinkedHashMap<K,V>
 	    if (currentRemoved) {
 		throw new IllegalStateException(
 		    "The current element has already been removed");
-	    } else if (currentLeafRef == null) {
+	    } else if (curEntry == null) {
 		throw new IllegalStateException("No current element");
 	    }
-	    getCurrentLeaf().remove(currentHash, currentKeyRef);
+	    K key = curEntry.get().getKey();
+	    backingMapRef.get().remove(key);
 	    currentRemoved = true;
 	}
 
+
 	/**
-	 * Clear transient fields so that they will be recomputed if an attempt
-	 * is made to use the iterator in another transaction.
+	 * Reconstructs the {@code ConcurrentInsertionOrderIterator}
+	 * from the provided stream and checks that its name space
+	 * prefix is still valid.
 	 */
-	private void writeObject(ObjectOutputStream out) throws IOException {
-	    out.defaultWriteObject();
-	    nextLeaf = null;
-	    nextEntry = null;
-	    nextLeafModifications = 0;
-	    checkedRootModifications = false;
+	private void readObject(ObjectInputStream s)
+	    throws IOException, ClassNotFoundException {
+	    
+	    // read in all the non-transient state
+	    s.defaultReadObject();	
+	    
+	    ScalableLinkedHashMap<K,V> backingMap = backingMapRef.get();
+
+	    // see if the map has been cleared since we last were
+	    // deserialized
+ 	    if (clearCount != backingMap.clearCount) {
+ 		// and if so, upgrade our entry name versions
+ 		curEntryName = backingMap.getStartOfMapEntryNamespace();
+ 		namespacePrefix = backingMap.getMapEntryNamespacePrefix();		
+ 		clearCount = backingMap.clearCount;
+ 	    }
 	}
     }
 
@@ -2601,7 +2646,7 @@ public class ScalableLinkedHashMap<K,V>
      * An iterator over the entry set
      */
     private static final class EntryIterator<K,V>
-	extends ConcurrentIterator<Entry<K,V>,K,V> {
+	extends ConcurrentInsertionOrderIterator<Entry<K,V>,K,V> {
 
 	private static final long serialVersionUID = 0x1L;
 
@@ -2610,8 +2655,8 @@ public class ScalableLinkedHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie
 	 */
-	EntryIterator(ScalableLinkedHashMap<K,V> root) {
-	    super(root);
+	EntryIterator(ScalableLinkedHashMap<K,V> backingMap) {
+	    super(backingMap);
 	}
 
 	/**
@@ -2626,7 +2671,7 @@ public class ScalableLinkedHashMap<K,V>
      * An iterator over the keys in the map.
      */
     private static final class KeyIterator<K,V>
-	extends ConcurrentIterator<K,K,V>
+	extends ConcurrentInsertionOrderIterator<K,K,V>
     {
 	private static final long serialVersionUID = 0x1L;
 
@@ -2635,8 +2680,8 @@ public class ScalableLinkedHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie
 	 */
-	KeyIterator(ScalableLinkedHashMap<K,V> root) {
-	    super(root);
+	KeyIterator(ScalableLinkedHashMap<K,V> backingMap) {
+	    super(backingMap);
 	}
 
 	/**
@@ -2652,7 +2697,7 @@ public class ScalableLinkedHashMap<K,V>
      * An iterator over the values in the tree.
      */
     private static final class ValueIterator<K,V>
-	extends ConcurrentIterator<V,K,V> {
+	extends ConcurrentInsertionOrderIterator<V,K,V> {
 
 	public static final long serialVersionUID = 0x1L;
 
@@ -2661,8 +2706,8 @@ public class ScalableLinkedHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie
 	 */
-	ValueIterator(ScalableLinkedHashMap<K,V> root) {
-	    super(root);
+	ValueIterator(ScalableLinkedHashMap<K,V> backingMap) {
+	    super(backingMap);
 	}
 
 	/**
@@ -2702,21 +2747,20 @@ public class ScalableLinkedHashMap<K,V>
 	private static final long serialVersionUID = 0x1L;
 
 	/**
-	 * A reference to the root node of the prefix tree
+	 * A reference to the root node of the prefix tree.
 	 *
 	 * @serial
 	 */
 	private final ManagedReference<ScalableLinkedHashMap<K,V>> rootRef;
 
 	/**
-	 * A cached version of the root node for faster accessing
+	 * A cached version of the root node for faster accessing.
 	 */
 	private transient ScalableLinkedHashMap<K,V> root;
 
-
 	EntrySet(ScalableLinkedHashMap<K,V> root) {
 	    this.root = root;
-	    rootRef = AppContext.getDataManager().createReference(root);
+	     rootRef = AppContext.getDataManager().createReference(root);
 	}
 
 	private void checkCache() {
