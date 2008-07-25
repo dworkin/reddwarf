@@ -679,7 +679,8 @@ class ClientSessionHandler {
 			    if (isConnected()) {
 				sessionService.getChannelService().
 				    handleChannelMessage(
-					channelRefId, sessionImpl,
+					channelRefId,
+					sessionImpl.getWrappedClientSession(),
 					channelMessage.asReadOnlyBuffer());
 			    }
 			} else {
