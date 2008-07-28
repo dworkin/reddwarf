@@ -2204,7 +2204,7 @@ public class TestScalableLinkedHashMap extends Assert {
 			ScalableLinkedHashMap test =
 			    (ScalableLinkedHashMap) dataService.getBinding("test");
 			dataService.setBinding("valuesIter",
-			    new ManagedSerializable(test.values().iterator()));
+			    test.values().iterator());
 		    }
 		}, taskOwner);
 	    txnScheduler.runTask(
@@ -2214,10 +2214,9 @@ public class TestScalableLinkedHashMap extends Assert {
 			    dataService.removeObject(
 				dataService.getBinding("bar"));
 			}
-			ManagedSerializable<Iterator> ms = uncheckedCast(
+			Iterator valuesIter = uncheckedCast(
 			    dataService.getBinding("valuesIter"));
-			dataService.markForUpdate(ms);
-			Iterator valuesIter = ms.get();
+			dataService.markForUpdate(valuesIter);
 			int count = 0;
 			while (valuesIter.hasNext()) {
 			    count++;
