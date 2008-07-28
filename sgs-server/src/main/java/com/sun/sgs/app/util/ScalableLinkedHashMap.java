@@ -190,11 +190,13 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * <p>
  *
  * <a name="iterator"></a> The {@code Iterator} for each view also
- * implements {@code Serializable}.  A single iterator should only be
- * used by a single {@code ManagedObject} instance at a time.
- * Multiple {@code ManagedObject} instances may have the same iterator
- * as a part of their state, but concurrent traversal of the elements
- * will result in a corrupted ordering.
+ * implements {@code ManagedObject}, and therefore an application
+ * <i>must</i> remove them from the data store when finished using
+ * them.  A single iterator should only be used by a single {@code
+ * ManagedObject} instance at a time.  Multiple {@code ManagedObject}
+ * instances may have the same iterator as a part of their state, but
+ * concurrent traversal of the elements will result in a corrupted
+ * ordering.
  *
  * <p>
  *
@@ -330,17 +332,6 @@ public class ScalableLinkedHashMap<K,V>
     private static final int MAX_REMOVE_ENTRIES = 100;
 
     /**
-     * The name used to load a {@code ManagedSerializable<Integer>}
-     * that contains the most instance number of this map.  This
-     * instance value is used to create a unique map prefix for each
-     * instance.
-     *
-     * @see ScalableLinkedHashMap#findMapPrefix()
-     */
-    private static final String CLASS_INSTANCE_COUNT = 
-	ScalableLinkedHashMap.class.getName() + "-map-num";    
-
-    /**
      * If non-null, a runnable to call when a task that asynchronously removes
      * nodes is done -- used for testing.  Note that this method is called
      * during the transaction that completes the removal.
@@ -401,10 +392,9 @@ public class ScalableLinkedHashMap<K,V>
      * The fixed-size table for storing all Map entries.  This table will be
      * {@code null} if this instance is a directory node.
      */
-    // NOTE: this is actually an array of type PrefixEntry<K,V> but generic
-    //       arrays are not allowed, so we cast the elements as necessary
-    //private transient PrefixEntry[] table;
-
+    // NOTE: this is actually an array of type
+    //       ManagedReference<PrefixEntry<K,V>> but generic arrays are
+    //       not allowed, so we cast the elements as necessary
     private ManagedReference[] table;
 
     /**
@@ -417,18 +407,29 @@ public class ScalableLinkedHashMap<K,V>
     private int size;
 
     /**
-     * FIX ME
+     * The bound name for the first entry in this map according to
+     * insertion order
      */
     private String nameForFirstEntry;
 
     /**
-     * FIX ME
+     * The bound name for the last entry in this map according to
+     * insertion order
      */
     private String nameForLastEntry;
 
-
+    /**
+     * A mapping from each of the current, usable {@link
+     * ConcurrentInsertionOrderIterator} instances to the element that
+     * they would next return.  This mapping is used to update the
+     * next element of any iterators that are in a serialized state
+     * when their next element is removed.
+     *
+     * @see ScalableLinkedHashMap#checkIterators(PrefixEntry)
+     * @see ConcurrentInsertionOrderIterator#checkForNextEntryUpdates()
+     */
     private ManagedReference<ManagedSerializable<Map<
-        String,ManagedReference<PrefixEntry<K,V>>>>>
+        BigInteger,ManagedReference<PrefixEntry<K,V>>>>>
 	serializedIteratorsNextElementsRef;
 
     /**
@@ -501,7 +502,8 @@ public class ScalableLinkedHashMap<K,V>
 				  int directorySize, String nameForFirstEntry, 
 				  String nameForLastEntry, 
 				  ManagedReference<ManagedSerializable<Map<
-				  String,ManagedReference<PrefixEntry<K,V>>>>>
+				  BigInteger,ManagedReference<
+				  PrefixEntry<K,V>>>>>
 				  serializedIteratorsNextElementsRef)
 	{
 	this(depth, minDepth, splitThreshold, directorySize);
@@ -575,48 +577,25 @@ public class ScalableLinkedHashMap<K,V>
 	// the leaf references from being correctly established
 	if (depth == 0) {
 
-	    String mapPrefix = findMapPrefix();
+	    DataManager dm = AppContext.getDataManager();
+
+	    String mapPrefix = ScalableLinkedHashMap.class.getName() + "-" +
+		dm.createReference(this).getId();
+
 	    nameForFirstEntry = mapPrefix + "first-entry";
 	    nameForLastEntry = mapPrefix + "last-entry";
 	    
-	    ManagedSerializable<Map<String,ManagedReference<PrefixEntry<K,V>>>>
+	    ManagedSerializable<Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>>
 		serializedIteratorsNextElements = new ManagedSerializable<
-		Map<String,ManagedReference<PrefixEntry<K,V>>>>(
-		    new HashMap<String,ManagedReference<PrefixEntry<K,V>>>());
+		Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>>(
+		    new HashMap<BigInteger,ManagedReference<PrefixEntry<K,V>>>());
 	    
 	    serializedIteratorsNextElementsRef = 
-		AppContext.getDataManager().
-		createReference(serializedIteratorsNextElements);
+		dm.createReference(serializedIteratorsNextElements);
 
 	    initDepth(minDepth, nameForFirstEntry, nameForLastEntry,
 		      serializedIteratorsNextElementsRef);
 	}
-    }
-
-    private static String findMapPrefix() {
-	    
-	DataManager dm = AppContext.getDataManager();
-	int instanceNum = -1;
-	try {
-	    ManagedSerializable<Integer> mostRecentMapNum = 
-		uncheckedCast(dm.getBinding(CLASS_INSTANCE_COUNT));
-	    instanceNum = mostRecentMapNum.get().intValue() + 1;
-	} catch (NameNotBoundException nnbe) {
-	    // we must be the first instance
-	    instanceNum = 0;
-	}
-	
-	// update the most recent instance binding to reflect this
-	// map's creation
-	dm.setBinding(CLASS_INSTANCE_COUNT, 
-		      new ManagedSerializable<Integer>(instanceNum));
-	
-	// then set up the prefix string
-	String mapSuffix = String.format("%014d", instanceNum);
-
-	// combine the common class prefix for entries with this
-	// instance's suffix to create a unique namespace for this map
-	return ScalableLinkedHashMap.class.getName() + mapSuffix + "-entry-";
     }
 
     /**
@@ -719,7 +698,7 @@ public class ScalableLinkedHashMap<K,V>
     private void initDepth(int minDepth,  String nameForFirstEntry, 
 			   String nameForLastEntry, 
 			   ManagedReference<ManagedSerializable<Map<
-			   String,ManagedReference<PrefixEntry<K,V>>>>>
+			   BigInteger,ManagedReference<PrefixEntry<K,V>>>>>
 			   serializedIteratorsNextElementsRef) {
 
 	if (depth >= minDepth) {
@@ -838,12 +817,12 @@ public class ScalableLinkedHashMap<K,V>
 	
 	// let all the iterators know that the map has been cleared by
 	// setting their next element to null
-	Map<String,ManagedReference<PrefixEntry<K,V>>>
+	Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>
 	    iteratorToCurrentEntry = 
 	    serializedIteratorsNextElementsRef.getForUpdate().get();
 	
 	// examine each iterator's next entry and set it to null
-	for (Map.Entry<String,ManagedReference<PrefixEntry<K,V>>> e :
+	for (Map.Entry<BigInteger,ManagedReference<PrefixEntry<K,V>>> e :
 		 iteratorToCurrentEntry.entrySet()) {
 	    e.setValue(null);
 	}
@@ -933,48 +912,6 @@ public class ScalableLinkedHashMap<K,V>
 	ManagedReference<PrefixEntry<K,V>> ref = uncheckedCast(table[index]);
 	return ref.get();
     }
-
-//     /**
-//      * Returns the first entry in this leaf, or {@code null} if there are no
-//      * entries.
-//      *
-//      * @return the first entry in this leaf or {@code null}
-//      */
-//     PrefixEntry<K,V> firstEntry() {
-// 	for (int i = 0; i < table.length; i++) {
-// 	    PrefixEntry<K,V> entry = getBucket(i);
-// 	    if (entry != null) {
-// 		return entry;
-// 	    }
-// 	}
-// 	return null;
-//     }
-
-//     /**
-//      * Returns the next entry in this leaf after the entry with the specified
-//      * hash and key reference, or {@code null} if there are no entries after
-//      * that position.
-//      *
-//      * @param hash the hash code
-//      * @param keyRef the reference for the entry key
-//      *
-//      * @return the next entry or {@code null}
-//      */
-//     PrefixEntry<K,V> nextEntry(int hash, ManagedReference<?> keyRef) {
-// 	BigInteger keyId = keyRef.getId();
-// 	for (int i = indexFor(hash); i < table.length; i++) {
-// 	    for (PrefixEntry<K,V> e = getBucket(i); e != null; e = e.next()) {
-// 		if (unsignedLessThan(e.hash, hash)) {
-// 		    continue;
-// 		} else if (e.hash != hash ||
-// 			   e.keyRef().getId().compareTo(keyId) > 0)
-// 		{
-// 		    return e;
-// 		}
-// 	    }
-// 	}
-// 	return null;
-//     }
 
     /**
      * Compares the arguments as unsigned integers.
@@ -1719,7 +1656,7 @@ public class ScalableLinkedHashMap<K,V>
      * @param entry the entry being removed
      */
     private void checkIterators(PrefixEntry<K,V> entry) {
-	Map<String,ManagedReference<PrefixEntry<K,V>>>
+	Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>
 	    iteratorToCurrentEntry = 
 	    serializedIteratorsNextElementsRef.get().get();
 
@@ -1728,7 +1665,7 @@ public class ScalableLinkedHashMap<K,V>
 	
 	// examine each iterator's next entry and see if it is the one
 	// we have just removed
-	for (Map.Entry<String,ManagedReference<PrefixEntry<K,V>>> e :
+	for (Map.Entry<BigInteger,ManagedReference<PrefixEntry<K,V>>> e :
 		 iteratorToCurrentEntry.entrySet()) {
 	    
 	    ManagedReference<PrefixEntry<K,V>> nextEntry = e.getValue();
@@ -2554,11 +2491,8 @@ public class ScalableLinkedHashMap<K,V>
 
     /**
      * A concurrent, persistable {@code Iterator} implementation for
-     * the {@code ScalableLinkedHashMap}.  This implementation is
-     * stable with respect to concurrent changes to the associated
-     * collection, but may ignore additions and removals made to the
-     * collection during iteration, and may also visit more than once
-     * a key value that is removed and re-added.
+     * the {@code ScalableLinkedHashMap}.  This implementation returns
+     * entries in the order of their insertion.
      *
      * <p>
      *
@@ -2575,13 +2509,10 @@ public class ScalableLinkedHashMap<K,V>
      * between concurrent tasks.
      */
     abstract static class ConcurrentInsertionOrderIterator<E,K,V>
-	implements Iterator<E>, Serializable {
+	implements Iterator<E>, Serializable, ManagedObjectRemoval {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 2;
-
-	private static final String ITERATOR_INSTANCE_COUNT = 
-	    ConcurrentInsertionOrderIterator.class.getName() + "-instance-num";
 
 	/**
 	 * Whether the current entry has already been removed
@@ -2598,21 +2529,21 @@ public class ScalableLinkedHashMap<K,V>
 	 */
 	private ManagedReference<PrefixEntry<K,V>> curEntry;
 
-	private final String iteratorName;
-
 	/**
 	 * A reference to the backing map
 	 */
 	private ManagedReference<ScalableLinkedHashMap<K,V>> backingMapRef;
 
 	private ManagedReference<ManagedSerializable<Map<
-	    String,ManagedReference<PrefixEntry<K,V>>>>>
+	    BigInteger,ManagedReference<PrefixEntry<K,V>>>>>
 	    serializedIteratorsNextElementsRef;
 
 	private boolean nextEntryWasNullOnCreation;
 
 	private transient boolean recheckNextEntry;
-	
+
+	private final BigInteger iteratorId;
+
 	/**
 	 * Constructs a new {@code ConcurrentEntryOrderIterator}.
 	 *
@@ -2637,47 +2568,11 @@ public class ScalableLinkedHashMap<K,V>
 		backingMap.serializedIteratorsNextElementsRef;
 
 	    backingMapRef = dm.createReference(backingMap);
+	    iteratorId = dm.createReference(this).getId();
 	    
-	    // get a unique name for this iterator
-	    iteratorName = newIteratorName();
-
 	    recheckNextEntry = false;
 	    updatePersistentNextEntry();
 	}
-
-	/**
-	 * Returns the next unique name for a {@code
-	 * ConcurrentInsertionOrderIterator} instance.
-	 *
-	 * @return the next unique name
-	 */
-	private static String newIteratorName() {
-	    
-	    DataManager dm = AppContext.getDataManager();
-	    int instanceNum = -1;
-	    try {
-		ManagedSerializable<Integer> mostRecentIteratorNum = 
-		    uncheckedCast(dm.getBinding(ITERATOR_INSTANCE_COUNT));
-		instanceNum = mostRecentIteratorNum.get().intValue() + 1;
-	    } catch (NameNotBoundException nnbe) {
-		// we must be the first instance
-		instanceNum = 0;
-	    }
-	    
-	    // update the most recent instance binding to reflect this
-	    // iterator's creation
-	    dm.setBinding(ITERATOR_INSTANCE_COUNT, 
-			  new ManagedSerializable<Integer>(instanceNum));
-	    
-	    // then set up the prefix string
-	    String iteratorSuffix = String.format("%014d", instanceNum);
-	    
-	    // combine the common class prefix for entries with this
-	    // instance's suffix to create a unique namespace for this map
-	    return ConcurrentInsertionOrderIterator.class.getName() + 
-		iteratorSuffix;
-	}
-
 
 	/**
 	 * {@inheritDoc}
@@ -2713,8 +2608,6 @@ public class ScalableLinkedHashMap<K,V>
 	 * @see ScalableLinkedHashMap#checkIterators(PrefixEntry)
 	 */
 	private void checkForNextEntryUpdates() {
-	    System.out.println("before recheck, " + this 
-			       + ".nextEntry = " + nextEntry);
 
 	    // check to see if this iterator was created with a null
 	    // first entry.  This flag will only be true if this
@@ -2737,13 +2630,13 @@ public class ScalableLinkedHashMap<K,V>
 	    // next entry was.  In this case, we should check to see
 	    // if the next entry prior to serialization has been removed.
 	    else {
-		Map<String,ManagedReference<PrefixEntry<K,V>>>
+		Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>
 		    iteratorToNextEntry = 
 		    serializedIteratorsNextElementsRef.getForUpdate().get();
 		
 		// remove ourselves and assign whatever is listed as the
 		// next entry for us
-		nextEntry = iteratorToNextEntry.remove(iteratorName);
+		nextEntry = iteratorToNextEntry.remove(iteratorId);
 		
 		// obtain a read lock on the entry to start with
 		if (nextEntry != null)
@@ -2751,9 +2644,6 @@ public class ScalableLinkedHashMap<K,V>
 	    }
 
 	    recheckNextEntry = false;
-
-	    System.out.println("after recheck, " + this 
-			       + ".nextEntry = " + nextEntry);
 	}
 
 	/**
@@ -2795,6 +2685,17 @@ public class ScalableLinkedHashMap<K,V>
 	}
 
 	/**
+	 * Removes this iterator from the registry of active iterators.
+	 */
+	public void removingObject() {
+	    Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>
+		iteratorToNextEntry = 
+		serializedIteratorsNextElementsRef.getForUpdate().get();
+
+	    iteratorToNextEntry.remove(iteratorId);
+	}
+
+	/**
 	 * Saves the {@code ManagedReference} of the next entry that
 	 * this iterator is going to return to a peristant state.
 	 * This enables the iterator to receive updates from the map
@@ -2804,11 +2705,11 @@ public class ScalableLinkedHashMap<K,V>
 	 * @see ScalableLinkedHashMap#checkIterators(PrefixEntry)
 	 */
 	private void updatePersistentNextEntry() {
-	    Map<String,ManagedReference<PrefixEntry<K,V>>>
+	    Map<BigInteger,ManagedReference<PrefixEntry<K,V>>>
 		iteratorToNextEntry = 
 		serializedIteratorsNextElementsRef.getForUpdate().get();
 
-	    iteratorToNextEntry.put(iteratorName, nextEntry);
+	    iteratorToNextEntry.put(iteratorId, nextEntry);
 	}
 
 	/**
@@ -2831,14 +2732,7 @@ public class ScalableLinkedHashMap<K,V>
 		// this lazy check at call-time here to avoid doing
 		// any unnecessary work.
 	    }
-		currentRemoved = true;
-	}
-
-	/**
-	 * Returns the unique name for this iterator
-	 */
-	public String toString() {
-	    return iteratorName;
+	    currentRemoved = true;
 	}
 
 	private void writeObject(ObjectOutputStream s)
