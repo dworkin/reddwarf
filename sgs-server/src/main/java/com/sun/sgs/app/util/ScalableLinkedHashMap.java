@@ -46,6 +46,7 @@ import java.util.AbstractSet;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
@@ -55,6 +56,8 @@ import java.util.Stack;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 
 /*
+ * Comments copied from ScalableHashMap - dj202934 (7/28/08)
+ *
  * TBD: Add an asynchronous version of size to avoid scaling problems.
  * -tjb@sun.com (09/26/2007)
  *
@@ -63,28 +66,56 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  */
 
 /**
- * A scalable implementation of {@link Map}.  The internal structure of the map
- * is separated into distributed pieces, which reduces the amount of data any
- * one operation needs to access.  The distributed structure increases the
- * concurrency and allows for parallel write operations to successfully
- * complete.
+ * A scalable implementation of {@link Map}, which provides a
+ * predictable iteration ordering like {@link LinkedHashMap}.  This
+ * implementation differs from {@link ScalabeLinkedHashmap} in that it
+ * maintains a doubly-linked list of all the entries according to
+ * their insertion order.  Therefore, the iteration ordering is
+ * equivalent to the insertion ordering.  As with {@code
+ * LinkedHashMap} if a key is re-inserted into a map, it will not
+ * change the order iteration.  Unlike the {@code LinkedHashMap} class
+ * this implementation does not support iterating by access order.
  *
  * <p>
  *
- * Developers may use this class as a drop-in replacement for the {@link
- * java.util.HashMap} class for use in a {@link ManagedObject}.  A {@code
- * HashMap} will typically perform better than this class when the number of
+ * The internal structure of the map is separated into distributed
+ * pieces, which reduces the amount of data any one operation needs to
+ * access.  Due to the nature of maintaining the doubly-linked list
+ * of entries, this implementation does not support concurrent
+ * operation that change the insertion order: put, when the key is not
+ * already present, and remove.  However, this implementation does
+ * support concurrent re-insertion operations where the key is already
+ * present, as these do not change the insertion order.
+ *
+ * <p>
+ *
+ * Peformance is likely to be just below {@code ScalableHashMap} due
+ * to added expense of maintaining the doubly-linked list, with one
+ * exception.  Iteration over the views of a {@code
+ * ScalableLinkedHashMap} will be faster due to fewer object accesses
+ * from the data store, and will cause less contention.
+ *
+ * <p>
+ *
+ * Developers may use this class as a drop-in replacement for the
+ * {@link java.util.LinkedHashMap} class.  A {@code LinkedHashMap}
+ * will typically perform better than this class when the number of
  * mappings is small, the objects being stored are small, and minimal
- * concurrency is required.  As the size of the serialized {@code HashMap}
- * increases, this class will perform significantly better.  Developers are
- * encouraged to profile the serialized size of their map to determine which
- * implementation will perform better.  Note that {@code HashMap} does not
- * provide any concurrency for {@code Task}s running in parallel that attempt
- * to modify the map at the same time, so this class may perform better in
- * situations where multiple tasks need to modify the map concurrently, even if
- * the total number of mappings is small.  Also note that, unlike {@code
- * HashMap}, this class can be used to store {@code ManagedObject} instances
- * directly.
+ * concurrency is required.  As the size of the serialized {@code
+ * LinkedHashMap} increases, the cost of accessing it significantly
+ * increases.  Since the cost of accessing instance of this class this
+ * class is <i>independent</i> of the number of elements, this class
+ * will perform significantly better than a {@code LinkedHashMap} as
+ * the number of mappings increases.  Developers are encouraged to
+ * profile the serialized size of their map to determine which
+ * implementation will perform better.  Note that {@code
+ * LinkedHashMap} does not provide any concurrency for {@code Task}s
+ * running in parallel that attempt to modify the map at the same
+ * time, so this class may perform better in situations where multiple
+ * tasks need to modify the map concurrently, even if the total number
+ * of mappings is small.  Also note that, unlike {@code
+ * LinkedHashMap}, this class can be used to store {@code
+ * ManagedObject} instances directly.
  *
  * <p>
  *
@@ -130,14 +161,17 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  *
  * <p>
  *
- * An instance of {@code ScalableLinkedHashMap} offers one parameter for performance
- * tuning: {@code minConcurrency}, which specifies the minimum number of write
- * operations to support in parallel.  This parameter acts as a hint to the map
- * on how to perform resizing.  As the map grows, the number of supported
- * parallel operations will also grow beyond the specified minimum.  Setting
- * the minimum concurrency too high will waste space and time, while setting it
- * too low will cause conflicts until the map grows sufficiently to support
- * more concurrent operations.
+ * An instance of {@code ScalableLinkedHashMap} offers one parameter
+ * for performance tuning: {@code minConcurrency}, which specifies the
+ * minimum number of re-insertion operations to support in parallel.
+ * This paramenter will not improve the performance of operations that
+ * modify the doubly-linked list of entries.  The {@code
+ * minConcurrency} parameter acts as a hint to the map on how to
+ * perform internal resizing.  As the map grows, the number of
+ * supported parallel operations will also grow beyond the specified
+ * minimum.  Setting the minimum concurrency too high will waste space
+ * and time, while setting it too low will cause conflicts until the
+ * map grows sufficiently to support more concurrent operations.
  *
  * <p>
  *
@@ -155,27 +189,22 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  *
  * <p>
  *
- * <a name="iterator"></a> The {@code Iterator} for each view also implements
- * {@code Serializable}.  A single iterator may be saved by different {@code
- * ManagedObject} instances, which will create distinct copies of the original
- * iterator.  A copy starts its iteration from where the state of the original
- * was at the time of the copy.  However, each copy maintains a separate,
- * independent state from the original and will therefore not reflect any
- * changes to the original iterator.  To share a single {@code Iterator}
- * between multiple {@code ManagedObject} <i>and</i> have the iterator use a
- * consistent view for each, the iterator should be contained within a shared
- * {@code ManagedObject}.
+ * <a name="iterator"></a> The {@code Iterator} for each view also
+ * implements {@code Serializable}.  A single iterator should only be
+ * used by a single {@code ManagedObject} instance at a time.
+ * Multiple {@code ManagedObject} instances may have the same iterator
+ * as a part of their state, but concurrent traversal of the elements
+ * will result in a corrupted ordering.
  *
  * <p>
  *
  * The iterators do not throw {@link
- * java.util.ConcurrentModificationException}.  The iterators are stable with
- * respect to concurrent changes to the associated collection, but may ignore
- * additions and removals made to the collection during iteration, and may also
- * visit more than once a key value that is removed and re-added.  Attempting
- * to use an iterator when the associated map has been removed from the {@code
- * DataManager} will result in an {@code ObjectNotFoundException} being thrown,
- * although the {@link Iterator#remove remove} method may throw {@code
+ * java.util.ConcurrentModificationException}.  The iterators are
+ * stable with respect to concurrent changes to the associated
+ * collection.  Attempting to use an iterator when the associated map
+ * has been removed from the {@code DataManager} will result in an
+ * {@code ObjectNotFoundException} being thrown, although the {@link
+ * Iterator#remove remove} method may throw {@code
  * IllegalStateException} instead if that is appropriate.
  *
  * <p>
@@ -190,14 +219,15 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * <p>
  *
  * This class and its iterator implement all optional operations and support
- * both {@code null} keys and values.  This map provides no guarantees on the
- * order of elements when iterating over the key set, values or entry set.
+ * both {@code null} keys and values.  
  *
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
  *
  * @see Object#hashCode Object.hashCode
  * @see java.util.Map
+ * @see java.util.LinkedHashMap
+ * @see ScalableHashMap
  * @see Serializable
  * @see ManagedObject
  */
@@ -378,16 +408,6 @@ public class ScalableLinkedHashMap<K,V>
     private ManagedReference[] table;
 
     /**
-     * The monotonic counter that reflects the number of times this
-     * instance has been cleared.  The counter is used by the {@code
-     * ConcurrentInsertionOrderIterator} class to detect changes
-     * between transactions.
-     *
-     * @serial
-     */
-    private int clearCount;
-
-    /**
      * The number of entries in this node's table.  Note that this is
      * <i>not</i> the total number of entries in the entire tree.  For a
      * directory node, this should be set to 0.
@@ -397,12 +417,19 @@ public class ScalableLinkedHashMap<K,V>
     private int size;
 
     /**
-     * A reference to the name space manager that provides all the
-     * name bindings for {@code PrefixEntry} instances.  The names
-     * returned by the nameFinder all the iterator to walk the entries
-     * in insertion order.
+     * FIX ME
      */
-    private ManagedReference<NamespaceManager> nameFinderRef;
+    private String nameForFirstEntry;
+
+    /**
+     * FIX ME
+     */
+    private String nameForLastEntry;
+
+
+    private ManagedReference<ManagedSerializable<Map<
+        String,ManagedReference<PrefixEntry<K,V>>>>>
+	serializedIteratorsNextElementsRef;
 
     /**
      * The maximum number of {@code PrefixEntry} entries in a leaf node before
@@ -456,7 +483,6 @@ public class ScalableLinkedHashMap<K,V>
      *        cause the leaf to split
      * @param directorySize the maximum number of children nodes of a directory
      *        node
-     * @param nameFinderRef the name finder used by all the nodes in this map
      *
      * @throws IllegalArgumentException if:
      *	       <ul>
@@ -472,12 +498,16 @@ public class ScalableLinkedHashMap<K,V>
     // optimization.  At no point should depth be exposed for public
     // modification.  directorySize should also not be directly exposed.
     private ScalableLinkedHashMap(int depth, int minDepth, int splitThreshold,
-				  int directorySize, 
-				  ManagedReference<NamespaceManager> 
-				  nameFinderRef) {
+				  int directorySize, String nameForFirstEntry, 
+				  String nameForLastEntry, 
+				  ManagedReference<ManagedSerializable<Map<
+				  String,ManagedReference<PrefixEntry<K,V>>>>>
+				  serializedIteratorsNextElementsRef)
+	{
 	this(depth, minDepth, splitThreshold, directorySize);
-
-	this.nameFinderRef = nameFinderRef;
+	
+	this.nameForLastEntry = nameForLastEntry;
+	this.serializedIteratorsNextElementsRef = serializedIteratorsNextElementsRef;
     }
 
 
@@ -528,7 +558,6 @@ public class ScalableLinkedHashMap<K,V>
 	this.minDepth = minDepth;
 
 	size = 0;
-	clearCount = 0;
 	parentRef = null;
 	leftLeafRef = null;
 	rightLeafRef = null;
@@ -546,15 +575,21 @@ public class ScalableLinkedHashMap<K,V>
 	// the leaf references from being correctly established
 	if (depth == 0) {
 
-	    // find the unique prefix string that will be used to mark
-	    // all the entries in this map.
-	    String mapEntryPrefix = findMapPrefix();
+	    String mapPrefix = findMapPrefix();
+	    nameForFirstEntry = mapPrefix + "first-entry";
+	    nameForLastEntry = mapPrefix + "last-entry";
+	    
+	    ManagedSerializable<Map<String,ManagedReference<PrefixEntry<K,V>>>>
+		serializedIteratorsNextElements = new ManagedSerializable<
+		Map<String,ManagedReference<PrefixEntry<K,V>>>>(
+		    new HashMap<String,ManagedReference<PrefixEntry<K,V>>>());
+	    
+	    serializedIteratorsNextElementsRef = 
+		AppContext.getDataManager().
+		createReference(serializedIteratorsNextElements);
 
-	    NamespaceManager nameFinder = new NamespaceManager(mapEntryPrefix);
-	    nameFinderRef = 
-		AppContext.getDataManager().createReference(nameFinder);
-
-	    initDepth(minDepth, nameFinderRef);
+	    initDepth(minDepth, nameForFirstEntry, nameForLastEntry,
+		      serializedIteratorsNextElementsRef);
 	}
     }
 
@@ -681,8 +716,11 @@ public class ScalableLinkedHashMap<K,V>
     // NOTE: if this were to be called in a depth-first fashion, with split
     // being called repeatedly, the leaves of the tree of the tree would have
     // their left and right reference improperly initialized.
-    private void initDepth(int minDepth, 
-			   ManagedReference<NamespaceManager> nameFinderRef) {
+    private void initDepth(int minDepth,  String nameForFirstEntry, 
+			   String nameForLastEntry, 
+			   ManagedReference<ManagedSerializable<Map<
+			   String,ManagedReference<PrefixEntry<K,V>>>>>
+			   serializedIteratorsNextElementsRef) {
 
 	if (depth >= minDepth) {
 	    return;
@@ -709,7 +747,9 @@ public class ScalableLinkedHashMap<K,V>
 	for (int i = 0; i < numLeaves; ++i) {
 	    ScalableLinkedHashMap<K,V> leaf = new ScalableLinkedHashMap<K,V>(
 		depth + leafBits, minDepth, splitThreshold, 1 << maxDirBits,
-		nameFinderRef);
+		nameForFirstEntry, nameForLastEntry, 
+		serializedIteratorsNextElementsRef);
+									
 	    leaves[i] = leaf;
 	    leaf.parentRef = thisRef;
 	}
@@ -748,7 +788,8 @@ public class ScalableLinkedHashMap<K,V>
 
 	/* Make sure the leaves have the minimum required depth. */
 	for (ScalableLinkedHashMap leaf : leaves) {
-	    leaf.initDepth(minDepth, nameFinderRef);
+	    leaf.initDepth(minDepth, nameForFirstEntry, nameForLastEntry, 
+			   serializedIteratorsNextElementsRef);
 	}
     }
 
@@ -787,17 +828,35 @@ public class ScalableLinkedHashMap<K,V>
 	leftLeafRef = null;
 	rightLeafRef = null;
 	table = new ManagedReference[leafCapacity];
-
+	DataManager dm = AppContext.getDataManager();
+	try {
+	    dm.removeBinding(nameForFirstEntry);
+	    dm.removeBinding(nameForLastEntry);
+	} catch (NameNotBoundException nnbe) {
+	    // we might have been called twice
+	}
+	
+	// let all the iterators know that the map has been cleared by
+	// setting their next element to null
+	Map<String,ManagedReference<PrefixEntry<K,V>>>
+	    iteratorToCurrentEntry = 
+	    serializedIteratorsNextElementsRef.getForUpdate().get();
+	
+	// examine each iterator's next entry and set it to null
+	for (Map.Entry<String,ManagedReference<PrefixEntry<K,V>>> e :
+		 iteratorToCurrentEntry.entrySet()) {
+	    e.setValue(null);
+	}
+	    
 	// increment the version number to invalidate all the other
 	// names while they are being cleared.  This lets us continue
 	// to add name bindings with a unique prefix.  Also, any
 	// outstanding iterators will notice the change and no longer
 	// iterate over the cleared entries.
-	nameFinderRef.get().incrementVersion();
-	clearCount++;
 
 	if (depth == 0) {
-	    initDepth(minDepth, nameFinderRef);
+	    initDepth(minDepth, nameForFirstEntry, nameForLastEntry, 
+		      serializedIteratorsNextElementsRef);
 	}
     }
 
@@ -875,47 +934,47 @@ public class ScalableLinkedHashMap<K,V>
 	return ref.get();
     }
 
-    /**
-     * Returns the first entry in this leaf, or {@code null} if there are no
-     * entries.
-     *
-     * @return the first entry in this leaf or {@code null}
-     */
-    PrefixEntry<K,V> firstEntry() {
-	for (int i = 0; i < table.length; i++) {
-	    PrefixEntry<K,V> entry = getBucket(i);
-	    if (entry != null) {
-		return entry;
-	    }
-	}
-	return null;
-    }
+//     /**
+//      * Returns the first entry in this leaf, or {@code null} if there are no
+//      * entries.
+//      *
+//      * @return the first entry in this leaf or {@code null}
+//      */
+//     PrefixEntry<K,V> firstEntry() {
+// 	for (int i = 0; i < table.length; i++) {
+// 	    PrefixEntry<K,V> entry = getBucket(i);
+// 	    if (entry != null) {
+// 		return entry;
+// 	    }
+// 	}
+// 	return null;
+//     }
 
-    /**
-     * Returns the next entry in this leaf after the entry with the specified
-     * hash and key reference, or {@code null} if there are no entries after
-     * that position.
-     *
-     * @param hash the hash code
-     * @param keyRef the reference for the entry key
-     *
-     * @return the next entry or {@code null}
-     */
-    PrefixEntry<K,V> nextEntry(int hash, ManagedReference<?> keyRef) {
-	BigInteger keyId = keyRef.getId();
-	for (int i = indexFor(hash); i < table.length; i++) {
-	    for (PrefixEntry<K,V> e = getBucket(i); e != null; e = e.next()) {
-		if (unsignedLessThan(e.hash, hash)) {
-		    continue;
-		} else if (e.hash != hash ||
-			   e.keyRef().getId().compareTo(keyId) > 0)
-		{
-		    return e;
-		}
-	    }
-	}
-	return null;
-    }
+//     /**
+//      * Returns the next entry in this leaf after the entry with the specified
+//      * hash and key reference, or {@code null} if there are no entries after
+//      * that position.
+//      *
+//      * @param hash the hash code
+//      * @param keyRef the reference for the entry key
+//      *
+//      * @return the next entry or {@code null}
+//      */
+//     PrefixEntry<K,V> nextEntry(int hash, ManagedReference<?> keyRef) {
+// 	BigInteger keyId = keyRef.getId();
+// 	for (int i = indexFor(hash); i < table.length; i++) {
+// 	    for (PrefixEntry<K,V> e = getBucket(i); e != null; e = e.next()) {
+// 		if (unsignedLessThan(e.hash, hash)) {
+// 		    continue;
+// 		} else if (e.hash != hash ||
+// 			   e.keyRef().getId().compareTo(keyId) > 0)
+// 		{
+// 		    return e;
+// 		}
+// 	    }
+// 	}
+// 	return null;
+//     }
 
     /**
      * Compares the arguments as unsigned integers.
@@ -972,11 +1031,13 @@ public class ScalableLinkedHashMap<K,V>
 	ScalableLinkedHashMap<K,V> leftChild =
 	    new ScalableLinkedHashMap<K,V>(
 		depth+1, minDepth, splitThreshold, 1 << maxDirBits,
-		nameFinderRef);
+		nameForFirstEntry, nameForLastEntry,
+		serializedIteratorsNextElementsRef);
 	ScalableLinkedHashMap<K,V> rightChild =
 	    new ScalableLinkedHashMap<K,V>(
 	        depth+1, minDepth, splitThreshold, 1 << maxDirBits,
-		nameFinderRef);
+		nameForFirstEntry, nameForLastEntry, 
+		serializedIteratorsNextElementsRef);
 
 	// to add this node to the parent directory, we need to determine the
 	// prefix that will lead to this node.  Grabbing a hash code from one
@@ -1317,9 +1378,7 @@ public class ScalableLinkedHashMap<K,V>
 	    }
 	    /* Create the new entry to get the ID of its key ref */
 	    if (newEntry == null) {
-		String entryName = nextEntryName();
-		newEntry = new PrefixEntry<K,V>(hash, key, value, entryName);
-		AppContext.getDataManager().setBinding(entryName, newEntry);
+		newEntry = new PrefixEntry<K,V>(hash, key, value);
 		keyId = newEntry.keyRef().getId();
 	    }
 	    /* Keep bucket chain sorted by key reference object ID */
@@ -1333,42 +1392,40 @@ public class ScalableLinkedHashMap<K,V>
 
 	// we found no key match, so add an entry
 	if (newEntry == null) {
-	    String entryName = nextEntryName();
-	    newEntry = new PrefixEntry<K,V>(hash, key, value, entryName);
-	    AppContext.getDataManager().setBinding(entryName, newEntry);
+	    newEntry = new PrefixEntry<K,V>(hash, key, value);	   
 	}
 	leaf.addEntryMaybeSplit(newEntry, prev);
+
+	// update the insertion-order list
+	PrefixEntry<K,V> lastInsert = getLastEntry();
+	DataManager dm = AppContext.getDataManager();
+
+	if (lastInsert != null) {
+	    lastInsert.nextInsert = dm.createReference(newEntry);
+	    newEntry.prevInsert = dm.createReference(lastInsert);
+	}
+	else {
+	    // if the last entry inserted was null, then it means this
+	    // is the first entry, to set the binding accordingly
+	    dm.setBinding(nameForFirstEntry, newEntry);
+	}
+	// bind the new entry as the most recently inserted entry
+	dm.setBinding(nameForLastEntry, newEntry);
 
 	return null;
     }
     
-    /**
-     * Returns the next unused name binding for a {@code PrefixEntry}.
-     *
-     * @return the name binding
-     */
-    private String nextEntryName() {
-	return nameFinderRef.get().nextEntryName();
-    }
-    
-    /**
-     * Returns the name past which starts all the entries for this
-     * map's name space.
-     *
-     * @return the start of the name space
-     */
-    private String getStartOfMapEntryNamespace() {
-	return nameFinderRef.get().getStartOfMapEntryNamespace();
-    }
-
-    /**
-     * Returns the prefix for all the current, valid names of entries
-     * in this map.  
-     *
-     * @return the prefix for all current, valid names
-     */ 
-    private String getMapEntryNamespacePrefix() {
-	return nameFinderRef.get().getMapEntryNamespacePrefix();
+    private PrefixEntry<K,V> getLastEntry() {
+	DataManager dm = AppContext.getDataManager();
+	try {
+	    PrefixEntry<K,V> e = 
+		uncheckedCast(dm.getBinding(nameForLastEntry));
+	    return e;
+	}
+	catch (NameNotBoundException nnbe) {
+	    // this only happens if the map is empty
+	    return null;
+	}
     }
 
     /**
@@ -1568,13 +1625,14 @@ public class ScalableLinkedHashMap<K,V>
 			prev.setNext(next);
 		    }
 
+		    removeEntryFromInsertionList(e);
+		    checkEntryPointers(e);
+		    checkIterators(e);
+
 		    // if this data structure is responsible for the
 		    // persistence lifetime of the key or value, remove them
 		    // from the data store
 		    e.unmanage();
-
-		    // remove the entry's binding from the listing
-		    dm.removeBinding(e.entryName);
 
 		    // NOTE: this is where we would attempt a merge operation
 		    // if we decide to later support one
@@ -1586,6 +1644,111 @@ public class ScalableLinkedHashMap<K,V>
 	}
 	return null;
     }
+
+    /**
+     * When removing the provided entry, this method updates the first
+     * and last entry name bindings as necessary if the removed
+     * element was bound to either of these names
+     *
+     * @param e the entry being removed
+     */
+    private void checkEntryPointers(PrefixEntry<K,V> e) {
+	DataManager dm = AppContext.getDataManager();
+
+	PrefixEntry<K,V> first = 
+	    uncheckedCast(dm.getBinding(nameForFirstEntry));
+
+	PrefixEntry<K,V> last  = 
+	    uncheckedCast(dm.getBinding(nameForLastEntry));
+	
+	if (e.equals(first)) {
+	    if (e.nextInsert == null)
+		dm.removeBinding(nameForFirstEntry);
+	    else
+		dm.setBinding(nameForFirstEntry, e.nextInsert.get());
+	}
+	else if (e.equals(last)) {
+	    if (e.prevInsert == null)
+		dm.removeBinding(nameForLastEntry);
+	    else
+		dm.setBinding(nameForLastEntry, e.prevInsert.get());
+	}
+    }
+
+    /**
+     * When removing the provided entry, this method updates the
+     * doubly linked list of entries that keeps track of their
+     * insertion order.
+     *
+     * @param e the entry being removed.
+     */
+    private void removeEntryFromInsertionList(PrefixEntry<K,V> e) {
+	// update the insertion order chain
+	PrefixEntry<K,V> prev = (e.prevInsert == null) 
+	    ? null : e.prevInsert.getForUpdate();
+	PrefixEntry<K,V> next = (e.nextInsert == null)
+	    ? null : e.nextInsert.getForUpdate();
+	
+	if (prev != null)
+	    prev.nextInsert = e.nextInsert;
+	if (next != null)
+	    next.prevInsert = e.prevInsert;
+    }
+
+    /**
+     * Checks the state of all {@link
+     * ConcurrentInsertionOrderIterator} instances to see if the
+     * provided entry, which is being removed, is their next entry to
+     * return, and updates their state accordingly.  
+     *
+     * <p>
+     * 
+     * Note that this effect is only meaningful to iterators that are
+     * in a serialized state at the time of this call.  This method
+     * will never be called if the iterator is currently traversing on
+     * the entry prior to the one removed.  This is due to the fact
+     * that the {@link
+     * ScalableLinkedHashMap#removeEntryFromInsertionList(PrefixEntry)}
+     * method has to acquire a write lock on the entry the iterator is
+     * currently accessing.  Therefore, either the iterator will have
+     * to abort and this update will succeed, in which case, the
+     * iterator will deserialize again and update to the correct
+     * state.  Or, the task doing the removal will abort and the
+     * iterator will proceed with its traversal.
+     *
+     * @param entry the entry being removed
+     */
+    private void checkIterators(PrefixEntry<K,V> entry) {
+	Map<String,ManagedReference<PrefixEntry<K,V>>>
+	    iteratorToCurrentEntry = 
+	    serializedIteratorsNextElementsRef.get().get();
+
+	DataManager dm = AppContext.getDataManager();
+	ManagedReference entryRef = dm.createReference(entry);
+	
+	// examine each iterator's next entry and see if it is the one
+	// we have just removed
+	for (Map.Entry<String,ManagedReference<PrefixEntry<K,V>>> e :
+		 iteratorToCurrentEntry.entrySet()) {
+	    
+	    ManagedReference<PrefixEntry<K,V>> nextEntry = e.getValue();
+
+	    // if the iterator was going to return the removed entry
+	    // next, then we need to update it with the nextInsert
+	    // value from the removed entry
+	    if (nextEntry != null && nextEntry.equals(entryRef)) {
+
+		// mark that the map has changed
+		dm.markForUpdate(serializedIteratorsNextElementsRef.get());
+		
+		// then update the iterators next value
+		e.setValue(entry.nextInsert);
+	    }
+	}
+
+    }
+
+
 
     /**
      * Removes the entry with the given hash code and key reference, if
@@ -1618,12 +1781,13 @@ public class ScalableLinkedHashMap<K,V>
 		    prev.setNext(e.next());
 		}
 
+		removeEntryFromInsertionList(e);
+		checkEntryPointers(e);
+		checkIterators(e);		
+
 		// free up any Serializable objects that were managing
 		e.unmanage();
 
-		// remove the entry's binding from the listing
-		dm.removeBinding(e.entryName);
-				
 		break;
 	    }
 	    prev = e;
@@ -1640,6 +1804,18 @@ public class ScalableLinkedHashMap<K,V>
 	// is what we use when searching for it
 	return lookup(0x0);
     }
+
+    PrefixEntry<K,V> firstEntry() {
+	try {
+	    return uncheckedCast(AppContext.getDataManager().
+				 getBinding(nameForFirstEntry));
+	}
+	catch (NameNotBoundException nnbe) {
+	    // occurs if size == 0
+	    return null;
+	}
+    }
+
 
     /**
      * Returns the bucket index for this hash value given the provided number
@@ -1738,10 +1914,16 @@ public class ScalableLinkedHashMap<K,V>
 		PrefixEntry e = cur.get();
 
 		do {
-		    // free any resources created by the entry and
-		    // remove its name binding
+		    // free any resources created by the entry 
 		    e.unmanage();
-		    AppContext.getDataManager().removeBinding(e.entryName);
+		    
+		    // NOTE: we don't need to call these because the
+		    // global call to clear already took care it this
+		    // for us
+		    //
+ 		    // removeEntryFromInsertionList(e);
+ 		    // checkEntryPointers(e);
+ 		    // checkIterators(e);
 
 		    PrefixEntry next = e.next();
 		    table[i] = (next == null) ? null : dm.createReference(next);
@@ -2006,7 +2188,10 @@ public class ScalableLinkedHashMap<K,V>
 	 */
 	private final ManagedReference<?> keyOrPairRef;
 
-	private final String entryName;
+	private ManagedReference<PrefixEntry<K,V>> prevInsert;
+
+	private ManagedReference<PrefixEntry<K,V>> nextInsert;
+
 
 	/**
 	 * A reference to the value, or null if the key and value are paired.
@@ -2048,9 +2233,11 @@ public class ScalableLinkedHashMap<K,V>
 	 * @param k the key
 	 * @param v the value
 	 */
-	PrefixEntry(int h, K k, V v, String entryName) {
+	PrefixEntry(int h, K k, V v) {
 	    this.hash = h;
-	    this.entryName = entryName;
+
+	    this.prevInsert = null;
+	    this.nextInsert = null;
 
 	    DataManager dm = AppContext.getDataManager();
 
@@ -2366,125 +2553,26 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * A utility class for managing the name spaces used by the {@code
-     * ScalableLinkedHashMap} instances.  This class issues names with
-     * a predictable, monotonically increasing iteration order.
-     */
-    private static class NamespaceManager 
-	implements ManagedObject, Serializable {
-
-	/**
-	 * The number of entries used in the current version
-	 */
-	private int entryCount;
-	
-	/**
-	 * The name space prefix for the map itself.
-	 */
-	private final String mapPrefix;
-
-	/**
-	 * The current name space prefix based on the map's prefix and
-	 * the current version number
-	 */
-	private String namespacePrefix;
-
-	/**
-	 * The name past which starts the first returned name.
-	 */
-	private String startOfNamespace;
-
-	/**
-	 * The current version number for this name space.
-	 *
-	 * @see ScalableLinkedHashSet#clearCount
-	 */
-	private int version;
-
-	/**
-	 * Constructs a name space manager with the map's provided
-	 * naming prefix.
-	 *
-	 * @param mapPrefix the name used to prefix all other names
-	 *        issued by this instance
-	 */
-	public NamespaceManager(String mapPrefix) {
-
-	    this.mapPrefix = mapPrefix;
-	    version = 0;
-	    entryCount = 1;
-	    
-	    String versionString = "ver-" + String.format("%05d",version);
-
-	    // set the prefix for this namespace based on the map's
-	    // prefix and the current version
-	    namespacePrefix = mapPrefix + versionString;
-
-	    // other entries will occur after this name
-	    startOfNamespace = namespacePrefix + "-" + String.format("%014d",0);
-	}
-
-	/**
-	 * Increments the version number of this map and updates the
-	 * start of this instance's name space.
-	 */
-	void incrementVersion() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    version++;
-
-	    // reset the start of the namespace and its prefix
-	    String versionString = "ver-" + String.format("%05d",version);
-	    namespacePrefix = mapPrefix + versionString;
-	    startOfNamespace = namespacePrefix + "-" + String.format("%014d",0);
-	}
-
-	/**
-	 * Returns the string that prefixes all the name in the
-	 * current name space.  This value can be used to check
-	 * whether a current name has the right version
-	 *
-	 * @return the string that prefixes all the name in the
-	 *         current name space.
-	 */
-	public String getMapEntryNamespacePrefix() {
-	    return namespacePrefix;
-	}
-
-	/**
-	 * The name past which starts the first returned name.
-	 * Callers can use {@link DataManager#nextBoundName(String)
-	 * nextBoundName} with this value to find the first name.	 
-	 *
-	 * @return the name after which starts the first returned name
-	 */
-	public String getStartOfMapEntryNamespace() {
-	    return startOfNamespace;
-	}
-
-	/**
-	 * Returns the next name in the name space.
-	 *
-	 * @return the next name
-	 */
-	public String nextEntryName() {
-	    DataManager dm = AppContext.getDataManager();
-	    String nextName = namespacePrefix + 
-		String.format("%014d", entryCount);
-	    entryCount++;
-	    dm.markForUpdate(this);
-
-	    return nextName;
-	}
-
-    }
-
-
-    /**
-     * A concurrent, persistable {@code Iterator} implementation for the {@code
-     * ScalableLinkedHashMap}.  This implementation is stable with respect to
-     * concurrent changes to the associated collection, but may ignore
-     * additions and removals made to the collection during iteration, and may
-     * also visit more than once a key value that is removed and re-added.
+     * A concurrent, persistable {@code Iterator} implementation for
+     * the {@code ScalableLinkedHashMap}.  This implementation is
+     * stable with respect to concurrent changes to the associated
+     * collection, but may ignore additions and removals made to the
+     * collection during iteration, and may also visit more than once
+     * a key value that is removed and re-added.
+     *
+     * <p>
+     *
+     * If an iterator is created for an empty map, and then
+     * serialized, it will remain valid upon any subsequent
+     * deserialization.  An iterator in this state, where it has been
+     * created but {@code next} has never been called, will always
+     * begin an the first entry in the map, if any, since its
+     * deserialization.
+     *
+     * <p> 
+     *
+     * Instance of this class are <i>not</i> designed to be shared
+     * between concurrent tasks.
      */
     abstract static class ConcurrentInsertionOrderIterator<E,K,V>
 	implements Iterator<E>, Serializable {
@@ -2492,15 +2580,8 @@ public class ScalableLinkedHashMap<K,V>
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 2;
 
-	/**
-	 * The name of the current entry that was last iterated over.
-	 */
-	private String curEntryName;
-	
-	/**
-	 * The name of the next entry
-	 */
-	private transient String nextEntryName;
+	private static final String ITERATOR_INSTANCE_COUNT = 
+	    ConcurrentInsertionOrderIterator.class.getName() + "-instance-num";
 
 	/**
 	 * Whether the current entry has already been removed
@@ -2510,57 +2591,169 @@ public class ScalableLinkedHashMap<K,V>
 	/**
 	 * A reference to the current entry
 	 */
+	private ManagedReference<PrefixEntry<K,V>> nextEntry;
+
+	/**
+	 * A reference to the current entry
+	 */
 	private ManagedReference<PrefixEntry<K,V>> curEntry;
+
+	private final String iteratorName;
 
 	/**
 	 * A reference to the backing map
 	 */
 	private ManagedReference<ScalableLinkedHashMap<K,V>> backingMapRef;
 
-	/**
-	 * The current prefix used for all entry names.
-	 */
-	private String namespacePrefix;
+	private ManagedReference<ManagedSerializable<Map<
+	    String,ManagedReference<PrefixEntry<K,V>>>>>
+	    serializedIteratorsNextElementsRef;
 
-	/**
-	 * The number of times the backing map has been cleared since
-	 * this instance was last deserialized.
-	 */ 
-	private int clearCount;
+	private boolean nextEntryWasNullOnCreation;
+
+	private transient boolean recheckNextEntry;
 	
 	/**
 	 * Constructs a new {@code ConcurrentEntryOrderIterator}.
 	 *
-	 * @param root the root node of the {@code ScalableLinkedHashMap}
+	 * @param backingMap the root node of the {@code ScalableLinkedHashMap}
 	 */
-	ConcurrentInsertionOrderIterator(ScalableLinkedHashMap<K,V> backingMap) {
-	    curEntryName = backingMap.getStartOfMapEntryNamespace();
-	    namespacePrefix = backingMap.getMapEntryNamespacePrefix();
-	    clearCount = backingMap.clearCount;
-	    nextEntryName = null;
+	ConcurrentInsertionOrderIterator(ScalableLinkedHashMap<K,V> 
+					 backingMap) {
+
 	    currentRemoved = false;
 	    curEntry = null;
-	    backingMapRef = AppContext.getDataManager().createReference(backingMap);
+
+	    DataManager dm = AppContext.getDataManager();
+	    PrefixEntry<K,V> first = backingMap.firstEntry();	    
+	    nextEntry = (first == null) ? null : dm.createReference(first);
+
+	    // mark if the next entry was null.  If so, if we
+	    // serialize this iterator and then deserialize it, we
+	    // should refresh the first entry in the map	   
+	    nextEntryWasNullOnCreation = nextEntry == null;
+
+	    serializedIteratorsNextElementsRef = 
+		backingMap.serializedIteratorsNextElementsRef;
+
+	    backingMapRef = dm.createReference(backingMap);
+	    
+	    // get a unique name for this iterator
+	    iteratorName = newIteratorName();
+
+	    recheckNextEntry = false;
+	    updatePersistentNextEntry();
 	}
+
+	/**
+	 * Returns the next unique name for a {@code
+	 * ConcurrentInsertionOrderIterator} instance.
+	 *
+	 * @return the next unique name
+	 */
+	private static String newIteratorName() {
+	    
+	    DataManager dm = AppContext.getDataManager();
+	    int instanceNum = -1;
+	    try {
+		ManagedSerializable<Integer> mostRecentIteratorNum = 
+		    uncheckedCast(dm.getBinding(ITERATOR_INSTANCE_COUNT));
+		instanceNum = mostRecentIteratorNum.get().intValue() + 1;
+	    } catch (NameNotBoundException nnbe) {
+		// we must be the first instance
+		instanceNum = 0;
+	    }
+	    
+	    // update the most recent instance binding to reflect this
+	    // iterator's creation
+	    dm.setBinding(ITERATOR_INSTANCE_COUNT, 
+			  new ManagedSerializable<Integer>(instanceNum));
+	    
+	    // then set up the prefix string
+	    String iteratorSuffix = String.format("%014d", instanceNum);
+	    
+	    // combine the common class prefix for entries with this
+	    // instance's suffix to create a unique namespace for this map
+	    return ConcurrentInsertionOrderIterator.class.getName() + 
+		iteratorSuffix;
+	}
+
 
 	/**
 	 * {@inheritDoc}
 	 */
 	public boolean hasNext() {
-	    if (nextEntryName != null)
-		return true;
-
-	    String nextName = AppContext.getDataManager().
-		nextBoundName(curEntryName);
-	    
-	    // check that the next name is in our namespace, as there
-	    // may be other names after this map's that shouldn't be
-	    // gotten
-	    if (nextName != null && nextName.startsWith(namespacePrefix)) {
-		nextEntryName = nextName;
-		return true;
+	    if (recheckNextEntry) {
+		checkForNextEntryUpdates();
 	    }
-	    return false;
+	    return nextEntry != null;
+	}
+
+	/**
+	 * After deserialization, this iterator should check that its
+	 * reference to the next entry is still valid.  Two cases
+	 * exist to check.
+	 *
+	 * <p>
+	 *
+	 * First, if this iterator was created based on an empty map,
+	 * and has never iterated over the first element, the iterator
+	 * must check whether any new elements exist in the map.  Once
+	 * an element exists, the iterator updates its nextEntry
+	 * reference and is no longer in the "empty map" state.
+	 *
+	 * <p>
+	 *
+	 * In the second case, while serialized, the next entry could
+	 * have been removed from the backing map.  Should it have
+	 * been removed, the map will have updated the shared mapping
+	 * from iterator to next entry, with a reference as to what
+	 * this iterator's new next entry should.  
+	 *
+	 * @see ScalableLinkedHashMap#checkIterators(PrefixEntry)
+	 */
+	private void checkForNextEntryUpdates() {
+	    System.out.println("before recheck, " + this 
+			       + ".nextEntry = " + nextEntry);
+
+	    // check to see if this iterator was created with a null
+	    // first entry.  This flag will only be true if this
+	    // iterator has never seen a first entry
+	    if (nextEntryWasNullOnCreation) {
+
+		// see if the first entry in the map is now non-null
+		PrefixEntry<K,V> first = backingMapRef.get().firstEntry();
+		nextEntry = (first == null) ? null : 
+		    AppContext.getDataManager().createReference(first);
+		
+		// mark if the next entry is now non-null.  If so, if
+		// we unset the flag and the iterator, which will
+		// never be set to true again.
+		if (nextEntry != null)
+		    nextEntryWasNullOnCreation = false;		
+	    }
+	    // otherwise, this iterator has seen at least one entry
+	    // and had updated the map prior to serialization what its
+	    // next entry was.  In this case, we should check to see
+	    // if the next entry prior to serialization has been removed.
+	    else {
+		Map<String,ManagedReference<PrefixEntry<K,V>>>
+		    iteratorToNextEntry = 
+		    serializedIteratorsNextElementsRef.getForUpdate().get();
+		
+		// remove ourselves and assign whatever is listed as the
+		// next entry for us
+		nextEntry = iteratorToNextEntry.remove(iteratorName);
+		
+		// obtain a read lock on the entry to start with
+		if (nextEntry != null)
+		    nextEntry.get();
+	    }
+
+	    recheckNextEntry = false;
+
+	    System.out.println("after recheck, " + this 
+			       + ".nextEntry = " + nextEntry);
 	}
 
 	/**
@@ -2585,21 +2778,37 @@ public class ScalableLinkedHashMap<K,V>
 		throw new NoSuchElementException();
 	    }
 	    DataManager dm = AppContext.getDataManager();
-	    Object o = dm.getBinding(nextEntryName);
-	    PrefixEntry<K,V> entry = uncheckedCast(o);
-	    
-	    // get a reference to the current entry so that we can
-	    // remove it later.  We can't keep a Java reference since
-	    // this iterator might get serialized.
 
-	    curEntry = dm.createReference(entry);
+	    PrefixEntry<K,V> entry = nextEntry.get();
+	    
 	    currentRemoved = false;
 
 	    // update the iterator state
-	    curEntryName = nextEntryName;
-	    nextEntryName = null;
+	    curEntry = nextEntry;
+	    nextEntry = entry.nextInsert;
 		
+	    // save the next entry that we're going to return in case
+	    // we're serialized after this call
+	    updatePersistentNextEntry();
+
 	    return entry;
+	}
+
+	/**
+	 * Saves the {@code ManagedReference} of the next entry that
+	 * this iterator is going to return to a peristant state.
+	 * This enables the iterator to receive updates from the map
+	 * while serialized if the next element that it should return
+	 * was removed.
+	 *
+	 * @see ScalableLinkedHashMap#checkIterators(PrefixEntry)
+	 */
+	private void updatePersistentNextEntry() {
+	    Map<String,ManagedReference<PrefixEntry<K,V>>>
+		iteratorToNextEntry = 
+		serializedIteratorsNextElementsRef.getForUpdate().get();
+
+	    iteratorToNextEntry.put(iteratorName, nextEntry);
 	}
 
 	/**
@@ -2612,16 +2821,39 @@ public class ScalableLinkedHashMap<K,V>
 	    } else if (curEntry == null) {
 		throw new IllegalStateException("No current element");
 	    }
-	    K key = curEntry.get().getKey();
-	    backingMapRef.get().remove(key);
-	    currentRemoved = true;
+	    try {
+		K key = curEntry.get().getKey();
+		backingMapRef.get().remove(key);
+	    } catch (ObjectNotFoundException onfe) {
+		// this happens if the current entry was removed while
+		// this iterator was serialized.  We could check for
+		// this upon deserialization, but instead we rely on
+		// this lazy check at call-time here to avoid doing
+		// any unnecessary work.
+	    }
+		currentRemoved = true;
+	}
+
+	/**
+	 * Returns the unique name for this iterator
+	 */
+	public String toString() {
+	    return iteratorName;
+	}
+
+	private void writeObject(ObjectOutputStream s)
+	    throws IOException {
+	    // write out all the non-transient state
+	    s.defaultWriteObject();
 	}
 
 
 	/**
 	 * Reconstructs the {@code ConcurrentInsertionOrderIterator}
-	 * from the provided stream and checks that its name space
-	 * prefix is still valid.
+	 * from the provided stream and marks that this iterator
+	 * should check that its next entry is still valid
+	 *
+	 * @see ConcurrentInsertionOrderIterator#checkForNextEntryUpdates()
 	 */
 	private void readObject(ObjectInputStream s)
 	    throws IOException, ClassNotFoundException {
@@ -2629,16 +2861,9 @@ public class ScalableLinkedHashMap<K,V>
 	    // read in all the non-transient state
 	    s.defaultReadObject();	
 	    
-	    ScalableLinkedHashMap<K,V> backingMap = backingMapRef.get();
-
-	    // see if the map has been cleared since we last were
-	    // deserialized
- 	    if (clearCount != backingMap.clearCount) {
- 		// and if so, upgrade our entry name versions
- 		curEntryName = backingMap.getStartOfMapEntryNamespace();
- 		namespacePrefix = backingMap.getMapEntryNamespacePrefix();		
- 		clearCount = backingMap.clearCount;
- 	    }
+	    // mark that the iterator should recheck what its next
+	    // element is prior to returning any next entry.
+	    recheckNextEntry = true;
 	}
     }
 
