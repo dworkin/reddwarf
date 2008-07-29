@@ -111,7 +111,7 @@ final class TransactionImpl implements Transaction {
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
 	state = State.ACTIVE;
-	if (collector.getGlobalProfileLevel().ordinal() >= 
+	if (collector.getDefaultProfileLevel().ordinal() >= 
                 ProfileLevel.MEDIUM.ordinal()) {
 	    detailMap = new HashMap<String,ProfileParticipantDetailImpl>();
 	} else {

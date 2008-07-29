@@ -263,18 +263,22 @@ system including identity management, profiling, and task scheduling.
   authenticator simply accepts any name-password pair.
     
 <dt>com.sun.sgs.impl.kernel.profile.level
-<span class="default">off</span>
-<dd>Whether to perform profiling.  Profiling is enabled if the value is
-  <code>on</code>.
+<span class="default">min</span>
+<dd>The profiling level. Valid levels are
+<ul>
+    <li><code>min</code> - minimal profiling data is collected. 
+    <li><code>medium</code>  - more data is collected, but is still appropriate 
+                             for monitoring a production system.
+    <li><code>max</code> - all available profiling data is collected.  This 
+                         level may only be appropriate for debugging systems in
+                         development.
+</ul>
 
 <dt>com.sun.sgs.impl.kernel.profile.listeners
-<span class="default">
-    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
+<span class="nodefault"/>
 <dd>A colon separated list of profile listeners, which consume profile output.
-  The <code>AggregateProfileListener</code> reports its findings on a server
-  socket, by default on port <code>43005</code>.  To configure this and other
-  available listeners, see the individual class javadoc for profile listener
-  implementations.
+  To configure the available listeners, see the individual class javadoc for 
+  profile listener implementations.
 
 <dt>com.sun.sgs.impl.kernel.transaction.threads
 <span class="default">4</span>

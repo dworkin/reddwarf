@@ -38,7 +38,7 @@ public interface ProfileConsumer {
     /**
      * Set the local profiling level for this consumer.  Setting the global
      * profiling level via 
-     * {@link ProfileCollector#setGlobalProfileLevel(ProfileLevel)} will
+     * {@link ProfileCollector#setDefaultProfileLevel(ProfileLevel)} will
      * override this value.
      * 
      * @param level the profiling level
@@ -47,7 +47,7 @@ public interface ProfileConsumer {
     
     /**
      * Get the local profiling level for this consumer. Defaults to the
-     * value of {@link ProfileCollector#getGlobalProfileLevel()}.
+     * value of {@link ProfileCollector#getDefaultProfileLevel()}.
      * 
      * @return the profiling level
      */

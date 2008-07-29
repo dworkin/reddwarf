@@ -243,6 +243,8 @@
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>
+    <!-- The default transaction timeout -->
+    <com.sun.sgs.txn.timeout>100</com.sun.sgs.txn.timeout>
   </properties>
 
 </project>

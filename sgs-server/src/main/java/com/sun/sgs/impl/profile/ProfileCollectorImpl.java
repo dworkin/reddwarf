@@ -22,7 +22,6 @@ package com.sun.sgs.impl.profile;
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
@@ -35,18 +34,16 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 import java.beans.PropertyChangeEvent;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 
 /**
@@ -56,18 +53,14 @@ import java.util.logging.Logger;
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
     
-    // logger for this class
-    private static final LoggerWrapper logger = new LoggerWrapper(
-                  Logger.getLogger(ProfileCollectorImpl.class.getName()));
-    
     // A map from profile consumer name to profile consumer object
     private final ConcurrentHashMap<String, ProfileConsumerImpl> consumers;
     
     // the number of threads currently in the scheduler
     private volatile int schedulerThreadCount;
 
-    // the set of registered listeners
-    private List<ProfileListener> listeners;
+    // A map from registered listener to whether it can be removed or shutdown
+    private final ConcurrentHashMap<ProfileListener, Boolean> listeners;
 
     // thread-local detail about the current task, used to let us
     // aggregate data across all participants in a given task
@@ -84,9 +77,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     // long-running thread to report data
     private final Thread reporterThread;
     
-    // The current global profiling level.  This is initially set from 
-    // properties at startup, but can be changed dynamically.
-    private ProfileLevel globalProfileLevel;
+    // The default profiling level.  This is initially set from 
+    // properties at startup.
+    private ProfileLevel defaultProfileLevel;
     
     // The application properties, used to instantiate {@code ProfileListener}s
     private final Properties appProperties;
@@ -96,7 +89,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     
     /**
      * Creates an instance of {@code ProfileCollectorImpl}.
-     * @param level the default global profiling level
+     * @param level the default system profiling level
      * @param appProperties the application properties, used for instantiating
      *          {@code ProfileListener}s
      * @param systemRegistry the system registry, used for instantiating
@@ -110,11 +103,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         this.systemRegistry = systemRegistry;
         
         schedulerThreadCount = 0;
-        listeners = new CopyOnWriteArrayList<ProfileListener>();
+        listeners = new ConcurrentHashMap<ProfileListener, Boolean>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
         consumers = new ConcurrentHashMap<String, ProfileConsumerImpl> ();
 
-        globalProfileLevel = level;
+        defaultProfileLevel = level;
         
         // start a long-lived task to consume the other end of the queue
         reporterThread = new Thread(new CollectorRunnable());
@@ -132,35 +125,33 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 	    // do nothing
 	}
 
-        // Shut down each of the listeners, but don't be alarmed if they've
-        // already been shut down.  Some system components are also listeners,
-        // so they will be shut down twice.
-        // TODO - perhaps this means that those components should not be
-        // listeners in the same sense as the listeners that can be dynamically
-        // added and removed.  We might need another type here.
-        for (ProfileListener listener : listeners) {
-            try {
-                listener.shutdown();
-            } catch (IllegalStateException e) {
-                // Ignore the second shutdown attempt
+        // Shut down each of the listeners if it was added with remove and
+        // shutdown enabled.
+        for (Map.Entry<ProfileListener, Boolean> entry : listeners.entrySet()) {
+            if (entry.getValue().equals(Boolean.TRUE)) {
+                entry.getKey().shutdown();
             }
         }
     }
 
     /** {@inheritDoc} */
-    public ProfileLevel getGlobalProfileLevel() {
-        return globalProfileLevel;
+    public ProfileLevel getDefaultProfileLevel() {
+        return defaultProfileLevel;
     }
 
     /** {@inheritDoc} */
-    public void setGlobalProfileLevel(ProfileLevel level) {
-        globalProfileLevel = level;
-        // update each of our consumers
-        for (ProfileConsumerImpl pc : consumers.values()) {
-            pc.setProfileLevel(level);
-        }
+    public void setDefaultProfileLevel(ProfileLevel level) {
+        defaultProfileLevel = level;
     }
-
+    
+    /** {@inheritDoc} */
+    public Map<String, ProfileConsumer> getConsumers() {
+        // Create a copy of the map to get the type correct.
+        ConcurrentHashMap<String, ProfileConsumer> retMap = 
+                new ConcurrentHashMap<String, ProfileConsumer>(consumers);
+        return Collections.unmodifiableMap(retMap);
+    }
+    
     /** Called by the profile registrar */
     ProfileConsumer registerProfileProducer(String name) {
         ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
@@ -169,8 +160,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
     
     /** {@inheritDoc} */
-    public void addListener(ProfileListener listener) {
-        listeners.add(listener);
+    public void addListener(ProfileListener listener, boolean canRemove) {
+        listeners.put(listener, canRemove);
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
 				    null, schedulerThreadCount);
@@ -186,54 +177,40 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
  
-    /** 
-     * {@inheritDoc} 
-     * <p>
-     * If there is an error, it is logged at Level.WARNING.
-     */
-    public ProfileListener instantiateListener(String listenerClassName) {
-        try {                  
-            // make sure we can resolve the listener
-            Class<?> listenerClass = Class.forName(listenerClassName);
-            Constructor<?> listenerConstructor =
-                listenerClass.getConstructor(Properties.class,
-                                             Identity.class,
-                                             ComponentRegistry.class);
+    /** {@inheritDoc}  */
+    public void addListener(String listenerClassName) throws Exception {              
+        // make sure we can resolve the listener
+        Class<?> listenerClass = Class.forName(listenerClassName);
+        Constructor<?> listenerConstructor =
+            listenerClass.getConstructor(Properties.class,
+                                         Identity.class,
+                                         ComponentRegistry.class);
 
-            // create a new identity for the listener
-            IdentityImpl owner = new IdentityImpl(listenerClassName);
+        // create a new identity for the listener
+        IdentityImpl owner = new IdentityImpl(listenerClassName);
 
-            // try to create and register the listener
-            Object obj =
-                listenerConstructor.newInstance(appProperties, owner,
-                                                systemRegistry);
-            return (ProfileListener)obj;
-        } catch (InvocationTargetException e) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, e.getCause(), 
-                        "Failed to load ProfileListener {0} ... " +
-                        "it will not be available for profiling",
-                        listenerClassName);
-            return null;
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, e, "Failed to load " +
-                                "ProfileListener {0} ... it will not " +
-                                "be available for profiling",
-                                listenerClassName);
-            return null;
-        }
+        // try to create and register the listener
+        Object obj =
+            listenerConstructor.newInstance(appProperties, owner,
+                                            systemRegistry);
+        addListener((ProfileListener) obj, true);
     }
     
     /** {@inheritDoc} */
     public List<ProfileListener> getListeners() {
-        return Collections.unmodifiableList(listeners);
+        // Create a list from the keys
+        ArrayList<ProfileListener> list = 
+                new ArrayList<ProfileListener>(listeners.keySet());
+        // and return a read-only copy.
+        return Collections.unmodifiableList(list);
     }
     
     /** {@inheritDoc} */
     public void removeListener(ProfileListener listener) {
-        boolean registered = listeners.remove(listener);
-        if (registered) {
+        // Check to see if we're allowed to remove this listener
+        Boolean canRemove = listeners.get(listener);
+        if (canRemove != null && canRemove.equals(Boolean.TRUE)) {
+            listeners.remove(listener);
             listener.shutdown();
         }
     }
@@ -246,7 +223,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount - 1, 
 				    schedulerThreadCount);
 
-        for (ProfileListener listener : listeners)
+        for (ProfileListener listener : listeners.keySet())
             listener.propertyChange(event);
     }
 
@@ -258,7 +235,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount + 1, 
 				    schedulerThreadCount);
 
-        for (ProfileListener listener : listeners)
+        for (ProfileListener listener : listeners.keySet())
             listener.propertyChange(event);
     }
 
@@ -335,7 +312,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
      * @param event the change the listeners will be notified about
      */
     void notifyListeners(PropertyChangeEvent event) {
-        for (ProfileListener listener : listeners) {
+        for (ProfileListener listener : listeners.keySet()) {
             listener.propertyChange(event);
         }
     }
@@ -394,7 +371,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                         Collections.
                         unmodifiableSet(profileReport.participants);
 
-                    for (ProfileListener listener : listeners)
+                    for (ProfileListener listener : listeners.keySet())
                         listener.report(profileReport);
                 }
             } catch (InterruptedException ie) {}

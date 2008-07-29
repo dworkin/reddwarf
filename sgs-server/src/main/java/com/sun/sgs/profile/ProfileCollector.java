@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -43,32 +44,44 @@ public interface ProfileCollector {
      * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.
      */
     public enum ProfileLevel {
-        /** Collect minimal profiling data. */
+        /** 
+         * Collect minimal profiling data, used by the system internally.
+         * This is the default profiling level.  This level of profiling 
+         * is appropriate for monitoring of production systems.
+         */
         MIN,
-        /** Collect a medium amount of profiling data. */
+        /** 
+         * Collect a medium amount of profiling data.  This level of profiling
+         * provides more data than {@code MIN}, but is still appropriate for 
+         * monitoring of production systems.
+         */
         MEDIUM,
-        /** Collect all profiling data available. */
+        /** 
+         * Collect all profiling data available.  Because this could be an
+         * extensive amount of data, this level may only be appropriate for 
+         * debugging systems under development.
+         */
         MAX,
     }
     
     /** 
-     * The current global profiling level, which is the default level
+     * The default system profiling level, which is the default level
      * for any newly created {@code ProfileConsumer} and can be set at
      * startup with the property 
      * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.  
-     * @return the current profiling level
-     */
-    public ProfileLevel getGlobalProfileLevel();
-    
-    /**
-     * Set the current global profiling level.  Setting this level will 
-     * set each of the {@code ProfileConsumer} profile levels, making this
-     * method a convient way to enable or disable all profiling.
      * 
-     * @param level the profiling level
+     * @return the default profiling level
      */
-    public void setGlobalProfileLevel(ProfileLevel level);
+    public ProfileLevel getDefaultProfileLevel();
 
+    /**
+     * Set the default profile level, used as the initial level when creating
+     * new {@code ProfileConsumer}s.
+     * 
+     * @param level the new default profile level
+     */
+    public void setDefaultProfileLevel(ProfileLevel level);
+    
     /** 
      * Shuts down the ProfileCollector, reclaiming resources as necessary.
      */
@@ -79,24 +92,33 @@ public interface ProfileCollector {
      * Adds a <code>ProfileListener</code> as a listener for
      * profiling data reports. The listener is immediately updated on
      * the current set of operations and the number of scheduler
-     * threads.
+     * threads. The listener can be marked as unable to be removed by
+     * {@link #removeListener} or shutdown by {@link #shutdown};  if these
+     * operations are performed on a listener that does not allow them, they
+     * are silently ignored.
      *
      * @param listener the {@code ProfileListener} to add
+     * @param canRemove {@code true} if this listener can be removed or 
+     *                  shut down by the {@code ProfileCollector}.  This 
+     *                  parameter should usually be set to {@code true}.
      */
-    public void addListener(ProfileListener listener);
-    
+    public void addListener(ProfileListener listener, boolean canRemove);
+       
     /**
-     * Instantiates a {@code ProfileListener}.  The listener must
+     * Instantiates and adds a {@code ProfileListener}. The listener must
      * implement a constructor of the form ({@code java.util.Properties},
      * {@code com.sun.sgs.kernel.TaskOwner},
      * {@code com.sun.sgs.kernel.ComponentRegistry}). 
+     * The listener is immediately updated on
+     * the current set of operations and the number of scheduler
+     * threads.
      * 
      * @param listenerClassName the fully qualified class name of the 
-     *                          listener to instantiate.
+     *                          listener to instantiate and add.
      * 
-     * @return the instantiated listener or null if there was an error
+     * @throws any exception generated during instantiation
      */
-    public ProfileListener instantiateListener(String listenerClassName);
+    public void addListener(String listenerClassName) throws Exception;
     
 
     /**
@@ -106,7 +128,7 @@ public interface ProfileCollector {
      * @return the list of listeners
      */
     public List<ProfileListener> getListeners();
-    
+
     /**
      * Removes a {@code ProfileListener} and calls
      * {@link ProfileListener#shutdown} on the listener.  If the
@@ -116,6 +138,15 @@ public interface ProfileCollector {
      * @param listener the listener to remove
      */
     public void removeListener(ProfileListener listener);
+    
+    /**
+     * Returns a read-only map of {@code ProfileConsumer} names to the 
+     * {@code ProfileConsumer}s which have been registered through a call to 
+     * {@link ProfileRegistrar#registerProfileProducer}.
+     * 
+     * @return the map of names to consumers
+     */
+    public Map<String, ProfileConsumer> getConsumers();
     
     /**
      * Notifies the collector that a thread has been added to the scheduler.

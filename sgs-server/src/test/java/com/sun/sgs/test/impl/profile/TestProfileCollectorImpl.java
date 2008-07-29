@@ -27,6 +27,7 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.UtilReflection;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Locale;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -98,9 +99,9 @@ public class TestProfileCollectorImpl extends TestCase {
     }
         ////////     The tests     /////////
     public void testDefaultKernel() {
-        // The profile collector must not be null and the level must be "off"
+        // The profile collector must not be null and the level must be "min"
         assertNotNull(profileCollector);
-        assertSame(ProfileLevel.MIN, profileCollector.getGlobalProfileLevel());
+        assertSame(ProfileLevel.MIN, profileCollector.getDefaultProfileLevel());
     }
 
     public void testKernelNoProfile() throws Exception {
@@ -114,7 +115,7 @@ public class TestProfileCollectorImpl extends TestCase {
 
         ProfileCollector collector = getCollector(additionalNodes[0]);
         assertNotNull(collector);
-        assertSame(ProfileLevel.MIN, collector.getGlobalProfileLevel());
+        assertSame(ProfileLevel.MIN, collector.getDefaultProfileLevel());
 
     }
 
@@ -144,40 +145,22 @@ public class TestProfileCollectorImpl extends TestCase {
         addNodes(serviceProps, 1);
         ProfileCollector collector = getCollector(additionalNodes[0]);
         assertNotNull(collector);
-        assertSame(ProfileLevel.MEDIUM, collector.getGlobalProfileLevel());
+        assertSame(ProfileLevel.MEDIUM, collector.getDefaultProfileLevel());
     }
     
-    // setProfileLevel tests
-    public void testEnableProfile() {
-        profileCollector.setGlobalProfileLevel(ProfileLevel.MAX);
-        assertSame(ProfileLevel.MAX, profileCollector.getGlobalProfileLevel());
-        // Test the listener list has not changed, maybe through reflection?
-        
-        // TBD  How will we instantiate a new listener?  Needs access to
-        //   the kernel component registry.  New method in the kernel?
-        
-        // Need to find a way to ensure profiling is being recorded;  will
-        // also need a test to show that it is (mostly) stopped if we turn
-        // off profiling.
-    }
+    // need tests to check that listeners added with boolean false (addListener)
+    // are not shut down, and tests for consumer profile levels being 
+    // independent and changable.
     
-    public void testSetGlobalLevel() {
-        ProfileRegistrar registrar = 
-            serverNode.getSystemRegistry().getComponent(
-                com.sun.sgs.profile.ProfileRegistrar.class);
-        ProfileConsumer pc = registrar.registerProfileProducer("unique");
-        assertEquals(ProfileLevel.MIN, 
-                     profileCollector.getGlobalProfileLevel());
-        assertEquals(pc.getProfileLevel(), 
-                     profileCollector.getGlobalProfileLevel());
-        
-        pc.setProfileLevel(ProfileLevel.MEDIUM);
-        ProfileLevel level = pc.getProfileLevel();
-        assertEquals(ProfileLevel.MEDIUM, level);
-        assertFalse(level.equals(profileCollector.getGlobalProfileLevel())); 
-        // Setting the global level overrides the local level
-        profileCollector.setGlobalProfileLevel(ProfileLevel.MAX);
-        assertEquals(pc.getProfileLevel(), 
-                     profileCollector.getGlobalProfileLevel());
+    public void testLocale() throws Exception {
+        Locale.setDefault(Locale.JAPANESE);
+        Properties serviceProps = 
+                SgsTestNode.getDefaultProperties(APP_NAME, serverNode, null);
+        serviceProps.setProperty(
+                "com.sun.sgs.impl.kernel.profile.level", "medium");
+        addNodes(serviceProps, 1);
+        ProfileCollector collector = getCollector(additionalNodes[0]);
+        assertNotNull(collector);
+        assertSame(ProfileLevel.MEDIUM, collector.getDefaultProfileLevel());
     }
 }

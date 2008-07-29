@@ -59,8 +59,8 @@ import java.io.IOException;
 
 import java.lang.reflect.Constructor;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -77,7 +77,7 @@ import java.util.logging.Logger;
  * the system is enabled.  To enable more profiling, the kernel property
  * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY} must be set to 
  * a valid level for {@link 
- * com.sun.sgs.profile.ProfileCollector#setGlobalProfileLevel(ProfileLevel)}.
+ * com.sun.sgs.profile.ProfileCollector#setDefaultProfileLevel(ProfileLevel)}.
  * By default, no profile listeners are enabled.  Set the 
  * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
  * a colon-separated list of fully-qualified class names, each of which 
@@ -95,9 +95,6 @@ class Kernel {
     // the property for setting the profile listeners
     public static final String PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.listeners";
-    // the default profile listeners .. currently not used
-    private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -176,7 +173,7 @@ class Kernel {
             ProfileLevel profileLevel;
             try {
                 profileLevel = 
-                        ProfileLevel.valueOf(level.toUpperCase(Locale.ENGLISH));
+                        ProfileLevel.valueOf(level.toUpperCase());
                 if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(Level.CONFIG, "Profiling level is {0}", level);
                 }
@@ -256,15 +253,27 @@ class Kernel {
      * Private helper routine that loads all of the requested listeners
      * for profiling data.
      */
-     private void loadProfileListeners(ProfileCollector profileCollector) {
+    private void loadProfileListeners(ProfileCollector profileCollector) {
         String listenerList = appProperties.getProperty(PROFILE_LISTENERS);
 
         if (listenerList != null) {
             for (String listenerClassName : listenerList.split(":")) {
-                ProfileListener listener = 
-                    profileCollector.instantiateListener(listenerClassName);
-                if (listener != null) {
-                    profileCollector.addListener(listener);
+                try {
+                    profileCollector.addListener(listenerClassName);
+                } catch (InvocationTargetException e) {
+                    // Strip off exceptions found via reflection
+                    if (logger.isLoggable(Level.WARNING))
+                        logger.logThrow(Level.WARNING, e.getCause(), 
+                                "Failed to load ProfileListener {0} ... " +
+                                "it will not be available for profiling",
+                                listenerClassName);
+              
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.WARNING))
+                        logger.logThrow(Level.WARNING, e, 
+                                "Failed to load ProfileListener {0} ... " +
+                                "it will not be available for profiling",
+                                 listenerClassName);
                 }
             }
         }
@@ -273,7 +282,7 @@ class Kernel {
         // NOTE: if we make the schedulers pluggable, or add other components
         // that are listeners, then we should scan through all of the system
         // components and check if they are listeners
-        profileCollector.addListener(transactionScheduler);
+        profileCollector.addListener(transactionScheduler, false);
     }
 
     /**
@@ -586,12 +595,13 @@ class Kernel {
     void shutdown() {
         if (application != null)
             application.shutdownServices();
+        if (profileCollector != null) 
+            profileCollector.shutdown();
+        // The schedulers must be shut down last.
         if (transactionScheduler != null)
             transactionScheduler.shutdown();
         if (taskScheduler != null)
             taskScheduler.shutdown();
-        if (profileCollector != null) 
-            profileCollector.shutdown();
     }
     
     /**

@@ -61,7 +61,7 @@ public class DummyProfileCoordinator {
         OperationLoggingProfileOpListener listener =
             new OperationLoggingProfileOpListener(System.getProperties(),
                                                   owner, null);
-        collector.addListener(listener);
+        collector.addListener(listener, true);
     }
 
     /** Get the singleton registrar, used for creating services. */
@@ -72,14 +72,14 @@ public class DummyProfileCoordinator {
     /** Starts profiling */
     public static void startProfiling() {
         synchronized (lockObject) {
-            instance.collector.setGlobalProfileLevel(ProfileLevel.MAX);
+            instance.collector.setDefaultProfileLevel(ProfileLevel.MAX);
         }
     }
 
     /** Stops all profiling */
     public static void stopProfiling() {
         synchronized (lockObject) {
-            instance.collector.setGlobalProfileLevel(ProfileLevel.MIN);
+            instance.collector.setDefaultProfileLevel(ProfileLevel.MIN);
         }
     }
 
