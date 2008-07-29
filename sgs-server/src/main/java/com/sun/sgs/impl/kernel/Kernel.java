@@ -163,13 +163,9 @@ class Kernel {
         this.appProperties = appProperties;
 
         try {
-            // See if we're doing any profiling. Accept "on" to mean "max",
-            // for backward compatibility.
+            // See if we're doing any profiling.
             String level = appProperties.getProperty(PROFILE_PROPERTY,
                     ProfileLevel.MIN.name());
-            if (level.equals("on")) {
-                level = ProfileLevel.MAX.name();
-            }
             ProfileLevel profileLevel;
             try {
                 profileLevel = 
