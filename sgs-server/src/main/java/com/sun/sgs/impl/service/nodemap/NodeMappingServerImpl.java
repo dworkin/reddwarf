@@ -294,7 +294,9 @@ public final class NodeMappingServerImpl
         exporter.unexport();
         try {
             if (removeThread != null) {
-                removeThread.interrupt();
+		synchronized (removeThread) {
+		    removeThread.notifyAll();
+		}
                 removeThread.join();
             }
         } catch (InterruptedException e) {
@@ -446,7 +448,6 @@ public final class NodeMappingServerImpl
      */
     private class RemoveThread extends Thread {
         private final long expireTime;   // milliseconds
-	private boolean interrupted = false;
         
         RemoveThread(long expireTime) { 
             super(PKG_NAME + "$RemoveThread");
@@ -454,18 +455,22 @@ public final class NodeMappingServerImpl
         }
         
         public void run() {
-            while (!hasBeenInterrupted()) {
-                try {
-                    sleep(expireTime);
-                } catch (InterruptedException ex) {
-                    logger.log(Level.FINE, "Remove thread interrupted");
-                    break;
-                }
-                
+            while (true) {
+		synchronized (this) {
+		    if (shuttingDown()) {
+			break;
+		    }
+		    try {
+			wait(expireTime);
+		    } catch (InterruptedException ex) {
+			logger.log(Level.FINE, "Remove thread interrupted");
+			break;
+		    }
+		}
                 Long time = System.currentTimeMillis() - expireTime;
                 
                 boolean workToDo = true;
-                while (workToDo && !hasBeenInterrupted()) {
+                while (workToDo && !shuttingDown()) {
                     RemoveInfo info = removeQueue.peek();
                     if (info != null && info.getTimeInserted() < time) {
                         // Always remove the item from the list, even if we
@@ -489,23 +494,6 @@ public final class NodeMappingServerImpl
                 }
             }
         }
-
-	/**
-	 * Override this method to set the interrupted flag.  The logging code
-	 * is known to swallow the interrupted exception sometimes.
-	 * InterruptedException clears the interrupt status, so checking
-	 * isInterrupted doesn't tell us if the thread has ever been
-	 * interrupted.
-	 */
-	public synchronized void interrupt() {
-	    interrupted = true;
-	    super.interrupt();
-	}
-
-	/** Checks whether interrupt was ever called. */
-	private synchronized boolean hasBeenInterrupted() {
-	    return interrupted;
-	}
     }
     
     /**

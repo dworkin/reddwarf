@@ -402,7 +402,9 @@ public final class WatchdogServiceImpl
 
     /** {@inheritDoc} */
     protected void doShutdown() {
-	renewThread.interrupt();
+	synchronized (renewThread) {
+	    renewThread.notifyAll();
+	}
 	try {
 	    renewThread.join();
 	} catch (InterruptedException e) {
@@ -511,12 +513,17 @@ public final class WatchdogServiceImpl
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (getIsAlive() == true && ! shuttingDown()) {
+	    while (getIsAlive()) {
 
-		try {
-		    Thread.sleep(nextRenewInterval);
-		} catch (InterruptedException e) {
-		    return;
+		synchronized (this) {
+		    if (shuttingDown()) {
+			return;
+		    }
+		    try {
+			wait(nextRenewInterval);
+		    } catch (InterruptedException e) {
+			return;
+		    }
 		}
 
 		boolean renewed = false;
