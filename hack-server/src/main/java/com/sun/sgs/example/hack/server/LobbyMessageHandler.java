@@ -12,6 +12,9 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.NameNotBoundException;
 
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
+
 import java.io.Serializable;
 
 import java.nio.BufferUnderflowException;
@@ -44,22 +47,18 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
         data.put(message);
         data.rewind();
 
-        //System.out.println("Got move request: " + new String(message));
-
         // the command identifier is always stored in the first byte
-        int command = (int)(data.get());
+        int encodedCommand = data.getInt();
+	Command command = Commands.decode(encodedCommand);
 
         // NOTE: it would be more elegant to use an enum to define the
         //       messages
 	switch (command) {
-            case 1:
+            case MOVE_CLIENT_TO_GAME:
                 moveToGame(player, data);
                 break;
 	    default:
-		// NOTE: in a more robust production system what we
-		//       should to do is either log the error, or send
-		//       back a generic error response
-		System.out.println("unhandled lobby command: " + command);
+		player.notifyUnhandledCommand(Lobby.IDENTIFIER, command);
 	}
     }
 
@@ -79,7 +78,8 @@ public class LobbyMessageHandler implements MessageHandler, Serializable {
             //       to the lobby...so, for now, the idea is just to
             //       drop this message and assume that a valid lobby
             //       message will show up soon
-            return;
+	    
+	    return;
         }
         String gameName = new String(bytes);
 

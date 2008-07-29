@@ -53,6 +53,15 @@ public interface ChatListener
      *
      * @param uidMap a map from user identifier to user name
      */
-    public void addUidMappings(Map<BigInteger,String> uidMap);
+    public void addPlayerIdMappings(Map<BigInteger,String> playerIdsToNames);
+
+    /**
+     * Notifies the listener about a signle mapping from player
+     * identifier to player name.
+     *
+     * @param playerID a player identifier
+     * @param playerName a player name
+     */
+    public void addPlayerIdMapping(BigInteger playerId, String playerName);
 
 }

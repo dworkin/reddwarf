@@ -11,6 +11,8 @@ package com.sun.sgs.example.hack.client;
 import com.sun.sgs.client.simple.SimpleClient;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.nio.ByteBuffer;
 
@@ -63,9 +65,9 @@ public class CreatorManager implements CreatorListener
      * @param charClass the type of character
      */
     public void rollForStats(int charClass) {
-        ByteBuffer bb = ByteBuffer.allocate(5);
+        ByteBuffer bb = ByteBuffer.allocate(8);
 
-        bb.put((byte)1);
+        bb.putInt(Commands.encode(Command.ROLL_FOR_STATS));
         bb.putInt(charClass);
         bb.rewind();
 
@@ -83,9 +85,9 @@ public class CreatorManager implements CreatorListener
      * @param name the character's name
      */
     public void createCurrentCharacter(String name) {
-        ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
+        ByteBuffer bb = ByteBuffer.allocate(4 + name.length());
 
-        bb.put((byte)2);
+        bb.putInt(Commands.encode(Command.CREATE_CURRENT_CLIENT_CHARACTER));
         bb.put(name.getBytes());
         bb.rewind();
 
@@ -100,9 +102,9 @@ public class CreatorManager implements CreatorListener
      * Requests that character creation finish without creating a character.
      */
     public void cancelCreation() {
-        ByteBuffer bb = ByteBuffer.allocate(1);
+        ByteBuffer bb = ByteBuffer.allocate(4);
 
-        bb.put((byte)3);
+        bb.putInt(Commands.encode(Command.CANCEL_CURRENT_CHARACTER_CREATION));
         bb.rewind();
 
         try {

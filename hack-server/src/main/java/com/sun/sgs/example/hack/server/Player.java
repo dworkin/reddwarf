@@ -22,6 +22,7 @@ import com.sun.sgs.example.hack.server.level.Level;
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -297,7 +298,7 @@ public class Player
      * @param board the <code>Board</code> to send
      */
     public void sendBoard(Board board) {
-        Messages.sendBoard(board, channel(), getCurrentSession());
+        Messages.sendBoard(getCurrentSession(), board);
     }
 
     /**
@@ -305,9 +306,22 @@ public class Player
      *
      * @param updates the updates to send
      */
-    public void sendUpdate(Collection<BoardSpace> updates) {
-        Messages.sendUpdate(updates, channel(),
-                            new ClientSession [] {getCurrentSession()});
+    public void broadcastBoardUpdate(Collection<BoardSpace> updates) {
+        Messages.broadcastBoardUpdate(channel(), updates);
+    }
+
+    /**
+     * Notifies the client that they have sent an unhandled command to
+     * the specified channel.
+     *
+     * @param channelName the name of the channel that the unhandled
+     * command was sent on
+     *
+     * @param command the unhandled command
+     */
+    public void notifyUnhandledCommand(String channelName, Command command) {
+	Messages.sendNotificationOfUnhandledCommand(getCurrentSession(),
+						    channelName, command);
     }
 
     /**
@@ -316,8 +330,8 @@ public class Player
      * @param character the character who's statistics will be sent
      */
     public void sendCharacter(PlayerCharacter character) {
-        Messages.sendCharacter(character.getID(), character.getStatistics(),
-                               channel(), getCurrentSession());
+        Messages.sendCharacter(getCurrentSession(), character.getID(), 
+			       character.getStatistics());                               
     }
 
     /**
@@ -327,7 +341,7 @@ public class Player
      * @param stats the character statistics
      */
     public void sendCharacterStats(int id, CharacterStats stats) {
-        Messages.sendCharacter(id, stats, channel(), getCurrentSession());
+        Messages.sendCharacter(getCurrentSession(), id, stats);
     }
 
     /**
@@ -336,8 +350,12 @@ public class Player
      *
      * @param message the message to send
      */
-    public void sendTextMessage(String message) {
-        Messages.sendTextMessage(message, channel(), getCurrentSession());
+    public void sendServerMessage(String message) {
+        Messages.sendServerMessage(getCurrentSession(), message);
+    }
+
+    public String toString() {
+	return name;
     }
 
 }

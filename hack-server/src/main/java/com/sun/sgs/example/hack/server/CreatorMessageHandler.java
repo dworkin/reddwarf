@@ -12,6 +12,8 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.io.Serializable;
 
@@ -49,39 +51,37 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
         data.rewind();
 
         // the command identifier is always stored in the first byte
-        int command = (int)(data.get());
+        int encodedCommand = data.getInt();
+	Command command = Commands.decode(encodedCommand);
 
         // NOTE: it would be more elegant to use an enum to define the
         //       messages
 	switch (command) {
-            case 1:
-                // get the id and create the stats
-                characterId = data.getInt();
-                currentStats = getNewStats(characterId);
-                player.sendCharacterStats(-1, currentStats);
-                break;
-            case 2:
-                // get the name...
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                String characterName = new String(bytes);
-
-                // ...create the character...
-                PlayerCharacter pc = setupCharacter(player, characterName);
-                player.getCharacterManager().addCharacter(pc);
-
-                // ...and go to the lobby
-                moveToLobby(player);
-                break;
-            case 3:
-                // go to the lobby
-                moveToLobby(player);
-                break;
-	    default:
-		System.out.println("unknown command: " + command);
-		// NOTE: in a robust production system, what we should
-		//       do here is either log the error, or send back
-		//       a generic error response
+	case ROLL_FOR_STATS:
+	    // get the id and create the stats
+	    characterId = data.getInt();
+	    currentStats = getNewStats(characterId);
+	    player.sendCharacterStats(-1, currentStats);
+	    break;
+	case CREATE_CURRENT_CLIENT_CHARACTER:
+	    // get the name...
+	    byte [] bytes = new byte[data.remaining()];
+	    data.get(bytes);
+	    String characterName = new String(bytes);
+	    
+	    // ...create the character...
+	    PlayerCharacter pc = setupCharacter(player, characterName);
+	    player.getCharacterManager().addCharacter(pc);
+	    
+	    // ...and go to the lobby
+	    moveToLobby(player);
+	    break;
+	case CANCEL_CURRENT_CHARACTER_CREATION:
+	    // go to the lobby
+	    moveToLobby(player);
+	    break;
+	default:
+	    player.notifyUnhandledCommand(Creator.IDENTIFIER, command);
 	}
     }
 

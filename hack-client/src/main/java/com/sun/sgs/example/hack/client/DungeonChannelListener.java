@@ -13,6 +13,8 @@ import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.Commands;
+import com.sun.sgs.example.hack.share.Commands.Command;
 
 import java.awt.Image;
 
@@ -67,45 +69,33 @@ public class DungeonChannelListener extends GameChannelListener
     public void receivedMessage(ClientChannel channel, 
                                 ByteBuffer data) {
 
-	// if this is a message from the server, then it's some
-	// command that we need to process, so get the command code
-	int command = (int)(data.get());
+	int encodedCmd = (int)(data.getInt());
+	Command cmd = Commands.decode(encodedCmd);
 
-	// NOTE: in a more robust implementation, the commands used
-	//       should really be an enumeration
 	try {
-	    switch (command) {
-	    case 0:
-		// we got some uid to player name mapping
-		addUidMappings(data);
-		break;
-	    case 1:
-		// we were sent updated character statistics
-		int id = data.getInt();
-		CharacterStats stats = (CharacterStats)(getObject(data));
-		plistener.setCharacter(id, stats);
-		break;
-	    case 8:
-		notifyJoinOrLeave(data, true);
-		break;
-	    case 9:
-		notifyJoinOrLeave(data, true);
+	    switch (cmd) {
+	    case ADD_PLAYER_ID:
+		@SuppressWarnings("unchecked")
+		BigInteger playerID = (BigInteger)(getObject(data));
+		@SuppressWarnings("unchecked")
+		String playerName = (String)(getObject(data));
+		addPlayerIdMapping(playerID, playerName);
 		break;
 
-	    case 21:
-		// we were sent game membership updates
-		int spriteSize = data.getInt();
-		@SuppressWarnings("unchecked")
-                    Map<Integer,byte[]> spriteMap =
-		    (Map<Integer,byte[]>)(getObject(data));
-		blistener.setSpriteMap(spriteSize, convertMap(spriteMap));
-                break;
-	    case 22:
-		// we got a complete board update
-		Board board = (Board)(getObject(data));
-		blistener.changeBoard(board);
-                break;
-	    case 23:
+	    case PLAYER_JOINED:
+		notifyJoin(data);
+		break;
+		
+	    case PLAYER_LEFT:
+		notifyLeave(data);
+		break;
+
+	    /*
+	     * When a board space on the player's current level is
+	     * changed, the server broadcasts the space's new contents
+	     * to all the players in the dungeon.
+	     */
+	    case UPDATE_BOARD_SPACES:
 		// we got some selective space updates
 		@SuppressWarnings("unchecked")
                     Collection<BoardSpace> spaces =
@@ -113,50 +103,17 @@ public class DungeonChannelListener extends GameChannelListener
 		BoardSpace [] s = new BoardSpace[spaces.size()];
 		blistener.updateSpaces(spaces.toArray(s));
                 break;
-	    case 24:
-		// we heard some message from the server
-		byte [] bytes = new byte[data.remaining()];
-		data.get(bytes);
-		String msg = new String(bytes);
-		blistener.hearMessage(msg);
-		break;
+
 	    default:
-		// someone must have sent us a chat message since
-		// the first byte didn't start with a known
-		// command
-		notifyChatMessage(data);
+		System.out.printf("Received unknown command %s (%d) on the " +
+				  "Creator channel%n", cmd, encodedCmd);	
 	    }
 	} catch (IOException ioe) {
 	    // NOTE: this should probably handle the error a little more
 	    // gracefully, but it's unclear what the right approach is
-	    System.out.println("Failed to handle incoming Dungeon object");
+	    System.out.println("Failed to handle incoming Dungeon object "
+			       + "for command " + cmd);
 	    ioe.printStackTrace();
 	}
     }
-
-    /**
-     * A private helper that converts the map from the server (that
-     * maps integers to byte arrays) into the form needed on the
-     * client (that maps integers to images). The server sends the
-     * byte array form because images aren't serializable.
-     */
-    private Map<Integer,Image> convertMap(Map<Integer,byte[]> map) {
-        Map<Integer,Image> newMap = new HashMap<Integer,Image>();
-
-        // for each of the identified sprites, try to load the bytes
-        // as a recognizable image format and store in the new map
-        for (int identifier : map.keySet()) {
-            try {
-                ByteArrayInputStream in =
-                    new ByteArrayInputStream(map.get(identifier));
-                newMap.put(identifier, ImageIO.read(in));
-            } catch (IOException ioe) {
-                System.out.println("Failed to convert image: " + identifier);
-                ioe.printStackTrace();
-            }
-        }
-
-        return newMap;
-    }
-
 }

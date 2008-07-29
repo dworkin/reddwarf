@@ -153,7 +153,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @param updates the updates to send
      */
     public void sendUpdate(Collection<BoardSpace> updates) {
-        playerRef.get().sendUpdate(updates);
+        playerRef.get().broadcastBoardUpdate(updates);
     }
 
     /**
