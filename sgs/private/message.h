@@ -191,7 +191,7 @@ int sgs_msg_add_uint16(sgs_message *msg, uint16_t val);
 int sgs_msg_add_uint32(sgs_message* pmsg, uint32_t val);
 
 /*
- * function: sgss_msg_add_string()
+ * function: sgs_msg_add_string()
  *
  * Writes a string to an existing message. It will first write the length of 
  * the string, then the contents of the character array, stripping off the
@@ -301,6 +301,10 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
  * will be allocated by this call, but freeing this memory will be the 
  * responsibility of the caller (or subsequent code).
  *
+ * Note that if *result points to allocated memory, that memory will be lost. 
+ * This function cannot tell if a non-null value of *result is a pointer to 
+ * allocated memory or an uninitialized value pointing to nothing.
+ *
  * Returns the total number of bytes read from the starting point on success,
  * or -1 on failure.
  */
@@ -319,6 +323,10 @@ int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **resu
  * allocated by this function; it is the responsibility of the caller to 
  * free this memory. 
  *
+ * Note that if *result points to allocated memory, that memory will be lost. 
+ * This function cannot tell if a non-null value of *result is a pointer to 
+ * allocated memory or an uninitialized value pointing to nothing.
+ *
  * Returns the total number of bytes in the buffer that contained the combination
  * of the string and the length if successful. On failure, returns -1.
  */
@@ -330,7 +338,13 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **re
  * Reads the indicated set of bytes from the message, starting with the position 
  * start, and copies them into the buffer pointed to by result. The space for
  * the buffer will be allocated by this function, but will need to be freed by the
- * calling function. Returns the number of bytes transferred, or -1 on failure
+ * calling function. 
+ * 
+ * Note that if *result points to allocated memory, that memory will be lost. 
+ * This function cannot tell if a non-null value of *result is a pointer to 
+ * allocated memory or an uninitialized value pointing to nothing.
+ *
+ * Returns the number of bytes transferred, or -1 on failure
  */
 int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **result, uint16_t count);
 

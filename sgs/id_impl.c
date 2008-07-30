@@ -43,12 +43,6 @@
 #include "sgs/config.h"
 #include "sgs/id.h"
 
-//typedef struct sgs_id_impl {
-    /** buf form */
-  //  uint8_t *buf;
-   // uint8_t buf_len;
-// sgs_id_impl;*/
-
 
 /*
  * sgs_id_compare()

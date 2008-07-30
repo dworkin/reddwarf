@@ -179,7 +179,6 @@ int sgs_msg_add_string(sgs_message *pmsg, const char *content){
     int16_t stringlen;
     
     stringlen = strlen(content);
-    //stringlen -= 1; //account for the null-terminator
     return(sgs_msg_add_fixed_content(pmsg, (uint8_t *)content, stringlen));
 }
 
@@ -284,7 +283,7 @@ int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **resu
     if (incr1 != length){
         return -1;
     }
-    
+
     *result = sgs_id_create(buffer, length);
     return (incr + incr1);
 }
@@ -298,8 +297,8 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **re
     incr = sgs_msg_read_uint16(pmsg, start, &strsize);
     if (incr < 0)
         return incr;
-    *result = malloc(sizeof (char) * (strsize + 1));
 
+    *result = malloc(sizeof (char) * (strsize + 1));
     if (*result == NULL)
         return -1;
     memcpy(*result, pmsg->buf + start + incr, strsize);
@@ -314,6 +313,7 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **re
 int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **result, uint16_t count){
     int retcount;
     
+
     *result = malloc(count);
     if (*result == NULL){
         return -1;
