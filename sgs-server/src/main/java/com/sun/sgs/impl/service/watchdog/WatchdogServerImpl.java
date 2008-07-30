@@ -321,8 +321,12 @@ public final class WatchdogServerImpl
     protected void doShutdown() {
 	// Unexport server and stop threads.
 	exporter.unexport();
-	checkExpirationThread.interrupt();
-	notifyClientsThread.interrupt();
+	synchronized (checkExpirationThread) {
+	    checkExpirationThread.notifyAll();
+	}
+	synchronized (notifyClientsLock) {
+	    notifyClientsLock.notifyAll();
+	}
 	try {
 	    checkExpirationThread.join();
 	    notifyClientsThread.join();
@@ -641,10 +645,15 @@ public final class WatchdogServerImpl
 			renewInterval :
 			expirationSet.first().getExpiration() - now;
 		}
-		try {
-		    Thread.sleep(sleepTime);
-		} catch (InterruptedException e) {
-		    return;
+		synchronized (this) {
+		    if (shuttingDown()) {
+			return;
+		    }
+		    try {
+			wait(sleepTime);
+		    } catch (InterruptedException e) {
+			return;
+		    }
 		}
 	    }
 	}
@@ -772,15 +781,22 @@ public final class WatchdogServerImpl
 	/** {@inheritDoc} */
 	public void run() {
 
-	    while (! shuttingDown()) {
+	    while (true) {
 		synchronized (notifyClientsLock) {
 		    while (statusChangedNodes.isEmpty()) {
+			if (shuttingDown()) {
+			    return;
+			}
 			try {
 			    notifyClientsLock.wait();
 			} catch (InterruptedException e) {
 			    return;
 			}
 		    }
+		}
+
+		if (shuttingDown()) {
+		    break;
 		}
 
 		// TBD: possibly wait for more updates to batch?
