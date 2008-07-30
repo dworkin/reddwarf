@@ -1020,7 +1020,7 @@ public final class ClientSessionServiceImpl
 		if (! contextQueue.isEmpty()) {
 		    Iterator<Context> iter = contextQueue.iterator();
 		    while (iter.hasNext()) {
-			if (Thread.currentThread().isInterrupted()) {
+			if (shuttingDown()) {
 			    return;
 			}
 			Context context = iter.next();

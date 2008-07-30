@@ -526,6 +526,10 @@ public final class WatchdogServiceImpl
 		    }
 		}
 
+		if (shuttingDown()) {
+		    return;
+		}
+
 		boolean renewed = false;
 		try {
 		    if (! serverProxy.renewNode(localNodeId)) {
