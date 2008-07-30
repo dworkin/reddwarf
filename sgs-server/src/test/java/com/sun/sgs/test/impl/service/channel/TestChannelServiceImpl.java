@@ -237,6 +237,117 @@ public class TestChannelServiceImpl extends TestCase {
         }
     }
 
+    // -- Test constructor -- 
+
+    public void testConstructorNullProperties() throws Exception {
+	try {
+	    new ChannelServiceImpl(null, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNullComponentRegistry() throws Exception {
+	try {
+	    new ChannelServiceImpl(serviceProps, null, serverNode.getProxy());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNullTransactionProxy() throws Exception {
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNoAppName() throws Exception {
+	try {
+	    new ChannelServiceImpl(
+		new Properties(), serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructedVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = (Version)
+			dataService.getServiceBinding(VERSION_KEY);
+		    if (version.getMajorVersion() != MAJOR_VERSION ||
+			version.getMinorVersion() != MINOR_VERSION)
+		    {
+			fail("Expected service version (major=" +
+			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
+			     "), got:" + version);
+		    }
+		}}, taskOwner);
+    }
+
+    public void testConstructorWithCurrentVersion() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	ChannelServiceImpl newChannelService = null;
+	try {
+	    newChannelService =
+		new ChannelServiceImpl(serviceProps,
+				       serverNode.getSystemRegistry(),
+				       serverNode.getProxy());
+	} finally {
+	    if (newChannelService != null) {
+		newChannelService.shutdown();
+	    }
+	}
+    }
+
+    public void testConstructorWithMajorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorWithMinorVersionMismatch() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    Version version =
+			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
+		    dataService.setServiceBinding(VERSION_KEY, version);
+		}}, taskOwner);
+
+	try {
+	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
+				   serverNode.getProxy());
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
     // -- Test createChannel --
 
     public void testCreateChannelNullName() throws Exception {
@@ -1447,118 +1558,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
     }
-
-    // -- Test constructor -- 
-
-    public void testConstructorNullProperties() throws Exception {
-	try {
-	    new ChannelServiceImpl(null, serverNode.getSystemRegistry(),
-				   serverNode.getProxy());
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConstructorNullComponentRegistry() throws Exception {
-	try {
-	    new ChannelServiceImpl(serviceProps, null, serverNode.getProxy());
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConstructorNullTransactionProxy() throws Exception {
-	try {
-	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
-				   null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConstructorNoAppName() throws Exception {
-	try {
-	    new ChannelServiceImpl(
-		new Properties(), serverNode.getSystemRegistry(),
-		serverNode.getProxy());
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Version version = (Version)
-			dataService.getServiceBinding(VERSION_KEY);
-		    if (version.getMajorVersion() != MAJOR_VERSION ||
-			version.getMinorVersion() != MINOR_VERSION)
-		    {
-			fail("Expected service version (major=" +
-			     MAJOR_VERSION + ", minor=" + MINOR_VERSION +
-			     "), got:" + version);
-		    }
-		}}, taskOwner);
-    }
-
-    public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
-		    dataService.setServiceBinding(VERSION_KEY, version);
-		}}, taskOwner);
-
-	ChannelServiceImpl newChannelService = null;
-	try {
-	    newChannelService =
-		new ChannelServiceImpl(serviceProps,
-				       serverNode.getSystemRegistry(),
-				       serverNode.getProxy());
-	} finally {
-	    if (newChannelService != null) {
-		newChannelService.shutdown();
-	    }
-	}
-    }
-
-    public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Version version =
-			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
-		    dataService.setServiceBinding(VERSION_KEY, version);
-		}}, taskOwner);
-
-	try {
-	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
-				   serverNode.getProxy());
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-		public void run() {
-		    Version version =
-			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
-		    dataService.setServiceBinding(VERSION_KEY, version);
-		}}, taskOwner);
-
-	try {
-	    new ChannelServiceImpl(serviceProps, serverNode.getSystemRegistry(),
-				   serverNode.getProxy());
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
-    }
-
+    
     // -- END TEST CASES --
 
     private class ClientGroup {
@@ -2686,12 +2686,9 @@ public class TestChannelServiceImpl extends TestCase {
 		if (next == null) {
 		    break;
 		}
-		ManagedReference ref = dataService.createReferenceForId(next);
-		String stringRep = ref.get().toString();
-		System.err.println(next + ": " + stringRep);
-		if (!stringRep.startsWith("IdentityMO")) {
-		    count++;
-		}
+		//ManagedReference ref = dataService.createReferenceForId(next);
+		//System.err.println(next + ": " + ref.get());
+		count++;
 		last = next;
 	    }
 	}
