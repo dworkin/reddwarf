@@ -327,7 +327,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
     private Properties createProps(boolean server, String appName,
                                    String dbDirectory) throws Exception {
         String isServer = String.valueOf(server);
-        int port = server ? 0 :
+        int port = server ? SgsTestNode.getNextUniquePort() :
             SgsTestNode.getDataServerPort((DataServiceImpl)
 					  (serverNode.getDataService()));
         String portStr = String.valueOf(port);
