@@ -302,6 +302,7 @@ public final class ChannelServiceImpl
 		logger.logThrow(
 		    Level.CONFIG, e, "Failed to create ChannelServiceImpl");
 	    }
+	    doShutdown();
 	    throw e;
 	}
     }
@@ -326,7 +327,9 @@ public final class ChannelServiceImpl
 	logger.log(Level.FINEST, "shutdown");
 	
 	try {
-	    exporter.unexport();
+	    if (exporter != null) {
+		exporter.unexport();
+	    }
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "unexport server throws");
 	    // swallow exception
