@@ -39,12 +39,12 @@
  *  success and -1 upon failure, while also setting errno to the specific error
  *  code.
  */
-
 #include "sgs/config.h"
 #include "sgs/id.h"
 #include "sgs/error_codes.h"
 #include "sgs/private/message.h"
 #include "sgs/protocol.h"
+#include "sgs/buffer.h"
 
 
 static void update_msg_len(sgs_message *pmsg);
@@ -136,7 +136,6 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
     _uint16_tmp = htons(clen);
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, &_uint16_tmp, 2);
     pmsg->len += 2;
-    
     /** copy the content over, and update the length */
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, content, clen);
     pmsg->len += clen;
@@ -171,6 +170,16 @@ int sgs_msg_add_uint16(sgs_message *pmsg, uint16_t val){
 int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
     uint32_t converted = htonl(val);
     return sgs_msg_add_arb_content(pmsg, (uint8_t*)&converted, 4);
+}
+
+/*
+ * sgs_msg_add_string()
+ */
+int sgs_msg_add_string(sgs_message *pmsg, const char *content){
+    int16_t stringlen;
+    
+    stringlen = strlen(content);
+    return(sgs_msg_add_fixed_content(pmsg, (uint8_t *)content, stringlen));
 }
 
 /*
@@ -234,6 +243,85 @@ uint16_t sgs_msg_get_size(const sgs_message *pmsg) {
     return pmsg->len + SGS_MSG_INIT_LEN;
 }
 
+/*
+ * sgs_msg_read_uint16()
+ */
+int sgs_msg_read_uint16(const sgs_message *pmsg, const uint16_t start, uint16_t *result){
+    if (start > pmsg->len){
+        return -1;
+    }
+    memcpy(result, pmsg->buf + start, 2);
+    *result = ntohs(*result);
+    return 2;
+}
+
+/*
+ * sgs_msg_read_uint32()
+ */
+int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t *result){
+    if (start + 2 > pmsg->len){
+        return -1;
+    }
+    memcpy(result, pmsg->buf + start, 4);    
+    *result = ntohl(*result);
+    return 4;
+}
+
+/*
+ * sgs_msg_read_id()
+ */
+int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **result){
+    uint16_t length;
+    uint8_t *buffer;
+    int incr, incr1;
+    
+    incr = sgs_msg_read_uint16(pmsg, start, &length);
+    if (incr < 1)
+        return -1;
+
+    incr1 = sgs_msg_read_bytes(pmsg, start+ incr, &buffer, length);
+    if (incr1 != length){
+        return -1;
+    }
+
+    *result = sgs_id_create(buffer, length);
+    return (incr + incr1);
+}
+/*
+ * sgs_msg_read_string
+ */
+int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **result) {
+    uint16_t strsize;
+    int incr;
+
+    incr = sgs_msg_read_uint16(pmsg, start, &strsize);
+    if (incr < 0)
+        return incr;
+
+    *result = malloc(sizeof (char) * (strsize + 1));
+    if (*result == NULL)
+        return -1;
+    memcpy(*result, pmsg->buf + start + incr, strsize);
+    *((*result) + strsize) = '\0';
+
+    return (strsize + incr);
+}
+
+/*
+ * sgs_msg_read_bytes
+ */
+int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **result, uint16_t count){
+    int retcount;
+    
+
+    *result = malloc(count);
+    if (*result == NULL){
+        return -1;
+    }
+    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? pmsg->len - start : count;
+    memcpy(*result, pmsg->buf + start, retcount);
+    return retcount;
+}
 
 #ifndef NDEBUG
 void sgs_msg_dump(const sgs_message* msg) {

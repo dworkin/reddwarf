@@ -43,17 +43,11 @@
 #include "sgs/config.h"
 #include "sgs/id.h"
 
-typedef struct sgs_id_impl {
-    /** buf form */
-    uint8_t *buf;
-    uint8_t buf_len;
-} sgs_id_impl;
-
 
 /*
  * sgs_id_compare()
  */
-int sgs_id_compare(const sgs_id_impl* a, const sgs_id_impl* b) {
+int sgs_id_compare(const sgs_id* a, const sgs_id* b) {
     if (a->buf_len < b->buf_len)
         return -1;
   
@@ -67,28 +61,28 @@ int sgs_id_compare(const sgs_id_impl* a, const sgs_id_impl* b) {
 /*
  * sgs_id_get_bytes()
  */
-const uint8_t *sgs_id_get_bytes(const sgs_id_impl *id) {
+const uint8_t *sgs_id_get_bytes(const sgs_id *id) {
     return id->buf;
 }
 
 /*
  * sgs_id_get_byte_len()
  */
-size_t sgs_id_get_byte_len(const sgs_id_impl *id) {
+size_t sgs_id_get_byte_len(const sgs_id *id) {
     return id->buf_len;
 }
 
 /*
  * sgs_id_create()
- * creates a sgs_id_impl from the data stream. The argument data points
+ * creates a sgs_id from the data stream. The argument data points
  * to the data stream that begins with the information that is needed to
  * create the id; the len parameter is the total length of the buffer pointed
  * to by data
  */
-sgs_id_impl* sgs_id_create(const uint8_t* data, size_t len) {
-    sgs_id_impl* id;
+sgs_id* sgs_id_create(const uint8_t* data, size_t len) {
+    sgs_id* id;
 
-    id = malloc(sizeof (sgs_id_impl));
+    id = malloc(sizeof (sgs_id));
     if (id == NULL) return NULL;
 
     id->buf_len = len;
@@ -107,7 +101,7 @@ sgs_id_impl* sgs_id_create(const uint8_t* data, size_t len) {
 #ifndef NDEBUG
 #include <stdio.h>
 
-void sgs_id_dump(const sgs_id_impl* id) {
+void sgs_id_dump(const sgs_id* id) {
     size_t i;
     for (i = 0; i < id->buf_len; ++i) {
         printf("%2.2x", id->buf[i]);
@@ -116,14 +110,14 @@ void sgs_id_dump(const sgs_id_impl* id) {
 }
 #else /* NDEBUG */
 
-void sgs_id_dump(const sgs_id_impl* id) {
+void sgs_id_dump(const sgs_id* id) {
 }
 #endif /* NDEBUG */
 
-sgs_id_impl* sgs_id_duplicate(const sgs_id_impl* id) {
-    sgs_id_impl* result;
+sgs_id* sgs_id_duplicate(const sgs_id* id) {
+    sgs_id* result;
 
-    result = malloc(sizeof (sgs_id_impl));
+    result = malloc(sizeof (sgs_id));
     if (result == NULL) return NULL;
 
     result->buf_len = id->buf_len;
@@ -132,7 +126,7 @@ sgs_id_impl* sgs_id_duplicate(const sgs_id_impl* id) {
     return result;
 }
 
-void sgs_id_destroy(sgs_id_impl* id) {
+void sgs_id_destroy(sgs_id* id) {
     if (id != NULL){
         free(id->buf);
         free(id);

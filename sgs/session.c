@@ -50,13 +50,9 @@
 #include "sgs/private/message.h"
 #include "sgs/private/session_impl.h"
 #include "sgs/protocol.h"
-
-/*
- * STATIC FUNCTION DECLARATIONS
- * (can only be called by functions in this file)
- */
-static uint16_t read_len_header(const uint8_t *data);
-static uint32_t read_uint32(const uint8_t *data);
+#include "private/session_impl.h"
+#include "private/connection_impl.h"
+#include "private/context_impl.h"
 
 
 /*
@@ -123,13 +119,12 @@ int sgs_session_impl_login(sgs_session_impl *session, const char *login,
     if (sgs_msg_add_arb_content(&msg, &protocolVersion, 1) == -1)
         return -1;
 
-    /** Add "login" data field to message. */
-    if (sgs_msg_add_fixed_content(&msg, (uint8_t*) login, strlen(login)) == -1)
+    /** Add "login" string field to message. */
+    if (sgs_msg_add_string(&msg, login) == -1)
         return -1;
 
-    /** Add "password" data field to message. */
-    if (sgs_msg_add_fixed_content(&msg, (uint8_t*) password,
-            strlen(password)) == -1)
+    /** Add "password" string to message. */
+    if (sgs_msg_add_string(&msg, password) == -1)
         return -1;
 
     /**store the "login" and "password" fields in case there is a reconnect*/
@@ -205,13 +200,14 @@ sgs_session_impl *sgs_session_impl_create(sgs_connection_impl *connection) {
  */
 int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     int8_t result;
-    ssize_t namelen, offset, null_offset;
+    ssize_t readlen, offset;
     sgs_id* channel_id;
     sgs_message msg;
     const uint8_t* msg_data;
     sgs_channel* channel;
     size_t msg_datalen;
     sgs_connection_impl *old_connection;
+    char *namebuffer;
 
     if (sgs_msg_deserialize(&msg, session->msg_buf,
             sizeof (session->msg_buf)) == -1)
@@ -220,7 +216,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
     //sgs_msg_dump(&msg);
 
     /** Get the length of the payload, and a pointer to the beginning of the 
-     *  payload
+     *  payload. The payload includes the opcode, so we will have to set an
+     *  offset to insure that we pass in the beginning of the part of the 
+     *  buffer that we need read to the appropriate functions
      */
     msg_datalen = sgs_msg_get_datalen(&msg);
     msg_data = sgs_msg_get_data(&msg);
@@ -235,9 +233,9 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             /** reconnection-key; the key is a byte[] and, since it is the only 
              *  payload, the length of the array is the same as the payload length
              */
-            session->reconnect_key = sgs_id_create(msg_data+offset, 
-                    msg_datalen - offset);
-            if (session->reconnect_key == NULL) return -1;
+            readlen = sgs_msg_read_id(&msg,offset + 2,
+                    &session->reconnect_key);
+            if (readlen < 0) return -1;
 
             if (session->connection->ctx->logged_in_cb != NULL)
                 session->connection->ctx->logged_in_cb(session->connection,
@@ -254,25 +252,19 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 
         case SGS_OPCODE_LOGIN_REDIRECT:
             /** start by getting the redirect host and port*/
-            namelen = read_len_header(msg_data + offset);
+            /** adjust the offset, since we will be using the message
+             *  buffer rather than the msg_data */
             offset += 2;
-            /** see if the string is already null terminated*/
-            if (*(msg_data+offset+namelen) == '\0')
-                    null_offset = 0;
-            else
-                null_offset = 1;
-            if (session->connection->ctx->hostname != NULL) {
-                free(session->connection->ctx->hostname);
-            }
-            session->connection->ctx->hostname = malloc(namelen + null_offset);
-            if (session->connection->ctx->hostname == NULL)
+            readlen = sgs_msg_read_string(&msg, offset,
+                    &(session->connection->ctx->hostname));
+            if (readlen < 0)
                 return -1;
-            memcpy(session->connection->ctx->hostname, msg_data + offset, namelen);
-            if (null_offset == 1)
-                session->connection->ctx->hostname[namelen + 1] = '\0';
-            offset += namelen;
+            else offset += readlen;
 
-            session->connection->ctx->port = read_uint32(msg_data + offset);
+            readlen = sgs_msg_read_uint32(&msg, offset, 
+                    &(session->connection->ctx->port));
+            if (readlen < 0)
+                return -1;
 
             old_connection = session->connection;
             old_connection->in_redirect = 1;
@@ -309,20 +301,19 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             return 0;
 
         case SGS_OPCODE_CHANNEL_JOIN:
-            /** field 1: channel name (first 2 bytes = length of string) 
-             *  We get this so we can skip over the channel name and get the channel id,
-             *  which is the rest of the payload; we use the channel name once we have
-             *  obtained the id
+            /*first, get the channel name; bump the offset since we
+             * are using the msg buffer rather than the data_buf
              */
-
-            namelen = read_len_header(msg_data + offset);
-            offset += 2;
-
-            /** field 2: channel-id  */
-            channel_id =
-                    sgs_id_create(msg_data + offset + namelen,
-                    msg_datalen - namelen - offset);
-            if (channel_id == NULL) return -1;
+            offset += 2; 
+            readlen = sgs_msg_read_string(&msg, offset, &namebuffer);
+            if (readlen < 0)
+                return -1;
+            else offset += readlen;
+            
+            /* Now, get the channel id*/
+            readlen = sgs_msg_read_id(&msg, offset, &channel_id);
+            if (readlen < 0)
+                return -1;
 
             if (sgs_map_contains(session->channels, channel_id)) {
                 errno = SGS_ERR_ILLEGAL_STATE;
@@ -331,7 +322,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             }
 
             channel = sgs_channel_impl_create(session, channel_id,
-                    (const char*) (msg_data + offset), namelen);
+                    namebuffer, strlen(namebuffer));
 
             if (channel == NULL) {
                 sgs_id_destroy(channel_id);
@@ -380,12 +371,11 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              *  The first two bytes are the length of the byte array containing
              *  the ID, and the remainder is the id itself
              */
-            namelen = read_len_header(msg_data + offset);
-            offset += 2;
-            channel_id = sgs_id_create(msg_data + offset, namelen);
-            if (channel_id == NULL) return -1;
-            offset += namelen;
-
+            readlen = sgs_msg_read_id(&msg, offset + 2, &channel_id);
+            if (readlen < 0)
+                return -1;
+            else offset += readlen;
+            
             channel = sgs_map_get(session->channels, channel_id);
             sgs_id_destroy(channel_id);
 
@@ -427,24 +417,3 @@ int sgs_session_impl_send_msg(sgs_session_impl *session) {
 
     return 0;
 }
-
-/*
- * function: read_len_header()
- *
- * Reads two bytes from data argument and interprets them as a 2-byte integer
- * field, returning the result.
- */
-static uint16_t read_len_header(const uint8_t *data) {
-    uint16_t tmp;
-    tmp = *((uint16_t*)data);
-    return ntohs(tmp);
-    //return tmp;
-}
-
-static uint32_t read_uint32(const uint8_t *data) {
-    uint32_t value;
-    value = *(uint8_t *) data;
-    return (ntohl(value));
-}
-
-
