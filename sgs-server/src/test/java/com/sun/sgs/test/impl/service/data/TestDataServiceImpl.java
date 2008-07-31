@@ -35,6 +35,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -3505,6 +3506,7 @@ public class TestDataServiceImpl extends TestCase {
 	    return null;
 	}
 	public long nextObjectId(Transaction txn, long oid) { return -1; }
+        public void createProfilingInfo(ProfileRegistrar registrar) { }
     }
 
     /**

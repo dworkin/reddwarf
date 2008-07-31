@@ -19,6 +19,7 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 
 /**
  * This interface should be implemented by components that accept
@@ -35,6 +36,24 @@ package com.sun.sgs.profile;
 public interface ProfileConsumer {
 
     /**
+     * Set the local profiling level for this consumer.  Setting the global
+     * profiling level via 
+     * {@link ProfileCollector#setDefaultProfileLevel(ProfileLevel)} will
+     * override this value.
+     * 
+     * @param level the profiling level
+     */
+    public void setProfileLevel(ProfileLevel level);
+    
+    /**
+     * Get the local profiling level for this consumer. Defaults to the
+     * value of {@link ProfileCollector#getDefaultProfileLevel()}.
+     * 
+     * @return the profiling level
+     */
+    public ProfileLevel getProfileLevel();
+    
+    /**
      * Registers the named operation with this consumer, such that the
      * operation can be reported as part of a task's profile. Note
      * that registering the same name multiple times on the same
@@ -42,10 +61,13 @@ public interface ProfileConsumer {
      * <code>ProfileOperation</code>.  
      *
      * @param name the name of the operation
+     * @param minLevel the minimum level of profiling that must be set to report
+     *              this operation
      *
      * @return an instance of <code>ProfileOperation</code>
      */
-    public ProfileOperation registerOperation(String name);
+    public ProfileOperation registerOperation(String name, 
+                                              ProfileLevel minLevel);
 
     /**
      * Registers the named counter with this consumer, such that the
@@ -59,10 +81,13 @@ public interface ProfileConsumer {
      * @param name the name of the counter
      * @param taskLocal <code>true</code> if this counter is local to
      *        tasks, <code>false</code> otherwise
+     * @param minLevel the minimum level of profiling that must be set to update
+     *              this counter
      *
      * @return an instance of <code>ProfileCounter</code>
      */
-    public ProfileCounter registerCounter(String name, boolean taskLocal);
+    public ProfileCounter registerCounter(String name, boolean taskLocal,
+                                          ProfileLevel minLevel);
 
     /**
      * Registers the named source of data samples, and returns a
@@ -83,11 +108,20 @@ public interface ProfileConsumer {
      * @param name a name or description of the sample type
      * @param taskLocal <code>true</code> if this counter is local to
      *        tasks, <code>false</code> otherwise
-     * @param maxSamples the maximum number of samples to keep.  
+     * @param maxSamples the maximum number of samples to keep.
+     * @param minLevel the minimum level of profiling that must be set to record
+     *              this sample  
      *
      * @return a {@code ProfileSample} that collects the data
      */
     public ProfileSample registerSampleSource(String name, boolean taskLocal,
-					       long maxSamples);
+					       long maxSamples, 
+                                               ProfileLevel minLevel);
 
+    /**
+     * Each profile consumer has a unique name.
+     *
+     * @return the name of this consumer
+     */
+    public String getName();
 }

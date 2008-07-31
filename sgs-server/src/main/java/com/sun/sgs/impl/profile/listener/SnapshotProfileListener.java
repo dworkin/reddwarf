@@ -159,6 +159,7 @@ public class SnapshotProfileListener implements ProfileListener {
      */
     public void shutdown() {
         handle.cancel();
+        networkReporter.shutdown();
     }
 
     /**

@@ -176,7 +176,8 @@ public class SnapshotParticipantListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-        
+        handle.cancel();
+        networkReporter.shutdown();
     }
 
     /**

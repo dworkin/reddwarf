@@ -110,8 +110,7 @@ public final class TransactionCoordinatorImpl
      *
      * @param	properties the properties for configuring this service
      * @param	collector the <code>ProfileCollector</code> used to report
-     *       	participant detail or <code>null</code> if profiling is
-     *       	disabled
+     *       	participant detail
      * @throws	IllegalArgumentException if the bounded or
      *		unbounded timeout properties are less than {@code 1}
      */
@@ -119,6 +118,9 @@ public final class TransactionCoordinatorImpl
 				      ProfileCollector collector) {
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
+	}
+        if (collector == null) {
+	    throw new NullPointerException("Collector must not be null");
 	}
 	this.collector = collector;
 

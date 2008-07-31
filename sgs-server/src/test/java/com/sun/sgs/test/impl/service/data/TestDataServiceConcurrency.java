@@ -218,7 +218,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    SgsTestNode.getDefaultProperties("TestDataServicePerformance",
 					     null, null);
 	props.setProperty("com.sun.sgs.finalService", "DataService");
-	props.setProperty("com.sun.sgs.impl.kernel.profile.level", "on");
+	props.setProperty("com.sun.sgs.impl.kernel.profile.level", "max");
 	props.setProperty("com.sun.sgs.impl.kernel.profile.listeners",
 			  "com.sun.sgs.impl.profile.listener." +
 			  "OperationLoggingProfileOpListener");

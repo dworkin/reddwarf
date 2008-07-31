@@ -43,11 +43,11 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 
+import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
@@ -117,8 +117,7 @@ import java.util.logging.Logger;
  */
 public class TaskServiceImpl 
         extends AbstractService
-        implements ProfileProducer, TaskService, 
-                   NodeMappingListener, RecoveryListener 
+        implements TaskService, NodeMappingListener, RecoveryListener 
 {
 
     /**
@@ -225,9 +224,11 @@ public class TaskServiceImpl
     private HashMap<Identity,Set<RecurringTaskHandle>> identityRecurringMap;
 
     // the profiled operations
-    private ProfileOperation scheduleNDTaskOp = null;
-    private ProfileOperation scheduleNDTaskDelayedOp = null;
-
+    private final ProfileOperation scheduleNDTaskOp;
+    private final ProfileOperation scheduleNDTaskDelayedOp;
+    private final ProfileOperation scheduleTaskOp;
+    private final ProfileOperation scheduleTaskDelayedOp;
+    private final ProfileOperation scheduleTaskPeriodicOp;
     /**
      * Creates an instance of {@code TaskServiceImpl}. See the class javadoc
      * for applicable properties.
@@ -300,6 +301,24 @@ public class TaskServiceImpl
         if (handoffPeriod < 0)
             throw new IllegalStateException("Handoff Period property must " +
                                             "be non-negative");
+
+        // create our profiling info
+        ProfileRegistrar registrar = 
+            systemRegistry.getComponent(ProfileRegistrar.class);
+        ProfileConsumer consumer =
+            registrar.registerProfileProducer(getName());
+
+        ProfileLevel level = ProfileLevel.MAX;
+        scheduleNDTaskOp =
+            consumer.registerOperation("scheduleNonDurableTask", level);
+        scheduleNDTaskDelayedOp =
+            consumer.registerOperation("scheduleNonDurableTaskDelayed", 
+                                       level);
+        scheduleTaskOp = consumer.registerOperation("scheduleTask", level);
+        scheduleTaskDelayedOp =
+            consumer.registerOperation("scheduleDelayedTask", level);
+        scheduleTaskPeriodicOp =
+            consumer.registerOperation("schedulePeriodicTask", level);
 
         // finally, create a timer for delaying the status votes and get
         // the delay used in submitting status votes
@@ -431,22 +450,8 @@ public class TaskServiceImpl
     /**
      * {@inheritDoc}
      */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
-        ProfileConsumer consumer =
-            profileRegistrar.registerProfileProducer(this);
-
-        if (consumer != null) {
-            scheduleNDTaskOp =
-                consumer.registerOperation("scheduleNonDurableTask");
-            scheduleNDTaskDelayedOp =
-                consumer.registerOperation("scheduleNonDurableTaskDelayed");
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public void scheduleTask(Task task) {
+        scheduleTaskOp.report();
         scheduleSingleTask(task, START_NOW);
     }
 
@@ -454,6 +459,7 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleTask(Task task, long delay) {
+        scheduleTaskDelayedOp.report();
         long startTime = System.currentTimeMillis() + delay;
 
         if (delay < 0)
@@ -487,6 +493,7 @@ public class TaskServiceImpl
      */
     public PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
                                                    long period) {
+        scheduleTaskPeriodicOp.report();
         // note the start time
         long startTime = System.currentTimeMillis() + delay;
 
@@ -534,8 +541,7 @@ public class TaskServiceImpl
             throw new NullPointerException("Task must not be null");
         if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
-        if (scheduleNDTaskOp != null)
-            scheduleNDTaskOp.report();
+        scheduleNDTaskOp.report();
 
         Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
@@ -553,8 +559,7 @@ public class TaskServiceImpl
             throw new IllegalArgumentException("Delay must not be negative");
         if (shuttingDown())
             throw new IllegalStateException("Service is shutdown");
-        if (scheduleNDTaskDelayedOp != null)
-            scheduleNDTaskDelayedOp.report();
+        scheduleNDTaskDelayedOp.report();
 
         Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
