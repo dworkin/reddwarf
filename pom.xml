@@ -24,6 +24,7 @@
     <module>hack-client</module>
     <module>hack-server</module>
     <module>hack-shared</module>
+    <module>hack-ai</module>
   </modules>
 
   <build>
