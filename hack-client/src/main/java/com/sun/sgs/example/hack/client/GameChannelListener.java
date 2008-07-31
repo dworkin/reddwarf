@@ -47,8 +47,7 @@ public abstract class GameChannelListener implements ClientChannelListener
     public void leftChannel(ClientChannel channel) {
         // NOTE: the current architecture does nothing when this is
         //       called but future revisions could provide addition
-        //       player notifications here
-	System.out.println("left channel " + channel.getName());
+        //       player notifications here	
     }
 
     /**
@@ -59,7 +58,6 @@ public abstract class GameChannelListener implements ClientChannelListener
         data.get(bytes);
         BigInteger sessionId = new BigInteger(1, bytes);
 	chatListener.playerJoined(sessionId);
-
     }
 
     /**

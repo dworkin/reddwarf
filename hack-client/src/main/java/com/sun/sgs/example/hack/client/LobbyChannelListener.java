@@ -96,8 +96,16 @@ public class LobbyChannelListener extends GameChannelListener {
 	    case GAME_ADDED: {
 		// we heard about a new game
 		byte [] bytes = new byte[data.remaining()];
-		data.get(bytes);
-		llistener.gameAdded(new String(bytes));
+
+		// NOTE: This is a temporary kludge to stop the client
+		// from adding 0-length names, as described in Issue
+		// 19.  This code should be removed with the
+		// service-side source that sends these messages has
+		// been stopped.
+		if (bytes.length > 0) {
+		    data.get(bytes);
+		    llistener.gameAdded(new String(bytes));
+		}
 		break; 
 	    }
 
@@ -116,7 +124,8 @@ public class LobbyChannelListener extends GameChannelListener {
 	} catch (IOException ioe) {
 	    // NOTE: this should probably handle the error a little more
 	    // gracefully, but it's unclear what the right approach is
-	    System.out.println("Failed to handle incoming Lobby object");
+	    System.out.println("Failed to handle incoming Lobby object for "
+			       + "command " + cmd);
 	    ioe.printStackTrace();
 	}
     }

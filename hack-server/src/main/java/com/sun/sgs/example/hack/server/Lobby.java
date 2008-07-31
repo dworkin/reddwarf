@@ -17,6 +17,8 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
+import com.sun.sgs.app.util.ScalableHashMap;
+
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
@@ -60,11 +62,27 @@ public class Lobby implements Game, GameChangeListener, Serializable {
     // the channel used for all players currently in the lobby
     private ManagedReference<Channel> lobbyCommandsChannel;
 
-    // the set of players in the lobby, mapping from the reference to
-    // player's session to account name
-    private HashMap<ManagedReference<ClientSession>,String> playerMap;
+    /**
+     * The set of players in the lobby, mapping from the reference to
+     * player's session to account name.  This map is will grow with
+     * the number of players and therefore needs to be adaptive.
+     */
+    private ManagedReference<? extends Map<ManagedReference<ClientSession>,String>> 
+	playerMapRef;
 
-    // the map for player counts in each game
+    /**
+     * The number of players currently in the Lobby.  Because we are
+     * using a {@code ScalableHashMap} to keep track of the members,
+     * we need to keep track of the size ourselves.
+     *
+     * @see ScalableHashMap#size()
+     */
+    private int numPlayers;
+
+    /**
+     * The map for player counts in each game.  This map is likely to
+     * be small, and so can be local state of the Lobby.
+     */
     private HashMap<String,GameMembershipDetail> countMap;
     
     /**
@@ -92,7 +110,12 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         gcmRef = dataManager.createReference(gcm);
 
         // initialize the player list
-        playerMap = new HashMap<ManagedReference<ClientSession>,String>();
+	ScalableHashMap<ManagedReference<ClientSession>,String> playerMap = 
+	    new ScalableHashMap<ManagedReference<ClientSession>,String>();
+	
+	playerMapRef = dataManager.createReference(playerMap);
+
+	numPlayers = 0;
 
         // initialize the count for each game
         countMap = new HashMap<String,GameMembershipDetail>();
@@ -160,18 +183,11 @@ public class Lobby implements Game, GameChangeListener, Serializable {
 
         // add the player to the lobby channel and the player map
         lobbyCommandsChannel.get().join(session);
-        playerMap.put(sessionRef, playerName);
+        playerMapRef.get().put(sessionRef, playerName);
         player.userJoinedChannel(lobbyCommandsChannel.get());
 	
         // update the player about all uid to name mappings on the channel
-	Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
-	for (Map.Entry<ManagedReference<ClientSession>,String> e :
-		 playerMap.entrySet()) {
-
-	    idsToNames.put(e.getKey().getId(), e.getValue());
-	}
-	
-        Messages.sendBulkPlayerIDs(session, idsToNames);
+        Messages.sendBulkPlayerIDs(session, playerMapRef.get());
 
 	// Let the other players in the lobby know that the new player
 	// has joined the lobby
@@ -190,6 +206,8 @@ public class Lobby implements Game, GameChangeListener, Serializable {
                  player.getCharacterManager().getCharacters())
             characters.add(character.getStatistics());
         Messages.sendPlayableCharacters(session, characters);
+
+	numPlayers++;
     }
 
     /**
@@ -209,15 +227,13 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         Messages.broadcastPlayerLeft(lobbyCommandsChannel.get(), playerID);
 
         lobbyCommandsChannel.get().leave(session);
-        playerMap.remove(sessionRef);
+        playerMapRef.get().remove(sessionRef);
 
-        // send an update about the new lobby membership count
-        // FIXME: this was going to be a queued task, but that tripped the
-        // classloading bug that has now been fixed...should we go back to
-        // the queue model?
         GameMembershipDetail detail =
             new GameMembershipDetail(IDENTIFIER, numPlayers());
         gcmRef.get().notifyMembershipChanged(detail);
+
+	numPlayers--;
     }
 
     /**
@@ -245,7 +261,7 @@ public class Lobby implements Game, GameChangeListener, Serializable {
      * @return the number of players in the lobby
      */
     public int numPlayers() {
-        return playerMap.size();
+        return numPlayers;	    
     }
 
     /**
@@ -298,6 +314,10 @@ public class Lobby implements Game, GameChangeListener, Serializable {
 					       detail.getCount(),
 					       detail.getGame());
         }
+    }
+
+    public String toString() {
+	return getName();
     }
 
 }

@@ -15,35 +15,54 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-
+import java.util.Set;
 
 public class AILobbyListener implements LobbyListener {
 
     private final LobbyManager lobbyManager;
     private final String name;
 
-    private List<String> games = new ArrayList<String>();
+    private Set<String> games = new HashSet<String>();
 
     private final Random random = new Random();
+
+    private final Runnable gameJoiner;
 
     public AILobbyListener(LobbyManager lobbyManager, String name) {
         this.lobbyManager = lobbyManager;
         this.name = name;
-    }
-
-    public void enteredLobby() {
-        AIClient.runDelayed(new Runnable() {
+	
+	gameJoiner = new Runnable() {
                 public void run() {
 		    synchronized (games) {
 			if (!games.isEmpty()) {
-			    int whichGame = random.nextInt(games.size());
-			    lobbyManager.joinGame(games.get(whichGame), name);
+			    List<String> gameList = 
+				new ArrayList<String>(games);
+			    int whichGame = random.nextInt(gameList.size());
+			    AILobbyListener.this.lobbyManager.
+				joinGame(gameList.get(whichGame), 
+					 AILobbyListener.this.name);
+			}
+			else {
+			    // retry later when maybe a game has been added
+			    AIClient.runDelayed(gameJoiner, 
+						random.nextInt(4000));
 			}
 		    }
                 }
-            }, random.nextInt(4000));
+	    };
+    }
+
+    
+
+    public void enteredLobby() {
+	// connect at a random time, but ensure at least some time
+	// elapses to give us enough space to join the lobby channel
+	// first.
+        AIClient.runDelayed(gameJoiner, random.nextInt(4000) + 200);
     }
 
     public void gameAdded(String game) {

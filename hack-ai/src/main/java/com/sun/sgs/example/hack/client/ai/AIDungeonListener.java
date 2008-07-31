@@ -47,7 +47,9 @@ public class AIDungeonListener implements BoardListener, PlayerListener {
 
     public void enteredDungeon() {
         inDungeon = true;
-        AIClient.runDelayed(new MoveTask(), random.nextInt(MAX_WAIT));
+	// add delay to the initial movement command in order to wait
+	// for us to join the dungeon channel officially
+        AIClient.runDelayed(new MoveTask(), random.nextInt(MAX_WAIT) + 500);
     }
     public void leftDungeon() {
         inDungeon = false;

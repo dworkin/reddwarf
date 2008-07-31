@@ -11,7 +11,11 @@ package com.sun.sgs.example.hack.server;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.Task;
+
+import com.sun.sgs.app.util.ScalableHashMap;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
@@ -25,12 +29,14 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.Serializable;
 
 import java.math.BigInteger;
 
 import java.nio.ByteBuffer;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,6 +48,14 @@ import java.util.HashSet;
  * message code definition is done here.
  */
 public final class Messages {
+
+    /**
+     * The maximum number of Player ID to Name mappings to send during
+     * a single task.
+     *
+     * @see #sendBulkPlayerIDs(ClientSession,Map)
+     */
+    private static final int MAX_ID_SEND = 100;
 
     /**
      * Private constructor for preventing instantiation.
@@ -57,9 +71,6 @@ public final class Messages {
 					   Object... args) {
 	byte [] bytes = encodeObjects(args);
 
-	System.out.printf("broadcasting command %s on channel %s%n",
-			   command, channel.getName());
-        
         // create a buffer for the message code and the object bytes
 	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
 	bb.putInt(Commands.encode(command));
@@ -75,9 +86,6 @@ public final class Messages {
 				     Object... args) {
 	byte [] bytes = encodeObjects(args);
         
-	System.out.printf("sending command %s to session %s%n",
-			  command, session.getName());
-
         // create a buffer for the message code and the object bytes
 	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
 	bb.putInt(Commands.encode(command));
@@ -123,6 +131,12 @@ public final class Messages {
         }
     }
 
+    public static void sendNotificationOfUnhandledCommand(ClientSession session,
+							  String channelName, 
+							  Command command) {
+	sendToClient(session, Command.UNHANDLED_COMMAND, channelName, 
+		     new Integer(Commands.encode(command)));
+    }
     
     //
     // Game-state notification methods
@@ -159,19 +173,150 @@ public final class Messages {
 			   playerID);
     }
 
-    /**
+    /**	
      * Sends the command to add the all of the provided mappings from
-     * player ID to player name to all the clients on the provided
-     * channel.
+     * player ID to player name to the specified client. If the
+     * provided map is too large, it will be sent in parts through
+     * mutliple messages.
      */
     public static void sendBulkPlayerIDs(ClientSession session,
-					 Map<BigInteger,String> 
-					 idsToNames) {
+	Map<ManagedReference<ClientSession>,String> playerToName) 
+    {
 
-	sendToClient(session, Command.ADD_BULK_PLAYER_IDS,
-		     idsToNames);
+	// The provided mapping could be large enough to serializable
+	// to more bytes than we can send at one time.  Furthermore,
+	// it could also be a ScalableHashMap, which we can't send to
+	// the client side.  
+	if (playerToName instanceof ScalableHashMap) {
+	    AppContext.getTaskManager().
+		scheduleTask(new ScalableMapBulkIdSender(
+                    (ScalableHashMap<ManagedReference<ClientSession>,String>)
+		        playerToName, session));
+	}
+	// if we know we can call size() on it, see how big the map is
+	// See ScalableHashMap.size() on why we can't call it in this
+	// case
+	else if (playerToName.size() > 200) {
+
+	    // if the map is too big to send at once, then we'll start
+	    // a task to iterate over a fixed number of names and
+	    // enqueue itself again to do the rest if necessary.
+	    AppContext.getTaskManager().
+		scheduleTask(new HashMapBulkIdSender(playerToName, session));
+	}
+	// otherwise, it's okay to send the entire map at once.
+	else {
+	    
+	    // convert the ClientSession to a BigInteger identifier
+	    Map<BigInteger,String> idsToNames = 
+		new HashMap<BigInteger,String>();
+
+	    for (Map.Entry<ManagedReference<ClientSession>,String> e :
+		     playerToName.entrySet()) {
+		
+		idsToNames.put(e.getKey().getId(), e.getValue());
+	    }
+	    
+	    sendToClient(session, Command.ADD_BULK_PLAYER_IDS,
+			 idsToNames);	    
+	}
     }
-					  
+	
+    private static final class ScalableMapBulkIdSender 
+	implements Task, ManagedObject, Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	private final 
+	    Iterator<Map.Entry<ManagedReference<ClientSession>,String>> iter;
+	
+	private final ManagedReference<ClientSession> sessionRef;
+
+	public ScalableMapBulkIdSender(
+	    ScalableHashMap<ManagedReference<ClientSession>,String> playrToName,
+	    ClientSession session)
+	{
+	    iter = playrToName.entrySet().iterator();
+	    this.sessionRef = 
+		AppContext.getDataManager().createReference(session);
+	}
+	
+	/**
+	 * Iterates over a finite number of IDs and sends them over.
+	 * Then reschedules itself if more IDs remain.
+	 */
+	public void run() {
+	    AppContext.getDataManager().markForUpdate(this);
+
+	    Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
+	    while (idsToNames.size() < MAX_ID_SEND &&
+		   iter.hasNext()) {
+		Map.Entry<ManagedReference<ClientSession>,String> e = 
+		    iter.next();
+		idsToNames.put(e.getKey().getId(), e.getValue());
+	    }
+	    
+	    Messages.sendToClient(sessionRef.get(), Command.ADD_BULK_PLAYER_IDS,
+				  idsToNames);	    
+	    
+	    if (iter.hasNext())
+		AppContext.getTaskManager().scheduleTask(this);
+	}
+    }
+
+    private static final class HashMapBulkIdSender 
+	implements Task, ManagedObject, Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	private final 
+	    Map<ManagedReference<ClientSession>,String> remaining;
+
+	private final ManagedReference<ClientSession> sessionRef;
+	
+	public HashMapBulkIdSender(
+	    Map<ManagedReference<ClientSession>,String> playerToName,
+	    ClientSession session)
+	{
+	    // make a copy of the map since we'll be mutating it
+	    remaining = new HashMap<ManagedReference<ClientSession>,String>(
+                playerToName);
+	    this.sessionRef = 
+		AppContext.getDataManager().createReference(session);
+	}
+	
+	/**
+	 * Iterates over a finite number of IDs and sends them over.
+	 * Then reschedules itself if more IDs remain.
+	 */
+	public void run() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    
+	    Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
+
+	    Iterator<Map.Entry<ManagedReference<ClientSession>,String>> iter =
+		remaining.entrySet().iterator();
+
+	    while (idsToNames.size() < MAX_ID_SEND &&
+		   iter.hasNext()) {
+		Map.Entry<ManagedReference<ClientSession>,String> e = 
+		    iter.next();
+		// remove the entry from the map so that we don't send
+		// this id again.
+		iter.remove();
+		
+		idsToNames.put(e.getKey().getId(), e.getValue());
+	    }
+	    
+	    Messages.sendToClient(sessionRef.get(), Command.ADD_BULK_PLAYER_IDS,
+				  idsToNames);	    
+	    
+	    if (iter.hasNext())
+		AppContext.getTaskManager().scheduleTask(this);
+	}
+    }
+    
+	  
 
     /*
      * START LOBBY MESSAGES

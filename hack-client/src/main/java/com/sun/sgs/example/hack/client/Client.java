@@ -161,6 +161,7 @@ public class Client extends JFrame implements SimpleClientListener {
 	    };
 	pd.pack();
 	pd.setVisible(true);
+
 	if (pd.isCancel()) {
 	    setVisible(false);
 	    dispose();
@@ -277,7 +278,6 @@ public class Client extends JFrame implements SimpleClientListener {
 		    Integer id = (Integer)(idAndStats[0]);
 		    CharacterStats stats = (CharacterStats)(idAndStats[1]);
 		    crmanager.changeStatistics(id, stats);
-		    System.out.println("changed stats");		
 		    break;
 
 		/*

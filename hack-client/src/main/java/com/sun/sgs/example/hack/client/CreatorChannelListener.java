@@ -57,7 +57,6 @@ public class CreatorChannelListener extends GameChannelListener
 
 	int encodedCmd = (int)(data.getInt());
 	Command cmd = Commands.decode(encodedCmd);
-	System.out.println(this + " recevied command " + cmd + " from server");
 
 	try {
 	    switch(cmd) {

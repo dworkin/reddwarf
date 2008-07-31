@@ -16,6 +16,8 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.app.util.ScalableHashMap;
+
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
@@ -52,9 +54,22 @@ public class Dungeon implements Game, Serializable {
     // the connection into the dungeon
     private ManagedReference<GameConnector> connectorRef;
 
-    // the set of players in the lobby, mapping from a reference to
-    // the player's ClientSession to account name
-    private HashMap<ManagedReference<ClientSession>,String> playerMap;
+    /**
+     * The a mapping of players currently the dungeon to account name.
+     * This map is will grow with the number of players and therefore
+     * needs to be adaptive.
+     */
+    private ManagedReference<? extends Map<ManagedReference<ClientSession>,String>>
+	playerMapRef;
+
+    /**
+     * The number of players currently in the Dungeon.  Because we are
+     * using a {@code ScalableHashMap} to keep track of the members,
+     * we need to keep track of the size ourselves.
+     *
+     * @see ScalableHashMap#size()
+     */
+    private int numPlayers;
 
     /**
      * Creates a new instance of a <code>Dungeon</code>.
@@ -79,7 +94,12 @@ public class Dungeon implements Game, Serializable {
         dungeonCommandsChannel = dataManager.createReference(channel);
 
         // initialize the player list
-        playerMap = new HashMap<ManagedReference<ClientSession>,String>();
+	ScalableHashMap<ManagedReference<ClientSession>,String> playerMap = 
+	    new ScalableHashMap<ManagedReference<ClientSession>,String>();
+	
+	playerMapRef = dataManager.createReference(playerMap);
+
+	numPlayers = 0;
 
         // get a reference to the membership change manager
         gcmRef = dataManager.createReference(
@@ -108,18 +128,13 @@ public class Dungeon implements Game, Serializable {
 	
         // Add the player to the dungeon channel and the local map
         dungeonCommandsChannel.get().join(session);
-        playerMap.put(dataManager.createReference(session), playerName);
+        playerMapRef.get().put(dataManager.createReference(session), playerName);
 
         // Update the player about all uid to name mappings on the
         // channel.  We'll use each of the client's session's ids for
         // the unique identifier.
 	Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
-	for (Map.Entry<ManagedReference<ClientSession>,String> e : 
-		 playerMap.entrySet()) {
-	    
-	    idsToNames.put(e.getKey().getId(), e.getValue());
-	}
-	Messages.sendBulkPlayerIDs(session, idsToNames);
+	Messages.sendBulkPlayerIDs(session, playerMapRef.get());
 
         // Notify the manager that our membership count changed
         sendCountChanged();
@@ -143,6 +158,8 @@ public class Dungeon implements Game, Serializable {
                               getCurrentCharacter());
         player.sendCharacter(pc);
         connectorRef.get().enteredConnection(player.getCharacterManager());
+
+	numPlayers++;
     }
 
     /**
@@ -163,7 +180,7 @@ public class Dungeon implements Game, Serializable {
 
         // remove the player from the dungeon channel and the player map
         dungeonCommandsChannel.get().leave(session);
-        playerMap.remove(sessionRef);
+        playerMapRef.get().remove(sessionRef);
 
         // just to be paranoid, we should make sure that they're out of
         // their current level...for instance, if we got called because the
@@ -172,6 +189,8 @@ public class Dungeon implements Game, Serializable {
 
         // notify the manager that our membership count changed
         sendCountChanged();
+
+	numPlayers--;
     }
 
     /**
@@ -208,7 +227,11 @@ public class Dungeon implements Game, Serializable {
      * @return the number of players in this dungeon
      */
     public int numPlayers() {
-        return playerMap.size();
+        return numPlayers;
+    }
+
+    public String toString() {
+	return getName();
     }
 
 }
