@@ -170,6 +170,16 @@ public interface ProfileReport {
     public Map<String,List<Long>> getUpdatedTaskSamples();  
 
     /**
+     * Returns detail of the object accesses as reported by the
+     * <code>AccessCoordinator</code> or <code>null</code> if no
+     * objects were accessed, no accesses reported, or if this
+     * report is for a non-transactional task.
+     *
+     * @return the associated access detail or <code>null</code>
+     */
+    public AccessedObjectsDetail getAccessedObjectsDetail();
+
+    /**
      * Returns the number of tasks in the same context as this report's task
      * that were in the scheduler and ready to run when this report's task
      * was started. Note that some schedulers may not differentiate between
@@ -180,7 +190,6 @@ public interface ProfileReport {
      * @return the number of ready tasks in the same context
      */
     public int getReadyCount();
-
 
     /**
      * Returns any failure that occurred during the execution of

@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileListener;
@@ -189,6 +190,21 @@ public class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
         profileReport.participants.add(participantDetail);
+    }
+
+    /** {@inheritDoc} */
+    public void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
+            throw new IllegalStateException("No task is being profiled in " +
+                                            "this thread");
+        }
+        if (! profileReport.transactional)
+            throw new IllegalStateException("Object access cannot be added " +
+                                            "to a non-transactional task");
+        profileReport.accessedObjectsDetail = detail;
     }
 
     /** {@inheritDoc} */

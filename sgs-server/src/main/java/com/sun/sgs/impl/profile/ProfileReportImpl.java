@@ -23,6 +23,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileReport;
@@ -70,7 +71,7 @@ class ProfileReportImpl implements ProfileReport {
     long runningTime = 0;
     int tryCount = 0;
     Throwable throwable = null;
-
+    AccessedObjectsDetail accessedObjectsDetail = null;
 
     Set<ProfileParticipantDetail> participants;
 
@@ -289,6 +290,13 @@ class ProfileReportImpl implements ProfileReport {
      */
     public Map<String,List<Long>> getUpdatedTaskSamples() {
 	return (localSamples == null) ? EMPTY_SAMPLE_MAP : localSamples;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public AccessedObjectsDetail getAccessedObjectsDetail() {
+        return accessedObjectsDetail;
     }
 
     /**

@@ -21,6 +21,7 @@ package com.sun.sgs.profile;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 
 /**
@@ -104,6 +105,17 @@ public interface ProfileCollector {
      *                               this thread
      */
     public void addParticipant(ProfileParticipantDetail participantDetail);
+
+    /**
+     * Sets the detail for all objects accessed during the task as
+     * reported to the <code>AccessCoordinator</code>.
+     * 
+     * @param detail all detail of the accessed objects
+     *
+     * @throws IllegalStateException if no transactional task is bound to
+     *                               this thread
+     */
+    public void setAccessedObjectsDetail(AccessedObjectsDetail detail);
 
     /**
      * Tells the collector that the current task associated with the

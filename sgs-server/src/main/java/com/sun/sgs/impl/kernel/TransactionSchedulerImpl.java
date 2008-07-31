@@ -109,6 +109,9 @@ final class TransactionSchedulerImpl
     // the collector used for profiling data
     private final ProfileCollector profileCollector;
 
+    // the coordinator for all transactional object access
+    private final AccessCoordinatorImpl accessCoordinator;
+
     // the executor service used to manage our threads
     private final ExecutorService executor;
 
@@ -140,7 +143,8 @@ final class TransactionSchedulerImpl
      */
     TransactionSchedulerImpl(Properties properties,
                              TransactionCoordinator transactionCoordinator,
-                             ProfileCollector profileCollector)
+                             ProfileCollector profileCollector,
+                             AccessCoordinatorImpl accessCoordinator)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating a Transaction Scheduler");
@@ -152,6 +156,7 @@ final class TransactionSchedulerImpl
 
         this.transactionCoordinator = transactionCoordinator;
         this.profileCollector = profileCollector;
+        this.accessCoordinator = accessCoordinator;
 
         String queueName = properties.getProperty(SCHEDULER_QUEUE_PROPERTY,
                                                   DEFAULT_SCHEDULER_QUEUE);
@@ -538,7 +543,13 @@ final class TransactionSchedulerImpl
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
 
+                    // increment the try count and notify the access
+                    // coordinator of the new transaction
                     task.incrementTryCount();
+                    final int tryCount = task.getTryCount();
+                    accessCoordinator.
+                        notifyNewTransaction(task.getStartTime(), tryCount);
+
                     try {
                         // run the task in the new transactional context
                         task.getTask().run();
@@ -558,7 +569,7 @@ final class TransactionSchedulerImpl
 
                     // the task completed successfully, so we're done
                     if (profileCollector != null)
-                        profileCollector.finishTask(task.getTryCount());
+                        profileCollector.finishTask(tryCount);
                     task.setDone(null);
                     return true;
                 } catch (InterruptedException ie) {
