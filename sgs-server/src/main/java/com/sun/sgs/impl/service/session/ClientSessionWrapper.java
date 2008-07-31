@@ -115,10 +115,14 @@ public class ClientSessionWrapper
 	ClientSessionImpl sessionImpl = null;
 	try {
 	    sessionImpl = sessionRef.get();
-	} catch (ObjectNotFoundException e) {
+	} catch (Exception e) {
 	}
-	return getClass().getName() + "[" +
-	    (sessionImpl == null ? "(not found)" : sessionImpl.toString()) + "]";
+	return
+	    getClass().getName() + "[" +
+	    (sessionImpl == null ?
+	     sessionRef.toString() :
+	     sessionImpl.toString())
+	    + "]";
     }
     
     /* -- Other methods -- */

@@ -36,7 +36,9 @@ import java.util.Set;
  * {@code Channel}'s {@link #join(ClientSession) join} and {@link
  * #leave(ClientSession) leave} methods respectively.  All client sessions
  * can be removed from a channel by invoking {@link #leaveAll leaveAll} on
- * the channel.
+ * the channel.  To explicitly close a {@code Channel}, remove the {@code
+ * Channel} object from the data manager using the {@link
+ * DataManager#removeObject DataManager.removeObject} method.
  *
  * <p>The server can send a message to all client sessions joined to a
  * channel by using the {@link #send send} method.  Note that the

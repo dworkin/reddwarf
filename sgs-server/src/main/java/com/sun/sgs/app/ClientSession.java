@@ -34,7 +34,10 @@ import java.nio.ByteBuffer;
  * current connection between that client and the server.  By returning a
  * unique {@link ClientSessionListener} from the {@code loggedIn} method
  * for each given client session, the application will receive notification
- * when a client session sends a message, is disconnected, or logs out.
+ * when a client session sends a message, is disconnected, or logs out.  To
+ * explicitly disconnect a {@code ClientSession}, remove the associated
+ * {@code ClientSession} object from the data manager using the {@link
+ * DataManager#removeObject DataManager.removeObject} method.
  *
  * <p>A {@code ClientSession} is used to identify a client that is
  * logged in, to send messages to that client, and to forcibly disconnect
