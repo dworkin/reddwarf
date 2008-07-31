@@ -90,20 +90,20 @@ public class SgsTestNode {
         }
     }
 
-    /** The default initial application port for the this test suite. */
+    /** The default initial unique port for this test suite. */
     private final static int DEFAULT_PORT = 20000;
     
     /** The property that can be used to select an initial port. */
     private final static String PORT_PROPERTY = "test.sgs.port";
     
-    /** The next application port to use for this test suite. */
-    private static AtomicInteger nextAppPort;
+    /** The next unique port to use for this test suite. */
+    private static AtomicInteger nextUniquePort;
     
     static {
         Integer systemPort = Integer.getInteger(PORT_PROPERTY);
         int port = systemPort == null ? DEFAULT_PORT 
                                       : systemPort.intValue();
-        nextAppPort = new AtomicInteger(port);
+        nextUniquePort = new AtomicInteger(port);
     }
     
     
@@ -378,18 +378,18 @@ public class SgsTestNode {
 
         int requestedDataPort =
             isServerNode ?
-            0 :
+            getNextUniquePort() :
             getDataServerPort((DataServiceImpl) serverNode.getDataService());
 
         int requestedWatchdogPort =
             isServerNode ?
-            0 :
+            getNextUniquePort() :
             ((WatchdogServiceImpl) serverNode.getWatchdogService()).
 	    	getServer().getPort();
 
         int requestedNodeMapPort =
             isServerNode ?
-            0 :
+            getNextUniquePort() :
             getNodeMapServerPort((NodeMappingServiceImpl)
 				 serverNode.getNodeMappingService());
 
@@ -409,6 +409,14 @@ public class SgsTestNode {
                 "com.sun.sgs.impl.service.data.store.net.DataStoreClient",
             "com.sun.sgs.impl.service.watchdog.server.port",
                 String.valueOf(requestedWatchdogPort),
+	    "com.sun.sgs.impl.service.channel.server.port",
+	        String.valueOf(getNextUniquePort()),
+	    "com.sun.sgs.impl.service.session.server.port",
+	        String.valueOf(getNextUniquePort()),
+	    "com.sun.sgs.impl.service.nodemap.client.port",
+	        String.valueOf(getNextUniquePort()),
+	    "com.sun.sgs.impl.service.watchdog.client.port",
+	        String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.watchdog.renew.interval", "500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
@@ -440,9 +448,17 @@ public class SgsTestNode {
      * Returns a unique port number.
      */
     public static int getNextAppPort() {
-        return nextAppPort.getAndIncrement();
+        return getNextUniquePort();
     }
     
+    /**
+     * Returns a unique port number.  Note that the ports are only unique
+     * within the current process.
+     */
+    public static int getNextUniquePort() {
+        return nextUniquePort.getAndIncrement();
+    }
+
     /** Creates the specified directory, if it does not already exist. */
     private static void createDirectory(String directory) {
         File dir = new File(directory);

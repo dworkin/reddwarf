@@ -110,7 +110,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         defaultProfileLevel = level;
         
         // start a long-lived task to consume the other end of the queue
-        reporterThread = new Thread(new CollectorRunnable());
+        reporterThread = new CollectorThread();
         reporterThread.start();
      }
 
@@ -337,14 +337,18 @@ public final class ProfileCollectorImpl implements ProfileCollector {
      * to to observe performance, and it's unclear whether it's worth
      * reporting anywhere, and where to report it.
      */
-    private class CollectorRunnable implements Runnable {
+    private class CollectorThread extends Thread {
         /*private volatile long queueSize = 0;
           private volatile long queueSamples = 0;*/
+	private boolean interrupted;
         public void run() {
             try {
                 while (true) {
-                    if (Thread.interrupted())
-                        return;
+		    synchronized (this) {
+			if (interrupted) {
+			    return;
+			}
+		    }
 
                     ProfileReportImpl profileReport = queue.poll();
                     if (profileReport == null) {
@@ -376,5 +380,18 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                 }
             } catch (InterruptedException ie) {}
         }
+	/**
+	 * Modify interrupt to keep track of whether the thread has ever been
+	 * interrupted.  That way we can have the thread exit if an interrupt
+	 * has occurred, even if something (say logging) catches an interrupt
+	 * and forgets to reset the interrupt status.
+	 */
+	@Override
+	public void interrupt() {
+	    synchronized (this) {
+		interrupted = true;
+	    }
+	    super.interrupt();
+	}
     }
 }

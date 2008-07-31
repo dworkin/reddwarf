@@ -95,9 +95,7 @@ public class TestDataServiceImpl extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static final String dbDirectory =
-	System.getProperty("java.io.tmpdir") + File.separator +
-	"TestDataServiceImpl.db";
+    private static String dbDirectory;
 
     /** The component registry. */
     private static ComponentRegistry componentRegistry;
@@ -108,14 +106,6 @@ public class TestDataServiceImpl extends TestCase {
 
     /** An instance of the data service, to test. */
     static DataServiceImpl service;
-
-    /**
-     * Delete the database directory at the start of the test run, but not for
-     * each test.
-     */
-    static {
-	cleanDirectory(dbDirectory);
-    }
 
     /** Set when the test passes. */
     protected boolean passed;
@@ -140,6 +130,15 @@ public class TestDataServiceImpl extends TestCase {
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	if (dbDirectory == null) {
+	    dbDirectory = System.getProperty("java.io.tmpdir") +
+		File.separator + "TestDataServiceImpl.db";
+	    /*
+	     * Delete the database directory at the start of the test run, but
+	     * not for each test.
+	     */
+	    cleanDirectory(dbDirectory);
+	}
         MinimalTestKernel.create();
         componentRegistry = MinimalTestKernel.getRegistry();
 	props = getProperties();
@@ -1521,12 +1520,26 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testMarkForUpdateLocking() throws Exception {
-	dummy.setValue("a");
 	txn.commit();
 	service.shutdown();
+	/*
+	 * Create a fresh data service -- BDB Java edition does not permit
+	 * changing the lock timeout for an existing database.
+	 * -tjb@sun.com (07/22/2008)
+	 */
+	String dir = dbDirectory + "testMarkForUpdateLocking";
+	cleanDirectory(dir);
+        MinimalTestKernel.create();
+        componentRegistry = MinimalTestKernel.getRegistry();
+	props.setProperty(DataStoreImplClassName + ".directory", dir);
 	props.setProperty(getLockTimeoutPropertyName(props), "500");
 	service = getDataServiceImpl();
 	MinimalTestKernel.setComponent(service);
+	createTransaction();
+	dummy = new DummyManagedObject();
+	dummy.setValue("a");
+	service.setBinding("dummy", dummy);
+	txn.commit();
 	createTransaction(1000);
 	dummy = (DummyManagedObject) service.getBinding("dummy");
 	assertEquals("a", dummy.value);
@@ -2401,12 +2414,27 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetReferenceUpdateLocking() throws Exception {
-	dummy.setNext(new DummyManagedObject());
 	txn.commit();
 	service.shutdown();
+	/*
+	 * Create a fresh data service -- BDB Java edition does not permit
+	 * changing the lock timeout for an existing database.
+	 * -tjb@sun.com (07/22/2008)
+	 */
+	String dir = dbDirectory + "testGetReferenceUpdateLocking";
+	cleanDirectory(dir);
+        MinimalTestKernel.create();
+        componentRegistry = MinimalTestKernel.getRegistry();
+	props.setProperty(DataStoreImplClassName + ".directory", dir);
 	props.setProperty(getLockTimeoutPropertyName(props), "500");
 	service = getDataServiceImpl();
 	MinimalTestKernel.setComponent(service);
+	createTransaction();
+	dummy = new DummyManagedObject();
+	dummy.setValue("a");
+	service.setBinding("dummy", dummy);
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
 	createTransaction(1000);
 	dummy = (DummyManagedObject) service.getBinding("dummy");
 	dummy.getNext();

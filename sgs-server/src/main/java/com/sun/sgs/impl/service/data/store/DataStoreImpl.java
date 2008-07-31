@@ -26,6 +26,16 @@ import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.ALLOCATION_BLOCK_SIZE;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.FIRST_PLACEHOLDER_ID_KEY;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.NEXT_OBJ_ID_KEY;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
+import static com.sun.sgs.impl.service.data.store.
+    DataStoreHeader.QUOTE_OBJ_VALUE;
 import com.sun.sgs.impl.service.data.store.db.DataEncoding;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
 import com.sun.sgs.impl.service.data.store.db.DbDatabase;
@@ -49,10 +59,13 @@ import java.io.FileNotFoundException;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -83,23 +96,7 @@ import java.util.logging.Logger;
  *
  * The {@link #DataStoreImpl(Properties) constructor} supports these public <a
  * href="../../../../app/doc-files/config-properties.html#DataStore">
- * properties</a>, and the following additional properties: <p>
- *
- * <dl style="margin-left: 1em">
- *
- * <dt> <i>Property:</i> <b>{@value #ALLOCATION_BLOCK_SIZE_PROPERTY}</b> <br>
- *	<i>Default:</i> {@value #DEFAULT_ALLOCATION_BLOCK_SIZE}
- *
- * <dd style="padding-top: .5em">The number of object IDs to allocate at a
- *	time.  This value must be greater than <code>0</code>.  Object IDs are
- *	allocated in an independent transaction, and are discarded if a
- *	transaction aborts, if a managed object is made reachable within the
- *	data store but is removed from the store before the transaction
- *	commits, or if the program exits before it uses the object IDs it has
- *	allocated.  This number limits the maximum number of object IDs that
- *	would be discarded when the program exits. <p>
- *
- * </dl> <p>
+ * properties</a>. <p>
  *
  * The constructor also passes the properties to the {@link BdbEnvironment}
  * constructor, which supports additional properties. <p>
@@ -138,16 +135,6 @@ public class DataStoreImpl
     /** The default directory for database files from the app root. */
     private static final String DEFAULT_DIRECTORY = "dsdb";
 
-    /**
-     * The property that specifies the number of object IDs to allocate at one
-     * time.
-     */
-    public static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocation.block.size";
-
-    /** The default for the number of object IDs to allocate at one time. */
-    public static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 1024;
-
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -171,11 +158,11 @@ public class DataStoreImpl
 	    }
         };
 
+    /** The object data for a placeholder. */
+    private static final byte[] PLACEHOLDER_DATA = { PLACEHOLDER_OBJ_VALUE };
+
     /** The directory in which to store database files. */
     private final String directory;
-
-    /** The number of object IDs to allocate at one time. */
-    private final int allocationBlockSize;
 
     /** Stores information about transactions. */
     private final TxnInfoTable<TxnInfo> txnInfoTable;
@@ -194,14 +181,20 @@ public class DataStoreImpl
     private final DbDatabase classesDb;
 
     /** The database that maps object IDs to object bytes. */
-    private final DbDatabase oidsDb;
+    final DbDatabase oidsDb;
 
     /** The database that maps name bindings to object IDs. */
     private final DbDatabase namesDb;
 
+    /**
+     * Whether object allocations should create a placeholder at the end of
+     * each allocation block.  These placeholders help to avoid allocation
+     * concurrency conflicts when using BDB Java edition.
+     */
+    final boolean useAllocationBlockPlaceholders;
+
     /** Information about free object IDs. */
-    final List<ObjectIdInfo> freeObjectIds =
-	Collections.synchronizedList(new ArrayList<ObjectIdInfo>());
+    final FreeObjectIds freeObjectIds;
 
     /**
      * Object to synchronize on when accessing txnCount, allOps and
@@ -242,6 +235,7 @@ public class DataStoreImpl
     private ProfileCounter writtenObjectsCounter = null;
     private ProfileSample readBytesSample = null;
     private ProfileSample writtenBytesSample = null;
+
     /**
      * Records information about all active transactions.
      *
@@ -371,39 +365,91 @@ public class DataStoreImpl
 	 */
 	private ObjectIdInfo objectIdInfo = null;
 
+	/**
+	 * Object ID blocks whose last IDs were used during this transaction,
+	 * or null if there were no such blocks.  The empty blocks will be
+	 * rolled back on abort, and will have their placeholders removed on
+	 * commit.
+	 */
+	private List<ObjectIdInfo> emptyObjectIdInfo = null;
+
 	TxnInfo(Transaction txn, DbEnvironment env) {
 	    dbTxn = env.beginTransaction(txn.getTimeout());
 	}
 
-	/** Prepares the transaction, first closing the cursors, if present. */
+	/**
+	 * Prepares the transaction, first updating object ID information and
+	 * closing cursors.
+	 */
 	void prepare(byte[] gid) {
+	    prepareFreeObjectIds();
 	    maybeCloseCursors();
 	    dbTxn.prepare(gid);
 	}
 
 	/**
-	 * Commits the transaction, first closing the cursors, if present, and
-	 * returning the operations count for this transaction.
+	 * Prepares and commits the transaction, first updating object ID
+	 * information and closing cursors.
 	 */
-	void commit() {
+	void prepareAndCommit() {
+	    prepareFreeObjectIds();
 	    maybeCloseCursors();
 	    dbTxn.commit();
-	    if (objectIdInfo != null) {
-		freeObjectIds.add(objectIdInfo);
-	    }
 	}
 
 	/**
-	 * Aborts the transaction, first closing the cursors, if present, and
-	 * returning the operations count for this transaction.
+	 * Updates object ID information for a transaction that is going to be
+	 * committed.  Returns object ID blocks that have more IDs to the free
+	 * list, and updates allocation block placeholders for blocks that are
+	 * empty.
+	 */
+	private void prepareFreeObjectIds() {
+	    /* Move an empty objectIdInfo to emptyObjectIdInfo */
+	    if (objectIdInfo != null && !objectIdInfo.hasNext()) {
+		if (emptyObjectIdInfo == null) {
+		    emptyObjectIdInfo = new LinkedList<ObjectIdInfo>();
+		}
+		emptyObjectIdInfo.add(objectIdInfo);
+		objectIdInfo = null;
+	    }
+	    /*
+	     * Remove placeholders for empty blocks.  Note that this operation
+	     * may fail, because it operates on the database, so do it first
+	     * and without holding the lock on the free object IDs.
+	     */
+	    if (useAllocationBlockPlaceholders && emptyObjectIdInfo != null) {
+		for (ObjectIdInfo empty : emptyObjectIdInfo) {
+		    long placeholder = empty.last();
+		    byte[] key = DataEncoding.encodeLong(placeholder);
+		    byte[] value = oidsDb.get(dbTxn, key, true);
+		    if (value != null && isPlaceholderValue(value)) {
+			boolean success = oidsDb.delete(dbTxn, key);
+			assert success;
+		    }
+		}
+	    }
+	    freeObjectIds.prepare(objectIdInfo, emptyObjectIdInfo);
+	    objectIdInfo = null;
+	    emptyObjectIdInfo = null;
+	}
+
+	/**
+	 * Commits the transaction, which should already have been prepared.
+	 */
+	void commit() {
+	    dbTxn.commit();
+	}
+
+	/**
+	 * Aborts the transaction, first updating object ID information and
+	 * closing cursors.
 	 */
 	void abort() {
+	    freeObjectIds.abort(objectIdInfo, emptyObjectIdInfo);
+	    objectIdInfo = null;
+	    emptyObjectIdInfo = null;
 	    maybeCloseCursors();
 	    dbTxn.abort();
-	    if (objectIdInfo != null) {
-		objectIdInfo.abort();
-		freeObjectIds.add(objectIdInfo);
-	    }
 	}
 
 	/** Returns the next name in the names database. */
@@ -465,6 +511,13 @@ public class DataStoreImpl
 			? DataEncoding.decodeLong(oidsCursor.getKey()) : -1;
 		}
 	    }
+	    /* Skip placeholders */
+	    while (lastOidsCursorKey != -1 &&
+		   isPlaceholderValue(oidsCursor.getValue()))
+	    {
+		lastOidsCursorKey = oidsCursor.findNext()
+		    ? DataEncoding.decodeLong(oidsCursor.getKey()) : -1;
+	    }
 	    return lastOidsCursorKey;
 	}
 
@@ -488,20 +541,33 @@ public class DataStoreImpl
 
 	/**
 	 * Returns information about free object IDs available for allocation
-	 * in this transaction.
+	 * in this transaction, or null if no IDs are already available.
 	 */
 	ObjectIdInfo getObjectIdInfo() {
 	    if (objectIdInfo == null) {
-		synchronized (freeObjectIds) {
-		    objectIdInfo = freeObjectIds.isEmpty()
-			? null : freeObjectIds.remove(0);
-		}
-		if (objectIdInfo == null) {
-		    objectIdInfo = new ObjectIdInfo();
-		} else {
+		objectIdInfo = freeObjectIds.get();
+		if (objectIdInfo != null) {
 		    objectIdInfo.initTxn();
 		}
+	    } else if (!objectIdInfo.hasNext()) {
+		if (emptyObjectIdInfo == null) {
+		    emptyObjectIdInfo = new LinkedList<ObjectIdInfo>();
+		}
+		emptyObjectIdInfo.add(objectIdInfo);
+		objectIdInfo = null;
 	    }
+	    return objectIdInfo;
+	}
+
+	/**
+	 * Creates and stores information about newly available free object
+	 * IDs.
+	 */
+	ObjectIdInfo createObjectIdInfo(
+	    long firstObjectId, long lastObjectId)
+	{
+	    assert objectIdInfo == null;
+	    objectIdInfo = freeObjectIds.create(firstObjectId, lastObjectId);
 	    return objectIdInfo;
 	}
     }
@@ -530,32 +596,137 @@ public class DataStoreImpl
      * store.
      */
     private static class Databases {
-	private DbDatabase info, classes, oids, names;
+	DbDatabase info, classes, oids, names;
+    }
+
+    /** Stores information about free object IDs. */
+    private static final class FreeObjectIds {
+
+	/**
+	 * Available allocation blocks, with the lowest ID block first.
+	 * Synchronize on the FreeObjectIds instance when accessing this field.
+	 */
+	private final Queue<ObjectIdInfo> freeObjectIdInfo =
+	    new PriorityQueue<ObjectIdInfo>();
+
+	/**
+	 * The set of object IDs of placeholders for allocation blocks that are
+	 * still in use, or null if placeholders are not being used.
+	 * Synchronize on the FreeObjectIds instance when accessing the
+	 * contents of this field.
+	 */
+	private final SortedSet<Long> placeholderOids;
+
+	/** Creates an instance of this class. */
+	FreeObjectIds(boolean usePlaceholders) {
+	    placeholderOids = usePlaceholders ? new TreeSet<Long>() : null;
+	}
+
+	/** Obtains a block of object IDs, or null if none are available. */
+	synchronized ObjectIdInfo get() {
+	    return freeObjectIdInfo.poll();
+	}
+
+	/**
+	 * Updates object ID information for a transaction that is going to be
+	 * committed.  Returns the object ID block, if not null, to the free
+	 * list, and updates placeholders for the empty blocks.
+	 */
+	synchronized void prepare(ObjectIdInfo info,
+				  List<ObjectIdInfo> emptyObjectIdInfo)
+	{
+	    if (info != null) {
+		assert info.hasNext();
+		freeObjectIdInfo.add(info);
+	    }
+	    if (placeholderOids != null && emptyObjectIdInfo != null) {
+		for (ObjectIdInfo empty : emptyObjectIdInfo) {
+		    placeholderOids.remove(empty.last());
+		}
+	    }
+	}
+
+	/**
+	 * Updates object ID information for a transaction that is being
+	 * aborted.  Rolls back the allocations in all blocks.
+	 */
+	synchronized void abort(ObjectIdInfo info,
+				List<ObjectIdInfo> emptyObjectIdInfo)
+	{
+	    if (info != null) {
+		info.abort();
+		freeObjectIdInfo.add(info);
+	    }
+	    if (emptyObjectIdInfo != null) {
+		for (ObjectIdInfo empty : emptyObjectIdInfo) {
+		    empty.abort();
+		    freeObjectIdInfo.add(empty);
+		}
+	    }
+	}
+
+	/** Creates and returns a new block of object IDs. */
+	ObjectIdInfo create(long firstObjectId, long lastObjectId) {
+	    assert firstObjectId >= 0;
+	    assert lastObjectId > firstObjectId;
+	    ObjectIdInfo info = new ObjectIdInfo(firstObjectId, lastObjectId);
+	    if (placeholderOids != null) {
+		synchronized (this) {
+		    placeholderOids.add(lastObjectId);
+		}
+	    }
+	    return info;
+	}
+
+	/**
+	 * Returns the object ID of the lowest-numbered object allocation block
+	 * placeholder currently in use, or -1 if none.  This method should
+	 * only be called if placeholders are in use.
+	 */
+	synchronized long getFirstPlaceholder() {
+	    return placeholderOids.isEmpty() ? -1 : placeholderOids.first();
+	}
     }
 
     /** Stores information about object IDs available for allocation. */
-    private static final class ObjectIdInfo {
+    private static final class ObjectIdInfo
+	implements Comparable<ObjectIdInfo>
+    {
+	/** The first object ID in this block. */
+	private final long firstObjectId;
 
 	/**
 	 * The next object ID to use for creating an object.  Valid if not
 	 * greater than lastObjectId.
 	 */
-	private long nextObjectId = 0;
+	private long nextObjectId;
 
 	/**
 	 * The last object ID that is free for allocating an object before
 	 * needing to obtain more IDs from the database.
 	 */
-	private long lastObjectId = -1;
+	private final long lastObjectId;
 
 	/**
 	 * The value of nextObjectId at the start of the transaction, and which
 	 * it should be set to if the transaction aborts.
 	 */
-	private long abortNextObjectId = 0;
+	private long abortNextObjectId;
 
-	/** Creates an instance of this class. */
-	ObjectIdInfo() { }
+	/**
+	 * Creates an instance with the specified first and last object IDs.
+	 */
+	ObjectIdInfo(long firstObjectId, long lastObjectId) {
+	    this.firstObjectId = firstObjectId;
+	    nextObjectId = firstObjectId;
+	    this.lastObjectId = lastObjectId;
+	    abortNextObjectId = nextObjectId;
+	}
+
+	/** Implement Comparable<ObjectIdInfo>, ordered by object ID. */
+	public int compareTo(ObjectIdInfo other) {
+	    return Long.signum(lastObjectId - other.lastObjectId);
+	}
 
 	/**
 	 * Records the initial value of nextObjectId, so that it can be rolled
@@ -563,17 +734,6 @@ public class DataStoreImpl
 	 */
 	void initTxn() {
 	    abortNextObjectId = nextObjectId;
-	}
-
-	/** Updates the next and last object IDs. */
-	void setObjectIds(long nextObjectId, long lastObjectId) {
-	    this.nextObjectId = nextObjectId;
-	    this.lastObjectId = lastObjectId;
-	    /*
-	     * Since blocks of object IDs may not be allocated contiguously,
-	     * only back up to the start of the most recently allocated block.
-	     */
-	    this.abortNextObjectId = nextObjectId;
 	}
 
 	/** Returns whether there are more object IDs available. */
@@ -593,6 +753,16 @@ public class DataStoreImpl
 	 */
 	void abort() {
 	    nextObjectId = abortNextObjectId;
+	}
+
+	/** Returns the first object ID in this block. */
+	long first() {
+	    return firstObjectId;
+	}
+
+	/** Returns the last object ID in this block. */
+	long last() {
+	    return lastObjectId;
 	}
     }
 
@@ -642,9 +812,6 @@ public class DataStoreImpl
 	 * -tjb@sun.com (02/16/2007)
 	 */
 	directory = new File(specifiedDirectory).getAbsolutePath();
-	allocationBlockSize = wrappedProps.getIntProperty(
-	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
-	    1, Integer.MAX_VALUE);
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	DbTransaction dbTxn = null;
 	boolean done = false;
@@ -657,6 +824,10 @@ public class DataStoreImpl
 	    classesDb = dbs.classes;
 	    oidsDb = dbs.oids;
 	    namesDb = dbs.names;
+	    useAllocationBlockPlaceholders =
+		env.useAllocationBlockPlaceholders();
+	    freeObjectIds = new FreeObjectIds(useAllocationBlockPlaceholders);
+	    removeUnusedAllocationPlaceholders(dbTxn);
 	    done = true;
 	    dbTxn.commit();
 	} catch (RuntimeException e) { 
@@ -726,6 +897,54 @@ public class DataStoreImpl
 	return dbs;
     }
 
+    /**
+     * Removes any unused allocation block placeholders and updates the ID of
+     * the first placeholder.
+     */
+    private void removeUnusedAllocationPlaceholders(DbTransaction dbTxn) {
+	byte[] firstPlaceholderKey =
+	    DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY);
+	long placeholderOid = DataEncoding.decodeLong(
+	    infoDb.get(dbTxn, firstPlaceholderKey, true));
+	if (placeholderOid < 0) {
+	    logger.log(Level.FINEST, "No allocation placeholders");
+	    return;
+	}
+	DbCursor cursor = oidsDb.openCursor(dbTxn);
+	try {
+	    while (cursor.findNext(DataEncoding.encodeLong(placeholderOid))) {
+		byte[] key = cursor.getKey();
+		if (DataEncoding.decodeLong(key) != placeholderOid) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "Placeholder oid:{0,number,#} not found",
+				   placeholderOid);
+		    }
+		} else if (isPlaceholderValue(cursor.getValue())) {
+		    boolean success = oidsDb.delete(dbTxn, key);
+		    assert success;
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "Removed placeholder at oid:{0,number,#}",
+				   placeholderOid);
+		    }
+		} else {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "Ignoring oid:{0,number,#} that does not" +
+				   " refer to a placeholder",
+				   placeholderOid);
+		    }
+		}
+		placeholderOid += ALLOCATION_BLOCK_SIZE;
+	    }
+	    infoDb.put(
+		dbTxn, firstPlaceholderKey, DataEncoding.encodeLong(-1));
+	} finally {
+	    cursor.close();
+	}
+    }
+
     /* -- Implement DataStore -- */
 
     /** {@inheritDoc} */
@@ -734,16 +953,44 @@ public class DataStoreImpl
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, createObjectOp);
 	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
-	    if (!objectIdInfo.hasNext()) {
+	    if (objectIdInfo == null) {
 		logger.log(Level.FINE, "Allocate more object IDs");
-		long newNextObjectId = getNextId(
-		    DataStoreHeader.NEXT_OBJ_ID_KEY,
-		    allocationBlockSize, txn.getTimeout());
-		objectIdInfo.setObjectIds(
-		    newNextObjectId,
-		    newNextObjectId + allocationBlockSize - 1);
+		long newNextObjectId;
+		long newLastObjectId;
+		DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
+		boolean done = false;
+		try {
+		    newNextObjectId = DataStoreHeader.getNextId(
+			NEXT_OBJ_ID_KEY, infoDb, dbTxn, ALLOCATION_BLOCK_SIZE);
+		    newLastObjectId =
+			newNextObjectId + ALLOCATION_BLOCK_SIZE - 1;
+		    maybeUpdateAllocationBlockPlaceholders(
+			dbTxn, newLastObjectId);
+		    done = true;
+		    dbTxn.commit();
+		} finally {
+		    if (!done) {
+			dbTxn.abort();
+		    }
+		}
+		objectIdInfo = txnInfo.createObjectIdInfo(
+		    newNextObjectId, newLastObjectId);
 	    }
 	    long result = objectIdInfo.next();
+	    if (useAllocationBlockPlaceholders &&
+		result == objectIdInfo.first())
+	    {
+		/*
+		 * Create the placeholder when using the first ID in the block.
+		 * Don't do this when storing the allocation and placeholder
+		 * information in the info database because this transaction
+		 * may already be holding a lock on the location in the OIDs
+		 * database.
+		 */
+		oidsDb.put(txnInfo.dbTxn,
+			   DataEncoding.encodeLong(objectIdInfo.last()),
+			   PLACEHOLDER_DATA);
+	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createObject txn:{0} returns oid:{1,number,#}",
@@ -789,9 +1036,10 @@ public class DataStoreImpl
 		       txn, oid, forUpdate);
 	}
 	try {
-	    byte[] result = getObjectInternal(
-		txn, oid, forUpdate,
-		forUpdate ? getObjectForUpdateOp : getObjectOp);
+	    byte[] result = decodeValue(
+		getObjectInternal(
+		    txn, oid, forUpdate,
+		    forUpdate ? getObjectForUpdateOp : getObjectOp));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -815,7 +1063,7 @@ public class DataStoreImpl
 	TxnInfo txnInfo = checkTxn(txn, op);
 	byte[] result = oidsDb.get(
 	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
-	if (result == null) {
+	if (result == null || isPlaceholderValue(result)) {
 	    throw new ObjectNotFoundException("Object not found: " + oid);
 	}
 	if (readBytesCounter != null) {
@@ -833,17 +1081,8 @@ public class DataStoreImpl
 		       txn, oid);
 	}
 	try {
-	    checkId(oid);
-	    if (data == null) {
-		throw new NullPointerException("The data must not be null");
-	    }
 	    TxnInfo txnInfo = checkTxn(txn, setObjectOp);
-	    oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
-	    if (writtenBytesCounter != null) {
-		writtenBytesCounter.incrementCount(data.length);
-		writtenObjectsCounter.incrementCount();
-		writtenBytesSample.addSample(data.length);
-	    }
+	    setObjectInternal(txnInfo, oid, data);
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -876,18 +1115,7 @@ public class DataStoreImpl
 			       "setObjects txn:{0}, oid:{1,number,#}",
 			       txn, oid);
 		}
-		checkId(oid);
-		byte[] data = dataArray[i];
-		if (data == null) {
-		    throw new NullPointerException(
-			"The data must not be null");
-		}
-		oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
-		if (writtenBytesCounter != null) {
-		    writtenBytesCounter.incrementCount(data.length);
-		    writtenObjectsCounter.incrementCount();
-		    writtenBytesSample.addSample(data.length);
-		}
+		setObjectInternal(txnInfo, oid, dataArray[i]);
 	    }
 	    txnInfo.modified = true;
 	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
@@ -895,6 +1123,25 @@ public class DataStoreImpl
 	    throw convertException(
 		txn, Level.FINEST, e,
 		"setObjects txn:" + txn + (oidSet ? ", oid:" + oid : ""));
+	}
+    }
+
+    /**
+     * Store the value of a single object, without logging.  Don't check the
+     * transaction here, so we can use this method for setting multiple
+     * objects.
+     */
+    private void setObjectInternal(TxnInfo txnInfo, long oid, byte[] data) {
+	checkId(oid);
+	if (data == null) {
+	    throw new NullPointerException("The data must not be null");
+	}
+	byte[] encodedData = encodeValue(data);
+	oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), encodedData);
+	if (writtenBytesCounter != null) {
+	    writtenBytesCounter.incrementCount(encodedData.length);
+	    writtenObjectsCounter.incrementCount();
+	    writtenBytesSample.addSample(encodedData.length);
 	}
     }
 
@@ -907,11 +1154,13 @@ public class DataStoreImpl
 	try {
 	    checkId(oid);
 	    TxnInfo txnInfo = checkTxn(txn, removeObjectOp);
-	    boolean found = oidsDb.delete(
-		txnInfo.dbTxn, DataEncoding.encodeLong(oid));
-	    if (!found) {
+	    byte[] key = DataEncoding.encodeLong(oid);
+	    byte[] value = oidsDb.get(txnInfo.dbTxn, key, true);
+	    if (value == null || isPlaceholderValue(value)) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    }
+	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
+	    assert found : "Object not found during delete";
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -1289,7 +1538,7 @@ public class DataStoreImpl
 		 */
 		try {
 		    txnInfoTable.remove(txn);
-		    txnInfo.commit();
+		    txnInfo.prepareAndCommit();
 		} finally {
 		    decrementTxnCount();
 		} 
@@ -1353,7 +1602,7 @@ public class DataStoreImpl
 	     */
 	    txnInfoTable.remove(txn);
 	    try {
-		txnInfo.commit();
+		txnInfo.prepareAndCommit();
 		logger.log(
 		    Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 		return;
@@ -1598,7 +1847,6 @@ public class DataStoreImpl
      * timeout when creating a DB transaction.
      */
     private long getNextId(long key, int blockSize, long timeout) {
-	assert blockSize > 0;
 	DbTransaction dbTxn = env.beginTransaction(timeout);
 	boolean done = false;
 	try {
@@ -1640,6 +1888,131 @@ public class DataStoreImpl
 	    return keyBytes;
 	} catch (DigestException e) {
 	    throw new AssertionError(e);
+	}
+    }
+
+    /**
+     * Checks if an object value read from the database is from a placeholder,
+     * meaning there is no object present.
+     */
+    static boolean isPlaceholderValue(byte[] value) {
+	return value.length > 0 && value[0] == PLACEHOLDER_OBJ_VALUE;
+    }
+
+    /**
+     * Encodes an object value for writing to the database to quote it's first
+     * byte if it would conflict with PLACEHOLDER_OBJ_VALUE or QUOTE_OBJ_VALUE.
+     */
+    private static byte[] encodeValue(byte[] value) {
+	if (value.length > 0) {
+	    if (value[0] == PLACEHOLDER_OBJ_VALUE ||
+		value[0] == QUOTE_OBJ_VALUE)
+	    {
+		byte[] result = new byte[value.length + 1];
+		result[0] = QUOTE_OBJ_VALUE;
+		System.arraycopy(value, 0, result, 1, value.length);
+		return result;
+	    }
+	}
+	return value;
+    }
+
+    /**
+     * Decodes an object value read from the database to account for quoting of
+     * its first byte.  Throws an exception if the value represents a
+     * placeholder.
+     */
+    private static byte[] decodeValue(byte[] value) {
+	if (value.length > 0) {
+	    if (value[0] == PLACEHOLDER_OBJ_VALUE) {
+		throw new IllegalArgumentException(
+		    "Attempt to decode a placeholder as an object value");
+	    } else if (value[0] == QUOTE_OBJ_VALUE) {
+		byte[] result = new byte[value.length - 1];
+		System.arraycopy(value, 1, result, 0, value.length - 1);
+		return result;
+	    }
+	}
+	return value;
+    }
+
+    /**
+     * Notes the first placeholder when starting to use a new allocation block
+     * with the specified object ID at its end, if using allocation block
+     * placeholders.
+     */
+    private void maybeUpdateAllocationBlockPlaceholders(
+	DbTransaction dbTxn, long placeholderOid)
+    {
+	if (useAllocationBlockPlaceholders) {
+	    long firstPlaceholderOid = freeObjectIds.getFirstPlaceholder();
+	    if (firstPlaceholderOid == -1) {
+		firstPlaceholderOid = placeholderOid;
+	    }
+	    infoDb.put(dbTxn,
+		       DataEncoding.encodeLong(FIRST_PLACEHOLDER_ID_KEY),
+		       DataEncoding.encodeLong(firstPlaceholderOid));
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "Note first placeholder oid:{0,number,#}",
+			   firstPlaceholderOid);
+	    }
+	}
+    }
+
+    /**
+     * Store raw data for the specified object ID.  The value is used as the
+     * literal data, without checking for placeholders or quoted values.  This
+     * method is intended for testing.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oid the object ID
+     * @param	data the data
+     */
+    private void setObjectRaw(Transaction txn, long oid, byte[] data) {
+	TxnInfo txnInfo = checkTxn(txn, null);
+	oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
+    }
+
+    /**
+     * Get raw data for the specified object ID.  The value returned is the
+     * literal data, without checking for placeholders or quoted values.  This
+     * method is intended for testing.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oid the object ID
+     * @return	the data or null if the object ID is not found
+     */
+    private byte[] getObjectRaw(Transaction txn, long oid) {
+	TxnInfo txnInfo = checkTxn(txn, null);
+	return oidsDb.get(txnInfo.dbTxn, DataEncoding.encodeLong(oid), false);
+    }
+
+    /**
+     * Gets the next object ID after the one specified, or -1 if there are no
+     * more objects.  If oid is -1, then returns the first object ID.  The
+     * values for the object IDs will not be checked, so this method can be
+     * used to obtain object IDs for placeholders.  This method is intended for
+     * testing.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oid the object ID or -1
+     * @return	the next object ID or -1
+     */
+    private long nextObjectIdRaw(Transaction txn, long oid) {
+	TxnInfo txnInfo = checkTxn(txn, null);
+	DbCursor cursor = oidsDb.openCursor(txnInfo.dbTxn);
+	try {
+	    boolean found =  (oid < 0)
+		? cursor.findFirst()
+		: cursor.findNext(DataEncoding.encodeLong(oid + 1));
+	    if (found) {
+		return DataEncoding.decodeLong(cursor.getKey());
+	    } else {
+		return -1;
+	    }
+	} finally {
+	    cursor.close();
 	}
     }
 }

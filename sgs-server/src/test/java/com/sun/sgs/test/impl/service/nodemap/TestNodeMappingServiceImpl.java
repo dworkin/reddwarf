@@ -272,7 +272,10 @@ public class TestNodeMappingServiceImpl extends TestCase {
                               .setServiceBinding(VERSION_KEY, version);
 		}}, taskOwner);
 
-	new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	new NodeMappingServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestNodeMappingServiceImpl", serverNode, null),
+	    systemRegistry, txnProxy);  
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {
@@ -314,7 +317,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
         try {
             nodemap = 
                 new NodeMappingServiceImpl(
-                            serviceProps, systemRegistry, txnProxy);
+		    SgsTestNode.getDefaultProperties(
+			"TestNodeMappingServiceImpl", serverNode, null),
+		    systemRegistry, txnProxy);
             TestListener listener = new TestListener();        
             nodemap.addNodeMappingListener(listener);
             
@@ -460,6 +465,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testRoundRobinAutoMove() throws Exception {
         // Remove what happened at setup().  I know, I know...
         tearDown();
+	serviceProps = SgsTestNode.getDefaultProperties(
+	    "TestNodeMappingServiceImpl", null, null);
         
         final int MOVE_COUNT = 5;
         // Create a new nodeMappingServer which will move an identity
@@ -537,7 +544,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testLocalNodePolicy() throws Exception {
         // Remove what happened at setup().  I know, I know...
         tearDown();
-        
+	serviceProps = SgsTestNode.getDefaultProperties(
+	    "TestNodeMappingServiceImpl", null, null);
+
         // Create a new nodeMappingServer which will move an identity
         // automatically every so often.  
         serviceProps.setProperty(

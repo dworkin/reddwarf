@@ -24,6 +24,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
+import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +34,7 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
@@ -105,7 +107,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	props = createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    DataStoreNetPackage + ".server.port", "0");
-	server = getDataStoreServer();
+	props.setProperty(getLockTimeoutPropertyName(props), "100");
+ 	server = getDataStoreServer();
 	tid = server.createTransaction(1000);
 	oid = server.createObject(tid);
     }
@@ -589,6 +592,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	server.setObject(tid2, oid, new byte[0]);
 	/* Block getting read lock in txn 1 */
 	final Semaphore flag = new Semaphore(0);
+	final AtomicBoolean aborted = new AtomicBoolean(false);
 	Thread thread = new Thread() {
 	    public void run() {
 		try {
@@ -596,7 +600,7 @@ public class TestDataStoreServerImpl extends TestCase {
 		    server.getObject(tid, oid, false);
 		} catch (TransactionAbortedException e) {
 		    System.err.println(e);
-		    tid = -1;
+		    aborted.set(true);
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
@@ -621,6 +625,9 @@ public class TestDataStoreServerImpl extends TestCase {
 	    server.abort(tid2);
 	    assertTrue("Blocking thread didn't complete",
 		       flag.tryAcquire(100, TimeUnit.MILLISECONDS));
+	    if (aborted.get()) {
+		tid = -1;
+	    }
 	}
     }
 }
