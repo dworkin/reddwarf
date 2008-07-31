@@ -294,7 +294,9 @@ public final class NodeMappingServerImpl
         exporter.unexport();
         try {
             if (removeThread != null) {
-                removeThread.interrupt();
+		synchronized (removeThread) {
+		    removeThread.notifyAll();
+		}
                 removeThread.join();
             }
         } catch (InterruptedException e) {
@@ -443,12 +445,6 @@ public final class NodeMappingServerImpl
      * during our waiting time, marking the identity as active, during the
      * waiting time.  If it is still appropriate to remove the identity,
      * all traces of it are removed from the data store.
-     * <p>
-     * NOTE: this thread is still not correct in the face of interrupts:
-     * the logging code is known to swallow the interrupted exception
-     * sometimes.  InterruptedException clears the interrupt status,
-     * so checking isInterrupted() doesn't tell us if the thread has 
-     * <b>ever</b> been interrupted.
      */
     private class RemoveThread extends Thread {
         private final long expireTime;   // milliseconds
@@ -459,18 +455,22 @@ public final class NodeMappingServerImpl
         }
         
         public void run() {
-            while (!isInterrupted()) {
-                try {
-                    sleep(expireTime);
-                } catch (InterruptedException ex) {
-                    logger.log(Level.FINE, "Remove thread interrupted");
-                    break;
-                }
-                
+            while (true) {
+		synchronized (this) {
+		    if (shuttingDown()) {
+			break;
+		    }
+		    try {
+			wait(expireTime);
+		    } catch (InterruptedException ex) {
+			logger.log(Level.FINE, "Remove thread interrupted");
+			break;
+		    }
+		}
                 Long time = System.currentTimeMillis() - expireTime;
                 
                 boolean workToDo = true;
-                while (workToDo && !isInterrupted()) {
+                while (workToDo && !shuttingDown()) {
                     RemoveInfo info = removeQueue.peek();
                     if (info != null && info.getTimeInserted() < time) {
                         // Always remove the item from the list, even if we

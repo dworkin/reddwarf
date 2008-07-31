@@ -101,14 +101,6 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	System.err.println("Skipping");
     }
     @Override
-    public void testConstructorBadAllocationBlockSize() throws Exception {
-	System.err.println("Skipping");
-    }
-    @Override
-    public void testConstructorNegativeAllocationBlockSize() throws Exception {
-	System.err.println("Skipping");
-    }
-    @Override
     public void testConstructorNonexistentDirectory() throws Exception {
 	System.err.println("Skipping");
     }

@@ -363,6 +363,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		       "systemRegistry:{1}, txnProxy:{2}",
 		       properties, systemRegistry, txnProxy);
 	}
+	DataStore storeToShutdown = null;
 	try {
 	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
@@ -399,6 +400,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    } else {
 		store = new DataStoreClient(properties);
 	    }
+	    storeToShutdown = store;
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -429,6 +431,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 			}
 		    },
 		taskOwner);
+	    storeToShutdown = null;
 	} catch (RuntimeException e) {
 	    getExceptionLogger(e).logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
@@ -437,6 +440,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
+	} finally {
+	    if (storeToShutdown != null) {
+		storeToShutdown.shutdown();
+	    }
 	}
     }
 

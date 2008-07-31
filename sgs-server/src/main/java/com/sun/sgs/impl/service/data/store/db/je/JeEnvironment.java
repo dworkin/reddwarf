@@ -420,4 +420,14 @@ public class JeEnvironment implements DbEnvironment {
 	    throw convertException(e, false);
 	}
     }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation returns {@code true} to specify that this
+     * environment requires the use of allocation block placeholders.
+     */
+    public boolean useAllocationBlockPlaceholders() {
+	return true;
+    }
 }
