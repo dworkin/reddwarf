@@ -37,6 +37,7 @@ static int testUint16(sgs_message *pmsg, int numTests, int silent);
 static int testUint32(sgs_message *pmsg, int numTests, int silent);
 static int testStrings(sgs_message *pmsg, int numTests, int silent);
 static int testIds(sgs_message *pmsg, int numTests, int silent);
+static int testBytes(sgs_message *pmsg, int numTests, int silent);
 
 
 /*
@@ -93,6 +94,12 @@ int main(int argc, char *argv[]) {
         printf("test Ids passed\n");
     } else 
         printf("%d failures in testIds\n", result);
+    
+    result = sgs_msg_init(&msg, buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST);
+    if ((result = testBytes(&msg, 200, 0))== 0){
+        printf("test Bytes passed\n");
+    } else
+        printf("%d failures in byteTest\n", result);
   
     printf("Goodbye!\n");
   
@@ -315,4 +322,77 @@ int testIds(sgs_message *pmsg, int numTests, int silent){
     }
     return totalBad;
 }
+
+typedef struct bytetest{
+    int size;
+    uint8_t *contents;
+} byteTest;
+
+void generateTestBytes(byteTest **toTest){
+    int i, j, len;
+    long sourcebuf[5];
+    
+    for (i = 0; i < 10; i++){    
+        len = (random()%20);
+        len++;
+        for (j = 0; j < 5; j++){
+            sourcebuf[j] = random();
+        }
+        (*(toTest+i))->contents = malloc(len);
+        if ((*(toTest+i))->contents == NULL){
+            printf("unable to allocate memory for byte buffer\n");
+            exit(1);
+        }
+        memcpy((*(toTest+i))->contents, sourcebuf, len);
+        (*(toTest+i))->size = len;
+    }
+}
+
+int testBytes(sgs_message *pmsg, int numTests, int silent){
+    byteTest *inputBytes[10];
+    byteTest *outputBytes[10];
+    
+    int i, j, k, incr, results, totalBad;
+    
+    totalBad = 0;
+    
+    for (i = 0; i<numTests; i+=j){
+        generateTestBytes(inputBytes);
+        pmsg->len = 1;
+        for (j= 0; j<10; j++){
+            results = sgs_msg_add_arb_content(pmsg, inputBytes[j]->contents, 
+            inputBytes[j]->size);
+            if (results < 0){
+                printf("Unable to write test bytes to buffer\n");
+            }
+        }
+        incr = 3;
+        for (j=0; j<10; j++){
+            results = sgs_msg_read_bytes(pmsg, incr, &(outputBytes[j]->contents), inputBytes[j]->size);
+            if (results < 0){
+                printf("unable to read bytes from buffer\n");
+                exit(1);
+            }
+            incr += results;
+        }
+        for (j = 0; j < 10; j++){
+            for (k = 0; k < inputBytes[j]->size; k++){
+                if (*(inputBytes[j]->contents+k) != *(outputBytes[j]->contents+k)){
+                    if (silent == 0){
+                        printf("input = %d, ouput = %d, index = %d\n",
+                            *(inputBytes[j]->contents+k), *(outputBytes[j]->contents+k), k);
+                    }
+                    totalBad++;
+                    k = inputBytes[j]->size;
+                }
+            }
+        }
+        for (j = 0; j<10; j++){
+            free(inputBytes[j]->contents);
+            free(outputBytes[j]->contents);
+        }
+    
+    }
+    return totalBad;
+ }
 
