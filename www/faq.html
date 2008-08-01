@@ -1,0 +1,357 @@
+<html>
+<head>
+<title>Hack - A Project Darkstar Game: FAQ</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+
+<style>
+  #apphead {display:none;}
+</style>
+
+</head>
+
+<body bgcolor="#FFFFFF" text="#000000">
+
+  <table border="0" width="700px">
+    <tr><td>
+
+  <center>
+    <a href="https://darkstar-hack.dev.java.net/">
+      <img src="images/hack-logo.gif" border=0>
+    </a>
+  <h3>A Project Darkstar Game</h3>
+  </center>
+
+  <h1>FAQ</h1>
+  
+  Click on a link below to take you to a specific topic, or just start
+  browsing. <br/>
+  
+  <a href="#general">General</a><br/>
+  <a href="#building">Building and Running</a><br/>
+  <a href="#design">Game Design</a><br/>
+  <a href="#gameplay">Gameplay</a><br/>
+  <a href="#other">Other</a><br/>
+
+  <br/>
+
+  <a name="general"/>
+  <h2>General Questions</h2>
+  
+  <table cellpadding="0" cellspacing="10" border="0" width="100%">
+    
+    <tr>
+      <td width="25"></td>
+      <td align="left">
+	
+	<p style="text-indent:-30px;"> <b>What is Hack?</b></p>
+	
+	<p>Hack is a fully-working small 2D dungeon crawler game
+	  with a playable client and server.  The game is very similar
+	  to a graphical,
+	  generic <a href="http://en.wikipedia.org/wiki/Rogue_(computer_game)">Rogue</a>-like
+	  game.  Right now it's a bit light on game-specific logic,
+	  but this is because our primary goals was to develop all the
+	  application logic needed, such as dealing with clients,
+	  having characters move, processing messages, etc.  As a part
+	  of this goal, we designed the system to be highly extensible
+	  so later developers could add their own improvements.  Some
+	  of the current features are:
+	    <ul>
+	      <li>Client login and hooks for passwords and authentication</li>
+	      <li>Character classes and stats</li>
+	      <li>A Lobby where players can choose which dungeon to visit</li>
+	      <li>A configurable dungeon, creature and NPC system where developers can easily design their own dungeons.</li>
+	      <li>A minimal combat system where the player can kill and be killed by creatures.</li>
+	      <li>A 2D graphical client for the player (screen shot below) and a large sprite map for extending the game with new player classes and objects.</li>
+	    </ul>
+	</p>
+	
+	<center>
+	  <img src="images/client-screenshot.png"/>
+	</center>
+	
+      </td>
+    </tr>
+
+    
+    <tr>
+      <td width="25"></td>
+      <td align="left">
+	
+	<p style="text-indent:-30px;"> <b>Where did Hack come from?</b><p/>
+	  
+	<p>Hack was initially built as an internal game as a part of
+	  <a href="https://games-darkstar.dev.java.net/">Project
+	  Darkstar</a> (PDS).  Now that PDS has been open sourced,
+	  Hack has also been released under the Creative Commons
+	  license and is being developed as its own game.</p>
+	
+      </td>
+    </tr>
+      
+    <tr>
+      <td width="25"></td>
+      <td align="left">
+	
+	<p style="text-indent:-30px;"> <b>If I add feature X, can I
+	use the code again later in a different project?</b><p/>
+	  
+	<p>Yes, and not only that, you can use all the other code in
+	the Hack project as well.  Hack was released under the
+	Creative Commons license for this very purpose.  Often when
+	new game developers are just starting out, they want to try
+	implementing some cool feature or gameplay option, but the
+	minimal programming investment to get the game running is so
+	large, they give up before finishing.  We would like to see
+	new developers try programming with Hack first and adding the
+	things they want, and then taking their new game-programming
+	knowledge and their code to develop their own games.  (or they can keep working on Hack too <img src="images/smiley.gif"/>)</p>
+	
+      </td>
+    </tr>
+    
+  </table>
+  
+  <br><br>
+  <hr width="700px"/>
+  
+  <a name="building"/>
+  <h2>Questions on Building and Running</h2>
+  
+  <table cellpadding="0" cellspacing="10" border="0" width="100%">
+    
+    <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>How do I get the source?</b><p/>
+	    
+	  <p>Hack is an open-source game.  You can download the source
+	    from our SVN repository with the following
+	    command:<br/>&nbsp;&nbsp;<tt>svn checkout https://darkstar-hack.dev.java.net/svn/darkstar-hack/trunk darkstar-hack --username username</tt><br/>
+	    where <tt>username</tt> is your java.net username, or you
+	    can check it out anonymously using the username <tt>guest</tt></p>
+	  
+	</td>
+      </tr>
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>How do I build the source?</b><p/>
+	    
+	  <p>We
+	  use <a href="http://en.wikipedia.org/wiki/Apache_Maven">Apache
+	  Maven</a> for our project.  If you have the project checked
+	  out, you can type <tt>mvn compile</tt> at the root directory
+	  and this will build the source for all four of the subprojects.</p>
+	  
+	</td>
+      </tr>
+
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>What are all these subprojects?</b><p/>
+	    
+	  <p>We have divided the code base into four logically
+	  separate Maven subprojects:
+	    <ol>
+	      <li><b><tt>hack-client:</tt></b><p>The client project
+	      encompasses all the client-side code for processing
+	      messages and displaying the game state in a GUI.</p></li>
+	      <li><b><tt>hack-ai:</tt></b> <p>The ai project is a
+	      headless client that connects to the server, creates a
+	      character, then joins a game and begins randomly
+	      wandering around.  This project's runtime configuration
+	      lets you specify how many AI clients to connect, which
+	      is useful for stress testing how many clients a
+	      particular server configuration can handle before
+	      performance problems set in.  The AI project has a
+	      dependency on parts of the client project for its
+	      message processing.</p></li>
+	      <li><b><tt>hack-server:</tt></b> <p>The server is where all
+	      the server-side code for manipulating game state and
+	      handling client messages lives.  Currently, the server
+	      also has knowledge of parts of the GUI, notably the
+	      tileset, and the client can request these informatin
+	      from the server.</p></li>
+	      <li><b><tt>hack-shared:</tt></b> <p>The shared project is
+	      the only non-runnable project in the group.  It contains
+	      all the shared code between the client project and
+	      server.  It also contains all the messaging and command
+	      classes, along with utilities for encoding the various
+	      game commands into network-ready data types.</p></li>
+	    </ol>
+	  </p>
+	  
+	</td>
+      </tr>
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>How do I run this?</b><p/>
+	    
+	  <p>We have application run commands in the Maven pom.xml so
+	  you can start things from the command line as follows:
+	    <ol>
+	      <li><b><tt>hack-client:</tt></b> <tt>mvn process-test-resources -Ptest-run</tt></li>
+	      <li><b><tt>hack-ai:</tt></b> <tt>mvn process-test-resources -Ptest-run</tt></li>
+	      <li><b><tt>hack-server:</tt></b> <tt>mvn process-test-resources -Psingle-node-server</tt></li>
+	    </ol>
+
+	    The Hack client and ai projects can take optional
+	    parameter <tt>hack.host</tt> to specificy which machine to
+	    connect to.  The ai project also has the optional
+	    parameter <tt>ai.clients</tt> to specify how many clients
+	    should connect from the new JVM.  These properties should
+	    be specified on the command line using the
+	    "-D<i>property</i>=value" syntax.
+	  </p>
+	  
+	</td>
+      </tr>
+
+      
+  </table>
+  
+  <br><br>
+  <hr width="700px">
+  
+  <a name="design"/>
+  <h2>Design and Development Questions</h2>
+  
+    <table cellpadding="0" cellspacing="10" border="0" width="100%">
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>I don't know Project Darkstar very well.  Can I still contribute?</b><p/>
+	    	  
+	  <p>Most definitely.  We have plenty of client-side and
+	  server-side projects that require no experience with how to
+	  program in the Project Darkstart environment.  Of course,
+	  once you start working with the code base, you're bound to
+	  pick up how it's done.  If you have a specific project you
+	  have in mind that you're not sure about, feel free to email
+	  the dev mailing list about it.  We're always happy to help
+	  developers get started.</p>
+	  
+	</td>
+      </tr>
+
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>I want to add feature X, what do I do?</b><p/>
+	    	  
+	  <p>Email us! We're always looking for new ideas and featues
+	  to add.  Also, check out the list
+	  of <a href="servlets/ProjectIssues">current projects and
+	  issues</a> to see if someone has already proposed what
+	  you're suggesting.  You might be able to work together with
+	  that person, or you could create another implementation of
+	  it so we have some pluggable behavior.</p>
+	  
+	</td>
+      </tr>
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>I'm having trouble
+	  figuring out how all this code works.  Can you explain what
+	  X is doing?</b><p/>
+	    	  
+	  <p>You might want to check out
+	  the <a href="design.html">design document</a> to see if that
+	  helps answer your question.  If not feel free to email the
+	  dev mailing list.  We appreciate any feedback on the design
+	  document too as it's important that the project have a clear
+	  statement of how the code interacts.  If you think that some
+	  part of the code would be better restructured, you're
+	  welcome to suggest that too.</p>
+	  
+	</td>
+      </tr>
+
+
+    </table>
+
+
+    <br><br>
+    <hr width="700px">
+
+    <a name="gameplay"/>
+    <h2>Gameplay Questions</h2>
+  
+    <table cellpadding="0" cellspacing="10" border="0" width="100%">
+
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>My character won't move!</b><p/>
+	    
+	  <p>The key commands are i,j,k,l.</p>
+	  
+	</td>
+      </tr>
+      
+    </table>
+
+
+    <br><br>
+    <hr width="700px">
+
+    <a name="other"/>
+    <h2>Other Questions</h2>
+
+    <table cellpadding="0" cellspacing="10" border="0" width="100%">
+
+
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>Why did you make a game
+	  with such outdated graphics?</b><p/>
+	    
+	  <p>Two reasons: we're primarily game and systems
+	  programmers, so we're not very good at art design and
+	  graphics.  (Shameless plug: if you're a graphic designer, or
+	  want to try writing a cool GUI, this is your chance.) More
+	  importantly, we wanted to get the core gameplay implemented
+	  first.  It's more useful to have a fun game with old
+	  graphics, than a boring game with good graphics.</p>
+	  
+	</td>
+      </tr>
+      
+    </table>
+
+
+  <br><br>
+  <center>
+    <a href="https://games-darkstar.dev.java.net/">
+      <img src="images/darkstarLogo.jpg" width="288" height="60" border="0" alt="Project Darkstar"/>
+    </a>
+    <p style="font-size: 8pt">Hack is a proud member of the Project Darkstar Game Community</p>
+  </center>
+
+
+  </td></tr>
+  </table>
+
+</body>
+</html>
