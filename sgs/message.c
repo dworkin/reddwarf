@@ -318,7 +318,8 @@ int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **
     if (*result == NULL){
         return -1;
     }
-    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? pmsg->len - start : count;
+    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? 
+        (pmsg->len + SGS_MSG_INIT_LEN) - start : count;
     memcpy(*result, pmsg->buf + start, retcount);
     return retcount;
 }
