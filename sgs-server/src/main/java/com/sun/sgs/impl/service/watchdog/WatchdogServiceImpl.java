@@ -369,12 +369,7 @@ public final class WatchdogServiceImpl
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
-	    if (exporter != null) {
-		exporter.unexport();
-	    }
-	    if (serverImpl != null) {
-		serverImpl.shutdown();
-	    }
+	    doShutdown();
 	    throw e;
 	}
     }
