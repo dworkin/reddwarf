@@ -135,10 +135,10 @@ public final class WatchdogServerImpl
     private static final int DEFAULT_RENEW_INTERVAL = 1000;
 
     /** The lower bound for the renew interval. */
-    private static final int RENEW_INTERVAL_LOWER_BOUND = 5;
+    private static final int RENEW_INTERVAL_LOWER_BOUND = 100;
 
     /** The upper bound for the renew interval. */
-    private static final int RENEW_INTERVAL_UPPER_BOUND = 10000;
+    private static final int RENEW_INTERVAL_UPPER_BOUND = Integer.MAX_VALUE;
 
     /** The name of the ID generator. */
     private static final String ID_GENERATOR_NAME =
@@ -241,9 +241,12 @@ public final class WatchdogServerImpl
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
-	isFullStack = fullStack;    
-	logger.log(Level.CONFIG, "WatchdogServerImpl: detected " +
-		   (isFullStack ? "full stack" : "server stack"));
+	isFullStack = fullStack;
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ":" + port +
+		       "]: detected " +
+		       (isFullStack ? "full stack" : "server stack"));
+	}
 
 	/*
 	 * Check service version.
@@ -256,9 +259,19 @@ public final class WatchdogServerImpl
 	
 	int requestedPort = wrappedProps.getIntProperty(
  	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
-	renewInterval = wrappedProps.getLongProperty(
-	    RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL,
-	    RENEW_INTERVAL_LOWER_BOUND, RENEW_INTERVAL_UPPER_BOUND);
+	boolean noRenewIntervalProperty = 
+	    wrappedProps.getProperty(RENEW_INTERVAL_PROPERTY) == null;
+	renewInterval =
+	    isFullStack && noRenewIntervalProperty ?
+	    RENEW_INTERVAL_UPPER_BOUND :
+	    wrappedProps.getLongProperty(
+		RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL,
+		RENEW_INTERVAL_LOWER_BOUND, RENEW_INTERVAL_UPPER_BOUND);
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ":" + port +
+		       "]: renewInterval:" + renewInterval);
+	}
+
 	idBlockSize = wrappedProps.getIntProperty(
  	    ID_BLOCK_SIZE_PROPERTY, DEFAULT_ID_BLOCK_SIZE,
 	    IdGenerator.MIN_BLOCK_SIZE, Integer.MAX_VALUE);
