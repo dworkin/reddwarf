@@ -401,6 +401,10 @@ public final class WatchdogServiceImpl
 	    renewThread.notifyAll();
 	}
 	try {
+	    // The following 'join' call relies on an undocumented feature:
+	    // 'join' can be also be invoked on a thread that isn't started.
+	    // If the server can't be exported, the renewThread won't be
+	    // started when 'doShutdown' is invoked.
 	    renewThread.join();
 	} catch (InterruptedException e) {
 	}
