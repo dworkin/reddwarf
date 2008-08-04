@@ -23,6 +23,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
@@ -767,7 +768,9 @@ public class ClientSessionImpl
     /**
      * The session's event queue.
      */
-    private static class EventQueue implements ManagedObject, Serializable {
+    private static class EventQueue
+	implements ManagedObjectRemoval, Serializable
+    {
 
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -890,6 +893,19 @@ public class ClientSessionImpl
 		}
 
 		event.serviceEvent(this);
+	    }
+	}
+
+	/* -- Implement ManagedObjectRemoval -- */
+
+	/** {@inheritDoc} */
+	public void removingObject() {
+	    try {
+		DataService dataService =
+		    ClientSessionServiceImpl.getDataService();
+		dataService.removeObject(queueRef.get());
+	    } catch (ObjectNotFoundException e) {
+		// already removed.
 	    }
 	}
     }

@@ -36,6 +36,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
+import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -787,6 +788,62 @@ public class TestClientSessionServiceImpl extends TestCase {
              }, taskOwner);
 	} finally {
 	    client.disconnect();
+	}
+    }
+
+    public void testClientSessionToString() throws Exception {
+	final String name = "testClient";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort()).login();
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+			ClientSession session = (ClientSession)
+			    dataService.getBinding(name);
+			if (!(session instanceof ClientSessionWrapper)) {
+			    fail("session not instance of " +
+				 "ClientSessionWrapper");
+			}
+			System.err.println("session: " + session);
+		    }
+		}, taskOwner);
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
+    public void testClientSessionToStringNoTransaction() throws Exception {
+	final String name = "testClient";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort()).login();
+	    GetClientSessionTask task = new GetClientSessionTask(name);
+	    txnScheduler.runTask(task, taskOwner);
+	    try {
+		System.err.println("session: " + task.session.toString());
+		return;
+	    } catch (Exception e) {
+		e.printStackTrace();
+		fail("unexpected exception in ClientSessionWrapper.toString");
+	    }
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    private class GetClientSessionTask extends AbstractKernelRunnable {
+	private final String name;
+	volatile ClientSession session;
+
+	GetClientSessionTask(String name) {
+	    this.name = name;
+	}
+
+	public void run() {
+	    session = (ClientSession) dataService.getBinding(name);
+	    if (!(session instanceof ClientSessionWrapper)) {
+		fail("session not instance of ClientSessionWrapper");
+	    }
 	}
     }
 
