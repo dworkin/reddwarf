@@ -1,0 +1,153 @@
+<html>
+<head>
+<title>Hack - A Project Darkstar Game: Design Document</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+
+<style>
+  #apphead {display:none;}
+</style>
+
+</head>
+
+<body bgcolor="#FFFFFF" text="#000000">
+
+  <table border="0" width="700px">
+    <tr><td>
+
+  <center>
+    <a href="https://darkstar-hack.dev.java.net/">
+      <img src="images/hack-logo.gif" border=0>
+    </a>
+  <h3>A Project Darkstar Game</h3>
+  </center>
+
+  <center>
+    <h1>Design Document</h1>
+  </center>
+
+  <br><br>
+
+  This design document is always a work in progress and reflects a
+  best-effort on the part of the developers to explain how the various
+  parts of the system are designed.  Feedback is <i>always</i> welcome
+  and can be sent to the dev mailing list.<br/>
+
+  
+  <h3>Client-Server Communication</h3>
+  
+  <p>The following diagram illustrates the core communication between
+    the client and the server.  Each of the various numbers represents
+    some type of interaction is described in detail below.</p>
+
+  <center>
+    <img src="images/communication_diagram.png"/>
+  </center>
+
+  
+  <ol>
+    <li>The client initially connects to the server by way
+    of <tt>GameSimBoot</tt>, which is the AppListener on the server
+    side.  If the client does not already have a player, they are
+    moved to the creator stage of the game.  Otherwise, the client's
+    already-created player is used and the client is moved to the
+    lobby.</li>
+
+    <li><tt>Messages</tt> serves as the main class on the server side
+    for encoding the various commands and sending them to channels and
+    client sessions.  All the server components use this class instead
+    of sending the messages themselves.  This reduces the chance for
+    any message formatting inconsistencies.</li>
+
+    <li>The <tt>Player</tt> class is responsible for maintaining the
+      client's server side state.  The various game-stage controllers
+      will update this object based on the commands received and the
+      actions of other characters in the game.</li>
+
+    <li>The creator channel contains all the broadcasted
+    traffic from the server.  This is typically any new player's id
+    and name.  The client will send requests on this channel to create
+    a new character.  None of the messages send from the client on
+    this channel are sent to any other clients.</li>
+
+    <li>The lobby channel handles messages about joining a new game.
+    The server will broadcast on it regarding any new games that are
+    added.  Clients will send back requests to join games on this
+    channel.  None of the messages send from the client on this
+    channel are sent to any other clients.</li>
+
+
+    <li>The dungeon channel contains all the updates to the current
+    dungeon that the client is connected to.  These include any
+    movement updates from other players.  None of the messages send
+    from the client on this channel are sent to any other clients
+    directly.  Any movements commands are first processed by the
+    server before being sent on this channel.</li>
+
+
+    <li>The <tt>SimpleClient</tt> used by the Hack <tt>Client</tt>
+    receives all the messages sent directly using
+    the <tt>ClientSession</tt> on the server-side.  These messages are
+    typically reponses that pertain only to that player and should not
+    be broadcasted.  The Hack <tt>Client</tt> processes these messages
+    as they are received.</li>
+
+    <li>The <tt>CreatorManager</tt> and <CreatorChannelListener</tt>
+    contain all the character creation logic on the client side.  The
+    former sends all of the outgoing messages, while the latter is
+    reponsible for processing all of the broadcasted updates on the
+    creator channel.</li>
+
+
+    <li>The <tt>LobbyManager</tt> and <LobbyChannelListener</tt>
+    contain all the game-choosing logic on the client side.  The
+    former sends all of the outgoing messages regarding which dungeon
+    a client will join, while the latter is reponsible for processing
+    all of the broadcasted updates on the lobby channel.</li>
+
+
+    <li>The <tt>GameManager</tt> and <DungeonChannelListener</tt>
+    contain all the dungeon-related logic on the client side, such as
+    moving.  The former sends all of the outgoing messages, while the
+    latter is reponsible for processing all of the broadcasted updates
+    on the dungeon channel.</li>
+
+    <li>The <tt>GamePanel</tt> is a part of the GUI logic that is
+    responsible for processing key commands while a player is in the
+    dungeon.  It forwards these commands to the <tt>GameManager</tt>
+    as requests for the current player to be moved.</li>
+
+    <li>The <tt>Creator</tt> and <tt>CreatorMessageHandler</tt>
+    contain all the server-side logic for dealing with character
+    creation.  The former is responsible for sending out all messages
+    and updates.  The latter listens for any commands sent to the
+    server on the creator channel.</li>
+
+    <li>The <tt>Lobby</tt> and <tt>LobbyMessageHandler</tt> contain
+    all the server-side logic for dealing with a player while they are
+    in the lobby.  The former is responsible for sending out all
+    messages and updates.  The latter listens for any commands sent to
+    the server on the lobby channel.</li>
+
+    <li>The <tt>Dungeon</tt> and <tt>DungeonMessageHandler</tt>
+    contain all the server-side logic for dealing with a player while
+    they are in a dungeon.  The former is responsible for sending out
+    all messages and updates.  The latter listens for any commands
+    sent to the server on the dungeon channel.  When a player dies in
+    a dungeon, they are sent back to the lobby state of the game by
+    the <tt>Dungeon</tt>.</li>
+
+  </ol>
+
+
+  <center>
+    <a href="https://games-darkstar.dev.java.net/">
+      <img src="images/darkstarLogo.jpg" width="288" height="60" border="0" alt="Project Darkstar"/>
+    </a>
+    <p style="font-size: 8pt">Hack is a proud member of the Project Darkstar Game Community</p>
+  </center> 
+
+  </td></tr>
+  </table>
+
+</body>
+</html>
