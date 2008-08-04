@@ -53,6 +53,9 @@ public class ClientSessionWrapper
      * @param	sessionRef a reference to a client session to wrap
      */
     ClientSessionWrapper(ManagedReference<ClientSessionImpl> sessionRef) {
+	if (sessionRef == null) {
+	    throw new NullPointerException("null sessionRef");
+	}
 	this.sessionRef = sessionRef;
     }
 
