@@ -234,7 +234,8 @@ Setting these properties has no effect on application nodes.
 <dl>
 
 <dt>com.sun.sgs.impl.service.watchdog.server.renew.interval
-<span class="default">1000 (one second)</span>
+<span class="default">1000 (for a multi-node configuration) or
+Integer.MAX_VALUE (for a single node configuration) </span>
 <dd>The time interval, in milliseconds, in which application nodes must
   contact the watchdog service's internal server in order to be considered
   alive. This time interval is sent to each application node during start up, 
