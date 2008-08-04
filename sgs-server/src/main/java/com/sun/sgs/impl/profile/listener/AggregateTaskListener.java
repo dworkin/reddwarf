@@ -156,7 +156,7 @@ public class AggregateTaskListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void shutdown() {
-        // unused
+        networkReporter.shutdown();
     }
 
     private static class TaskDetail {

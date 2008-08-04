@@ -22,7 +22,6 @@ package com.sun.sgs.impl.profile;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
 
 import java.util.logging.Level;
@@ -58,11 +57,11 @@ public class ProfileRegistrarImpl implements ProfileRegistrar {
     /**
      * {@inheritDoc}
      */
-    public ProfileConsumer registerProfileProducer(ProfileProducer producer) {
+    public ProfileConsumer registerProfileProducer(String name) {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "Registering profile producer {0}",
-                       producer);
-        return new ProfileConsumerImpl(producer, profileCollector);
+                       name);
+        return profileCollector.registerProfileProducer(name);
     }
 
 }
