@@ -33,8 +33,8 @@ import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
-import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 
+import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -48,10 +48,10 @@ import com.sun.sgs.impl.util.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileProducer;
-import com.sun.sgs.profile.ProfileRegistrar;
 
+import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
@@ -60,8 +60,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Properties;
 
@@ -75,14 +75,15 @@ import java.util.logging.LogManager;
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
  * <p>
- * By default, profiling is not turned on. To enable profiling, the kernel
- * property <code>com.sun.sgs.impl.kernel.profile.level</code> must
- * be given the value "on". If no profile listeners are specified, then the
- * default <code>AggregateProfileListener</code> is enabled. To specify that a
- * different set of <code>ProfileListener</code>s should be used,
- * the <code>com.sun.sgs.impl.kernel.profile.listeners</code>
- * property must be specified with a colon-separated list of fully-qualified
- * classes, each of which implements <code>ProfileListener</code>.
+ * By default, the minimal amount of profiling which is used internally by
+ * the system is enabled.  To enable more profiling, the kernel property
+ * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY} must be set to 
+ * a valid level for {@link 
+ * com.sun.sgs.profile.ProfileCollector#setDefaultProfileLevel(ProfileLevel)}.
+ * By default, no profile listeners are enabled.  Set the 
+ * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
+ * a colon-separated list of fully-qualified class names, each of which 
+ * implements {@link ProfileListener}.
  */
 class Kernel {
 
@@ -91,14 +92,11 @@ class Kernel {
         new LoggerWrapper(Logger.getLogger(Kernel.class.getName()));
 
     // the property for setting profiling levels
-    private static final String PROFILE_PROPERTY =
+    public static final String PROFILE_PROPERTY =
         "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
-    private static final String PROFILE_LISTENERS =
+    public static final String PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.listeners";
-    // the default profile listeners
-    private static final String DEFAULT_PROFILE_LISTENERS =
-        "com.sun.sgs.impl.profile.listener.AggregateProfileListener";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -131,9 +129,6 @@ class Kernel {
     
     // the properties used to start the application
     private final Properties appProperties;
-    
-    // the registration point for producers of profiling data
-    private final ProfileRegistrar profileRegistrar;
 
     // the schedulers used for transactional and non-transactional tasks
     private final TransactionSchedulerImpl transactionScheduler;
@@ -146,7 +141,11 @@ class Kernel {
     private final ComponentRegistryImpl systemRegistry;
     
     // collector and reporter of profile information
+    // note that this object should never escape this kernel, as it contains
+    // methods that should only be called by objects created by this kernel
     private final ProfileCollectorImpl profileCollector;
+    // the registry object for creating profiling content objects
+    private final ProfileRegistrar profileRegistrar;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -166,30 +165,30 @@ class Kernel {
         this.appProperties = appProperties;
 
         try {
-            // see if we're doing any level of profiling, which for the
-            // current version is as simple as "on" or "off"
-            String profileLevel = appProperties.getProperty(PROFILE_PROPERTY);
-            if (profileLevel != null) {
-                if (profileLevel.equals("on")) {
-                    logger.log(Level.CONFIG, "System profiling is on");
-                    profileCollector =
-                        new ProfileCollectorImpl();
-                    profileRegistrar =
-                        new ProfileRegistrarImpl(profileCollector);
-                } else {
-                    profileCollector = null;
-                    profileRegistrar = null;
-                    if (! profileLevel.equals("off")) {
-                        if (logger.isLoggable(Level.WARNING))
-                            logger.log(Level.WARNING, "Unknown profile " +
-                                       "level {0} ... all profiling will be " +
-                                       "turned off", profileLevel);
-                    }
+            // See if we're doing any profiling.
+            String level = appProperties.getProperty(PROFILE_PROPERTY,
+                    ProfileLevel.MIN.name());
+            ProfileLevel profileLevel;
+            try {
+                profileLevel = 
+                        ProfileLevel.valueOf(level.toUpperCase());
+                if (logger.isLoggable(Level.CONFIG)) {
+                    logger.log(Level.CONFIG, "Profiling level is {0}", level);
                 }
-            } else {
-                profileCollector = null;
-                profileRegistrar = null;
+            } catch (IllegalArgumentException iae) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.log(Level.WARNING, "Unknown profile level {0}", 
+                               level);
+                }
+                throw iae;
             }
+            
+            // Create the system registry
+            systemRegistry = new ComponentRegistryImpl();
+            
+            profileCollector = new ProfileCollectorImpl(profileLevel, 
+                                              appProperties, systemRegistry);
+            profileRegistrar = new ProfileRegistrarImpl(profileCollector);
 
             // create the authenticators and identity coordinator
             ArrayList<IdentityAuthenticator> authenticators =
@@ -240,15 +239,16 @@ class Kernel {
             taskScheduler.setContext(ctx);
 
             // collect the shared system components into a registry
-            systemRegistry = new ComponentRegistryImpl();
             systemRegistry.addComponent(accessCoordinator);
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
+            systemRegistry.addComponent(profileRegistrar);
 
-            // if profiling is on then create the profiling listeners
-            if (profileCollector != null)
-                loadProfileListeners(profileCollector);
+            // create the profiling listeners.  It is important to not
+            // do this until we've finished adding components to the
+            // system registry, as some listeners use those components.
+            loadProfileListeners(profileCollector);
 
             if (logger.isLoggable(Level.INFO))
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
@@ -271,40 +271,27 @@ class Kernel {
      * for profiling data.
      */
     private void loadProfileListeners(ProfileCollector profileCollector) {
-        String listenerList =
-            appProperties.getProperty(PROFILE_LISTENERS,
-                                      DEFAULT_PROFILE_LISTENERS);
+        String listenerList = appProperties.getProperty(PROFILE_LISTENERS);
 
-        for (String listenerClassName : listenerList.split(":")) {
-            try {
-                // make sure we can resolve the listener
-                Class<?> listenerClass = Class.forName(listenerClassName);
-                Constructor<?> listenerConstructor =
-                    listenerClass.getConstructor(Properties.class,
-                                                 Identity.class,
-                                                 ComponentRegistry.class);
-
-                // create a new identity for the listener
-                IdentityImpl owner = new IdentityImpl(listenerClassName);
-
-                // try to create and register the listener
-                Object obj =
-                    listenerConstructor.newInstance(appProperties, owner,
-                                                    systemRegistry);
-                ProfileListener listener = (ProfileListener)obj;
-                profileCollector.addListener(listener);
-            } catch (InvocationTargetException e) {
-                if (logger.isLoggable(Level.WARNING))
-                    logger.logThrow(Level.WARNING, e.getCause(), 
-                            "Failed to load ProfileListener {0} ... " +
-                            "it will not be available for profiling",
-                            listenerClassName);
-            } catch (Exception e) {
-                if (logger.isLoggable(Level.WARNING))
-                    logger.logThrow(Level.WARNING, e, "Failed to load " +
-                                    "ProfileListener {0} ... it will not " +
-                                    "be available for profiling",
-                                    listenerClassName);
+        if (listenerList != null) {
+            for (String listenerClassName : listenerList.split(":")) {
+                try {
+                    profileCollector.addListener(listenerClassName);
+                } catch (InvocationTargetException e) {
+                    // Strip off exceptions found via reflection
+                    if (logger.isLoggable(Level.WARNING))
+                        logger.logThrow(Level.WARNING, e.getCause(), 
+                                "Failed to load ProfileListener {0} ... " +
+                                "it will not be available for profiling",
+                                listenerClassName);
+              
+                } catch (Exception e) {
+                    if (logger.isLoggable(Level.WARNING))
+                        logger.logThrow(Level.WARNING, e, 
+                                "Failed to load ProfileListener {0} ... " +
+                                "it will not be available for profiling",
+                                 listenerClassName);
+                }
             }
         }
 
@@ -312,7 +299,7 @@ class Kernel {
         // NOTE: if we make the schedulers pluggable, or add other components
         // that are listeners, then we should scan through all of the system
         // components and check if they are listeners
-        profileCollector.addListener(transactionScheduler);
+        profileCollector.addListener(transactionScheduler, false);
     }
 
     /**
@@ -525,7 +512,6 @@ class Kernel {
     {
         Class<?> serviceClass = Class.forName(className);
         Service service = createService(serviceClass);
-        registerProducer(service);
         startupContext.addService(service);
     }
 
@@ -564,7 +550,6 @@ class Kernel {
         // create the manager and put it and the service in the collections
         // and the temporary startup context
         Object manager = managerConstructor.newInstance(service);
-        registerProducer(manager);
         startupContext.addService(service);
         startupContext.addManager(manager);
     }
@@ -585,16 +570,6 @@ class Kernel {
         // return a new instance
         return (Service)(serviceConstructor.
                          newInstance(appProperties, systemRegistry, proxy));
-    }
-    
-    /**
-     * Private helper that notifies the given {@code Object} of the
-     * {@code ProfileRegistrar} if the {@code Object} is an instance of
-     * {@code ProfileProducer} and profiling is enabled.
-     */
-    private void registerProducer(Object obj) {
-        if ((profileRegistrar != null) && (obj instanceof ProfileProducer))
-            ((ProfileProducer)obj).setProfileRegistrar(profileRegistrar);
     }
 
     /** Start the application, throwing an exception if there is a problem. */
@@ -637,12 +612,13 @@ class Kernel {
     void shutdown() {
         if (application != null)
             application.shutdownServices();
+        if (profileCollector != null) 
+            profileCollector.shutdown();
+        // The schedulers must be shut down last.
         if (transactionScheduler != null)
             transactionScheduler.shutdown();
         if (taskScheduler != null)
             taskScheduler.shutdown();
-        if (profileCollector != null) 
-            profileCollector.shutdown();
     }
     
     /**

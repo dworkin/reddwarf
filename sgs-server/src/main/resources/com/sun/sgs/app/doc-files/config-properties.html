@@ -234,16 +234,16 @@ Setting these properties has no effect on application nodes.
 <dl>
 
 <dt>com.sun.sgs.impl.service.watchdog.server.renew.interval
-<span class="default">1000 (one second)</span>
+<span class="default">1000 (for a multi-node configuration) or
+Integer.MAX_VALUE (for a single node configuration) </span>
 <dd>The time interval, in milliseconds, in which application nodes must
   contact the watchdog service's internal server in order to be considered
   alive. This time interval is sent to each application node during start up, 
   when the application node registers with the watchdog's internal server. The 
-  interval must be greater than or equal to <code>5</code> milliseconds and 
-  less than or equal to <code>10000</code> milliseconds (10 seconds).  Using a 
-  renew interval that is too small may cause some application nodes to be 
-  considered failed by the <code>WatchdogService</code> when they are very busy.
-  Using an interval that is too large will increase the amount of time the 
+  interval must be greater than or equal to <code>100</code> milliseconds.
+  Using a renew interval that is too small may cause some application nodes to
+  be considered failed by the <code>WatchdogService</code> when they are very
+  busy. Using an interval that is too large will increase the amount of time the 
   system takes to respond to failed nodes.
 
 </dl>
@@ -263,18 +263,22 @@ system including identity management, profiling, and task scheduling.
   authenticator simply accepts any name-password pair.
     
 <dt>com.sun.sgs.impl.kernel.profile.level
-<span class="default">off</span>
-<dd>Whether to perform profiling.  Profiling is enabled if the value is
-  <code>on</code>.
+<span class="default">min</span>
+<dd>The profiling level. Valid levels are
+<ul>
+    <li><code>min</code> - minimal profiling data is collected. 
+    <li><code>medium</code>  - more data is collected, but is still appropriate 
+                             for monitoring a production system.
+    <li><code>max</code> - all available profiling data is collected.  This 
+                         level may only be appropriate for debugging systems in
+                         development.
+</ul>
 
 <dt>com.sun.sgs.impl.kernel.profile.listeners
-<span class="default">
-    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
+<span class="nodefault"/>
 <dd>A colon separated list of profile listeners, which consume profile output.
-  The <code>AggregateProfileListener</code> reports its findings on a server
-  socket, by default on port <code>43005</code>.  To configure this and other
-  available listeners, see the individual class javadoc for profile listener
-  implementations.
+  To configure the available listeners, see the individual class javadoc for 
+  profile listener implementations.
 
 <dt>com.sun.sgs.impl.kernel.transaction.threads
 <span class="default">4</span>

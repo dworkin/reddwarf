@@ -45,7 +45,9 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
@@ -139,7 +141,7 @@ import java.util.logging.Logger;
  * com.sun.sgs.impl.service.data.DataServiceImpl.abort}, to make it easier to
  * debug concurrency conflicts by just logging aborts.
  */
-public final class DataServiceImpl implements DataService, ProfileProducer {
+public final class DataServiceImpl implements DataService {
 
     /** The name of this class. */
     private static final String CLASSNAME = 
@@ -233,6 +235,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
+    /** Our profiling operations. */
+    private ProfileOperation createReferenceOp = null;
+    
     /**
      * Defines the transaction context map for this class.  This class checks
      * the service state and the reference table whenever the context is
@@ -396,7 +401,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
-	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
+	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner); 
 	    boolean serverStart = wrappedProps.getBooleanProperty(
 		StandardProperties.SERVER_START, true);
 	    if (dataStoreClassName != null) {
@@ -409,7 +414,17 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    } else {
 		store = new DataStoreClient(properties);
 	    }
-	    storeToShutdown = store;
+            storeToShutdown = store;
+
+            ProfileRegistrar registrar = 
+                    systemRegistry.getComponent(ProfileRegistrar.class);
+            ProfileConsumer consumer =
+                registrar.registerProfileProducer(this.getClass().getName());
+            createReferenceOp = 
+                consumer.registerOperation("createReference", ProfileLevel.MAX);
+            
+            store.createProfilingInfo(registrar);
+
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -579,6 +594,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** {@inheritDoc} */
     public <T> ManagedReference<T> createReference(T object) {
+        createReferenceOp.report();
 	Context context = null;
 	try {
 	    checkManagedObject(object);
@@ -859,16 +875,6 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	synchronized (stateLock) {
 	    this.detectModifications = detectModifications;
 	}
-    }
-
-    /* -- Implement ProfileProducer -- */
-
-    /**
-     * {@inheritDoc}
-     */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
-        if (store instanceof ProfileProducer)
-            ((ProfileProducer) store).setProfileRegistrar(profileRegistrar);
     }
 
     /* -- Other methods -- */

@@ -911,8 +911,9 @@ public class TestTaskServiceImpl extends TestCase {
         // shutdown the node and verify that the handoff removal happens
         node.shutdown(false);
         String interval = serverNode.getServiceProperties().
-            getProperty("com.sun.sgs.impl.service.watchdog.renew.interval",
-                        "500");
+            getProperty(
+		"com.sun.sgs.impl.service.watchdog.server.renew.interval",
+		"500");
         Thread.sleep(3 * Long.valueOf(interval));
         txnScheduler.runTask(
             new AbstractKernelRunnable() {
