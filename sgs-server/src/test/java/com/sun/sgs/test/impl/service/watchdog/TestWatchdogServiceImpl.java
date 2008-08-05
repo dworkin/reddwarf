@@ -127,7 +127,7 @@ public class TestWatchdogServiceImpl extends TestCase {
                 Integer.toString(SgsTestNode.getNextAppPort()));
         renewTime = Integer.valueOf(
             serviceProps.getProperty(
-                "com.sun.sgs.impl.service.watchdog.renew.interval"));
+                "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
 
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
@@ -325,7 +325,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
-    public void testConstructorStartServerRenewIntervalTooLarge()
+    public void testConstructorStartServerWithLargeRenewInterval()
 	throws Exception
     {
         WatchdogServiceImpl watchdog = null;
@@ -334,13 +334,13 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, "20000",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
-	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
+	    WatchdogServerPropertyPrefix + ".renew.interval",
+		Integer.toString(Integer.MAX_VALUE));
 	try {
 	    watchdog =
                 new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
-	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
+	    fail("Unexpected IllegalArgumentException");
 	} finally {
             if (watchdog != null) watchdog.shutdown();
         }

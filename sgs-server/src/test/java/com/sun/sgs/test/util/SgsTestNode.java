@@ -418,7 +418,7 @@ public class SgsTestNode {
 	        String.valueOf(getNextUniquePort()),
 	    "com.sun.sgs.impl.service.watchdog.client.port",
 	        String.valueOf(getNextUniquePort()),
-            "com.sun.sgs.impl.service.watchdog.renew.interval", "500",
+            "com.sun.sgs.impl.service.watchdog.server.renew.interval", "500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
             "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
