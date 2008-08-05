@@ -23,10 +23,13 @@ import com.sun.sgs.service.Transaction;
 
 
 /**
- * Used to notify the coordinator of requested access to some object. Methods
- * must be called in the context of an active transaction.
+ * Used to notify the coordinator of requested access to some
+ * object. Methods must be called in the context of an active
+ * transaction.
+ *
+ * @param <T> the type of the object being accessed
  */
-public interface AccessNotifier {
+public interface AccessNotificationProxy<T> {
 
     /** The type of access requested. */
     public enum AccessType {
@@ -56,10 +59,37 @@ public interface AccessNotifier {
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
      */
-    public void notifyObjectAccess(Object objId, AccessType type);
+    public void notifyObjectAccess(T objId, AccessType type);
 
     /**
-     * Optionally mark the given object with some annotation that should have
+     * Notifies the coordinator that an object with the provided
+     * description has been accessed in the context of the current
+     * transaction. This object is shared, and may be a source of
+     * contention.
+     * <p>
+     * The {@code objId} parameter must implement {@code equals()} and
+     * {@code hashCode()}. To make the resulting detail provided to the
+     * profiler as useful as possible, {@code objId} should have a meaningful
+     * toString() method.
+     * <p>
+     * TODO: in the next phase of this work an exception will be thrown
+     * from this method if the object access causes the calling transaction
+     * to fail (e.g., due to conention).
+     *
+     * @param objId the {@code Object} being accessed
+     * @param type the {@code AccessType} being requested
+     * @param description an arbitrary object that contains a
+     *        description of the objId being accessed
+     *
+     * @throws TransactionNotActiveException if not called in the context
+     *                                       of an active transaction
+     */
+    public void notifyObjectAccess(T objId, AccessType type, 
+				   Object description);
+
+
+    /**
+     * Optionally mark the given object with some description that should have
      * a meaningful toString() method. This will be available in the
      * profiling data, and is useful when displaying details about a given
      * accessed object. Note that this may be called before the object is
@@ -67,11 +97,12 @@ public interface AccessNotifier {
      * is called for the given {@code objId}.
      *
      * @param objId the {@code Object} to annotate
-     * @param annotation an arbitrary annotation to associate with the object
+     * @param annotation an arbitrary object that contains a
+     *        description of the objId being accessed
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
      */
-    public void setObjectAnnotation(Object objId, Object annotation);
+    public void setObjectDescription(T objId, Object description);
 
 }

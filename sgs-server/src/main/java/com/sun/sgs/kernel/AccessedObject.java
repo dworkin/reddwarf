@@ -19,7 +19,7 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.kernel.AccessNotifier.AccessType;
+import com.sun.sgs.kernel.AccessNotificationProxy.AccessType;
 
 
 /**
@@ -42,11 +42,13 @@ public interface AccessedObject {
     public AccessType getAccessType();
 
     /**
-     * Returns the annotation, if any, associated with this object.
+     * Returns the supplied description of the object, if any.
      *
-     * @return the associated annotation, or {@code null}
+     * @return the associated description, or {@code null}
+     *
+     * @see AccessNotificationProxy#setObjectDescription(Object,Object)
      */
-    public Object getAnnotation();
+    public Object getDescription();
 
     /**
      * Returns the name of the source that reported this object access.

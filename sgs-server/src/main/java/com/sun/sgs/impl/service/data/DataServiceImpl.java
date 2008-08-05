@@ -37,6 +37,9 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
+import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.AccessNotificationProxy;
+import com.sun.sgs.kernel.AccessNotificationProxy.AccessType;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
@@ -173,6 +176,12 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** Synchronize on this object when accessing the contextMap field. */
     private static final Object contextMapLock = new Object();
+
+    /** The proxy for notifying of object accesses */
+    private final AccessNotificationProxy<BigInteger> oidAccesses;
+
+    /** The proxy for notifying of bound name accesses */
+    private final AccessNotificationProxy<String> boundNameAccesses;
 
     /**
      * The transaction context map, or null if configure has not been called.
@@ -431,6 +440,17 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 			}
 		    },
 		taskOwner);
+
+	    // notify the AccessCoordinator that the DataService is a
+	    // source of contention for ManagedObjects and name
+	    // bindings.
+	    AccessCoordinator accessCoordinator = 
+		systemRegistry.getComponent(AccessCoordinator.class);	    
+	    oidAccesses = accessCoordinator.
+		registerContentionSource(CLASSNAME, BigInteger.class);
+	    boundNameAccesses = accessCoordinator.
+		registerContentionSource(CLASSNAME, String.class);
+
 	    storeToShutdown = null;
 	} catch (RuntimeException e) {
 	    getExceptionLogger(e).logThrow(
@@ -488,6 +508,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
+		// mark that this object has been write locked
+		oidAccesses.notifyObjectAccess(ref.getId(), AccessType.WRITE,
+					       object);
+
 		if (object instanceof ManagedObjectRemoval) {
 		    context.removingObject((ManagedObjectRemoval) object);
 		    /*
@@ -527,6 +551,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
+		// mark that this object has been write locked
+		oidAccesses.notifyObjectAccess(ref.getId(), AccessType.WRITE,
+					       object);
+
 		ref.markForUpdate();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -556,6 +584,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    checkManagedObject(object);
 	    context = getContext();
 	    ManagedReference<T> result = context.getReference(object);
+	    // mark that this object has been read locked
+	    oidAccesses.notifyObjectAccess(result.getId(), AccessType.READ,
+					   object);
+
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -661,6 +693,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    try {
 		result = context.getBinding(
 		    getInternalName(name, serviceBinding));
+		// mark that this name has been read locked
+		boundNameAccesses.notifyObjectAccess(name, AccessType.READ,
+					       result);
+
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -700,6 +736,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    checkManagedObject(object);
 	    context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
+	    // mark that this name has been write locked
+	    boundNameAccesses.notifyObjectAccess(name, AccessType.WRITE,
+					   object);
+
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -734,6 +774,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    context = getContext();
 	    try {
 		context.removeBinding(getInternalName(name, serviceBinding));
+		// mark that this name has been write locked
+		boundNameAccesses.notifyObjectAccess(name, AccessType.WRITE);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");

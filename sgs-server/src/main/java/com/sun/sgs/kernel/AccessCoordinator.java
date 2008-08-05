@@ -38,10 +38,13 @@ public interface AccessCoordinator {
      *
      * @param sourceName the name of the source of objects
      *
+     * @param contendedType the type of the objects that will be contended.
+     *
      * @return an {@code AccessNotifier} used to notify the system
      *         of access to shared objects
      */
-    public AccessNotifier registerContentionSource(String sourceName);
+    public <T> AccessNotificationProxy<T> registerContentionSource
+	(String sourceName, Class<T> contendedType);
 
     /**
      * The idea here is that a resolver needs to know who else might be
