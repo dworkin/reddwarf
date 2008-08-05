@@ -28,7 +28,6 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.Exceptions;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
@@ -663,11 +662,6 @@ public final class DataStoreClient
 	throw convertException(
 	    txn, txnInfo, Level.FINEST, exception,
 	    "nextObjectId txn:" + txn + ", oid:" + oid + " throws");
-    }
-
-    /** {@inheritDoc} */
-    public void createProfilingInfo(ProfileRegistrar registrar) { 
-        // no profiling info to create
     }
 
     /* -- Implement TransactionParticipant -- */

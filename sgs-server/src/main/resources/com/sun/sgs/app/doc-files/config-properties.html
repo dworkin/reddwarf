@@ -202,14 +202,45 @@ effect on application nodes.
 
 </dl>
 
+<a name="Db"></a>
+<h4>Database Properties</h4>
+
+These properties are the subset of the properties supported by
+the <code>DataService</code> that select the implementation of the
+underlying database.  Setting these properties has no effect on
+application nodes.
+<dl>
+
+<a name="com.sun.sgs.impl.service.data.store.db.environment.class"></a>
+<dt>com.sun.sgs.impl.service.data.store.db.environment.class
+<span class="default">
+  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+</span>
+<dd>The name of the class that implements the underlying database.  The
+  default value selects a database implementation based
+  on <a href="http://www.oracle.com/database/berkeley-db/db/index.html">
+  Berkeley DB</a>.  Specifying
+  <code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+  selects a database implementation based on
+  <a href="http://www.oracle.com/database/berkeley-db/je/index.html">
+  Berkeley DB Java Edition</a>.  Other values should specify the fully
+  qualified name of a class that satisfies the requirements specified by
+  the <code>
+  com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory.getEnvironment
+  </code> method.
+
+</dl>
+
 <a name="Bdb"></a>
 <h4>Berkeley DB Properties</h4>
 
 These properties are the subset of the properties supported by
-the <code>DataService</code> that control the implementation of the
-underlying Berkeley DB database. Setting these properties has no
-effect on application nodes.
-
+the <code>DataService</code> that control the behavior of the Berkeley
+DB database, when it has been specified as the implementation of the
+underlying database using the
+<a href="#com.sun.sgs.impl.service.data.store.db.environment.class"><code>
+com.sun.sgs.impl.service.data.store.db.environment.class</code></a>
+property. Setting these properties has no effect on application nodes.
 <dl>
 
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.cache.size
