@@ -22,6 +22,7 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -30,8 +31,11 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -74,7 +78,7 @@ public abstract class AbstractService implements Service {
 
     /** The task scheduler. */
     protected final TaskScheduler taskScheduler;
-    
+
     /** The transaction scheduler. */
     protected final TransactionScheduler transactionScheduler;
 
@@ -397,9 +401,77 @@ public abstract class AbstractService implements Service {
         }
     }
     
+    /**
+     * Runs a transactional task to query the status of the node with the
+     * specified {@code nodeId} and returns {@code true} if the node is alive
+     * and {@code false} otherwise.
+     *
+     * <p>This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown.
+     *
+     * @param	nodeId a node ID
+     * @return	{@code true} if the node with the associated ID is
+     *		considered alive, otherwise returns {@code false}
+     * @throws	IllegalStateException if this method is invoked inside a
+     *		transactional context 
+     */
+    public boolean isAlive(long nodeId) {
+	// Make sure that we're not in a transactional context.
+	try {
+	    txnProxy.getCurrentTransaction();
+	    throw new IllegalStateException(
+		"isAlive called from a transactional context");
+	} catch (TransactionNotActiveException e) {
+	}
+	
+	try {
+	    CheckNodeStatusTask nodeStatus =
+		new CheckNodeStatusTask(nodeId);
+	    transactionScheduler.runTask(nodeStatus, taskOwner);
+	    return nodeStatus.isAlive;
+	} catch (Exception e) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e, "running CheckNodeStatusTask throws");
+	    }
+	    // TBD: is this the correct value to return?
+	    return false;
+	}
+    } 
+
     /** Creates a {@code TaskQueue} for dependent, transactional tasks. */
     public TaskQueue createTaskQueue() {
 	return transactionScheduler.createTaskQueue();
+    }
+
+    /**
+     * Executes the specified {@code ioTask} by invoking its {@link
+     * IoRunnable#run run} method.  If the specified task throws an
+     * {@code IOException}, this method will retry the task while the
+     * node with the given {@code nodeId} is alive until the task
+     * completes successfully.
+     *
+     * @param	ioTask a task with IO-related operations
+     * @param	nodeId the node that is the target of the IO operations
+     */
+    public void runIoTask(IoRunnable ioTask, long nodeId) {
+	do {
+	    try {
+		ioTask.run();
+		return;
+	    } catch (IOException e) {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.logThrow(
+			Level.FINEST, e,
+			"IoRunnable {0} throws", ioTask);
+		}
+		try {
+		    // TBD: what back-off policy do we want here?
+		    Thread.sleep(200);
+		} catch (InterruptedException ie) {
+		}
+	    }
+	} while (isAlive(nodeId));
     }
     
     /**
@@ -502,6 +574,8 @@ public abstract class AbstractService implements Service {
             return result;              
         }
     }
+
+    /* -- Private methods and classes -- */
     
     /**
      * Sets this service's state to {@code newState}.
@@ -514,6 +588,27 @@ public abstract class AbstractService implements Service {
 	}
     }
 
+    /**
+     * A task to obtain the status of a given node.
+     */
+    private class CheckNodeStatusTask extends AbstractKernelRunnable {
+	private final long nodeId;
+	volatile boolean isAlive = false;
+
+	/** Constructs an instance with the specified {@code nodeId}. */
+	CheckNodeStatusTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    WatchdogService watchdogService =
+		txnProxy.getService(WatchdogService.class);
+	    Node node = watchdogService.getNode(nodeId);
+	    isAlive = node != null && node.isAlive();
+	}
+    }
+    
     /**
      * Thread for shutting down service/server.
      */
@@ -537,5 +632,4 @@ public abstract class AbstractService implements Service {
 	    setState(AbstractService.State.SHUTDOWN);
 	}
     }
-
 }

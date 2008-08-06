@@ -24,10 +24,12 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.AbstractService;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
@@ -136,7 +138,9 @@ public class TestAbstractService extends TestCase {
 	service.checkHandleServiceVersionMismatchInvoked(true);
     }
     
-    public void testHandleServiceVersionMismatchThrowsRuntimeException() throws Exception {
+    public void testHandleServiceVersionMismatchThrowsRuntimeException()
+	throws Exception
+    {
 	DummyService service = createDummyService();
 	    
 	service.callCheckServiceVersion(1, 0, null);
@@ -179,6 +183,44 @@ public class TestAbstractService extends TestCase {
 	}
 
 	service.checkHandleServiceVersionMismatchInvoked(true);
+    }
+
+    public void testRunIoTaskThatThrowsNoExceptions() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(0);
+	service.runIoTask(ioTask, serverNode.getNodeId());
+	assertEquals(ioTask.runCount, 1);
+    }
+
+    public void testRunIoTaskThatThrowsIOException() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(4);
+	service.runIoTask(ioTask, serverNode.getNodeId());
+	assertEquals(ioTask.runCount, 5);
+    }
+    
+    public void testRunIoTaskToFailedNode() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(1);
+	service.runIoTask(ioTask, serverNode.getNodeId() + 1);
+	assertEquals(ioTask.runCount, 1);
+    }
+
+    private static class IoRunnableImpl implements IoRunnable {
+
+	int runCount = 0;
+	private int exceptionCount;
+
+	IoRunnableImpl(int exceptionCount) {
+	    this.exceptionCount = exceptionCount;
+	}
+	
+	public void run() throws IOException {
+	    runCount++;
+	    if (exceptionCount-- > 0) {
+		throw new IOException();
+	    }
+	}
     }
     
     private DummyService createDummyService() {
