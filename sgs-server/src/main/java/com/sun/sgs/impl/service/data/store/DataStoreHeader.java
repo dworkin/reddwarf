@@ -152,9 +152,9 @@ final class DataStoreHeader {
 
     /**
      * The first byte stored in an object value in order to ignore the meaning
-     * of the first byte, in particular if it is {@link PLACEHOLDER_OBJ_VALUE}
-     * or this value.  When this is the first byte of object data, the actual
-     * data consists of the second and following bytes.  Because object data is
+     * of the first byte, in particular if it is PLACEHOLDER_OBJ_VALUE or this
+     * value.  When this is the first byte of object data, the actual data
+     * consists of the second and following bytes.  Because object data is
      * always serialized data, which uses a specialized encoding that starts
      * with either 1 or 2, this value should not be used in practice.
      */

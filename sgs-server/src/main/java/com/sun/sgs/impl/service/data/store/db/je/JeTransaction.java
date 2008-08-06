@@ -27,7 +27,7 @@ import java.util.Arrays;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.Xid;
 
-/** Provides a transaction implementation using Berkeley DB, Java Edition. */
+/** Provides a transaction implementation using Berkeley DB Java Edition. */
 class JeTransaction implements DbTransaction {
 
     /** The Berkeley DB environment. */
