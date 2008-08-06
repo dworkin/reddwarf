@@ -325,7 +325,7 @@ int testIds(sgs_message *pmsg, int numTests, int silent){
                     printf("%dth ids differ\n", j);
                 }
             }
-            //sgs_id_destroy(outIds[j]);
+            sgs_id_destroy(outIds[j]);
         }
         pmsg->len = 1;
     }
