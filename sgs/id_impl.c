@@ -127,6 +127,7 @@ sgs_id* sgs_id_duplicate(const sgs_id* id) {
 }
 
 void sgs_id_destroy(sgs_id* id) {
+    printf("freeing id at %d, with buffer at %d\n", id, id->buf);
     if (id != NULL){
         free(id->buf);
         free(id);
