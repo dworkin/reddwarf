@@ -38,18 +38,27 @@
 #include "sgs/hex_utils.h"
 
 void test1() {
-    uint8_t bytes[] = { 1, 2, 3 };
+    uint8_t bytes[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+    int i;
     sgs_id* id;
     
-    id = sgs_id_create(bytes, sizeof(bytes));
+    for (i = 0; i<200; i++){
+        id = sgs_id_create(bytes, (i+1)%10);
+        sgs_id_destroy(id);
+    }
+    printf("create and destroy finished\n");
+    
+    id = sgs_id_create(bytes, 3);
     if (id == NULL) {
         sgs_id_destroy(id);
         perror("init()");
     }
     
     printf("bytelen = %ld\n", sgs_id_get_byte_len(id));
-    printf("memcmp = %d\n", memcmp(bytes, sgs_id_get_bytes(id),
-               sgs_id_get_byte_len(id)));
+    memcmp(bytes, sgs_id_get_bytes(id), sgs_id_get_byte_len(id));
+    for (i = 0; i < 3; i++){
+        printf("%dth value of bytes is %d\n", i, bytes[i]);
+    }
     sgs_id_destroy(id);
 }
 
