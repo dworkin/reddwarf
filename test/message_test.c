@@ -287,6 +287,7 @@ void generateIds(sgs_id **testIds){
         memcpy(buffer+i, sourcebuf, len);
         *(testIds + i) = sgs_id_create(buffer+i, len);
     }
+    //printf("exiting generateIds\n");
 }
 
 int testIds(sgs_message *pmsg, int numTests, int silent){
@@ -295,15 +296,21 @@ int testIds(sgs_message *pmsg, int numTests, int silent){
     int i, j, incr, result, totalBad;
     
     totalBad = 0;
-    generateIds(testIds);
     
     for (i = 0; i < numTests; i+=j){
+        generateIds(testIds);
         for (j = 0; j < 10; j++){
-            sgs_msg_add_id(pmsg, testIds[j]);
+            if (j != 9)
+                sgs_msg_add_id(pmsg, testIds[j], 1);
+            else
+                sgs_msg_add_id(pmsg, testIds[j], 0);
         }
         incr = 3;
         for (j = 0; j<10; j++){
-            result = sgs_msg_read_id(pmsg, incr, (outIds+j));
+            if (j != 9)
+                result = sgs_msg_read_id(pmsg, incr, 1, (outIds+j));
+            else
+                result = sgs_msg_read_id(pmsg, incr, 0, (outIds+j));
             if (result < 1){
                 printf("error reading the %dth value\n", i+j);
                 return -1;
@@ -318,7 +325,9 @@ int testIds(sgs_message *pmsg, int numTests, int silent){
                     printf("%dth ids differ\n", j);
                 }
             }
+            //sgs_id_destroy(outIds[j]);
         }
+        pmsg->len = 1;
     }
     return totalBad;
 }
