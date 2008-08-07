@@ -29,6 +29,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
@@ -227,7 +228,7 @@ public final class DataServiceImpl implements DataService {
     private boolean detectModifications;
 
     /** Our profiling operations. */
-    private ProfileOperation createReferenceOp = null;
+    private final ProfileOperation createReferenceOp;
     
     /**
      * Defines the transaction context map for this class.  This class checks
@@ -392,30 +393,28 @@ public final class DataServiceImpl implements DataService {
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
-	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner); 
+	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
 	    boolean serverStart = wrappedProps.getBooleanProperty(
 		StandardProperties.SERVER_START, true);
+	    DataStore baseStore;
 	    if (dataStoreClassName != null) {
-		store = wrappedProps.getClassInstanceProperty(
+		baseStore = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
 		    new Class[] { Properties.class }, properties);
-		logger.log(Level.CONFIG, "Using data store {0}", store);
+		logger.log(Level.CONFIG, "Using data store {0}", baseStore);
 	    } else if (serverStart) {
-		store = new DataStoreImpl(properties, scheduler);
+		baseStore = new DataStoreImpl(properties, scheduler);
 	    } else {
-		store = new DataStoreClient(properties);
+		baseStore = new DataStoreClient(properties);
 	    }
-            storeToShutdown = store;
-
+            storeToShutdown = baseStore;
             ProfileRegistrar registrar = 
-                    systemRegistry.getComponent(ProfileRegistrar.class);
+		systemRegistry.getComponent(ProfileRegistrar.class);
+	    store = new DataStoreProfileProducer(baseStore, registrar);
             ProfileConsumer consumer =
-                registrar.registerProfileProducer(this.getClass().getName());
-            createReferenceOp = 
-                consumer.registerOperation("createReference", ProfileLevel.MAX);
-            
-            store.createProfilingInfo(registrar);
-
+                registrar.registerProfileProducer(getClass().getName());
+            createReferenceOp = consumer.registerOperation(
+		"createReference", ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {

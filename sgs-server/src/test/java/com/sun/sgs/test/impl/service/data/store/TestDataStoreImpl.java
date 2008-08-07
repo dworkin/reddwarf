@@ -30,8 +30,10 @@ import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -292,7 +294,9 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testCreateObjectSuccess() throws Exception {
 	assertTrue(id >= 0);
-	assertTrue(txn.participants.contains(store));
+	assertTrue(
+	    txn.participants.contains(
+		((DataStoreProfileProducer) store).getDataStore()));
 	long id2 = store.createObject(txn);
 	assertTrue(id2 >= 0);
 	assertTrue(id != id2);
@@ -381,7 +385,9 @@ public class TestDataStoreImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.markForUpdate(txn, id);
 	store.markForUpdate(txn, id);
-	assertTrue(txn.participants.contains(store));
+	assertTrue(
+	    txn.participants.contains(
+		((DataStoreProfileProducer) store).getDataStore()));
 	/* Marking for update is not an update! */
 	assertTrue(txn.prepare());
     }
@@ -473,7 +479,9 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	byte[] result =	store.getObject(txn, id, false);
-	assertTrue(txn.participants.contains(store));
+	assertTrue(
+	    txn.participants.contains(
+		((DataStoreProfileProducer) store).getDataStore()));
 	assertTrue(Arrays.equals(data, result));
 	store.getObject(txn, id, false);
 	/* Getting for update is not an update! */
@@ -2044,7 +2052,10 @@ public class TestDataStoreImpl extends TestCase {
 
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
-	return new DataStoreImpl(props);
+	DataStore store = new DataStoreProfileProducer(
+	    new DataStoreImpl(props), DummyProfileCoordinator.getRegistrar());
+	DummyProfileCoordinator.startProfiling();
+	return store;
     }
 
     /** Returns the default properties to use for creating data stores. */
