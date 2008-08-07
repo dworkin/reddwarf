@@ -24,7 +24,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.Transaction;
 import java.io.ObjectStreamClass;
 
@@ -285,12 +284,4 @@ public interface DataStore {
      *		problem with the current transaction
      */
     long nextObjectId(Transaction txn, long oid);
-    
-    /**
-     * Create profiling information for the data store.
-     * 
-     * @param registrar the profiling registrar used to create 
-     *                  profiling operations
-     */
-    void createProfilingInfo(ProfileRegistrar registrar);
 }

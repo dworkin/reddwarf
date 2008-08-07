@@ -25,6 +25,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
@@ -417,7 +418,7 @@ public class SgsTestNode {
 	        String.valueOf(getNextUniquePort()),
 	    "com.sun.sgs.impl.service.watchdog.client.port",
 	        String.valueOf(getNextUniquePort()),
-            "com.sun.sgs.impl.service.watchdog.renew.interval", "500",
+            "com.sun.sgs.impl.service.watchdog.server.renew.interval", "500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
             "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
@@ -494,9 +495,12 @@ public class SgsTestNode {
     {
         Field storeField = DataServiceImpl.class.getDeclaredField("store");
         storeField.setAccessible(true);
-        DataStoreClient dsClient = (DataStoreClient) storeField.get(service);
-
-        Field serverPortField = DataStoreClient.class.getDeclaredField("serverPort");
+	DataStoreProfileProducer profileWrapper =
+	    (DataStoreProfileProducer) storeField.get(service);
+        DataStoreClient dsClient =
+	    (DataStoreClient) profileWrapper.getDataStore();
+        Field serverPortField =
+	    DataStoreClient.class.getDeclaredField("serverPort");
         serverPortField.setAccessible(true);
         return (Integer) serverPortField.get(dsClient);
     }

@@ -43,15 +43,8 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
-import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileCounter;
-import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
-import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
@@ -98,8 +91,9 @@ import java.util.logging.Logger;
  * href="../../../../app/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
  *
- * The constructor also passes the properties to the {@link BdbEnvironment}
- * constructor, which supports additional properties. <p>
+ * The constructor also passes the properties to {@link
+ * DbEnvironmentFactory#getEnvironment DbEnvironmentFactory.getEnvironment},
+ * which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> to log
@@ -207,34 +201,6 @@ public class DataStoreImpl
 
     /** Whether the data store is in the process of shutting down. */
     private boolean shuttingDown = false;
-
-    /* -- The operations -- DataStore API -- */
-    private ProfileOperation createObjectOp = null;
-    private ProfileOperation markForUpdateOp = null;
-    private ProfileOperation getObjectOp = null;
-    private ProfileOperation getObjectForUpdateOp = null;
-    private ProfileOperation setObjectOp = null;
-    private ProfileOperation setObjectsOp = null;
-    private ProfileOperation removeObjectOp = null;
-    private ProfileOperation getBindingOp = null;
-    private ProfileOperation setBindingOp = null;
-    private ProfileOperation removeBindingOp = null;
-    private ProfileOperation nextBoundNameOp = null;
-    private ProfileOperation getClassIdOp = null;
-    private ProfileOperation getClassInfoOp = null;
-    private ProfileOperation nextObjectIdOp = null;
-
-    /**
-     * The counters and samples used for profile reporting, which track the
-     * bytes read and written within a task, and how many objects were read
-     * and written
-     */
-    private ProfileCounter readBytesCounter = null;
-    private ProfileCounter readObjectsCounter = null;
-    private ProfileCounter writtenBytesCounter = null;
-    private ProfileCounter writtenObjectsCounter = null;
-    private ProfileSample readBytesSample = null;
-    private ProfileSample writtenBytesSample = null;
 
     /**
      * Records information about all active transactions.
@@ -951,7 +917,7 @@ public class DataStoreImpl
     public long createObject(Transaction txn) {
 	logger.log(Level.FINEST, "createObject txn:{0}", txn);
 	try {
-	    TxnInfo txnInfo = checkTxn(txn, createObjectOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
 	    if (objectIdInfo == null) {
 		logger.log(Level.FINE, "Allocate more object IDs");
@@ -1015,7 +981,7 @@ public class DataStoreImpl
 	 * lock.  -tjb@sun.com (10/06/2006)
 	 */
 	try {
-	    getObjectInternal(txn, oid, true, markForUpdateOp);
+	    getObjectInternal(txn, oid, true);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
@@ -1036,10 +1002,8 @@ public class DataStoreImpl
 		       txn, oid, forUpdate);
 	}
 	try {
-	    byte[] result = decodeValue(
-		getObjectInternal(
-		    txn, oid, forUpdate,
-		    forUpdate ? getObjectForUpdateOp : getObjectOp));
+	    byte[] result =
+		decodeValue(getObjectInternal(txn, oid, forUpdate));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -1057,19 +1021,14 @@ public class DataStoreImpl
 
     /** Implement getObject, without logging. */
     private byte[] getObjectInternal(
-	Transaction txn, long oid, boolean forUpdate, ProfileOperation op)
+	Transaction txn, long oid, boolean forUpdate)
     {
 	checkId(oid);
-	TxnInfo txnInfo = checkTxn(txn, op);
+	TxnInfo txnInfo = checkTxn(txn);
 	byte[] result = oidsDb.get(
 	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
 	if (result == null || isPlaceholderValue(result)) {
 	    throw new ObjectNotFoundException("Object not found: " + oid);
-	}
-	if (readBytesCounter != null) {
-	    readBytesCounter.incrementCount(result.length);
-	    readBytesSample.addSample(result.length);
-	    readObjectsCounter.incrementCount();
 	}
 	return result;
     }
@@ -1081,7 +1040,7 @@ public class DataStoreImpl
 		       txn, oid);
 	}
 	try {
-	    TxnInfo txnInfo = checkTxn(txn, setObjectOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    setObjectInternal(txnInfo, oid, data);
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -1101,7 +1060,7 @@ public class DataStoreImpl
 	long oid = -1;
 	boolean oidSet = false;
 	try {
-	    TxnInfo txnInfo = checkTxn(txn, setObjectsOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    int len = oids.length;
 	    if (len != dataArray.length) {
 		throw new IllegalArgumentException(
@@ -1136,13 +1095,8 @@ public class DataStoreImpl
 	if (data == null) {
 	    throw new NullPointerException("The data must not be null");
 	}
-	byte[] encodedData = encodeValue(data);
-	oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), encodedData);
-	if (writtenBytesCounter != null) {
-	    writtenBytesCounter.incrementCount(encodedData.length);
-	    writtenObjectsCounter.incrementCount();
-	    writtenBytesSample.addSample(encodedData.length);
-	}
+	oidsDb.put(
+	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), encodeValue(data));
     }
 
     /** {@inheritDoc} */
@@ -1153,7 +1107,7 @@ public class DataStoreImpl
 	}
 	try {
 	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn, removeObjectOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    byte[] key = DataEncoding.encodeLong(oid);
 	    byte[] value = oidsDb.get(txnInfo.dbTxn, key, true);
 	    if (value == null || isPlaceholderValue(value)) {
@@ -1183,7 +1137,7 @@ public class DataStoreImpl
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
 	    }
-	    TxnInfo txnInfo = checkTxn(txn, getBindingOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    byte[] value = namesDb.get(
 		txnInfo.dbTxn, DataEncoding.encodeString(name), false);
 	    if (value == null) {
@@ -1215,7 +1169,7 @@ public class DataStoreImpl
 		throw new NullPointerException("Name must not be null");
 	    }
 	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn, setBindingOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    namesDb.put(txnInfo.dbTxn, DataEncoding.encodeString(name),
 			DataEncoding.encodeLong(oid));
 	    txnInfo.modified = true;
@@ -1242,7 +1196,7 @@ public class DataStoreImpl
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
 	    }
-	    TxnInfo txnInfo = checkTxn(txn, removeBindingOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    boolean found = namesDb.delete(
 		txnInfo.dbTxn, DataEncoding.encodeString(name));
 	    if (!found) {
@@ -1273,7 +1227,7 @@ public class DataStoreImpl
 		Level.FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
 	}
 	try {
-	    TxnInfo txnInfo = checkTxn(txn, nextBoundNameOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    String result = txnInfo.nextName(name, namesDb);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -1330,7 +1284,7 @@ public class DataStoreImpl
 	logger.log(Level.FINER, "getClassId txn:{0}", txn);
 	String operation = "getClassId txn:" + txn;
 	try {
-	    checkTxn(txn, getClassIdOp);
+	    checkTxn(txn);
 	    if (classInfo == null) {
 		throw new NullPointerException(
 		    "The classInfo argument must not be null");
@@ -1403,7 +1357,7 @@ public class DataStoreImpl
 	}
 	String operation = "getClassInfo txn:" + txn + ", classId:" + classId;
 	try {
-	    checkTxn(txn, getClassInfoOp);
+	    checkTxn(txn);
 	    if (classId < 1) {
 		throw new IllegalArgumentException(
 		    "The classId argument must greater than 0");
@@ -1451,7 +1405,7 @@ public class DataStoreImpl
 		throw new IllegalArgumentException(
 		    "Invalid object ID: " + oid);
 	    }
-	    TxnInfo txnInfo = checkTxn(txn, nextObjectIdOp);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    long result = txnInfo.nextObjectId(oid, oidsDb);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -1464,42 +1418,6 @@ public class DataStoreImpl
 	    throw convertException(txn, Level.FINEST, e,
 				   "nextObjectId txn:" + txn + ", oid:" + oid);
 	}
-    }
-
-    /** {@inheritDoc} */
-    public void createProfilingInfo(ProfileRegistrar registrar) {
-        ProfileConsumer consumer =
-            registrar.registerProfileProducer(this.getClass().getName());
-
-        ProfileLevel level = ProfileLevel.MAX;
-	createObjectOp = consumer.registerOperation("createObject", level);
-	markForUpdateOp = consumer.registerOperation("markForUpdate", level);
-	getObjectOp = consumer.registerOperation("getObject", level);
-	getObjectForUpdateOp =
-	    consumer.registerOperation("getObjectForUpdate", level);
-	setObjectOp = consumer.registerOperation("setObject", level);
-	setObjectsOp = consumer.registerOperation("setObjects", level);
-	removeObjectOp = consumer.registerOperation("removeObject", level);
-	getBindingOp = consumer.registerOperation("getBinding", level);
-	setBindingOp = consumer.registerOperation("setBinding", level);
-	removeBindingOp = consumer.registerOperation("removeBinding", level);
-	nextBoundNameOp = consumer.registerOperation("nextBoundName", level);
-	getClassIdOp = consumer.registerOperation("getClassId", level);
-	getClassInfoOp = consumer.registerOperation("getClassInfo", level);
-	nextObjectIdOp = consumer.registerOperation("nextObjectIdOp", level);
-
-	readBytesCounter = consumer.registerCounter("readBytes", true, level);
-	readObjectsCounter = 
-                consumer.registerCounter("readObjects", true, level);
-	writtenBytesCounter = 
-                consumer.registerCounter("writtenBytes", true, level);
-	writtenObjectsCounter =
-	    consumer.registerCounter("writtenObjects", true, level);
-	readBytesSample = consumer.registerSampleSource("readBytes", true,
-					Integer.MAX_VALUE, level);
-	writtenBytesSample = consumer.registerSampleSource("writtenBytes", true,
-					Integer.MAX_VALUE, level);
-
     }
 
     /* -- Implement TransactionParticipant -- */
@@ -1716,7 +1634,7 @@ public class DataStoreImpl
      * in progress.  The op argument, if non-null, specifies the operation
      * being performed under the specified transaction.
      */
-    private TxnInfo checkTxn(Transaction txn, ProfileOperation op) {
+    private TxnInfo checkTxn(Transaction txn) {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
@@ -1726,9 +1644,6 @@ public class DataStoreImpl
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
-	}
-        if (op != null) {
-            op.report();
 	}
 	return txnInfo;
     }
@@ -1970,7 +1885,7 @@ public class DataStoreImpl
      * @param	data the data
      */
     private void setObjectRaw(Transaction txn, long oid, byte[] data) {
-	TxnInfo txnInfo = checkTxn(txn, null);
+	TxnInfo txnInfo = checkTxn(txn);
 	oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
     }
 
@@ -1984,7 +1899,7 @@ public class DataStoreImpl
      * @return	the data or null if the object ID is not found
      */
     private byte[] getObjectRaw(Transaction txn, long oid) {
-	TxnInfo txnInfo = checkTxn(txn, null);
+	TxnInfo txnInfo = checkTxn(txn);
 	return oidsDb.get(txnInfo.dbTxn, DataEncoding.encodeLong(oid), false);
     }
 
@@ -2000,7 +1915,7 @@ public class DataStoreImpl
      * @return	the next object ID or -1
      */
     private long nextObjectIdRaw(Transaction txn, long oid) {
-	TxnInfo txnInfo = checkTxn(txn, null);
+	TxnInfo txnInfo = checkTxn(txn);
 	DbCursor cursor = oidsDb.openCursor(txnInfo.dbTxn);
 	try {
 	    boolean found =  (oid < 0)
