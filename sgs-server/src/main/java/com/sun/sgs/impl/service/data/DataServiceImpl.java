@@ -38,8 +38,8 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.AccessCoordinator;
-import com.sun.sgs.kernel.AccessNotificationProxy;
-import com.sun.sgs.kernel.AccessNotificationProxy.AccessType;
+import com.sun.sgs.kernel.AccessReporter;
+import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
@@ -180,10 +180,10 @@ public final class DataServiceImpl implements DataService {
     private static final Object contextMapLock = new Object();
 
     /** The proxy for notifying of object accesses */
-    private final AccessNotificationProxy<BigInteger> oidAccesses;
+    private final AccessReporter<BigInteger> oidAccesses;
 
     /** The proxy for notifying of bound name accesses */
-    private final AccessNotificationProxy<String> boundNameAccesses;
+    private final AccessReporter<String> boundNameAccesses;
 
     /**
      * The transaction context map, or null if configure has not been called.

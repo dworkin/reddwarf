@@ -21,8 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
-import com.sun.sgs.kernel.AccessNotificationProxy;
-import com.sun.sgs.kernel.AccessNotificationProxy.AccessType;
+import com.sun.sgs.kernel.AccessReporter;
+import com.sun.sgs.kernel.AccessReporter.AccessType;
 
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
@@ -75,19 +75,20 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     // NOTE: this is here as an experiment, as it's not clear if it needs
     // to be in the coordinator, or could be moved to the profiling code,
     // or put somewhere else altogether
-
     private final Queue<AccessedObjectsDetailImpl> backlog;
+
+    static final String BACKLOG_QUEUE_PROPERTY =
+        AccessedObjectsDetailImpl.class.getName() + ".queue.size";
 
     // system components
     private final TransactionProxy txnProxy;
     private final ProfileCollector profileCollector;
  
-    /** 
-     * Creates an instance of {@code AccessCoordinatorImpl}. 
+    /**
+     * Creates an instance of {@code AccessCoordinatorImpl}.
      *
-     * @throws IllegalArgumentException if <ol><li>{@code properties}
-     *         is {@code}, or</li><li>{@code txnProxy} is {@code
-     *         null}</li></ol>
+     * @throws IllegalArgumentException if the requested backlog queue size
+     *                                  is not a valid number greater than 0
      */
     AccessCoordinatorImpl(Properties properties, TransactionProxy txnProxy,
                           ProfileCollector profileCollector) {
@@ -95,19 +96,18 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             throw new NullPointerException("Properties cannot be null");
         if (txnProxy == null)
             throw new NullPointerException("Proxy cannot be null");
-        // TODO: when Jane's updates are committed, also make sure that the
-        // collector is not null
+        if (profileCollector == null)
+            throw new NullPointerException("Collector cannot be null");
 
-        String backlogProp = properties.getProperty("prop.name");
+        String backlogProp = properties.getProperty(BACKLOG_QUEUE_PROPERTY);
         if (backlogProp != null) {
-            int size;
             try {
-                size = Integer.parseInt(backlogProp);
+                backlog = new LinkedBlockingQueue
+                    <AccessedObjectsDetailImpl>(Integer.parseInt(backlogProp));
             } catch (NumberFormatException nfe) {
                 throw new IllegalArgumentException("Backlog size must be a " +
                                                    "number: " + backlogProp);
             }
-            backlog = new LinkedBlockingQueue<AccessedObjectsDetailImpl>(size);
         } else {
             backlog = null;
         }
@@ -123,10 +123,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     /** 
      * {@inheritDoc} 
      */
-    public <T> AccessNotificationProxy<T> registerContentionSource
-	(String sourceName, Class<T> contendedType) {
-
-        return new AccessNotificationProxyImpl<T>(sourceName);
+    public <T> AccessReporter<T> registerContentionSource
+	(String sourceName, Class<T> contendedType)
+    {
+        return new AccessReporterImpl<T>(sourceName);
     }
 
     /**
@@ -137,6 +137,23 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // transaction to return
         return null;
     }
+
+    /**
+     * The idea here is that a resolver needs to know who else might be
+     * interested in a given object...but is this the right approach? The
+     * reasoning here is that the Coodrinator should implement basic
+     * conflict and deadlock detection so that each resolver doesn't have
+     * to, but deadlock may depend on how resolution is done. So, maybe
+     * the resolver is responsible for this, in which case it needs to
+     * know about each access, not just possible contention cases. Does
+     * this suggest that the Coordinator just tracks access, reports
+     * profilie, etc. but passes on all access requests to the resolver?
+     * ...
+     * Maybe all requests get pased on, but the Coordinator implements a
+     * utility method to see if there is basic contention happening?
+     */
+    //public List<> getCurrentReaders(Object obj);
+    //public List<> getCurrentWriters(Object obj);
 
     /*
      * Implement NonDurableTransactionParticipant interface.
@@ -193,10 +210,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         AccessedObjectsDetailImpl detail =
             txnMap.remove(txnProxy.getCurrentTransaction());
 
-        // TODO: this should be replaced with a level check once Jane's
-        // updates are ready
-        if (profileCollector == null)
-            return;
+        // TODO: check the profiling level to make sure that we're
+        // actually supposed to be reporting this detail
 
 	// if the task failed try to determine why
         if (!succeeded) {
@@ -205,16 +220,11 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	    // try to refine it.
 	    detail.conflictType = ConflictType.UNKNOWN;
 
-	    // Currently, the only way to refine the cause is to
-	    // search the transaction back log (if we have one) and
-	    // look for any transaction that acquired the same locks.
-	    //
-            // NOTE: in the current system we'll never see a
-            // transaction fail because of contention with another
-            // active transaction, so currently this is only for
-            // looking through a backlog, if that's enabled
+            // NOTE: in the current system we'll never see a transaction
+            // fail because of contention with another active transaction,
+            // so currently this is only for looking through a backlog
 	    if (backlog != null) {
-
+                // look through the backlog for a conflict
 		for (AccessedObjectsDetailImpl oldDetail : backlog) {
 		    if (detail.conflictsWith(oldDetail)) {
 			detail.setCause(ConflictType.ACCESS_NOT_GRANTED,
@@ -252,7 +262,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         txnMap.put(txn, new AccessedObjectsDetailImpl());
     }
 
-    // TBD: there should be another version of the notifyNewTransaction
+    // NOTE: there will be another version of the notifyNewTransaction
     // method that takes a specific resolution policy (once we get that
     // feature implemented)
 
@@ -260,93 +270,56 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * Class implementations.
      */
 
-    /** 
-     * Private implementation of {@code AccessedObjectsDetail}. 
-     */
-    private static class AccessedObjectsDetailImpl implements AccessedObjectsDetail {
-
+    /** Private implementation of {@code AccessedObjectsDetail}. */
+    private static class AccessedObjectsDetailImpl
+        implements AccessedObjectsDetail
+    {
+        // a generator for identifiers, and the identifier for each instance
         private static final AtomicLong DETAIL_ID_COUNTER = new AtomicLong(0);
+        private final long id = DETAIL_ID_COUNTER.incrementAndGet();
 
-        private final long id;
+        // the ordered set of accesses, and a separate set of just the writes
+        private final LinkedHashSet<AccessedObject> accessList =
+            new LinkedHashSet<AccessedObject>();
+	private final Set<AccessedObject> writes =
+            new HashSet<AccessedObject>();
 
-        private final LinkedHashSet<AccessedObject> accessList;
+        // any provided object descriptions
+	private final Map<Object,Object> objIDtoDescription =
+            new HashMap<Object,Object>();
+
+        // whether the transaction has already proceeded past prepare
+	private final AtomicBoolean committing = new AtomicBoolean(false);
+
+        // information about why the transaction failed
+        private boolean failed = false;
+	private ConflictType conflictType = ConflictType.NONE;
+        private long idOfConflictingTxn = 0;
+
+        /** Implement AccessObjectsDetail. */
 	
-	/**
-	 * A separate set of the write locks obtained during this
-	 * Detail's lifetime
-	 */
-	private final Set<AccessedObject> writes;
-
-	private final Map<Object,Object> objIDtoDescription;
-
-	private final AtomicBoolean committing;
-
-        private boolean failed;
-
-	private ConflictType conflictType;
-
-        private long idOfConflictingTxn;
-
-	AccessedObjectsDetailImpl() {
-
-	    id = DETAIL_ID_COUNTER.incrementAndGet();
-
-	    accessList = new LinkedHashSet<AccessedObject>();
-
-	    objIDtoDescription = new HashMap<Object,Object>();
-
-	    writes = new HashSet<AccessedObject>();
-
-	    committing = new AtomicBoolean(false);
-
-	    failed = false;
-
-	    conflictType = ConflictType.NONE;
-
-	    idOfConflictingTxn = 0;
-
-	}
-	
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
         public long getId() {
             return id;
         }
-
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
         public List<AccessedObject> getAccessedObjects() {
-	    // make a copy of the set
             return new ArrayList<AccessedObject>(accessList);
         }
-
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
         public boolean failedOnContention() {
             return failed;
         }
-
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
         public ConflictType getConflictType() {
             return conflictType;
         }
-
-        /** 
-	 * {@inheritDoc}
-	 */
+        /** {@inheritDoc} */
         public long getContendingId() {
             return idOfConflictingTxn;
         }
 	
-        /** 
-	 * Adds a the provided {@code AccessedObject} to the list of
-	 * currently accessed objects.	 
-	 */
+        /** Adds an {@code AccessedObject} to the list of accessed objects. */
         void addAccess(AccessedObject accessedObject) {
             accessList.add(accessedObject);
 	    
@@ -357,14 +330,12 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 		writes.add(accessedObject);
         }
 
-        /** 
-	 * Maps the provided object Id to an annotation describing
-	 * that object.
-	 */ 
+        /** Maps the provided object Id to a description. */
         void setDescription(Object objId, Object annotation) {
             objIDtoDescription.put(objId, annotation);
         }
-	
+
+        /** Sets the cause of conflict for this access detail. */
 	synchronized void setCause(ConflictType conflictReason, 
 				   long idOfConflictingTxn) {
 	    failed = true;
@@ -372,16 +343,12 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	    this.idOfConflictingTxn = idOfConflictingTxn;
 	}
 
-        /**
-	 * Returns a given object's annotation or {@code null} if none exists.
-	 */
+        /** Returns a given object's annotation or {@code null}. */
 	Object getDescription(Object objId) {
             return objIDtoDescription.get(objId);
         }
 
-        /** 
-	 * Marks this detail as having progressed past prepare(). 
-	 */
+        /** Marks this detail as having progressed past prepare(). */
 	void markCommitting() {
             committing.set(true);
         }
@@ -391,6 +358,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	    return committing.get();
         }
 
+        /** Checks if the given detail conflicts with this detail. */
         boolean conflictsWith(AccessedObjectsDetailImpl other) {
 	    
 	    // A conflict occurs if two details have write sets that
@@ -428,10 +396,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 		if (reads2.contains(o))
 		    return true;
 	    }
-	   
 
             return false;
         }
+
     }
 
     /** 
@@ -440,29 +408,21 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private static class AccessedObjectImpl implements AccessedObject {
 
         private final Object objId;
-
         private final AccessType type;
-
         private final String source;
-
         private final AccessedObjectsDetailImpl parent;
 
-        /** 
-	 * Creates an instance of {@code AccessedObjectImpl}. 
-	 *
-	 * @throws IllegalArgumentException if any of the provided
-	 *         parameters are {@code null}.
-	 */
+        /** Creates an instance of {@code AccessedObjectImpl}. */
         AccessedObjectImpl(Object objId, AccessType type, String source,
                            AccessedObjectsDetailImpl parent) {
 	    if (objId == null) 
-		throw new IllegalArgumentException("objId must not be null");
+		throw new NullPointerException("objId must not be null");
 	    else if (type == null) 
-		throw new IllegalArgumentException("type must not be null");
+		throw new NullPointerException("type must not be null");
 	    else if (source == null) 
-		throw new IllegalArgumentException("source must not be null");
+		throw new NullPointerException("source must not be null");
 	    else if (parent == null) 
-		throw new IllegalArgumentException("parent must not be null");
+		throw new NullPointerException("parent must not be null");
 	    
             this.objId = objId;
             this.type = type;
@@ -470,7 +430,28 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             this.parent = parent;
         }
 
-	/**
+        /** Implement AccessedObject. */
+
+        /** {@inheritDoc} */
+        public Object getObject() {
+            return objId;
+        }
+        /** {@inheritDoc} */
+        public AccessType getAccessType() {
+            return type;
+        }
+        /** {@inheritDoc} */
+        public Object getDescription() {
+            return parent.getDescription(objId);
+        }
+        /** {@inheritDoc} */
+        public String getSource() {
+            return source;
+        }
+
+        /** Support comparison checking. */
+
+        /**
 	 * Returns {@code true} if the other object is an instance of
 	 * {@code AccessedObjectImpl} and has the same object Id and
 	 * access type.
@@ -483,34 +464,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	    return false;
 	}
 
-        /**
-	 * {@inheritDoc} 
-	 */
-        public Object getObject() {
-            return objId;
-        }
-	
-        /** 
-	 * {@inheritDoc} 
-	 */
-        public AccessType getAccessType() {
-            return type;
-        }
-
-        /** 
-	 * {@inheritDoc} 
-	 */
-        public Object getDescription() {
-            return parent.getDescription(objId);
-        }
-	
-        /** 
-	 * {@inheritDoc} 
-	 */
-        public String getSource() {
-            return source;
-        }
-
 	/**
 	 * Returns the hash code of the object Id xor'd with the hash
 	 * code of the access type.
@@ -518,38 +471,33 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	public int hashCode() {
 	    return objId.hashCode() ^ type.hashCode();
 	}
+
     }
 
     /** 
-     * Private implementation of {@code AccessNotifier}. 
+     * Private implementation of {@code AccessNotifier}. Note that once we
+     * start managing contention then the {@code notifyObjectAccess} calls
+     * will need to start tracking access and check that this doesn't cause
+     * some transaction to fail.
+     * <p>
+     * TODO: until contention management is implemented, this only serves
+     * to provide detail to the profiling stream, so these methods should
+     * probably only keep this data if the profiling level is high enough.
      */
-    private class AccessNotificationProxyImpl<T> implements AccessNotificationProxy<T> {
-     
+    private class AccessReporterImpl<T> implements AccessReporter<T> {
 	private final String source;
-        
-	/**
-	 * Creates an instance of {@code AccessNotificationProxy}. 
-	 */
-        AccessNotificationProxyImpl(String source) {
+	/** Creates an instance of {@code AccessReporter}. */
+        AccessReporterImpl(String source) {
             this.source = source;
         }
-
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
         public void notifyObjectAccess(T objId, AccessType type) {
             AccessedObjectsDetailImpl detail =
                 txnMap.get(txnProxy.getCurrentTransaction());
             detail.addAccess(new AccessedObjectImpl(objId, type, source,
                                                     detail));
-            // TODO: when we're managing contention, this step should
-            // also track the requested access, seeing if this could
-            // cause failure to the calling or other transaction
         }
-
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
 	public void notifyObjectAccess(T objId, AccessType type, 
 				       Object description) {
 	    AccessedObjectsDetailImpl detail =
@@ -558,11 +506,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 						    detail));
             detail.setDescription(objId, description);
 	}
-	
-
-        /** 
-	 * {@inheritDoc} 
-	 */
+        /** {@inheritDoc} */
 	public void setObjectDescription(T objId, Object description) {
             AccessedObjectsDetailImpl detail =
                 txnMap.get(txnProxy.getCurrentTransaction());

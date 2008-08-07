@@ -19,7 +19,7 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.kernel.AccessNotificationProxy.AccessType;
+import com.sun.sgs.kernel.AccessReporter.AccessType;
 
 
 /**
@@ -46,7 +46,7 @@ public interface AccessedObject {
      *
      * @return the associated description, or {@code null}
      *
-     * @see AccessNotificationProxy#setObjectDescription(Object,Object)
+     * @see AccessReporter#setObjectDescription(Object,Object)
      */
     public Object getDescription();
 

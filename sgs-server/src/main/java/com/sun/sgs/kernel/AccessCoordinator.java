@@ -43,25 +43,8 @@ public interface AccessCoordinator {
      * @return an {@code AccessNotifier} used to notify the system
      *         of access to shared objects
      */
-    public <T> AccessNotificationProxy<T> registerContentionSource
-	(String sourceName, Class<T> contendedType);
-
-    /**
-     * The idea here is that a resolver needs to know who else might be
-     * interested in a given object...but is this the right approach? The
-     * reasoning here is that the Coodrinator should implement basic
-     * conflict and deadlock detection so that each resolver doesn't have
-     * to, but deadlock may depend on how resolution is done. So, maybe
-     * the resolver is responsible for this, in which case it needs to
-     * know about each access, not just possible contention cases. Does
-     * this suggest that the Coordinator just tracks access, reports
-     * profilie, etc. but passes on all access requests to the resolver?
-     * ...
-     * Maybe all requests get pased on, but the Coordinator implements a
-     * utility method to see if there is basic contention happening?
-     */
-    //public List<> getCurrentReaders(Object obj);
-    //public List<> getCurrentWriters(Object obj);
+    public <T> AccessReporter<T> registerContentionSource
+        (String sourceName, Class<T> contendedType);
 
     /**
      * Find out what transaction, if still active, caused the given

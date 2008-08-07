@@ -26,7 +26,7 @@ import java.util.List;
 
 /**
  * An interface accesible through a {@code ProfileReport} that details a
- * collection of object access, typically all of the object accesses within
+ * collection of object accesses, typically all of the object accesses within
  * a single transaction. If that transaction failed due to some kind of
  * conflict, then the type of failure and contending task is also identified.
  */

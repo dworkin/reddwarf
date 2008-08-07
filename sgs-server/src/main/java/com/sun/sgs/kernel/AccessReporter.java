@@ -23,13 +23,12 @@ import com.sun.sgs.service.Transaction;
 
 
 /**
- * Used to notify the coordinator of requested access to some
- * object. Methods must be called in the context of an active
- * transaction.
+ * Used to report to the coordinator requested accesses to shared
+ * objects. Methods must be called in the context of an active transaction.
  *
  * @param <T> the type of the object being accessed
  */
-public interface AccessNotificationProxy<T> {
+public interface AccessReporter<T> {
 
     /** The type of access requested. */
     public enum AccessType {
@@ -89,15 +88,17 @@ public interface AccessNotificationProxy<T> {
 
 
     /**
-     * Optionally mark the given object with some description that should have
-     * a meaningful toString() method. This will be available in the
+     * Mark the given object with some description that should have a
+     * meaningful toString() method. This will be available in the
      * profiling data, and is useful when displaying details about a given
      * accessed object. Note that this may be called before the object is
      * actually accessed, and thefore before {@code notifyObjectAccess}
-     * is called for the given {@code objId}.
+     * is called for the given {@code objId}. Use of this method is
+     * optional, and only used to provide additional detail for profiling
+     * and debugging.
      *
-     * @param objId the {@code Object} to annotate
-     * @param annotation an arbitrary object that contains a
+     * @param objId the {@code Object} being described
+     * @param annotation an arbitrary {@code Object} that contains a
      *        description of the objId being accessed
      *
      * @throws TransactionNotActiveException if not called in the context
