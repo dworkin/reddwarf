@@ -847,6 +847,7 @@ public final class ChannelServiceImpl
 	Context context = contextFactory.joinTransaction();
 	context.addTask(channelId, task);
     }
+
     /* -- Implement TransactionContext -- */
 
     /**

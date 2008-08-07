@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -26,6 +27,7 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 
@@ -47,6 +49,12 @@ public class TestAbstractService extends TestCase {
     
     private SgsTestNode serverNode = null;
 
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
+
+    /** The owner for tasks I initiate. */
+    private Identity taskOwner;
+
     /** Creates an instance. */
     public TestAbstractService(String name) {
 	super(name);
@@ -56,6 +64,10 @@ public class TestAbstractService extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	serverNode = new SgsTestNode("TestAbstractSevice", null,  null);
+	txnScheduler = 
+            serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
     /** Shuts down the server node. */
@@ -185,6 +197,20 @@ public class TestAbstractService extends TestCase {
 	service.checkHandleServiceVersionMismatchInvoked(true);
     }
 
+    public void testRunIoTaskInTransaction() throws Exception {
+	final DummyService service = createDummyService();
+	final IoRunnableImpl ioTask = new IoRunnableImpl(0);
+	try {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    service.runIoTask(ioTask, serverNode.getNodeId());
+		}}, taskOwner);
+	    fail("expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println("caught IllegalStateException");
+	}
+    }
+    
     public void testRunIoTaskThatThrowsNoExceptions() throws Exception {
 	DummyService service = createDummyService();
 	IoRunnableImpl ioTask = new IoRunnableImpl(0);

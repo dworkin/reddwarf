@@ -52,6 +52,10 @@ import java.util.logging.Level;
  */
 public abstract class AbstractService implements Service {
 
+    /** The time (in milliseconds) to wait before retrying an (@code
+     * IoRunnable} in the {@code runIoTask} method. */ 
+    private static final int WAIT_TIME_BEFORE_RETRY = 100;
+
     /** Service state. */
     protected static enum State {
         /** The service is initialized. */
@@ -416,14 +420,7 @@ public abstract class AbstractService implements Service {
      *		transactional context 
      */
     public boolean isAlive(long nodeId) {
-	// Make sure that we're not in a transactional context.
-	try {
-	    txnProxy.getCurrentTransaction();
-	    throw new IllegalStateException(
-		"isAlive called from a transactional context");
-	} catch (TransactionNotActiveException e) {
-	}
-	
+	checkNonTransactionalContext();
 	try {
 	    CheckNodeStatusTask nodeStatus =
 		new CheckNodeStatusTask(nodeId);
@@ -451,10 +448,16 @@ public abstract class AbstractService implements Service {
      * node with the given {@code nodeId} is alive until the task
      * completes successfully.
      *
+     * <p>This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown.
+     *
      * @param	ioTask a task with IO-related operations
      * @param	nodeId the node that is the target of the IO operations
+     * @throws	IllegalStateException if this method is invoked within a
+     * 		transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
+	checkNonTransactionalContext();
 	do {
 	    try {
 		ioTask.run();
@@ -467,7 +470,7 @@ public abstract class AbstractService implements Service {
 		}
 		try {
 		    // TBD: what back-off policy do we want here?
-		    Thread.sleep(200);
+		    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
 		} catch (InterruptedException ie) {
 		}
 	    }
@@ -589,9 +592,23 @@ public abstract class AbstractService implements Service {
     }
 
     /**
+     * Checks that the current thread is not in a transactional context
+     * and throws {@code IllegalStateException} if the thread is in a
+     * transactional context.
+     */
+    private void checkNonTransactionalContext() {
+	try {
+	    txnProxy.getCurrentTransaction();
+	    throw new IllegalStateException(
+		"operation not allowed from a transactional context");
+	} catch (TransactionNotActiveException e) {
+	}
+    }
+	
+    /**
      * A task to obtain the status of a given node.
      */
-    private class CheckNodeStatusTask extends AbstractKernelRunnable {
+    private static class CheckNodeStatusTask extends AbstractKernelRunnable {
 	private final long nodeId;
 	volatile boolean isAlive = false;
 
