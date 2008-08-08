@@ -233,7 +233,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             /** reconnection-key; the key is a byte[] and, since it is the only 
              *  payload, the length of the array is the same as the payload length
              */
-            readlen = sgs_msg_read_id(&msg,offset + 2,
+            readlen = sgs_msg_read_id(&msg,offset + 2, 0,
                     &session->reconnect_key);
             if (readlen < 0) return -1;
 
@@ -311,7 +311,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             else offset += readlen;
             
             /* Now, get the channel id*/
-            readlen = sgs_msg_read_id(&msg, offset, &channel_id);
+            readlen = sgs_msg_read_id(&msg, offset, 1, &channel_id);
             if (readlen < 0)
                 return -1;
 
@@ -371,7 +371,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              *  The first two bytes are the length of the byte array containing
              *  the ID, and the remainder is the id itself
              */
-            readlen = sgs_msg_read_id(&msg, offset + 2, &channel_id);
+            readlen = sgs_msg_read_id(&msg, offset + 2, 1, &channel_id);
             if (readlen < 0)
                 return -1;
             else offset += readlen;

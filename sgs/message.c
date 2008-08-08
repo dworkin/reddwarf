@@ -45,6 +45,7 @@
 #include "sgs/private/message.h"
 #include "sgs/protocol.h"
 #include "sgs/buffer.h"
+#include "private/message.h"
 
 
 static void update_msg_len(sgs_message *pmsg);
@@ -151,9 +152,14 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
  * This will copy the length of the id, and then the contents of the id,
  * to the message field
  */
-int sgs_msg_add_id(sgs_message *msg, const sgs_id *id) {
-    return sgs_msg_add_fixed_content(msg, sgs_id_get_bytes(id), 
-            sgs_id_get_byte_len(id));
+int sgs_msg_add_id(sgs_message *msg, const sgs_id *id, int add_length) {
+    if (add_length != 0) {
+        return sgs_msg_add_fixed_content(msg, sgs_id_get_bytes(id),
+                sgs_id_get_byte_len(id));
+    } else {
+        return sgs_msg_add_arb_content(msg, sgs_id_get_bytes(id),
+                sgs_id_get_byte_len(id));
+    }
 }
 
 /*
@@ -270,17 +276,23 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
 /*
  * sgs_msg_read_id()
  */
-int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **result){
+int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start,
+        int read_length, sgs_id **result) {
     uint16_t length;
     uint8_t *buffer;
     int incr, incr1;
-    
-    incr = sgs_msg_read_uint16(pmsg, start, &length);
-    if (incr < 1)
-        return -1;
 
-    incr1 = sgs_msg_read_bytes(pmsg, start+ incr, &buffer, length);
-    if (incr1 != length){
+    if (read_length != 0) {
+        incr = sgs_msg_read_uint16(pmsg, start, &length);
+        if (incr < 1)
+            return -1;
+    } else {
+        length = (pmsg->len + SGS_MSG_INIT_LEN) - start;
+        incr = 0;
+    }
+
+    incr1 = sgs_msg_read_bytes(pmsg, start + incr, &buffer, length);
+    if (incr1 != length) {
         return -1;
     }
 
@@ -318,7 +330,8 @@ int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **
     if (*result == NULL){
         return -1;
     }
-    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? pmsg->len - start : count;
+    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? 
+        (pmsg->len + SGS_MSG_INIT_LEN) - start : count;
     memcpy(*result, pmsg->buf + start, retcount);
     return retcount;
 }

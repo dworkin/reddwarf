@@ -144,21 +144,23 @@ int sgs_msg_add_fixed_content(sgs_message* pmsg, const uint8_t* content,
  * function: sgs_msg_add_id()
  *
  * Writes an sgs_id to an existing message. The id is not interpreted in any
- * way, and can be of any size. The result is that a two-byte size (in a form
- * appropriate for sending on the network) is added to the data buffer, followed
- * by the bytes of the id. The overall length of the message is updated to 
- * reflect the addition of both the bytes that make up the id and the two byte
- * length.
+ * way, and can be of any size. If add_length is not 0, the result is that a 
+ * two-byte size (in a form appropriate for sending on the network) is added to 
+ * the data buffer, followed by the bytes of the id. If add_length is 0, only the 
+ * bytes of the id are written to the stream. In either case, the overall length 
+ * of the message is updated to reflect the addition of the content that was added.
  *
  * args:
  *     pmsg: pointer to the message to add data to
  *       id: pointer to the sgs_id to add to the message
+ *     add_length: if 0, only the bytes of the id are added to the stream,
+ *              otherwise, both the length and the bytes of the id are added
  *
  * returns:
  *    0: success
  *   -1: failure (errno is set to specific error code)
  */
-int sgs_msg_add_id(sgs_message* pmsg, const sgs_id* id);
+int sgs_msg_add_id(sgs_message* pmsg, const sgs_id* id, int add_length);
 	
 /*
  * function: sgs_msg_add_uint16()
@@ -305,11 +307,18 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
  * This function cannot tell if a non-null value of *result is a pointer to 
  * allocated memory or an uninitialized value pointing to nothing.
  *
+ * If the value of the parameter read_length is not zero, the length of the 
+ * id will be read from the data stream pointed to by pmsg beginning with the
+ * position indicated by the parameter start. If the value of read_length is
+ * 0, then the size of the id will be taken to be the rest of the buffer pointed
+ * to by pmsg from position start to the end of the buffer.
+ *
  * Returns the total number of bytes read from the starting point on success,
  * or -1 on failure.
  */
 
-int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, sgs_id **result);
+int sgs_msg_read_id(const sgs_message *pmsg, const uint16_t start, 
+            int read_length, sgs_id **result);
 
 /*
  * function sgs_msg_read_string()

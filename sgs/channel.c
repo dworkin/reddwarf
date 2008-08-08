@@ -72,7 +72,7 @@ int sgs_channel_send(sgs_channel_impl *channel, const uint8_t *data,
         return -1;
     
     /** Add channel-id data field to message. */
-    if (sgs_msg_add_id(&msg, channel->id) == -1)
+    if (sgs_msg_add_id(&msg, channel->id, 1) == -1)
         return -1;
 	
     

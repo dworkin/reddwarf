@@ -37,6 +37,7 @@ static int testUint16(sgs_message *pmsg, int numTests, int silent);
 static int testUint32(sgs_message *pmsg, int numTests, int silent);
 static int testStrings(sgs_message *pmsg, int numTests, int silent);
 static int testIds(sgs_message *pmsg, int numTests, int silent);
+static int testBytes(sgs_message *pmsg, int numTests, int silent);
 
 
 /*
@@ -93,6 +94,12 @@ int main(int argc, char *argv[]) {
         printf("test Ids passed\n");
     } else 
         printf("%d failures in testIds\n", result);
+    
+    result = sgs_msg_init(&msg, buf, sizeof(buf), SGS_OPCODE_LOGIN_REQUEST);
+    if ((result = testBytes(&msg, 200, 0))== 0){
+        printf("test Bytes passed\n");
+    } else
+        printf("%d failures in byteTest\n", result);
   
     printf("Goodbye!\n");
   
@@ -280,6 +287,7 @@ void generateIds(sgs_id **testIds){
         memcpy(buffer+i, sourcebuf, len);
         *(testIds + i) = sgs_id_create(buffer+i, len);
     }
+    //printf("exiting generateIds\n");
 }
 
 int testIds(sgs_message *pmsg, int numTests, int silent){
@@ -288,15 +296,21 @@ int testIds(sgs_message *pmsg, int numTests, int silent){
     int i, j, incr, result, totalBad;
     
     totalBad = 0;
-    generateIds(testIds);
     
     for (i = 0; i < numTests; i+=j){
+        generateIds(testIds);
         for (j = 0; j < 10; j++){
-            sgs_msg_add_id(pmsg, testIds[j]);
+            if (j != 9)
+                sgs_msg_add_id(pmsg, testIds[j], 1);
+            else
+                sgs_msg_add_id(pmsg, testIds[j], 0);
         }
         incr = 3;
         for (j = 0; j<10; j++){
-            result = sgs_msg_read_id(pmsg, incr, (outIds+j));
+            if (j != 9)
+                result = sgs_msg_read_id(pmsg, incr, 1, (outIds+j));
+            else
+                result = sgs_msg_read_id(pmsg, incr, 0, (outIds+j));
             if (result < 1){
                 printf("error reading the %dth value\n", i+j);
                 return -1;
@@ -311,8 +325,83 @@ int testIds(sgs_message *pmsg, int numTests, int silent){
                     printf("%dth ids differ\n", j);
                 }
             }
+            sgs_id_destroy(outIds[j]);
         }
+        pmsg->len = 1;
     }
     return totalBad;
 }
+
+typedef struct bytetest{
+    int size;
+    uint8_t *contents;
+} byteTest;
+
+void generateTestBytes(byteTest **toTest){
+    int i, j, len;
+    long sourcebuf[5];
+    
+    for (i = 0; i < 10; i++){    
+        len = (random()%20);
+        len++;
+        for (j = 0; j < 5; j++){
+            sourcebuf[j] = random();
+        }
+        (*(toTest+i))->contents = malloc(len);
+        if ((*(toTest+i))->contents == NULL){
+            printf("unable to allocate memory for byte buffer\n");
+            exit(1);
+        }
+        memcpy((*(toTest+i))->contents, sourcebuf, len);
+        (*(toTest+i))->size = len;
+    }
+}
+
+int testBytes(sgs_message *pmsg, int numTests, int silent){
+    byteTest *inputBytes[10];
+    byteTest *outputBytes[10];
+    
+    int i, j, k, incr, results, totalBad;
+    
+    totalBad = 0;
+    
+    for (i = 0; i<numTests; i+=j){
+        generateTestBytes(inputBytes);
+        pmsg->len = 1;
+        for (j= 0; j<10; j++){
+            results = sgs_msg_add_arb_content(pmsg, inputBytes[j]->contents, 
+            inputBytes[j]->size);
+            if (results < 0){
+                printf("Unable to write test bytes to buffer\n");
+            }
+        }
+        incr = 3;
+        for (j=0; j<10; j++){
+            results = sgs_msg_read_bytes(pmsg, incr, &(outputBytes[j]->contents), inputBytes[j]->size);
+            if (results < 0){
+                printf("unable to read bytes from buffer\n");
+                exit(1);
+            }
+            incr += results;
+        }
+        for (j = 0; j < 10; j++){
+            for (k = 0; k < inputBytes[j]->size; k++){
+                if (*(inputBytes[j]->contents+k) != *(outputBytes[j]->contents+k)){
+                    if (silent == 0){
+                        printf("input = %d, ouput = %d, index = %d\n",
+                            *(inputBytes[j]->contents+k), *(outputBytes[j]->contents+k), k);
+                    }
+                    totalBad++;
+                    k = inputBytes[j]->size;
+                }
+            }
+        }
+        for (j = 0; j<10; j++){
+            free(inputBytes[j]->contents);
+            free(outputBytes[j]->contents);
+        }
+    
+    }
+    return totalBad;
+ }
 
