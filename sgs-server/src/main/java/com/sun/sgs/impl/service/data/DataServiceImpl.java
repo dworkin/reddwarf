@@ -392,6 +392,17 @@ public final class DataServiceImpl implements DataService {
 		throw new NullPointerException(
 		    "The txnProxy argument must not be null");
 	    }
+
+	    // notify the AccessCoordinator that the DataService is a
+	    // source of contention for ManagedObjects and name
+	    // bindings.
+	    AccessCoordinator accessCoordinator = 
+		systemRegistry.getComponent(AccessCoordinator.class);	    
+	    oidAccesses = accessCoordinator.
+		registerContentionSource(CLASSNAME, BigInteger.class);
+	    boundNameAccesses = accessCoordinator.
+		registerContentionSource(CLASSNAME, String.class);
+
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
 	    detectModifications = wrappedProps.getBooleanProperty(
@@ -455,16 +466,6 @@ public final class DataServiceImpl implements DataService {
 			}
 		    },
 		taskOwner);
-
-	    // notify the AccessCoordinator that the DataService is a
-	    // source of contention for ManagedObjects and name
-	    // bindings.
-	    AccessCoordinator accessCoordinator = 
-		systemRegistry.getComponent(AccessCoordinator.class);	    
-	    oidAccesses = accessCoordinator.
-		registerContentionSource(CLASSNAME, BigInteger.class);
-	    boundNameAccesses = accessCoordinator.
-		registerContentionSource(CLASSNAME, String.class);
 
 	    storeToShutdown = null;
 	} catch (RuntimeException e) {
@@ -754,7 +755,7 @@ public final class DataServiceImpl implements DataService {
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    // mark that this name has been write locked
 	    boundNameAccesses.notifyObjectAccess(name, AccessType.WRITE,
-					   object);
+						 object);
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(

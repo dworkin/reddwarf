@@ -78,7 +78,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private final Queue<AccessedObjectsDetailImpl> backlog;
 
     static final String BACKLOG_QUEUE_PROPERTY =
-        AccessedObjectsDetailImpl.class.getName() + ".queue.size";
+        AccessCoordinatorImpl.class.getName() + ".queue.size";
 
     // system components
     private final TransactionProxy txnProxy;
@@ -207,8 +207,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      *        not abort).
      */
     private void reportDetail(Transaction txn, boolean succeeded) {
-        AccessedObjectsDetailImpl detail =
-            txnMap.remove(txnProxy.getCurrentTransaction());
+
+        AccessedObjectsDetailImpl detail = txnMap.remove(txn);
 
         // TODO: check the profiling level to make sure that we're
         // actually supposed to be reporting this detail
@@ -360,6 +360,9 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
         /** Checks if the given detail conflicts with this detail. */
         boolean conflictsWith(AccessedObjectsDetailImpl other) {
+
+	    if (other == null)
+		return false;
 	    
 	    // A conflict occurs if two details have write sets that
 	    // intersect, or if the write set of either set intersects

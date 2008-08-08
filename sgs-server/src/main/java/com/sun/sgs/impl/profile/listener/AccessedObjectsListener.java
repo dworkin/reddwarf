@@ -85,7 +85,7 @@ public class AccessedObjectsListener implements ProfileListener {
 			      + "\n  accesor id: %d, try count %d; objects "
 			      + "accessed ordered by first access:\n%s" 
 			      + "conflict type: %s, ID of contending " 
-			      + "accessor %d\n",
+			      + "accessor %d%n%n",
 			      profileReport.getTask().getBaseTaskType(),
 			      detail.getId(), 
 			      profileReport.getRetryCount(),
