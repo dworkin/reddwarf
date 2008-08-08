@@ -220,6 +220,7 @@
 		      fork="true">
 		  <jvmarg line="${run.jvm.args}"/>
 		  <jvmarg line="${run.jvm.args.profile}"/>
+		  <jvmarg line="-server"/>
 		  <sysproperty key="java.library.path" 
 			       file="${run.javapath}"/>
 		  <sysproperty key="java.util.logging.config.file"

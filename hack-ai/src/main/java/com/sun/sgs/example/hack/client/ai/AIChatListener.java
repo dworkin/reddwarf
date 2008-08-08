@@ -32,21 +32,22 @@ public class AIChatListener implements ChatListener {
 
         random = new Random();
 
-        AIClient.runDelayed(new ChatTask(), random.nextInt(MAX_WAIT));
+        // AIClient.runDelayed(new ChatTask(), random.nextInt(MAX_WAIT));
     }
 
-    private class ChatTask implements Runnable {
-        public void run() {
-            byte [] bytes = new byte[random.nextInt(128) + 1];
-            random.nextBytes(bytes);
-            chatManager.sendMessage(new String(bytes));
-            AIClient.runDelayed(this, random.nextInt(MAX_WAIT));
-        }
-    }
+//     private class ChatTask implements Runnable {
+//         public void run() {
+//             byte [] bytes = new byte[random.nextInt(128) + 1];
+//             random.nextBytes(bytes);
+//             chatManager.sendMessage(new String(bytes));
+//             AIClient.runDelayed(this, random.nextInt(MAX_WAIT));
+//         }
+//     }
 
     public void playerJoined(BigInteger uid) {}
     public void playerLeft(BigInteger uid) {}
     public void messageArrived(String message) {}
-    public void addUidMappings(Map<BigInteger,String> uidMap) {}
+    public void addPlayerIdMappings(Map<BigInteger,String> uidMap) {}
+    public void addPlayerIdMapping(BigInteger id, String name) {}
 
 }

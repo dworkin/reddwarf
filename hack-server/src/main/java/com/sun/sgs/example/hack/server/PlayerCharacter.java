@@ -88,7 +88,7 @@ public class PlayerCharacter implements Character, Serializable {
         // ...and check to see if we're still alive
         if (stats.getHitPoints() == 0) {
             // we were killed, so send a message...
-            player.sendTextMessage("you died.");
+            player.sendServerMessage("You died.  Now returning to the lobby");
 
             // ...remove ourself directly from the level, so there's no
             // confusion about interacting with us before we get called
@@ -131,7 +131,7 @@ public class PlayerCharacter implements Character, Serializable {
             Player player = playerRef.get();
             int lostHP = previousHP - stats.getHitPoints();
             if (lostHP > 0)
-                player.sendTextMessage(character.getName() + " hit you for " +
+                player.sendServerMessage(character.getName() + " hit you for " +
                                        lostHP + "HP");
 
             // do the general stat notify routine
@@ -166,7 +166,7 @@ public class PlayerCharacter implements Character, Serializable {
      * @param message the message to send
      */
     public void sendMessage(String message) {
-        playerRef.get().sendTextMessage(message);
+        playerRef.get().sendServerMessage(message);
     }
 
 }
