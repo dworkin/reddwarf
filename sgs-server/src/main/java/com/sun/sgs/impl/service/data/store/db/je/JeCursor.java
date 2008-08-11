@@ -31,7 +31,7 @@ import com.sleepycat.je.Transaction;
 import com.sun.sgs.impl.service.data.store.db.DbCursor;
 import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 
-/** Provides a cursor implementation using Berkeley DB, Java Edition. */
+/** Provides a cursor implementation using Berkeley DB Java Edition. */
 public class JeCursor implements DbCursor {
 
     /** The Berkeley DB cursor. */

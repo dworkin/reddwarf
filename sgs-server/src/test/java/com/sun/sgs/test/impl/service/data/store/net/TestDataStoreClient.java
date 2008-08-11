@@ -22,10 +22,12 @@ package com.sun.sgs.test.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.impl.service.data.store.net.NetworkException;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import java.util.Properties;
 import junit.framework.TestSuite;
@@ -89,7 +91,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     /** Create a DataStoreClient. */
     @Override
     protected DataStore createDataStore(Properties props) throws Exception {
-	return new DataStoreClient(props);
+	DataStore store = new DataStoreProfileProducer(
+	    new DataStoreClient(props), DummyProfileCoordinator.getRegistrar());
+	DummyProfileCoordinator.startProfiling();
+	return store;
     }
 
     /* -- Tests -- */
