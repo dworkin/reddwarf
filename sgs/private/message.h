@@ -144,7 +144,7 @@ int sgs_msg_add_fixed_content(sgs_message* pmsg, const uint8_t* content,
  * function: sgs_msg_add_id()
  *
  * Writes an sgs_id to an existing message. The id is not interpreted in any
- * way, and can be of any size. If add_length is not 0, he result is that a 
+ * way, and can be of any size. If add_length is not 0, the result is that a 
  * two-byte size (in a form appropriate for sending on the network) is added to 
  * the data buffer, followed by the bytes of the id. If add_length is 0, only the 
  * bytes of the id are written to the stream. In either case, the overall length 
