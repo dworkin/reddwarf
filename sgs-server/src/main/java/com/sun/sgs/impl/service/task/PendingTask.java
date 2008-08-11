@@ -39,9 +39,6 @@ import java.io.Serializable;
  * sure that the {@code Task} itself is persisted. This meta-data classs
  * can be flagged as available, so that a single instance can be persisted
  * and then re-used as needed.
- * <p>
- * FIXME: there are now two notions of "available" so one of those names
- * should be changed.
  */
 class PendingTask implements ManagedObject, Serializable {
 
@@ -60,8 +57,8 @@ class PendingTask implements ManagedObject, Serializable {
     private long startTime;
     private long period;
     
-    // identiifies whether this instance is available for re-use
-    private boolean available;
+    // identifies whether this instance is free for re-use
+    private boolean reusable;
 
     // if this is a periodic task, where it's currently running
     private long runningNode;
@@ -74,7 +71,7 @@ class PendingTask implements ManagedObject, Serializable {
     PendingTask(Identity identity) {
         this.identity = identity;
 
-        this.available = true;
+        this.reusable = true;
         this.runningNode = -1;
     }
 
@@ -115,19 +112,19 @@ class PendingTask implements ManagedObject, Serializable {
         this.startTime = s;
         this.period = p;
 
-        this.available = false;
+        this.reusable = false;
         this.runningNode = -1;
     }
 
-    /** Returns whether this {@code PendingTask} is available for re-use. */
-    boolean isAvailable() {
-        return available;
+    /** Returns whether this {@code PendingTask} is free to be re-used. */
+    boolean isReusable() {
+        return reusable;
     }
 
-    /** Sets this {@code PendingTask} as available for re-use. */
-    void setAvailable() {
+    /** Sets this {@code PendingTask} as free for re-use. */
+    void setReusable() {
         AppContext.getDataManager().markForUpdate(this);
-        available = true;
+        reusable = true;
     }
 
     /** Returns the type of the pending task. */

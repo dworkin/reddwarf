@@ -61,6 +61,8 @@ import com.sun.sgs.service.WatchdogService;
 
 import java.io.Serializable;
 
+import java.math.BigInteger;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -86,7 +88,9 @@ import java.util.logging.Logger;
  * {@code PendingTask}, indexed by the owning identity. When a given identity
  * is mapped to the local node, all tasks associated with that identity are
  * started running on the local node. As long as an identity still has pending
- * tasks scheduled to run locally, that identity is marked as active.
+ * tasks scheduled to run locally, that identity is marked as active. To
+ * help minimize object creation, a cache of {@code PendingTask}s is created
+ * for each identity.
  * <p>
  * When an identity is moved from the local node to a new node, then all
  * recurring tasks for that identity are cancelled, and all tasks for that
@@ -219,13 +223,13 @@ public class TaskServiceImpl
     private final TransactionContextFactory<TxnState> ctxFactory;
 
     // the transient map for all recurring tasks' handles
-    private ConcurrentHashMap<String,RecurringDetail> recurringMap;
+    private ConcurrentHashMap<BigInteger,RecurringDetail> recurringMap;
 
     // the transient map for all recurring handles based on identity
     private HashMap<Identity,Set<RecurringTaskHandle>> identityRecurringMap;
 
     // the transient map for available pending task entries
-    private final ConcurrentHashMap<Identity,HashSet<String>>
+    private final ConcurrentHashMap<Identity,HashSet<BigInteger>>
         availablePendingMap;
 
     // the profiled operations
@@ -255,11 +259,11 @@ public class TaskServiceImpl
         activeIdentityMap = new HashMap<Identity,Integer>();
         mappedIdentitySet = new HashSet<Identity>();
         statusTaskMap = new ConcurrentHashMap<Identity,TimerTask>();
-        recurringMap = new ConcurrentHashMap<String,RecurringDetail>();
+        recurringMap = new ConcurrentHashMap<BigInteger,RecurringDetail>();
         identityRecurringMap =
             new HashMap<Identity,Set<RecurringTaskHandle>>();
         availablePendingMap =
-            new ConcurrentHashMap<Identity,HashSet<String>>();
+            new ConcurrentHashMap<Identity,HashSet<BigInteger>>();
 
         // create the factory for managing transaction context
         ctxFactory = new TransactionContextFactoryImpl(txnProxy);
@@ -481,7 +485,7 @@ public class TaskServiceImpl
 
         // check where the owner is active to get the task running
         if (! isMappedLocally(owner)) {
-            if (handoffTask(runner.getObjName(), owner))
+            if (handoffTask(generateObjName(owner, runner.getObjId()), owner))
                 return;
             runner.markIgnoreIsLocal();
         }
@@ -510,24 +514,25 @@ public class TaskServiceImpl
         // persist the task regardless of where it will ultimately run
         Identity owner = txnProxy.getCurrentOwner();
         TaskRunner runner = getRunner(task, owner, startTime, period);
-        String objName = runner.getObjName();
+        BigInteger objId = runner.getObjId();
 
         // check where the owner is active to get the task running
         if (! isMappedLocally(owner)) {
+            String objName = generateObjName(owner, objId);
             if (handoffTask(objName, owner))
                 return new PeriodicTaskHandleImpl(objName);
             runner.markIgnoreIsLocal();
         }
-        PendingTask ptask =
-            (PendingTask) dataService.getServiceBinding(objName);
+        PendingTask ptask = 
+            (PendingTask)(dataService.createReferenceForId(objId).
+                          getForUpdate());
         ptask.setRunningNode(nodeId);
 
         RecurringTaskHandle handle =
             transactionScheduler.scheduleRecurringTask(runner, owner,
                                                        startTime, period);
-        ctxFactory.joinTransaction().addRecurringTask(objName, handle,
-                                                      owner);
-        return new PeriodicTaskHandleImpl(objName);
+        ctxFactory.joinTransaction().addRecurringTask(objId, handle, owner);
+        return new PeriodicTaskHandleImpl(generateObjName(owner, objId));
     }
 
     /**
@@ -576,20 +581,32 @@ public class TaskServiceImpl
         logger.log(Level.FINEST, "setting up a pending task");
 
         // create a new pending task that will be used when the runner runs
-        String objName = allocatePendingTask(task, identity, startTime, period);
+        BigInteger objId =
+            allocatePendingTask(task, identity, startTime, period);
 
         if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "created pending task {0}", objName);
+            logger.log(Level.FINEST, "created pending task {0} for {1}",
+                       objId, identity);
 
-        return new TaskRunner(objName, task.getClass().getName(), identity);
+        return new TaskRunner(objId, task.getClass().getName(), identity);
+    }
+
+    /** Helper that generates the name for a pending object. */
+    private static String generateObjName(Identity owner, BigInteger objId) {
+        return DS_PENDING_SPACE + owner.getName() + "." + objId;
+    }
+
+    /** Helper that gets the id from a name. */
+    private static BigInteger getIdFromName(String objName) {
+        return new BigInteger(objName.substring(objName.lastIndexOf('.') + 1));
     }
 
     /** Helper that allocates a pending task, re-using one if possible. */
-    private String allocatePendingTask(Task task, Identity identity,
-                                       long startTime, long period) {
+    private BigInteger allocatePendingTask(Task task, Identity identity,
+                                           long startTime, long period) {
         PendingTask ptask = null;
-        String objName = null;
-        HashSet<String> set = availablePendingMap.get(identity);
+        BigInteger objId = null;
+        HashSet<BigInteger> set = availablePendingMap.get(identity);
 
         // a null set means that the identity isn't mapped here, so the task
         // will get handed-off to another node...since this isn't a common
@@ -598,50 +615,52 @@ public class TaskServiceImpl
         if (set != null) {
             synchronized (set) {
                 if (! set.isEmpty()) {
-                    objName = set.iterator().next();
-                    set.remove(objName);
+                    objId = set.iterator().next();
+                    set.remove(objId);
                     ctxFactory.joinTransaction().
-                        notePendingNameAllocated(identity, objName);
+                        notePendingIdAllocated(identity, objId);
                 }
             }
         }
 
-        if (objName == null) {
+        if (objId != null) {
+            // a pending task might be available for re-use, so try
+            // to get it but handle the possibility that another node
+            // could have removed or re-used this entry already
+            try {
+                ptask = (PendingTask)(dataService.createReferenceForId(objId).
+                                      get());
+                if (! ptask.isReusable())
+                    objId = null;
+            } catch (IllegalArgumentException iae) {
+                objId = null;
+            }
+        }
+
+        if (objId == null) {
             // there was no available pending task, so create one now
             ptask = new PendingTask(identity);
             ManagedReference<PendingTask> taskRef =
                 dataService.createReference(ptask);
-            objName = DS_PENDING_SPACE + identity.getName() +
-                "." + taskRef.getId();
-            dataService.setServiceBinding(objName, ptask);
-        } else {
-            // resolve the available pending task, and keep track of the
-            // name in case the transaction aborts
-            ptask = (PendingTask)(dataService.getServiceBinding(objName));
+            objId = taskRef.getId();
+            dataService.
+                setServiceBinding(generateObjName(identity, objId), ptask);
         }
 
         ptask.resetValues(task, startTime, period);
         
-        return objName;
+        return objId;
     }
 
-    /** Helper that frees a pending task for re-use. */
-    private void freePendingTask(PendingTask ptask, String objName) {
-        if (ptask.isPeriodic()) {
-            // TODO: I think periodic tasks should just get removed, since
-            // this is likely to be rare, and it's the easiest way to make
-            // sure that future attempts to cancel this task don't interact
-            // with re-used tasks...but this should be verified
-            dataService.removeServiceBinding(objName);
-            dataService.removeObject(ptask);
-            return;
-        }
-
+    /** Helper that frees a non-periodic pending task for re-use. */
+    private void freePendingTask(PendingTask ptask, BigInteger objId) {
         assert ptask.getIdentity().equals(txnProxy.getCurrentOwner()) :
             "Only the current name should be freed for non-periodic tasks";
+        assert (! ptask.isPeriodic()) :
+            "periodic tasks should not be freed for re-use";
 
-        ctxFactory.joinTransaction().notePendingNameFreed(objName);
-        ptask.setAvailable();
+        ctxFactory.joinTransaction().notePendingIdFreed(objId);
+        ptask.setReusable();
     }
 
     /**
@@ -691,19 +710,19 @@ public class TaskServiceImpl
      * already removed the pending task entry, then this method returns null
      * meaning that there is no task to run.
      */
-    PendingTask fetchPendingTask(String objName) {
+    PendingTask fetchPendingTask(BigInteger objId) {
         PendingTask ptask = null;
         try {
-            ptask = (PendingTask) dataService.getServiceBinding(objName);
-        } catch (NameNotBoundException nnbe) {
+            ptask = (PendingTask)(dataService.createReferenceForId(objId).
+                                  get());
+        } catch (IllegalArgumentException iae) {
             // the task was already removed, so check if this is a recurring
             // task, because then we need to cancel it (this may happen if
             // the task was cancelled on a different node than where it is
             // currently running)
-            if (recurringMap.containsKey(objName))
+            if (recurringMap.containsKey(objId))
                 ctxFactory.joinTransaction().
-                    cancelRecurringTask(objName, txnProxy.
-                                                 getCurrentOwner());
+                    cancelRecurringTask(objId, txnProxy.getCurrentOwner());
             else
                 ctxFactory.joinTransaction().
                     decrementStatusCount(txnProxy.getCurrentOwner());
@@ -714,10 +733,10 @@ public class TaskServiceImpl
         // if it's not periodic then free the pending task, checking that
         // this doesn't change the identity's status
         if (! ptask.isPeriodic()) {
-            if (ptask.isAvailable())
+            if (ptask.isReusable())
                 isAvailable = false;
             else
-                freePendingTask(ptask, objName);
+                freePendingTask(ptask, objId);
             ctxFactory.joinTransaction().
                 decrementStatusCount(ptask.getIdentity());
         } else {
@@ -725,7 +744,7 @@ public class TaskServiceImpl
             // not, then we need to remove the mapping and cancel the task.
             // Note that this should be a very rare case
             if (! isAvailable)
-                cancelPeriodicTask(objName);
+                cancelPeriodicTask(ptask, objId);
         }
 
         return isAvailable ? ptask : null;
@@ -736,23 +755,19 @@ public class TaskServiceImpl
      * underlying recurring task, removes the task and name binding, and
      * notes the cancelled task in the local transaction state.
      */
-    private void cancelPeriodicTask(String objName) {
+    private void cancelPeriodicTask(PendingTask ptask, BigInteger objId) {
         if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "cancelling periodic task {0}", objName);
+            logger.log(Level.FINEST, "cancelling periodic task {0}", objId);
 
-        TxnState txnState = ctxFactory.joinTransaction();
-        PendingTask ptask = null;
+        ctxFactory.joinTransaction().
+            cancelRecurringTask(objId, ptask.getIdentity());
 
-        // resolve the task, which checks if the task was already cancelled
-        try {
-            ptask = (PendingTask) dataService.getServiceBinding(objName);
-        } catch (NameNotBoundException nnbe) {
-            throw new ObjectNotFoundException("task was already cancelled");
-        }
-
-        // make sure the recurring task gets cancelled and freed on commit
-        txnState.cancelRecurringTask(objName, ptask.getIdentity());
-        freePendingTask(ptask, objName);
+        // remove the object rather than allowing it to be re-used to make
+        // sure that any outstanding handles don't get confused later
+        dataService.
+            removeServiceBinding(generateObjName(ptask.getIdentity(),
+                                                 objId));
+        dataService.removeObject(ptask);
     }
 
     /**
@@ -766,10 +781,10 @@ public class TaskServiceImpl
      * periodic. Note that this method is not called within an active
      * transaction.
      */
-    private void notifyNonRetry(final String objName) {
+    private void notifyNonRetry(final BigInteger objId) {
         if (logger.isLoggable(Level.INFO))
             logger.log(Level.INFO, "trying to remove non-retried task {0}",
-                       objName);
+                       objId);
 
         // check if the task is in the recurring map, in which case we don't
         // do anything else, because we don't remove recurring tasks except
@@ -780,12 +795,12 @@ public class TaskServiceImpl
         // that will have no effect once run (because fetchPendingTask will
         // look at the pending task data, see that it's recurring, and
         // leave it in the map)
-        if (recurringMap.containsKey(objName))
+        if (recurringMap.containsKey(objId))
             return;
         
         try {
             transactionScheduler.
-                scheduleTask(new NonRetryCleanupRunnable(objName),
+                scheduleTask(new NonRetryCleanupRunnable(objId),
                              txnProxy.getCurrentOwner());
         } catch (TaskRejectedException tre) {
             // Note that this should (essentially) never happen, but if it
@@ -794,7 +809,7 @@ public class TaskServiceImpl
             if (logger.isLoggable(Level.WARNING))
                 logger.logThrow(Level.WARNING, tre, "could not schedule " +
                                 "task to remove non-retried task {0}: " +
-                                "giving up", objName);
+                                "giving up", objId);
             throw tre;
         }
     }
@@ -804,9 +819,9 @@ public class TaskServiceImpl
      * block comment above in notifyNonRetry for more detail.
      */
     private class NonRetryCleanupRunnable implements KernelRunnable {
-        private final String objName;
-        NonRetryCleanupRunnable(String objName) {
-            this.objName = objName;
+        private final BigInteger objId;
+        NonRetryCleanupRunnable(BigInteger objId) {
+            this.objId = objId;
         }
         /** {@inheritDoc} */
         public String getBaseTaskType() {
@@ -818,10 +833,10 @@ public class TaskServiceImpl
                 if (logger.isLoggable(Level.WARNING))
                     logger.log(Level.WARNING, "Service is shutdown, so a " +
                                "non-retried task {0} will not be removed",
-                               objName);
+                               objId);
                 throw new IllegalStateException("Service is shutdown");
             }
-            fetchPendingTask(objName);
+            fetchPendingTask(objId);
         }
     }
 
@@ -831,12 +846,12 @@ public class TaskServiceImpl
      */
     private class TxnState extends TransactionContext {
         private HashSet<TaskReservation> reservationSet = null;
-        private HashMap<Identity,HashSet<String>> allocatedTaskNames = null;
-        private HashMap<String,RecurringDetail> addedRecurringMap = null;
-        private HashSet<String> cancelledRecurringSet = null;
+        private HashMap<Identity,HashSet<BigInteger>> allocatedTaskIds = null;
+        private HashMap<BigInteger,RecurringDetail> addedRecurringMap = null;
+        private HashSet<BigInteger> cancelledRecurringSet = null;
         private HashMap<Identity,Integer> statusMap =
             new HashMap<Identity,Integer>();
-        private String currentTaskName = null;
+        private BigInteger currentTaskId = null;
         private Identity currentTaskOwner = null;
         /** Creates context tied to the given transaction. */
         TxnState(Transaction txn) {
@@ -846,8 +861,8 @@ public class TaskServiceImpl
         public void commit() {
             // cancel the cancelled periodic tasks...
             if (cancelledRecurringSet != null) {
-                for (String objName : cancelledRecurringSet) {
-                    RecurringDetail detail = recurringMap.remove(objName);
+                for (BigInteger objId : cancelledRecurringSet) {
+                    RecurringDetail detail = recurringMap.remove(objId);
                     if (detail != null) {
                         detail.handle.cancel();
                         removeHandleForIdentity(detail.handle, detail.identity);
@@ -867,7 +882,7 @@ public class TaskServiceImpl
                     reservation.use();
             // ... and start the periodic tasks
             if (addedRecurringMap != null) {
-                for (Entry<String,RecurringDetail> entry :
+                for (Entry<BigInteger,RecurringDetail> entry :
                          addedRecurringMap.entrySet()) {
                     RecurringDetail detail = entry.getValue();
                     recurringMap.put(entry.getKey(), detail);
@@ -876,12 +891,12 @@ public class TaskServiceImpl
                 }
             }
             // finally, return the name of this task if it's now available
-            if (currentTaskName != null) {
-                HashSet<String> set =
+            if (currentTaskId != null) {
+                HashSet<BigInteger> set =
                     availablePendingMap.get(currentTaskOwner);
                 if (set != null) {
                     synchronized (set) {
-                        set.add(currentTaskName);
+                        set.add(currentTaskId);
                     }
                 }
             }
@@ -897,10 +912,10 @@ public class TaskServiceImpl
                 for (RecurringDetail detail : addedRecurringMap.values())
                     detail.handle.cancel();
             // return any taken pending tasks
-            if (allocatedTaskNames != null) {
-                for (Entry<Identity,HashSet<String>> entry :
-                         allocatedTaskNames.entrySet()) {
-                    HashSet<String> localSet =
+            if (allocatedTaskIds != null) {
+                for (Entry<Identity,HashSet<BigInteger>> entry :
+                         allocatedTaskIds.entrySet()) {
+                    HashSet<BigInteger> localSet =
                         availablePendingMap.get(entry.getKey());
                     if (localSet != null) {
                         synchronized (localSet) {
@@ -918,26 +933,26 @@ public class TaskServiceImpl
             incrementStatusCount(identity);
         }
         /** Adds a handle to start at commit-time. */
-        void addRecurringTask(String name, RecurringTaskHandle handle,
+        void addRecurringTask(BigInteger objId, RecurringTaskHandle handle,
                               Identity identity) {
             if (addedRecurringMap == null)
-                addedRecurringMap = new HashMap<String,RecurringDetail>();
-            addedRecurringMap.put(name, new RecurringDetail(handle, identity));
+                addedRecurringMap = new HashMap<BigInteger,RecurringDetail>();
+            addedRecurringMap.put(objId, new RecurringDetail(handle, identity));
             incrementStatusCount(identity);
         }
         /**
          * Tries to cancel the associated recurring task, recognizing whether
          * the task was scheduled within this transaction or previously.
          */
-        void cancelRecurringTask(String name, Identity identity) {
+        void cancelRecurringTask(BigInteger objId, Identity identity) {
             RecurringDetail detail = null;
             if ((addedRecurringMap == null) ||
-                ((detail = addedRecurringMap.remove(name)) == null)) {
+                ((detail = addedRecurringMap.remove(objId)) == null)) {
                 // the task wasn't created in this transaction, so make
                 // sure that it gets cancelled at commit
                 if (cancelledRecurringSet == null)
-                    cancelledRecurringSet = new HashSet<String>();
-                cancelledRecurringSet.add(name);
+                    cancelledRecurringSet = new HashSet<BigInteger>();
+                cancelledRecurringSet.add(objId);
             } else {
                 // the task was created in this transaction, so we just have
                 // to make sure that it doesn't start
@@ -960,21 +975,21 @@ public class TaskServiceImpl
                 statusMap.put(identity, -1);
         }
         /**  */
-        void notePendingNameAllocated(Identity id, String objName) {
-            if (allocatedTaskNames == null)
-                allocatedTaskNames = new HashMap<Identity,HashSet<String>>();
-            HashSet<String> set = allocatedTaskNames.get(id);
+        void notePendingIdAllocated(Identity identity, BigInteger objId) {
+            if (allocatedTaskIds == null)
+                allocatedTaskIds = new HashMap<Identity,HashSet<BigInteger>>();
+            HashSet<BigInteger> set = allocatedTaskIds.get(identity);
             if (set == null) {
-                set = new HashSet<String>();
-                allocatedTaskNames.put(id, set);
+                set = new HashSet<BigInteger>();
+                allocatedTaskIds.put(identity, set);
             }
-            set.add(objName);
+            set.add(objId);
         }
         /**  */
-        void notePendingNameFreed(String objName) {
-            assert currentTaskName == null : "The name of the current task " +
+        void notePendingIdFreed(BigInteger objId) {
+            assert currentTaskId == null : "The id of the current task " +
                 "has alread been assigned to be freed on commit";
-            currentTaskName = objName;
+            currentTaskId = objId;
             currentTaskOwner = txnProxy.getCurrentOwner();
         }
     }
@@ -998,17 +1013,18 @@ public class TaskServiceImpl
      * run the {@code Task}s scheduled by the application.
      */
     private class TaskRunner implements KernelRunnable {
-        private final String objName;
+        private final BigInteger objId;
         private final String objTaskType;
         private final Identity taskIdentity;
         private boolean doLocalCheck = true;
-        TaskRunner(String objName, String objTaskType, Identity taskIdentity) {
-            this.objName = objName;
+        TaskRunner(BigInteger objId, String objTaskType,
+                   Identity taskIdentity) {
+            this.objId = objId;
             this.objTaskType = objTaskType;
             this.taskIdentity = taskIdentity;
         }
-        String getObjName() {
-            return objName;
+        BigInteger getObjId() {
+            return objId;
         }
         /**
          * This method is used in the case where the associated identity is
@@ -1031,7 +1047,7 @@ public class TaskServiceImpl
             // check that the task's identity is still active on this node,
             // and if not then return, cancelling the task if it's recurring
             if ((doLocalCheck) && (! isMappedLocally(taskIdentity))) {
-                RecurringDetail detail = recurringMap.remove(objName);
+                RecurringDetail detail = recurringMap.remove(objId);
                 if (detail != null) {
                     detail.handle.cancel();
                     removeHandleForIdentity(detail.handle, detail.identity);
@@ -1042,7 +1058,7 @@ public class TaskServiceImpl
 
             try {
                 // fetch the task, making sure that it's available
-                PendingTask ptask = fetchPendingTask(objName);
+                PendingTask ptask = fetchPendingTask(objId);
                 if (ptask == null) {
                     logger.log(Level.FINER, "tried to run a task that was " +
                                "removed previously from the data service; " +
@@ -1055,13 +1071,13 @@ public class TaskServiceImpl
                     if (node != nodeId) {
                         // someone else picked it up, so just cancel it locally
                         ctxFactory.joinTransaction().
-                            cancelRecurringTask(objName, taskIdentity);
+                            cancelRecurringTask(objId, taskIdentity);
                         return;
                     }
                 }
                 if (logger.isLoggable(Level.FINEST))
                     logger.log(Level.FINEST, "running task {0} scheduled to " +
-                               "run at {1}", objName, ptask.getStartTime());
+                               "run at {1}", objId, ptask.getStartTime());
                 // finally, run the task itself
                 ptask.run();
             } catch (Exception e) {
@@ -1070,7 +1086,7 @@ public class TaskServiceImpl
                 // to notify the service
                 if ((! (e instanceof ExceptionRetryStatus)) ||
                     (! ((ExceptionRetryStatus)e).shouldRetry()))
-                    notifyNonRetry(objName);
+                    notifyNonRetry(objId);
                 throw e;
             }
         }
@@ -1156,19 +1172,21 @@ public class TaskServiceImpl
                 return;
         }
 
-        // if the pending task is available, then there's no task to run,
-        // so just add it to our local list
-        if (ptask.isAvailable()) {
-            HashSet set = availablePendingMap.get(identity);
+        BigInteger objId = getIdFromName(objName);
+
+        // if the pending task is reusable then it's a placeholder and
+        // there's no task to run, so just add it to the local list
+        if (ptask.isReusable()) {
+            HashSet<BigInteger> set = availablePendingMap.get(identity);
             if (set != null) {
                 synchronized (set) {
-                    set.add(objName);
+                    set.add(objId);
                 }
             }
             return;
         }
 
-        TaskRunner runner = new TaskRunner(objName, ptask.getBaseTaskType(),
+        TaskRunner runner = new TaskRunner(objId, ptask.getBaseTaskType(),
                                            identity);
         runner.markIgnoreIsLocal();
 
@@ -1182,7 +1200,7 @@ public class TaskServiceImpl
             // which would cause two copies of the task to start, so
             // the recurringMap is checked to make sure it doesn't already
             // contain the task being restarted
-            if (recurringMap.containsKey(objName))
+            if (recurringMap.containsKey(objId))
                 return;
 
             // get the times associated with this task, and if the start
@@ -1203,7 +1221,7 @@ public class TaskServiceImpl
                 transactionScheduler.scheduleRecurringTask(runner, identity,
                                                            start, period);
             ctxFactory.joinTransaction().
-                addRecurringTask(objName, handle, identity);
+                addRecurringTask(objId, handle, identity);
         }
     }
 
@@ -1485,7 +1503,7 @@ public class TaskServiceImpl
         }
 
         // add an entry for the local cache of pending tasks
-        availablePendingMap.putIfAbsent(id, new HashSet());
+        availablePendingMap.putIfAbsent(id, new HashSet<BigInteger>());
 
         // start-up the pending tasks for this identity
         final String identityName = id.getName();
@@ -1507,7 +1525,7 @@ public class TaskServiceImpl
     }
 
     /** {@inheritDoc} */
-    public void mappingRemoved(Identity id, Node newNode) {
+    public void mappingRemoved(final Identity id, Node newNode) {
         if (shuttingDown())
             return;
 
@@ -1526,10 +1544,36 @@ public class TaskServiceImpl
         // cancel all of the identity's recurring tasks
         cancelHandlesForIdentity(id);
 
-        // remove the local cache of avilable pending tasks
-        // TODO: the entries in the data store should be removed if the
-        // identity has been removed from the system
+        // remove the local cache of avilable pending tasks, and remove
+        // the entries in the data store if the identity has been removed
         availablePendingMap.remove(id);
+        if (newNode == null) {
+            try {
+                transactionScheduler.runTask(new KernelRunnable() {
+                        public String getBaseTaskType() {
+                            return NAME + ".PendingTaskCleanupRunner";
+                        }
+                        public void run() throws Exception {
+                            String prefix =
+                                DS_PENDING_SPACE + id.getName() + ".";
+                            String objName =
+                                dataService.nextServiceBoundName(prefix);
+                            while ((objName != null) &&
+                                   (objName.startsWith(prefix))) {
+                                Object obj =
+                                    dataService.getServiceBinding(objName);
+                                dataService.removeServiceBinding(objName);
+                                dataService.removeObject(obj);
+                                objName = dataService.
+                                    nextServiceBoundName(objName);
+                            }
+                        }
+                    }, id);
+            } catch (Exception e) {
+                logger.logThrow(Level.WARNING, e, "Failed to remove reusable" +
+                                " pending tasks for {0}", id);
+            }
+        }
         
         // immediately vote that the identity is active iif there are
         // still tasks running locally
@@ -1563,7 +1607,16 @@ public class TaskServiceImpl
                 getService(TaskServiceImpl.class);
             if (service.shuttingDown())
                 throw new IllegalStateException("Service is shutdown");
-            service.cancelPeriodicTask(objName);
+            // resolve the task, which checks if the task was already cancelled
+            try {
+                PendingTask ptask =
+                    (PendingTask)(service.dataService.
+                                  getServiceBinding(objName));
+                service.cancelPeriodicTask(ptask, TaskServiceImpl.
+                                                  getIdFromName(objName));
+            } catch (NameNotBoundException nnbe) {
+                throw new ObjectNotFoundException("task was already cancelled");
+            }
         }
     }
 

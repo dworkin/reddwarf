@@ -54,6 +54,7 @@ import com.sun.sgs.test.util.SgsTestNode;
 import java.io.Serializable;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 
 import java.lang.reflect.Field;
 import java.util.MissingResourceException;
@@ -438,13 +439,14 @@ public class TestTaskServiceImpl extends TestCase {
                 }
         }, owner);
 
-        Thread.sleep(200);
+        Thread.sleep(400);
         assertCounterClearXAction("Some immediate tasks did not run");
     }
 
     public void testRunNonRetriedTasks() throws Exception {
         // NOTE: this test assumes a certain structure in the TaskService.
-        clearPendingTasksInStore();
+
+        final Field reusableField = getReusableField();
 
         txnScheduler.runTask(
             new AbstractKernelRunnable() {
@@ -456,15 +458,17 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         txnScheduler.runTask(
             new AbstractKernelRunnable() {
-                public void run() {
+                public void run() throws Exception {
                     String name = dataService.nextServiceBoundName(PENDING_NS);
-                    if ((name != null) && (name.startsWith(PENDING_NS)))
-                        fail("Non-retried task didn't get removed from " +
-                                "the pending set");
+                    if ((name != null) && (name.startsWith(PENDING_NS))) {
+                        Object o = dataService.getServiceBinding(name);
+                        if (! reusableField.getBoolean(o))
+                            fail("Non-retried task didn't get removed or " +
+                                 "set for re-use");
+                    }
                 }
         }, taskOwner);
 
-        clearPendingTasksInStore();
         txnScheduler.runTask(
             new AbstractKernelRunnable() {
                 public void run() {
@@ -475,11 +479,14 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(200);
         txnScheduler.runTask(
             new AbstractKernelRunnable() {
-                public void run() {
+                public void run() throws Exception {
                     String name = dataService.nextServiceBoundName(PENDING_NS);
-                    if ((name != null) && (name.startsWith(PENDING_NS)))
-                        fail("Non-retried task didn't get removed from " +
-                                "the pending set");
+                    if ((name != null) && (name.startsWith(PENDING_NS))) {
+                        Object o = dataService.getServiceBinding(name);
+                        if (! reusableField.getBoolean(o))
+                            fail("Non-retried task didn't get removed or " +
+                                 "set for re-use");
+                    }
                 }
         }, taskOwner);
     }
@@ -930,20 +937,6 @@ public class TestTaskServiceImpl extends TestCase {
      * Utility routines.
      */
 
-    private void clearPendingTasksInStore() throws Exception {
-        txnScheduler.runTask(
-            new AbstractKernelRunnable() {
-                public void run() {
-                    String name = dataService.nextServiceBoundName(PENDING_NS);
-                    while ((name != null) && (name.startsWith(PENDING_NS))) {
-                        ManagedObject obj = dataService.getBinding(name);
-                        dataService.removeObject(obj);
-                        dataService.removeBinding(name);
-                    }
-                }
-        }, taskOwner);
-    }
-
     private Counter getClearedCounter() {
         Counter counter = (Counter) dataService.getBinding("counter");
         dataService.markForUpdate(counter);
@@ -968,6 +961,14 @@ public class TestTaskServiceImpl extends TestCase {
                     assertCounterClear(message);
                 }
         }, taskOwner);
+    }
+
+    private static Field getReusableField() throws Exception {
+        Class pendingTaskClass =
+            Class.forName("com.sun.sgs.impl.service.task.PendingTask");
+        Field reusableField = pendingTaskClass.getDeclaredField("reusable");
+        reusableField.setAccessible(true);
+        return reusableField;
     }
 
     /**
