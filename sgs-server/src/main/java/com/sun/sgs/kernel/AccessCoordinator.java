@@ -24,36 +24,40 @@ import com.sun.sgs.service.Transaction;
 
 /**
  * A central point for tracking all shared objects accessed in the context
- * of a transaction, and managing any contention that this causes.
+ * of a transaction, and managing any conflict these accesses may cause.
  */
 public interface AccessCoordinator {
 
     /**
-     * Register as a source of possible contention. This should be used
+     * Register as a provider of shared objects, and therefore a possible
+     * source of conflict between transactions. This should be used
      * by any component that is providing access to shared objects (e.g.,
      * the {@code DataService} which provides access to
      * {@code ManagedObject}s and name bindings). This ensures that
-     * contention is managed for access to the reported objects, and
+     * conflict is managed for access to the reported objects, and
      * that a report of all accesses is available through profiling.
      *
-     * @param sourceName the name of the source of objects
-     *
-     * @param contendedType the type of the objects that will be contended.
+     * @param sourceName the name of the source of objects which may
+     *                   cause conflict on access
+     * @param objectIdType the type of the identifier that will be used
+     *                     to identify accessed objects
      *
      * @return an {@code AccessNotifier} used to notify the system
      *         of access to shared objects
      */
-    public <T> AccessReporter<T> registerContentionSource
-        (String sourceName, Class<T> contendedType);
+    public <T> AccessReporter<T> registerAccessSource
+        (String sourceName, Class<T> objectIdType);
 
     /**
      * Find out what transaction, if still active, caused the given
-     * transaction to fail due to conflict.
+     * transaction to fail due to conflict. This is particularly useful
+     * if you want to wait for that active transaction to finish, e.g.
+     * for re-trying the failed transaction.
      *
      * @param txn a {@code Transaction} that failed due to conflict
      *
-     * @return the active {@code Transaction} that causes the provided
-     *         {@code Transaction} to fail due to contention, or
+     * @return the active {@code Transaction} that caused the provided
+     *         {@code Transaction} to fail due to conflict, or
      *         {@code null} if there is no such active {@code Transaction}
      */
     public Transaction getConflictingTransaction(Transaction txn);

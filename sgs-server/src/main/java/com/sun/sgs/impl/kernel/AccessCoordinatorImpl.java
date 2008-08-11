@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * A package-private implementation of {@code AccessCoordinator} that is
  * used by the system to track access to objects and handle any possible
- * contention. This implementation is also responsible for reporting
+ * conflict. This implementation is also responsible for reporting
  * the access detail to the profiling system.
  */
 class AccessCoordinatorImpl implements AccessCoordinator,
@@ -64,9 +64,9 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         txnMap = new ConcurrentHashMap<Transaction,AccessedObjectsDetailImpl>();
 
     // TODO: there may need to be maps for the active locks...these may
-    // eventually move (in whole or in part) to the contention resolver,
+    // eventually move (in whole or in part) to the conflict resolver,
     // but this seems like the right place at least to start them out.
-    // At any rate, these aren't needed until contention is being managed,
+    // At any rate, these aren't needed until conflict is being managed,
     // since active transactions will not be the cause of failure
 
     // an optional backlog of completed transactions used for guessing at
@@ -123,8 +123,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     /** 
      * {@inheritDoc} 
      */
-    public <T> AccessReporter<T> registerContentionSource
-	(String sourceName, Class<T> contendedType)
+    public <T> AccessReporter<T> registerAccessSource
+	(String sourceName, Class<T> objectIdType)
     {
         return new AccessReporterImpl<T>(sourceName);
     }
@@ -133,7 +133,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public Transaction getConflictingTransaction(Transaction txn) {
-        // until we manage contention, there will never be an active
+        // until we manage conflict, there will never be an active
         // transaction to return
         return null;
     }
@@ -145,12 +145,12 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * conflict and deadlock detection so that each resolver doesn't have
      * to, but deadlock may depend on how resolution is done. So, maybe
      * the resolver is responsible for this, in which case it needs to
-     * know about each access, not just possible contention cases. Does
+     * know about each access, not just possible conclit cases. Does
      * this suggest that the Coordinator just tracks access, reports
      * profilie, etc. but passes on all access requests to the resolver?
      * ...
      * Maybe all requests get pased on, but the Coordinator implements a
-     * utility method to see if there is basic contention happening?
+     * utility method to see if there is basic conflict happening?
      */
     //public List<> getCurrentReaders(Object obj);
     //public List<> getCurrentWriters(Object obj);
@@ -164,7 +164,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      */
     public boolean prepare(Transaction txn) {
         AccessedObjectsDetailImpl detail = txnMap.get(txn);
-        // TODO: this is the last chance to abort because of contention,
+        // TODO: this is the last chance to abort because of conflict,
         // when we're actually managing the contention
         detail.markCommitting();
         return false;
@@ -221,7 +221,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	    detail.conflictType = ConflictType.UNKNOWN;
 
             // NOTE: in the current system we'll never see a transaction
-            // fail because of contention with another active transaction,
+            // fail because of conflict with another active transaction,
             // so currently this is only for looking through a backlog
 	    if (backlog != null) {
                 // look through the backlog for a conflict
@@ -294,7 +294,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // information about why the transaction failed
         private boolean failed = false;
 	private ConflictType conflictType = ConflictType.NONE;
-        private long idOfConflictingTxn = 0;
+        private long idOfConflictingTxn = -1;
 
         /** Implement AccessObjectsDetail. */
 	
@@ -307,15 +307,13 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             return new ArrayList<AccessedObject>(accessList);
         }
         /** {@inheritDoc} */
-        public boolean failedOnContention() {
-            return failed;
-        }
-        /** {@inheritDoc} */
         public ConflictType getConflictType() {
             return conflictType;
         }
         /** {@inheritDoc} */
-        public long getContendingId() {
+        public long getConflictingId() {
+            if (conflictType == ConflictType.NONE)
+                throw new IllegalStateException("No conflict was noted");
             return idOfConflictingTxn;
         }
 	
@@ -436,7 +434,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         /** Implement AccessedObject. */
 
         /** {@inheritDoc} */
-        public Object getObject() {
+        public Object getObjectId() {
             return objId;
         }
         /** {@inheritDoc} */
@@ -460,7 +458,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	 * access type.
 	 */
 	public boolean equals(Object o) {
-	    if (o instanceof AccessedObjectImpl) {
+	    if ((o != null) && (o instanceof AccessedObjectImpl)) {
 		AccessedObjectImpl a = (AccessedObjectImpl)o;
 		return objId.equals(a.objId) && type.equals(a.type);
 	    }
@@ -479,11 +477,11 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
     /** 
      * Private implementation of {@code AccessNotifier}. Note that once we
-     * start managing contention then the {@code notifyObjectAccess} calls
+     * start managing conflict then the {@code notifyObjectAccess} calls
      * will need to start tracking access and check that this doesn't cause
      * some transaction to fail.
      * <p>
-     * TODO: until contention management is implemented, this only serves
+     * TODO: until conflict management is implemented, this only serves
      * to provide detail to the profiling stream, so these methods should
      * probably only keep this data if the profiling level is high enough.
      */
@@ -494,14 +492,14 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             this.source = source;
         }
         /** {@inheritDoc} */
-        public void notifyObjectAccess(T objId, AccessType type) {
+        public void reportObjectAccess(T objId, AccessType type) {
             AccessedObjectsDetailImpl detail =
                 txnMap.get(txnProxy.getCurrentTransaction());
             detail.addAccess(new AccessedObjectImpl(objId, type, source,
                                                     detail));
         }
         /** {@inheritDoc} */
-	public void notifyObjectAccess(T objId, AccessType type, 
+	public void reportObjectAccess(T objId, AccessType type, 
 				       Object description) {
 	    AccessedObjectsDetailImpl detail =
                 txnMap.get(txnProxy.getCurrentTransaction());

@@ -23,16 +23,16 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 
 
 /**
- * An interface that provides access to the detail of a single object access.
+ * An interface that provides details of a single object access.
  */
 public interface AccessedObject {
 
     /**
-     * Returns the accessed object.
+     * Returns the identifier for the accessed object.
      *
-     * @return the accessed {@code Object}
+     * @return the identifier for the accessed object
      */
-    public Object getObject();
+    public Object getObjectId();
 
     /**
      * Returns the type of access requested.

@@ -76,22 +76,23 @@ public class AccessedObjectsListener implements ProfileListener {
 	AccessedObjectsDetail detail = 
 	    profileReport.getAccessedObjectsDetail();
 	
-	if (detail != null && detail.failedOnContention()) {
+	if ((detail != null) &&
+            (detail.getConflictType() != ConflictType.NONE)) {
 
 	    List<AccessedObject> accessedObjects = 
 		detail.getAccessedObjects();
 
-	    System.out.printf("Task type %s failed due to contention.  Details:"
+	    System.out.printf("Task type %s failed due to conflict.  Details:"
 			      + "\n  accesor id: %d, try count %d; objects "
 			      + "accessed ordered by first access:\n%s" 
-			      + "conflict type: %s, ID of contending " 
+			      + "conflict type: %s, ID of conflicting " 
 			      + "accessor %d%n%n",
 			      profileReport.getTask().getBaseTaskType(),
 			      detail.getId(), 
 			      profileReport.getRetryCount(),
 			      formatAccesses(accessedObjects),
 			      detail.getConflictType(),
-			      detail.getContendingId());
+			      detail.getConflictingId());
 	}	       
     }
 
@@ -108,7 +109,7 @@ public class AccessedObjectsListener implements ProfileListener {
 	    formatted += String.format("[source: %s] %-5s %s, desciption %s\n",
 				       object.getSource(),
 				       object.getAccessType(),
-				       object.getObject(),
+				       object.getObjectId(),
 				       object.getDescription());
 	}
 	return formatted;

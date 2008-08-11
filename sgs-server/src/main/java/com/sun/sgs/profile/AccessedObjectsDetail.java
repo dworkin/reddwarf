@@ -25,10 +25,10 @@ import java.util.List;
 
 
 /**
- * An interface accesible through a {@code ProfileReport} that details a
- * collection of object accesses, typically all of the object accesses within
- * a single transaction. If that transaction failed due to some kind of
- * conflict, then the type of failure and contending task is also identified.
+ * An interface accesible through a {@code ProfileReport} that details the
+ * collection of object accesses that occurred during the associated
+ * transaction. If that transaction failed due to some kind of conflict, then
+ * the type of failure and conflicting task is also identified.
  */
 public interface AccessedObjectsDetail {
 
@@ -41,7 +41,7 @@ public interface AccessedObjectsDetail {
          * or a lock being unavailable.
          */
         ACCESS_NOT_GRANTED,
-        /** The type of conflict is unknown. */
+        /** There was conflict, but the type of conflict is unknown. */
         UNKNOWN,
         /** There was no conflict caused by these object accesses. */
         NONE
@@ -57,22 +57,12 @@ public interface AccessedObjectsDetail {
     public long getId();
 
     /**
-     * The ordered collection of requested accesses.
+     * The collection of requested object accesses. The order is the same
+     * as the order in which the objects were requested in the transaction.
      *
      * @param a {@code List} of {@code AccessedObject}s
      */
     public List<AccessedObject> getAccessedObjects();
-
-    /**
-     * Reports whether the set of accesses failed due to some contention-
-     * related issue. If this returns {@code true} then there will be details
-     * available from {@code getConflictType} and {@code getContendingId}
-     * about what happened.
-     *
-     * @return {@code true} if this collection of accesses failed due to
-     *         contention on some object, {@code false} otherwise
-     */
-    public boolean failedOnContention();
 
     /**
      * The type of conflict, if any, caused by these object accesses.
@@ -84,11 +74,14 @@ public interface AccessedObjectsDetail {
     /**
      * Returns the identifier of the accessor that caused this access to
      * fail, if known. This can be paired with the result of {@code getId}
-     * to match successful and failed access attempts.
+     * to match successful and failed access attempts. If there was no
+     * failure then this throws an exception.
      *
-     * @return identifier for the successful access, or 0 if the accessor
-     *         is unknown or there was no conflict
+     * @return identifier for the successful access that caused conflict,
+     *         or -1 if there was conflict but the accessor is unknown
+     *
+     * @throws IllegalStateException if no conflict occurred
      */
-    public long getContendingId();
+    public long getConflictingId();
 
 }

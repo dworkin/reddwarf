@@ -399,9 +399,9 @@ public final class DataServiceImpl implements DataService {
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    oidAccesses = accessCoordinator.
-		registerContentionSource(CLASSNAME, BigInteger.class);
+		registerAccessSource(CLASSNAME, BigInteger.class);
 	    boundNameAccesses = accessCoordinator.
-		registerContentionSource(CLASSNAME, String.class);
+		registerAccessSource(CLASSNAME, String.class);
 
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
@@ -525,7 +525,7 @@ public final class DataServiceImpl implements DataService {
 	    ref = context.findReference(object);
 	    if (ref != null) {
 		// mark that this object has been write locked
-		oidAccesses.notifyObjectAccess(ref.getId(), AccessType.WRITE,
+		oidAccesses.reportObjectAccess(ref.getId(), AccessType.WRITE,
 					       object);
 
 		if (object instanceof ManagedObjectRemoval) {
@@ -568,7 +568,7 @@ public final class DataServiceImpl implements DataService {
 	    ref = context.findReference(object);
 	    if (ref != null) {
 		// mark that this object has been write locked
-		oidAccesses.notifyObjectAccess(ref.getId(), AccessType.WRITE,
+		oidAccesses.reportObjectAccess(ref.getId(), AccessType.WRITE,
 					       object);
 
 		ref.markForUpdate();
@@ -602,7 +602,7 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    ManagedReference<T> result = context.getReference(object);
 	    // mark that this object has been read locked
-	    oidAccesses.notifyObjectAccess(result.getId(), AccessType.READ,
+	    oidAccesses.reportObjectAccess(result.getId(), AccessType.READ,
 					   object);
 
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -708,11 +708,11 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    ManagedObject result;
 	    try {
-		result = context.getBinding(
-		    getInternalName(name, serviceBinding));
+                String internalName = getInternalName(name, serviceBinding);
+		result = context.getBinding(internalName);
 		// mark that this name has been read locked
-		boundNameAccesses.notifyObjectAccess(name, AccessType.READ,
-					       result);
+		boundNameAccesses.
+                    reportObjectAccess(internalName, AccessType.READ, result);
 
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
@@ -752,10 +752,11 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    checkManagedObject(object);
 	    context = getContext();
-	    context.setBinding(getInternalName(name, serviceBinding), object);
+            String internalName = getInternalName(name, serviceBinding);
+            context.setBinding(internalName, object);
 	    // mark that this name has been write locked
-	    boundNameAccesses.notifyObjectAccess(name, AccessType.WRITE,
-						 object);
+	    boundNameAccesses.
+                reportObjectAccess(internalName, AccessType.WRITE, object);
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -790,9 +791,11 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    context = getContext();
 	    try {
-		context.removeBinding(getInternalName(name, serviceBinding));
+                String internalName = getInternalName(name, serviceBinding);
+		context.removeBinding(internalName);
 		// mark that this name has been write locked
-		boundNameAccesses.notifyObjectAccess(name, AccessType.WRITE);
+		boundNameAccesses.
+                    reportObjectAccess(internalName, AccessType.WRITE);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
