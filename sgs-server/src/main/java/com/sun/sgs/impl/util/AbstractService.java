@@ -426,14 +426,19 @@ public abstract class AbstractService implements Service {
 		new CheckNodeStatusTask(nodeId);
 	    transactionScheduler.runTask(nodeStatus, taskOwner);
 	    return nodeStatus.isAlive;
+	} catch (IllegalStateException ignore) {
+	    // Ignore because the service is shutting down.
 	} catch (Exception e) {
+	    // This shouldn't happen, so log.
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e, "running CheckNodeStatusTask throws");
 	    }
-	    // TBD: is this the correct value to return?
-	    return false;
 	}
+	// TBD: is this the correct value to return?  We can't really tell
+	// what the status of a non-local node is if the local node is
+	// shutting down.
+	return false;
     } 
 
     /** Creates a {@code TaskQueue} for dependent, transactional tasks. */

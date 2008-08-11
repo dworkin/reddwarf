@@ -224,6 +224,17 @@ public class TestAbstractService extends TestCase {
 	service.runIoTask(ioTask, serverNode.getNodeId());
 	assertEquals(ioTask.runCount, 5);
     }
+
+    public void testRunIoTaskThatThrowsRuntimeException() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(new MyRuntimeException());
+	try {
+	    service.runIoTask(ioTask, serverNode.getNodeId());
+	    fail("expected MyRuntimeException to be thrown");
+	} catch (MyRuntimeException e) {
+	    System.err.println("caught MyRuntimeException");
+	}
+    }
     
     public void testRunIoTaskToFailedNode() throws Exception {
 	DummyService service = createDummyService();
@@ -232,16 +243,29 @@ public class TestAbstractService extends TestCase {
 	assertEquals(ioTask.runCount, 1);
     }
 
+    private static class MyRuntimeException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
+    }
+
     private static class IoRunnableImpl implements IoRunnable {
 
 	int runCount = 0;
 	private int exceptionCount;
+	private final RuntimeException exception;
 
 	IoRunnableImpl(int exceptionCount) {
 	    this.exceptionCount = exceptionCount;
+	    this.exception = null;
+	}
+
+	IoRunnableImpl(RuntimeException exception) {
+	    this.exception = exception;
 	}
 	
 	public void run() throws IOException {
+	    if (exception != null) {
+		throw exception;
+	    }
 	    runCount++;
 	    if (exceptionCount-- > 0) {
 		throw new IOException();
