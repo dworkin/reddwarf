@@ -39,6 +39,7 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -361,23 +362,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return;
 	    }
 	    final long coord = coordNodeId;
-	    ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
+	    final ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    channelService.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable() {
 		  public void run() {
-		    do {
-			try {
-			    coordinator.serviceEventQueue(channelId);
-			    return;
-			} catch (IOException e) {
-			    if (logger.isLoggable(Level.FINEST)) {
-				logger.logThrow(
-				    Level.FINEST, e,
-				    "serviceEventQueue channel:{0} coord:{1} " +
-				    "throws", HexDumper.toHexString(channelId),
-				    coord);
-			    }
-			}
-		    } while (isAlive(coord));
+		      channelService.runIoTask(
+ 			new IoRunnable() {
+			  public void run() throws IOException {
+			      coordinator.serviceEventQueue(channelId);
+			  }}, coord);
 		  }
 		}, false);
 	}
@@ -855,23 +849,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * the failed server.
 	 */
 	if (server != null) {
-	    ChannelServiceImpl.addChannelTask(
+	    ChannelServiceImpl.getChannelService().addChannelTask(
 		new BigInteger(1, channelId),
-		new AbstractKernelRunnable() {
-		    public void run() {
-			do {
-			    try {
-				server.leave(channelId, sessionIdBytes);
-				return;
-			    } catch (IOException e) {
-				logger.logThrow(
-			            Level.FINE, e,
-				    "unable to contact channel server:{0} to " +
-				    "handle event:{1}", server, this);
-			    }
-			} while (isAlive(nodeId));
-		    }
-		});
+		new IoRunnable() {
+		    public void run() throws IOException {
+			server.leave(channelId, sessionIdBytes);
+		    }},
+		nodeId);
 	}
 	return true;
     }
@@ -1421,35 +1405,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     */
 	    boolean serviceAllEvents = sendRefresh;
 	    if (sendRefresh) {
-		final List<Long> channelServerNodeIds = 
-		    channel.getChannelServerNodeIds();
-		final BigInteger channelRefId = getChannelRefId();
+		BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
 		final String channelName = channel.name;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelIdBytes));
 		}
-		ChannelServiceImpl.addChannelTask(
-		    channelRefId,
-		    new AbstractKernelRunnable() {
-		      public void run() {
-			for (long nodeId : channelServerNodeIds) {
-			    ChannelServer server = getChannelServer(nodeId);
-			    if (server == null) continue;
-			    do {
-				try {
-				  server.refresh(channelName, channelIdBytes);
-				  break;
-				} catch (IOException e) {
-				    logger.log(
-				        Level.FINE,
-					"unable to contact server:{0}",
-					server);
+		for (final long nodeId : channel.getChannelServerNodeIds()) {
+		    channelService.addChannelTask(
+		    	channelRefId,
+			new IoRunnable() {
+			    public void run() throws IOException {
+				ChannelServer server = getChannelServer(nodeId);
+				if (server != null) {
+				    server.refresh(channelName, channelIdBytes);
 				}
-			    } while (isAlive(nodeId));
-			}
-		    }});
+			    }},
+			nodeId);
+		}
 		dataService.markForUpdate(this);
 		sendRefresh = false;
 	    }
@@ -1556,7 +1530,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    if (!channel.addSession(session)) {
 		return;
 	    }
-	    final long nodeId = getNodeId(session);
+	    long nodeId = getNodeId(session);
 	    final ChannelServer server = getChannelServer(nodeId);
 	    if (server == null) {
 		/*
@@ -1568,24 +1542,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 */
 		return;
 	    }
-	    ChannelServiceImpl.addChannelTask(
+	    final String channelName = channel.name;
+	    final byte[] channelIdBytes = channel.channelId;
+	    ChannelServiceImpl.getChannelService().addChannelTask(
 		eventQueue.getChannelRefId(),
-		new AbstractKernelRunnable() {
-		    public void run() {
-			do {
-			    try {
-				server.join(channel.name, channel.channelId,
-					    sessionId);
-				return;
-			    } catch (IOException e) {
-				logger.logThrow(
-			            Level.FINE, e,
-				    "unable to contact channel server:{0} to " +
-				    "handle event:{1}", server, this);
-			    }
-			} while (isAlive(nodeId));
-		    }
-		});
+		new IoRunnable() {
+		    public void run() throws IOException {
+			server.join(channelName, channelIdBytes, sessionId);
+		    }},
+		nodeId);
 	}
 
 	/** {@inheritDoc} */
@@ -1653,30 +1618,23 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 
-	    final ChannelImpl channel = eventQueue.getChannel();
+	    ChannelImpl channel = eventQueue.getChannel();
 	    channel.removeAllSessions();
-	    final List<Long> channelServerNodeIds =
-		channel.getChannelServerNodeIds();
-	    ChannelServiceImpl.addChannelTask(
-		eventQueue.getChannelRefId(),
-		new AbstractKernelRunnable() {
-		  public void run() {
-		    for (long nodeId : channelServerNodeIds) {
-			ChannelServer server = getChannelServer(nodeId);
-			if (server == null) continue;
-			do {
-			    try {
-				server.leaveAll(channel.channelId);
-				break;
-			    } catch (IOException e) {
-				logger.logThrow(
-				    Level.FINE, e,
-				    "unable to contact channel server:{0} " +
-				    "to handle event:{1}", server, this);
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    final byte[] channelIdBytes = channel.channelId;
+	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+		channelService.addChannelTask(
+		    eventQueue.getChannelRefId(),
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.leaveAll(channelIdBytes);
 			    }
-			} while (isAlive(nodeId));
-		    }
-		  }});
+			}},
+		    nodeId);
+	    }
 	}
 
 	/** {@inheritDoc} */
@@ -1724,7 +1682,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Verfiy that the sending session (if any) is a member of this
 	     * channel.
 	     */
-	    final ChannelImpl channel = eventQueue.getChannel();
+	    ChannelImpl channel = eventQueue.getChannel();
 	    if (senderId != null) {
 		ClientSession sender =
 		    (ClientSession) getObjectForId(new BigInteger(1, senderId));
@@ -1736,31 +1694,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue a channel task to forward the message to the
 	     * channel's servers for delivery.
 	     */
-	    final List<Long> channelServerNodeIds =
-		channel.getChannelServerNodeIds();
-	    ChannelServiceImpl.addChannelTask(
-		eventQueue.getChannelRefId(),
-		new AbstractKernelRunnable() {
-		  public void run() {
-		    for (long nodeId : channelServerNodeIds) {
-			ChannelServer server = getChannelServer(nodeId);
-			if (server == null) continue;
-			do {
-			    try {
-				server.send(channel.channelId, message);
-				break;
-			    } catch (IOException e) {
-				logger.logThrow(
-				    Level.FINE, e,
-				    "unable to contact channel server:{0} " +
-				    "to handle event:{1}", server, this);
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    final byte[] channelIdBytes = channel.channelId;
+	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+		channelService.addChannelTask(
+		    eventQueue.getChannelRefId(),
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.send(channelIdBytes, message);
 			    }
-			} while (isAlive(nodeId));
-		    }
-		    // TBD: need to update queue that all
-		    // channel servers have been notified of
-		    // the 'send'.
-		  }});
+			}},
+		    nodeId);
+	    }
+
+	    // TBD: need to add a task to update queue that all
+	    // channel servers have been notified of
+	    // the 'send'.
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -1801,33 +1753,31 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 
-	    final ChannelImpl channel = eventQueue.getChannel();
-	    final List<Long> channelServerNodeIds =
-		channel.getChannelServerNodeIds();
+	    ChannelImpl channel = eventQueue.getChannel();
 	    final BigInteger channelRefId = eventQueue.getChannelRefId();
 	    channel.removeChannel();
-	    ChannelServiceImpl.addChannelTask(
+	    final ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    final byte[] channelIdBytes = channel.channelId;
+	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+		channelService.addChannelTask(
+		    channelRefId,
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.close(channelIdBytes);
+			    }
+			}},
+		    nodeId);
+	    }
+	    
+	    channelService.addChannelTask(
 		channelRefId,
 		new AbstractKernelRunnable() {
-		  public void run() {
-		    for (long nodeId : channelServerNodeIds) {
-			ChannelServer server = getChannelServer(nodeId);
-			if (server == null) continue;
-			do {
-			    try {
-				server.close(channel.channelId);
-				break;
-			    } catch (IOException e) {
-				logger.logThrow(
-			            Level.FINE, e,
-				    "unable to contact channel server:{0} " +
-				    "to handle event:{1}", server, this);
-			    }
-			} while (isAlive(nodeId));
-		    }
-		    ChannelServiceImpl.getChannelService().
-			closedChannel(channelRefId);
-		  }});
+		    public void run() {
+			channelService.closedChannel(channelRefId);
+		    }});
 	}
 
 	/** {@inheritDoc} */
