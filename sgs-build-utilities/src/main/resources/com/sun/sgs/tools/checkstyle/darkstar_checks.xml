@@ -310,10 +310,11 @@
 	<!-- DARKSTAR: Don't require method, constructor, or catch
              block parameters to be final -->
         <!-- <module name="FinalParameters"/> -->
-        <module name="GenericIllegalRegexp">
-            <property name="format" value="\s+$"/>
-            <property name="message" value="Line has trailing spaces."/>
-        </module>
+	<!-- DARKSTAR: Don't complain about trailing spaces -->
+	<!-- <module name="GenericIllegalRegexp"> -->
+	<!--   <property name="format" value="\s+$"/> -->
+	<!--   <property name="message" value="Line has trailing spaces."/> -->
+	<!-- </module> -->
         <module name="TodoComment"/>
         <module name="UpperEll"/>
 
