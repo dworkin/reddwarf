@@ -69,6 +69,9 @@ public class Client extends JFrame implements SimpleClientListener {
 
     private static final long serialVersionUID = 1;
 
+    private static final Logger logger = 
+	Logger.getLogger(Client.class.getName());
+
     // the simple client connection
     private SimpleClient client;
 
@@ -219,20 +222,27 @@ public class Client extends JFrame implements SimpleClientListener {
         if (channel.getName().equals("game:lobby")) {
             // we joined the lobby
             // lobbyPanel.clearList();
-            System.out.println("joined lobby channel");
+            logger.fine("joined lobby channel");
             managerLayout.show(managerPanel, "lobby");
             return llistener;
         } 
 	else if (channel.getName().equals("game:creator")) {
             // we joined the creator
-            System.out.println("joined creator channel");
+            logger.fine("joined creator channel");
             managerLayout.show(managerPanel, "creator");
             return crListener;
         } 
+	else if (channel.getName().startsWith("level:")) {
+	    // we are already in a dungeon but must have moved levels,
+	    // so return the dungeon listener which is going to handle
+	    // all the updates
+	    logger.fine("joined level channel: " + channel.getName());
+	    return dlistener;
+	}
 	else {
             // we joined some dungeon
             gamePanel.showLoadingScreen();
-	    System.out.println("joined " + channel.getName() + " channel");
+	    logger.fine("joined dungeon channel:" + channel.getName());
             managerLayout.show(managerPanel, "game");
             // request focus so all key presses are captured
             gamePanel.requestFocusInWindow();

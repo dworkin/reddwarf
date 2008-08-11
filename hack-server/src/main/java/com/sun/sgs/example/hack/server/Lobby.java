@@ -162,14 +162,19 @@ public class Lobby implements Game, GameChangeListener, Serializable {
      * and whenever they leave an active game.
      *
      * @param player the <code>Player</code> joining the lobby
+     *
+     * @return the {@code MessageHandler} that will process the
+     *         provided player's messages
      */
-    public void join(Player player) {
+    public MessageHandler join(Player player) {
         AppContext.getDataManager().markForUpdate(this);
 
         // send an update about the new lobby membership count
         GameMembershipDetail detail =
             new GameMembershipDetail(IDENTIFIER, numPlayers() + 1);
         gcmRef.get().notifyMembershipChanged(detail);
+
+	LobbyMessageHandler messageHandler = new LobbyMessageHandler();
 
         // update all existing members about the new uid's name
         ClientSession session = player.getCurrentSession();
@@ -208,6 +213,8 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         Messages.sendPlayableCharacters(session, characters);
 
 	numPlayers++;
+	
+	return messageHandler;
     }
 
     /**
@@ -234,15 +241,6 @@ public class Lobby implements Game, GameChangeListener, Serializable {
         gcmRef.get().notifyMembershipChanged(detail);
 
 	numPlayers--;
-    }
-
-    /**
-     * Creates a new instance of a <code>LobbyMessageHandler</code>.
-     *
-     * @return a <code>LobbyMessageHandler</code>
-     */
-    public MessageHandler createMessageHandler() {
-        return new LobbyMessageHandler();
     }
 
     /**

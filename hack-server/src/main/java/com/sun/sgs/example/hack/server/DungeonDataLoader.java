@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+import java.util.logging.Logger;
+
 import javax.imageio.ImageIO;
 
 
@@ -38,6 +40,9 @@ import javax.imageio.ImageIO;
  */
 public class DungeonDataLoader
 {
+
+    private static final Logger logger = 
+	Logger.getLogger(DungeonDataLoader.class.getName());
 
     /**
      * Private helper that sets up a StreamTokenizer from a file.
@@ -78,7 +83,7 @@ public class DungeonDataLoader
         // load the sprite maps and dungeons
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
             if (stok.sval.equals("SpriteMap")) {
-                System.out.println("loading sprite map");
+                logger.fine("loading sprite map");
                 stok.nextToken();
                 int mapId = (int)(stok.nval);
                 stok.nextToken();
@@ -90,7 +95,7 @@ public class DungeonDataLoader
                                loadSpriteMap(smFile, spriteSize));
                 impMap.put(mapId, getImpassableSet(smFile + ".imp"));
             } else if (stok.sval.equals("Dungeon")) {
-                System.out.println("loading dungeon");
+                logger.fine("loading dungeon");
                 stok.nextToken();
                 String name = stok.sval;
                 stok.nextToken();
@@ -104,7 +109,7 @@ public class DungeonDataLoader
                                                lobby/*,ag*/);
                 dungeons.add(new Dungeon(name, spriteMapId, gc));
             } else {
-                System.out.println("Unknown type: " + stok.sval + " on line "
+                logger.warning("Unknown type: " + stok.sval + " on line "
                                    + stok.lineno());
             }
         }
@@ -112,13 +117,13 @@ public class DungeonDataLoader
         // register each dungeon
         DataManager dataManager = AppContext.getDataManager();
         for (Dungeon dungeon : dungeons) {
-            System.out.println("Registering dungeon: " + dungeon.getName());
+            logger.fine("Registering dungeon: " + dungeon.getName());
             dataManager.setBinding(Game.NAME_PREFIX + dungeon.getName(),
                                    dungeon);
             gcm.notifyGameAdded(dungeon.getName());
         }
 
-        System.out.println("finished loading files");
+        logger.info("finished loading dungeon data and image files");
     }
 
     
@@ -134,7 +139,7 @@ public class DungeonDataLoader
     public static SpriteMap loadSpriteMap(String filename, int spriteSize)
         throws IOException
     {
-        System.out.println("Trying to read images from: " + filename);
+        logger.finer("Trying to read images from: " + filename);
 
         // open the file into a single image
         BufferedImage image = ImageIO.read(new File(filename));
@@ -160,7 +165,7 @@ public class DungeonDataLoader
             }
         }
 
-        System.out.println("image bytes read: " + totalSize);
+        logger.finer("image bytes read: " + totalSize);
 
         return new SpriteMap(spriteSize, spriteMap);
     }
@@ -173,7 +178,7 @@ public class DungeonDataLoader
     {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         if (! ImageIO.write(image, "png", out))
-            System.out.println("FAILED TO GET BYTES!!");
+            logger.warning("FAILED TO GET BYTES!!");
         return out.toByteArray();
     }
 

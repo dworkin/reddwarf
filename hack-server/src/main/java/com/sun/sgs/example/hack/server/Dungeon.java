@@ -112,8 +112,11 @@ public class Dungeon implements Game, Serializable {
      * Adds the given <code>Player</code> to this <code>Game</code>.
      *
      * @param player the <code>Player</code> that is joining
+     *
+     * @return the {@code MessageHandler} that will process the
+     *         provided player's messages
      */
-    public void join(Player player) {
+    public MessageHandler join(Player player) {
 
         DataManager dataManager = AppContext.getDataManager();
         dataManager.markForUpdate(this);
@@ -121,6 +124,8 @@ public class Dungeon implements Game, Serializable {
 	ClientSession session = player.getCurrentSession();
 	String playerName = player.getName();
 	BigInteger playerID = dataManager.createReference(session).getId();
+
+	DungeonMessageHandler messageHandler = new DungeonMessageHandler(this);
 	 
         // Update all existing members about the new uid's name
 	Messages.broadcastPlayerID(dungeonCommandsChannel.get(), playerName, 
@@ -160,6 +165,8 @@ public class Dungeon implements Game, Serializable {
         connectorRef.get().enteredConnection(player.getCharacterManager());
 
 	numPlayers++;
+
+	return messageHandler;
     }
 
     /**
@@ -201,15 +208,6 @@ public class Dungeon implements Game, Serializable {
         GameMembershipDetail detail =
                 new GameMembershipDetail(getName(), numPlayers());
         gcmRef.get().notifyMembershipChanged(detail);
-    }
-
-    /**
-     * Creates a new instance of a <code>DungeonMessageHandler</code>.
-     *
-     * @return a <code>DungeonMessageHandler</code>
-     */
-    public MessageHandler createMessageHandler() {
-        return new DungeonMessageHandler(this);
     }
 
     /**

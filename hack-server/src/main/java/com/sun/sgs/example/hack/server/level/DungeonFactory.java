@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+import java.util.logging.Logger;
 
 /**
  * This is a fairly simple static factory class that handles loading
@@ -45,6 +46,9 @@ import java.util.Set;
  * <code>SimpleBoard</code>).
  */
 public class DungeonFactory {
+
+    protected static final Logger logger = 
+	Logger.getLogger(DungeonFactory.class.getName());
 
     /**
      * This method takes a <code>StreamTokenizer</code> that is setup at
@@ -71,7 +75,7 @@ public class DungeonFactory {
         DataManager dataManager = AppContext.getDataManager();
 
         // the prefix for all level names
-        String levelPrefix = gameName + ":" + SimpleLevel.NAME_PREFIX;
+        String levelPrefix = gameName + ":" + Level.NAME_PREFIX;
 
         // details about where we enter the dungeon
         String entryLevel = null;
@@ -111,6 +115,10 @@ public class DungeonFactory {
                 // levels are handled separately by SimpleLevel
                 stok.nextToken();
                 String levelName = levelPrefix + stok.sval;
+		if (boards.containsKey(levelName)) {
+		    logger.warning("duplicate name defined for level: " + 
+				   levelName);		    
+		}
                 boards.put(levelName, new SimpleBoard(stok,
                                                       impassableSprites));
             } else if (stok.sval.equals("Connection")) {
@@ -301,9 +309,9 @@ public class DungeonFactory {
         stok.nextToken(); data.level2X = (int)(stok.nval);
         stok.nextToken(); data.level2Y = (int)(stok.nval);
 
-        System.out.println("read connection: " + data.level1 + "@" +
+        logger.finer("read connection: " + data.level1 + "@" +
                            data.level1X + "," + data.level1Y);
-        System.out.println("it connects to: " + data.level2 + "@" +
+        logger.finer("it connects to: " + data.level2 + "@" +
                            data.level2X + "," + data.level2Y);
 
         return data;
