@@ -9,12 +9,19 @@
 package com.sun.sgs.example.hack.server.level;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
 import com.sun.sgs.example.hack.server.Game;
 import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.Messages;
 import com.sun.sgs.example.hack.server.NSidedDie;
+import com.sun.sgs.example.hack.server.Player;
+import com.sun.sgs.example.hack.server.PlayerCharacterManager;
+
+import com.sun.sgs.example.hack.server.ai.AICharacterManager;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
@@ -46,7 +53,7 @@ public class SimpleLevel implements Level, Serializable {
     private String game;
 
     // the characters currently in this level
-    private HashSet<ManagedReference<CharacterManager>> characterRefs;
+    private Set<ManagedReference<CharacterManager>> characterRefs;
 
     // the dimentsion of this level
     private int levelWidth;
@@ -54,6 +61,10 @@ public class SimpleLevel implements Level, Serializable {
 
     // the board that maintains our state
     private LevelBoard board;
+
+    private ManagedReference<Channel> channelRef;
+
+    private Set<ManagedReference<CharacterManager>> serverSideCharacters;
 
     /**
      * Creates a <code>SimpleLevel</code>.
@@ -67,6 +78,7 @@ public class SimpleLevel implements Level, Serializable {
 
         // create a new set for our characters
         characterRefs = new HashSet<ManagedReference<CharacterManager>>();
+	serverSideCharacters = new HashSet<ManagedReference<CharacterManager>>();
     }
 
     /**
@@ -141,11 +153,25 @@ public class SimpleLevel implements Level, Serializable {
             mgr.setLevelPosition(-1, -1);
             return false;
         }
-
-        AppContext.getDataManager().markForUpdate(this);
+	
+	DataManager dm = AppContext.getDataManager();
+        dm.markForUpdate(this);
 
         // keep track of the character
-        characterRefs.add(AppContext.getDataManager().createReference(mgr));
+	ManagedReference<CharacterManager> characterRef = 
+	    dm.createReference(mgr);
+        characterRefs.add(characterRef);
+
+	// NOTE: this code is related to Issue 25 where we need to
+	// keep track of all the server side characters
+	if (mgr instanceof AICharacterManager)
+	    serverSideCharacters.add(characterRef);
+	// otherwise, it must be a player character, so get the
+	// channel associated with the commands for the dungeon
+	else if (channelRef == null && mgr instanceof PlayerCharacterManager) {
+	    channelRef = dm.createReference(((PlayerCharacterManager)mgr).
+					    getPlayer().channel());
+	}
 
         // now we need to send the board and position to the character
         mgr.sendBoard(getBoardSnapshot());
@@ -329,8 +355,21 @@ public class SimpleLevel implements Level, Serializable {
      * @param updates the spaces being updated
      */
     private void sendUpdates(Set<BoardSpace> updates) {
-        for (ManagedReference<CharacterManager> mgrRef : characterRefs)
-            mgrRef.get().sendUpdate(updates);
+	// we know that all the characters are connected to the same
+	// dungeon command channel.  Therefore, just select the first
+	// character and have them broadcast it to everyone.
+	//
+	// NOTE: the level code should at some point be reworked to
+	// take advantage of channels since we no long need to access
+	// any of the player objects to send a message.
+	if (channelRef != null) {
+	    Messages.broadcastBoardUpdate(channelRef.get(), updates);
+	}
+	// now send to all the server side (i.e. AI) characters
+	for (ManagedReference<CharacterManager> serverSideCharacter : 
+		 serverSideCharacters) {
+	    serverSideCharacter.get().broadcastUpdates(updates);
+	}
     }
 
     /**

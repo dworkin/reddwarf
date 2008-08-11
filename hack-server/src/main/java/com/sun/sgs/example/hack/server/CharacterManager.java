@@ -89,6 +89,6 @@ public interface CharacterManager extends ManagedObject {
      *
      * @param updates the updates to send
      */
-    public void sendUpdate(Collection<BoardSpace> updates);
+    public void broadcastUpdates(Collection<BoardSpace> updates);
 
 }

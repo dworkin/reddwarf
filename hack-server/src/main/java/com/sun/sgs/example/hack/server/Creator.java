@@ -110,6 +110,10 @@ public class Creator implements Game, Serializable {
         player.userJoinedChannel(creatorCommandsChannel.get());
         Messages.broadcastPlayerJoined(creatorCommandsChannel.get(), clientID);
 
+	// send the player an initial set of stats
+	CharacterStats currentStats = CreatorMessageHandler.getNewStats(-1);
+	player.sendCharacterStats(-1, currentStats);
+
         // NOTE: the idea of this "game" is that it should be used to
         // manage existing characters, create new ones, and delete ones
         // you don't want any more ... for the present, however, it's

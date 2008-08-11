@@ -94,12 +94,13 @@ public class Player
     }
 
     /**
-     * Gets the {@code Channel} associated with {@link #channelRef}.
+     * Returns the current {@code Channel} used to send commands to
+     * this player.
      *
      * @return the channel or {@code null} if {@code channelRef} is
      *         {@code null}.
      */
-    private Channel channel() {
+    public Channel channel() {
         return channelRef == null ? null : channelRef.get();
     }
 

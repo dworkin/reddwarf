@@ -85,6 +85,9 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 	}
     }
 
+    
+
+
     /**
      * Creates new stats for the provided character
      *
@@ -92,7 +95,7 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
      *
      * @return the new stats for the character
      */
-    private CharacterStats getNewStats(int id) {
+    static CharacterStats getNewStats(int id) {
         // NOTE: this should change based on the character class, but
         //       for now it's purely random
         int hp = NSidedDie.roll20Sided() + NSidedDie.roll20Sided();
