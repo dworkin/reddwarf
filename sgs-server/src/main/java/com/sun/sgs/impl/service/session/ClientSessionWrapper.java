@@ -53,6 +53,9 @@ public class ClientSessionWrapper
      * @param	sessionRef a reference to a client session to wrap
      */
     ClientSessionWrapper(ManagedReference<ClientSessionImpl> sessionRef) {
+	if (sessionRef == null) {
+	    throw new NullPointerException("null sessionRef");
+	}
 	this.sessionRef = sessionRef;
     }
 
@@ -115,10 +118,14 @@ public class ClientSessionWrapper
 	ClientSessionImpl sessionImpl = null;
 	try {
 	    sessionImpl = sessionRef.get();
-	} catch (ObjectNotFoundException e) {
+	} catch (Exception e) {
 	}
-	return getClass().getName() + "[" +
-	    (sessionImpl == null ? "(not found)" : sessionImpl.toString()) + "]";
+	return
+	    getClass().getName() + "[" +
+	    (sessionImpl == null ?
+	     sessionRef.toString() :
+	     sessionImpl.toString())
+	    + "]";
     }
     
     /* -- Other methods -- */

@@ -21,19 +21,19 @@ package com.sun.sgs.profile;
 
 
 /**
- * A registration interface where <code>ProfileProducers</code>s register
- * and get <code>ProfileConsumer</code>s used to consume profiling data.
+ * A registration interface where profile producers register
+ * and get {@code ProfileConsumer}s used to consume profiling data.
  */
 public interface ProfileRegistrar {
 
     /**
-     * Registers the given <code>ProfileProducer</code>.
+     * Registers the given unique name as a profile producer.
      *
-     * @param producer the <code>ProfileProducer</code> being registered
+     * @param name the unique name of the profile producer
      *
-     * @return a <code>ProfileConsumer</code> that will consume profiling
-     *         data from the provided <code>ProfileProducer</code>
+     * @return a {@code ProfileConsumer} that will consume profiling
+     *         data from the provided named producer
      */
-    public ProfileConsumer registerProfileProducer(ProfileProducer producer);
+    public ProfileConsumer registerProfileProducer(String name);
 
 }

@@ -369,12 +369,7 @@ public final class WatchdogServiceImpl
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
-	    if (exporter != null) {
-		exporter.unexport();
-	    }
-	    if (serverImpl != null) {
-		serverImpl.shutdown();
-	    }
+	    doShutdown();
 	    throw e;
 	}
     }
@@ -402,8 +397,14 @@ public final class WatchdogServiceImpl
 
     /** {@inheritDoc} */
     protected void doShutdown() {
-	renewThread.interrupt();
+	synchronized (renewThread) {
+	    renewThread.notifyAll();
+	}
 	try {
+	    // The following 'join' call relies on an undocumented feature:
+	    // 'join' can also be invoked on a thread that isn't started.
+	    // If the server can't be exported, the renewThread won't be
+	    // started when 'doShutdown' is invoked.
 	    renewThread.join();
 	} catch (InterruptedException e) {
 	}
@@ -511,11 +512,20 @@ public final class WatchdogServiceImpl
 	    long nextRenewInterval = startRenewInterval;
 	    long lastRenewTime = System.currentTimeMillis();
 
-	    while (getIsAlive() == true && ! shuttingDown()) {
+	    while (getIsAlive()) {
 
-		try {
-		    Thread.sleep(nextRenewInterval);
-		} catch (InterruptedException e) {
+		synchronized (this) {
+		    if (shuttingDown()) {
+			return;
+		    }
+		    try {
+			wait(nextRenewInterval);
+		    } catch (InterruptedException e) {
+			return;
+		    }
+		}
+
+		if (shuttingDown()) {
 		    return;
 		}
 

@@ -469,7 +469,9 @@ public final class ClientSessionServiceImpl
 	}
 	handlers.clear();
 
-	flushContextsThread.interrupt();
+	synchronized (flushContextsLock) {
+	    flushContextsLock.notifyAll();
+	}
     }
 
     /**
@@ -991,22 +993,24 @@ public final class ClientSessionServiceImpl
 	    
 	    for (;;) {
 		
-		if (shuttingDown()) {
-		    return;
-		}
-
 		/*
 		 * Wait for a non-empty context queue, returning if
-		 * this thread is interrupted.
+		 * the service is shutting down.
 		 */
 		synchronized (flushContextsLock) {
 		    if (contextQueue.isEmpty()) {
+			if (shuttingDown()) {
+			    return;
+			}
 			try {
 			    flushContextsLock.wait();
 			} catch (InterruptedException e) {
 			    return;
 			}
 		    }
+		}
+		if (shuttingDown()) {
+		    return;
 		}
 
 		/*
@@ -1016,7 +1020,7 @@ public final class ClientSessionServiceImpl
 		if (! contextQueue.isEmpty()) {
 		    Iterator<Context> iter = contextQueue.iterator();
 		    while (iter.hasNext()) {
-			if (Thread.currentThread().isInterrupted()) {
+			if (shuttingDown()) {
 			    return;
 			}
 			Context context = iter.next();

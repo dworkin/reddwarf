@@ -56,7 +56,7 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
 
 /**
  * Provides a database implementation based on <a href=
- * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB, Java
+ * "http://www.oracle.com/database/berkeley-db/je/index.html">Berkeley DB Java
  * Edition</a>. <p>
  * 
  * Operations on classes in this package will throw an {@link Error} if the
@@ -419,5 +419,15 @@ public class JeEnvironment implements DbEnvironment {
 	} catch (DatabaseException e) {
 	    throw convertException(e, false);
 	}
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation returns {@code true} to specify that this
+     * environment requires the use of allocation block placeholders.
+     */
+    public boolean useAllocationBlockPlaceholders() {
+	return true;
     }
 }

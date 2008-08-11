@@ -29,11 +29,11 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -43,7 +43,9 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
@@ -137,7 +139,7 @@ import java.util.logging.Logger;
  * com.sun.sgs.impl.service.data.DataServiceImpl.abort}, to make it easier to
  * debug concurrency conflicts by just logging aborts.
  */
-public final class DataServiceImpl implements DataService, ProfileProducer {
+public final class DataServiceImpl implements DataService {
 
     /** The name of this class. */
     private static final String CLASSNAME = 
@@ -225,6 +227,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
+    /** Our profiling operations. */
+    private final ProfileOperation createReferenceOp;
+    
     /**
      * Defines the transaction context map for this class.  This class checks
      * the service state and the reference table whenever the context is
@@ -364,6 +369,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		       "systemRegistry:{1}, txnProxy:{2}",
 		       properties, systemRegistry, txnProxy);
 	}
+	DataStore storeToShutdown = null;
 	try {
 	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
@@ -390,16 +396,25 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
 	    boolean serverStart = wrappedProps.getBooleanProperty(
 		StandardProperties.SERVER_START, true);
+	    DataStore baseStore;
 	    if (dataStoreClassName != null) {
-		store = wrappedProps.getClassInstanceProperty(
+		baseStore = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
 		    new Class[] { Properties.class }, properties);
-		logger.log(Level.CONFIG, "Using data store {0}", store);
+		logger.log(Level.CONFIG, "Using data store {0}", baseStore);
 	    } else if (serverStart) {
-		store = new DataStoreImpl(properties, scheduler);
+		baseStore = new DataStoreImpl(properties, scheduler);
 	    } else {
-		store = new DataStoreClient(properties);
+		baseStore = new DataStoreClient(properties);
 	    }
+            storeToShutdown = baseStore;
+            ProfileRegistrar registrar = 
+		systemRegistry.getComponent(ProfileRegistrar.class);
+	    store = new DataStoreProfileProducer(baseStore, registrar);
+            ProfileConsumer consumer =
+                registrar.registerProfileProducer(getClass().getName());
+            createReferenceOp = consumer.registerOperation(
+		"createReference", ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -430,6 +445,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 			}
 		    },
 		taskOwner);
+	    storeToShutdown = null;
 	} catch (RuntimeException e) {
 	    getExceptionLogger(e).logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
@@ -438,6 +454,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
+	} finally {
+	    if (storeToShutdown != null) {
+		storeToShutdown.shutdown();
+	    }
 	}
     }
 
@@ -495,20 +515,18 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "removeObject tid:{0,number,#}, object:{1}," +
+		    "removeObject tid:{0,number,#}, type:{1}," +
 		    " oid:{2,number,#} returns",
-		    contextTxnId(context), Objects.fastToString(object),
-		    refId(ref));
+		    contextTxnId(context), typeName(object), refId(ref));
 	    }
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
-		    "removeObject tid:{0,number,#}, object:{1}," +
+		    "removeObject tid:{0,number,#}, type:{1}," +
 		    " oid:{2,number,#} throws",
-		    contextTxnId(context), Objects.fastToString(object),
-		    refId(ref));
+		    contextTxnId(context), typeName(object), refId(ref));
 	    }
 	    throw e;
 	}
@@ -528,20 +546,18 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "markForUpdate tid:{0,number,#}, object:{1}," +
+		    "markForUpdate tid:{0,number,#}, type:{1}," +
 		    " oid:{2,number,#} returns",
-		    contextTxnId(context), Objects.fastToString(object),
-		    refId(ref));
+		    contextTxnId(context), typeName(object), refId(ref));
 	    }
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
-		    "markForUpdate tid:{0,number,#}, object:{1}," +
+		    "markForUpdate tid:{0,number,#}, type:{1}," +
 		    " oid:{2,number,#} throws",
-		    contextTxnId(context), Objects.fastToString(object),
-		    refId(ref));
+		    contextTxnId(context), typeName(object), refId(ref));
 	    }
 	    throw e;
 	}
@@ -549,6 +565,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** {@inheritDoc} */
     public <T> ManagedReference<T> createReference(T object) {
+        createReferenceOp.report();
 	Context context = null;
 	try {
 	    checkManagedObject(object);
@@ -557,10 +574,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "createReference tid:{0,number,#}, object:{1}" +
+		    "createReference tid:{0,number,#}, type:{1}" +
 		    " returns oid:{2,number,#}",
-		    contextTxnId(context), Objects.fastToString(object),
-		    refId(result));
+		    contextTxnId(context), typeName(object), refId(result));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
@@ -568,8 +584,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
-		    "createReference tid:{0,number,#}, object:{1} throws",
-		    contextTxnId(context), Objects.fastToString(object));
+		    "createReference tid:{0,number,#}, type:{1} throws",
+		    contextTxnId(context), typeName(object));
 	    }
 	    throw e;
 	}
@@ -667,9 +683,11 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2} returns {3}",
+		    "{0} tid:{1,number,#}, name:{2} returns type:{3}," +
+		    " oid:{4,number,#}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
-		    contextTxnId(context), name, Objects.fastToString(result));
+		    contextTxnId(context), name, typeName(result),
+		    objectId(context, result));
 	    }
 	    return result;
 	} catch (RuntimeException e) {
@@ -700,18 +718,22 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
-		    "{0} tid:{1,number,#}, name:{2}, object:{3} returns",
+		    "{0} tid:{1,number,#}, name:{2}, type:{3}," +
+		    " oid:{4,number,#} returns",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
-		    contextTxnId(context), name, Objects.fastToString(object));
+		    contextTxnId(context), name, typeName(object),
+		    objectId(context, object));
 	    }
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
-		    "{0} tid:{1,number,#}, name:{2}, object:{3} throws",
+		    "{0} tid:{1,number,#}, name:{2}, type:{3}," +
+		    " oid:{4,number,#} throws",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
-		    contextTxnId(context), name, Objects.fastToString(object));
+		    contextTxnId(context), name, typeName(object),
+		    objectId(context, object));
 	    }
 	    throw e;
 	}
@@ -810,16 +832,6 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 	synchronized (stateLock) {
 	    this.detectModifications = detectModifications;
 	}
-    }
-
-    /* -- Implement ProfileProducer -- */
-
-    /**
-     * {@inheritDoc}
-     */
-    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
-        if (store instanceof ProfileProducer)
-            ((ProfileProducer) store).setProfileRegistrar(profileRegistrar);
     }
 
     /* -- Other methods -- */
@@ -1016,6 +1028,19 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
      */
     private static BigInteger refId(ManagedReference<?> ref) {
 	return (ref != null) ? ref.getId() : null;
+    }
+
+    /** Returns the type name of the object. */
+    static String typeName(Object object) {
+	return (object == null) ? "null" : object.getClass().getName();
+    }
+
+    /**
+     * Returns the object ID of the object, or null if the object is null or
+     * not assigned an ID.  Returns an ID even if the object is removed.
+     */
+    private static BigInteger objectId(Context context, Object object) {
+	return refId(context.safeFindReference(object));
     }
 
     /**

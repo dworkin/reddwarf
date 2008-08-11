@@ -24,12 +24,15 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -41,6 +44,7 @@ import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -49,10 +53,11 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
@@ -62,37 +67,37 @@ import java.util.logging.Logger;
 /**
  * Channel implementation for use within a single transaction.
  */
-abstract class ChannelImpl implements Channel, Serializable {
+abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
-    
+    private static final long serialVersionUID = 1L;
+
     /** The logger for this class. */
-    protected final static LoggerWrapper logger =
+    protected static final LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
     /** The package name. */
-    private final static String PKG_NAME = "com.sun.sgs.impl.service.channel.";
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.channel.";
 
     /** The channel name component prefix. */
-    private final static String NAME_COMPONENT = "name.";
+    private static final String NAME_COMPONENT = "name.";
 
     /** The channel set component prefix. */
-    private final static String SET_COMPONENT = "set.";
+    private static final String SET_COMPONENT = "set.";
 
     /** The member session component prefix. */
-    private final static String SESSION_COMPONENT = "session.";
+    private static final String SESSION_COMPONENT = "session.";
 
     /** The work queue component prefix. */
-    private final static String QUEUE_COMPONENT = "eventq.";
+    private static final String QUEUE_COMPONENT = "eventq.";
 
     /** The random number generator for choosing a new coordinator. */
-    private final static Random random = new Random();
+    private static final Random random = new Random();
 
     /** The channel name. */
     protected final String name;
-    
+
     /** The ID from a managed reference to this instance. */
     protected final byte[] channelId;
 
@@ -121,7 +126,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /** The transaction. */
     private transient Transaction txn;
-    
+
     /** The data service. */
     private transient DataService dataService;
 
@@ -136,7 +141,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Constructs an instance of this class with the specified
-     * {@code name}, {@code listener}, {@code delivery} requirement, 
+     * {@code name}, {@code listener}, {@code delivery} requirement,
      * and write buffer capacity.
      *
      * @param name a channel name
@@ -153,9 +158,9 @@ abstract class ChannelImpl implements Channel, Serializable {
 	this.name = name;
 	this.dataService = ChannelServiceImpl.getDataService();
 	if (listener != null) {
-	    if (! (listener instanceof Serializable)) {
+	    if (!(listener instanceof Serializable)) {
 		throw new IllegalArgumentException("non-serializable listener");
-	    } else if (! (listener instanceof ManagedObject)) {
+	    } else if (!(listener instanceof ManagedObject)) {
 		listener = new ManagedSerializableChannelListener(listener);
 	    }
 	    this.listenerRef = dataService.createReference(listener);
@@ -208,18 +213,18 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /* -- Implement Channel -- */
-    
-    /** {@inheritDoc} */
-    public String getName() {
+
+    /** Implements {@link Channel#getName}. */
+    String getName() {
 	checkContext();
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "getName returns {0}", name);
 	}
 	return name;
     }
-    
-    /** {@inheritDoc} */
-    public Delivery getDeliveryRequirement() {
+
+    /** Implements {@link Channel#getDeliveryRequirement}. */
+    Delivery getDeliveryRequirement() {
 	checkContext();
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -228,55 +233,53 @@ abstract class ChannelImpl implements Channel, Serializable {
 	return delivery;
     }
 
-    /** {@inheritDoc} */
-    public boolean hasSessions() {
+    /** Implements {@link Channel#hasSessions}. */
+    boolean hasSessions() {
 	checkClosed();
 	String prefix = getSessionPrefix();
 	String name = dataService.nextServiceBoundName(prefix);
 	return name != null && name.startsWith(prefix);
     }
 
-    /** {@inheritDoc} */
-    public Iterator<ClientSession> getSessions() {
+    /** Implements {@link Channel#getSessions}. */
+    Iterator<ClientSession> getSessions() {
 	checkClosed();
 	return new ClientSessionIterator(dataService, getSessionPrefix());
     }
 
-    /** {@inheritDoc} */
-    public Channel join(final ClientSession session) {
+    /** Implements {@link Channel#join(ClientSession)}. */
+    void join(final ClientSession session) {
 	try {
 	    checkClosed();
 	    if (session == null) {
 		throw new NullPointerException("null session");
 	    }
-
 	    /*
 	     * Enqueue join request with underlying (unwrapped) client
-	     * session object. 
+	     * session object.
 	     */
 	    addEvent(new JoinEvent(unwrapSession(session)));
-	    
+
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
-	    return this;
-	    
+
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "join throws");
 	    throw e;
 	}
     }
 
-    /** {@inheritDoc}
+    /** Implements {@link Channel#join(Set)}.
      *
      * Enqueues a join event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public Channel join(final Set<ClientSession> sessions) {
+    void join(final Set<ClientSession> sessions) {
 	try {
 	    checkClosed();
 	    if (sessions == null) {
 		throw new NullPointerException("null sessions");
 	    }
-	    
+
 	    /*
 	     * Enqueue join requests, each with underlying (unwrapped)
 	     * client session object.
@@ -288,8 +291,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		addEvent(new JoinEvent(unwrapSession(session)));
 	    }
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
-	    return this;
-	    
+
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "join throws");
 	    throw e;
@@ -308,11 +310,8 @@ abstract class ChannelImpl implements Channel, Serializable {
      * ClientSession} so that the correct client session ID can be obtained.
      */
     private ClientSession unwrapSession(ClientSession session) {
-	if (session instanceof ClientSessionWrapper) {
-	    return ((ClientSessionWrapper) session).getClientSession();
-	} else {
-	    return session;
-	}
+	assert session instanceof ClientSessionWrapper;
+	return ((ClientSessionWrapper) session).getClientSession();
     }
 
     /**
@@ -344,12 +343,12 @@ abstract class ChannelImpl implements Channel, Serializable {
      * @param	eventQueue this channel's event queue
      */
     private void notifyServiceEventQueue(EventQueue eventQueue) {
-	
+
 	if (isCoordinator()) {
 	    eventQueue.serviceEvent();
-	    
+
 	} else {
-	    
+
 	    final ChannelServer coordinator = getChannelServer(coordNodeId);
 	    if (coordinator == null) {
 		/*
@@ -364,16 +363,12 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    final long coord = coordNodeId;
 	    ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable() {
-		    public void run() {
+		  public void run() {
+		    do {
 			try {
 			    coordinator.serviceEventQueue(channelId);
+			    return;
 			} catch (IOException e) {
-			    /*
-			     * It is likely that the coordinator's node failed
-			     * and hasn't recovered yet.   When the
-			     * coordinator recovers, it will resume
-			     * servicing events, so ignore this exception.
-			     */
 			    if (logger.isLoggable(Level.FINEST)) {
 				logger.logThrow(
 				    Level.FINEST, e,
@@ -382,16 +377,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 				    coord);
 			    }
 			}
-		    }}, false);
+		    } while (isAlive(coord));
+		  }
+		}, false);
 	}
     }
-    
-    /** {@inheritDoc}
+
+    /** Implements {@link Channel#leave(ClientSession)}.
      *
      * Enqueues a leave event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public Channel leave(final ClientSession session) {
+    void leave(final ClientSession session) {
 	try {
 	    checkClosed();
 	    if (session == null) {
@@ -404,20 +401,19 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     */
 	    addEvent(new LeaveEvent(unwrapSession(session)));
 	    logger.log(Level.FINEST, "leave session:{0} returns", session);
-	    return this;
-	    
+
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "leave throws");
 	    throw e;
 	}
     }
 
-    /** {@inheritDoc}
+    /** Implements {@link Channel#leave(Set)}.
      *
      * Enqueues leave event(s) to this channel's event queue and notifies
      * this channel's coordinator to service the event(s).
      */
-    public Channel leave(final Set<ClientSession> sessions) {
+    void leave(final Set<ClientSession> sessions) {
 	try {
 	    checkClosed();
 	    if (sessions == null) {
@@ -435,43 +431,40 @@ abstract class ChannelImpl implements Channel, Serializable {
 		addEvent(new LeaveEvent(unwrapSession(session)));
 	    }
 	    logger.log(Level.FINEST, "leave sessions:{0} returns", sessions);
-	    return this;
-	    
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINEST, e, "leave throws");
-	    throw e;
-	}
-    }
-    
-    /** {@inheritDoc}
-     *
-     * Enqueues a leaveAll event to this channel's event queue and notifies
-     * this channel's coordinator to service the event.
-     */
-    public Channel leaveAll() {
-	try {
-	    checkClosed();
-	    
-	    /*
-	     * Enqueue leaveAll request.
-	     */
-	    addEvent(new LeaveAllEvent());
-			    
-	    logger.log(Level.FINEST, "leaveAll returns");
-	    return this;
-	    
+
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "leave throws");
 	    throw e;
 	}
     }
 
-    /** {@inheritDoc}
+    /** Implements {@link Channel#leaveAll}.
+     *
+     * Enqueues a leaveAll event to this channel's event queue and notifies
+     * this channel's coordinator to service the event.
+     */
+    void leaveAll() {
+	try {
+	    checkClosed();
+
+	    /*
+	     * Enqueue leaveAll request.
+	     */
+	    addEvent(new LeaveAllEvent());
+	    logger.log(Level.FINEST, "leaveAll returns");
+
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, e, "leave throws");
+	    throw e;
+	}
+    }
+
+    /** Implements {@link Channel#send}.
      *
      * Enqueues a send event to this channel's event queue and notifies
      * this channel's coordinator to service the event.
      */
-    public Channel send(ClientSession sender, ByteBuffer message) {
+    void send(ClientSession sender, ByteBuffer message) {
 	try {
 	    checkClosed();
 	    if (message == null) {
@@ -498,7 +491,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
 			   this, HexDumper.format(msgBytes, 0x50));
 	    }
-	    
+
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
@@ -507,8 +500,6 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    }
 	    throw e;
 	}
-
-	return this;
     }
 
     /**
@@ -520,6 +511,8 @@ abstract class ChannelImpl implements Channel, Serializable {
      * and {@code message}.
      */
     private void receivedMessage(ClientSession sender, ByteBuffer message) {
+
+	assert sender instanceof ClientSessionWrapper;
 
 	if (listenerRef == null) {
 	    send(sender, message);
@@ -546,14 +539,14 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    isClosed = true;
 	}
     }
-    
+
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
     @Override
     public boolean equals(Object obj) {
 	// TBD: Because this is a managed object, does an "==" check
-	// suffice here? 
+	// suffice here?
 	return
 	    (this == obj) ||
 	    (obj != null && obj.getClass() == this.getClass() &&
@@ -616,11 +609,22 @@ abstract class ChannelImpl implements Channel, Serializable {
      * com.sun.sgs.impl.service.channel.
      *		session.<channelId>.
      */
-    private String getSessionPrefix() {
+    private static String getSessionPrefix(byte[] channelId) {
 	return PKG_NAME +
 	    SESSION_COMPONENT + HexDumper.toHexString(channelId) + ".";
     }
 
+    /**
+     * Returns the prefix for accessing all client sessions on this
+     * channel.  The prefix has the following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		session.<channelId>.
+     */
+    private String getSessionPrefix() {
+	return getSessionPrefix(channelId);
+    }
+    
     /**
      * Returns the prefix for accessing all the client sessions on
      * this channel that are connected to the node with the specified
@@ -629,8 +633,8 @@ abstract class ChannelImpl implements Channel, Serializable {
      * com.sun.sgs.impl.service.channel.
      *		session.<channelId>.<nodeId>.
      */
-    private String getSessionNodePrefix(long nodeId) {
-	return getSessionPrefix() + nodeId + ".";
+    private static String getSessionNodePrefix(byte[] channelId, long nodeId) {
+	return getSessionPrefix(channelId) + nodeId + ".";
     }
 
     /**
@@ -654,10 +658,18 @@ abstract class ChannelImpl implements Channel, Serializable {
      *		session.<channelId>.<nodeId>.<sessionId>
      */
     private String getSessionKey(long nodeId, byte[] sessionIdBytes) {
-	return getSessionNodePrefix(nodeId) +
+	return getSessionNodePrefix(channelId, nodeId) +
 	    HexDumper.toHexString(sessionIdBytes);
     }
 
+    /**
+     * Returns a prefix for accessing the event queues for channels
+     * coordinated on the given {@code nodeId}.  The prefix has the
+     * following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		eventq.<nodeId>.
+     */
     private static String getEventQueuePrefix(long nodeId) {
 	return PKG_NAME + QUEUE_COMPONENT + nodeId + ".";
     }
@@ -667,67 +679,27 @@ abstract class ChannelImpl implements Channel, Serializable {
      * coordinator.  The key has the following form:
      *
      * com.sun.sgs.impl.service.channel.
-     *		queue.<coordNodeId>.<channelId>
+     *		eventq.<coordNodeId>.<channelId>
      */
     private String getEventQueueKey() {
 	return getEventQueueKey(coordNodeId, channelId);
     }
 
-    
     /**
      * Returns a key for accessing the work queue for the channel with
      * the specified {@code channelId} and coordinator {@code
      * nodeId}. The key has the following form:
      *
      * com.sun.sgs.impl.service.channel.
-     *		queue.<nodeId>.<channelId>
+     *		eventq.<nodeId>.<channelId>
      */
     private static String getEventQueueKey(long nodeId, byte[] channelId) {
 	return getEventQueuePrefix(nodeId) +
 	    HexDumper.toHexString(channelId);
     }
-    
-    /**
-     * Returns the prefix for accessing channel sets for all sessions
-     * connected to the node with the specified {@code nodeId}.  The
-     * prefix has the following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		set.<nodeId>.
-     */
-    private static String getChannelSetPrefix(long nodeId) {
-	return PKG_NAME +
-	    SET_COMPONENT + nodeId + ".";
-    }
-    
-    /**
-     * Returns a key for accessing the channel set for the specified
-     * {@code session}.  The key has the following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		set.<nodeId>.<sessionId>
-     */
-    private static String getChannelSetKey(ClientSession session) {
-	return getChannelSetKey(
-	    getNodeId(session), getSessionIdBytes(session));
-    }
-
-    /**
-     * Returns a key for accessing the channel set for the session
-     * with the specified {@code sessionIdBytes} that is connected to
-     * the node with the specified {@code nodeId}.  The key has the
-     * following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		set.<nodeId>.<sessionId>
-     */
-    private static String getChannelSetKey(long nodeId, byte[] sessionIdBytes) {
-	return getChannelSetPrefix(nodeId) +
-	    HexDumper.toHexString(sessionIdBytes);
-    }
 
     /* -- Other methods -- */
-    
+
     /**
      * Returns the ID for the specified {@code session}.
      */
@@ -808,7 +780,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	 * channel, then add server's node ID to server list.
 	 */
 	long nodeId = getNodeId(session);
-	if (! hasServerNode(nodeId)) {
+	if (!hasServerNode(nodeId)) {
 	    dataService.markForUpdate(this);
 	    servers.add(nodeId);
 	}
@@ -819,28 +791,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	String sessionKey = getSessionKey(session);
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
-	
-	/*
-	 * Add channel to session's channel set.
-	 */
-	String channelSetKey = getChannelSetKey(session);
-	ChannelSet channelSet;
-	try {
-	    channelSet =
-		(ChannelSet) dataService.getServiceBinding(channelSetKey);
-	} catch (NameNotBoundException e) {
-	    channelSet = new ChannelSet(dataService, session);
-	    dataService.setServiceBinding(channelSetKey, channelSet);
-	} catch (ObjectNotFoundException e) {
-	    logger.logThrow(
-		Level.SEVERE, e,
-		"ChannelSet binding:{0} exists, but object removed",
-		channelSetKey);
-	    throw e;
-	}
-	if (channelSet.add(this)) {
-	    dataService.markForUpdate(channelSet);
-	}
+
 	return true;
     }
 
@@ -854,6 +805,18 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
+     * Removes the binding with the given {@code sessionKey} (and the
+     * associated object) and throws {@code NameNotBoundException} if the
+     * key is not bound.
+     */
+    private void removeSessionBinding(String sessionKey) {
+	ClientSessionInfo sessionInfo = (ClientSessionInfo)
+	    dataService.getServiceBinding(sessionKey);
+	dataService.removeServiceBinding(sessionKey);
+	dataService.removeObject(sessionInfo);
+    }
+
+    /**
      * Removes from this channel the member session with the specified
      * {@code sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId}, notifies the session's server that the
@@ -862,11 +825,13 @@ abstract class ChannelImpl implements Channel, Serializable {
      * invoked.  If the session is not a member of this channel, then no
      * action is taken and {@code false} is returned.
      */
-    private boolean removeSession(long nodeId, final byte[] sessionIdBytes) {
+    private boolean removeSession(
+	final long nodeId, final byte[] sessionIdBytes)
+    {
 	// Remove session binding.
 	String sessionKey = getSessionKey(nodeId, sessionIdBytes);
 	try {
-	    dataService.removeServiceBinding(sessionKey);
+	    removeSessionBinding(sessionKey);
 	} catch (NameNotBoundException e) {
 	    return false;
 	}
@@ -876,35 +841,11 @@ abstract class ChannelImpl implements Channel, Serializable {
 	 * removed from this channel, then remove the session's node
 	 * from the server map.
 	 */
-	if (! hasSessionsOnNode(nodeId)) {
+	if (!hasSessionsOnNode(nodeId)) {
 	    dataService.markForUpdate(this);
 	    servers.remove(nodeId);
 	}
 
-	/*
-	 * Remove channel from session's channel set.  If the channel
-	 * is the last one to be removed from the session's channel
-	 * set, then remove the channel set object and binding.
-	 */
-	try {
-	    String channelSetKey = getChannelSetKey(nodeId, sessionIdBytes);
-	    ChannelSet channelSet =
-		(ChannelSet) dataService.getServiceBinding(channelSetKey);
-	    boolean removed = channelSet.remove(this);
-	    if (channelSet.isEmpty()) {
-		dataService.removeServiceBinding(channelSetKey);
-		dataService.removeObject(channelSet);
-	    } else if (removed) {
-		dataService.markForUpdate(channelSet);
-	    }
-		  
-	} catch (NameNotBoundException e) {
-	    logger.logThrow(
-		Level.WARNING, e,
-		"Channel set for session:{0} prematurely removed",
-		HexDumper.toHexString(sessionIdBytes));
-	}
-	
 	final ChannelServer server = getChannelServer(nodeId);
 	/*
 	 * If there is no channel server for the session's node,
@@ -918,21 +859,19 @@ abstract class ChannelImpl implements Channel, Serializable {
 		new BigInteger(1, channelId),
 		new AbstractKernelRunnable() {
 		    public void run() {
-			try {
-			    server.leave(channelId, sessionIdBytes);
-			} catch (IOException e) {
-			    /*
-			     * If the channel server can't be contacted, it
-			     * has failed or is shut down, so there is no
-			     * need to contact it to update its membership
-			     * cache, so ignore this exception.
-			     */
-			    logger.logThrow(
-			        Level.FINE, e,
-				"unable to contact channel server:{0} to " +
-				"handle event:{1}", server, this);	
-			}
-		    }});
+			do {
+			    try {
+				server.leave(channelId, sessionIdBytes);
+				return;
+			    } catch (IOException e) {
+				logger.logThrow(
+			            Level.FINE, e,
+				    "unable to contact channel server:{0} to " +
+				    "handle event:{1}", server, this);
+			    }
+			} while (isAlive(nodeId));
+		    }
+		});
 	}
 	return true;
     }
@@ -1007,7 +946,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      * This method should be called within a transaction.
      */
     private long chooseCoordinatorNode() {
-	if (! servers.isEmpty()) {
+	if (!servers.isEmpty()) {
 	    int numServers = servers.size();
 	    Long[] serverIds = servers.toArray(new Long[numServers]);
 	    int startIndex = random.nextInt(numServers);
@@ -1026,28 +965,27 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Removes the client session with the specified {@code
-     * sessionIdBytes} that is connected to the node with the
-     * specified {@code nodeId} from all channels that it is currently
-     * a member of.  This method is invoked when a session is
-     * disconnected from this node, gracefully or otherwise, or if
-     * this node is recovering for a failed node whose sessions all
-     * became disconnected.
+     * Removes the client session with the specified {@code sessionIdBytes}
+     * from the channel with the specified {@code channelRefId}.  This
+     * method is invoked when a session is disconnected from this node
+     * (with the specified {@code nodeId}) gracefully or otherwise, or if
+     * this node is recovering for a failed node whose sessions all became
+     * disconnected.  The {@code nodeId} specifies the node that the
+     * session was previously connected to, which is not necessarily
+     * the local node's ID.
      *
      * This method should be called within a transaction.
      */
-    static void removeSessionFromAllChannels(
-	long nodeId, byte[] sessionIdBytes)
+    static void removeSessionFromChannel(
+	long nodeId, byte[] sessionIdBytes, BigInteger channelRefId)
     {
-	Set<byte[]> channelIds = getChannelsForSession(nodeId, sessionIdBytes);
-	for (byte[] channelId : channelIds) {
-	    ChannelImpl channel = (ChannelImpl) getObjectForId(
-		new BigInteger(1, channelId));
-	    if (channel != null) {
-		channel.removeSession(nodeId, sessionIdBytes);
-	    } else {
+	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
+	if (channel != null) {
+	    channel.removeSession(nodeId, sessionIdBytes);
+	} else {
+	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "channel already removed:{0}",
-			   HexDumper.toHexString(channelId));
+		    HexDumper.toHexString(channelRefId.toByteArray()));
 	    }
 	}
     }
@@ -1057,6 +995,17 @@ abstract class ChannelImpl implements Channel, Serializable {
      */
     private static long getLocalNodeId() {
 	return ChannelServiceImpl.getLocalNodeId();
+    }
+
+    /**
+     * Returns {@code true} if the node with the associated {@code nodeId}
+     * is alive, otherwise returns {@code false}.
+     *
+     * This method must be called from outside a transaction or an
+     * {@code IllegalStateException} will be thrown.
+     */
+    private static boolean isAlive(long nodeId) {
+	return ChannelServiceImpl.getChannelService().isAlive(nodeId);
     }
 
     /**
@@ -1086,44 +1035,11 @@ abstract class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Returns a set containing the IDs of each channel that the
-     * client session (specified by {@code nodeId} and {@code
-     * sessionIdBytes} is a member of.
+     * Returns a list containing the node IDs of the channel servers for
+     * this channel. 
      */
-    private static Set<byte[]> getChannelsForSession(
-		long nodeId, byte[] sessionIdBytes)
-    {
-	DataService dataService = ChannelServiceImpl.getDataService();
-	ChannelSet channelSet = null;
-	
-	try {
-	    String channelSetKey = getChannelSetKey(nodeId, sessionIdBytes);
-	    channelSet =
-		(ChannelSet) dataService.getServiceBinding(channelSetKey);
-	} catch (NameNotBoundException e) {
-	    // ignore; session may not be a member of any channel
-	}
-
-	if (channelSet != null) {
-	    return channelSet.getChannelIds();
-	} else {
-	    Set<byte[]> emptySet = Collections.emptySet();
-	    return emptySet;
-	}
-    }
-
-    /**
-     * Returns a set containing all the channel servers for this channel.
-     */
-    private Set<ChannelServer> getChannelServers() {
-	Set<ChannelServer> channelServers = new HashSet<ChannelServer>();
-	for (Long nodeId : servers) {
-	    ChannelServer channelServer = getChannelServer(nodeId);
-	    if (channelServer != null) {
-		channelServers.add(channelServer);
-	    }
-	}
-	return channelServers;
+    private List<Long> getChannelServerNodeIds() {
+	return new ArrayList<Long>(servers);
     }
     
     /**
@@ -1132,7 +1048,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      * when all sessions leave the channel.
      */
     private void removeAllSessions() {
-	for (String sessionKey : 
+	for (String sessionKey :
 		 BoundNamesUtil.getServiceBoundNamesIterable(
 		    dataService, getSessionPrefix()))
 	{
@@ -1179,7 +1095,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      * to the node with the specified {@code nodeId}.
      */
     private boolean hasSessionsOnNode(long nodeId) {
-	String keyPrefix = getSessionNodePrefix(nodeId);
+	String keyPrefix = getSessionNodePrefix(channelId, nodeId);
 	return dataService.nextServiceBoundName(keyPrefix).
 	    startsWith(keyPrefix);
     }
@@ -1243,7 +1159,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 
 	/** {@inheritDoc} */
 	public boolean hasNext() {
-	    if (! iterator.hasNext()) {
+	    if (!iterator.hasNext()) {
 		return false;
 	    }
 	    if (nextSession != null) {
@@ -1265,7 +1181,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	/** {@inheritDoc} */
 	public ClientSession next() {
 	    try {
-		if (nextSession == null && ! hasNext()) {
+		if (nextSession == null && !hasNext()) {
 		    throw new NoSuchElementException();
 		}
 		return nextSession;
@@ -1279,7 +1195,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    throw new UnsupportedOperationException("remove is not supported");
 	}
     }
-    
+
     /**
      * A wrapper for a {@code ChannelListener} that is serializable,
      * but not managed.
@@ -1288,8 +1204,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	extends ManagedSerializable<ChannelListener>
 	implements ChannelListener
     {
-	private final static long serialVersionUID = 1L;
-	
+	private static final long serialVersionUID = 1L;
+
 	/** Constructs an instance with the specified {@code listener}. */
 	ManagedSerializableChannelListener(ChannelListener listener) {
 	    super(listener);
@@ -1299,11 +1215,11 @@ abstract class ChannelImpl implements Channel, Serializable {
 	public void receivedMessage(
 	    Channel channel, ClientSession sender, ByteBuffer message)
 	{
+	    assert sender instanceof ClientSessionWrapper;
 	    get().receivedMessage(channel, sender, message);
 	}
-	
     }
-    
+
     /**
      * A {@code ManagedObject} wrapper for a {@code ClientSession}'s
      * ID.  An instance of this class also provides a means of
@@ -1315,11 +1231,10 @@ abstract class ChannelImpl implements Channel, Serializable {
     static class ClientSessionInfo
 	implements ManagedObject, Serializable
     {
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 	final long nodeId;
 	final byte[] sessionIdBytes;
 	private final ManagedReference<ClientSession> sessionRef;
-	    
 
 	/**
 	 * Constructs an instance of this class with the specified
@@ -1329,6 +1244,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    if (session == null) {
 		throw new NullPointerException("null session");
 	    }
+	    assert session instanceof ClientSessionImpl;
 	    nodeId = getNodeId(session);
 	    sessionRef = dataService.createReference(session);
 	    sessionIdBytes = sessionRef.getId().toByteArray();
@@ -1340,55 +1256,30 @@ abstract class ChannelImpl implements Channel, Serializable {
 	 */
 	ClientSession getClientSession() {
 	    try {
-		return sessionRef.get();
+		return ((ClientSessionImpl) sessionRef.get()).
+		    getWrappedClientSession();
 	    } catch (ObjectNotFoundException e) {
 		return null;
 	    }
 	}
-    }
 
-    /**
-     * Contains a set of channels (by ID) that a session is a member of.
-     */
-    private static class ChannelSet extends ClientSessionInfo {
-	
-	private final static long serialVersionUID = 1L;
-
-	/** The set of channel IDs that the client session is a member of. */
-	private final Set<BigInteger> set = new HashSet<BigInteger>();
-
-	ChannelSet(DataService dataService, ClientSession session) {
-	    super(dataService, session);
-	}
-
-	boolean add(ChannelImpl channel) {
-	    return set.add(new BigInteger(1,channel.channelId));
-	}
-
-	boolean remove(ChannelImpl channel) {
-	    return set.remove(new BigInteger(1, channel.channelId));
-	}
-
-	Set<byte[]> getChannelIds() {
-	    HashSet<byte[]> ids = new HashSet<byte[]>();
-	    for (BigInteger refId : set) {
-		ids.add(refId.toByteArray());
-	    }
-	    return ids;
-	}
-
-	boolean isEmpty() {
-	    return set.isEmpty();
+	/** {@inheritDoc} */
+	@Override
+	public String toString() {
+	    return getClass().getName() +
+		"[" + HexDumper.toHexString(sessionIdBytes) + "]";
 	}
     }
-
+    
     /**
      * The channel's event queue.
      */
-    private static class EventQueue implements ManagedObject, Serializable {
+    private static class EventQueue
+	implements ManagedObjectRemoval, Serializable
+    {
 
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/** The managed reference to the queue's channel. */
 	private final ManagedReference<ChannelImpl> channelRef;
@@ -1420,7 +1311,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	/**
 	 * Attempts to enqueue the specified {@code event}, and returns
 	 * {@code true} if successful, and {@code false} otherwise.
-	 * 
+	 *
 	 * @param event the event
 	 * @return {@code true} if successful, and {@code false} otherwise
 	 * @throws MessageRejectedException if the cost of the event
@@ -1459,7 +1350,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	BigInteger getChannelRefId() {
 	    return channelRef.getId();
 	}
-	
+
 	/**
 	 * Returns the managed queue object.
 	 */
@@ -1496,14 +1387,14 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    ChannelServiceImpl.getDataService().markForUpdate(this);
 	    sendRefresh = true;
 	}
-	    
+
 	/**
 	 * Processes (at least) the first event in the queue.
 	 */
 	void serviceEvent() {
 	    checkState();
 	    ChannelImpl channel = getChannel();
-	    if (! channel.isCoordinator()) {
+	    if (!channel.isCoordinator()) {
 		// TBD: should a serviceEventQueue request be forwarded to
 		// the true channel coordinator?
 		logger.log(
@@ -1530,8 +1421,8 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     */
 	    boolean serviceAllEvents = sendRefresh;
 	    if (sendRefresh) {
-		final Set<ChannelServer> channelServers =
-		    channel.getChannelServers();
+		final List<Long> channelServerNodeIds = 
+		    channel.getChannelServerNodeIds();
 		final BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
 		final String channelName = channel.name;
@@ -1542,24 +1433,23 @@ abstract class ChannelImpl implements Channel, Serializable {
 		ChannelServiceImpl.addChannelTask(
 		    channelRefId,
 		    new AbstractKernelRunnable() {
-			public void run() {
-			    for (ChannelServer server : channelServers) {
+		      public void run() {
+			for (long nodeId : channelServerNodeIds) {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server == null) continue;
+			    do {
 				try {
-				    server.refresh(channelName, channelIdBytes);
+				  server.refresh(channelName, channelIdBytes);
+				  break;
 				} catch (IOException e) {
-				    /*
-				     * It is possible that the channel server's
-				     * node is no longer running (because of
-				     * shutdown/crash), so ignore this exception
-				     * and continue.
-				     */
 				    logger.log(
-					Level.FINE,
-					"unable to contact server:{0}", server);
+				        Level.FINE,
+					"unable to contact server:{0}",
+					server);
 				}
-			    }
+			    } while (isAlive(nodeId));
 			}
-		    });
+		    }});
 		dataService.markForUpdate(this);
 		sendRefresh = false;
 	    }
@@ -1590,20 +1480,32 @@ abstract class ChannelImpl implements Channel, Serializable {
 		    }
 		}
 		event.serviceEvent(this);
-		
+
 	    } while (serviceAllEvents || --eventsToService > 0);
+	}
+
+	/* -- Implement ManagedObjectRemoval -- */
+
+	/** {@inheritDoc} */
+	public void removingObject() {
+	    try {
+		DataService dataService = ChannelServiceImpl.getDataService();
+		dataService.removeObject(queueRef.get());
+	    } catch (ObjectNotFoundException e) {
+		// already removed.
+	    }
 	}
     }
 
     /**
      * Represents an event on a channel.
      */
-    private static abstract class ChannelEvent
+    private abstract static class ChannelEvent
 	implements ManagedObject, Serializable
     {
 
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * Services this event, taken from the head of the given {@code
@@ -1615,7 +1517,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	 * Returns the cost of this event, which the {@code EventQueue}
 	 * may use to reject events when the total cost is too large.
 	 * The default implementation returns a cost of zero.
-	 * 
+	 *
 	 * @return the cost of this event
 	 */
 	int getCost() {
@@ -1628,7 +1530,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      */
     private static class JoinEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	private final byte[] sessionId;
 
@@ -1651,7 +1553,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		return;
 	    }
 	    final ChannelImpl channel = eventQueue.getChannel();
-	    if (! channel.addSession(session)) {
+	    if (!channel.addSession(session)) {
 		return;
 	    }
 	    final long nodeId = getNodeId(session);
@@ -1670,22 +1572,20 @@ abstract class ChannelImpl implements Channel, Serializable {
 		eventQueue.getChannelRefId(),
 		new AbstractKernelRunnable() {
 		    public void run() {
-		        try {
-			    server.join(channel.name, channel.channelId,
-					sessionId);
-			} catch (IOException e) {
-			    /*
-			     * If the channel server can't be contacted, it
-			     * has failed or is shut down, so there is no
-			     * need to contact it to update its membership
-			     * cache, so ignore this exception.
-			     */
-			    logger.logThrow(
-			        Level.FINE, e,
-				"unable to contact channel server:{0} to " +
-				"handle event:{1}", server, this);
-			}
-		    }});
+			do {
+			    try {
+				server.join(channel.name, channel.channelId,
+					    sessionId);
+				return;
+			    } catch (IOException e) {
+				logger.logThrow(
+			            Level.FINE, e,
+				    "unable to contact channel server:{0} to " +
+				    "handle event:{1}", server, this);
+			    }
+			} while (isAlive(nodeId));
+		    }
+		});
 	}
 
 	/** {@inheritDoc} */
@@ -1701,7 +1601,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      */
     private static class LeaveEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	private final byte[] sessionId;
 
@@ -1724,7 +1624,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 		return;
 	    }
 	    final ChannelImpl channel = eventQueue.getChannel();
-	    if (! channel.removeSession(session)) {
+	    if (!channel.removeSession(session)) {
 		return;
 	    }
 	}
@@ -1736,13 +1636,13 @@ abstract class ChannelImpl implements Channel, Serializable {
 		HexDumper.toHexString(sessionId);
 	}
     }
-    
+
     /**
      * A channel leaveAll event.
      */
     private static class LeaveAllEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * Constructs a leaveAll event.
@@ -1755,29 +1655,28 @@ abstract class ChannelImpl implements Channel, Serializable {
 
 	    final ChannelImpl channel = eventQueue.getChannel();
 	    channel.removeAllSessions();
-	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    final List<Long> channelServerNodeIds =
+		channel.getChannelServerNodeIds();
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
 		new AbstractKernelRunnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
+		  public void run() {
+		    for (long nodeId : channelServerNodeIds) {
+			ChannelServer server = getChannelServer(nodeId);
+			if (server == null) continue;
+			do {
 			    try {
 				server.leaveAll(channel.channelId);
+				break;
 			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted,
-				 * it has failed or is shut down, so there
-				 * is no need to contact it to update its
-				 * membership cache, so ignore this
-				 * exception and continue.
-				 */
 				logger.logThrow(
 				    Level.FINE, e,
 				    "unable to contact channel server:{0} " +
 				    "to handle event:{1}", server, this);
 			    }
-			}
-		    }});
+			} while (isAlive(nodeId));
+		    }
+		  }});
 	}
 
 	/** {@inheritDoc} */
@@ -1786,18 +1685,18 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    return getClass().getName();
 	}
     }
-    
+
     /**
      * A channel send event.
      */
     private static class SendEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	private final byte[] message;
 	/** The sender's session ID, or null. */
 	private final byte[] senderId;
-	
+
 	/**
 	 * Constructs a send event with the given {@code senderId} and
 	 * {@code message}.
@@ -1829,7 +1728,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    if (senderId != null) {
 		ClientSession sender =
 		    (ClientSession) getObjectForId(new BigInteger(1, senderId));
-		if (sender == null || ! channel.hasSession(sender)) {
+		if (sender == null || !channel.hasSession(sender)) {
 		    return;
 		}
 	    }
@@ -1837,34 +1736,31 @@ abstract class ChannelImpl implements Channel, Serializable {
 	     * Enqueue a channel task to forward the message to the
 	     * channel's servers for delivery.
 	     */
-	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    final List<Long> channelServerNodeIds =
+		channel.getChannelServerNodeIds();
 	    ChannelServiceImpl.addChannelTask(
 		eventQueue.getChannelRefId(),
 		new AbstractKernelRunnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
+		  public void run() {
+		    for (long nodeId : channelServerNodeIds) {
+			ChannelServer server = getChannelServer(nodeId);
+			if (server == null) continue;
+			do {
 			    try {
 				server.send(channel.channelId, message);
+				break;
 			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted, it
-				 * has failed or is shut down and the sessions
-				 * connected to that node have been
-				 * disconnected, so there is no need to contact
-				 * it to forward the message to its local
-				 * member sessions, so ignore this exception
-				 * and continue.
-				 */
 				logger.logThrow(
 				    Level.FINE, e,
 				    "unable to contact channel server:{0} " +
 				    "to handle event:{1}", server, this);
 			    }
-			    // TBD: need to update queue that all
-			    // channel servers have been notified of
-			    // the 'send'.
-			}
-		    }});
+			} while (isAlive(nodeId));
+		    }
+		    // TBD: need to update queue that all
+		    // channel servers have been notified of
+		    // the 'send'.
+		  }});
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -1882,7 +1778,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 
     /**
      * Returns the write buffer capacity for this channel.
-     * 
+     *
      * @return the write buffer capacity
      */
     int getWriteBufferCapacity() {
@@ -1894,7 +1790,7 @@ abstract class ChannelImpl implements Channel, Serializable {
      */
     private static class CloseEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * Constructs a close event.
@@ -1906,33 +1802,32 @@ abstract class ChannelImpl implements Channel, Serializable {
 	public void serviceEvent(EventQueue eventQueue) {
 
 	    final ChannelImpl channel = eventQueue.getChannel();
-	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    final List<Long> channelServerNodeIds =
+		channel.getChannelServerNodeIds();
 	    final BigInteger channelRefId = eventQueue.getChannelRefId();
 	    channel.removeChannel();
 	    ChannelServiceImpl.addChannelTask(
 		channelRefId,
 		new AbstractKernelRunnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
+		  public void run() {
+		    for (long nodeId : channelServerNodeIds) {
+			ChannelServer server = getChannelServer(nodeId);
+			if (server == null) continue;
+			do {
 			    try {
 				server.close(channel.channelId);
+				break;
 			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted,
-				 * it has failed or is shut down, so there
-				 * is no need to contact it to update its
-				 * membership cache, so ignore this
-				 * exception and continue.
-				 */
 				logger.logThrow(
 			            Level.FINE, e,
 				    "unable to contact channel server:{0} " +
 				    "to handle event:{1}", server, this);
 			    }
-			}
-			ChannelServiceImpl.getChannelService().
-			    closedChannel(channelRefId);
-		    }});
+			} while (isAlive(nodeId));
+		    }
+		    ChannelServiceImpl.getChannelService().
+			closedChannel(channelRefId);
+		  }});
 	}
 
 	/** {@inheritDoc} */
@@ -1941,7 +1836,7 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    return getClass().getName();
 	}
     }
-    
+
     /**
      * Returns the event queue for the channel that has the specified
      * {@code channelId} and coordinator {@code nodeId}.
@@ -1979,6 +1874,7 @@ abstract class ChannelImpl implements Channel, Serializable {
     static void handleChannelMessage(
 	BigInteger channelRefId, ClientSession session, ByteBuffer message)
     {
+	assert session instanceof ClientSessionWrapper;
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	if (channel != null) {
 	    channel.receivedMessage(session, message);
@@ -2004,67 +1900,206 @@ abstract class ChannelImpl implements Channel, Serializable {
 	    eventQueue.serviceEvent();
 	}
     }
-    
+
     /**
-     * Returns the next service bound name that starts with the given
-     * {@code prefix}, or {@code null} if there is none.
+     * Returns the next service bound name after the given {@code key} that
+     * starts with the given {@code prefix}, or {@code null} if there is none.
      */
     private static String nextServiceBoundNameWithPrefix(
-	DataService dataService, String prefix)
+ 	DataService dataService, String key, String prefix)
     {
-	String name = dataService.nextServiceBoundName(prefix);
+	String name = dataService.nextServiceBoundName(key);
 	return
 	    (name != null && name.startsWith(prefix)) ? name : null;
     }
 
     /**
-     * Removes the next client session for the specified {@code nodeId}
-     * from all channels that it is currently a member of and returns
-     * {@code true}.  If there is no client session for the specified
-     * {@code nodeId}, then {@code false} is returned.
+     * A persistent task to reassign channel coordinators on a failed node
+     * to another node. In a single task, only one failed coordinator is
+     * reassigned.  A task for one coordinator schedules a task for the
+     * next reassignment, if there are coordinators on the failed node left
+     * to be reassigned.
      */
-    static boolean removeNextSessionFromAllChannels(
-	DataService dataService, long nodeId)
+    static class ReassignCoordinatorsTask
+	implements Task, Serializable
     {
-	String key = nextServiceBoundNameWithPrefix(
-	    dataService, getChannelSetPrefix(nodeId));
-	if (key == null) {
-	    return false;
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The node ID of the failed node. */
+	private final long nodeId;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId} of the failed node.
+	 */
+	ReassignCoordinatorsTask(long nodeId) {
+	    this.nodeId = nodeId;
 	}
-	ChannelSet channelSet =
-	    (ChannelSet) dataService.getServiceBinding(key);
-	removeSessionFromAllChannels(nodeId, channelSet.sessionIdBytes);
-	return true;
+
+	/**
+	 * Reassigns the next coordinator for the {@code nodeId} to another
+	 * node with member sessions (or the local node if there are no
+	 * member sessions), schedules a task to remove failed sessions for
+	 * the channel, and then reschedules this task to reassign the next
+	 * coordinator.  If there are no more coordinators for the
+	 * specified {@code nodeId}, then no action is taken.
+	 */
+	public void run() {
+	    WatchdogService watchdogService =
+		ChannelServiceImpl.getWatchdogService();
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    TaskService taskService = ChannelServiceImpl.getTaskService();
+	    String prefix = getEventQueuePrefix(nodeId);
+	    String key = nextServiceBoundNameWithPrefix(
+ 		dataService, prefix, prefix);
+	    if (key == null) {
+		return;
+	    }
+	    EventQueue eventQueue =
+		(EventQueue) dataService.getServiceBinding(key);
+	    BigInteger channelRefId = eventQueue.getChannelRefId();
+	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
+	    if (channel != null) {
+		channel.reassignCoordinator(nodeId);
+		byte[] channelId = channel.channelId;
+		// Schedule a task to remove failed sessions for channel.
+		taskService.scheduleTask(
+		    new RemoveFailedSessionsFromChannelTask(
+			channelId, nodeId, channelRefId));
+		/*
+		 * If other channel servers have failed, remove their
+		 * sessions too.  This covers the case where a channel
+		 * coordinator (informed of a node failure) fails before it
+		 * has a chance to schedule a task to remove member
+		 * sessions for another failed node (cascading failure
+		 * during recovery).
+		 */
+		for (long serverNodeId : channel.servers) {
+		    if (serverNodeId != nodeId) {
+			Node serverNode = watchdogService.getNode(serverNodeId);
+			if (serverNode == null || !serverNode.isAlive()) {
+			    taskService.scheduleTask(
+			        new RemoveFailedSessionsFromChannelTask(
+				    channelId, serverNodeId, channelRefId));
+			}
+		    }
+		}
+	    } else {
+		// channel removed, so just remove the service binding.
+		dataService.removeServiceBinding(key);
+	    }
+	    // Schedule a task to reassign the next channel coordinator.
+	    taskService.scheduleTask(this);
+	}
     }
 
     /**
-     * Reassigns the next coordinator for the specified {@code nodeId} to
-     * another node with member sessions, or the local node if there are no
-     * member sessions and returns {@code true}.  If there is no
-     * coordinator for the specified {@code nodeId}, then {@code false} is
-     * returned. 
+     * A persistent task to remove sessions, connected to a failed node,
+     * from locally coordinated channels.  This task handles a single
+     * locally-coordinated channel, and then schedules another task to
+     * handle the next one.
      */
-    static boolean reassignNextCoordinator(
-	DataService dataService, long nodeId)
+    static class RemoveFailedSessionsFromLocalChannelsTask
+	implements Task, Serializable
     {
-	String key = nextServiceBoundNameWithPrefix(
-	    dataService, getEventQueuePrefix(nodeId));
-	if (key == null) {
-	    return false;
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private String localNodePrefix;
+	private String eventQueueKey;
+	private final long failedNodeId;
+
+	/**
+	 * Constructs an instance with the specified {@code localNodeId}
+	 * and {@code failedNodeId}.
+	 */
+	RemoveFailedSessionsFromLocalChannelsTask(
+	    long localNodeId, long failedNodeId)
+	{
+	    this.localNodePrefix = getEventQueuePrefix(localNodeId);
+	    this.eventQueueKey = this.localNodePrefix;
+	    this.failedNodeId = failedNodeId;
 	}
-	EventQueue eventQueue =
-	    (EventQueue) dataService.getServiceBinding(key);
-	BigInteger channelRefId = eventQueue.getChannelRefId();
-	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	if (channel != null) {
-	    channel.reassignCoordinator(nodeId);
-	} else {
-	    // channel removed, so just remove the service binding.
-	    dataService.removeServiceBinding(key);
+
+	/**
+	 * Finds the next locally-coordinated channel and schedules a
+	 * task to remove the failed sessions from that channel, and
+	 * reschedules this task to handle the next locally-coordinated
+	 * channel. If there are no more locally-coordinated channels,
+	 * then this task takes no action.
+	 */
+	public void run() {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    TaskService taskService = ChannelServiceImpl.getTaskService();
+	    eventQueueKey = nextServiceBoundNameWithPrefix(
+		dataService, eventQueueKey, localNodePrefix);
+	    if (eventQueueKey != null) {
+		BigInteger channelRefId =
+		    getLastComponentAsBigInteger(eventQueueKey);
+		taskService.scheduleTask(
+		    new RemoveFailedSessionsFromChannelTask(
+			    channelRefId.toByteArray(), failedNodeId,
+			    channelRefId));
+		    
+		// Schedule a task to remove failed sessions from next
+		// locally coordinated channel.
+		taskService.scheduleTask(this);
+	    }
 	}
-	return true;
     }
 
+    /**
+     * A persistent task to remove all failed sessions (specified by the
+     * {@code sessionPrefix} on a given node for a channel.  In a single
+     * task, only one failed session is removed from the channel.  A task
+     * for one session schedules a task for the next session to be removed
+     * if there are sessions left to be removed.
+     */
+    private static class RemoveFailedSessionsFromChannelTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private final String sessionPrefix;
+	private String sessionKey;
+	private final BigInteger channelRefId;
+	private final long failedNodeId;
+
+	/** Constructs an instance. */
+	RemoveFailedSessionsFromChannelTask(
+ 	    byte[] channelId, long failedNodeId, BigInteger channelRefId)
+	{
+	    this.sessionPrefix = getSessionNodePrefix(channelId, failedNodeId);
+	    this.sessionKey = sessionPrefix;
+	    this.channelRefId = channelRefId;
+	    this.failedNodeId = failedNodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    sessionKey =
+		nextServiceBoundNameWithPrefix(
+		    dataService, sessionKey, sessionPrefix);
+	    if (sessionKey != null) {
+		ChannelImpl channel =
+		    (ChannelImpl) getObjectForId(channelRefId);
+		if (channel != null) {
+		    BigInteger sessionRefId =
+			getLastComponentAsBigInteger(sessionKey);
+		    channel.removeSession(
+			failedNodeId, sessionRefId.toByteArray());
+		} else {
+		    // This shouldn't happen, but remove the binding anyway.
+		    channel.removeSessionBinding(sessionKey);
+		}	
+		ChannelServiceImpl.getTaskService().scheduleTask(this);
+	    }
+	}
+    }
+    
     /**
      * Returns a set containing session identifiers (as obtained by
      * {@link ManagedReference#getId ManagedReference.getId}) for all
@@ -2080,15 +2115,22 @@ abstract class ChannelImpl implements Channel, Serializable {
 	if (channel != null) {
 	    for (String sessionKey :
 		     BoundNamesUtil.getServiceBoundNamesIterable(
-			dataService, channel.getSessionNodePrefix(nodeId)))
+			dataService,
+			channel.getSessionNodePrefix(channel.channelId, nodeId)))
 	    {
-		int index = sessionKey.lastIndexOf('.');
-		sessionKey = sessionKey.substring(index + 1);
-		// convert to BigInteger
-		BigInteger sessionRefId = new BigInteger(sessionKey, 16);
+		BigInteger sessionRefId =
+		    getLastComponentAsBigInteger(sessionKey);
 		members.add(sessionRefId);
 	    }
 	}
 	return members;
+    }
+
+    /**
+     * Returns the last component of the given {@code key} as a BigInteger.
+     */
+    private static BigInteger getLastComponentAsBigInteger(String key) {
+	int index = key.lastIndexOf('.');
+	return new BigInteger(key.substring(index + 1), 16);
     }
 }

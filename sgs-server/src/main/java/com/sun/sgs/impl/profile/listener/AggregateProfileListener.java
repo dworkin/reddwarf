@@ -211,6 +211,7 @@ public class AggregateProfileListener implements ProfileListener {
     /** {@inheritDoc} */
     public void shutdown() {
         handle.cancel();
+        networkReporter.shutdown();
     }
 
     /**
