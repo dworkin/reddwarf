@@ -36,7 +36,7 @@ public interface ProfileSample {
      *
      * @return the counter's name
      */
-    public String getSampleName();
+    String getSampleName();
 
     /**
      * Returns whether this is a task-local list of samples.
@@ -44,13 +44,13 @@ public interface ProfileSample {
      * @return <code>true</code> if this counter is task-local,
      *         <code>false</code> if this counter is aggregated
      */
-    public boolean isTaskLocal();
+    boolean isTaskLocal();
 
     /**
      * Adds a new sample to the end of the current list of samples.
      *
      * @param value the amount to increment the counter
      */
-    public void addSample(long value);
+    void addSample(long value);
     
 }

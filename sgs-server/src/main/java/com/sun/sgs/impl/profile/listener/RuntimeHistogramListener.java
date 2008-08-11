@@ -29,7 +29,6 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -51,7 +50,6 @@ import java.util.Properties;
  * application properties file.  The default window size for this
  * class is {@code 5000}.
  *
- * @see ProfileProperties
  */
 public class RuntimeHistogramListener implements ProfileListener {
 
@@ -93,13 +91,15 @@ public class RuntimeHistogramListener implements ProfileListener {
      *
      */
     public RuntimeHistogramListener(Properties properties, Identity owner,
-                                    ComponentRegistry registry) {
+                                    ComponentRegistry registry) 
+    {
   	taskCount = 0;
 	lifetimeHistogram = new PowerOfTwoHistogram();
 	windowHistogram = new PowerOfTwoHistogram();
 
 	windowSize = new PropertiesWrapper(properties).
-	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+	    getIntProperty(ProfileListener.WINDOW_SIZE_PROPERTY, 
+                           DEFAULT_WINDOW_SIZE);
     }
 
     /**
@@ -119,8 +119,9 @@ public class RuntimeHistogramListener implements ProfileListener {
      */
     public void report(ProfileReport profileReport) {
 
-	if (!profileReport.wasTaskSuccessful())
+	if (!profileReport.wasTaskSuccessful()) {
 	    return;
+        }
 
 	long count = ++taskCount;
 

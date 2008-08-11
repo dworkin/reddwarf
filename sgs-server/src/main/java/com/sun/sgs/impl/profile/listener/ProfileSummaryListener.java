@@ -23,7 +23,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -57,7 +56,6 @@ import java.util.Properties;
  * Note that the mean runtime, max, mean lag time, mean throughput, and mean
  * latency reports only apply to successful tasks.
  *
- * @see ProfileProperties
  */
 public class ProfileSummaryListener implements ProfileListener {
 
@@ -121,13 +119,14 @@ public class ProfileSummaryListener implements ProfileListener {
      *
      */
     public ProfileSummaryListener(Properties properties, Identity owner,
-                                  ComponentRegistry registry) {
+                                  ComponentRegistry registry) 
+    {
 
 	lastWindowStart = System.currentTimeMillis();
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	windowSize = wrappedProps.getIntProperty(
-	    ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+	    ProfileListener.WINDOW_SIZE_PROPERTY, DEFAULT_WINDOW_SIZE);
 	average = wrappedProps.getIntProperty(
 	    AVERAGE_PROPERTY, DEFAULT_AVERAGE);
 
@@ -163,13 +162,13 @@ public class ProfileSummaryListener implements ProfileListener {
 
 	    runTime += r;
 
-	    if (r > maxRunTime)
+	    if (r > maxRunTime) {
 		maxRunTime = r;
+            }
 
 	    lagTimeSum += (profileReport.getActualStartTime() -
 			   profileReport.getScheduledStartTime());
-	}
-	else {
+	} else {
 	    failedCount++;
 	}
 	
@@ -183,8 +182,8 @@ public class ProfileSummaryListener implements ProfileListener {
 	    double meanFailed = (failedCount * 100) / (double) taskCount;
 	    double meanReadyCount = readyCountSum / (double) taskCount;
 	    double meanLagTime = lagTimeSum / successful;
-	    double meanThroughput =
-		(successful*1000) / (double) (windowEndTime - lastWindowStart);
+	    double meanThroughput = (successful * 1000) / 
+                                    (double) (windowEndTime - lastWindowStart);
 	    double meanLatency = (runTime + lagTimeSum) / successful;
 
 	    maRunTime.add(meanRunTime);
@@ -194,15 +193,15 @@ public class ProfileSummaryListener implements ProfileListener {
 	    maThroughput.add(meanThroughput);
 	    maLatency.add(meanLatency);
 
-	    System.out.printf("past %d tasks:%n"
-			      + "  mean runtime: %4.2fms,"
-			      + "  max: %6dms,"
-			      + "  failed: %d (%2.2f%%)" 
-			      + "%n  mean ready count: %.2f,"
-			      + "  mean lag time: %.2fms"
-			      + "%n  mean tasks running concurrently: %.2f"
-			      + "%n  mean throughput: %.2f txn/sec,"
-			      + "  mean latency: %.2f ms/txn%n",
+	    System.out.printf("past %d tasks:%n" +
+			      "  mean runtime: %4.2fms," +
+			      "  max: %6dms," +
+			      "  failed: %d (%2.2f%%)" +
+			      "%n  mean ready count: %.2f," +
+			      "  mean lag time: %.2fms" +
+			      "%n  mean tasks running concurrently: %.2f" +
+			      "%n  mean throughput: %.2f txn/sec," +
+			      "  mean latency: %.2f ms/txn%n",
 			      taskCount, 
 			      meanRunTime,
 			      maxRunTime, 
@@ -210,18 +209,18 @@ public class ProfileSummaryListener implements ProfileListener {
 			      meanFailed,
 			      meanReadyCount,
 			      meanLagTime,
-			      ((double)runTime / 
-			       (double)(windowEndTime - lastWindowStart)),	
+			      ((double) runTime / 
+			       (double) (windowEndTime - lastWindowStart)),	
 			      meanThroughput,
 			      meanLatency
 		);
-	    System.out.printf("past %d tasks:%n"
-			      + "  mean runtime: %4.2fms,"
-			      + "  failed: %2.2f%%"
-			      + "%n  mean ready count: %.2f,"
-			      + "  mean lag time: %.2fms"
-			      + "%n  mean throughput: %.2f txn/sec,"
-			      + "  mean latency: %.2f ms/txn%n",
+	    System.out.printf("past %d tasks:%n" +
+			      "  mean runtime: %4.2fms," +
+			      "  failed: %2.2f%%" +
+			      "%n  mean ready count: %.2f," +
+			      "  mean lag time: %.2fms" +
+			      "%n  mean throughput: %.2f txn/sec," +
+			      "  mean latency: %.2f ms/txn%n",
 			      maRunTime.count() * taskCount, 
 			      maRunTime.average(),
 			      maFailed.average(),

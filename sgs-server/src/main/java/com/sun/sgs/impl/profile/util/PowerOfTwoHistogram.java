@@ -29,7 +29,7 @@ public class PowerOfTwoHistogram implements Histogram {
      * the longest bar in the histogram
      */
     // REMINDER: should this be a configurable option?
-    private final static int MAX_HIST_LENGTH = 40;	
+    private static final int MAX_HIST_LENGTH = 40;	
 
     /**
      * The bins for the histogram, which contain the current count
@@ -79,24 +79,28 @@ public class PowerOfTwoHistogram implements Histogram {
      * counted.
      */
     public void bin(long value) {
-	if (value < 0)
+	if (value < 0) {
 	    return;
+        }
 	
-	int bin = 0, count;
+	int bin = 0;
 
 	// skip the special cases: bin 0 is for zero values.
  	if (value != 0) {
  	    int i = 0;
- 	    while (value > (1 << (i+1))) 
+ 	    while (value > (1 << (i + 1))) {
 		++i;
+            }
 	    bin = i + 1; // 0 index is for 0 values
  	}
 	
 	maxIndex = Math.max(maxIndex, bin);
 	minIndex = Math.min(minIndex, bin);
 	
-	if ((count = bins[bin]++) > maxCount)
-	    maxCount = count;       
+        int count = bins[bin]++;
+	if (count > maxCount) {
+	    maxCount = count;      
+        }
 
 	size++;
     }
@@ -105,8 +109,9 @@ public class PowerOfTwoHistogram implements Histogram {
      * {@inheritDoc}
      */
     public void clear() {
-	for (int i = 0; i < bins.length; ++i) 
+	for (int i = 0; i < bins.length; ++i) {
 	    bins[i] = 0;
+        }
 	maxIndex = Integer.MIN_VALUE;
 	minIndex = Integer.MAX_VALUE;
 	maxCount = 0;
@@ -167,22 +172,25 @@ public class PowerOfTwoHistogram implements Histogram {
 
 	    // special case for the 0 index, as it represents values
 	    // of 0 and therefore can't be shifted for its real value
-	    String n = (i == 0) ? "0" : Integer.toString(1 << (i-1));
+	    String n = (i == 0) ? "0" : Integer.toString(1 << (i - 1));
 
 	    // make the bars all line up evenly by padding with spaces	    
-	    for (int j = n.length(); j < maxLength; ++j)
+	    for (int j = n.length(); j < maxLength; ++j) {
 		b.append(" ");
+            }
 	    b.append(n).append(binLabel).append(" |");
 
 	    // scale the bar length relative to the max
-	    int bars = (int)((bins[i] / (double)maxCount) * MAX_HIST_LENGTH);
+	    int bars = (int) ((bins[i] / (double) maxCount) * MAX_HIST_LENGTH);
 
 	    // bump all non-empty buckets by one, so we can tell the
 	    // difference
-	    if (bins[i] > 0) 
+	    if (bins[i] > 0) {
 		bars++;
-	    for (int j = 0; j < bars; ++j)
+            }
+	    for (int j = 0; j < bars; ++j) {
 		b.append("*");
+            }
 	    b.append("\n");
 	}
 	return b.toString();
