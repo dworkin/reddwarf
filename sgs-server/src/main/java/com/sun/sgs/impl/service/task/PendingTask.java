@@ -37,8 +37,9 @@ import java.io.Serializable;
  * have not yet run to completion or been dropped. This class maintains all
  * of the meta-data associated with these pending tasks, and if needed, makes
  * sure that the {@code Task} itself is persisted. This meta-data classs
- * can be flagged as available, so that a single instance can be persisted
- * and then re-used as needed.
+ * can be flagged as re-usable, so that a single instance can be persisted
+ * and then re-used as needed, although a given instance must always be
+ * re-used for tasks for the same {@code Identity}.
  */
 class PendingTask implements ManagedObject, Serializable {
 
@@ -121,10 +122,16 @@ class PendingTask implements ManagedObject, Serializable {
         return reusable;
     }
 
-    /** Sets this {@code PendingTask} as free for re-use. */
+    /** Re-sets the task state so that the task can be re-used. */
     void setReusable() {
         AppContext.getDataManager().markForUpdate(this);
         reusable = true;
+        task = null;
+        taskRef = null;
+        taskType = null;
+        startTime = 0;
+        period = TaskServiceImpl.PERIOD_NONE;
+        runningNode = -1;
     }
 
     /** Returns the type of the pending task. */
