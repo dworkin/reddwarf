@@ -19,15 +19,19 @@
 
 package com.sun.sgs.test.impl.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.AbstractService;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 
+import java.io.IOException;
 import java.util.Properties;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
@@ -45,6 +49,12 @@ public class TestAbstractService extends TestCase {
     
     private SgsTestNode serverNode = null;
 
+    /** The transaction scheduler. */
+    private TransactionScheduler txnScheduler;
+
+    /** The owner for tasks I initiate. */
+    private Identity taskOwner;
+
     /** Creates an instance. */
     public TestAbstractService(String name) {
 	super(name);
@@ -54,6 +64,10 @@ public class TestAbstractService extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	serverNode = new SgsTestNode("TestAbstractSevice", null,  null);
+	txnScheduler = 
+            serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        taskOwner = serverNode.getProxy().getCurrentOwner();
     }
 
     /** Shuts down the server node. */
@@ -136,7 +150,9 @@ public class TestAbstractService extends TestCase {
 	service.checkHandleServiceVersionMismatchInvoked(true);
     }
     
-    public void testHandleServiceVersionMismatchThrowsRuntimeException() throws Exception {
+    public void testHandleServiceVersionMismatchThrowsRuntimeException()
+	throws Exception
+    {
 	DummyService service = createDummyService();
 	    
 	service.callCheckServiceVersion(1, 0, null);
@@ -179,6 +195,82 @@ public class TestAbstractService extends TestCase {
 	}
 
 	service.checkHandleServiceVersionMismatchInvoked(true);
+    }
+
+    public void testRunIoTaskInTransaction() throws Exception {
+	final DummyService service = createDummyService();
+	final IoRunnableImpl ioTask = new IoRunnableImpl(0);
+	try {
+	    txnScheduler.runTask(new AbstractKernelRunnable() {
+		public void run() {
+		    service.runIoTask(ioTask, serverNode.getNodeId());
+		}}, taskOwner);
+	    fail("expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println("caught IllegalStateException");
+	}
+    }
+    
+    public void testRunIoTaskThatThrowsNoExceptions() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(0);
+	service.runIoTask(ioTask, serverNode.getNodeId());
+	assertEquals(ioTask.runCount, 1);
+    }
+
+    public void testRunIoTaskThatThrowsIOException() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(4);
+	service.runIoTask(ioTask, serverNode.getNodeId());
+	assertEquals(ioTask.runCount, 5);
+    }
+
+    public void testRunIoTaskThatThrowsRuntimeException() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(new MyRuntimeException());
+	try {
+	    service.runIoTask(ioTask, serverNode.getNodeId());
+	    fail("expected MyRuntimeException to be thrown");
+	} catch (MyRuntimeException e) {
+	    System.err.println("caught MyRuntimeException");
+	}
+    }
+    
+    public void testRunIoTaskToFailedNode() throws Exception {
+	DummyService service = createDummyService();
+	IoRunnableImpl ioTask = new IoRunnableImpl(1);
+	service.runIoTask(ioTask, serverNode.getNodeId() + 1);
+	assertEquals(ioTask.runCount, 1);
+    }
+
+    private static class MyRuntimeException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
+    }
+
+    private static class IoRunnableImpl implements IoRunnable {
+
+	int runCount = 0;
+	private int exceptionCount;
+	private final RuntimeException exception;
+
+	IoRunnableImpl(int exceptionCount) {
+	    this.exceptionCount = exceptionCount;
+	    this.exception = null;
+	}
+
+	IoRunnableImpl(RuntimeException exception) {
+	    this.exception = exception;
+	}
+	
+	public void run() throws IOException {
+	    if (exception != null) {
+		throw exception;
+	    }
+	    runCount++;
+	    if (exceptionCount-- > 0) {
+		throw new IOException();
+	    }
+	}
     }
     
     private DummyService createDummyService() {

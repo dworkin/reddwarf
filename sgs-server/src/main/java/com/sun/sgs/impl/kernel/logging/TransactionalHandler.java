@@ -41,10 +41,10 @@ import java.util.logging.LogRecord;
  * A {@code Handler} implementation that given a backing {@code
  * Handler}, provides transactional semantics for the {@code
  * #publish(LogRecord)} method.  This class is used by the {@link
- * LoggingServiceImpl} to wrap existing handlers as specificed by the
- * application.
+ * TransactionAwareLogManager} to wrap existing handlers as specificed
+ * by the application.
  *
- * @see com.sun.sgs.impl.kernel.logging.TransactionAwareLoggingComponent
+ * @see com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager
  */
 public class TransactionalHandler extends Handler
     implements NonDurableTransactionParticipant {
