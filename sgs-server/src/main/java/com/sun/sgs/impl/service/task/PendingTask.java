@@ -196,6 +196,8 @@ class PendingTask implements ManagedObject, Serializable {
     boolean isTaskAvailable() {
         if (task != null)
             return true;
+        if (taskRef == null)
+          return false;
         try {
             taskRef.get();
             return true;
