@@ -68,11 +68,11 @@ import java.util.Properties;
 public class SnapshotProfileListener implements ProfileListener {
 
     // the number of successful tasks and the total number of tasks
-    private volatile long successCount = 0;
-    private volatile long totalCount = 0;
+    private long successCount = 0;
+    private long totalCount = 0;
 
     // the total number of ready tasks observed
-    private volatile int readyCount = 0;
+    private int readyCount = 0;
 
     // lock object for data above, used to ensure that during reporting no
     // one is looking at the data, since it gets cleared after the report

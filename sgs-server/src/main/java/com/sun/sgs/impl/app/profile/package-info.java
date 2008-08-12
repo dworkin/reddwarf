@@ -18,6 +18,6 @@
  */
 
 /**
- * Provides an implementations for profiling application managers.
+ * Provides manager implementations that support profiling.
  */
 package com.sun.sgs.impl.app.profile;
