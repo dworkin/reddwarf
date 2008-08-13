@@ -86,27 +86,6 @@ public class TestScalableLinkedHashMap extends Assert {
     /** A fixed random number generator for use in the test. */
     private static final Random RANDOM = new Random(1337);
 
-    /** The four argument constructor. */
-    private static final Constructor<ScalableLinkedHashMap>
-	scalableHashMapConstructor = getConstructor(
-	    ScalableLinkedHashMap.class, int.class, int.class, int.class, int.class);
-
-    /** The findMinDepthFor method. */
-    private static final Method findMinDepthFor =
-	getMethod(ScalableLinkedHashMap.class, "findMinDepthFor", int.class);
-
-    /** The getMinTreeDepth method. */
-    private static final Method getMinTreeDepth =
-	getMethod(ScalableLinkedHashMap.class, "getMinTreeDepth");
-
-    /** The getMaxTreeDepth method. */
-    private static final Method getMaxTreeDepth =
-	getMethod(ScalableLinkedHashMap.class, "getMaxTreeDepth");
-
-    /** The getAvgTreeDepth method. */
-    private static final Method getAvgTreeDepth =
-	getMethod(ScalableLinkedHashMap.class, "getAvgTreeDepth");
-
     /**
      * Test management.
      */
@@ -124,93 +103,72 @@ public class TestScalableLinkedHashMap extends Assert {
 	serverNode.shutdown(true);
     }
 
-    /*
-     * Test no arg constructor
-     */
-
-    @Test public void testConstructorNoArg() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap test =
-			new ScalableLinkedHashMap<Integer,Integer>();
-		    assertEquals(6, getMaxTreeDepth(test));
-		    assertEquals(6, getMaxTreeDepth(test));
-		    dataService.setBinding("test", test);
-		}
-	    }, taskOwner);
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap test =
-			(ScalableLinkedHashMap) dataService.getBinding("test");
-		    assertEquals(6, getMaxTreeDepth(test));
-		    assertEquals(6, getMinTreeDepth(test));
-		}
-	    }, taskOwner);
-    }
-
-    /*
-     * Test minimum concurrency constructor
-     */
-
-    @Test public void testConstructorOneArgDepth() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(1);
-		    assertEquals(1, getMaxTreeDepth(test));
-		    assertEquals(1, getMinTreeDepth(test));
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testConstructorOneArgDepth3() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(3);
-		    assertEquals(3, getMaxTreeDepth(test));
-		    assertEquals(3, getMinTreeDepth(test));
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testConstructorOneArgDepth4() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(5);
-		    assertEquals(4, getMaxTreeDepth(test));
-		    assertEquals(4, getMinTreeDepth(test));
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testConstructorOneArgWithZeroMaxConcurrencyException()
-	throws Exception
-    {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    try {
-			new ScalableLinkedHashMap<Integer,Integer>(0);
-			fail("Expected IllegalArgumentException");
-		    } catch (IllegalArgumentException iae) {
-		    }
-		}
-	    }, taskOwner);
-    }
 
     // NOTE: we do not test the maximum concurrency in the
     // constructor, as this would take far too long to test (hours).
 
     /*
-     * Test copy constructor
+     * Test constructors
      */
+
+    @Test public void testNoArgConstructor() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>();
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testAccessOrderConstructor() 
+	throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+		    ScalableLinkedHashMap<Integer,Integer> test2 =
+			new ScalableLinkedHashMap<Integer,Integer>(false);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testMinConcurrencyConstructor() 
+	throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(32);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testNegativeMinConcurrencyConstructor() 
+	throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    try {
+			ScalableLinkedHashMap<Integer,Integer> test =
+			    new ScalableLinkedHashMap<Integer,Integer>(-1);
+			fail("Expected IllegalArgumentException");
+		    } catch(IllegalArgumentException iae) {
+		    }
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testTwoArgConstructor() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(false, 32);
+		}
+	    }, taskOwner);
+    }
 
     @Test public void testCopyConstructor() throws Exception {
 	final Map<Integer,Integer> control = new HashMap<Integer,Integer>();
@@ -249,69 +207,6 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
-    /*
-     * Test non-public constructor
-     */
-
-    @Test public void testMultiParamConstructor() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    createScalableLinkedHashMap(Integer.class, Integer.class,
-					  1, 32, 5);
-		    createScalableLinkedHashMap(Integer.class, Integer.class,
-					  1, 32, 4);
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testMultiParamConstructorBadMinConcurrency()
-	throws Exception
-    {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    try {
-			createScalableLinkedHashMap(Integer.class, Integer.class,
-					      0, 1, 5);
-			fail("Expected IllegalArgumentException");
-		    } catch(IllegalArgumentException iae) {
-		    }
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testMultiParamConstructorBadSplitThreshold()
-	throws Exception
-    {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    try {
-			createScalableLinkedHashMap(Integer.class, Integer.class,
-					      1, 0, 5);
-			fail("Expected IllegalArgumentException");
-		    } catch (IllegalArgumentException iae) {
-		    }
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testMultiParamConstructorBadDirectorySize()
-	throws Exception
-    {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    try {
-			createScalableLinkedHashMap(Integer.class, Integer.class,
-					      1, 32, -1);
-			fail("Expected IllegalArgumentException");
-		    } catch (IllegalArgumentException iae) {
-		    }
-		}
-	    }, taskOwner);
-    }
 
     /*
      * Test putAll
@@ -391,8 +286,9 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
+    
     /*
-     * Test put
+     * Test put()
      */
 
     @Test public void testPutMisc() throws Exception {
@@ -1345,9 +1241,9 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
-    /*
-     * Test clear
-     */
+     /*
+      * Test clear
+      */
 
     @Test public void testClear() throws Exception {
 	txnScheduler.runTask(
@@ -1368,20 +1264,12 @@ public class TestScalableLinkedHashMap extends Assert {
 		    }
 		    
 		    assertEquals(control, test);
-
-		    LinkedDoneRemoving.init();
 		    test.clear();
 		    control.clear();
-
-		    /*
-		     * XXX: Test that clear does not change the minimum depth.
-		     * -tjb@sun.com (10/04/2007)
-		     */
 
 		    assertEquals(control, test);
 		}
 	    }, taskOwner);
-	LinkedDoneRemoving.await(1);
     }
 
     @SuppressWarnings("unchecked")
@@ -1392,14 +1280,13 @@ public class TestScalableLinkedHashMap extends Assert {
 		public void run() throws Exception {
 		    ScalableLinkedHashMap<Integer,Integer> test =
 			new ScalableLinkedHashMap<Integer,Integer>();
-		    LinkedDoneRemoving.init();
 		    test.clear();
 		    assertEquals(control, test);
 
 		    dataService.setBinding("test", test);
 		    }
 	    }, taskOwner);
-	LinkedDoneRemoving.await(1);
+
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
@@ -1415,7 +1302,7 @@ public class TestScalableLinkedHashMap extends Assert {
 		    assertEquals(control, test);
 		}
 	    }, taskOwner);
-	LinkedDoneRemoving.await(1);
+
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
@@ -1432,7 +1319,6 @@ public class TestScalableLinkedHashMap extends Assert {
 		    assertEquals(control, test);
 		}
 	    }, taskOwner);
-	LinkedDoneRemoving.await(1);
     }
 
     /*
@@ -1973,7 +1859,7 @@ public class TestScalableLinkedHashMap extends Assert {
      * Test size
      */
 
-    @Test public void testLeafSize() throws Exception {
+    @Test public void testSize() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
@@ -2009,132 +1895,9 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
-    @Test public void testLeafSizeAfterRemove() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>();
-
-		    int SAMPLE_SIZE = 10;
-
-		    int[] inputs1 = new int[SAMPLE_SIZE];
-		    int[] inputs2 = new int[SAMPLE_SIZE];
-		    int[] inputs3 = new int[SAMPLE_SIZE];
-
-		    for (int i = 0; i < inputs1.length; i++) {
-			inputs1[i] = RANDOM.nextInt();
-			inputs2[i] = RANDOM.nextInt();
-			inputs3[i] = RANDOM.nextInt();
-		    }
-
-		    for (int i = 0; i < inputs1.length; i++) {
-			test.put(inputs1[i], inputs1[i]);
-			test.put(inputs2[i], inputs2[i]);
-			assertEquals(test.size(), (i+1)*2);
-		    }
-
-		    for (int i = 0; i < inputs1.length; i++) {
-			int beforeSize = test.size();
-			test.put(inputs3[i], inputs3[i]);
-			test.remove(inputs2[i]);
-			assertEquals(beforeSize, test.size());
-		    }
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testTreeSizeOnSplitTree() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    // create a tree with an artificially small leaf size
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-
-		    assertEquals(0, test.size());
-
-		    for (int i = 0; i < 5; i++) {
-			test.put(i, i);
-		    }
-
-		    assertEquals(5, test.size());
-
-		    for (int i = 5; i < 15; i++) {
-			test.put(i,i);
-		    }
-
-		    assertEquals(15, test.size());
-
-		    for (int i = 15; i < 31; i++) {
-			test.put(i,i);
-		    }
-
-		    assertEquals(31, test.size());
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testTreeSizeOnSplitTreeWithRemovals() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    // create a tree with an artificially small leaf size
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-
-		    assertEquals(0, test.size());
-
-		    int[] inserts = new int[128];
-		    for (int i = 0; i < inserts.length; i++) {
-			inserts[i] = RANDOM.nextInt();
-		    }
-
-		    // add 32
-		    for (int i = 0; i < 32; i++) {
-			test.put(inserts[i], inserts[i]);
-		    }
-
-		    assertEquals(32, test.size());
-
-		    // remove 10
-		    for (int i = 0; i < 10; i++) {
-			test.remove(inserts[i]);
-		    }
-
-		    assertEquals(22, test.size());
-
-		    // add 32
-		    for (int i = 32; i < 64; i++) {
-			test.put(inserts[i],inserts[i]);
-		    }
-
-		    assertEquals(54, test.size());
-
-		    // remove 10
-		    for (int i = 32; i < 42; i++) {
-			test.remove(inserts[i]);
-		    }
-
-		    // add 64
-		    for (int i = 64; i < 128; i++) {
-			test.put(inserts[i],inserts[i]);
-		    }
-
-		    assertEquals(108, test.size());
-
-		    // remove 5
-		    for (int i = 64; i < 69; i++) {
-			test.remove(inserts[i]);
-		    }
-		    assertEquals(103, test.size());
-		}
-	    }, taskOwner);
-    }
-
-    /*
-     * Test iterators
-     */
+     /*
+      * Test iterators
+      */
 
     @Test public void testIteratorRemove() throws Exception {
 	txnScheduler.runTask(
@@ -2231,98 +1994,6 @@ public class TestScalableLinkedHashMap extends Assert {
 	}
     }
 
-    @Test public void testIteratorOnSplitTree() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Set<Integer> control = new HashSet<Integer>();
-
-		    // get from outside the range of the put
-		    for (int i = 0; i < 33; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j,j);
-			control.add(j);
-		    }
-
-		    for (Integer i : test.keySet()) {
-			control.remove(i);
-		    }
-
-		    assertEquals(0, control.size());
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testIteratorOnSplitTreeWithRemovals() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    // create a tree with an artificially small leaf size
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    HashMap<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
-		    assertEquals(0, test.size());
-
-		    int[] inserts = new int[128];
-		    for (int i = 0; i < inserts.length; i++) {
-			inserts[i] = RANDOM.nextInt();
-		    }
-
-		    // add 32
-		    for (int i = 0; i < 32; i++) {
-			test.put(inserts[i], inserts[i]);
-			control.put(inserts[i], inserts[i]);
-		    }
-
-		    assertEquals(control, test);
-
-		    // remove 10
-		    for (int i = 0; i < 10; i++) {
-			test.remove(inserts[i]);
-			control.remove(inserts[i]);
-		    }
-
-		    assertEquals(control, test);
-
-		    // add 32
-		    for (int i = 32; i < 64; i++) {
-			test.put(inserts[i],inserts[i]);
-			control.put(inserts[i],inserts[i]);
-		    }
-
-		    assertEquals(control, test);
-
-		    // remove 10
-		    for (int i = 32; i < 42; i++) {
-			test.remove(inserts[i]);
-			control.remove(inserts[i]);
-		    }
-
-		    assertEquals(control, test);
-
-		    // add 64
-		    for (int i = 64; i < 128; i++) {
-			test.put(inserts[i],inserts[i]);
-			control.put(inserts[i],inserts[i]);
-		    }
-
-		    assertEquals(control, test);
-
-		    // remove 5
-		    for (int i = 64; i < 69; i++) {
-			test.remove(inserts[i]);
-			control.remove(inserts[i]);
-		    }
-
-		    assertEquals(control, test);
-		}
-	    }, taskOwner);
-    }
-
     @Test public void testKeyIterator() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
@@ -2333,29 +2004,6 @@ public class TestScalableLinkedHashMap extends Assert {
 
 		    // get from outside the range of the put
 		    for (int i = 0; i < 100; i++) {
-			test.put(i,i);
-			control.add(i);
-		    }
-
-		    for (Integer i : test.keySet()) {
-			control.remove(i);
-		    }
-
-		    assertEquals(0, control.size());
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testKeyIteratorOnSplitMap() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Set<Integer> control = new HashSet<Integer>();
-
-		    // get from outside the range of the put
-		    for (int i = 0; i < 33; i++) {
 			test.put(i,i);
 			control.add(i);
 		    }
@@ -2392,29 +2040,6 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
-    @Test public void testValuesIteratorOnSplitMap() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Set<Integer> control = new HashSet<Integer>();
-
-		    // get from outside the range of the put
-		    for (int i = 0; i < 33; i++) {
-			test.put(i,i);
-			control.add(i);
-		    }
-
-		    for (Integer i : test.values()) {
-			control.remove(i);
-		    }
-
-		    assertEquals(0, control.size());
-		}
-	    }, taskOwner);
-    }
-
     @Test public void testInvalidRemove() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
@@ -2435,86 +2060,9 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
-    @SuppressWarnings("unchecked")
-	@Test public void testLeafSerialization() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>();
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
-		    int[] a = new int[100];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j, j);
-			control.put(j, j);
-			a[i] = j;
-		    }
-
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(test);
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    ScalableLinkedHashMap<Integer,Integer> m =
-			(ScalableLinkedHashMap<Integer,Integer>) ois.readObject();
-
-		    assertEquals(control, m);
-		}
-	    }, taskOwner);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testSplitTreeSerialization() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    Map<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
-		    int[] a = new int[100];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j, j);
-			control.put(j, j);
-			a[i] = j;
-		    }
-
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(test);
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    ScalableLinkedHashMap<Integer,Integer> m =
-			(ScalableLinkedHashMap<Integer,Integer>) ois.readObject();
-
-		    assertEquals(control, m);
-		}
-	    }, taskOwner);
-    }
 
     /*
-     * Tests on ManagedObject vs. Serializable object keys
-     *
-     * These tests should expose any bugs in the ScalableLinkedHashMap.PrefixEntry
-     * class, especially in the setValue() method.  These should also expose
-     * any bugs in the KeyValuePair class
+     * Serializiable / ManagedObject kev-value tests
      */
 
     @Test public void testOnManagedObjectKeys() throws Exception {
@@ -2614,16 +2162,16 @@ public class TestScalableLinkedHashMap extends Assert {
     }
 
     /*
-     * Concurrent Iterator tests
+     * Ordered Iterator tests
      *
      * These tests should expose any problems when the
-     * ScalableLinkedHashMap.ConcurrentIterator class is serialized and modifications
+     * ScalableLinkedHashMap.OrderedIterator class is serialized and modifications
      * are made to the map before it is deserialized.  This should simulate the
      * conditions between transactions where the map might be modified
      */
 
     @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIterator() throws Exception {
+    @Test public void testOrderedIterator() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
@@ -2659,185 +2207,77 @@ public class TestScalableLinkedHashMap extends Assert {
     }
 
     @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorSerialization() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
+    @Test public void testOrderedIteratorSerialization() throws Exception {
 
-		    int[] a = new int[256];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j, j);
-			control.put(j, j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<Integer,Integer>> entrySet =
-			control.entrySet();
-		    int entries = 0;
-
-		    Iterator<Map.Entry<Integer,Integer>> it =
-			test.entrySet().iterator();
-		    for (int i = 0; i < a.length / 2; i++) {
-			Map.Entry<Integer,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(it);
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    it = (Iterator<Map.Entry<Integer,Integer>>)
-			ois.readObject();
-
-		    while(it.hasNext()) {
-			Map.Entry<Integer,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    assertEquals(entrySet.size(), entries);
-		}
-	    }, taskOwner);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorWithRemovals() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
-		    int[] a = new int[1024];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j, j);
-			control.put(j, j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<Integer,Integer>> entrySet =
-			control.entrySet();
-		    int entries = 0;
-
-		    Iterator<Map.Entry<Integer,Integer>> it =
-			test.entrySet().iterator();
-
-		    // serialize the iterator
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(it);
-
-		    // then remove half of the entries
-		    for (int i = 0; i < a.length; i += 2) {
-			test.remove(a[i]);
-			control.remove(a[i]);
-		    }
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    it = (Iterator<Map.Entry<Integer,Integer>>)
-			ois.readObject();
-
-		    // ensure that the deserialized iterator reads the
-		    // remaining elements
-		    while(it.hasNext()) {
-			Map.Entry<Integer,Integer> e = it.next();
-			e.getKey();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    assertEquals(entrySet.size(), entries);
-		}
-	    }, taskOwner);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorWithAdditions() throws Exception {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			new ScalableLinkedHashMap<Integer,Integer>(16);
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
-		    // immediately get the iterator while the map size is zero
-		    Iterator<Map.Entry<Integer,Integer>> it =
-			test.entrySet().iterator();
-
-		    // serialize the iterator
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(it);
-
-		    int[] a = new int[128];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j, j);
-			control.put(j, j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<Integer,Integer>> entrySet =
-			control.entrySet();
-		    int entries = 0;
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    it = (Iterator<Map.Entry<Integer,Integer>>)
-			ois.readObject();
-
-		    // ensure that the deserialized iterator reads all of
-		    // the new elements
-		    while(it.hasNext()) {
-			Map.Entry<Integer,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    assertEquals(entrySet.size(), entries);
-		}
-	    }, taskOwner);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorWithReplacements()
-	throws Exception
-    {
+	final LinkedHashMap<Integer,Integer> control =
+	    new LinkedHashMap<Integer,Integer>();
 
 	final int[] a = new int[128];
 
-	final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	final ObjectOutputStream oos = new ObjectOutputStream(baos);
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(16);
 
-	final String mapName = "map1234-test-map";
+
+
+		    for (int i = 0; i < a.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j, j);
+			control.put(j, j);
+			a[i] = j;
+		    }
+		    
+		    Iterator<Map.Entry<Integer,Integer>> controlIter =
+			control.entrySet().iterator();		   
+
+		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+			uncheckedCast(test.entrySet().iterator());
+
+		    for (int i = 0; i < a.length / 2; ++i) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    AppContext.getDataManager().setBinding("test", testIter);
+		}
+	    }, taskOwner);
+
+	// then iterate over the second half of the map
+
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(16);
+		    
+		    Iterator<Map.Entry<Integer,Integer>> controlIter =
+			control.entrySet().iterator();		   
+
+		    // jump to half way for the control
+		    for (int i = 0; i < a.length / 2; ++i) {
+			controlIter.next();
+		    }
+
+		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+			uncheckedCast(AppContext.getDataManager().getBinding("test"));
+
+		    for (int i = a.length / 2; i < a.length; ++i) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    AppContext.getDataManager().removeBinding("test");
+		}
+	    }, taskOwner);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test public void testOrderedIteratorSerializationWithRemovals() throws Exception {
+
+	final LinkedHashMap<Integer,Integer> control =
+	    new LinkedHashMap<Integer,Integer>();
+
+	final int[] a = new int[128];
 
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
@@ -2845,369 +2285,107 @@ public class TestScalableLinkedHashMap extends Assert {
 		    ScalableLinkedHashMap<Integer,Integer> test =
 			new ScalableLinkedHashMap<Integer,Integer>(16);
 
-		    // bind the map so we can access it in the next transaction
-		    AppContext.getDataManager().setBinding(mapName, test);
-
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
 		    for (int i = 0; i < a.length; i++) {
 			int j = RANDOM.nextInt();
 			test.put(j, j);
 			control.put(j, j);
 			a[i] = j;
 		    }
-
-		    Set<Map.Entry<Integer,Integer>> entrySet =
-			control.entrySet();
-		    int entries = 0;
-
-		    Iterator<Map.Entry<Integer,Integer>> it =
-			test.entrySet().iterator();
-		    for (int i = 0; i < a.length / 2; i++) {
-			Map.Entry<Integer,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    assertEquals(a.length / 2, entries);
-
-		    // serialize the iterator
-		    oos.writeObject(it);
-
-		    // now replace all the elements in the map
-		    LinkedDoneRemoving.init();
-		    test.clear();
-		    control.clear();
-		}
-	    }, taskOwner);
-	LinkedDoneRemoving.await(1);    
-	
-
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-
-		    // get the map from the previous transaction		    
-		    ScalableLinkedHashMap<Integer,Integer> test =
-			uncheckedCast(AppContext.getDataManager().
-				      getBinding(mapName));
-
-		    Map<Integer,Integer> control =
-			new HashMap<Integer,Integer>();
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(j, j);
-			control.put(j, j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<Integer,Integer>> entrySet =
-			control.entrySet();
-
-		    // reserialize the iterator
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
 		    
-		    Iterator<Map.Entry<Integer,Integer>> it = 
-			(Iterator<Map.Entry<Integer,Integer>>)ois.readObject();
+		    Iterator<Map.Entry<Integer,Integer>> controlIter =
+			control.entrySet().iterator();		   
 
-		    while(it.hasNext()) {
-			Map.Entry<Integer,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
+		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+			uncheckedCast(test.entrySet().iterator());
+
+		    for (int i = 0; i < a.length / 4; ++i) {
+			assertEquals(controlIter.next(), testIter.next());
 		    }
-
-		    // remove the binding, just to be safe
-		    AppContext.getDataManager().removeBinding(mapName);
-
-		    // due to the random nature of the entries, we can't check
-		    // that it read in another half other elements.  However
-		    // this should still check that no execptions were thrown.
-		}
-	    }, taskOwner);
-
-    }
-
-    /*
-     * Tests on concurrent iterator edge cases
-     */
-
-    @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorSerializationEqualHashCodes()
-	throws Exception
-    {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<EqualHashObj,Integer> test =
-			new ScalableLinkedHashMap<EqualHashObj,Integer>(16);
-		    Map<EqualHashObj,Integer> control =
-			new HashMap<EqualHashObj,Integer>();
-
-		    int[] a = new int[256];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(new EqualHashObj(j), j);
-			control.put(new EqualHashObj(j), j);
-			a[i] = j;
-		    }
-
-		    Iterator<Map.Entry<EqualHashObj,Integer>> it =
-			test.entrySet().iterator();
-		    for (int i = 0; i < a.length / 2; i++) {
-			Map.Entry<EqualHashObj,Integer> e = it.next();
-			assertTrue(control.remove(e.getKey()) != null);
-		    }
-
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(it);
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    it = (Iterator<Map.Entry<EqualHashObj,Integer>>)
-			ois.readObject();
-
-		    while(it.hasNext()) {
-			Map.Entry<EqualHashObj,Integer> e = it.next();
-			assertTrue(control.remove(e.getKey()) != null);
-		    }
-
-		    assertEquals(0, control.size());
-		}
-	    }, taskOwner);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorWithRemovalsEqualHashCodes()
-	throws Exception
-    {
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<EqualHashObj,Integer> test =
-			new ScalableLinkedHashMap<EqualHashObj,Integer>(16);
-		    Map<EqualHashObj,Integer> control = new HashMap<EqualHashObj,Integer>();
-
-		    int[] a = new int[128];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(new EqualHashObj(j), j);
-			control.put(new EqualHashObj(j), j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<EqualHashObj,Integer>> entrySet =
-			control.entrySet();
-		    int entries = 0;
-
-		    Iterator<Map.Entry<EqualHashObj,Integer>> it =
-			test.entrySet().iterator();
-
-		    // serialize the iterator
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(it);
-
-		    // then remove half of the entries
-		    for (int i = 0; i < a.length; i += 2) {
-			test.remove(a[i]);
+		    
+		    // remove the middle 1/2 of the map
+		    for (int i = a.length / 4; i < (3 * a.length) / 4; ++i) {
 			control.remove(a[i]);
+			test.remove(a[i]);
 		    }
 
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    it = (Iterator<Map.Entry<EqualHashObj,Integer>>) ois.readObject();
-
-		    // ensure that the deserialized iterator reads the
-		    // remaining elements
-		    while(it.hasNext()) {
-			Map.Entry<EqualHashObj,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    assertEquals(entrySet.size(), entries);
+		    
+		    AppContext.getDataManager().setBinding("test", testIter);
 		}
 	    }, taskOwner);
+
+	// then iterate over the second half of the map
+
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Iterator<Map.Entry<Integer,Integer>> controlIter =
+			control.entrySet().iterator();		   
+
+		    // jump past the element we iterated over in the previous task
+		    for (int i = 0; i < a.length / 4; ++i) {
+			controlIter.next();
+		    }
+
+		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+			uncheckedCast(AppContext.getDataManager().getBinding("test"));
+
+		    // check the remaining elements
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(controlIter.hasNext());
+		    assertFalse(testIter.hasNext());
+
+		    AppContext.getDataManager().removeBinding("test");
+		}
+	    }, taskOwner);
+
     }
+
 
     @SuppressWarnings("unchecked")
-    @Test public void testConcurrentIteratorWithAdditionsEqualHashCodes()
-	throws Exception
-    {
+    @Test public void testOrderedIteratorSerializationWithClear() throws Exception {
+
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-		    ScalableLinkedHashMap<EqualHashObj,Integer> test =
-			new ScalableLinkedHashMap<EqualHashObj,Integer>(16);
-		    Map<EqualHashObj,Integer> control = new HashMap<EqualHashObj,Integer>();
-
-		    // immediately get the iterator while the map size is zero
-		    Iterator<Map.Entry<EqualHashObj,Integer>> it =
-			test.entrySet().iterator();
-
-		    // serialize the iterator
-		    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		    ObjectOutputStream oos = new ObjectOutputStream(baos);
-		    oos.writeObject(it);
+		    ScalableLinkedHashMap<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(16);
 
 		    int[] a = new int[128];
 
 		    for (int i = 0; i < a.length; i++) {
 			int j = RANDOM.nextInt();
-			test.put(new EqualHashObj(j), j);
-			control.put(new EqualHashObj(j), j);
+			test.put(j, j);
 			a[i] = j;
 		    }
-
-		    int entries = 0;
-
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    it = (Iterator<Map.Entry<EqualHashObj,Integer>>) ois.readObject();
-
-		    // ensure that the deserialized iterator reads all of
-		    // the new elements
-		    while(it.hasNext()) {
-			Map.Entry<EqualHashObj,Integer> e = it.next();
-			control.remove(e.getKey());
-		    }
-
-		    assertEquals(0, control.size());
-		}
-	    }, taskOwner);
-    }
-
-     @SuppressWarnings("unchecked")
-     @Test public void testConcurrentIteratorWithReplacementsOnEqualHashCodes()
-	 throws Exception
-    {
-
-	final int[] a = new int[128];
-
-	final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	final ObjectOutputStream oos = new ObjectOutputStream(baos);
-
-	final String mapName = "map12345-test-map";
-
-
-	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
-		public void run() throws Exception {
-		    ScalableLinkedHashMap<EqualHashObj,Integer> test =
-			new ScalableLinkedHashMap<EqualHashObj,Integer>(16);
 		    
-		    // bind the map so we can access it in the next transaction
-		    AppContext.getDataManager().setBinding(mapName, test);
+		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+			uncheckedCast(test.entrySet().iterator());
 
-		    Map<EqualHashObj,Integer> control = new HashMap<EqualHashObj,Integer>();
-
-		    int[] a = new int[128];
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(new EqualHashObj(j), j);
-			control.put(new EqualHashObj(j), j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<EqualHashObj,Integer>> entrySet =
-			control.entrySet();
-		    int entries = 0;
-
-		    Iterator<Map.Entry<EqualHashObj,Integer>> it =
-			test.entrySet().iterator();
-		    for (int i = 0; i < a.length / 2; i++) {
-			Map.Entry<EqualHashObj,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-			entries++;
-		    }
-
-		    assertEquals(a.length / 2, entries);
-
-		    // serialize the iterator
-		    oos.writeObject(it);
-
-		    // now replace all the elements in the map
-		    LinkedDoneRemoving.init();
+		    AppContext.getDataManager().setBinding("test", testIter);
 		    test.clear();
-		    control.clear();
 		}
 	    }, taskOwner);
-	
-	// wait for the map to finished clearing
-	LinkedDoneRemoving.await(1);    
+
+	// then iterate over the second half of the map
 
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 
-		    // get the map from the previous transaction
-		    ScalableLinkedHashMap<EqualHashObj,Integer> test =
-			uncheckedCast(AppContext.getDataManager().
-				      getBinding(mapName));
+		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+			uncheckedCast(AppContext.getDataManager().getBinding("test"));
 
-		    Map<EqualHashObj,Integer> control =
-			new HashMap<EqualHashObj,Integer>();
+		    assertFalse(testIter.hasNext());
 
-
-		    for (int i = 0; i < a.length; i++) {
-			int j = RANDOM.nextInt();
-			test.put(new EqualHashObj(j), j);
-			control.put(new EqualHashObj(j), j);
-			a[i] = j;
-		    }
-
-		    Set<Map.Entry<EqualHashObj,Integer>> entrySet =
-			control.entrySet();
-
-		    assertEquals(control.size(), test.size());
-
-		    // reserialize the iterator
-		    byte[] serializedForm = baos.toByteArray();
-
-		    ByteArrayInputStream bais =
-			new ByteArrayInputStream(serializedForm);
-		    ObjectInputStream ois = new ObjectInputStream(bais);
-
-		    Iterator<Map.Entry<EqualHashObj,Integer>> it = 
-			(Iterator<Map.Entry<EqualHashObj,Integer>>) ois.readObject();
-
-		    while (it.hasNext()) {
-			Map.Entry<EqualHashObj,Integer> e = it.next();
-			assertTrue(entrySet.contains(e));
-		    }
-
-		    // remove the binding, just to be safe
-		    AppContext.getDataManager().removeBinding(mapName);
-
-		    // due to the random nature of the entries, we can't check
-		    // that it read in another half other elements.  However
-		    // this should still check that no exceptions were thrown.
+		    AppContext.getDataManager().removeBinding("test");
 		}
 	    }, taskOwner);
     }
 
-    
     /*
      * Insertion order tests
      */
@@ -3243,8 +2421,374 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
-     
 
+    @Test public void testInsertionOrderWithIntermediateRemovals() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(16);
+
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			arr[i]= j;
+		    }
+
+		    // remove middle elements
+		    for (int i = arr.length / 3; i < (2*arr.length) / 3; ++i) {
+			test.remove(arr[i]);
+
+			// shift the array down a third
+			arr[i] = arr[i + (arr.length / 3)];
+		    }
+			
+
+		    // now test the iterator
+		    Iterator<Integer> it = test.keySet().iterator();
+		    int i = 0;
+		    while (it.hasNext()) {
+			Integer inMap = it.next();
+			Integer inOrder = arr[i];
+			assertEquals(inMap, inOrder);
+			i++;
+		    }
+		    
+		    assertEquals(i, test.size());
+		}
+	    }, taskOwner);
+    }
+
+
+    @Test public void testInsertionOrderWithFrontRemovals() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(16);
+
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			arr[i]= j;
+		    }
+
+		    // remove first elements
+		    for (int i = 0; i < arr.length / 3; ++i) {
+			test.remove(arr[i]);
+		    }
+			
+
+		    // now test the iterator
+		    Iterator<Integer> it = test.keySet().iterator();
+		    int i = 0; 
+		    int j = arr.length / 3;
+		    while (it.hasNext()) {
+			Integer inMap = it.next();
+			Integer inOrder = arr[j];
+			assertEquals(inMap, inOrder);
+			i++;
+			j++;
+		    }
+		    
+		    assertEquals(i, test.size());
+		}
+	    }, taskOwner);
+    }
+
+
+
+    @Test public void testInsertionOrderWithEndRemovals() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(16);
+
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			arr[i]= j;
+		    }
+
+		    // remove first elements
+		    for (int i = (2 * arr.length) / 3; i < arr.length; ++i) {
+			test.remove(arr[i]);
+		    }
+			
+
+		    // now test the iterator
+		    Iterator<Integer> it = test.keySet().iterator();
+		    int i = 0; 
+		    while (it.hasNext()) {
+			Integer inMap = it.next();
+			Integer inOrder = arr[i];
+			assertEquals(inMap, inOrder);
+			i++;
+		    }
+		    
+		    assertEquals(i, test.size());
+		}
+	    }, taskOwner);
+    }     
+
+
+    /*
+     * Access order tests
+     */
+    @Test public void testAccessOrder() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    int[] arr = new int[32];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[i] = j;
+		    }
+
+		    // now test the iterator
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }
+
+
+    @Test public void testAccessOrderWithIntermediateRemovals() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[(arr.length - 1) - i] = j;
+		    }
+
+		    // remove middle elements
+		    for (int i = arr.length / 3; i < (2*arr.length) / 3; ++i) {
+			test.remove(arr[i]);
+			control.remove(arr[i]);
+		    }
+			
+		    // now test the iterator order
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }
+
+
+    @Test public void testAccessOrderWithFrontRemovals() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[i] = j;
+		    }
+
+		    // remove first elements
+		    for (int i = 0; i < arr.length / 3; ++i) {
+			test.remove(arr[i]);
+			control.remove(arr[i]);
+		    }
+			
+
+		    // now test the iterator order
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }
+
+
+
+    @Test public void testAccessOrderWithEndRemovals() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[i] = j;
+		    }
+
+		    // remove last third of the elements
+		    for (int i = (2 * arr.length) / 3; i < arr.length; ++i) {
+			test.remove(arr[i]);
+			control.remove(arr[i]);
+		    }
+			
+
+		    // now test the iterator order
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }     
+
+    @Test public void testAccessOrderWithMiddleAccesses() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    int[] arr = new int[9];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[(arr.length - 1) - i] = j;
+		    }
+
+		    // touch middle elements
+		    for (int i = (2 * arr.length) / 3; i < arr.length; ++i) {
+			test.get(arr[i]);
+			control.get(arr[i]);
+		    }
+			
+
+		    // now test the iterator order
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }     
+
+
+    @Test public void testAccessOrderWithEndAccesses() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[(arr.length - 1) - i] = j;
+		    }
+
+		    // remove first elements
+		    for (int i = (2 * arr.length) / 3; i < arr.length; ++i) {
+			test.get(arr[i]);
+			control.get(arr[i]);
+		    }
+			
+		    // now test the iterator order
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }     
 
 
     /*
@@ -3294,63 +2838,8 @@ public class TestScalableLinkedHashMap extends Assert {
 	Class<K> keyClass, Class<V> valueClass,
 	int minConcurrency, int splitThreshold, int directorySize)
     {
-	int minDepth = findMinDepthFor(minConcurrency);
 	try {
-	    return (ScalableLinkedHashMap<K,V>)
-		scalableHashMapConstructor.newInstance(
-		    0, minDepth, splitThreshold, directorySize);
-	} catch (InvocationTargetException e) {
-	    throw (RuntimeException) e.getCause();
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
-    }
-
-    /**
-     * Returns the minimum depth of the tree necessary to support the requested
-     * minimum number of concurrent write operations.
-     */
-    private static int findMinDepthFor(int minConcurrency) {
-	try {
-	    return (Integer) findMinDepthFor.invoke(null, minConcurrency);
-	} catch (InvocationTargetException e) {
-	    throw (RuntimeException) e.getCause();
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
-    }
-
-    /**
-     * Returns the minimum depth for any leaf node in the map's backing tree.
-     * The root node has a depth of 1.
-     */
-    private int getMinTreeDepth(ScalableLinkedHashMap map) {
-	try {
-	    return (Integer) getMinTreeDepth.invoke(map);
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
-    }
-
-    /**
-     * Returns the maximum depth for any leaf node in the map's backing tree.
-     * The root node has a depth of 1.
-     */
-    private int getMaxTreeDepth(ScalableLinkedHashMap map) {
-	try {
-	    return (Integer) getMaxTreeDepth.invoke(map);
-	} catch (Exception e) {
-	    throw new RuntimeException("Unexpected exception: " + e, e);
-	}
-    }
-
-    /**
-     * Returns the average of all depth for the leaf nodes in the map's backing
-     * tree.  The root node has a depth of 1.
-     */
-    private double getAvgTreeDepth(ScalableLinkedHashMap map) {
-	try {
-	    return (Integer) getAvgTreeDepth.invoke(map);
+	    return new ScalableLinkedHashMap<K,V>();
 	} catch (Exception e) {
 	    throw new RuntimeException("Unexpected exception: " + e, e);
 	}

@@ -262,7 +262,7 @@ public class ScalableHashMap<K,V>
      * The default number of parallel write operations used when none is
      * specified in the constructor.
      */
-    private static final int DEFAULT_MINIMUM_CONCURRENCY =
+    static final int DEFAULT_MINIMUM_CONCURRENCY =
 	DEFAULT_DIRECTORY_SIZE;
 
     /**
