@@ -296,6 +296,22 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructorDisconnectDelayTooSmall() throws Exception {
+	try {
+	    Properties props =
+		createProperties(
+		    StandardProperties.APP_NAME, APP_NAME,
+		    StandardProperties.APP_PORT, "20000",
+		    "com.sun.sgs.impl.service.session.disconnect.delay", "199");
+	    new ClientSessionServiceImpl(
+		props, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testConstructedVersion() throws Exception {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 		public void run() {

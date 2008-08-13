@@ -164,18 +164,24 @@ public final class ClientSessionServiceImpl
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
-    /** The time that a disconnecting connection is allowed before
-     * this service forcibly disconnects it.
-     * TBD: should this be configurable?
+    /** The name of the disconnect delay property. */
+    private static final String DISCONNECT_DELAY_PROPERTY =
+	PKG_NAME + ".disconnect.delay";
+    
+    /** The time (in milliseconds) that a disconnecting connection is
+     * allowed before this service forcibly disconnects it.
      */
-    private static final int DISCONNECT_DELAY = 500;
+    private static final long DEFAULT_DISCONNECT_DELAY = 1000;
 
     /** The read buffer size for new connections. */
     private final int readBufferSize;
 
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
-    
+
+    /** The disconnect delay (in milliseconds) for disconnecting sessions. */
+    private final long disconnectDelay;
+
     /** The port for accepting connections. */
     private final int appPort;
 
@@ -282,7 +288,8 @@ public final class ClientSessionServiceImpl
                 StandardProperties.APP_PORT, 1, 65535);
 
 	    /*
-	     * Get the property for controlling session event processing.
+	     * Get the property for controlling session event processing
+	     * and connection disconnection.
 	     */
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
@@ -295,6 +302,10 @@ public final class ClientSessionServiceImpl
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
+
+	    disconnectDelay = wrappedProps.getLongProperty(
+		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
+		200, Long.MAX_VALUE);
 
 	    /*
 	     * Export the ClientSessionServer.
@@ -401,7 +412,8 @@ public final class ClientSessionServiceImpl
 	    monitorDisconnectingSessionsTaskHandle =
 		taskScheduler.scheduleRecurringTask(
  		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, 0, DISCONNECT_DELAY);
+		    taskOwner, 0,
+		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY)/2);
 	    monitorDisconnectingSessionsTaskHandle.start();
 	    
 	    // TBD: listen for UNRELIABLE connections as well?
@@ -1217,7 +1229,7 @@ public final class ClientSessionServiceImpl
      */
     void monitorDisconnection(ClientSessionHandler handler) {
 	disconnectingHandlersMap.put(
-	    System.currentTimeMillis() + DISCONNECT_DELAY,  handler);
+	    System.currentTimeMillis() + disconnectDelay,  handler);
     }
 
     /**
