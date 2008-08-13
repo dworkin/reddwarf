@@ -29,7 +29,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;

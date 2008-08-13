@@ -135,12 +135,13 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public Transaction getConflictingTransaction(Transaction txn) {
-        // until we manage conflict, there will never be an active
-        // transaction to return
+        // until we manage conflict, there aren't really any active
+        // transactions to return..
         return null;
     }
 
     /**
+     * TODO: Notes for when we look at conflict reolution...
      * The idea here is that a resolver needs to know who else might be
      * interested in a given object...but is this the right approach? The
      * reasoning here is that the Coodrinator should implement basic
@@ -149,7 +150,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * the resolver is responsible for this, in which case it needs to
      * know about each access, not just possible conclit cases. Does
      * this suggest that the Coordinator just tracks access, reports
-     * profilie, etc. but passes on all access requests to the resolver?
+     * profiling, etc. but passes on all access requests to the resolver?
      * ...
      * Maybe all requests get pased on, but the Coordinator implements a
      * utility method to see if there is basic conflict happening?
@@ -209,20 +210,15 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      *        not abort).
      */
     private void reportDetail(Transaction txn, boolean succeeded) {
-
         AccessedObjectsDetailImpl detail = txnMap.remove(txn);
 
-        // TODO: check the profiling level to make sure that we're
-        // actually supposed to be reporting this detail
-
 	// if the task failed try to determine why
-        if (!succeeded) {
-
+        if (! succeeded) {
 	    // mark the type with an initial guess of unknown and then
 	    // try to refine it.
 	    detail.conflictType = ConflictType.UNKNOWN;
 
-            // NOTE: in the current system we'll never see a transaction
+            // NOTE: in the current system we don't really see transactions
             // fail because of conflict with another active transaction,
             // so currently this is only for looking through a backlog
 	    if (backlog != null) {
@@ -234,17 +230,15 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 			break;
 		    }
 		}
-		
-		// since we're keeping a backlog of transactions, add
-		// this to the backlog.  If the backlog is full,
-		// remove some of the oldest transactions until there
-		// is room for this transaction.
-		if (backlog != null) {
-		    while (! backlog.offer(detail))
-			backlog.poll();
-		}
 	    }
 	}
+
+        // if we're keeping a backlog, then add the reported detail...if
+        // the backlog is full, then evict old data until there is room
+        if (backlog != null) {
+            while (! backlog.offer(detail))
+                backlog.poll();
+        }
 
         profileCollector.setAccessedObjectsDetail(detail);
     }
