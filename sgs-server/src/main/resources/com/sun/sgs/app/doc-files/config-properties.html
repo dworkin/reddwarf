@@ -279,6 +279,19 @@ Integer.MAX_VALUE (for a single node configuration) </span>
 
 </dl>
 
+<a name="ClientSessionService"></a>
+<h3>ClientSessionService Properties</h3>
+These properties control the implementation of the
+<code>ClientSessionService</code>.
+<dl>
+
+<dt>com.sun.sgs.impl.service.session.disconnect.delay
+<span class="default">1000</span>
+<dd>The time, in milliseconds, in which a disconnecting client is allowed to close a
+connection before it is closed by the server. The delay must be greater than or
+equal to <code>200</code> milliseconds.
+</dl>
+
 <a name="System"></a>
 <h3>System Properties</h3>
 

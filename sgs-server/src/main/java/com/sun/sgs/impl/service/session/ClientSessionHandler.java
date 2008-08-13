@@ -124,11 +124,22 @@ class ClientSessionHandler {
     /**
      * Constructs an instance of this class using the provided I/O connection,
      * and starts reading from the connection.
+     *
+     * @param	sessionService the ClientSessionService instance
+     * @param	dataService the DataService instance
+     * @param	sessionConnection the connection associated with this handler
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
 			 DataService dataService,
 			 AsynchronousMessageChannel sessionConnection)
     {
+	if (sessionService == null) {
+	    throw new NullPointerException("null sessionService");
+	} else if (dataService == null) {
+	    throw new NullPointerException("null dataService");
+	} else if (sessionConnection == null) {
+	    throw new NullPointerException("null sessionConnection");
+	}
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.sessionConnection = sessionConnection;
@@ -238,26 +249,38 @@ class ClientSessionHandler {
 
     /**
      * Handles a disconnect request (if not already handled) by doing
-     * the following:
+     * the following: <ol>
      *
-     * a) sending a disconnect acknowledgment (LOGOUT_SUCCESS)
+     * <li> sending a disconnect acknowledgment (LOGOUT_SUCCESS)
      *    if 'graceful' is true
      *
-     * b) closing this session's connection
+     * <li> if {@code closeConnection} is {@code true}, closing this
+     *    session's connection, otherwise monitor the connection's status
+     *    to ensure that the client disconnects it. 
      *
-     * c) submitting a transactional task to call the 'disconnected'
+     * <li> submitting a transactional task to call the 'disconnected'
      *    callback on the listener for this session.
      *
-     * d) notifying the identity (if non-null) that the session has
+     * <li> notifying the identity (if non-null) that the session has
      *    logged out.
      *
-     * e) notifying the node mapping service that the identity (if
+     * <li> notifying the node mapping service that the identity (if
      *    non-null) is no longer active.
+     * </ol>
      *
-     * @param graceful if the disconnection was graceful (i.e., due to
-     * a logout request).
+     * <p>Note:if {@code graceful} is {@code true}, then {@code
+     * closeConnection} must be {@code false} so that the client will receive
+     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * receive the message if the connection is disconnected immediately
+     * after sending the message.
+     *
+     * @param	graceful if {@code true}, the disconnection was graceful
+     *		(i.e., due to a logout request).
+     * @param	closeConnection if {@code true}, close this session's
+     *		connection immediately, otherwise monitor the connection to
+     *		ensure that it is terminated in a timely manner by the client
      */
-    void handleDisconnect(final boolean graceful) {
+    void handleDisconnect(final boolean graceful, boolean closeConnection) {
 
 	logger.log(Level.FINEST, "handleDisconnect handler:{0}", this);
 	
@@ -292,20 +315,17 @@ class ClientSessionHandler {
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
+		assert closeConnection == false;
 	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
-
-	        sendProtocolMessage(msg, Delivery.RELIABLE);
+		// Bypass sendProtocolMessage method which prevents sending
+		// messages to disconnecting sessions.
+		writeToWriteHandler(ByteBuffer.wrap(msg));
 	    }
 
-	    try {
-		sessionConnection.close();
-	    } catch (IOException e) {
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-		    	Level.WARNING, e,
-			"handleDisconnect (close) handle:{0} throws",
-			sessionConnection);
-		}
+	    if (closeConnection) {
+		closeConnection();
+	    } else {
+		sessionService.monitorDisconnection(this);
 	    }
 	}
 
@@ -327,19 +347,48 @@ class ClientSessionHandler {
     /**
      * Schedule a non-transactional task for disconnecting the client.
      *
+     * <p>Note:if {@code graceful} is {@code true}, then {@code
+     * closeConnection} must be {@code false} so that the client will receive
+     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * receive the message if the connection is disconnected immediately
+     * after sending the message.
+     *
      * @param	graceful if {@code true}, disconnection is graceful (i.e.,
      * 		a LOGOUT_SUCCESS protocol message is sent before
      * 		disconnecting the client session)
+     * @param	closeConnection if {@code true}, close this session's
+     *		connection immediately, otherwise monitor the connection to
+     *		ensure that it is terminated in a timely manner by the client
      */
-    private void scheduleHandleDisconnect(final boolean graceful) {
+    private void scheduleHandleDisconnect(
+	final boolean graceful, final boolean closeConnection)
+    {
         synchronized (lock) {
             if (state != State.DISCONNECTED)
                 state = State.DISCONNECTING;
         }
 	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	    public void run() {
-		handleDisconnect(graceful);
+		handleDisconnect(graceful, closeConnection);
 	    }});
+    }
+
+    /**
+     * Closes the connection associated with this instance.
+     */
+    void closeConnection() {
+	if (sessionConnection.isOpen()) {
+	    try {
+		sessionConnection.close();
+	    } catch (IOException e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"closing connection for handle:{0} throws",
+			sessionConnection);
+		}
+	    }
+	}
     }
 
     /**
@@ -353,13 +402,7 @@ class ClientSessionHandler {
 	    shutdown = true;
 	    disconnectHandled = true;
 	    state = State.DISCONNECTED;
-	    if (sessionConnection != null) {
-		try {
-		    sessionConnection.close();
-		} catch (IOException e) {
-		    // ignore
-		}
-	    }
+	    closeConnection();
 	}
     }
     
@@ -497,7 +540,7 @@ class ClientSessionHandler {
 				    ClientSessionHandler.this,
 				    HexDumper.format(message, 0x50));
                 }
-                scheduleHandleDisconnect(false);
+                scheduleHandleDisconnect(false, true);
             }
         }
     }
@@ -559,7 +602,7 @@ class ClientSessionHandler {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    scheduleHandleDisconnect(false);
+                    scheduleHandleDisconnect(false, true);
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -588,7 +631,7 @@ class ClientSessionHandler {
                         Level.FINE, e,
                         "Read completion exception {0}", sessionConnection);
                 }
-                scheduleHandleDisconnect(false);
+                scheduleHandleDisconnect(false, true);
             }
         }
 
@@ -616,7 +659,7 @@ class ClientSessionHandler {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-	            scheduleHandleDisconnect(false);
+	            scheduleHandleDisconnect(false, true);
 	            break;
 	        }
 
@@ -650,7 +693,7 @@ class ClientSessionHandler {
 				    receivedMessage(clientMessage.asReadOnlyBuffer());
 			    }
 			} else {
-			    scheduleHandleDisconnect(false);
+			    scheduleHandleDisconnect(false, true);
 			}
 		    }}, identity);
 
@@ -684,7 +727,7 @@ class ClientSessionHandler {
 					channelMessage.asReadOnlyBuffer());
 			    }
 			} else {
-			    scheduleHandleDisconnect(false);
+			    scheduleHandleDisconnect(false, true);
 			}
 		    }}, identity);
 
@@ -697,7 +740,7 @@ class ClientSessionHandler {
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
-		scheduleHandleDisconnect(isConnected());
+		scheduleHandleDisconnect(isConnected(), false);
 
 		// Resume reading immediately
                 read();
@@ -713,7 +756,7 @@ class ClientSessionHandler {
 		}
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
-		scheduleHandleDisconnect(false);
+		scheduleHandleDisconnect(false, true);
 		break;
 	    }
 	}
@@ -816,15 +859,7 @@ class ClientSessionHandler {
 		    public void run() {
 			sendLoginProtocolMessage(
 			    loginRedirectMessage, Delivery.RELIABLE);
-                        try {
-                            // FIXME: this is a hack to make sure that 
-                            // the client receives the login redirect 
-                            // message before disconnect. 
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
-                            // ignore
-                        }
-			handleDisconnect(false);
+			handleDisconnect(false, false);
 		    }});
 	    }
 	}
@@ -840,7 +875,7 @@ class ClientSessionHandler {
 		public void run() {
 		    sendLoginProtocolMessage(
 			loginFailureMessage, Delivery.RELIABLE);
-		    handleDisconnect(false);
+		    handleDisconnect(false, false);
 		}});
 	}
     }
