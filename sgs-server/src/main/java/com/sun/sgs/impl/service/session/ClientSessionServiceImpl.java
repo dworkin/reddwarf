@@ -457,7 +457,7 @@ public final class ClientSessionServiceImpl
             } catch (IOException e) {
                 logger.logThrow(Level.FINEST, e, "closing acceptor throws");
                 // swallow exception
-            }
+            } 
 	}
 
 	if (asyncChannelGroup != null) {
@@ -495,7 +495,11 @@ public final class ClientSessionServiceImpl
 	}
 
 	if (monitorDisconnectingSessionsTaskHandle != null) {
-	    monitorDisconnectingSessionsTaskHandle.cancel();
+	    try {
+		monitorDisconnectingSessionsTaskHandle.cancel();
+	    } finally {
+		monitorDisconnectingSessionsTaskHandle = null;
+	    }
 	}
 	    
 	for (ClientSessionHandler handler : handlers.values()) {
@@ -1212,7 +1216,6 @@ public final class ClientSessionServiceImpl
      *		{@code ClientSession}
      */
     void monitorDisconnection(ClientSessionHandler handler) {
-	System.err.println("Monitoring disconnection of " + handler);
 	disconnectingHandlersMap.put(
 	    System.currentTimeMillis() + DISCONNECT_DELAY,  handler);
     }

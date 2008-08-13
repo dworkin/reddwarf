@@ -544,9 +544,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
 	    client.logout();
-	    assertEquals(client.connected, true);
-	    Thread.sleep(1500);
-	    assertEquals(client.connected, false);
+	    assertEquals(client.isConnected(), true);
+	    assertEquals(client.waitForDisconnect(), true);
 	} finally {
 	    client.disconnect();
 	}
@@ -1334,6 +1333,25 @@ public class TestClientSessionServiceImpl extends TestCase {
 		     ", expected: " + graceful);
 	    }
 	    System.err.println(toString() + " disconnect successful");
+	}
+
+	boolean isConnected() {
+	    synchronized (lock) {
+		return connected;
+	    }
+	}
+
+	// Returns true if disconnect occurred.
+	boolean waitForDisconnect() {
+	    synchronized(lock) {
+		try {
+		    if (connected == true) {
+			lock.wait(WAIT_TIME);
+		    }
+		} catch (InterruptedException ignore) {
+		}
+		return !connected;
+	    }
 	}
 
 	public String toString() {

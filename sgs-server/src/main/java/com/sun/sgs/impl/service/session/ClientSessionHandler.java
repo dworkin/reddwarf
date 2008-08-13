@@ -249,23 +249,30 @@ class ClientSessionHandler {
 
     /**
      * Handles a disconnect request (if not already handled) by doing
-     * the following:
+     * the following: <ol>
      *
-     * a) sending a disconnect acknowledgment (LOGOUT_SUCCESS)
+     * <li> sending a disconnect acknowledgment (LOGOUT_SUCCESS)
      *    if 'graceful' is true
      *
-     * b) if {@code closeConnection} is {@code true}, closing this
+     * <li> if {@code closeConnection} is {@code true}, closing this
      *    session's connection, otherwise monitor the connection's status
      *    to ensure that the client disconnects it. 
      *
-     * c) submitting a transactional task to call the 'disconnected'
+     * <li> submitting a transactional task to call the 'disconnected'
      *    callback on the listener for this session.
      *
-     * d) notifying the identity (if non-null) that the session has
+     * <li> notifying the identity (if non-null) that the session has
      *    logged out.
      *
-     * e) notifying the node mapping service that the identity (if
+     * <li> notifying the node mapping service that the identity (if
      *    non-null) is no longer active.
+     * </ol>
+     *
+     * <p>Note:if {@code graceful} is {@code true}, then {@code
+     * closeConnection} must be {@code false} so that the client will receive
+     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * receive the message if the connection is disconnected immediately
+     * after sending the message.
      *
      * @param	graceful if {@code true}, the disconnection was graceful
      *		(i.e., due to a logout request).
@@ -339,6 +346,12 @@ class ClientSessionHandler {
 
     /**
      * Schedule a non-transactional task for disconnecting the client.
+     *
+     * <p>Note:if {@code graceful} is {@code true}, then {@code
+     * closeConnection} must be {@code false} so that the client will receive
+     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * receive the message if the connection is disconnected immediately
+     * after sending the message.
      *
      * @param	graceful if {@code true}, disconnection is graceful (i.e.,
      * 		a LOGOUT_SUCCESS protocol message is sent before
