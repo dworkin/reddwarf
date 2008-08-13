@@ -45,10 +45,12 @@ import com.sun.sgs.profile.ProfileReport;
 
 import com.sun.sgs.service.Transaction;
 
+import java.beans.PropertyChangeEvent;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-import java.beans.PropertyChangeEvent;
+import java.math.BigInteger;
 
 import java.util.LinkedList;
 import java.util.Properties;
@@ -529,7 +531,6 @@ final class TransactionSchedulerImpl
                     backingQueue.getReadyCount() + dependencyCount.get();
                 profileCollector.startTask(task.getTask(), task.getOwner(),
                                            task.getStartTime(), waitSize);
-                profileCollector.noteTransactional();
 
                 Transaction transaction = null;
 
@@ -539,6 +540,8 @@ final class TransactionSchedulerImpl
                         transactionCoordinator.createTransaction(unbounded);
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
+                    profileCollector.
+                        noteTransactional(new BigInteger(transaction.getId()));
 
                     // increment the try count and notify the access
                     // coordinator of the new transaction

@@ -25,6 +25,16 @@ import com.sun.sgs.service.Transaction;
 /**
  * A central point for tracking all shared objects accessed in the context
  * of a transaction, and managing any conflict these accesses may cause.
+ * In this case, "shared object" means any object that is accessible within
+ * any transaction on any node. An example would be a {@code ManagedObject}
+ * as provided by the {@code DataService}.
+ * <p>
+ * Implementations should assume that each given {@code AccessReporter} will
+ * report on a unique set of objects. That is, even if two different
+ * {@code AccessReporter} instances report access to an object with the
+ * same identifier, it should be assumed that these are different objects.
+ * Think of each {@code AccessReporter} as reporting on objects within a
+ * unique namespace.
  */
 public interface AccessCoordinator {
 

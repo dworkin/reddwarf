@@ -23,6 +23,8 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
+import java.math.BigInteger;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +57,14 @@ public interface ProfileReport {
      *         <code>false</code> otherwise
      */
     public boolean wasTaskTransactional();
+
+    /**
+     * Returns the identifier for the task's transaction, or <code>null</code>
+     * if the task was not transactional.
+     *
+     * @return the transaction identifier or <code>null</code>
+     */
+    public BigInteger getTransactionId();
 
     /**
      * Returns detail about each participant in the transaction, or an

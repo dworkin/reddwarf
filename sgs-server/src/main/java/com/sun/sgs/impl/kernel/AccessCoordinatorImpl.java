@@ -32,6 +32,8 @@ import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
+import java.math.BigInteger;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -227,8 +229,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
                 // look through the backlog for a conflict
 		for (AccessedObjectsDetailImpl oldDetail : backlog) {
 		    if (detail.conflictsWith(oldDetail)) {
-			detail.setCause(ConflictType.ACCESS_NOT_GRANTED,
-					oldDetail.getId());
+			detail.setConflict(ConflictType.ACCESS_NOT_GRANTED,
+                                           oldDetail);
 			break;
 		    }
 		}
@@ -271,12 +273,11 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      */
 
     /** Private implementation of {@code AccessedObjectsDetail}. */
-    private static class AccessedObjectsDetailImpl
-        implements AccessedObjectsDetail
+    private class AccessedObjectsDetailImpl implements AccessedObjectsDetail
     {
-        // a generator for identifiers, and the identifier for each instance
-        private static final AtomicLong DETAIL_ID_COUNTER = new AtomicLong(0);
-        private final long id = DETAIL_ID_COUNTER.incrementAndGet();
+        // the id of the transaction for this detail
+        private final BigInteger txnId =
+            new BigInteger(txnProxy.getCurrentTransaction().getId());
 
         // the ordered set of accesses, and a separate set of just the writes
         private final LinkedHashSet<AccessedObject> accessList =
@@ -294,14 +295,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // information about why the transaction failed
         private boolean failed = false;
 	private ConflictType conflictType = ConflictType.NONE;
-        private long idOfConflictingTxn = -1;
+        private BigInteger idOfConflictingTxn = null;
 
         /** Implement AccessObjectsDetail. */
 	
-        /** {@inheritDoc} */
-        public long getId() {
-            return id;
-        }
         /** {@inheritDoc} */
         public List<AccessedObject> getAccessedObjects() {
             return new ArrayList<AccessedObject>(accessList);
@@ -311,9 +308,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             return conflictType;
         }
         /** {@inheritDoc} */
-        public long getConflictingId() {
-            if (conflictType == ConflictType.NONE)
-                throw new IllegalStateException("No conflict was noted");
+        public BigInteger getConflictingId() {
             return idOfConflictingTxn;
         }
 	
@@ -333,12 +328,12 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             objIDtoDescription.put(objId, annotation);
         }
 
-        /** Sets the cause of conflict for this access detail. */
-	synchronized void setCause(ConflictType conflictReason, 
-				   long idOfConflictingTxn) {
+        /** Sets the cause and source of conflict for this access detail. */
+	synchronized void setConflict(ConflictType conflictReason, 
+                                      AccessedObjectsDetailImpl conflicting) {
 	    failed = true;
 	    conflictType = conflictReason;
-	    this.idOfConflictingTxn = idOfConflictingTxn;
+	    this.idOfConflictingTxn = conflicting.txnId;
 	}
 
         /** Returns a given object's annotation or {@code null}. */

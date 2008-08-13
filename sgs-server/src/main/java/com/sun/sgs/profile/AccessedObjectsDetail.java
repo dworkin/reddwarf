@@ -21,6 +21,8 @@ package com.sun.sgs.profile;
 
 import com.sun.sgs.kernel.AccessedObject;
 
+import java.math.BigInteger;
+
 import java.util.List;
 
 
@@ -48,15 +50,6 @@ public interface AccessedObjectsDetail {
     }
 
     /**
-     * Returns an arbitrary but unique identifier associated with this
-     * set of object accesses. This can be used to track which transaction
-     * caused another transaction to fail.
-     *
-     * @return an identifier for this set of object accesses
-     */
-    public long getId();
-
-    /**
      * The collection of requested object accesses. The order is the same
      * as the order in which the objects were requested in the transaction.
      *
@@ -72,16 +65,13 @@ public interface AccessedObjectsDetail {
     public ConflictType getConflictType();
 
     /**
-     * Returns the identifier of the accessor that caused this access to
-     * fail, if known. This can be paired with the result of {@code getId}
-     * to match successful and failed access attempts. If there was no
-     * failure then this throws an exception.
+     * Returns the identifier of the transaction that caused this access to
+     * fail, if any and if known.
      *
-     * @return identifier for the successful access that caused conflict,
-     *         or -1 if there was conflict but the accessor is unknown
-     *
-     * @throws IllegalStateException if no conflict occurred
+     * @return identifier for the successful transaction that caused conflict,
+     *         or {@code null} if there was no conflict or the accessor
+     *         is unknown
      */
-    public long getConflictingId();
+    public BigInteger getConflictingId();
 
 }

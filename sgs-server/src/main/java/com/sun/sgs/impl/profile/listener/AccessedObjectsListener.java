@@ -88,7 +88,7 @@ public class AccessedObjectsListener implements ProfileListener {
 			      + "conflict type: %s, ID of conflicting " 
 			      + "accessor %d%n%n",
 			      profileReport.getTask().getBaseTaskType(),
-			      detail.getId(), 
+			      profileReport.getTransactionId().longValue(), 
 			      profileReport.getRetryCount(),
 			      formatAccesses(accessedObjects),
 			      detail.getConflictType(),

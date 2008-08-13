@@ -25,6 +25,15 @@ import com.sun.sgs.service.Transaction;
 /**
  * Used to report to the coordinator requested accesses to shared
  * objects. Methods must be called in the context of an active transaction.
+ * <p>
+ * For the {@code reportObjectAccess} methods, access should be reported
+ * as early as possible. In particular, if actually resolving or retrieving
+ * the object could fail, or incur any significant expense, the report
+ * should be made first. This is to ensure that access is always noted, and
+ * has the chance to abort the transaction before any unneeded processing
+ * is done. For instance, in the case of the {@code DataService}, before
+ * a name binding is resolved in the {@code getBinding} method, the requested
+ * access to that bound object should be reported.
  *
  * @param <T> the type of the identifier used to identify accessed objects
  */
@@ -94,12 +103,12 @@ public interface AccessReporter<T> {
 
     /**
      * Mark the given object with some description that should have a
-     * meaningful toString() method. This will be available in the
+     * meaningful {@code toString} method. This will be available in the
      * profiling data, and is useful when displaying details about a given
      * accessed object. The intent is that an arbitary description can
      * be included with an object, but that the description is not
      * accessed unless a {@code ProfileListener} finds it useful to do
-     * so. At that point the description's {@code toString}() method may
+     * so. At that point the description's {@code toString} method may
      * be called, or the object itself might even be cast to some known
      * type to extract more detail about the accessed object.
      * <p>

@@ -35,6 +35,9 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 import java.beans.PropertyChangeEvent;
 
 import java.lang.reflect.Constructor;
+
+import java.math.BigInteger;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EmptyStackException;
@@ -249,7 +252,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /** {@inheritDoc} */
-    public void noteTransactional() {
+    public void noteTransactional(BigInteger txnId) {
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -259,6 +262,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         profileReport.transactional = true;
+        profileReport.transactionId = txnId;
     }
 
     /** {@inheritDoc} */

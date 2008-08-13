@@ -23,6 +23,9 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
+
+import java.math.BigInteger;
+
 import java.util.List;
 import java.util.Map;
 
@@ -182,9 +185,11 @@ public interface ProfileCollector {
      * are transactional, but that at least some of the task is run in a
      * transactional context.
      *
+     * @param transactionId the identifier for the transaction
+     *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void noteTransactional();
+    public void noteTransactional(BigInteger transactionId);
 
     /**
      * Tells the collector about a participant of a transaction when that
