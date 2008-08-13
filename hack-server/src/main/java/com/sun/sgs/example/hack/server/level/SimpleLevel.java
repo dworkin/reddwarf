@@ -419,14 +419,6 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
      * @param updates the spaces being updated
      */
     private void sendUpdates(Set<BoardSpace> updates) {
-	// we know that all the characters are connected to the same
-	// dungeon command channel.  Therefore, just select the first
-	// character and have them broadcast it to everyone.
-	//
-	// NOTE: the level code should at some point be reworked to
-	// take advantage of channels since we no long need to access
-	// any of the player objects to send a message.
-	
 
 	Channel levelUpdatesChannel = levelUpdatesChannelRef.get();
 	if (levelUpdatesChannel.hasSessions()) {

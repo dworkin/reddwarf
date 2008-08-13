@@ -100,7 +100,7 @@ public class Player
      * @return the channel or {@code null} if {@code channelRef} is
      *         {@code null}.
      */
-    public Channel channel() {
+    Channel channel() {
         return channelRef == null ? null : channelRef.get();
     }
 
