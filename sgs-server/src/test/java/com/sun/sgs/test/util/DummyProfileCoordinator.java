@@ -90,7 +90,7 @@ public class DummyProfileCoordinator {
                 try {
                     instance.collector.
                         startTask(task, owner, System.currentTimeMillis(), 0);
-                    instance.collector.noteTransactional();
+                    instance.collector.noteTransactional(null);
                 } catch (Exception e) { e.printStackTrace(); }
             }
         }

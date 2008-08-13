@@ -25,6 +25,7 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileListener;
@@ -34,6 +35,9 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 import java.beans.PropertyChangeEvent;
 
 import java.lang.reflect.Constructor;
+
+import java.math.BigInteger;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EmptyStackException;
@@ -253,7 +257,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /** {@inheritDoc} */
-    public void noteTransactional() {
+    public void noteTransactional(BigInteger txnId) {
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -263,6 +267,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         profileReport.transactional = true;
+        profileReport.transactionId = txnId;
     }
 
     /** {@inheritDoc} */
@@ -279,6 +284,21 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                                             "to a non-transactional task");
         }
         profileReport.participants.add(participantDetail);
+    }
+
+    /** {@inheritDoc} */
+    public void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
+            throw new IllegalStateException("No task is being profiled in " +
+                                            "this thread");
+        }
+        if (! profileReport.transactional)
+            throw new IllegalStateException("Object access cannot be added " +
+                                            "to a non-transactional task");
+        profileReport.accessedObjectsDetail = detail;
     }
 
     /** {@inheritDoc} */

@@ -23,6 +23,8 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
+import java.math.BigInteger;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -55,6 +57,14 @@ public interface ProfileReport {
      *         <code>false</code> otherwise
      */
     boolean wasTaskTransactional();
+
+    /**
+     * Returns the identifier for the task's transaction, or <code>null</code>
+     * if the task was not transactional.
+     *
+     * @return the transaction identifier or <code>null</code>
+     */
+    public BigInteger getTransactionId();
 
     /**
      * Returns detail about each participant in the transaction, or an
@@ -170,6 +180,16 @@ public interface ProfileReport {
     Map<String, List<Long>> getUpdatedTaskSamples();  
 
     /**
+     * Returns detail of the object accesses as reported by the
+     * <code>AccessCoordinator</code> or <code>null</code> if no
+     * objects were accessed, no accesses reported, or if this
+     * report is for a non-transactional task.
+     *
+     * @return the associated access detail or <code>null</code>
+     */
+    public AccessedObjectsDetail getAccessedObjectsDetail();
+
+    /**
      * Returns the number of tasks in the same context as this report's task
      * that were in the scheduler and ready to run when this report's task
      * was started. Note that some schedulers may not differentiate between
@@ -180,7 +200,6 @@ public interface ProfileReport {
      * @return the number of ready tasks in the same context
      */
     int getReadyCount();
-
 
     /**
      * Returns any failure that occurred during the execution of

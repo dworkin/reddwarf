@@ -21,7 +21,11 @@ package com.sun.sgs.profile;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
+
+import java.math.BigInteger;
+
 import java.util.List;
 import java.util.Map;
 
@@ -72,7 +76,7 @@ public interface ProfileCollector {
      * 
      * @return the default profiling level
      */
-    ProfileLevel getDefaultProfileLevel();
+    public ProfileLevel getDefaultProfileLevel();
 
     /**
      * Set the default profile level, used as the initial level when creating
@@ -80,13 +84,13 @@ public interface ProfileCollector {
      * 
      * @param level the new default profile level
      */
-    void setDefaultProfileLevel(ProfileLevel level);
+    public void setDefaultProfileLevel(ProfileLevel level);
     
     /** 
      * Shuts down the ProfileCollector, reclaiming resources as necessary.
      */
     
-    void shutdown();
+    public void shutdown();
     
     /**
      * Adds a <code>ProfileListener</code> as a listener for
@@ -102,7 +106,7 @@ public interface ProfileCollector {
      *                  shut down by the {@code ProfileCollector}.  This 
      *                  parameter should usually be set to {@code true}.
      */
-    void addListener(ProfileListener listener, boolean canRemove);
+    public void addListener(ProfileListener listener, boolean canRemove);
        
     /**
      * Instantiates and adds a {@code ProfileListener}. The listener must
@@ -116,9 +120,9 @@ public interface ProfileCollector {
      * @param listenerClassName the fully qualified class name of the 
      *                          listener to instantiate and add.
      * 
-     * @throws Exception any exception generated during instantiation
+     * @throws any exception generated during instantiation
      */
-    void addListener(String listenerClassName) throws Exception;
+    public void addListener(String listenerClassName) throws Exception;
     
 
     /**
@@ -127,7 +131,7 @@ public interface ProfileCollector {
      * 
      * @return the list of listeners
      */
-    List<ProfileListener> getListeners();
+    public List<ProfileListener> getListeners();
 
     /**
      * Removes a {@code ProfileListener} and calls
@@ -137,7 +141,7 @@ public interface ProfileCollector {
      *
      * @param listener the listener to remove
      */
-    void removeListener(ProfileListener listener);
+    public void removeListener(ProfileListener listener);
     
     /**
      * Returns a read-only map of {@code ProfileConsumer} names to the 
@@ -146,18 +150,18 @@ public interface ProfileCollector {
      * 
      * @return the map of names to consumers
      */
-    Map<String, ProfileConsumer> getConsumers();
+    public Map<String, ProfileConsumer> getConsumers();
     
     /**
      * Notifies the collector that a thread has been added to the scheduler.
      */
-    void notifyThreadAdded();
+    public void notifyThreadAdded();
 
     /**
      * Notifies the collector that a thread has been removed from the
      * scheduler.
      */
-    void notifyThreadRemoved();
+    public void notifyThreadRemoved();
 
     /**
      * Tells the collector that a new task is starting in the context of
@@ -171,7 +175,7 @@ public interface ProfileCollector {
      * @param scheduledStartTime the requested starting time for the task
      * @param readyCount the number of ready tasks at the scheduler
      */
-    void startTask(KernelRunnable task, Identity owner,
+    public void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount);
 
     /**
@@ -181,9 +185,11 @@ public interface ProfileCollector {
      * are transactional, but that at least some of the task is run in a
      * transactional context.
      *
+     * @param transactionId the identifier for the transaction
+     *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    void noteTransactional();
+    public void noteTransactional(BigInteger transactionId);
 
     /**
      * Tells the collector about a participant of a transaction when that
@@ -198,7 +204,18 @@ public interface ProfileCollector {
      * @throws IllegalStateException if no transactional task is bound to
      *                               this thread
      */
-    void addParticipant(ProfileParticipantDetail participantDetail);
+    public void addParticipant(ProfileParticipantDetail participantDetail);
+
+    /**
+     * Sets the detail for all objects accessed during the task as
+     * reported to the <code>AccessCoordinator</code>.
+     * 
+     * @param detail all detail of the accessed objects
+     *
+     * @throws IllegalStateException if no transactional task is bound to
+     *                               this thread
+     */
+    public void setAccessedObjectsDetail(AccessedObjectsDetail detail);
 
     /**
      * Tells the collector that the current task associated with the
@@ -209,7 +226,7 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    void finishTask(int tryCount);
+    public void finishTask(int tryCount);
 
     /**
      * Tells the collector that the current task associated with the calling
@@ -221,6 +238,6 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    void finishTask(int tryCount, Throwable t);
+    public void finishTask(int tryCount, Throwable t);
 
 }
