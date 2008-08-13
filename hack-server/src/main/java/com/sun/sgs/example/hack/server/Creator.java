@@ -24,10 +24,20 @@ import java.io.Serializable;
 import java.math.BigInteger;
 
 /**
- * The creator is where all players can create new characters. It maintains
- * a list of who is currently creating characters, so those players can
- * chat with each other. Beyond this, there is no interactivity, and nothing
- * that the creator game pushes out players.
+ * The creator is where all players can create new characters. It
+ * maintains a list of who is currently creating characters, so those
+ * players can chat with each other. Beyond this, there is no
+ * interactivity, and nothing that the creator game pushes out
+ * players.
+ *
+ * <p>
+ *
+ * The idea of this "game" is that it should be used to
+ * manage existing characters, create new ones, and delete
+ * ones you don't want any more ... for the present, however,
+ * it's just used to create characters one at a time, so we
+ * don't actually need to send anything to the user now other
+ * than their initial set of stats
  */
 public class Creator implements Game, Serializable {
 
@@ -93,11 +103,16 @@ public class Creator implements Game, Serializable {
      * to manage their characters.
      *
      * @param player the <code>Player</code> joining the creator
+     *
+     * @return the {@code MessageHandler} that will process the
+     *         provided player's messages
      */
-    public void join(Player player) {
+    public MessageHandler join(Player player) {
 
         DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
+
+	CreatorMessageHandler messageHandler = new CreatorMessageHandler();
 
         playerCount++;
 
@@ -110,11 +125,10 @@ public class Creator implements Game, Serializable {
         player.userJoinedChannel(creatorCommandsChannel.get());
         Messages.broadcastPlayerJoined(creatorCommandsChannel.get(), clientID);
 
-        // NOTE: the idea of this "game" is that it should be used to
-        // manage existing characters, create new ones, and delete ones
-        // you don't want any more ... for the present, however, it's
-        // just used to create characters one at a time, so we don't
-        // actually need to send anything to the user now
+	// send the player an initial set of stats
+	messageHandler.rollForStats(player, 1);
+
+	return messageHandler;
     }
 
     /**
@@ -136,15 +150,6 @@ public class Creator implements Game, Serializable {
 
         // remove the player from the channel
         creatorCommandsChannel.get().leave(player.getCurrentSession());
-    }
-
-    /**
-     * Creates a new instance of a <code>CreatorMessageHandler</code>.
-     *
-     * @return a <code>CreatorMessageHandler</code>
-     */
-    public MessageHandler createMessageHandler() {
-        return new CreatorMessageHandler();
     }
 
     /**

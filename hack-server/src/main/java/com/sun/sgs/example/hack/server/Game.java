@@ -28,8 +28,12 @@ public interface Game extends ManagedObject {
      * player has been get-locked.
      *
      * @param player the <code>Player</code> joining this game
+     *
+     * @return the {@code MessageHandler} that will process the
+     *         provided player's messages while they are joined to
+     *         this game
      */
-    public void join(Player player);
+    public MessageHandler join(Player player);
 
     /**
      * Removes the given <code>Player</code> from this <code>Game</code>. The
@@ -38,14 +42,6 @@ public interface Game extends ManagedObject {
      * @param player the <code>Player</code> joining this game
      */
     public void leave(Player player);
-
-    /**
-     * Creates a new instance of a <code>MessageHandler</code> that will
-     * handle messages intended for this <code>Game</code>. 
-     *
-     * @return a new instance of <code>MessageHandler</code>
-     */
-    public MessageHandler createMessageHandler();
 
     /**
      * Returns the name of this <code>Game</code>.

@@ -138,7 +138,7 @@ public class SimpleBoard implements LevelBoard {
      * @return true if the operation succeeded, false otherwise
      */
     public boolean addCharacterAt(int x, int y, CharacterManager mgr) {
-        return tiles[x][y].addCharacter(mgr);
+	return tiles[x][y].addCharacter(mgr);
     }
 
     /**

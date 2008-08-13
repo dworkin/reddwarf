@@ -30,7 +30,7 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 
     // the current character stats
     private CharacterStats currentStats;
-    private int characterId;
+    private int characterClassId;
 
     /**
      * Creates a new <code>CreatorMessageHandler</code>.
@@ -54,14 +54,12 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
         int encodedCommand = data.getInt();
 	Command command = Commands.decode(encodedCommand);
 
-        // NOTE: it would be more elegant to use an enum to define the
-        //       messages
 	switch (command) {
+
 	case ROLL_FOR_STATS:
 	    // get the id and create the stats
-	    characterId = data.getInt();
-	    currentStats = getNewStats(characterId);
-	    player.sendCharacterStats(-1, currentStats);
+	    int characterId = data.getInt();
+	    rollForStats(player, characterId);
 	    break;
 	case CREATE_CURRENT_CLIENT_CHARACTER:
 	    // get the name...
@@ -85,6 +83,13 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 	}
     }
 
+    void rollForStats(Player player, int characterClassId) {
+	this.characterClassId = characterClassId;
+	currentStats = getNewStats(characterClassId);
+	player.sendCharacterStats(-1, currentStats);
+    }
+
+
     /**
      * Creates new stats for the provided character
      *
@@ -92,7 +97,7 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
      *
      * @return the new stats for the character
      */
-    private CharacterStats getNewStats(int id) {
+    static CharacterStats getNewStats(int characterClassId) {
         // NOTE: this should change based on the character class, but
         //       for now it's purely random
         int hp = NSidedDie.roll20Sided() + NSidedDie.roll20Sided();
@@ -124,7 +129,7 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
                                currentStats.getHitPoints(),
                                currentStats.getMaxHitPoints());
 
-        return new PlayerCharacter(player, characterId, stats);
+        return new PlayerCharacter(player, characterClassId, stats);
     }
 
     /**

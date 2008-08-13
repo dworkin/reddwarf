@@ -415,7 +415,7 @@ public final class Messages {
      */
     public static void broadcastBoardUpdate(Channel channel,
 					    Collection<BoardSpace> spaces) 
-    {					    
+    {
         broadcastToClients(channel, Command.UPDATE_BOARD_SPACES, spaces);
     }
 

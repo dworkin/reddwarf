@@ -9,12 +9,23 @@
 package com.sun.sgs.example.hack.server.level;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.ChannelListener;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
 import com.sun.sgs.example.hack.server.Game;
 import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.Messages;
 import com.sun.sgs.example.hack.server.NSidedDie;
+import com.sun.sgs.example.hack.server.Player;
+import com.sun.sgs.example.hack.server.PlayerCharacterManager;
+
+import com.sun.sgs.example.hack.server.ai.AICharacterManager;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
@@ -25,8 +36,11 @@ import com.sun.sgs.example.hack.share.KeyMessages;
 
 import java.io.Serializable;
 
+import java.nio.ByteBuffer;
+
 import java.util.HashSet;
 import java.util.Set;
+
 import java.util.logging.Logger;
 
 
@@ -35,18 +49,28 @@ import java.util.logging.Logger;
  * do anything fancy with managing the internal state. It uses a
  * <code>LevelBoard</code> to track eveything on the level,
  */
-public class SimpleLevel implements Level, Serializable {
+public class SimpleLevel implements Level, Serializable, ChannelListener {
 
     private static final long serialVersionUID = 1;
 
-    // our name
-    private String name;
+    /**
+     * The logger used by this class to report errors
+     */
+    private static final Logger logger = 
+	Logger.getLogger(SimpleLevel.class.getName());
 
-    // the name of the game that owns this level
-    private String game;
+    /**
+     * The name oif this level
+     */
+    private final String levelName;    
+
+    /**
+     * the name of the game that owns this level
+     */
+    private final String gameName;
 
     // the characters currently in this level
-    private HashSet<ManagedReference<CharacterManager>> characterRefs;
+    private Set<ManagedReference<CharacterManager>> characterRefs;
 
     // the dimentsion of this level
     private int levelWidth;
@@ -55,6 +79,15 @@ public class SimpleLevel implements Level, Serializable {
     // the board that maintains our state
     private LevelBoard board;
 
+    private ManagedReference<Channel> levelUpdatesChannelRef;
+
+    /**
+     * A subset of the characters on this level that reside on the
+     * server-side and do not use channels to receive broadcasted
+     * updates
+     */
+    private Set<ManagedReference<CharacterManager>> serverSideCharacters;
+
     /**
      * Creates a <code>SimpleLevel</code>.
      *
@@ -62,11 +95,22 @@ public class SimpleLevel implements Level, Serializable {
      * @param gameName the name of the game where this level exists
      */
     public SimpleLevel(String levelName, String gameName) {
-        this.name = levelName;
-        this.game = gameName;
+        this.levelName = levelName;
+        this.gameName = gameName;
 
         // create a new set for our characters
         characterRefs = new HashSet<ManagedReference<CharacterManager>>();
+
+	serverSideCharacters = 
+	    new HashSet<ManagedReference<CharacterManager>>();
+
+	Channel levelUpdatesChannel = 
+	    AppContext.getChannelManager().createChannel(NAME_PREFIX + 
+							 levelName, this,
+							 Delivery.RELIABLE);
+	logger.fine("created level channel: " + levelName);
+	levelUpdatesChannelRef = 
+	    AppContext.getDataManager().createReference(levelUpdatesChannel);
     }
 
     /**
@@ -91,7 +135,14 @@ public class SimpleLevel implements Level, Serializable {
      * @return the name
      */
     public String getName() {
-        return name;
+        return levelName;
+    }
+
+    
+    public void receivedMessage(Channel channel, ClientSession sender, 
+				ByteBuffer message) {
+	logger.warning("recevied unexpected messaage from " + sender.getName() +
+		       " on channel " + channel.getName());
     }
 
     /**
@@ -137,15 +188,35 @@ public class SimpleLevel implements Level, Serializable {
         mgr.setLevelPosition(startX, startY);
 
         if (! board.addCharacterAt(startX, startY, mgr)) {
+	    logger.warning("could not add character at " + startX + "," + startY);
             mgr.setCurrentLevel(null);
             mgr.setLevelPosition(-1, -1);
             return false;
         }
-
-        AppContext.getDataManager().markForUpdate(this);
+	
+	DataManager dm = AppContext.getDataManager();
+        dm.markForUpdate(this);
 
         // keep track of the character
-        characterRefs.add(AppContext.getDataManager().createReference(mgr));
+	ManagedReference<CharacterManager> characterRef = 
+	    dm.createReference(mgr);
+        characterRefs.add(characterRef);
+
+	// NOTE: this code is related to Issue 25 where we need to
+	// keep track of all the server side characters
+	if (mgr instanceof AICharacterManager) {
+	    serverSideCharacters.add(characterRef);
+	}
+	// otherwise, it must be a player character, so add the player
+	// to the level-updates channel
+	else if (mgr instanceof PlayerCharacterManager) {
+	    PlayerCharacterManager pcm = (PlayerCharacterManager)mgr;
+	    Player player = pcm.getPlayer();
+	    ClientSession session = player.getCurrentSession();
+	    logger.finer("joined " + session.getName() + " to " +
+			 levelUpdatesChannelRef.get().getName());
+	    levelUpdatesChannelRef.get().join(session);
+	}
 
         // now we need to send the board and position to the character
         mgr.sendBoard(getBoardSnapshot());
@@ -181,6 +252,25 @@ public class SimpleLevel implements Level, Serializable {
             if (board.removeCharacterAt(x, y, mgr))
                 sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
         }
+
+	// NOTE: this code is related to Issue 25 where we need to
+	// keep track of all the server side characters
+	if (mgr instanceof AICharacterManager) {
+	    ManagedReference<CharacterManager> characterRef = 
+		AppContext.getDataManager().createReference(mgr);
+
+	    serverSideCharacters.remove(characterRef);
+	}
+	// otherwise, it must be a player character, so remove the
+	// player from the level-updates channel
+	else if (mgr instanceof PlayerCharacterManager) {
+	    PlayerCharacterManager pcm = (PlayerCharacterManager)mgr;
+	    Player player = pcm.getPlayer();
+	    ClientSession session = player.getCurrentSession();
+	    logger.finer("removed " + session.getName() + " from " +
+			 levelUpdatesChannelRef.get().getName());
+	    levelUpdatesChannelRef.get().leave(session);
+	}
     }
 
     /**
@@ -329,8 +419,17 @@ public class SimpleLevel implements Level, Serializable {
      * @param updates the spaces being updated
      */
     private void sendUpdates(Set<BoardSpace> updates) {
-        for (ManagedReference<CharacterManager> mgrRef : characterRefs)
-            mgrRef.get().sendUpdate(updates);
+
+	Channel levelUpdatesChannel = levelUpdatesChannelRef.get();
+	if (levelUpdatesChannel.hasSessions()) {
+	    Messages.broadcastBoardUpdate(levelUpdatesChannel, updates);
+	}
+
+	// now send to all the server side (i.e. AI) characters
+	for (ManagedReference<CharacterManager> serverSideCharacter : 
+		 serverSideCharacters) {
+	    serverSideCharacter.get().broadcastUpdates(updates);
+	}
     }
 
     /**
@@ -346,6 +445,25 @@ public class SimpleLevel implements Level, Serializable {
             AppContext.getDataManager().markForUpdate(this);
             sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
         }
+
+	// NOTE: this code is related to Issue 25 where we need to
+	// keep track of all the server side characters
+	if (mgr instanceof AICharacterManager) {
+	    ManagedReference<CharacterManager> characterRef = 
+		AppContext.getDataManager().createReference(mgr);
+
+	    serverSideCharacters.remove(characterRef);
+	}
+	// otherwise, it must be a player character, so remove the
+	// player from the level-updates channel
+	else if (mgr instanceof PlayerCharacterManager) {
+	    PlayerCharacterManager pcm = (PlayerCharacterManager)mgr;
+	    Player player = pcm.getPlayer();
+	    ClientSession session = player.getCurrentSession();
+	    logger.finer("removed " + session.getName() + " from " +
+			 levelUpdatesChannelRef.get().getName());
+	    levelUpdatesChannelRef.get().leave(session);
+	}
     }
 
 }
