@@ -24,8 +24,8 @@ package com.sun.sgs.impl.service.nodemap;
  * Thrown if the {@link NodeAssignPolicy} could not choose a node for
  * assignment because no nodes were available to it.
  * <p>
- * Note that this exception is very specific;  perhaps we'll want a
- * more general exception to be thrown from {@link NodeAssignPolicy#chooseNode}. 
+ * Note that this exception is very specific;  perhaps we'll want a more
+ * general exception to be thrown from {@link NodeAssignPolicy#chooseNode}. 
  */
 class NoNodesAvailableException extends Exception {
     /** The version of the serialized form. */

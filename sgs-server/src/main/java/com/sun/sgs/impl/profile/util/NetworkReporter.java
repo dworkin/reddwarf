@@ -105,7 +105,7 @@ public final class NetworkReporter {
             } catch (IOException e) {
                 try {
                     serverSocket.close();
-                } catch (IOException ioe) {}
+                } catch (IOException ioe) { }
             }
         }
     }

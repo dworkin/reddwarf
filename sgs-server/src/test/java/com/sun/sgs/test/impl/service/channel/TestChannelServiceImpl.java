@@ -2686,10 +2686,17 @@ public class TestChannelServiceImpl extends TestCase {
 		if (next == null) {
 		    break;
 		}
-		//ManagedReference ref = dataService.createReferenceForId(next);
-		//System.err.println(next + ": " + ref.get());
-		count++;
-		last = next;
+                // NOTE: this count is used at the end of the test to make sure
+                // that no objects were leaked in stressing the structure but
+                // any given service (e.g., the task service) may accumulate
+                // managed objects, so a more general way to exclude these from
+                // the count would be nice but for now the specific types that
+                // are accumulated get excluded from the count
+                String name = dataService.createReferenceForId(next).get().
+                    getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask"))
+                    count++;
+                last = next;
 	    }
 	}
     }

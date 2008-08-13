@@ -31,7 +31,7 @@ public interface ProfileParticipantDetail {
      *
      * @return the participant's name
      */
-    public String getParticipantName();
+    String getParticipantName();
 
     /**
      * Returns whether this participant finished preparing to commit at the
@@ -40,7 +40,7 @@ public interface ProfileParticipantDetail {
      * @return <code>true</code> if this participant finished preparing,
      *         <code>false</code> otherwise
      */
-    public boolean wasPrepared();
+    boolean wasPrepared();
 
     /**
      * Returns the vote that the participant returned from preparation. If
@@ -50,7 +50,7 @@ public interface ProfileParticipantDetail {
      * @return <code>true</code> if the participant returned from preparation
      *         with a vote of read-only, <code>false</code> otherwise
      */
-    public boolean wasReadOnly();
+    boolean wasReadOnly();
 
     /**
      * Returns whether this participant was successfully committed.
@@ -58,7 +58,7 @@ public interface ProfileParticipantDetail {
      * @return <code>true</code> if this participant committed,
      *         <code>false</code> otherwise
      */
-    public boolean wasCommitted();
+    boolean wasCommitted();
 
     /**
      * Returns whether this participant was called to prepare and commit in
@@ -72,7 +72,7 @@ public interface ProfileParticipantDetail {
      * @return <code>true</code> if this participant was called directly to
      *         commit, <code>false</code> otherwise
      */
-    public boolean wasCommittedDirectly();
+    boolean wasCommittedDirectly();
 
     /**
      * Returns the length of time this participant spent preparing to commit,
@@ -84,7 +84,7 @@ public interface ProfileParticipantDetail {
      *         commit, or the time spent preparing and committing if called
      *         directly to commit
      */
-    public long getPrepareTime();
+    long getPrepareTime();
 
     /**
      * Returns the length of time this participant spent committing. If the
@@ -98,7 +98,7 @@ public interface ProfileParticipantDetail {
      *          or the time spent preparing and committing if called directly
      *          to commit
      */
-    public long getCommitTime();
+    long getCommitTime();
 
     /**
      * Returns the length of time this participant spent aborting if the
@@ -107,6 +107,6 @@ public interface ProfileParticipantDetail {
      *
      * @return the time in milliseconds this participant spent aborting
      */
-    public long getAbortTime();
+    long getAbortTime();
 
 }
