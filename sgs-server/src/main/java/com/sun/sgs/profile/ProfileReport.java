@@ -41,14 +41,14 @@ public interface ProfileReport {
      *
      * @return the <code>KernelRunnable</code> that was run
      */
-    public KernelRunnable getTask();
+    KernelRunnable getTask();
 
     /**
      * Returns the owner of the run task.
      *
      * @return the <code>Identity</code> of the task owner
      */
-    public Identity getTaskOwner();
+    Identity getTaskOwner();
 
     /**
      * Returns whether any of the task was transactional.
@@ -56,7 +56,7 @@ public interface ProfileReport {
      * @return <code>true</code> if any part of the task ran transactionally,
      *         <code>false</code> otherwise
      */
-    public boolean wasTaskTransactional();
+    boolean wasTaskTransactional();
 
     /**
      * Returns the identifier for the task's transaction, or <code>null</code>
@@ -72,7 +72,7 @@ public interface ProfileReport {
      *
      * @return a <code>Set</code> of <code>ProfileParticipantDetail</code>
      */
-    public Set<ProfileParticipantDetail> getParticipantDetails();
+    Set<ProfileParticipantDetail> getParticipantDetails();
 
     /**
      * Returns whether the task successfully ran to completion. If this
@@ -82,7 +82,7 @@ public interface ProfileReport {
      * @return <code>true</code> if this task completed successfully,
      *         <code>false</code> otherwise
      */
-    public boolean wasTaskSuccessful();
+    boolean wasTaskSuccessful();
 
     /**
      * Returns the time at which that task was scheduled to run.
@@ -90,7 +90,7 @@ public interface ProfileReport {
      * @return the requested starting time for the task in milliseconds
      *         since January 1, 1970
      */
-    public long getScheduledStartTime();
+    long getScheduledStartTime();
 
     /**
      * Returns the time at which the task actually started running.
@@ -98,7 +98,7 @@ public interface ProfileReport {
      * @return the actual starting time for the task in milliseconds
      *         since January 1, 1970
      */
-    public long getActualStartTime();
+    long getActualStartTime();
 
     /**
      * Returns the length of time spent running the task. Note that this
@@ -107,7 +107,7 @@ public interface ProfileReport {
      *
      * @return the length in milliseconds to execute the task
      */
-    public long getRunningTime();
+    long getRunningTime();
 
     /**
      * Returns the number of times this task has been tried. If this is
@@ -115,7 +115,7 @@ public interface ProfileReport {
      * 
      * @return the number of times this task has been tried
      */
-    public int getRetryCount();
+    int getRetryCount();
 
     /**
      * Returns the operations that were reported as executed during the
@@ -125,7 +125,7 @@ public interface ProfileReport {
      * @return a <code>List</code> of <code>ProfileOperation</code>
      *         representing the ordered set of reported operations
      */
-    public List<ProfileOperation> getReportedOperations();
+    List<ProfileOperation> getReportedOperations();
 
     /**
      * Returns the updated values of the aggregate counters that were
@@ -139,7 +139,7 @@ public interface ProfileReport {
      *
      * @return a <code>Map</code> from counter name to observed value
      */
-    public Map<String,Long> getUpdatedAggregateCounters();
+    Map<String, Long> getUpdatedAggregateCounters();
 
     /**
      * Returns the values of the task-local counters that were updated
@@ -150,7 +150,7 @@ public interface ProfileReport {
      *
      * @return a <code>Map</code> from counter name to observed value
      */
-    public Map<String,Long> getUpdatedTaskCounters();
+    Map<String, Long> getUpdatedTaskCounters();
 
     /**
      * Returns a mapping for each sample that records for the lifetime
@@ -165,7 +165,7 @@ public interface ProfileReport {
      * @return a <code>Map</code> from sample name to a list of values
      *         added during the task  
      */
-    public Map<String,List<Long>> getUpdatedAggregateSamples();
+    Map<String, List<Long>> getUpdatedAggregateSamples();
 
     /**
      * Returns the list of values for the task-local samples that were
@@ -177,7 +177,7 @@ public interface ProfileReport {
      * @return a <code>Map</code> from sample name to a list of values
      *         added during the task
      */
-    public Map<String,List<Long>> getUpdatedTaskSamples();  
+    Map<String, List<Long>> getUpdatedTaskSamples();  
 
     /**
      * Returns detail of the object accesses as reported by the
@@ -199,7 +199,7 @@ public interface ProfileReport {
      *
      * @return the number of ready tasks in the same context
      */
-    public int getReadyCount();
+    int getReadyCount();
 
     /**
      * Returns any failure that occurred during the execution of
@@ -211,6 +211,6 @@ public interface ProfileReport {
      * @return the <code>Throwable</code> thrown during task execution
      *         or <code>null</code> if no failure occurred
      */
-    public Throwable getFailureCause();
+    Throwable getFailureCause();
 
 }

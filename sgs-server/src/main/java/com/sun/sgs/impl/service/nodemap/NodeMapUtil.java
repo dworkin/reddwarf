@@ -100,8 +100,7 @@ final class NodeMapUtil {
      * and {@code serviceName}.  The status mappings are held per 
      * identity per node.
      */
-    static String getStatusKey(Identity id, long nodeId, String serviceName) 
-    {
+    static String getStatusKey(Identity id, long nodeId, String serviceName) {
         StringBuilder sb = buildStatusKey(id, nodeId);
         sb.append(serviceName);
         return sb.toString();	

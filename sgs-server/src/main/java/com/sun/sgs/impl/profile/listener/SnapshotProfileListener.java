@@ -40,8 +40,6 @@ import java.io.IOException;
 import java.util.Formatter;
 import java.util.Properties;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 
 /**
  * This implementation of <code>ProfileListener</code> takes
@@ -70,12 +68,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SnapshotProfileListener implements ProfileListener {
 
     // the number of successful tasks and the total number of tasks
-    private volatile long successCount = 0;
-    private volatile long totalCount = 0;
+    private long successCount = 0;
+    private long totalCount = 0;
 
     // the total number of ready tasks observed
-    private volatile int readyCount = 0;
+    private int readyCount = 0;
 
+    // lock object for data above, used to ensure that during reporting no
+    // one is looking at the data, since it gets cleared after the report
+    // is made
+    private final Object lock = new Object();
+    
     // the number of threads running through the scheduler
     private volatile int threadCount;
 
@@ -84,10 +87,6 @@ public class SnapshotProfileListener implements ProfileListener {
 
     // the handle for the recurring reporting task
     private RecurringTaskHandle handle;
-
-    // a flag used to make sure that during reporting no one is looking
-    // at the data, since it gets cleared after the report is made
-    private AtomicBoolean flag;
 
     // the base name for properties
     private static final String PROP_BASE =
@@ -114,8 +113,6 @@ public class SnapshotProfileListener implements ProfileListener {
                                    ComponentRegistry registry)
         throws IOException
     {
-        flag = new AtomicBoolean(false);
-
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
@@ -134,23 +131,21 @@ public class SnapshotProfileListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void propertyChange(PropertyChangeEvent event) {
-	if (event.getPropertyName().equals("com.sun.sgs.profile.threadcount"))
-	    this.threadCount = ((Integer)event.getNewValue()).intValue();
+	if (event.getPropertyName().equals("com.sun.sgs.profile.threadcount")) {
+	    this.threadCount = ((Integer) event.getNewValue()).intValue();
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void report(ProfileReport profileReport) {
-        while (! flag.compareAndSet(false, true));
-
-        try {
-            if (profileReport.wasTaskSuccessful())
+        synchronized (lock) {
+            if (profileReport.wasTaskSuccessful()) {
                 successCount++;
+            }
             totalCount++;
             readyCount += profileReport.getReadyCount();
-        } finally {
-            flag.set(false);
         }
     }
 
@@ -175,20 +170,20 @@ public class SnapshotProfileListener implements ProfileListener {
             return SnapshotRunnable.class.getName();
         }
         public void run() throws Exception {
-            while (! flag.compareAndSet(false, true));
-
             Formatter reportStr = new Formatter();
 	    reportStr.format("Snapshot[period=%dms]:%n", reportPeriod);
-            try {
-                reportStr.format("  Threads=%d", threadCount);
-		reportStr.format("  Tasks=%d/%d%n", successCount, totalCount);
-                reportStr.format("  AverageQueueSize=%2.2f tasks%n%n",
-				 ((double)readyCount / (double)totalCount));
-            } finally {
-                successCount = 0;
-                totalCount = 0;
-                readyCount = 0;
-                flag.set(false);
+            synchronized (lock) {
+                try {
+                    reportStr.format("  Threads=%d", threadCount);
+                    reportStr.format("  Tasks=%d/%d%n", 
+                                     successCount, totalCount);
+                    reportStr.format("  AverageQueueSize=%2.2f tasks%n%n",
+				 ((double) readyCount / (double) totalCount));
+                } finally {
+                    successCount = 0;
+                    totalCount = 0;
+                    readyCount = 0;
+                }
             }
 
             networkReporter.report(reportStr.toString());

@@ -22,6 +22,7 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -30,8 +31,11 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -47,6 +51,10 @@ import java.util.logging.Level;
  * should provide an implementation of the {@code toString} method.
  */
 public abstract class AbstractService implements Service {
+
+    /** The time (in milliseconds) to wait before retrying an (@code
+     * IoRunnable} in the {@code runIoTask} method. */ 
+    private static final int WAIT_TIME_BEFORE_RETRY = 100;
 
     /** Service state. */
     protected static enum State {
@@ -74,7 +82,7 @@ public abstract class AbstractService implements Service {
 
     /** The task scheduler. */
     protected final TaskScheduler taskScheduler;
-    
+
     /** The transaction scheduler. */
     protected final TransactionScheduler transactionScheduler;
 
@@ -397,9 +405,81 @@ public abstract class AbstractService implements Service {
         }
     }
     
+    /**
+     * Runs a transactional task to query the status of the node with the
+     * specified {@code nodeId} and returns {@code true} if the node is alive
+     * and {@code false} otherwise.
+     *
+     * <p>This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown.
+     *
+     * @param	nodeId a node ID
+     * @return	{@code true} if the node with the associated ID is
+     *		considered alive, otherwise returns {@code false}
+     * @throws	IllegalStateException if this method is invoked inside a
+     *		transactional context 
+     */
+    public boolean isAlive(long nodeId) {
+	checkNonTransactionalContext();
+	try {
+	    CheckNodeStatusTask nodeStatus =
+		new CheckNodeStatusTask(nodeId);
+	    transactionScheduler.runTask(nodeStatus, taskOwner);
+	    return nodeStatus.isAlive;
+	} catch (IllegalStateException ignore) {
+	    // Ignore because the service is shutting down.
+	} catch (Exception e) {
+	    // This shouldn't happen, so log.
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e, "running CheckNodeStatusTask throws");
+	    }
+	}
+	// TBD: is this the correct value to return?  We can't really tell
+	// what the status of a non-local node is if the local node is
+	// shutting down.
+	return false;
+    } 
+
     /** Creates a {@code TaskQueue} for dependent, transactional tasks. */
     public TaskQueue createTaskQueue() {
 	return transactionScheduler.createTaskQueue();
+    }
+
+    /**
+     * Executes the specified {@code ioTask} by invoking its {@link
+     * IoRunnable#run run} method.  If the specified task throws an
+     * {@code IOException}, this method will retry the task while the
+     * node with the given {@code nodeId} is alive until the task
+     * completes successfully.
+     *
+     * <p>This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown.
+     *
+     * @param	ioTask a task with IO-related operations
+     * @param	nodeId the node that is the target of the IO operations
+     * @throws	IllegalStateException if this method is invoked within a
+     * 		transactional context
+     */
+    public void runIoTask(IoRunnable ioTask, long nodeId) {
+	checkNonTransactionalContext();
+	do {
+	    try {
+		ioTask.run();
+		return;
+	    } catch (IOException e) {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.logThrow(
+			Level.FINEST, e,
+			"IoRunnable {0} throws", ioTask);
+		}
+		try {
+		    // TBD: what back-off policy do we want here?
+		    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
+		} catch (InterruptedException ie) {
+		}
+	    }
+	} while (isAlive(nodeId));
     }
     
     /**
@@ -502,6 +582,8 @@ public abstract class AbstractService implements Service {
             return result;              
         }
     }
+
+    /* -- Private methods and classes -- */
     
     /**
      * Sets this service's state to {@code newState}.
@@ -514,6 +596,41 @@ public abstract class AbstractService implements Service {
 	}
     }
 
+    /**
+     * Checks that the current thread is not in a transactional context
+     * and throws {@code IllegalStateException} if the thread is in a
+     * transactional context.
+     */
+    private void checkNonTransactionalContext() {
+	try {
+	    txnProxy.getCurrentTransaction();
+	    throw new IllegalStateException(
+		"operation not allowed from a transactional context");
+	} catch (TransactionNotActiveException e) {
+	}
+    }
+	
+    /**
+     * A task to obtain the status of a given node.
+     */
+    private static class CheckNodeStatusTask extends AbstractKernelRunnable {
+	private final long nodeId;
+	volatile boolean isAlive = false;
+
+	/** Constructs an instance with the specified {@code nodeId}. */
+	CheckNodeStatusTask(long nodeId) {
+	    this.nodeId = nodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    WatchdogService watchdogService =
+		txnProxy.getService(WatchdogService.class);
+	    Node node = watchdogService.getNode(nodeId);
+	    isAlive = node != null && node.isAlive();
+	}
+    }
+    
     /**
      * Thread for shutting down service/server.
      */
@@ -537,5 +654,4 @@ public abstract class AbstractService implements Service {
 	    setState(AbstractService.State.SHUTDOWN);
 	}
     }
-
 }

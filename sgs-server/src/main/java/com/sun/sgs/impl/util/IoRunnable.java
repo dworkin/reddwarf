@@ -17,23 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.profile;
+package com.sun.sgs.impl.util;
 
+import java.io.IOException;
 
 /**
- * A registration interface where profile producers register
- * and get {@code ProfileConsumer}s used to consume profiling data.
+ * A task to encapsulate IO-related operations to be executed within the
+ * context of {@link AbstractService#runIoTask AbstractService.runIoTask}.
  */
-public interface ProfileRegistrar {
+public interface IoRunnable {
 
     /**
-     * Registers the given unique name as a profile producer.
+     * Runs IO-related operations to be executed within the context of
+     * {@link AbstractService#runIoTask AbstractService.runIoTask}.
      *
-     * @param name the unique name of the profile producer
-     *
-     * @return a {@code ProfileConsumer} that will consume profiling
-     *         data from the provided named producer
+     * @throws	IOException if an IOException occurs while running this
+     *		method 
      */
-    ProfileConsumer registerProfileProducer(String name);
-
+   void run() throws IOException;
 }

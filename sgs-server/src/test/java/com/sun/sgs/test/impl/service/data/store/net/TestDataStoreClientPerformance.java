@@ -20,8 +20,10 @@
 package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.test.impl.service.data.store.TestDataStorePerformance;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 
 /** Test the performance of the DataStoreClient class. */
 public class TestDataStoreClientPerformance extends TestDataStorePerformance {
@@ -62,6 +64,10 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
-	return new DataStoreClient(props);
+	DataStore store = new DataStoreProfileProducer(
+	    new DataStoreClient(props),
+	    DummyProfileCoordinator.getRegistrar());
+	DummyProfileCoordinator.startProfiling();
+	return store;
     }
 }
