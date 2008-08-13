@@ -237,7 +237,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         serverNode = null;
     }
 
-    /* -- Test constructor -- */
+    // -- Test constructor --
 
     public void testConstructorNullProperties() throws Exception {
 	try {
@@ -359,7 +359,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
     
-    /* -- Test connecting, logging in, logging out with server -- */
+    // -- Test connecting, logging in, logging out with server -- 
 
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient("foo");
@@ -537,6 +537,21 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testDisconnectFromServerAfterLogout() throws Exception {
+	final String name = "logout";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login();
+	    client.logout();
+	    assertEquals(client.connected, true);
+	    Thread.sleep(1500);
+	    assertEquals(client.connected, false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	final String name = "logout";
 	DummyClient client = new DummyClient(name);
@@ -545,7 +560,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login();
 	    checkBindings(1);
 	    client.logout();
-	    client.checkDisconnected(true);
+	    client.checkDisconnectedCallback(true);
 	    checkBindings(0);
 	    // check that client session was removed after disconnected callback
 	    // returned 
@@ -577,7 +592,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login();
 	    checkBindings(1);
 	    client.logout();
-	    client.checkDisconnected(true);
+	    client.checkDisconnectedCallback(true);
 	    // give scheduled task a chance to clean up...
 	    Thread.sleep(250);
 	    checkBindings(0);	    
@@ -625,15 +640,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    int appPort = serverNode.getAppPort();
 	    for (int i = 0; i < numClients; i++) {
-		/*
-		 * Create half of the clients with a name that starts with
-		 * "badClient" which will cause the associated session's
-		 * ClientSessionListener's 'disconnected' method to throw a
-		 * non-retryable exception.  We want to make sure that all the
-		 * client sessions are cleaned up after a crash, even if
-		 * invoking a session's listener's 'disconnected' callback
-		 * throws a non-retryable exception.
-		 */
+		 // Create half of the clients with a name that starts with
+		 // "badClient" which will cause the associated session's
+		 // ClientSessionListener's 'disconnected' method to throw a
+		 // non-retryable exception.  We want to make sure that all the
+		 // client sessions are cleaned up after a crash, even if
+		 // invoking a session's listener's 'disconnected' callback
+		 // throws a non-retryable exception.
 		String name = (i % 2 == 0) ? "client" : "badClient";
 		DummyClient client = new DummyClient(name + String.valueOf(i));
 		client.connect(appPort).login();
@@ -646,7 +659,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             setUp(false);
 
 	    for (DummyClient client : dummyClients.values()) {
-		client.checkDisconnected(false);
+		client.checkDisconnectedCallback(false);
 	    }
 	    
 	    // Wait to make sure that bindings and node key are cleaned up.
@@ -674,64 +687,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /**
-     * Check that the session bindings are the expected number and throw an
-     * exception if they aren't.
-     */
-    private void checkBindings(int numExpected) throws Exception {
-	
-	List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
-	System.err.println("Listener keys: " + listenerKeys);
-	if (listenerKeys.size() != numExpected) {
-	    fail("expected " + numExpected + " listener keys, got " +
-		 listenerKeys.size());
-	}
-	    
-	List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
-	System.err.println("Session keys: " + sessionKeys);
-	if (sessionKeys.size() != numExpected) {
-	    fail("expected " + numExpected + " session keys, got " +
-		 sessionKeys.size());
-	}
-	    
-	List<String> sessionNodeKeys =
-	    getServiceBindingKeys(SESSION_NODE_PREFIX);
-	System.err.println("Session node keys: " + sessionNodeKeys);
-	if (sessionNodeKeys.size() != numExpected) {
-	    fail("expected " + numExpected + " session node keys, got " +
-		 sessionNodeKeys.size());
-	}
-    }
-    
-    private List<String> getServiceBindingKeys(String prefix) throws Exception {
-        GetKeysTask task = new GetKeysTask(prefix);
-        txnScheduler.runTask(task, taskOwner);
-        return task.getKeys();
-    }
-
-    private class GetKeysTask extends AbstractKernelRunnable {
-        private List<String> keys = new ArrayList<String>();
-        private final String prefix;
-        GetKeysTask(String prefix) {
-            this.prefix = prefix;
-        }
-        public void run() throws Exception {
-            String key = prefix;
-            for (;;) {
-                key = dataService.nextServiceBoundName(key);
-                if (key == null ||
-                    ! key.regionMatches(
-                          0, prefix, 0, prefix.length()))
-                {
-                    break;
-                }
-                keys.add(key);
-            }
-        }
-        public List<String> getKeys() { return keys;}
-    }
-
-    /* -- test ClientSession -- */
+    // -- test ClientSession --
 
     public void testClientSessionIsConnected() throws Exception {
 	DummyClient client = new DummyClient("clientname");
@@ -861,11 +817,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
 	    
-	    /*
-	     * Replace each node's ClientSessionServer, bound in the data
-	     * service, with a wrapped server that delays before sending
-	     * the message.
-	     */
+	    // Replace each node's ClientSessionServer, bound in the data
+	    // service, with a wrapped server that delays before sending
+	    // the message.
 	    final DataService ds = dataService;
 	    TransactionScheduler txnScheduler =
 		serverNode.getSystemRegistry().
@@ -944,15 +898,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /**
-     * Test sending from the server to the client session in a transaction that
-     * aborts with a retryable exception to make sure that message buffers are
-     * reclaimed.  Try sending 4K bytes, and have the task abort 100 times with
-     * a retryable exception so the task is retried.  If the buffers are not
-     * being reclaimed then the sends will eventually fail because the buffer
-     * space is used up.  Note that this test assumes that sending 400 KB of
-     * data will surpass the I/O throttling limit.
-     */
+    // Test sending from the server to the client session in a transaction that
+    // aborts with a retryable exception to make sure that message buffers are
+    // reclaimed.  Try sending 4K bytes, and have the task abort 100 times with
+    // a retryable exception so the task is retried.  If the buffers are not
+    // being reclaimed then the sends will eventually fail because the buffer
+    // space is used up.  Note that this test assumes that sending 400 KB of
+    // data will surpass the I/O throttling limit.
     public void testClientSessionSendAbortRetryable() throws Exception {
 	DummyClient client = new DummyClient("clientname");
 	try {
@@ -1022,7 +974,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   ", elapsed time: " + (endTime - startTime) +
 			   " ms.");
     }
-    
+
+    /* -- other methods -- */
+
     private void sendMessagesAndCheck(
 	int numMessages, int expectedMessages, RuntimeException exception)
 	throws Exception
@@ -1038,7 +992,62 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /* -- other methods -- */
+    /**
+     * Check that the session bindings are the expected number and throw an
+     * exception if they aren't.
+     */
+    private void checkBindings(int numExpected) throws Exception {
+	
+	List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
+	System.err.println("Listener keys: " + listenerKeys);
+	if (listenerKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " listener keys, got " +
+		 listenerKeys.size());
+	}
+	    
+	List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
+	System.err.println("Session keys: " + sessionKeys);
+	if (sessionKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " session keys, got " +
+		 sessionKeys.size());
+	}
+	    
+	List<String> sessionNodeKeys =
+	    getServiceBindingKeys(SESSION_NODE_PREFIX);
+	System.err.println("Session node keys: " + sessionNodeKeys);
+	if (sessionNodeKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " session node keys, got " +
+		 sessionNodeKeys.size());
+	}
+    }
+    
+    private List<String> getServiceBindingKeys(String prefix) throws Exception {
+        GetKeysTask task = new GetKeysTask(prefix);
+        txnScheduler.runTask(task, taskOwner);
+        return task.getKeys();
+    }
+
+    private class GetKeysTask extends AbstractKernelRunnable {
+        private List<String> keys = new ArrayList<String>();
+        private final String prefix;
+        GetKeysTask(String prefix) {
+            this.prefix = prefix;
+        }
+        public void run() throws Exception {
+            String key = prefix;
+            for (;;) {
+                key = dataService.nextServiceBoundName(key);
+                if (key == null ||
+                    ! key.regionMatches(
+                          0, prefix, 0, prefix.length()))
+                {
+                    break;
+                }
+                keys.add(key);
+            }
+        }
+        public List<String> getKeys() { return keys;}
+    }
 
     private void printIt(String line) {
 	if (! isPerformanceTest) {
@@ -1312,7 +1321,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
 	}
 
-	void checkDisconnected(boolean graceful) throws Exception {
+	void checkDisconnectedCallback(boolean graceful) throws Exception {
 	    synchronized (disconnectedCallbackLock) {
 		if (!receivedDisconnectedCallback) {
 		    disconnectedCallbackLock.wait(WAIT_TIME);
@@ -1387,7 +1396,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                     synchronized (lock) {
                         logoutAck = true;
                         System.err.println("logout succeeded: " + name);
-                        // let disconnect do the lock notification
+			lock.notifyAll();
                     }
 		    break;
 
@@ -1427,16 +1436,6 @@ public class TestClientSessionServiceImpl extends TestCase {
             /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
                 synchronized (lock) {
-                    // Hack since client might not get last msg
-                    if (awaitGraceful) {
-                        // Pretend they logged out gracefully
-                        logoutAck = true;
-                    } else if (! loginAck) {
-                        // Pretend they got a login failure message
-                        loginAck = true;
-                        loginSuccess = false;
-                        reason = "disconnected before login ack";
-                    }
                     connected = false;
                     lock.notifyAll();
                 }

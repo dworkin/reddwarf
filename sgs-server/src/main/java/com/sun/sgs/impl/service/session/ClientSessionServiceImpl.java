@@ -41,6 +41,7 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
@@ -78,6 +79,7 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -162,6 +164,12 @@ public final class ClientSessionServiceImpl
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
+    /** The time that a disconnecting connection is allowed before
+     * this service forcibly disconnects it.
+     * TBD: should this be configurable?
+     */
+    private static final int DISCONNECT_DELAY = 500;
+
     /** The read buffer size for new connections. */
     private final int readBufferSize;
 
@@ -184,8 +192,10 @@ public final class ClientSessionServiceImpl
     volatile IoFuture<?, ?> acceptFuture;
 
     /** The registered session disconnect listeners. */
-    private final Set<ClientSessionDisconnectListener> sessionDisconnectListeners =
-	Collections.synchronizedSet(new HashSet<ClientSessionDisconnectListener>());
+    private final Set<ClientSessionDisconnectListener>
+	sessionDisconnectListeners =
+	    Collections.synchronizedSet(
+		new HashSet<ClientSessionDisconnectListener>());
 
     /** A map of local session handlers, keyed by session ID . */
     private final Map<BigInteger, ClientSessionHandler> handlers =
@@ -232,6 +242,16 @@ public final class ClientSessionServiceImpl
     /** The map of session task queues, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
+
+    /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
+     * the time the connection should expire.
+     */
+    private final ConcurrentSkipListMap<Long, ClientSessionHandler>
+	disconnectingHandlersMap =
+	    new ConcurrentSkipListMap<Long, ClientSessionHandler>();
+
+    /** The handle for the task that monitors disconnecting client sessions. */
+    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
 
     /** The maximum number of session events to sevice per transaction. */
     final int eventsPerTxn;
@@ -337,7 +357,7 @@ public final class ClientSessionServiceImpl
 				serverProxy));
 		    }},
 		taskOwner);
-	    
+
 	    /*
 	     * Listen for incoming client connections. If no host address
              * is supplied, default to listen on all interfaces.
@@ -374,6 +394,16 @@ public final class ClientSessionServiceImpl
                 }
 		throw e;
 	    }
+
+	    /*
+	     * Set up recurring task to monitor disconnecting client sessions.
+	     */
+	    monitorDisconnectingSessionsTaskHandle =
+		taskScheduler.scheduleRecurringTask(
+ 		    new MonitorDisconnectingSessionsTask(),
+		    taskOwner, 0, DISCONNECT_DELAY);
+	    monitorDisconnectingSessionsTaskHandle.start();
+	    
 	    // TBD: listen for UNRELIABLE connections as well?
 
 	} catch (Exception e) {
@@ -464,10 +494,15 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 
+	if (monitorDisconnectingSessionsTaskHandle != null) {
+	    monitorDisconnectingSessionsTaskHandle.cancel();
+	}
+	    
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
 	}
 	handlers.clear();
+	disconnectingHandlersMap.clear();
 
 	synchronized (flushContextsLock) {
 	    flushContextsLock.notifyAll();
@@ -929,7 +964,7 @@ public final class ClientSessionServiceImpl
 		 * error message. 
 		 */
 		if (handler != null) {
-		    handler.handleDisconnect(false);
+		    handler.handleDisconnect(false, true);
 		} else {
 		    logger.log(
 		        Level.FINE,
@@ -1167,6 +1202,22 @@ public final class ClientSessionServiceImpl
     }
 
     /**
+     * Adds the specified {@code handler} to the map containing {@code
+     * ClientSessionHandler}s that are disconnecting.  The map is keyed by
+     * connection expiration time.  The connection will expire after a fixed
+     * delay and will be forcibly terminated if the client hasn't already
+     * closed the connection.
+     *
+     * @param	handler a {@code ClientSessionHandler} for a disconnecting
+     *		{@code ClientSession}
+     */
+    void monitorDisconnection(ClientSessionHandler handler) {
+	System.err.println("Monitoring disconnection of " + handler);
+	disconnectingHandlersMap.put(
+	    System.currentTimeMillis() + DISCONNECT_DELAY,  handler);
+    }
+
+    /**
      * Schedules a non-durable, transactional task using the given
      * {@code Identity} as the owner.
      */
@@ -1220,6 +1271,31 @@ public final class ClientSessionServiceImpl
      */
     ChannelServiceImpl getChannelService() {
 	return channelService;
+    }
+
+    /**
+     * A task to monitor disconnecting {@code ClientSessionHandler}s to ensure
+     * that their associated connections are closed by the client in a
+     * timely manner.  If a connection is not terminated by the expiration
+     * time, then the connection is forcibly closed.
+     */
+    private class MonitorDisconnectingSessionsTask
+	extends AbstractKernelRunnable
+    {
+	/** {@inheritDoc} */
+	public void run() {
+	    long now = System.currentTimeMillis();
+	    if (! disconnectingHandlersMap.isEmpty() &&
+		disconnectingHandlersMap.firstKey() < now) {
+
+		Map<Long, ClientSessionHandler> expiredSessions = 
+		    disconnectingHandlersMap.headMap(now);
+		for (ClientSessionHandler handler : expiredSessions.values()) {
+		    handler.closeConnection();
+		}
+		expiredSessions.clear();
+	    }
+	}
     }
 
     /**
