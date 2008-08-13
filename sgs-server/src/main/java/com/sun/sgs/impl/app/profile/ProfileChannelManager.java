@@ -47,7 +47,8 @@ public class ProfileChannelManager implements ChannelManager {
      */
     public Channel createChannel(String name,
 				 ChannelListener listener,
-				 Delivery delivery) {
+				 Delivery delivery) 
+    {
         return backingManager.createChannel(name, listener, delivery);
     }
 

@@ -39,8 +39,8 @@ import java.util.Properties;
 public class TaskRuntimeGraphOutputListener implements ProfileListener {
 
     /** A map from basic task type to information collected for that type. */
-    private final Map<String,TaskTypeDetail> taskTimes =
-	new HashMap<String,TaskTypeDetail>();
+    private final Map<String, TaskTypeDetail> taskTimes =
+	new HashMap<String, TaskTypeDetail>();
 
     /** The directory for storing results. */
     private final String directory;

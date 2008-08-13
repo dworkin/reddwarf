@@ -43,7 +43,7 @@ public interface ProfileConsumer {
      * 
      * @param level the profiling level
      */
-    public void setProfileLevel(ProfileLevel level);
+    void setProfileLevel(ProfileLevel level);
     
     /**
      * Get the local profiling level for this consumer. Defaults to the
@@ -51,7 +51,7 @@ public interface ProfileConsumer {
      * 
      * @return the profiling level
      */
-    public ProfileLevel getProfileLevel();
+    ProfileLevel getProfileLevel();
     
     /**
      * Registers the named operation with this consumer, such that the
@@ -66,8 +66,7 @@ public interface ProfileConsumer {
      *
      * @return an instance of <code>ProfileOperation</code>
      */
-    public ProfileOperation registerOperation(String name, 
-                                              ProfileLevel minLevel);
+    ProfileOperation registerOperation(String name, ProfileLevel minLevel);
 
     /**
      * Registers the named counter with this consumer, such that the
@@ -86,8 +85,8 @@ public interface ProfileConsumer {
      *
      * @return an instance of <code>ProfileCounter</code>
      */
-    public ProfileCounter registerCounter(String name, boolean taskLocal,
-                                          ProfileLevel minLevel);
+    ProfileCounter registerCounter(String name, boolean taskLocal,
+                                   ProfileLevel minLevel);
 
     /**
      * Registers the named source of data samples, and returns a
@@ -114,14 +113,13 @@ public interface ProfileConsumer {
      *
      * @return a {@code ProfileSample} that collects the data
      */
-    public ProfileSample registerSampleSource(String name, boolean taskLocal,
-					       long maxSamples, 
-                                               ProfileLevel minLevel);
+    ProfileSample registerSampleSource(String name, boolean taskLocal,
+				       long maxSamples, ProfileLevel minLevel);
 
     /**
      * Each profile consumer has a unique name.
      *
      * @return the name of this consumer
      */
-    public String getName();
+    String getName();
 }

@@ -50,6 +50,14 @@ import java.beans.PropertyChangeEvent;
 public interface ProfileListener {
 
     /**
+     * The property for defining the number task to summarize for
+     * windowed {@code com.sun.sgs.profile.ProfileListener}
+     * implementations.  The value assigned to the property must be an
+     * integer.
+     */
+    String WINDOW_SIZE_PROPERTY = "com.sun.sgs.profile.listener.window.size";
+    
+    /**
      * Notifies this listener of a new change in the system
      * properties.  This method is called for any property that
      * changes.
@@ -85,7 +93,7 @@ public interface ProfileListener {
      *        describing the name of the property, its old and new
      *        values and the source of the change.
      */
-    public void propertyChange(PropertyChangeEvent event);
+    void propertyChange(PropertyChangeEvent event);
 
     /**
      * Reports a completed task that has been run through the scheduler. The
@@ -98,11 +106,11 @@ public interface ProfileListener {
      *
      * @param profileReport the <code>ProfileReport</code> for the task
      */
-    public void report(ProfileReport profileReport);
+    void report(ProfileReport profileReport);
 
     /**
      * Tells this listener that the system is shutting down.
      */
-    public void shutdown();
+    void shutdown();
 
 }
