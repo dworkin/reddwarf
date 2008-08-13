@@ -57,6 +57,16 @@ import java.util.concurrent.atomic.AtomicLong;
  * used by the system to track access to objects and handle any possible
  * conflict. This implementation is also responsible for reporting
  * the access detail to the profiling system.
+ * <p>
+ * This implementation provides the option to keep detail on a backlog of
+ * past transactions to discover what may have caused conflict. This is
+ * currently only useful for {@code ProfileListener}s that wish to diplay
+ * this detail. By default this backlog tracking is disabled. To enable,
+ * set the {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.queue.size}
+ * property to some positive value indicating the length of backlog to use.
+ * Note that with each transaction failure this backlog will be scanned
+ * to find a conflicting transaction, so a larger backlog may provide more
+ * detail about failure but will also be more compute-intensive.
  */
 class AccessCoordinatorImpl implements AccessCoordinator,
                                        NonDurableTransactionParticipant {
@@ -79,6 +89,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     // or put somewhere else altogether
     private final Queue<AccessedObjectsDetailImpl> backlog;
 
+    // the property to set the size of the backlog
     static final String BACKLOG_QUEUE_PROPERTY =
         AccessCoordinatorImpl.class.getName() + ".queue.size";
 

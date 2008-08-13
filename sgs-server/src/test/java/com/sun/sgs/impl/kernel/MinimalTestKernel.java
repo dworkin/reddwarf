@@ -53,10 +53,12 @@ public final class MinimalTestKernel {
 
         ProfileCollector collector = 
             new ProfileCollectorImpl(ProfileLevel.MIN, null, registry);
+        AccessCoordinatorImpl accessCoordinator =
+            new AccessCoordinatorImpl(new Properties(), proxy, collector);
 	TransactionSchedulerImpl txnScheduler =
 	    new TransactionSchedulerImpl(new Properties(),
 					 new TestTransactionCoordinator(),
-					 collector);
+					 collector, accessCoordinator);
 	txnScheduler.setContext(ctx);
 	registry.addComponent(txnScheduler);
 
