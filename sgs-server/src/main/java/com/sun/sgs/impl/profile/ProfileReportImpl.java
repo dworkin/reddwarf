@@ -69,7 +69,7 @@ class ProfileReportImpl implements ProfileReport {
 
     // the other fields, set directly by the ProfileCollectorImpl
     boolean transactional = false;
-    BigInteger transactionId;
+    BigInteger transactionId = null;
     boolean succeeded = false;
     long runningTime = 0;
     int tryCount = 0;

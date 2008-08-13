@@ -66,6 +66,7 @@ public final class MinimalTestKernel {
 	    new TaskSchedulerImpl(new Properties(), collector);
 	taskScheduler.setContext(ctx);
 	registry.addComponent(taskScheduler);
+        registry.addComponent(accessCoordinator);
 
         registry.addComponent(DummyProfileCoordinator.getRegistrar());
 	ContextResolver.setTaskState(ctx, new DummyIdentity());

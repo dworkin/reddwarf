@@ -98,19 +98,23 @@ public class AccessedObjectsListener implements ProfileListener {
      * {@inheritDoc}
      */
     public void report(ProfileReport profileReport) {
-	
-	AccessedObjectsDetail detail = 
-	    profileReport.getAccessedObjectsDetail();
+        // get the access detail, or return if there is none available
+	AccessedObjectsDetail detail = profileReport.getAccessedObjectsDetail();
+	if (detail == null)
+            return;
 
-        // see if there is any conflict detail available
-	if ((detail != null) &&
-            (detail.getConflictType() != ConflictType.NONE)) {
+        // if a backlog is in use, then store the new detail
+        if (backlogMap != null)
+            backlogMap.put(profileReport.getTransactionId(), detail);
+
+        // if there was conflict, then figure out what to display
+        if (detail.getConflictType() != ConflictType.NONE) {
 
             // print out the detail for the failed transaction
 	    System.out.printf("Task type %s failed due to conflict.  Details:"
-			      + "\n  accesor id: %d, try count %d; objects "
-			      + "accessed ordered by first access:\n%s" 
-			      + "conflict type: %s\n",
+			      + "%n  accesor id: %d, try count %d; objects "
+			      + "accessed ordered by first access:%n%s" 
+			      + "conflict type: %s%n",
 			      profileReport.getTask().getBaseTaskType(),
 			      profileReport.getTransactionId().longValue(), 
 			      profileReport.getRetryCount(),
@@ -121,7 +125,7 @@ public class AccessedObjectsListener implements ProfileListener {
             // shown all the detail we know
             BigInteger conflictingId = detail.getConflictingId();
             if (conflictingId == null) {
-                System.out.printf("\n");
+                System.out.printf("%n");
                 return;
             }
 
@@ -132,13 +136,12 @@ public class AccessedObjectsListener implements ProfileListener {
                 // and add the new detail to the backlog
                 AccessedObjectsDetail conflictingDetail =
                     backlogMap.get(conflictingId);
-                backlogMap.put(conflictingId, detail);
 
                 // if we found the conflicting detail, display it and return
                 if (conflictingDetail != null) {
-                    System.out.printf("Conflicting transaction objects"
+                    System.out.printf("Conflicting transaction id: %d, objects"
                                       + " accessed, ordered by first access:"
-                                      + "\n%s\n",
+                                      + "%n%s%n", conflictingId.longValue(),
                                       formatAccesses(conflictingDetail.
                                                      getAccessedObjects()));
 
@@ -147,7 +150,7 @@ public class AccessedObjectsListener implements ProfileListener {
             }
 
             // we don't know anything else, so just print out the id
-            System.out.printf("ID of conflicting accessor %s\n\n",
+            System.out.printf("ID of conflicting accessor %s%n%n",
                               conflictingId.toString());
 	}
     }
@@ -161,13 +164,28 @@ public class AccessedObjectsListener implements ProfileListener {
      */
     private static String formatAccesses(List<AccessedObject> accessedObjects) {
 	String formatted = "";
+        int count = 0;
+
 	for (AccessedObject object : accessedObjects) {
-	    formatted += String.format("[source: %s] %-5s %s, desciption %s\n",
-				       object.getSource(),
-				       object.getAccessType(),
-				       object.getObjectId(),
-				       object.getDescription());
+            try {
+                formatted += String.format("[source: %s] %-5s %s, "
+                                           +"desciption %s%n",
+                                           object.getSource(),
+                                           object.getAccessType(),
+                                           object.getObjectId(),
+                                           object.getDescription());
+            } catch (Throwable t) {
+                formatted += String.format("[%s threw exception: %s]%n",
+                                           object.getDescription().getClass(),
+                                           t);
+            }
+            if (count++ > 20) {
+                formatted += String.format("[ further access list "
+                                           + "truncated ]%n");
+                return formatted;
+            }
 	}
+
 	return formatted;
     }
 
