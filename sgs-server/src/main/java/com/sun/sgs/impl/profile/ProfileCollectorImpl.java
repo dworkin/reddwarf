@@ -105,7 +105,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         schedulerThreadCount = 0;
         listeners = new ConcurrentHashMap<ProfileListener, Boolean>();
         queue = new LinkedBlockingQueue<ProfileReportImpl>();
-        consumers = new ConcurrentHashMap<String, ProfileConsumerImpl> ();
+        consumers = new ConcurrentHashMap<String, ProfileConsumerImpl>();
 
         defaultProfileLevel = level;
         
@@ -178,7 +178,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
  
     /** {@inheritDoc}  */
-    public void addListener(String listenerClassName) throws Exception {              
+    public void addListener(String listenerClassName) 
+            throws Exception 
+    {              
         // make sure we can resolve the listener
         Class<?> listenerClass = Class.forName(listenerClassName);
         Constructor<?> listenerConstructor =
@@ -223,8 +225,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount - 1, 
 				    schedulerThreadCount);
 
-        for (ProfileListener listener : listeners.keySet())
+        for (ProfileListener listener : listeners.keySet()) {
             listener.propertyChange(event);
+        }
     }
 
     /** {@inheritDoc} */
@@ -235,13 +238,15 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 				    schedulerThreadCount + 1, 
 				    schedulerThreadCount);
 
-        for (ProfileListener listener : listeners.keySet())
+        for (ProfileListener listener : listeners.keySet()) {
             listener.propertyChange(event);
+        }
     }
 
     /** {@inheritDoc} */
     public void startTask(KernelRunnable task, Identity owner,
-                          long scheduledStartTime, int readyCount) {
+                          long scheduledStartTime, int readyCount)
+    {
         profileReports.get().push(new ProfileReportImpl(task, owner,
                                                         scheduledStartTime,
                                                         readyCount));
@@ -269,9 +274,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
         }
-        if (! profileReport.transactional)
+        if (!profileReport.transactional) {
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
+        }
         profileReport.participants.add(participantDetail);
     }
 
@@ -299,8 +305,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         
         // if this was a nested report, then merge all of the collected
         // data into the parent
-        if (! profileReports.get().empty())
+        if (!profileReports.get().empty()) {
             profileReports.get().peek().merge(profileReport);
+        }
 
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
@@ -375,10 +382,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                         Collections.
                         unmodifiableSet(profileReport.participants);
 
-                    for (ProfileListener listener : listeners.keySet())
+                    for (ProfileListener listener : listeners.keySet()) {
                         listener.report(profileReport);
+                    }
                 }
-            } catch (InterruptedException ie) {}
+            } catch (InterruptedException ie) { }
         }
 	/**
 	 * Modify interrupt to keep track of whether the thread has ever been
@@ -386,8 +394,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 	 * has occurred, even if something (say logging) catches an interrupt
 	 * and forgets to reset the interrupt status.
 	 */
-	@Override
-	public void interrupt() {
+	@Override public void interrupt() {
 	    synchronized (this) {
 		interrupted = true;
 	    }
