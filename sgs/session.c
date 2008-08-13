@@ -244,6 +244,12 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             return 0;
 
         case SGS_OPCODE_LOGIN_FAILURE:
+            /* Disconnect the current connection; this needs to be done
+             * prior to calling the login_failed_cb in case that callback
+             * tries to login again */
+            old_connection = session->connection;
+            sgs_connection_impl_disconnect(old_connection);
+            
             /** error string (first 2 bytes = length of string) */
             if (session->connection->ctx->login_failed_cb != NULL)
                 session->connection->ctx->login_failed_cb(session->connection,
@@ -298,6 +304,11 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 
         case SGS_OPCODE_LOGOUT_SUCCESS:
             session->connection->expecting_disconnect = 1;
+            /* Since the other connection data structures could be
+             * reused on a new login, we will only shut down the 
+             * socket from which we disconnected */
+            old_connection = session->connection;
+            sgs_connection_impl_disconnect(old_connection);
             return 0;
 
         case SGS_OPCODE_CHANNEL_JOIN:
