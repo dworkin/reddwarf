@@ -143,18 +143,22 @@ public class SimpleClient implements ServerSession {
      * is obtained by invoking its {@link SimpleClientListener listener}'s
      * {@link SimpleClientListener#getPasswordAuthentication
      * getPasswordAuthentication} method with a login prompt.
-     * <p>
-     * Next, if a connection with the server is successfully established and
-     * the client's login credential (as obtained above) is verified, then
-     * the client listener's {@link SimpleClientListener#loggedIn loggedIn}
-     * method is invoked. If, however, the login fails due to a connection
-     * failure with the server, a login authentication failure, or some
-     * other failure, the client listener's
-     * {@link SimpleClientListener#loginFailed loginFailed} method is
-     * invoked with a {@code String} indicating the reason for the
-     * failure.
-     * <p>
-     * If this client is disconnected for any reason (including login
+     * 
+     * <p>Next, if a connection with the server is successfully established
+     * and the client's login credential (as obtained above) is verified,
+     * then the client listener's {@link SimpleClientListener#loggedIn
+     * loggedIn} method is invoked. If, however, the login fails due to a
+     * connection failure with the server or a malformed login message to
+     * the server, the client listener's {@link
+     * SimpleClientListener#disconnected disconnected} method is invoked
+     * with a {@code String} indicating the reason for the failure.  If the
+     * login fails due to a login authentication failure or some other
+     * failure on the server while processing the login request, the client
+     * listener's {@link SimpleClientListener#loginFailed loginFailed}
+     * method is invoked with a {@code String} indicating the reason for
+     * the failure.
+     * 
+     * <p>If this client is disconnected for any reason (including login
      * failure), this method may be used again to log in.
      * <p>
      * The supported connection properties are:
@@ -300,6 +304,10 @@ public class SimpleClient implements ServerSession {
         /** Indicates whether this listener expects a disconnect message. */
         private volatile boolean expectingDisconnect = false;
 
+	/** Indicates whether the disconnected callback should not be
+	 * invoked. */
+	private volatile boolean suppressDisconnectedCallback = false;
+
         /** Indicates whether this listener has been disabled because
          *  of an automatic login redirect to another host and port.
          *  We need to disconnect our previous connection, but we don't
@@ -392,8 +400,12 @@ public class SimpleClient implements ServerSession {
             channels.clear();
 
             // TBI implement graceful disconnect.
-            // For now, look at the boolean we set when expecting disconnect
-            clientListener.disconnected(expectingDisconnect, reason);
+            // For now, look at the boolean we set when expecting
+            // disconnect
+	    if (! suppressDisconnectedCallback) {
+		clientListener.disconnected(expectingDisconnect, reason);
+	    }
+	    suppressDisconnectedCallback = false;
             expectingDisconnect = false;
         }
 
@@ -447,6 +459,16 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.LOGIN_FAILURE: {
                 String reason = msg.getString();
                 logger.log(Level.FINER, "Login failed: {0}", reason);
+		suppressDisconnectedCallback = true;
+                try {
+                    clientConnection.disconnect();
+                } catch (IOException e) {
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.logThrow(Level.FINE, e,
+                            "Disconnecting after login failure throws");
+                    }
+                    // ignore
+                }
                 clientListener.loginFailed(reason);
                 break;
             }
@@ -463,7 +485,15 @@ public class SimpleClient implements ServerSession {
                     clientConnection = null;
                     connectionStateChanging = true;
                 }
-                oldConnection.disconnect();
+		try {
+		    oldConnection.disconnect();
+		}  catch (IOException e) {
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.logThrow(Level.FINE, e,
+                            "Disconnecting after login redirect throws");
+                    }
+                    // ignore
+                }
                 redirect = true;
                 Properties props = new Properties();
                 props.setProperty("host", host);
@@ -501,7 +531,7 @@ public class SimpleClient implements ServerSession {
                 } catch (IOException e) {
                     if (logger.isLoggable(Level.FINE)) {
                         logger.logThrow(Level.FINE, e,
-                            "Disconnecting a failed reconnect");
+                            "Disconnecting a failed reconnect throws");
                     }
                     // ignore
                 }
@@ -511,21 +541,15 @@ public class SimpleClient implements ServerSession {
                 logger.log(Level.FINER, "Logged out gracefully");
                 expectingDisconnect = true;
                 loggedIn = false;
-
-                // TODO verify that graceful works correctly
-
-                // Server should disconnect us
-                /*
                 try {
                     clientConnection.disconnect();
                 } catch (IOException e) {
                     if (logger.isLoggable(Level.FINE)) {
                         logger.logThrow(Level.FINE, e,
-                            "Disconnecting after graceful logout");
-                    }
+                            "Disconnecting after graceful logout throws");
+                    } 
                     // ignore
                 }
-                */
                 break;
 
             case SimpleSgsProtocol.CHANNEL_JOIN: {
