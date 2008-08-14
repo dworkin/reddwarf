@@ -74,6 +74,7 @@ public class TestSimpleClient extends TestCase {
 	    client.wait(TIMEOUT * 2);
 	}
 	assertTrue(listener.disconnected);
+	assertFalse(listener.getPasswordAuthentication);
 	if (listener.disconnectReason == null) {
 	    fail("Received null disconnect reason");
 	}
@@ -212,6 +213,7 @@ public class TestSimpleClient extends TestCase {
     
     private class DummySimpleClientListener implements SimpleClientListener {
 
+	private volatile boolean getPasswordAuthentication = false;
 	private volatile boolean disconnected = false;
 	private volatile boolean disconnectGraceful = false;
 	private volatile String disconnectReason = null;
@@ -229,6 +231,7 @@ public class TestSimpleClient extends TestCase {
 	}
 	
 	public PasswordAuthentication getPasswordAuthentication() {
+	    getPasswordAuthentication = true;
 	    return auth;
 	}
 

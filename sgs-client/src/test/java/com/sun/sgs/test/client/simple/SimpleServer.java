@@ -54,7 +54,7 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
  */
 public class SimpleServer implements ConnectionListener {
 
-    private volatile Acceptor<SocketAddress> acceptor;
+    private Acceptor<SocketAddress> acceptor;
 
     private static int DEFAULT_PORT_NUMBER = 10002;
 

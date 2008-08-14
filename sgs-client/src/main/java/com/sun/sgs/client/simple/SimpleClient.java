@@ -138,25 +138,33 @@ public class SimpleClient implements ServerSession {
     /**
      * Initiates a login session with the server. A session is established
      * asynchronously with the server as follows:
-     * <p>
-     * First, this client's {@link PasswordAuthentication login credential}
+     *
+     * <p>First, this client attempts to establish a connection with the
+     * server.  If the client fails to establish a connection, then the
+     * client listener's {@link SimpleClientListener#disconnected
+     * disconnected} method is invoked with a {@code String} indicating the
+     * reason for the failure.
+     *
+     * <p>If a connection with the server is successfully established, this
+     * client's {@link PasswordAuthentication login credential} 
      * is obtained by invoking its {@link SimpleClientListener listener}'s
      * {@link SimpleClientListener#getPasswordAuthentication
      * getPasswordAuthentication} method with a login prompt.
      * 
-     * <p>Next, if a connection with the server is successfully established
-     * and the client's login credential (as obtained above) is verified,
-     * then the client listener's {@link SimpleClientListener#loggedIn
-     * loggedIn} method is invoked. If, however, the login fails due to a
-     * connection failure with the server or a malformed login message to
-     * the server, the client listener's {@link
+     * <p>Next, this client sends a login request to the server.  If the
+     * login request is malformed, the client listener's {@link
      * SimpleClientListener#disconnected disconnected} method is invoked
-     * with a {@code String} indicating the reason for the failure.  If the
-     * login fails due to a login authentication failure or some other
-     * failure on the server while processing the login request, the client
-     * listener's {@link SimpleClientListener#loginFailed loginFailed}
-     * method is invoked with a {@code String} indicating the reason for
-     * the failure.
+     * with a {@code String} indicating the reason for the failure or
+     * {@code null} if no reason can be determined.
+     *
+     * <p>If the client's login credential (as obtained above) is
+     * verified, then the client listener's {@link
+     * SimpleClientListener#loggedIn loggedIn} method is invoked. If,
+     * however, the login fails due to a login authentication failure or
+     * some other failure on the server while processing the login request,
+     * the client listener's {@link SimpleClientListener#loginFailed
+     * loginFailed} method is invoked with a {@code String} indicating the
+     * reason for the failure.
      * 
      * <p>If this client is disconnected for any reason (including login
      * failure), this method may be used again to log in.
