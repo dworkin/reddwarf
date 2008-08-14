@@ -3,7 +3,6 @@
 TOPDIR=.
 
 SRCS = \
-	sgs/hex_utils.c \
 	sgs/linked_map.c \
 	sgs/buffer.c \
 	sgs/io_utils.c \
