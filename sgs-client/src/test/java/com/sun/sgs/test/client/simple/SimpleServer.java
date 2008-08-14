@@ -56,19 +56,28 @@ public class SimpleServer implements ConnectionListener {
 
     private Acceptor<SocketAddress> acceptor;
 
-    private int port = 10002;
+    private static int DEFAULT_PORT_NUMBER = 10002;
+
+    private int port;
     
     final String TEST_CHANNEL_NAME = "Test Channel";
 
     /**
      * Construct a new SimpleServer to accept incoming connections.
      */
-    public SimpleServer() {
+    public SimpleServer(int port) {
+	if (port == 0) {
+	    throw new IllegalArgumentException("port must be non-zero");
+	}
+	this.port = port;
         acceptor = new ServerSocketEndpoint(new InetSocketAddress(port),
                 TransportType.RELIABLE).createAcceptor();
     }
 
-    private void start() {
+    /**
+     * Starts up the server.
+     */
+    public void start() {
         System.out.println("Listening on port " + port);
         try {
             acceptor.listen(new AcceptorListener() {
@@ -94,12 +103,24 @@ public class SimpleServer implements ConnectionListener {
     }
 
     /**
+     * Shuts down the server.
+     */
+    public void shutdown() {
+	if (acceptor != null) {
+	    try {
+		acceptor.shutdown();
+	    } catch (RuntimeException rte) {
+	    }
+	}
+    }
+
+    /**
      * Run the SimpleServer.
      *
      * @param args command-line arguments
      */
     public final static void main(String[] args) {
-        SimpleServer server = new SimpleServer();
+        SimpleServer server = new SimpleServer(DEFAULT_PORT_NUMBER);
         synchronized (server) {
             server.start();
             try {
@@ -107,6 +128,7 @@ public class SimpleServer implements ConnectionListener {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+	    server.shutdown();
         }
     }
 
@@ -168,7 +190,7 @@ public class SimpleServer implements ConnectionListener {
             String username = msg.getString();
             String password = msg.getString();
 
-            System.out.println("UserName: " + username + " Password "
+            System.out.println("UserName: " + username + " Password: "
                     + password);
 
             MessageBuffer reply;
@@ -202,15 +224,10 @@ public class SimpleServer implements ConnectionListener {
                 stopMessages(conn);
             }
         } else if (command == SimpleSgsProtocol.LOGOUT_REQUEST) {
+	    System.out.println("Received logout request");
             MessageBuffer reply = new MessageBuffer(1);
             reply.putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
             sendMessage(conn, reply.getBuffer());
-            try {
-                conn.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-                // ignore
-            }
         }
     }
 

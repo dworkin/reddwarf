@@ -44,44 +44,213 @@ import junit.framework.TestCase;
 
 public class TestSimpleClient extends TestCase {
 
+    private static final char[] password = { 'g', 'u', 'e', 's', 't' };
+
+    private static final long TIMEOUT = 1000;
+
+    public TestSimpleClient(String name) {
+	super(name);
+    }
+
+    /** Prints the test case. */
+    protected void setUp() throws Exception {
+	System.err.println("Testcase: " + getName());
+    }
+    
+    // Tests that a failure to connect to the server causes a
+    // disconnected callback (but not a loginFailed callback).
     public void testLoginNoServer() throws Exception {
 	DummySimpleClientListener listener =
 	    new DummySimpleClientListener();
 
 	SimpleClient client = new SimpleClient(listener);
-	long timeout = 1000;
 	Properties props =
 	    createProperties(
 		"host", "localhost",
 		"port", Integer.toString(5382),
-		"connectTimeout", Long.toString(timeout));
+		"connectTimeout", Long.toString(TIMEOUT));
 	client.login(props);
-	try {
-	    Thread.sleep(timeout * 2);
-	} catch (InterruptedException e) {
+	synchronized (client) {
+	    client.wait(TIMEOUT * 2);
 	}
+	assertTrue(listener.disconnected);
+	assertFalse(listener.getPasswordAuthentication);
 	if (listener.disconnectReason == null) {
-	    fail("Didn't receive disconnected callback");
+	    fail("Received null disconnect reason");
 	}
-
 	System.err.println("reason: " + listener.disconnectReason);
+	assertFalse(listener.disconnectGraceful);
+	assertFalse(listener.loginFailed);
     }
 
     // TBD: it would be good to have a test that exercises
     // the timeout expiration.
 
+    // Tests that a login authentication failure at the server causes
+    // a loginFailed callback on the client (but not a disconnected
+    // callback).
+    public void testLoginFailedCallback() throws Exception {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+ 		new PasswordAuthentication("guest", new char[] {'!'}));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5382;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loginFailed);
+	    if (listener.loginFailedReason == null) {
+		fail("Didn't receive loginFailed callback");
+	    }
+	    System.err.println("reason: " + listener.loginFailedReason);
+	    assertFalse(listener.disconnected);
+
+	} finally {
+	    server.shutdown();
+	}
+    }
+
+    public void testLoggedInCallback() throws Exception {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+		new PasswordAuthentication("guest", password));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loggedIn);
+	} finally {
+	    server.shutdown();
+	}
+    }
+
+    public void testDisconnectedCallbackAfterGracefulLogout() throws Exception {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+		new PasswordAuthentication("guest", password));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loggedIn);
+	    assertFalse(listener.disconnected);
+	    // request graceful logout
+	    client.logout(false);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.disconnected);
+	    assertTrue(listener.disconnectGraceful);
+	} finally {
+	    server.shutdown();
+	}
+    }
+
+    public void testDisconnectedCallbackAfterForcedLogout() throws Exception {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+		new PasswordAuthentication("guest", password));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loggedIn);
+	    assertFalse(listener.disconnected);
+	    // request forced disconnection
+	    client.logout(true);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.disconnected);
+	    assertFalse(listener.disconnectGraceful);
+	} finally {
+	    server.shutdown();
+	}
+    }
+    
     private class DummySimpleClientListener implements SimpleClientListener {
 
+	private volatile boolean getPasswordAuthentication = false;
+	private volatile boolean disconnected = false;
+	private volatile boolean disconnectGraceful = false;
 	private volatile String disconnectReason = null;
+	private volatile boolean loginFailed = false;
+	private volatile String loginFailedReason = null;
+	private volatile boolean loggedIn = false;
+	private final PasswordAuthentication auth;
+
+	DummySimpleClientListener() {
+	    this(null);
+	}
+
+	DummySimpleClientListener(PasswordAuthentication auth) {
+	    this.auth = auth;
+	}
 	
 	public PasswordAuthentication getPasswordAuthentication() {
-	    return null;
+	    getPasswordAuthentication = true;
+	    return auth;
 	}
 
 	public void loggedIn() {
+	    System.err.println("TestSimpleClient.loggedIn");
+	    loggedIn = true;
+	    synchronized (this) {
+		notify();
+	    }
 	}
 
 	public void loginFailed(String reason) {
+	    System.err.println("TestSimpleClient.loginFailed: reason: " +
+			       reason);
+	    loginFailed = true;
+	    loginFailedReason = reason;
+	    synchronized (this) {
+		notify();
+	    }
 	}
 
 	public ClientChannelListener joinedChannel(ClientChannel channel) {
@@ -100,7 +269,12 @@ public class TestSimpleClient extends TestCase {
 	public void disconnected(boolean graceful, String reason){
 	    System.err.println("TestSimpleClient.disconnected: graceful: " +
 			       graceful + ", reason: " + reason);
+	    disconnected = true;
+	    disconnectGraceful = graceful;
 	    disconnectReason = reason;
+	    synchronized (this) {
+		notify();
+	    }
 	}
     }
 

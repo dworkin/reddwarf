@@ -64,8 +64,8 @@ public interface SimpleClientListener extends ServerSessionListener {
 
     /**
      * Notifies this listener that a session could not be established with
-     * the server due to some failure such as failure to verify a login
-     * credential or failure to contact the server.
+     * the server due to some failure logging in such as failure to verify
+     * a login credential.
      * 
      * @param reason a description of the failure
      */
