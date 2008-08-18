@@ -159,12 +159,16 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
             if (logger.isLoggable(Level.FINE)) {
                 long now = System.currentTimeMillis();
                 Formatter opCountTally = new Formatter();
+                boolean first = true;
                 for (ProfileOperation op : opCounts.keySet()) {
+                    if (!first) {
+                        opCountTally.format("%n");
+                    }
+                    first = false;
 		    Long count = opCounts.get(op);
                     opCountTally.format("  %s: %d", op,
 			(count == null) ? 0 : count.longValue());
                     opCounts.put(op, 0L);
-                    opCountTally.format("%n");
                 }
 
 		Formatter counterTally = new Formatter();
