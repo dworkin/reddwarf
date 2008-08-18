@@ -65,11 +65,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AggregateProfileListener implements ProfileListener {
 
-    private int maxOp = 0;
-    private Map<Integer, ProfileOperation> registeredOps =
-        new HashMap<Integer, ProfileOperation>();
-    private Map<Integer, Long> sOpCounts = new HashMap<Integer, Long>();
-    private Map<Integer, Long> fOpCounts = new HashMap<Integer, Long>();
+    private Map<ProfileOperation, Long> sOpCounts =
+            new HashMap<ProfileOperation, Long>();
+    private Map<ProfileOperation, Long> fOpCounts =
+            new HashMap<ProfileOperation, Long>();
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -146,13 +145,8 @@ public class AggregateProfileListener implements ProfileListener {
                 equals("com.sun.sgs.profile.newop")) 
         {          
 	    ProfileOperation op = (ProfileOperation) (event.getNewValue());
-	    int id = op.getId();
-	    if (id > maxOp) {
-		maxOp = id;
-            }
-	    registeredOps.put(id, op);
-	    sOpCounts.put(id, 0L);
-	    fOpCounts.put(id, 0L);
+	    sOpCounts.put(op, 0L);
+	    fOpCounts.put(op, 0L);
 	}
     }
 
@@ -167,16 +161,16 @@ public class AggregateProfileListener implements ProfileListener {
                           profileReport.getScheduledStartTime());
             tryCount += profileReport.getRetryCount();
             for (ProfileOperation op : ops) {
-                Long i = sOpCounts.get(op.getId());
-		sOpCounts.put(op.getId(), Long.valueOf(i == null ? 1 : i + 1));
+                Long i = sOpCounts.get(op);
+		sOpCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	    }
         } else {
             fTaskCount++;
             fTaskOpCount += ops.size();
             fRunTime += profileReport.getRunningTime();
             for (ProfileOperation op : ops) {
-                Long i = fOpCounts.get(op.getId());
-		fOpCounts.put(op.getId(), Long.valueOf(i == null ? 1 : i + 1));
+                Long i = fOpCounts.get(op);
+		fOpCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	    }
         }
 
@@ -264,15 +258,9 @@ public class AggregateProfileListener implements ProfileListener {
 
             reportStr.format("OpCounts:%n");
 	    int j, k = 0;
-            //for (int i = 1; i < maxOp + 1; i++) {
-	    for (Integer i : registeredOps.keySet()) {
-		//System.out.println("registeredOps: " + registeredOps);
-		//System.out.printf("registeredOps.get(%s) = %s\n",
-                //                   i, registeredOps.get(i));
-		j = sOpCounts.get(i).intValue();
-                reportStr.format("   %s=%d/%d", registeredOps.get(i), j,
-				 j + fOpCounts.get(i));
-                //if (((i.intValue % 3) == 0) || (i.intValue() == (maxOp)))
+	    for (ProfileOperation op : sOpCounts.keySet()) {
+		j = sOpCounts.get(op).intValue();
+                reportStr.format("   %s=%d/%d", op, j, j + fOpCounts.get(op));
 		if (++k % 3 == 0) {
                     reportStr.format("%n");
                 }
