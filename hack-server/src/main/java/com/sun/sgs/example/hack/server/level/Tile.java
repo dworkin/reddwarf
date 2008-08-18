@@ -8,6 +8,7 @@
 
 package com.sun.sgs.example.hack.server.level;
 
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
@@ -24,7 +25,7 @@ import java.io.Serializable;
  * interface are not a {@link ManagedObject}s because they are
  * included as private state for other <code>ManagedObject</code>s.
  */
-public interface Tile extends Serializable {
+public interface Tile extends Serializable, ManagedObject {
 
     /**
      * Returns the identifier for this tile. Typically this is the sprite

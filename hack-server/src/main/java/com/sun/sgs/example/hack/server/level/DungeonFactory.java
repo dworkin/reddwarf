@@ -119,8 +119,8 @@ public class DungeonFactory {
 		    logger.warning("duplicate name defined for level: " + 
 				   levelName);		    
 		}
-                boards.put(levelName, new SimpleBoard(stok,
-                                                      impassableSprites));
+                boards.put(levelName, SimpleBoard.parse(stok,
+							impassableSprites));
             } else if (stok.sval.equals("Connection")) {
                 connections.add(readConnection(stok, levelPrefix));
             } else if (stok.sval.equals("OneWayConnection")) {

@@ -25,6 +25,7 @@
     <module>hack-server</module>
     <module>hack-shared</module>
     <module>hack-ai</module>
+    <module>hack-javadoc</module>
   </modules>
 
   <build>

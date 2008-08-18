@@ -76,23 +76,23 @@ public class Client extends JFrame implements SimpleClientListener {
     private SimpleClient client;
 
     // the gui and message handlers for interaction with the lobby
-    private LobbyManager lmanager;
+    private LobbyManager lobbyManager;
     private LobbyPanel lobbyPanel;
-    private LobbyChannelListener llistener;
+    private LobbyChannelListener lobbyListener;
 
     // the gui and message handlers for interacting with character creation
-    private CreatorManager crmanager;
+    private CreatorManager creatorManager;
     private CreatorPanel creatorPanel;
-    private CreatorChannelListener crListener;
+    private CreatorChannelListener creatorListener;
 
     // the gui and messages handlers for chatting
-    private ChatManager cmanager;
+    private ChatManager chatManager;
     private ChatPanel chatPanel;
 
     // the gui and message handlers for interaction with a dungeon
-    private GameManager gmanager;
+    private GameManager dungeonManager;
     private GamePanel gamePanel;
-    private DungeonChannelListener dlistener;
+    private DungeonChannelListener dungeonListener;
 
     // the card layout manager for swapping between different panels
     private CardLayout managerLayout;
@@ -112,24 +112,27 @@ public class Client extends JFrame implements SimpleClientListener {
         addWindowListener(new BasicWindowMonitor());
 
         // create the managers
-        lmanager = new LobbyManager();
-        crmanager = new CreatorManager();
-        cmanager = new ChatManager();
-        gmanager = new GameManager();
+        lobbyManager = new LobbyManager();
+        creatorManager = new CreatorManager();
+        chatManager = new ChatManager();
+        dungeonManager = new GameManager();
 	
         // setup the listeners to handle communication from the game app
-        llistener = new LobbyChannelListener(lmanager, cmanager);
-        crListener = new CreatorChannelListener(crmanager, cmanager);
-        dlistener = new DungeonChannelListener(gmanager, cmanager, gmanager);
+        lobbyListener = new LobbyChannelListener(lobbyManager, chatManager);
+        creatorListener = new CreatorChannelListener(creatorManager, 
+						     chatManager);
+        dungeonListener = new DungeonChannelListener(dungeonManager, 
+						     chatManager, 
+						     dungeonManager);
 
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
 
         // create the GUI panels used for the game elements
-        lobbyPanel = new LobbyPanel(lmanager);
-        creatorPanel = new CreatorPanel(crmanager);
-        gamePanel = new GamePanel(gmanager);
-        chatPanel = new ChatPanel(cmanager, gamePanel);
+        lobbyPanel = new LobbyPanel(lobbyManager);
+        creatorPanel = new CreatorPanel(creatorManager);
+        gamePanel = new GamePanel(dungeonManager);
+        chatPanel = new ChatPanel(chatManager, gamePanel);
 
         // setup a CardLayout for the game and lobby panels, so we can
         // easily switch between them
@@ -174,9 +177,9 @@ public class Client extends JFrame implements SimpleClientListener {
     private void setupClient() {
         // setup the client connection
         client = new SimpleClient(this);
-        lmanager.setClient(client);
-        crmanager.setClient(client);
-        gmanager.setClient(client);
+        lobbyManager.setClient(client);
+        creatorManager.setClient(client);
+        dungeonManager.setClient(client);
     }
     
     public PasswordAuthentication getPasswordAuthentication() {
@@ -214,7 +217,7 @@ public class Client extends JFrame implements SimpleClientListener {
 
         // update the chat manager with the channel, so it knows where to
         // broadcast chat messages
-        cmanager.setChannel(channel);
+        chatManager.setChannel(channel);
 
         // see which type of game we've joined, and based on this display
         // the right panel and set the appropriate listener to handle
@@ -224,20 +227,20 @@ public class Client extends JFrame implements SimpleClientListener {
             // lobbyPanel.clearList();
             logger.fine("joined lobby channel");
             managerLayout.show(managerPanel, "lobby");
-            return llistener;
+            return lobbyListener;
         } 
 	else if (channel.getName().equals("game:creator")) {
             // we joined the creator
             logger.fine("joined creator channel");
             managerLayout.show(managerPanel, "creator");
-            return crListener;
+            return creatorListener;
         } 
 	else if (channel.getName().startsWith("level:")) {
 	    // we are already in a dungeon but must have moved levels,
 	    // so return the dungeon listener which is going to handle
 	    // all the updates
 	    logger.fine("joined level channel: " + channel.getName());
-	    return dlistener;
+	    return dungeonListener;
 	}
 	else {
             // we joined some dungeon
@@ -247,7 +250,7 @@ public class Client extends JFrame implements SimpleClientListener {
             // request focus so all key presses are captured
             gamePanel.requestFocusInWindow();
 
-            return dlistener;
+            return dungeonListener;
         }
     }
 
@@ -287,7 +290,7 @@ public class Client extends JFrame implements SimpleClientListener {
 		    Object[] idAndStats = (Object[])(getObject(message));
 		    Integer id = (Integer)(idAndStats[0]);
 		    CharacterStats stats = (CharacterStats)(idAndStats[1]);
-		    crmanager.changeStatistics(id, stats);
+		    creatorManager.changeStatistics(id, stats);
 		    break;
 
 		/*
@@ -305,12 +308,12 @@ public class Client extends JFrame implements SimpleClientListener {
 			if (! detail.getGame().equals("game:lobby")) {
 			    // it's a specific dungeon, so add the game and
 			    // set the initial count
-			    lmanager.gameAdded(detail.getGame());
-			    lmanager.playerCountUpdated(detail.getGame(),
+			    lobbyManager.gameAdded(detail.getGame());
+			    lobbyManager.playerCountUpdated(detail.getGame(),
 							detail.getCount());
 			} else {
 			    // it's the lobby, so update the count
-			    lmanager.playerCountUpdated(detail.getCount());
+			    lobbyManager.playerCountUpdated(detail.getCount());
 			}
 		    }		    
 		    break;
@@ -325,7 +328,7 @@ public class Client extends JFrame implements SimpleClientListener {
 		    @SuppressWarnings("unchecked")
 			Collection<CharacterStats> characters =
 			(Collection<CharacterStats>)(getObject(message));
-		    lmanager.setCharacters(characters);		    
+		    lobbyManager.setCharacters(characters);		    
 		    break; 
 
 		/*
@@ -339,7 +342,7 @@ public class Client extends JFrame implements SimpleClientListener {
 		    @SuppressWarnings("unchecked")
 			Map<Integer,byte[]> spriteMap =
 			(Map<Integer,byte[]>)(sizeAndSprites[1]);
-		    gmanager.setSpriteMap(spriteSize,
+		    dungeonManager.setSpriteMap(spriteSize,
 					  convertMap(spriteMap));
 		    break;
 
@@ -353,7 +356,7 @@ public class Client extends JFrame implements SimpleClientListener {
 		case NEW_BOARD:
 		    // we got a complete board update
 		    Board board = (Board)(getObject(message));
-		    gmanager.changeBoard(board);
+		    dungeonManager.changeBoard(board);
 		    break;
 
 		/*
@@ -362,10 +365,9 @@ public class Client extends JFrame implements SimpleClientListener {
 		 */
 		case NEW_SERVER_MESSAGE:
 		    // we heard some message from the server
-		    byte [] bytes = new byte[message.remaining()];
-		    message.get(bytes);
-		    String msg = new String(bytes);
-		    gmanager.hearMessage(msg);
+		    char[] chars = (char[])(getObject(message));
+		    String msg = new String(chars);
+		    dungeonManager.hearMessage(msg);
 		    break;
 
 		default:

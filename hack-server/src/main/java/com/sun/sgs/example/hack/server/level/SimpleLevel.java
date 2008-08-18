@@ -76,7 +76,11 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
     private int levelWidth;
     private int levelHeight;
 
-    // the board that maintains our state
+    /**
+     * The canonical board that represents the state of this level.
+     * All other client and AI board instances are a reflection of
+     * this board's state.
+     */
     private LevelBoard board;
 
     private ManagedReference<Channel> levelUpdatesChannelRef;

@@ -427,7 +427,7 @@ public final class Messages {
      */
     public static void sendServerMessage(ClientSession session, String message) {
 
-        sendToClient(session, Command.NEW_SERVER_MESSAGE, message);
+        sendToClient(session, Command.NEW_SERVER_MESSAGE, message.toCharArray());
     }
 
     /*

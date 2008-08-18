@@ -8,35 +8,69 @@
 
 package com.sun.sgs.example.hack.server.level;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedReference;
+
+import com.sun.sgs.app.util.ScalableHashMap;
+
 import com.sun.sgs.example.hack.server.CharacterManager;
 import com.sun.sgs.example.hack.server.Item;
+
+import com.sun.sgs.example.hack.server.util.Point;
 
 import java.io.IOException;
 import java.io.StreamTokenizer;
 
 import java.util.Set;
-import java.util.HashSet;
-
+//import java.util.HashSet;
+import java.util.Map;
 
 /**
- * This is a simple implementation of <code>LevelBoard</code> that is
- * used as the default mechanism to store level state. Note that this
- * class is not a {@link ManagedObject}. It must be managed as private
- * state as a part of something that is a <code>ManagedObject</code>.
+ * TO DO
  */
 public class SimpleBoard implements LevelBoard {
 
     private static final long serialVersionUID = 1;
 
     // the dimension of this board
-    private int width;
-    private int height;
+    private final int width;
+    private final int height;
 
-    // whether or not this board is dark
+    /**
+     * Whether or not this board is dark
+     */
     private boolean isDark;
 
-    // an array of Tiles, which is where we store the state
-    private Tile [][] tiles;
+    /**
+     *
+     */
+    private ManagedReference<? extends Map<Point,Tile>> boardGridRef;
+
+    /**
+     * Creates a new instance of {@code SimpleBoard} with an empty
+     * tile set
+     *
+     * @param width the width of the board
+     * @param height the height of the board
+     *
+     * @throws IllegalArgumentException if height or width is
+     *         non-positive
+     */
+    public SimpleBoard(int width, int height) {
+	if (width <= 0)
+	    throw new IllegalArgumentException("width must be positive");
+	if (height <= 0)
+	    throw new IllegalArgumentException("height must be positive");
+
+	this.width = width;
+	this.height = height;
+	isDark = false;
+	ScalableHashMap<Point,Tile> boardGrid = 
+	    new ScalableHashMap<Point,Tile>();
+	
+	boardGridRef = AppContext.getDataManager().createReference(boardGrid);
+    }
 
     /**
      * Creates a new instance of <code>SimpleBoard</code> from the given
@@ -47,33 +81,79 @@ public class SimpleBoard implements LevelBoard {
      *
      * @throws IOException if the stream isn't formatted correctly
      */
-    public SimpleBoard(StreamTokenizer stok, Set<Integer> impassableSprites)
-        throws IOException
+    public static SimpleBoard parse(StreamTokenizer stok,
+				    Set<Integer> impassableSprites) 
+	throws IOException
     {
         // get the width and height
         stok.nextToken();
-        width = (int)(stok.nval);
+        int width = (int)(stok.nval);
         stok.nextToken();
-        height = (int)(stok.nval);
+        int height = (int)(stok.nval);
 
         // get whether it's dark
         stok.nextToken();
-        isDark = stok.sval.equals("true");
+        boolean isDark = stok.sval.equals("true");
 
         // create the grid for our tiles
-        tiles = new Tile[width][height];
+	SimpleBoard board = new SimpleBoard(width, height);
         
-        // loop through the remaining data, creating the tiles
+        // loop through the remaining data, creating the tiles based
+        // on their type and setting them on the level
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 stok.nextToken();
                 int id = (int)(stok.nval);
-                if (impassableSprites.contains(id))
-                    tiles[x][y] = new ImpassableTile(id);
-                else
-                    tiles[x][y] = new PassableTile(id);
+		board.setGridSpace(x, y, 
+				   ((impassableSprites.contains(id))
+				    ? new ImpassableTile(id)
+				    : new PassableTile(id)));
             }
         }
+	return board;
+    }
+
+    private void checkBounds(int x, int y) {
+	if (x < 0 || x >= width)
+	    throw new IllegalArgumentException("x coordinate " + x +
+					       " is outside the range of " +
+					       "this level's width: " + width);
+	if (y < 0 || y >= height)
+	    throw new IllegalArgumentException("y coordinate " + y +
+					       " is outside the range of " +
+					       "this level's height: " + 
+					       height);
+    }
+
+    /**
+     * Updates the grid space of the level with the provided {@code
+     * Tile}.
+     *
+     * @param x the x-coordinate
+     * @param y the y-coordinate
+     * @param tile the new tile at (x,y)
+     */
+    private void setGridSpace(int x, int y, Tile tile) {
+	checkBounds(x, y);
+
+	Tile old = boardGridRef.get().put(new Point(x, y), tile);
+
+	// REMINDER: if we want to support having items or gold
+	// embedded in walls, then updating a wall to a floor space
+	// should transfer the contents between the two tiles.  This
+	// is the point to do that operation.
+
+	// if we are replacing a tile, which could happen if the
+	// player has tunneled into a wall, we need to remove the old
+	// tile from the data store
+	if (old != null) {
+	    AppContext.getDataManager().removeObject(old);
+	}
+    }
+
+    private Tile getGridSpace(int x, int y) {
+	checkBounds(x, y);
+	return boardGridRef.get().get(new Point(x,y));
     }
 
     /**
@@ -84,8 +164,8 @@ public class SimpleBoard implements LevelBoard {
      * @param connector the <code>Connector</code>
      */
     public void setAsConnector(int x, int y, Connector connector) {
-        Tile tile = tiles[x][y];
-        tiles[x][y] = new ConnectorTile(tile.getID(), connector);
+        Tile tile = getGridSpace(x, y);
+        setGridSpace(x, y, new ConnectorTile(tile.getID(), connector));
     }
 
     /**
@@ -115,7 +195,7 @@ public class SimpleBoard implements LevelBoard {
      * @return the set of identifiers at this space
      */
     public int [] getAt(int x, int y) {
-        return tiles[x][y].getIdStack();
+        return getGridSpace(x, y).getIdStack();
     }
 
     /**
@@ -138,7 +218,7 @@ public class SimpleBoard implements LevelBoard {
      * @return true if the operation succeeded, false otherwise
      */
     public boolean addCharacterAt(int x, int y, CharacterManager mgr) {
-	return tiles[x][y].addCharacter(mgr);
+	return getGridSpace(x, y).addCharacter(mgr);
     }
 
     /**
@@ -151,7 +231,7 @@ public class SimpleBoard implements LevelBoard {
      * @return true if the operation succeeded, false otherwise
      */
     public boolean removeCharacterAt(int x, int y, CharacterManager mgr) {
-        return tiles[x][y].removeCharacter(mgr);
+        return getGridSpace(x, y).removeCharacter(mgr);
     }
 
     /**
@@ -165,7 +245,7 @@ public class SimpleBoard implements LevelBoard {
      * @return true if the operation succeeded, false otherwise
      */
     public boolean addItemAt(int x, int y, Item item) {
-        return tiles[x][y].addItem(item);
+        return getGridSpace(x, y).addItem(item);
     }
 
     /**
@@ -178,7 +258,7 @@ public class SimpleBoard implements LevelBoard {
      * @return true if the operation succeeded, false otherwise
      */
     public boolean removeItemAt(int x, int y, Item item) {
-        return tiles[x][y].removeItem(item);
+        return getGridSpace(x, y).removeItem(item);
     }
 
     /**
@@ -192,7 +272,7 @@ public class SimpleBoard implements LevelBoard {
      * @return true if the operation would succeed, false otherwise
      */
     public boolean testMove(int x, int y, CharacterManager mgr) {
-        return tiles[x][y].canOccupy(mgr);
+        return getGridSpace(x, y).canOccupy(mgr);
     }
 
     /**
@@ -207,14 +287,14 @@ public class SimpleBoard implements LevelBoard {
      */
     public ActionResult moveTo(int x, int y, CharacterManager mgr) {
         // see if the space is passable
-        if (! tiles[x][y].isPassable(mgr))
+        if (! getGridSpace(x, y).isPassable(mgr))
             return ActionResult.FAIL;
 
         // try to move onto that space, but remember the previous position
         // since we'll need it if the player left
         int oldX = mgr.getLevelXPos();
         int oldY = mgr.getLevelYPos();
-        ActionResult result = tiles[x][y].moveTo(mgr);
+        ActionResult result = getGridSpace(x, y).moveTo(mgr);
 
         // if this didn't result in sucess, then return the result (note
         // that this could still have been a "successful" move, since
@@ -226,14 +306,14 @@ public class SimpleBoard implements LevelBoard {
             // the pre-move location, just in case the character now
             // thinks it has a new location somewhere)
             if (result == ActionResult.CHARACTER_LEFT)
-                tiles[oldX][oldY].removeCharacter(mgr);
+                getGridSpace(oldX, oldY).removeCharacter(mgr);
 
             return result;
         }
 
         // ...but if we succeeded, then move the character...
-        tiles[oldX][oldY].removeCharacter(mgr);
-        tiles[x][y].addCharacter(mgr);
+	getGridSpace(oldX, oldY).removeCharacter(mgr);
+        getGridSpace(x, y).addCharacter(mgr);
 
         // ...and return success
         return ActionResult.SUCCESS;
@@ -249,10 +329,10 @@ public class SimpleBoard implements LevelBoard {
      * @return the result of getting an item
      */
     public ActionResult getItem(int x, int y, CharacterManager mgr) {
-        ActionResult result = tiles[x][y].getItem(mgr);
+        ActionResult result = getGridSpace(x, y).getItem(mgr);
 
         if (result == ActionResult.CHARACTER_LEFT)
-            tiles[x][y].removeCharacter(mgr);
+            getGridSpace(x, y).removeCharacter(mgr);
 
         return result;
     }
