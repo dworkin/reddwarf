@@ -2067,8 +2067,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Obsolete ChannelSet representation.  The serialized form is here
-     * just so that obsolete channel sets can be removed by
+     * Obsolete (@code ChannelSet} representation.  The serialized form is
+     * here just so that obsolete channel sets can be removed by 
+     * {@code ChannelServiceImpl} upon recovery.
      */
     private static class ChannelSet extends ClientSessionInfo {
 	
@@ -2077,6 +2078,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The set of channel IDs that the client session is a member of. */
 	private final Set<BigInteger> set = new HashSet<BigInteger>();
 
+	/**
+	 * Constructs an instance.  This constructor is only present for
+	 * testing purposes.
+	 */
 	public ChannelSet(DataService dataService, ClientSession session) {
 	    super(dataService, session);
 	}

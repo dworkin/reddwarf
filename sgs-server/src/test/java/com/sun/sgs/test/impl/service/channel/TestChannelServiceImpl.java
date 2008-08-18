@@ -1578,7 +1578,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final String prefix =
 	    "com.sun.sgs.impl.service.channel.set." + nodeId + ".";
 	
-	int beforeCount = getBindingCount();
+	int beforeCount = getChannelServiceBindingCount();
 	System.err.println("beforeCount: " + beforeCount);
 	// Add some obsolete channel sets
 
@@ -1596,7 +1596,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	    }, taskOwner);
 
-	int afterCount = getBindingCount();
+	int afterCount = getChannelServiceBindingCount();
 	assertEquals(beforeCount + 10, afterCount);
 	System.err.println("afterCount: " + afterCount);
 	printServiceBindings();
@@ -1609,7 +1609,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    addNodes("yetAnotherNode");
 	    // Give node a chance to recover.
 	    Thread.sleep(3000);
-	    assertEquals(beforeCount, getBindingCount());
+	    assertEquals(beforeCount, getChannelServiceBindingCount());
 	} finally {
 	    printServiceBindings();
 	    client.disconnect();
@@ -2758,17 +2758,25 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    private int getBindingCount() throws Exception {
-	GetBindingCountTask task = new GetBindingCountTask();
+    /**
+     * Returns the count of channel service bindings, i,e. bindings that
+     * have the following prefix:
+     *
+     * com.sun.sgs.impl.service.channel
+     */
+    private int getChannelServiceBindingCount() throws Exception {
+	GetChannelServiceBindingCountTask task =
+	    new GetChannelServiceBindingCountTask();
 	txnScheduler.runTask(task, taskOwner);
 	return task.count;
     }
     
-    private class GetBindingCountTask extends AbstractKernelRunnable {
-
+    private class GetChannelServiceBindingCountTask
+	extends AbstractKernelRunnable
+    {
 	volatile int count = 0;
 	
-	GetBindingCountTask() {
+	GetChannelServiceBindingCountTask() {
 	}
 
 	public void run() {
