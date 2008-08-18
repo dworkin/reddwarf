@@ -1124,6 +1124,14 @@ public final class ChannelServiceImpl
 			     */
 			    taskService.scheduleTask(
 				new RemoveChannelServerProxyTask(nodeId));
+
+			    /*
+			     * Remove any obsolete channel sets left over
+			     * from previous ChannelServiceImpl version.
+			     */
+			    taskService.scheduleTask(
+				new ChannelImpl.
+				    RemoveObsoleteChannelSetsTask(nodeId));
 			}
 		    },
 		    taskOwner);
