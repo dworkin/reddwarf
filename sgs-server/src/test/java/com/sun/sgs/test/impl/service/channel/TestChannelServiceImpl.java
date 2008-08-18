@@ -58,6 +58,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -225,7 +226,9 @@ public class TestChannelServiceImpl extends TestCase {
      */
     private void addNodes(String... hosts) throws Exception {
         // Create the other nodes
-        additionalNodes = new HashMap<String, SgsTestNode>();
+	if (additionalNodes == null) {
+	    additionalNodes = new HashMap<String, SgsTestNode>();
+	}
 
         for (String host : hosts) {
 	    Properties props = SgsTestNode.getDefaultProperties(
@@ -1131,7 +1134,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group2.disconnect(false);
 	}
     }
-    
+
     public void testChannelSendToExistingMembersAfterNodeFailure()
 	throws Exception
     {
@@ -1557,6 +1560,60 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(false);
 	}
 	
+    }
+
+    public void testRemoveObsoleteChannelSets() throws Exception {
+	String otherHost = "otherNode";
+	addNodes(otherHost);
+	DummyClient client = newClient();
+	final String name = "dummy";
+	long nodeId = additionalNodes.get(otherHost).getNodeId();
+
+	Class cl =
+	    Class.forName("com.sun.sgs.impl.service.channel.ChannelImpl$ChannelSet");
+	@SuppressWarnings("unchecked")
+	final Constructor constr =
+	    cl.getConstructor(DataService.class, ClientSession.class);
+	constr.setAccessible(true);
+	final String prefix =
+	    "com.sun.sgs.impl.service.channel.set." + nodeId + ".";
+	
+	int beforeCount = getChannelServiceBindingCount();
+	System.err.println("beforeCount: " + beforeCount);
+	// Add some obsolete channel sets
+
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ClientSession session =
+		    unwrapSession(getClientSession(name));
+		for (int i = 0; i < 10; i++) {
+		    ManagedObject obj = (ManagedObject)
+			constr.newInstance(dataService, session);
+		    String key = prefix + Integer.toString(i);
+		    dataService.setServiceBinding(key, obj);
+		}
+	    }
+	    }, taskOwner);
+
+	int afterCount = getChannelServiceBindingCount();
+	assertEquals(beforeCount + 10, afterCount);
+	System.err.println("afterCount: " + afterCount);
+	printServiceBindings();
+
+	try {
+	    // shutdown node
+	    shutdownNode(otherHost);
+	    // start another node to force channel service recovery and
+	    // removal of obsolete channel sets
+	    addNodes("yetAnotherNode");
+	    // Give node a chance to recover.
+	    Thread.sleep(3000);
+	    assertEquals(beforeCount, getChannelServiceBindingCount());
+	} finally {
+	    printServiceBindings();
+	    client.disconnect();
+	}
     }
     
     // -- END TEST CASES --
@@ -2693,7 +2750,7 @@ public class TestChannelServiceImpl extends TestCase {
                 // the count would be nice but for now the specific types that
                 // are accumulated get excluded from the count
                 String name = dataService.createReferenceForId(next).get().
-                    getClass().getName();
+		    getClass().getName();
                 if (! name.equals("com.sun.sgs.impl.service.task.PendingTask"))
                     count++;
                 last = next;
@@ -2701,6 +2758,39 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * Returns the count of channel service bindings, i,e. bindings that
+     * have the following prefix:
+     *
+     * com.sun.sgs.impl.service.channel
+     */
+    private int getChannelServiceBindingCount() throws Exception {
+	GetChannelServiceBindingCountTask task =
+	    new GetChannelServiceBindingCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetChannelServiceBindingCountTask
+	extends AbstractKernelRunnable
+    {
+	volatile int count = 0;
+	
+	GetChannelServiceBindingCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    Iterator<String> iter =
+		BoundNamesUtil.getServiceBoundNamesIterator(
+		    dataService, "com.sun.sgs.impl.service.channel.");
+	    while (iter.hasNext()) {
+		iter.next();
+		count++;
+	    }
+	}
+    }
+    
     private void closeChannel(final String name) throws Exception {
 
 	txnScheduler.runTask(new AbstractKernelRunnable() {

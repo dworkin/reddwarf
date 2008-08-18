@@ -2049,6 +2049,87 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	}
     }
+
+    /**
+     * Returns the prefix for accessing channel sets for all sessions
+     * connected to the node with the specified {@code nodeId}.  The
+     * prefix has the following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		set.<nodeId>.
+     *
+     * This method is only included to locate obsolete channel sets to be
+     * removed. 
+     */
+    private static String getChannelSetPrefix(long nodeId) {
+	return PKG_NAME +
+	    SET_COMPONENT + nodeId + ".";
+    }
+
+    /**
+     * Obsolete (@code ChannelSet} representation.  The serialized form is
+     * here just so that obsolete channel sets can be removed by 
+     * {@code ChannelServiceImpl} upon recovery.
+     */
+    private static class ChannelSet extends ClientSessionInfo {
+	
+	private final static long serialVersionUID = 1L;
+
+	/** The set of channel IDs that the client session is a member of. */
+	private final Set<BigInteger> set = new HashSet<BigInteger>();
+
+	/**
+	 * Constructs an instance.  This constructor is only present for
+	 * testing purposes.
+	 */
+	public ChannelSet(DataService dataService, ClientSession session) {
+	    super(dataService, session);
+	}
+    }
+    
+
+    /**
+     * A task to remove any obsolete channel sets left over from previous
+     * ChannelServiceImpl version.
+     */
+    static class RemoveObsoleteChannelSetsTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private final long failedNodeId;
+
+	/**
+	 * Constructs an instance.
+	 * @param failedNodeId the ID of the failed node
+	 */
+	RemoveObsoleteChannelSetsTask(long failedNodeId) {
+	    this.failedNodeId = failedNodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    String prefix = getChannelSetPrefix(failedNodeId);
+	    String key =
+		nextServiceBoundNameWithPrefix(dataService, prefix, prefix);
+	    if (key != null) {
+		try {
+		    ManagedObject channelSet =
+			dataService.getServiceBinding(key);
+		    dataService.removeObject(channelSet);
+		} catch (ObjectNotFoundException e) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Cleaning up obsolete channel set:{0} throws",
+			key);
+		}
+		dataService.removeServiceBinding(key);
+		ChannelServiceImpl.getTaskService().scheduleTask(this);
+	    }
+	}
+    }
     
     /**
      * Returns a set containing session identifiers (as obtained by

@@ -472,6 +472,11 @@ public final class ClientSessionServiceImpl
             } 
 	}
 
+	for (ClientSessionHandler handler : handlers.values()) {
+	    handler.shutdown();
+	}
+	handlers.clear();
+	
 	if (asyncChannelGroup != null) {
 	    asyncChannelGroup.shutdown();
 	    boolean groupShutdownCompleted = false;
@@ -514,10 +519,6 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 	    
-	for (ClientSessionHandler handler : handlers.values()) {
-	    handler.shutdown();
-	}
-	handlers.clear();
 	disconnectingHandlersMap.clear();
 
 	synchronized (flushContextsLock) {
