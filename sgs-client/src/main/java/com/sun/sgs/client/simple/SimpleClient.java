@@ -520,7 +520,16 @@ public class SimpleClient implements ServerSession {
                 checkLoggedIn();
                 byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
                 ByteBuffer buf = ByteBuffer.wrap(msgBytes);
-                clientListener.receivedMessage(buf.asReadOnlyBuffer());
+		try {
+		    clientListener.receivedMessage(buf.asReadOnlyBuffer());
+		} catch (RuntimeException e) {
+		    if (logger.isLoggable(Level.WARNING)) {
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "SimpleClientListener.receivedMessage callback " +
+			    "throws");
+		    }
+		}
                 break;
             }
 
