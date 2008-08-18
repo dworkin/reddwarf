@@ -27,14 +27,31 @@ import java.util.Set;
 import java.util.Map;
 
 /**
- * TO DO
+ * A server-side {@link LevelBoard} implementation that utilizes
+ * individual tile-locking to achieve maximum concurrency.
+ * Internally, the board is represented as a 2D gride of tiles, each
+ * of which are {@code ManagedObject} instances.  Accesses and updates
+ * only acquire the minimum number of tiles, which results in better
+ * througput for a board with many active players.
+ *
+ * This implementation uses a {@link ScalableHashMap} of points
+ * instead of a {@code ManagedReference<Tile>[][]} to store its tiles
+ * in order to reduce the amount of data that needs to be loaded for
+ * each board access.  For large boards, the {@code ManagedReference}
+ * array would have imposed a significant data bottleneck.
  */
 public class SimpleBoard implements LevelBoard {
 
     private static final long serialVersionUID = 1;
 
-    // the dimension of this board
+    /** 
+     * the width dimension of this board 
+     */
     private final int width;
+
+    /** 
+     * the width dimension of this board 
+     */
     private final int height;
 
     /**
@@ -43,7 +60,11 @@ public class SimpleBoard implements LevelBoard {
     private boolean isDark;
 
     /**
-     *
+     * A reference to the map that contains the board; tiles are
+     * accessed by creating a new {@link Point} with the tile's
+     * coordinates.  A {@link ScalableHashMap} of points is used
+     * instead of a {@code ManagedReference[][]} to reduce the amount
+     * of data that needs to be loaded for each board access.
      */
     private ManagedReference<? extends Map<Point,Tile>> boardGridRef;
 
