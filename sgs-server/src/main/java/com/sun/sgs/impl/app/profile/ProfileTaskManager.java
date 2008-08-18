@@ -61,7 +61,8 @@ public class ProfileTaskManager implements TaskManager {
      * {@inheritDoc}
      */
     public PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
-                                                   long period) {
+                                                   long period) 
+    {
         return backingManager.schedulePeriodicTask(task, delay, period);
     }
 

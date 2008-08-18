@@ -49,8 +49,9 @@ public class ProfileRegistrarImpl implements ProfileRegistrar {
      * @param profileCollector the backing collector for all producers
      */
     public ProfileRegistrarImpl(ProfileCollectorImpl profileCollector) {
-        if (profileCollector == null)
+        if (profileCollector == null) {
             throw new NullPointerException("Collector must not be null");
+        }
         this.profileCollector = profileCollector;
     }
 
@@ -58,9 +59,10 @@ public class ProfileRegistrarImpl implements ProfileRegistrar {
      * {@inheritDoc}
      */
     public ProfileConsumer registerProfileProducer(String name) {
-        if (logger.isLoggable(Level.CONFIG))
+        if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "Registering profile producer {0}",
                        name);
+        }
         return profileCollector.registerProfileProducer(name);
     }
 

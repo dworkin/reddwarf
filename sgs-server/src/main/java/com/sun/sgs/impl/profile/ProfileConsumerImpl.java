@@ -50,9 +50,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
     
     private final AtomicInteger opIdCounter;
     // the ops, samples, and counters for this consumer
-    private final ConcurrentHashMap<String,ProfileOperation> ops;
-    private final ConcurrentHashMap<String,ProfileSample> samples;
-    private final ConcurrentHashMap<String,ProfileCounter> counters;
+    private final ConcurrentHashMap<String, ProfileOperation> ops;
+    private final ConcurrentHashMap<String, ProfileSample> samples;
+    private final ConcurrentHashMap<String, ProfileCounter> counters;
 
     /**
      * Creates an instance of <code>ProfileConsumerImpl</code>.
@@ -60,10 +60,10 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * @param profileCollector the backing <code>ProfileCollectorImpl</code>
      * @param name an identifier for this consumer
      */
-    ProfileConsumerImpl(ProfileCollectorImpl profileCollector,
-                        String name) {
-        if (profileCollector == null)
+    ProfileConsumerImpl(ProfileCollectorImpl profileCollector, String name) {
+        if (profileCollector == null) {
             throw new NullPointerException("The collector must not be null");
+        }
 
         this.name = name;
         this.profileCollector = profileCollector;
@@ -71,9 +71,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         this.profileLevel = profileCollector.getDefaultProfileLevel();
 
         opIdCounter = new AtomicInteger(0);
-        ops = new ConcurrentHashMap<String,ProfileOperation>();
-        samples = new ConcurrentHashMap<String,ProfileSample>(); 
-        counters = new ConcurrentHashMap<String,ProfileCounter>(); 
+        ops = new ConcurrentHashMap<String, ProfileOperation>();
+        samples = new ConcurrentHashMap<String, ProfileSample>(); 
+        counters = new ConcurrentHashMap<String, ProfileCounter>(); 
     }
     
     /** {@inheritDoc} */
@@ -104,7 +104,8 @@ class ProfileConsumerImpl implements ProfileConsumer {
 	}
 
 	PropertyChangeEvent event = 
-	    new PropertyChangeEvent(this, "com.sun.sgs.profile.newop",null, op);
+	    new PropertyChangeEvent(this, 
+                                    "com.sun.sgs.profile.newop", null, op);
         profileCollector.notifyListeners(event);
         return op;
     }
@@ -115,9 +116,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
     public ProfileCounter registerCounter(String name, boolean taskLocal,
                                           ProfileLevel minLevel) 
     {
-        if (counters.containsKey(name))
+        if (counters.containsKey(name)) {
             return counters.get(name);
-        else {
+        } else {
             ProfileCounter counter;
             if (taskLocal) {
                 counter = new TaskLocalProfileCounter(name, minLevel);
@@ -198,7 +199,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void report() {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
             try {
                 ProfileReportImpl profileReport = 
                         profileCollector.getCurrentProfileReport();
@@ -246,7 +249,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void incrementCount() {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
 
             try {
                 ProfileReportImpl profileReport = 
@@ -261,11 +266,15 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void incrementCount(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
             
-            if (value < 0)
+            if (value < 0) {
                 throw new IllegalArgumentException("Increment value must be " +
                                                    "greater than zero");
+            }
+
             try {
                 ProfileReportImpl profileReport = 
                         profileCollector.getCurrentProfileReport();
@@ -290,7 +299,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void incrementCount() {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
             
             try {
                 ProfileReportImpl profileReport =
@@ -304,11 +315,15 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void incrementCount(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
             
-            if (value < 0)
+            if (value < 0) {
                 throw new IllegalArgumentException("Increment value must be " +
                                                    "greater than zero");
+            }
+
             try {
                 ProfileReportImpl profileReport =
                         profileCollector.getCurrentProfileReport();
@@ -351,7 +366,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void addSample(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
             try {
                 ProfileReportImpl profileReport =
                         profileCollector.getCurrentProfileReport();
@@ -382,10 +399,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void addSample(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) return;
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
             
-	    if (samples.size() == maxSamples)
+	    if (samples.size() == maxSamples) {
 		samples.removeFirst(); // remove oldest
+            }
 	    samples.add(value);
 	    // NOTE: we return a sub-list view to ensure that the
 	    // ProfileReport only sees the samples that were added,

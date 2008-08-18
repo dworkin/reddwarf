@@ -35,6 +35,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
@@ -822,12 +823,28 @@ public final class ChannelServiceImpl
     }
 
     /**
+     * Adds the specified {@code ioTask} (in a wrapper that runs the task by
+     * invoking {@link AbstractService#runIoTask runIoTask} with the {@code
+     * ioTask} and {@code nodeId}) to the task list of the given {@code
+     * channelId}.
+     */
+    void addChannelTask(
+	BigInteger channelId, final IoRunnable ioTask, final long nodeId)
+    {
+	addChannelTask(
+	    channelId,
+	    new AbstractKernelRunnable() {
+		public void run() {
+		    runIoTask(ioTask, nodeId);
+		}});
+    }
+
+    /**
      * Adds the specified {@code task} to the task list of the given {@code
      * channelId}.
      */
-    static void addChannelTask(BigInteger channelId, KernelRunnable task) {
-	Context context =
-	    getChannelService().contextFactory.joinTransaction();
+    void addChannelTask(BigInteger channelId, KernelRunnable task) {
+	Context context = contextFactory.joinTransaction();
 	context.addTask(channelId, task);
     }
 
@@ -1030,38 +1047,6 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Runs a transactional task to query the status of the node with the
-     * specified {@code nodeId} and returns {@code true} if the node is alive
-     * and {@code false} otherwise.
-     *
-     * This method must be called from outside a transaction or {@code
-     * IllegalStateException} will be thrown.
-     */
-    boolean isAlive(long nodeId) {
-	// Make sure that we're not in a transactional context.
-	try {
-	    getTransaction();
-	    throw new IllegalStateException(
-		"isAlive called from a transactional context");
-	} catch (TransactionNotActiveException e) {
-	}
-	
-	try {
-	    CheckNodeStatusTask nodeStatus =
-		new CheckNodeStatusTask(nodeId);
-	    transactionScheduler.runTask(nodeStatus, taskOwner);
-	    return nodeStatus.isAlive;
-	} catch (Exception e) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING, e, "running CheckNodeStatusTask throws");
-	    }
-	    // TBD: is this the correct value to return?
-	    return false;
-	}
-    } 
-
-    /**
      * Returns the key for accessing the {@code ChannelServer}
      * instance (which is wrapped in a {@code ManagedSerializable})
      * for the specified {@code nodeId}.
@@ -1244,25 +1229,6 @@ public final class ChannelServiceImpl
 	    } catch (ObjectNotFoundException e) {
 	    }
 	    dataService.removeServiceBinding(channelServerKey);
-	}
-    }
-
-    /**
-     * A task to obtain the status of a given node.
-     */
-    private static class CheckNodeStatusTask extends AbstractKernelRunnable {
-	private final long nodeId;
-	volatile boolean isAlive = false;
-
-	/** Constructs an instance with the specified {@code nodeId}. */
-	CheckNodeStatusTask(long nodeId) {
-	    this.nodeId = nodeId;
-	}
-
-	/** {@inheritDoc} */
-	public void run() {
-	    Node node = getWatchdogService().getNode(nodeId);
-	    isAlive = node != null && node.isAlive();
 	}
     }
 

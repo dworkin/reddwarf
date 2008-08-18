@@ -31,14 +31,14 @@ public interface ProfileOperation {
      *
      * @return the name
      */
-    public String getOperationName();
+    String getOperationName();
 
     /**
      * Returns the identifier for this operation.
      *
      * @return the identifier
      */
-    public int getId();
+    int getId();
 
     /**
      * Tells this operation to report that it is happening. This may be
@@ -47,6 +47,6 @@ public interface ProfileOperation {
      * @throws IllegalStateException if this is called outside the scope
      *                               of a task run through the scheduler
      */
-    public void report();
+    void report();
 
 }

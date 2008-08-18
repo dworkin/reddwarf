@@ -106,7 +106,7 @@ public final class TransactionAwareLogManager extends LogManager {
      *
      * Note that prior to this call, the application's namespace is
      * not known so any {@code Logger} instances will be of type
-     * {@link TransactionalLogger}, but will be configured as
+     * {@code TransactionalLogger}, but will be configured as
      * non-transactional.  After this call, any of these instances
      * that were in the application's namespace will be transactional.
      *

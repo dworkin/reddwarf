@@ -80,7 +80,7 @@ public class SnapshotParticipantListener implements ProfileListener {
     private static final long DEFAULT_PERIOD = 5000;
 
     // the map of all participants in the current snapshot window
-    private HashMap<String,ParticipantCounts> participantMap;
+    private HashMap<String, ParticipantCounts> participantMap;
 
     // the number of transactional tasks from the current snapshot window
     private int taskCount = 0;
@@ -102,7 +102,7 @@ public class SnapshotParticipantListener implements ProfileListener {
     {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        participantMap = new HashMap<String,ParticipantCounts>();
+        participantMap = new HashMap<String, ParticipantCounts>();
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port);
@@ -131,7 +131,8 @@ public class SnapshotParticipantListener implements ProfileListener {
 	    synchronized (participantMap) {
 		taskCount++;
 		for (ProfileParticipantDetail detail :
-			 profileReport.getParticipantDetails()) {
+			 profileReport.getParticipantDetails()) 
+                {
 		    ParticipantCounts counts =
 			participantMap.get(detail.getParticipantName());
 		    if (counts == null) {
@@ -141,8 +142,9 @@ public class SnapshotParticipantListener implements ProfileListener {
 		    }
 		    counts.time += detail.getPrepareTime();
 		    if (detail.wasCommitted()) {
-			if (! detail.wasCommittedDirectly())
+			if (!detail.wasCommittedDirectly()) {
 			    counts.time += detail.getCommitTime();
+                        }
 			counts.commits++;
 		    } else {
 			counts.time += detail.getAbortTime();
@@ -161,13 +163,13 @@ public class SnapshotParticipantListener implements ProfileListener {
 	int commits = 0;
 	int aborts = 0;
 	public String toString() {
-	    double taskTotal = (double)(commits + aborts);
-	    double participationPct = (taskTotal / (double)taskCount) * 100.0;
-	    double commitPct = ((double)commits / taskTotal) * 100.0;
+	    double taskTotal = (double) (commits + aborts);
+	    double participationPct = (taskTotal / (double) taskCount) * 100.0;
+	    double commitPct = ((double) commits / taskTotal) * 100.0;
 	    Formatter formatter = new Formatter();
 	    formatter.format(" participated=%2.2f%%", participationPct);
 	    formatter.format(" committed=%2.2f%%", commitPct);
-	    formatter.format(" avgTime=%2.2fms", (double)time / taskTotal);
+	    formatter.format(" avgTime=%2.2fms", (double) time / taskTotal);
 	    return formatter.toString();
 	}
     }
@@ -194,10 +196,12 @@ public class SnapshotParticipantListener implements ProfileListener {
 		reportStr.format(
 		    "Participants for last %d transactional tasks:%n",
 		    taskCount);
-                for (Entry<String,ParticipantCounts> entry :
+                for (Entry<String, ParticipantCounts> entry :
 			 participantMap.entrySet())
+                {
 		    reportStr.format(
 			"%s%s%n", entry.getKey(), entry.getValue());
+                }
 		participantMap.clear();
 		taskCount = 0;
 	    }
