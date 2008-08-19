@@ -42,6 +42,7 @@
 
 #include "sgs/config.h"
 #include "sgs/id.h"
+#include "id.h"
 
 
 /*
@@ -121,6 +122,11 @@ sgs_id* sgs_id_duplicate(const sgs_id* id) {
     if (result == NULL) return NULL;
 
     result->buf_len = id->buf_len;
+    result->buf = malloc(id->buf_len);
+    if (result->buf == NULL){
+        free(result);
+        return NULL;
+    }
     memcpy(result->buf, id->buf, id->buf_len);
 
     return result;

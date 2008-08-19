@@ -284,10 +284,9 @@ void generateIds(sgs_id **testIds){
         for (k = 0; k < 3; k++){
             sourcebuf[k] = random();
         }
-        memcpy(buffer+i, sourcebuf, len);
-        *(testIds + i) = sgs_id_create(buffer+i, len);
+        memcpy(buffer, sourcebuf, len);
+        *(testIds + i) = sgs_id_create(buffer, len);
     }
-    //printf("exiting generateIds\n");
 }
 
 int testIds(sgs_message *pmsg, int numTests, int silent){
@@ -364,6 +363,10 @@ int testBytes(sgs_message *pmsg, int numTests, int silent){
     int i, j, k, incr, results, totalBad;
     
     totalBad = 0;
+    for (i = 0; i < 10; i++){
+        inputBytes[i] = malloc(sizeof(byteTest));
+        outputBytes[i] = malloc(sizeof(byteTest));
+    }
     
     for (i = 0; i<numTests; i+=j){
         generateTestBytes(inputBytes);
