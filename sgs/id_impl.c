@@ -123,6 +123,10 @@ sgs_id* sgs_id_duplicate(const sgs_id* id) {
 
     result->buf_len = id->buf_len;
     result->buf = malloc(id->buf_len);
+    if (result->buf == NULL){
+        free(result);
+        return NULL;
+    }
     memcpy(result->buf, id->buf, id->buf_len);
 
     return result;
