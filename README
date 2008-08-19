@@ -9,9 +9,6 @@ Server.
 
 CONTENTS
 
-- chatclient
-  Source code for a simple chat example
-
 - sgs
   Source code for the example C client implementation
 
@@ -63,10 +60,9 @@ RUNNING TESTS
   executables can be run manually.  For example, on Unix:
 
     % cd test
-    % ./buffer_test
+    % ./id_test
+    % ./message_test
 
-  ...and so on with the other test executables.
-  
 
 KNOWN ISSUES
 
