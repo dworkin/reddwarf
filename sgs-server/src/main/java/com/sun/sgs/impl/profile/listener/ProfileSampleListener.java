@@ -25,7 +25,6 @@ import com.sun.sgs.impl.profile.util.PowerOfTwoHistogram;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileProperties;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -50,7 +49,6 @@ import java.util.Properties;
  * application properties file.  The default window size for this
  * class is {@code 5000}.
  *
- * @see ProfileProperties
  * @see com.sun.sgs.profile.ProfileSample
  */
 public class ProfileSampleListener implements ProfileListener {
@@ -70,7 +68,7 @@ public class ProfileSampleListener implements ProfileListener {
     // statistics updated for the aggregate window
     private int taskCount;
 
-    private final Map<String,Histogram> profileSamples;
+    private final Map<String, Histogram> profileSamples;
 
     /**
      * Creates an instance of {@code ProfileSampleListener}.
@@ -83,13 +81,15 @@ public class ProfileSampleListener implements ProfileListener {
      *
      */
     public ProfileSampleListener(Properties properties, Identity owner,
-                                 ComponentRegistry registry) {
+                                 ComponentRegistry registry) 
+    {
 
 	taskCount = 0;
-	profileSamples = new HashMap<String,Histogram>();
+	profileSamples = new HashMap<String, Histogram>();
 
 	windowSize = new PropertiesWrapper(properties).
-	    getIntProperty(ProfileProperties.WINDOW_SIZE, DEFAULT_WINDOW_SIZE);
+	    getIntProperty(ProfileListener.WINDOW_SIZE_PROPERTY, 
+                           DEFAULT_WINDOW_SIZE);
     }
 
     /**
@@ -112,10 +112,11 @@ public class ProfileSampleListener implements ProfileListener {
 	
 	taskCount++;
 	
-	Map<String,List<Long>> m = profileReport.getUpdatedTaskSamples();
+	Map<String, List<Long>> m = profileReport.getUpdatedTaskSamples();
 
-	if (m == null)
+	if (m == null) {
 	    return;
+        }
 
 	for (Entry<String, List<Long>> entry : m.entrySet()) {
 	    String name = entry.getKey();
@@ -127,8 +128,9 @@ public class ProfileSampleListener implements ProfileListener {
 	    }
 
 	    List<Long> samples = entry.getValue();
-	    for (Long l : samples) 
-		hist.bin(l.longValue());	   
+	    for (Long l : samples) {
+		hist.bin(l.longValue());
+            }
 	}
 	
 	if (taskCount % windowSize == 0) {
@@ -137,9 +139,12 @@ public class ProfileSampleListener implements ProfileListener {
 		System.out.printf("Profile samples for the past %d tasks:%n", 
 				  taskCount);
 		
-		for (Map.Entry<String,Histogram> e : profileSamples.entrySet()) 
+		for (Map.Entry<String, Histogram> e : 
+                         profileSamples.entrySet()) 
+                {
 		    System.out.printf("%s: (%d samples)%n%s%n", e.getKey(), 
 				      e.getValue().size(), e.getValue());
+                }
 		
 
 		// reset the samples for the next window
@@ -154,7 +159,4 @@ public class ProfileSampleListener implements ProfileListener {
     public void shutdown() {
 	// unused
     }
-    
-    
-
 }

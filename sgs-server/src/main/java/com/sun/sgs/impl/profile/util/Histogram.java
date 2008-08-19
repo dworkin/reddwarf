@@ -36,27 +36,27 @@ public interface Histogram {
      *
      * @param value the value to be aggregated
      */
-    public void bin(long value);
+    void bin(long value);
 
     /**
      * Clears the internal state of the histogram, removing all
      * collected samples.
      */
-    public void clear();
+    void clear();
     
     /**
      * Returns the number of samples represented by this histogram.
      *
      * @return the number of samples represented by this hisogram
      */
-    public int size();    
+    int size();    
 
     /**
      * Returns a text-based representation of this histogram.
      *
      * @return a text-based representation of this histogram
      */
-    public String toString();
+    String toString();
 
     /**
      * Returns a text-based representation of this histogram where
@@ -69,6 +69,6 @@ public interface Histogram {
      * 
      * @return a text based representation of this histogram
      */
-    public String toString(String binLabel);
+    String toString(String binLabel);
 
 }

@@ -72,7 +72,7 @@ public interface ProfileCollector {
      * 
      * @return the default profiling level
      */
-    public ProfileLevel getDefaultProfileLevel();
+    ProfileLevel getDefaultProfileLevel();
 
     /**
      * Set the default profile level, used as the initial level when creating
@@ -80,13 +80,13 @@ public interface ProfileCollector {
      * 
      * @param level the new default profile level
      */
-    public void setDefaultProfileLevel(ProfileLevel level);
+    void setDefaultProfileLevel(ProfileLevel level);
     
     /** 
      * Shuts down the ProfileCollector, reclaiming resources as necessary.
      */
     
-    public void shutdown();
+    void shutdown();
     
     /**
      * Adds a <code>ProfileListener</code> as a listener for
@@ -102,7 +102,7 @@ public interface ProfileCollector {
      *                  shut down by the {@code ProfileCollector}.  This 
      *                  parameter should usually be set to {@code true}.
      */
-    public void addListener(ProfileListener listener, boolean canRemove);
+    void addListener(ProfileListener listener, boolean canRemove);
        
     /**
      * Instantiates and adds a {@code ProfileListener}. The listener must
@@ -116,9 +116,9 @@ public interface ProfileCollector {
      * @param listenerClassName the fully qualified class name of the 
      *                          listener to instantiate and add.
      * 
-     * @throws any exception generated during instantiation
+     * @throws Exception any exception generated during instantiation
      */
-    public void addListener(String listenerClassName) throws Exception;
+    void addListener(String listenerClassName) throws Exception;
     
 
     /**
@@ -127,7 +127,7 @@ public interface ProfileCollector {
      * 
      * @return the list of listeners
      */
-    public List<ProfileListener> getListeners();
+    List<ProfileListener> getListeners();
 
     /**
      * Removes a {@code ProfileListener} and calls
@@ -137,7 +137,7 @@ public interface ProfileCollector {
      *
      * @param listener the listener to remove
      */
-    public void removeListener(ProfileListener listener);
+    void removeListener(ProfileListener listener);
     
     /**
      * Returns a read-only map of {@code ProfileConsumer} names to the 
@@ -146,18 +146,18 @@ public interface ProfileCollector {
      * 
      * @return the map of names to consumers
      */
-    public Map<String, ProfileConsumer> getConsumers();
+    Map<String, ProfileConsumer> getConsumers();
     
     /**
      * Notifies the collector that a thread has been added to the scheduler.
      */
-    public void notifyThreadAdded();
+    void notifyThreadAdded();
 
     /**
      * Notifies the collector that a thread has been removed from the
      * scheduler.
      */
-    public void notifyThreadRemoved();
+    void notifyThreadRemoved();
 
     /**
      * Tells the collector that a new task is starting in the context of
@@ -171,7 +171,7 @@ public interface ProfileCollector {
      * @param scheduledStartTime the requested starting time for the task
      * @param readyCount the number of ready tasks at the scheduler
      */
-    public void startTask(KernelRunnable task, Identity owner,
+    void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount);
 
     /**
@@ -183,7 +183,7 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void noteTransactional();
+    void noteTransactional();
 
     /**
      * Tells the collector about a participant of a transaction when that
@@ -198,7 +198,7 @@ public interface ProfileCollector {
      * @throws IllegalStateException if no transactional task is bound to
      *                               this thread
      */
-    public void addParticipant(ProfileParticipantDetail participantDetail);
+    void addParticipant(ProfileParticipantDetail participantDetail);
 
     /**
      * Tells the collector that the current task associated with the
@@ -209,7 +209,7 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void finishTask(int tryCount);
+    void finishTask(int tryCount);
 
     /**
      * Tells the collector that the current task associated with the calling
@@ -221,6 +221,6 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    public void finishTask(int tryCount, Throwable t);
+    void finishTask(int tryCount, Throwable t);
 
 }
