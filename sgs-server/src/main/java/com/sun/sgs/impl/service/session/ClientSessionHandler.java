@@ -838,7 +838,7 @@ class ClientSessionHandler {
 		}
 		sessionService.addHandler(
 		    sessionRefId, ClientSessionHandler.this);
-		scheduleTask(new LoginTask());
+		taskQueue.addTask(new LoginTask(), identity);
 		
 	    } else {
 		/*

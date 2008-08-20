@@ -238,7 +238,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-
+    /*
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -456,7 +456,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	
     }
-
+    */
+    public void testLoginSendMessageRace() throws Exception {
+	String name = "race";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login(false);
+	    client.sendMessages(1, 1, null);
+	} finally {
+            client.disconnect();
+	}
+    }
+    /*
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
 	String name = "success";
 	DummyClient client = new DummyClient(name);
@@ -640,7 +652,6 @@ public class TestClientSessionServiceImpl extends TestCase {
             client.disconnect();
 	}
     }
-
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	int numClients = 4;
@@ -989,7 +1000,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   ", elapsed time: " + (endTime - startTime) +
 			   " ms.");
     }
-
+    */
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
@@ -1168,10 +1179,30 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns {@code true} if login was successful, and returns
-	 * {@code false} if login was redirected.
+	 * Sends a login request and waits for it to be acknowledged,
+	 * returning {@code true} if login was successful, and {@code
+	 * false} if login was redirected.  If the login was not successful
+	 * or redirected, then a {@code RuntimeException} is thrown because
+	 * the login operation timed out before being acknowledged.
 	 */
 	boolean login() {
+	    return login(true);
+	}
+
+	/**
+	 * Sends a login request and if {@code waitForLogin} is {@code
+	 * true} waits for the request to be acknowledged, returning {@code
+	 * true} if login was successful, and {@code false} if login was
+	 * redirected, otherwise a {@code RuntimeException} is thrown
+	 * because the login operation timed out before being acknowldeged.
+	 *
+	 * If {@code waitForLogin} is false, this method returns {@code
+	 * true} if the login is known to be successful (the outcome may
+	 * not yet be known because the login operation is asynchronous),
+	 * otherwise it returns false.  Invoke {@code waitForLogin} to wait
+	 * for an expected successful login.
+	 */
+	boolean login(boolean waitForLogin) {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(toString() + " not connected");
@@ -1192,6 +1223,22 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
+	    if (waitForLogin) {
+		return waitForLogin();
+	    } else {
+		synchronized (lock) {
+		    return loginSuccess;
+		}
+	    }
+	}
+
+	/**
+	 * Waits for a login acknowledgement, and returns {@code true} if
+	 * login was successful, {@code false} if login was redirected,
+	 * otherwise a {@code RuntimeException} is thrown because the login
+	 * operation timed out before being acknowledged.
+	 */
+	boolean waitForLogin() {
 	    synchronized (lock) {
 		try {
 		    if (loginAck == false) {
@@ -1232,7 +1279,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
-	    checkLoggedIn();
+	    //checkLoggedIn();
 
 	    MessageBuffer buf =
 		new MessageBuffer(1+ message.length);
