@@ -151,7 +151,7 @@ public class Dungeon implements Game, Serializable {
         Messages.sendSpriteMap(session, spriteMap);
 
         Messages.broadcastPlayerJoined(dungeonCommandsChannel.get(), playerID);
-
+      
         // Finally, throw the player into the game through the starting
         // connection point ... the only problem is that the channel info
         // won't be there when we try to send a board (because we still have

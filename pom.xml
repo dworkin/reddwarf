@@ -25,6 +25,7 @@
     <module>hack-server</module>
     <module>hack-shared</module>
     <module>hack-ai</module>
+    <module>hack-javadoc</module>
   </modules>
 
   <build>
@@ -75,7 +76,7 @@
   </repositories>
 
   <properties>
-    <sgs.version>0.9.6.2</sgs.version>
+     <sgs.version>0.9.6.3</sgs.version>
     <!-- to run against the latest version of the trunk uncomment the
     following line and comment out the line above this comment -->
     <!-- <sgs.version>0.9.7-SNAPSHOT</sgs.version> -->
