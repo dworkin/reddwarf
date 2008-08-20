@@ -208,6 +208,42 @@
 	</td>
       </tr>
 
+      <tr>
+	<td width="25"></td>
+	<td align="left">
+	  
+	  <p style="text-indent:-30px;"> <b>Maven says it's unable to download the artifact?</b><p/>
+	    
+	  <p> If you're seeing something like the following error:
+	    <br><br>
+	    <tt>[INFO] ------------------------------------------------------------------------<br>
+	      [ERROR] BUILD ERROR<br>
+	      [INFO] ------------------------------------------------------------------------<br>
+	      [INFO] Failed to resolve artifact.<br>
+	      <br>
+	      GroupId: com.projectdarkstar.example.hack<br>
+	      ArtifactId: hack<br>
+	      Version: 1.0-SNAPSHOT<br>
+	      <br>
+	      Reason: Unable to download the artifact from any repository<br>
+	      <br>
+	      com.projectdarkstar.example.hack:hack:pom:1.0-SNAPSHOT<br>
+	      <br>
+	      from the specified remote repositories:<br>
+	      central (http://repo1.maven.org/maven2),<br>
+	      java.net (http://download.java.net/maven/2/),<br>
+	      games-darkstar.snapshots (https://games-darkstar.dev.java.net/nonav/snapshots)</tt><br>
+	    <br>
+	    Then it might be due an old version of maven.  We've seen
+	    this issue with the default version of Maven that ships
+	    with OS X.  Try downloading the latest version and then
+	    try to build it.  If this doesn't work, <i>please</i>
+	    email us about the issue and attach the error you're
+	    seeing, as we want the code to "just work" right out of
+	    the box.</p>	 
+	</td>
+      </tr>
+
 
       <tr>
 	<td width="25"></td>
@@ -365,7 +401,7 @@
 	  
 	</td>
       </tr>
-      
+
     </table>
 
 
