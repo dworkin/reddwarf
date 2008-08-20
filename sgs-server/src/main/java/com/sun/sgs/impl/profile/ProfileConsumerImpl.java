@@ -29,7 +29,6 @@ import java.util.Collection;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -48,7 +47,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
     // the profile level for this consumer
     private ProfileLevel profileLevel;
     
-    private final AtomicInteger opIdCounter;
     // the ops, samples, and counters for this consumer
     private final ConcurrentHashMap<String, ProfileOperation> ops;
     private final ConcurrentHashMap<String, ProfileSample> samples;
@@ -70,7 +68,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
         // default profile level is taken from the collector
         this.profileLevel = profileCollector.getDefaultProfileLevel();
 
-        opIdCounter = new AtomicInteger(0);
         ops = new ConcurrentHashMap<String, ProfileOperation>();
         samples = new ConcurrentHashMap<String, ProfileSample>(); 
         counters = new ConcurrentHashMap<String, ProfileCounter>(); 
@@ -97,8 +94,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
 	ProfileOperation op = ops.get(name);
 
 	if (op == null) {
-            int opId = opIdCounter.getAndIncrement();
-	    op = new ProfileOperationImpl(name, opId, minLevel);
+	    op = new ProfileOperationImpl(name, minLevel);
 	    ops.putIfAbsent(name, op);
 	    op = ops.get(name);
 	}
@@ -173,20 +169,14 @@ class ProfileConsumerImpl implements ProfileConsumer {
      */
     private class ProfileOperationImpl implements ProfileOperation {
         private final String opName;
-        private final int opId;
         private final ProfileLevel minLevel;
-        ProfileOperationImpl(String opName, int opId, ProfileLevel minLevel) {
+        ProfileOperationImpl(String opName, ProfileLevel minLevel) {
             this.opName = opName;
-            this.opId = opId;
             this.minLevel = minLevel;
         }
 
         public String getOperationName() {
             return opName;
-        }
-
-        public int getId() {
-            return opId;
         }
 
         public String toString() {

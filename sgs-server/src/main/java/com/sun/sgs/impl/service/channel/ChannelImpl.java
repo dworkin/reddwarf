@@ -2067,7 +2067,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Obsolete (@code ChannelSet} representation.  The serialized form is
+     * Obsolete {@code ChannelSet} representation.  The serialized form is
      * here just so that obsolete channel sets can be removed by 
      * {@code ChannelServiceImpl} upon recovery.
      */
