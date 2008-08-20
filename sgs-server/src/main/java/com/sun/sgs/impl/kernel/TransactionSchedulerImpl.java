@@ -137,6 +137,8 @@ final class TransactionSchedulerImpl
      *                               by the system to manage transactions
      * @param profileCollector the {@code ProfileCollector} used by the
      *                         system to collect profiling data
+     * @param accessCoordinator the {@code AccessCoordinator} used by
+     *                          the system to managed shared data
      *
      * @throws InvocationTargetException if there is a failure initializing
      *                                   the {@code SchedulerQueue}
@@ -156,6 +158,8 @@ final class TransactionSchedulerImpl
             throw new NullPointerException("Coordinator cannot be null");
         if (profileCollector == null)
             throw new NullPointerException("Collector cannot be null");
+	if (accessCoordinator == null)
+	    throw new NullPointerException("AccessCoordinator cannot be null");
 
         this.transactionCoordinator = transactionCoordinator;
         this.profileCollector = profileCollector;
@@ -536,6 +540,7 @@ final class TransactionSchedulerImpl
 
                 try {
                     // setup the transaction state
+		    
                     TransactionHandle handle =
                         transactionCoordinator.createTransaction(unbounded);
                     transaction = handle.getTransaction();

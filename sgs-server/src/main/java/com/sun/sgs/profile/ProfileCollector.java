@@ -21,7 +21,6 @@ package com.sun.sgs.profile;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import java.math.BigInteger;

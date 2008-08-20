@@ -55,6 +55,16 @@ public class AccessedObjectsListener implements ProfileListener {
     private final BoundedLinkedHashMap<BigInteger,AccessedObjectsDetail>
         backlogMap;
 
+    private static final String ACCESS_COUNT_PROPERTY = 
+	AccessedObjectsListener.class.getName() + ".access.count";
+
+    private static final int DEFAULT_ACCESS_COUNT = 20;
+
+    /**
+     * The number of accesses to show when outputting text
+     */
+    private int accessesToShow;
+
     /**
      * Creates an instance of {@code AccessedObjectsListener}.
      *
@@ -85,6 +95,22 @@ public class AccessedObjectsListener implements ProfileListener {
         } else {
             backlogMap = null;
         }
+
+	String accessCountStr = properties.getProperty(ACCESS_COUNT_PROPERTY);
+	if (accessCountStr == null) {
+	    accessesToShow = DEFAULT_ACCESS_COUNT;
+	}
+	else {
+	    try {
+		int accessesToShow = Integer.parseInt(accessCountStr);
+		
+	    } catch (NumberFormatException nfe) {
+		throw new IllegalArgumentException("Access count moust be a " +
+						   "number: " + accessCountStr);
+	    }
+	    
+	}
+
     }
 
     /**
@@ -162,29 +188,41 @@ public class AccessedObjectsListener implements ProfileListener {
      * 
      * @return a formatted list of locks
      */
-    private static String formatAccesses(List<AccessedObject> accessedObjects) {
+    private String formatAccesses(List<AccessedObject> accessedObjects) {
 	String formatted = "";
         int count = 0;
 
 	for (AccessedObject object : accessedObjects) {
-            try {
-                formatted += String.format("[source: %s] %-5s %s, "
-                                           +"desciption %s%n",
-                                           object.getSource(),
-                                           object.getAccessType(),
-                                           object.getObjectId(),
-                                           object.getDescription());
-            } catch (Throwable t) {
-                formatted += String.format("[%s threw exception: %s]%n",
-                                           object.getDescription().getClass(),
-                                           t);
-            }
-            if (count++ > 20) {
-                formatted += String.format("[ further access list "
-                                           + "truncated ]%n");
-                return formatted;
-            }
+            if (count++ < accessesToShow) {
+		try {
+		    formatted += String.format("[source: %s] %-5s %s, "
+					       +"desciption: %s%n",
+					       object.getSource(),
+					       object.getAccessType(),
+					       object.getObjectId(),
+					       object.getDescription());
+		} catch (Throwable t) {
+		    // the first three calls are guaranteed not to
+		    // throw an exception since we control their
+		    // implementation.  However, the description is
+		    // provided at run time and therefore may have
+		    // thrown an exception, so we mark it as such.
+		    formatted += 
+			String.format("[source %s] %-5s %s [%s.toString() threw"
+				      + " exception: %s]%n", object.getSource(), 
+				      object.getAccessType(), 
+				      object.getObjectId(),					      
+				      object.getDescription().getClass(), t);
+		}
+	    }
+	    else {
+		break;
+	    }
 	}
+
+	if (count == accessesToShow)
+	    formatted += String.format("[%d further accesses truncated]%n",
+				       accessedObjects.size() - accessesToShow);
 
 	return formatted;
     }
@@ -196,11 +234,15 @@ public class AccessedObjectsListener implements ProfileListener {
 	// unused
     }
 
-    /** A private implementation of LinkedHashMap that is bounded in size. */
+    /** 
+     * A private implementation of {@code LinkedHashMap} that is
+     * bounded in size.
+     */
     private static class BoundedLinkedHashMap<K,V> extends LinkedHashMap<K,V> {
         // the bounding size
         private final int maxSize;
-        /** Creates an instance of BoundedLinkedHashMap. */
+     
+	/** Creates an instance of {@code BoundedLinkedHashMap}. */
         BoundedLinkedHashMap(int maxSize) {
             this.maxSize = maxSize;
         }

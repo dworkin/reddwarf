@@ -71,7 +71,9 @@ import java.util.concurrent.atomic.AtomicLong;
 class AccessCoordinatorImpl implements AccessCoordinator,
                                        NonDurableTransactionParticipant {
 
-    // the map from active transactions to associated detail
+    /**
+     * The map from active transactions to associated detail
+     */
     private final ConcurrentMap<Transaction,AccessedObjectsDetailImpl>
         txnMap = new ConcurrentHashMap<Transaction,AccessedObjectsDetailImpl>();
 
@@ -81,15 +83,22 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     // At any rate, these aren't needed until conflict is being managed,
     // since active transactions will not be the cause of failure
 
-    // an optional backlog of completed transactions used for guessing at
-    // past conflict...the queue is bounded if active, or null if backlog
-    // checking is inactive
     // NOTE: this is here as an experiment, as it's not clear if it needs
     // to be in the coordinator, or could be moved to the profiling code,
     // or put somewhere else altogether
+    /**
+     * An optional backlog of completed transactions used for
+     * identifying a past conflict.  The queue is bounded if by the
+     * value set in the {@link #BACKLOG_QUEUE_PROPERTY}, or {@code
+     * null} by default.
+     */
     private final Queue<AccessedObjectsDetailImpl> backlog;
 
-    // the property to set the size of the backlog
+    /**
+     * The property to set the size of the backlog and enable
+     * transaction conflict detail reporting.  The value set by this
+     * property must be non-negative.
+     */
     static final String BACKLOG_QUEUE_PROPERTY =
         AccessCoordinatorImpl.class.getName() + ".queue.size";
 
@@ -119,7 +128,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
                     <AccessedObjectsDetailImpl>(Integer.parseInt(backlogProp));
             } catch (NumberFormatException nfe) {
                 throw new IllegalArgumentException("Backlog size must be a " +
-                                                   "number: " + backlogProp);
+                                                   "positive number: "
+						   + backlogProp);
             }
         } else {
             backlog = null;
@@ -135,10 +145,16 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
     /** 
      * {@inheritDoc} 
+     *
+     * @throws NullPointerException if any of the arguments are {@code null}
      */
     public <T> AccessReporter<T> registerAccessSource
 	(String sourceName, Class<T> objectIdType)
     {
+	if (sourceName == null)
+	    throw new NullPointerException("source name cannot be null");
+	if (objectIdType == null)
+	    throw new NullPointerException("objectIdType cannot be null");
         return new AccessReporterImpl<T>(sourceName);
     }
 
@@ -146,6 +162,9 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public Transaction getConflictingTransaction(Transaction txn) {
+	if (txn == null)
+	    throw new NullPointerException("txn cannot be null");
+
         // until we manage conflict, there aren't really any active
         // transactions to return..
         return null;
@@ -155,7 +174,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * TODO: Notes for when we look at conflict reolution...
      * The idea here is that a resolver needs to know who else might be
      * interested in a given object...but is this the right approach? The
-     * reasoning here is that the Coodrinator should implement basic
+     * reasoning here is that the Coordinator should implement basic
      * conflict and deadlock detection so that each resolver doesn't have
      * to, but deadlock may depend on how resolution is done. So, maybe
      * the resolver is responsible for this, in which case it needs to
@@ -180,7 +199,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         AccessedObjectsDetailImpl detail = txnMap.get(txn);
         // TODO: this is the last chance to abort because of conflict,
         // when we're actually managing the contention
-        detail.markCommitting();
+        detail.markPrepared();
         return false;
     }
 
@@ -284,20 +303,35 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         private final BigInteger txnId =
             new BigInteger(txnProxy.getCurrentTransaction().getId());
 
-        // the ordered set of accesses, and a separate set of just the writes
-        private final LinkedHashSet<AccessedObject> accessList =
-            new LinkedHashSet<AccessedObject>();
-	private final Set<AccessedObject> writes =
-            new HashSet<AccessedObject>();
+	/**
+	 * The ordered set of accesses for all sources, which includes
+	 * both reads and writes
+	 */
+	private final LinkedHashSet<AccessedObject> accessList =
+             new LinkedHashSet<AccessedObject>();
+	
+	/**
+	 * The list of write accesses that occurred during the
+	 * transaction.  We use a {@code List} here to improve
+	 * iteration efficiency in the {@code conflictsWith} method.
+	 * This list is guaranteed not to have any duplicates in it.
+	 */
+ 	private final List<AccessedObject> writes =
+             new ArrayList<AccessedObject>();
 
-        // any provided object descriptions
-	private final Map<Object,Object> objIDtoDescription =
-            new HashMap<Object,Object>();
+	/**
+	 * The mapping from a source to a second mapping from all of
+	 * that sources's Ids to their descriptions.  This secondary
+	 * mapping is used to prevent collisions between multiple
+	 * sources that use the same Id.
+	 */
+	private final Map<String,Map<Object,Object>> sourceToObjIdAndDescription
+	    = new HashMap<String,Map<Object,Object>>();
 
         // whether the transaction has already proceeded past prepare
-	private final AtomicBoolean committing = new AtomicBoolean(false);
+	private final AtomicBoolean prepared = new AtomicBoolean(false);
 
-        // information about why the transaction failed
+        // information about why the transaction failed.
         private boolean failed = false;
 	private ConflictType conflictType = ConflictType.NONE;
         private BigInteger idOfConflictingTxn = null;
@@ -319,18 +353,50 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	
         /** Adds an {@code AccessedObject} to the list of accessed objects. */
         void addAccess(AccessedObject accessedObject) {
-            accessList.add(accessedObject);
-	    
-	    // keep track of the write accesses in case we later need
-	    // to determine whether this detail conflicted with
-	    // another.
-	    if (accessedObject.getAccessType().equals(AccessType.WRITE))
-		writes.add(accessedObject);
-        }
+	    boolean added = accessList.add(accessedObject);
 
+	    // if this is the first time the object has been accessed,
+	    // we may need to add its id to the set of descriptions,
+	    // and if it was a write, add it to the list.
+	    if (added) {
+		String source = accessedObject.getSource();
+		Map<Object,Object> idToDescription = 
+		    sourceToObjIdAndDescription.get(source);
+		if (idToDescription == null) {
+		    idToDescription = new HashMap<Object,Object>();
+		    sourceToObjIdAndDescription.put(source, idToDescription);
+		}
+		// if we didn't already have a description set for
+		// this object, put its Id in the map so we have a
+		// recorded access of it.  We use the keyset of this
+		// map when checking for conflicts, so every access
+		// needs to be recorded in it
+		Object objId = accessedObject.getObjectId();
+		if (!idToDescription.containsKey(objId)) {
+		    idToDescription.put(objId, null);		    
+		}
+		
+		// keep track of the write accesses in case we later
+		// need to determine whether this detail conflicted
+		// with another.
+		if (accessedObject.getAccessType().equals(AccessType.WRITE)) {
+		    writes.add(accessedObject);
+		}
+	    }
+	}
+	    
         /** Maps the provided object Id to a description. */
-        void setDescription(Object objId, Object annotation) {
-            objIDtoDescription.put(objId, annotation);
+        void setDescription(String source, Object objId, Object description) {
+	    Map<Object,Object> objIdToDescription = 
+		sourceToObjIdAndDescription.get(source);
+	    if (objIdToDescription == null) {
+		objIdToDescription = new HashMap<Object,Object>();
+		sourceToObjIdAndDescription.put(source, objIdToDescription);
+	    }
+
+	    // if the Id didn't already have a description, add one
+	    if (objIdToDescription.get(objId) == null)
+		objIdToDescription.put(objId, description);
         }
 
         /** Sets the cause and source of conflict for this access detail. */
@@ -342,18 +408,21 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	}
 
         /** Returns a given object's annotation or {@code null}. */
-	Object getDescription(Object objId) {
-            return objIDtoDescription.get(objId);
+	Object getDescription(String source, Object objId) {
+	    Map<Object,Object> objIdToDescription = 
+		sourceToObjIdAndDescription.get(source);
+            return (objIdToDescription == null) 
+		? null : objIdToDescription.get(objId);
         }
 
         /** Marks this detail as having progressed past prepare(). */
-	void markCommitting() {
-            committing.set(true);
+	void markPrepared() {
+            prepared.set(true);
         }
 
         /** Reports whether the associated transaction has prepared. */
-	boolean isCommitting() {
-	    return committing.get();
+	boolean isPrepared() {
+	    return prepared.get();
         }
 
         /** Checks if the given detail conflicts with this detail. */
@@ -361,41 +430,31 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
 	    if (other == null)
 		return false;
-	    
+
 	    // A conflict occurs if two details have write sets that
 	    // intersect, or if the write set of either set intersects
-	    // with the other's read set.
-	    //
-	    // To minimize the number of operations, we determine
-	    // which write set is smaller.  We then use the smaller of
-	    // the two for checking item presence in the other's write
-	    // and read sets.
-	    Set<AccessedObject> fewerWrites = null;
-	    Set<AccessedObject> moreWrites  = null;
-	    Set<AccessedObject> reads  = null; // read set for fewerWrites
-	    Set<AccessedObject> reads2 = null; // read set for moreWrites
+	    // with the other's read set.  We therefore iterate over
+	    // each detail's write set and check if the second detail
+	    // had a source that accessed an object with the same key
+	    // as the write access from the first detail.	    
+	    for (AccessedObject o : writes) {
 
-	    if (writes.size() < other.writes.size()) {
-		fewerWrites = writes;
-		moreWrites = other.writes;
-		reads = other.accessList;
-		reads2 = accessList;
-	    }
-	    else {
-		fewerWrites = other.writes;
-		moreWrites = writes;
-		reads = accessList;
-		reads2 = other.accessList;
-	    }
-	    
-	    for (AccessedObject o : fewerWrites) {
-		if (moreWrites.contains(o) || reads.contains(o))
+		Map<Object,Object> objIdToDescription = 
+		    other.sourceToObjIdAndDescription.get(o.getSource());
+
+		if (objIdToDescription != null && 
+		    objIdToDescription.containsKey(o.getObjectId()))
 		    return true;		
 	    }
 
-	    for (AccessedObject o : moreWrites) {
-		if (reads2.contains(o))
-		    return true;
+	    for (AccessedObject o : other.writes) {
+
+		Map<Object,Object> objIdToDescription = 
+		    sourceToObjIdAndDescription.get(o.getSource());
+
+		if (objIdToDescription != null && 
+		    objIdToDescription.containsKey(o.getObjectId()))
+		    return true;		
 	    }
 
             return false;
@@ -431,7 +490,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             this.parent = parent;
         }
 
-        /** Implement AccessedObject. */
+        /* Implement AccessedObject. */
 
         /** {@inheritDoc} */
         public Object getObjectId() {
@@ -443,14 +502,14 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         }
         /** {@inheritDoc} */
         public Object getDescription() {
-            return parent.getDescription(objId);
+            return parent.getDescription(source, objId);
         }
         /** {@inheritDoc} */
         public String getSource() {
             return source;
         }
 
-        /** Support comparison checking. */
+        /* Support comparison checking. */
 
         /**
 	 * Returns {@code true} if the other object is an instance of
@@ -460,7 +519,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	public boolean equals(Object o) {
 	    if ((o != null) && (o instanceof AccessedObjectImpl)) {
 		AccessedObjectImpl a = (AccessedObjectImpl)o;
-		return objId.equals(a.objId) && type.equals(a.type);
+		return objId.equals(a.objId) && type.equals(a.type) &&
+		    source.equals(a.source);
 	    }
 	    return false;
 	}
@@ -487,31 +547,73 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      */
     private class AccessReporterImpl<T> implements AccessReporter<T> {
 	private final String source;
+
 	/** Creates an instance of {@code AccessReporter}. */
         AccessReporterImpl(String source) {
+	    if (source == null)
+		throw new NullPointerException("source cannot be null");
             this.source = source;
         }
+
         /** {@inheritDoc} */
-        public void reportObjectAccess(T objId, AccessType type) {
-            AccessedObjectsDetailImpl detail =
-                txnMap.get(txnProxy.getCurrentTransaction());
+        public void reportObjectAccess(Transaction txn, T objId, AccessType type) {
+	    if (txn == null)
+		throw new NullPointerException("txn cannot be null");
+	    if (objId == null)
+		throw new NullPointerException("objId cannot be null");
+	    if (type == null)
+		throw new NullPointerException("type cannot be null");
+
+
+            AccessedObjectsDetailImpl detail = txnMap.get(txn);
             detail.addAccess(new AccessedObjectImpl(objId, type, source,
                                                     detail));
         }
+
+        /** {@inheritDoc} */
+	public void reportObjectAccess(Transaction txn, T objId, AccessType type, 
+				       Object description) {
+	    if (txn == null)
+		throw new NullPointerException("txn cannot be null");
+	    if (objId == null)
+		throw new NullPointerException("objId cannot be null");
+	    if (type == null)
+		throw new NullPointerException("type cannot be null");
+
+	    AccessedObjectsDetailImpl detail = txnMap.get(txn);
+	    detail.addAccess(new AccessedObjectImpl(objId, type, source,
+						    detail));
+            detail.setDescription(source, objId, description);
+	}
+
+        /** {@inheritDoc} */
+	public void setObjectDescription(Transaction txn, T objId, Object description) {
+	    if (txn == null)
+		throw new NullPointerException("txn cannot be null");
+	    if (objId == null)
+		throw new NullPointerException("objId cannot be null");
+
+            AccessedObjectsDetailImpl detail =
+                txnMap.get(txn);
+            detail.setDescription(source, objId, description);
+        }
+
+        /** {@inheritDoc} */
+        public void reportObjectAccess(T objId, AccessType type) {
+	    reportObjectAccess(txnProxy.getCurrentTransaction(), objId, type);
+        }
+
         /** {@inheritDoc} */
 	public void reportObjectAccess(T objId, AccessType type, 
 				       Object description) {
-	    AccessedObjectsDetailImpl detail =
-                txnMap.get(txnProxy.getCurrentTransaction());
-	    detail.addAccess(new AccessedObjectImpl(objId, type, source,
-						    detail));
-            detail.setDescription(objId, description);
+	    reportObjectAccess(txnProxy.getCurrentTransaction(), 
+			       objId, type, description);
 	}
+
         /** {@inheritDoc} */
 	public void setObjectDescription(T objId, Object description) {
-            AccessedObjectsDetailImpl detail =
-                txnMap.get(txnProxy.getCurrentTransaction());
-            detail.setDescription(objId, description);
+	    setObjectDescription(txnProxy.getCurrentTransaction(), 
+				 objId, description);
         }
     }
 }

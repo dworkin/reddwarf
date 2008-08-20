@@ -29,7 +29,7 @@ import com.sun.sgs.service.Transaction;
  * any transaction on any node. An example would be a {@code ManagedObject}
  * as provided by the {@code DataService}.
  * <p>
- * Implementations should assume that each given {@code AccessReporter} will
+ * Implementations should require that each given {@code AccessReporter} will
  * report on a unique set of objects. That is, even if two different
  * {@code AccessReporter} instances report access to an object with the
  * same identifier, it should be assumed that these are different objects.
@@ -51,8 +51,9 @@ public interface AccessCoordinator {
      *                   cause conflict on access
      * @param objectIdType the type of the identifier that will be used
      *                     to identify accessed objects
+     * @param <T> the type of the id object used to report accesses
      *
-     * @return an {@code AccessNotifier} used to notify the system
+     * @return an {@code AccessReporter} used to notify the system
      *         of access to shared objects
      */
     public <T> AccessReporter<T> registerAccessSource

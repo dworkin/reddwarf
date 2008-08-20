@@ -64,8 +64,8 @@ public interface ProfileReport {
      *
      * @return the transaction identifier or <code>null</code>
      */
-    public BigInteger getTransactionId();
-
+    BigInteger getTransactionId();
+    
     /**
      * Returns detail about each participant in the transaction, or an
      * empty <code>Set</code> if the task was not transactional.
@@ -187,7 +187,7 @@ public interface ProfileReport {
      *
      * @return the associated access detail or <code>null</code>
      */
-    public AccessedObjectsDetail getAccessedObjectsDetail();
+    AccessedObjectsDetail getAccessedObjectsDetail();
 
     /**
      * Returns the number of tasks in the same context as this report's task

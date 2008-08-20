@@ -27,7 +27,7 @@ import java.util.List;
 
 
 /**
- * An interface accesible through a {@code ProfileReport} that details the
+ * An interface accessible through a {@code ProfileReport} that details the
  * collection of object accesses that occurred during the associated
  * transaction. If that transaction failed due to some kind of conflict, then
  * the type of failure and conflicting task is also identified.
@@ -53,7 +53,7 @@ public interface AccessedObjectsDetail {
      * The collection of requested object accesses. The order is the same
      * as the order in which the objects were requested in the transaction.
      *
-     * @param a {@code List} of {@code AccessedObject}s
+     * @return a {@code List} of {@code AccessedObject}s
      */
     public List<AccessedObject> getAccessedObjects();
 

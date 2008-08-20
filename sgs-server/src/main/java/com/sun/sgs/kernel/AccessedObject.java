@@ -23,7 +23,10 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 
 
 /**
- * An interface that provides details of a single object access.
+ * An interface that provides details of a single object access.  Two
+ * accessed objects are identical if both were reported by the same
+ * {@link AccessReporter} and the values returned by {@link
+ * #getObjectId()} and {@link #getAccessType()} are equal.
  */
 public interface AccessedObject {
 

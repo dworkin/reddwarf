@@ -288,7 +288,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
-		detectModifications, classesTable);
+		detectModifications, classesTable, oidAccesses);
 	}
 	@Override protected TransactionParticipant createParticipant() {
 	    /* Create a durable participant */
@@ -465,7 +465,6 @@ public final class DataServiceImpl implements DataService {
 			}
 		    },
 		taskOwner);
-
 	    storeToShutdown = null;
 	} catch (RuntimeException e) {
 	    getExceptionLogger(e).logThrow(
@@ -680,6 +679,7 @@ public final class DataServiceImpl implements DataService {
 	    long nextOid = context.nextObjectId(oid);
 	    BigInteger result =
 		(nextOid == -1) ? null : BigInteger.valueOf(nextOid);
+	    oidAccesses.reportObjectAccess(result, AccessType.READ);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "nextObjectId objectId:{0} returns {1}",
@@ -708,11 +708,11 @@ public final class DataServiceImpl implements DataService {
 	    ManagedObject result;
 	    try {
                 String internalName = getInternalName(name, serviceBinding);
-		result = context.getBinding(internalName);
 		// mark that this name has been read locked
 		boundNameAccesses.
-                    reportObjectAccess(internalName, AccessType.READ, result);
-
+		    reportObjectAccess(internalName, AccessType.READ);	    
+		result = context.getBinding(internalName);
+		boundNameAccesses.setObjectDescription(internalName, result);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -752,10 +752,10 @@ public final class DataServiceImpl implements DataService {
 	    checkManagedObject(object);
 	    context = getContext();
             String internalName = getInternalName(name, serviceBinding);
-            context.setBinding(internalName, object);
 	    // mark that this name has been write locked
 	    boundNameAccesses.
                 reportObjectAccess(internalName, AccessType.WRITE, object);
+            context.setBinding(internalName, object);
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -791,10 +791,10 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    try {
                 String internalName = getInternalName(name, serviceBinding);
-		context.removeBinding(internalName);
 		// mark that this name has been write locked
 		boundNameAccesses.
                     reportObjectAccess(internalName, AccessType.WRITE);
+		context.removeBinding(internalName);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -822,9 +822,12 @@ public final class DataServiceImpl implements DataService {
 	Context context = null;
 	try {
 	    context = getContext();
-	    String result = getExternalName(
-		context.nextBoundName(getInternalName(name, serviceBinding)),
-		serviceBinding);
+	    String internalName = getInternalName(name, serviceBinding);
+	    // mark that this name has been write locked
+	    boundNameAccesses.
+                reportObjectAccess(internalName, AccessType.READ);	    
+	    String result = getExternalName(context.nextBoundName(internalName),
+					    serviceBinding);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "{0} tid:{1,number,#}, name:{2} returns {3}",
