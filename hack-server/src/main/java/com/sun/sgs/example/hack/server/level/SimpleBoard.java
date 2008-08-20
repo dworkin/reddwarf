@@ -17,7 +17,7 @@ import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.example.hack.server.CharacterManager;
 import com.sun.sgs.example.hack.server.Item;
 
-import com.sun.sgs.example.hack.server.util.Point;
+import java.awt.Point;
 
 import java.io.IOException;
 import java.io.StreamTokenizer;
