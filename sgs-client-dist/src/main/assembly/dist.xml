@@ -18,6 +18,15 @@
       <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
     </dependencySet>
 
+    <!-- Include the sgs-client source files -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.client:sgs-client:jar:sources</include>
+      </includes>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
     <!-- Include each of the jar files required at runtime for the
 	 client packages and place them in the lib directory -->
     <dependencySet>
@@ -28,6 +37,15 @@
         <include>org.slf4j:slf4j-jdk14</include>
       </includes>
       <outputDirectory>sgs-client-${sgs.version}/lib</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
+    <!-- Include the sgs-shared source files -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
+      </includes>
+      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 

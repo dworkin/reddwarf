@@ -1,4 +1,4 @@
-Project Darkstar Client SDK, Binary Distribution
+Project Darkstar Client SDK Distribution
 Version ${sgs.version}
 
 INTRODUCTION
@@ -7,10 +7,10 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The binary distribution of the Project Darkstar Client SDK contains
-everything you need to develop and run game clients that communicate
-with each other and with game servers implemented with the Project
-Darkstar Server.  The Project Darkstar Server is available as a separate
+This distribution of the Project Darkstar Client SDK contains everything
+you need to develop and run game clients that communicate with each
+other and with game servers implemented with the Project Darkstar
+Server.  The Project Darkstar Server is available as a separate
 download.
 
 See the CHANGELOG file for a summary of recent changes, and the
@@ -43,9 +43,9 @@ processors:
 This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
 greater.
 
-It has been tested with version 1.5.0_15 of the J2SE(TM) Runtime
+It has been tested with version 1.5.0_16-b02 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
-1.5.0_13 on Mac OS X platforms.
+1.5.0_15-b04 on Mac OS X platforms.
 
 DEVELOPING AND RUNNING
 
@@ -59,10 +59,6 @@ KNOWN ISSUES
 
 This version of the Project Darkstar Client SDK has the following
 limitations:
-
-- It only includes a J2SE client implementation.  Developers can use the
-  documentation of the network protocol to develop other
-  implementations, including ones to support different languages.
 
 - This release supports only limited I/O throttling, so it is possible
   for clients to overwhelm the server with network traffic and cause the

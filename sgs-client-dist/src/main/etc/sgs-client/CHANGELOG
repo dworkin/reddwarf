@@ -1,3 +1,8 @@
+Version 0.9.7:
+- Disconnect the client connection after a LOGIN_FAILURE,
+  LOGIN_REDIRECT, or LOGOUT_SUCCESS message (issue #4)
+- Log exceptions from SimpleClientListener.receivedMessage (issue #1)
+
 Version 0.9.6:
 - Use ByteBuffer for message parameters
 - Remove subset channel sends
