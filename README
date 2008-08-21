@@ -1,4 +1,5 @@
 Project Darkstar Example C Client
+Version 0.9.7
 
 INTRODUCTION
 
@@ -32,10 +33,6 @@ Unix:
     % cd test
     % make
 
-- To build the chat client example:
-    % cd chatclient
-    % make
-
 Windows:
 
 - Ensure that the appropriate compiler tools are available in
@@ -60,7 +57,9 @@ RUNNING TESTS
   executables can be run manually.  For example, on Unix:
 
     % cd test
+    % ./buffer_test
     % ./id_test
+    % ./map_test
     % ./message_test
 
 
@@ -70,4 +69,3 @@ This example has the following limitations:
 
 - The Windows implementation is incomplete; the networking code
   needs to be ported to the Winsock2 API.
-

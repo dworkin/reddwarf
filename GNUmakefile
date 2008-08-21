@@ -17,6 +17,12 @@ SRCS = \
 
 LIB = libsgsclient.a
 
+VERSION = 0.9.7
+
+DIST_FILE = sgs-c-client-$(VERSION).zip
+
+DIST_DIR = sgs-c-client-$(VERSION)
+
 all: $(LIB)
 
 include $(TOPDIR)/etc/sgs.mk
@@ -24,8 +30,22 @@ include $(TOPDIR)/etc/sgs.mk
 $(LIB): $(OBJS)
 	$(AR) $@ $(OBJS)
 
+dist:
+	-/bin/rm -rf $(TOPDIR)/target/$(DIST_DIR) $(TOPDIR)/target/$(DIST_FILE)
+	-mkdir -p $(TOPDIR)/target/$(DIST_DIR)
+	-cp GNUmakefile LICENSE README $(TOPDIR)/target/$(DIST_DIR)
+	-mkdir $(TOPDIR)/target/$(DIST_DIR)/etc
+	-cp etc/*.mk $(TOPDIR)/target/$(DIST_DIR)/etc
+	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs
+	-cp sgs/*.{c,h} $(TOPDIR)/target/$(DIST_DIR)/sgs
+	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs/private
+	-cp sgs/private/*.h $(TOPDIR)/target/$(DIST_DIR)/sgs/private
+	-mkdir $(TOPDIR)/target/$(DIST_DIR)/test
+	-cp test/{GNUmakefile,*.c,*.mak} $(TOPDIR)/target/$(DIST_DIR)/test
+	-cd $(TOPDIR)/target; zip -r $(DIST_FILE) $(DIST_DIR)
+
 clean:
-	-/bin/rm -rf $(OBJDIR)/sgs
+	-/bin/rm -rf $(OBJDIR)/sgs $(TOPDIR)/target
 	-@cd $(TOPDIR)/test && $(MAKE) $@
 	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
 
