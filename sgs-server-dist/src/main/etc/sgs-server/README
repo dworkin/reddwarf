@@ -1,4 +1,4 @@
-Project Darkstar Server, Binary Distribution
+Project Darkstar Server Distribution
 Version ${sgs.version}
 
 INTRODUCTION
@@ -7,10 +7,10 @@ Project Darkstar lets developers write scalable, reliable, persistent
 and fault-tolerant game server applications using simple
 single-threaded, event-driven code.
 
-The binary distribution of the Project Darkstar Server contains
-everything you need to develop game servers that run as applications in
-the Project Darkstar Server environment.  Information about building
-client applications is available as a separate download.
+This distribution of the Project Darkstar Server contains everything you
+need to develop game servers that run as applications in the Project
+Darkstar Server environment.  Information about building client
+applications is available as separate downloads.
 
 In addition to the documents, APIs and examples, this distribution
 contains a complete single-system version of the Project Darkstar
@@ -42,14 +42,14 @@ processors:
   processors
 - Windows XP SP2 on 32-bit processors
 - Redhat Linux EL4 on 32-bit processors
-- Mac OS X 10.5 on PowerPC and Intel processors
+- Mac OS X 10.5 on Intel processors
 
-This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
-greater.
+This distribution requires Java(TM) Platform, Standard Edition 6 (Java
+SE platform 6), or greater.
 
-It has been tested with version 1.5.0_15 of the J2SE(TM) Runtime
-Environment 5.0 on Solaris, Windows, and Linux platforms, and version
-1.5.0_13 on Mac OS X platforms.
+It has been tested with version 1.6.0_07-b06 of Java SE platform 6 on
+Solaris, Windows, and Linux platforms, and version 1.6.0_05-b13 on Mac
+OS X platforms.
 
 REQUIRED LIBRARIES
 
@@ -68,6 +68,15 @@ If using files compiled separately, the Berkeley DB JAR file should be
 copied to the lib/bdb subdirectory, and the natives libraries for the
 current platform should be copied to proper subdirectory as specified in
 the startup scripts.
+
+This distribution supports Berkeley DB Java edition version
+${bdb.je.version}, which can be obtained from:
+
+  http://www.oracle.com/database/berkeley-db/je/index.html
+
+The je-${bdb.je.version}.jar JAR file should be copied to the lib
+subdirectory.  The JAR file is only needed when the system is configured
+to run with Berkeley DB Java edition.
 
 This distribution requires Apache MINA, version ${org.apache.mina.version}, which may be
 bundled with this distribution, or else can be obtained from:
@@ -114,6 +123,20 @@ To run the Project Darkstar server:
    installation directory, type:
 
    sgs tutorial.jar HelloWorld.properties
+
+
+RELEASE COMPATIBILITY
+
+Release 0.9.7 of the Project Darkstar Server API is compatible with the
+0.9.6 release.
+
+Release 0.9.7 is compatible with persistent data created by applications
+running with release 0.9.6.  Running an application using release 0.9.7
+will automatically upgrade persistent data to the current release
+format, which is incompatible with earlier releases.
+
+Note that persistent data created using Berkeley DB is incompatible with
+data created using Berkeley DB Java edition.
 
 
 KNOWN ISSUES

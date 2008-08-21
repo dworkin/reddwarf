@@ -17,6 +17,15 @@
       <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
     </dependencySet>
 
+    <!-- Include the sgs-server source files -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.server:sgs-server:jar:sources</include>
+      </includes>
+      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
     <!-- Include the jar of sgs shared classes in the lib director -->
     <dependencySet>
       <includes>
@@ -26,6 +35,15 @@
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
     
+    <!-- Include the sgs-shared source files -->
+    <dependencySet>
+      <includes>
+	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
+      </includes>
+      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+    </dependencySet>
+
     <!-- Unpack the berkeleydb binaries into the bdb directory -->
     <dependencySet>
       <includes>
