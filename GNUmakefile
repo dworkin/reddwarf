@@ -19,7 +19,7 @@ LIB = libsgsclient.a
 
 VERSION = 0.9.7
 
-DIST_FILE = sgs-c-client-$(VERSION).zip
+DIST_FILE = sgs-c-client-dist-$(VERSION).zip
 
 DIST_DIR = sgs-c-client-$(VERSION)
 
@@ -37,11 +37,12 @@ dist:
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/etc
 	-cp etc/*.mk $(TOPDIR)/target/$(DIST_DIR)/etc
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs
-	-cp sgs/*.{c,h} $(TOPDIR)/target/$(DIST_DIR)/sgs
+	-cp sgs/*.c sgs/*.h $(TOPDIR)/target/$(DIST_DIR)/sgs
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs/private
 	-cp sgs/private/*.h $(TOPDIR)/target/$(DIST_DIR)/sgs/private
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/test
-	-cp test/{GNUmakefile,*.c,*.mak} $(TOPDIR)/target/$(DIST_DIR)/test
+	-cp test/GNUmakefile test/*.c test/*.mak \
+	    $(TOPDIR)/target/$(DIST_DIR)/test
 	-cd $(TOPDIR)/target; zip -r $(DIST_FILE) $(DIST_DIR)
 
 clean:
@@ -53,4 +54,3 @@ realclean: clean
 	-/bin/rm -f $(LIB)
 	-@cd $(TOPDIR)/test && $(MAKE) $@
 	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
-
