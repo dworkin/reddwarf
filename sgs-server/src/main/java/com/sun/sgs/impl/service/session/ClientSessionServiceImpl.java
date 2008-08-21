@@ -623,32 +623,30 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Sends the specified protocol {@code message} to the specified
-     * client {@code session} with the specified {@code delivery}
-     * guarantee.  This method must be called within a transaction.
+     * Sends the specified login acknowledgment {@code message} to the
+     * specified client {@code session} with the specified {@code delivery}
+     * guarantee.  If {@code success} is false, then no further messages
+     * can be sent to this session, even if they have been enqueued during
+     * the current transaction.
      *
-     * <p>The message is placed at the head of the queue of messages sent
-     * during the current transaction and is delivered along with any
-     * other queued messages when the transaction commits.
+     * <p>When the transaction commits, the login acknowledgment message is
+     * delivered to the client session first, and if {@code success} is
+     * true, all other enqueued messages will be delivered.
      *
      * @param	session	a client session
      * @param	message a complete protocol message
      * @param	delivery a delivery requirement
-     * @param	clearMessages if true, clear message queue of any other
-     *		messages
+     * @param	success if {@code true}, login was successful
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void sendProtocolMessageFirst(
+    void sendLoginAck(
  	ClientSessionImpl session, byte[] message,
-	Delivery delivery, boolean clearMessages)
+	Delivery delivery, boolean success)
     {
 	Context context = checkContext();
-	if (clearMessages) {
-	    context.clearMessages(session);
-	}
-	context.addMessageFirst(session, message, delivery);
+	context.addLoginAck(session, message, delivery, success);
     }
 
     /**
@@ -757,35 +755,63 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
+	 * Adds a login acknowledgment message be sent to the specified
+	 * session after this transaction commits.  If {@code success} is
+	 * {@code false}, no other messages are sent to the session after
+	 * the login acknowledgment.
+	 */
+	void addLoginAck(
+ 	    ClientSessionImpl session, byte[] message, Delivery delivery,
+	    boolean success)
+	{
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"Context.addLoginAck:{0} session:{1}, message:{2}",
+			success, session, message);
+		}
+		checkPrepared();
+
+		getCommitActions(session).addLoginAck(message, success);
+
+	    
+	    } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+			Level.FINE, e,
+			"Context.addMessage exception");
+                }
+                throw e;
+            }
+	}
+
+	/**
 	 * Adds a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
-	void addMessage(
+	private void addMessage(
 	    ClientSessionImpl session, byte[] message, Delivery delivery)
 	{
-	    addMessage0(session, message, delivery, false);
-	}
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"Context.addMessage session:{0}, message:{1}",
+			session, message);
+		}
+		checkPrepared();
 
-	/**
-	 * Adds to the head of the list a message to be sent to the
-	 * specified session after this transaction commits.
-	 */
-	void addMessageFirst(
-	    ClientSessionImpl session, byte[] message, Delivery delivery)
-	{
-	    addMessage0(session, message, delivery, true);
-	}
-
-	/**
-	 * Clears the message queue for the given client session.  This
-	 * method is invoked when a login failure happens due to the
-	 * AppListener.loggedIn method either throwing a non-retryable
-	 * exception, or returning a null or non-serializable client
-	 * session listener.  It those cases, no messages other than the
-	 * LOGIN_FAILED protocol message should reach the client.
-	 */
-	void clearMessages(ClientSessionImpl session) {
-	    getCommitActions(session).clearMessages();
+		getCommitActions(session).addMessage(message);
+	    
+	    } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+			Level.FINE, e,
+			"Context.addMessage exception");
+                }
+                throw e;
+            }
 	}
 
 	/**
@@ -809,31 +835,6 @@ public final class ClientSessionServiceImpl
                     logger.logThrow(
 			Level.FINE, e,
 			"Context.setDisconnect throws");
-                }
-                throw e;
-            }
-	}
-
-	private void addMessage0(
-	    ClientSessionImpl session, byte[] message,
-	    Delivery delivery, boolean isFirst)
-	{
-	    try {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"Context.addMessage first:{0} session:{1}, message:{2}",
-			isFirst, session, message);
-		}
-		checkPrepared();
-
-		getCommitActions(session).addMessage(message, isFirst);
-	    
-	    } catch (RuntimeException e) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.logThrow(
-			Level.FINE, e,
-			"Context.addMessage exception");
                 }
                 throw e;
             }
@@ -943,6 +944,9 @@ public final class ClientSessionServiceImpl
 	/** The login ack protocol message, or null. */
 	private byte[] loginAck = null;
 
+	/** The login outcome, only valid if {@code loginAck} is non-null. */
+	private boolean loginSuccess = false;
+	
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
 
@@ -956,16 +960,13 @@ public final class ClientSessionServiceImpl
 	    this.sessionRefId = sessionImpl.getId();
 	}
 
-	void addMessage(byte[] message, boolean isFirst) {
- 	    if (isFirst) {
-		loginAck = message;
-	    } else {
-		messages.add(message);
-	    }
+	void addMessage(byte[] message) {
+	    messages.add(message);
 	}
 
-	void clearMessages() {
-	    messages.clear();
+	void addLoginAck(byte[] message, boolean success) {
+	    loginAck = message;
+	    loginSuccess = success;
 	}
 	
 	void setDisconnect() {
@@ -1002,7 +1003,10 @@ public final class ClientSessionServiceImpl
 	    if (handler != null && handler.isConnected()) {
 		if (loginAck != null) {
 		    handler.sendLoginProtocolMessage(
-			loginAck, Delivery.RELIABLE);
+			loginAck, Delivery.RELIABLE, loginSuccess);
+		    if (! loginSuccess) {
+			return;
+		    }
 		}
 		for (byte[] message : messages) {
 		    handler.sendProtocolMessage(message, Delivery.RELIABLE);

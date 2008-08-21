@@ -238,7 +238,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    /*
+
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -456,19 +456,30 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	
     }
-    */
-    public void testLoginSendMessageRace() throws Exception {
-	String name = "race";
-	DummyClient client = new DummyClient(name);
+    
+    public void testSendBeforeLoginComplete() throws Exception {
+	DummyClient client = new DummyClient("dummy");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(false);
+	    client.sendMessages(1, 0, null);
+	} finally {
+            client.disconnect();
+	}
+    }
+
+    public void testSendAfterLoginComplete() throws Exception {
+	DummyClient client = new DummyClient("dummy");
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login(false);
+	    client.waitForLogin();
 	    client.sendMessages(1, 1, null);
 	} finally {
             client.disconnect();
 	}
     }
-    /*
+
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
 	String name = "success";
 	DummyClient client = new DummyClient(name);
@@ -1000,7 +1011,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   ", elapsed time: " + (endTime - startTime) +
 			   " ms.");
     }
-    */
+
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
