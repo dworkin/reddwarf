@@ -10,12 +10,13 @@ Version 0.9.7:
   single node mode (issue #4)
 - Modify the client session and channel services to retry tasks after
   network failures (issues #1 and #2)
-- Modify the client session handler to wait before disconnecting clients
-  on login failures and on logout (issues #7, #8 and #9)
+- Modify the client session handler to allow clients to disconnect on
+  login failures and on logout (issues #7, #8 and #9)
 - Add support for dynamic and finer-grained profiling (issues #33 and
   #34)
 - Add a transactional log manager (issue #20)
 - Require Java 6
+- Also fixed issues #6, #10, #13, #22 and #69
 
 Version 0.9.6:
 - Support multi-node operation
