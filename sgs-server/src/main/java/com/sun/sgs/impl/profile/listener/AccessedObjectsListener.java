@@ -196,7 +196,7 @@ public class AccessedObjectsListener implements ProfileListener {
      * @return a formatted representation of the accessed objects
      */
     private String formatAccesses(List<AccessedObject> accessedObjects) {
-	String formatted = "";
+        StringBuilder formatted = new StringBuilder();
         int count = 0;
 
 	for (AccessedObject object : accessedObjects) {
@@ -204,35 +204,36 @@ public class AccessedObjectsListener implements ProfileListener {
                 break;
 
             try {
-                formatted += String.format("[source: %s] %-5s %s, " +
-                                           "description: %s%n",
-                                           object.getSource(),
-                                           object.getAccessType(),
-                                           object.getObjectId(),
-                                           object.getDescription());
+                formatted.append(String.format("[source: %s] %-5s %s, " +
+                                               "description: %s%n",
+                                               object.getSource(),
+                                               object.getAccessType(),
+                                               object.getObjectId(),
+                                               object.getDescription()));
             } catch (Throwable t) {
                 // calling toString() on the object id or the description
                 // may have failed, though in practice (in the current
                 // implementation) only the description will have caused
                 // any trouble, so we can include some detail about
                 // both the access and the failure
-                formatted += 
-                    String.format("[source %s] %-5s %s [%s.toString() threw " +
-                                  "exception: %s]%n",
-                                  object.getSource(),
-                                  object.getAccessType(),
-                                  object.getObjectId(),
-                                  object.getDescription().getClass(), t);
+                formatted.append(String.format("[source %s] %-5s %s [%s." +
+                                               "toString() threw: %s]%n",
+                                               object.getSource(),
+                                               object.getAccessType(),
+                                               object.getObjectId(),
+                                               object.getDescription().
+                                               getClass(), t));
             }
         }
 
         // if we went over the max count then it means there was still
         // more to show, so add a message about the truncation
 	if (--count == accessesToShow)
-	    formatted += String.format("[%d further accesses truncated]%n",
-				       accessedObjects.size() - accessesToShow);
+	    formatted.
+                append(String.format("[%d further accesses truncated]%n",
+                                     accessedObjects.size() - accessesToShow));
 
-	return formatted;
+	return formatted.toString();
     }
 
     /**
@@ -247,6 +248,8 @@ public class AccessedObjectsListener implements ProfileListener {
      * bounded in size.
      */
     private static class BoundedLinkedHashMap<K,V> extends LinkedHashMap<K,V> {
+        private static final long serialVersionUID = 1;
+
         // the bounding size
         private final int maxSize;
      

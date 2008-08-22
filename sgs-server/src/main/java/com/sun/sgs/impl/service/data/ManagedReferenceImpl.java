@@ -649,9 +649,10 @@ final class ManagedReferenceImpl<T>
 		context.oidAccesses.
 		    reportObjectAccess(context.txn.originalTxn, 
 				       BigInteger.valueOf(oid),
-				       AccessType.WRITE, 
+				       AccessType.WRITE,
 				       "object was not explicitly " +
-				       "marked for update:" + result);
+				       "marked for update: " +
+                                       object.getClass());
 		if (debugDetectLogger.isLoggable(Level.FINEST)) {
 		    debugDetectLogger.log(
 			Level.FINEST,

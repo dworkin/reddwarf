@@ -294,8 +294,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      */
 
     /** Private implementation of {@code AccessedObjectsDetail}. */
-    private class AccessedObjectsDetailImpl implements AccessedObjectsDetail
-    {
+    private class AccessedObjectsDetailImpl implements AccessedObjectsDetail {
         // the id of the transaction for this detail
         private final byte [] txnId = txnProxy.getCurrentTransaction().getId();
 
@@ -327,8 +326,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // whether the transaction has already proceeded past prepare
 	private final AtomicBoolean prepared = new AtomicBoolean(false);
 
-        // information about why the transaction failed.
-        private boolean failed = false;
+        // information about why the transaction failed, if it failed
 	private ConflictType conflictType = ConflictType.NONE;
         private byte [] idOfConflictingTxn = null;
 
@@ -398,7 +396,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         /** Sets the cause and source of conflict for this access detail. */
 	synchronized void setConflict(ConflictType conflictReason, 
                                       AccessedObjectsDetailImpl conflicting) {
-	    failed = true;
 	    conflictType = conflictReason;
 	    this.idOfConflictingTxn = conflicting.txnId;
 	}

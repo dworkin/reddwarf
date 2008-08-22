@@ -56,8 +56,8 @@ public interface AccessCoordinator {
      * @return an {@code AccessReporter} used to notify the system
      *         of access to shared objects
      */
-    public <T> AccessReporter<T> registerAccessSource
-        (String sourceName, Class<T> objectIdType);
+    <T> AccessReporter<T> registerAccessSource(String sourceName,
+                                               Class<T> objectIdType);
 
     /**
      * Find out what transaction, if still active, caused the given
@@ -71,6 +71,6 @@ public interface AccessCoordinator {
      *         {@code Transaction} to fail due to conflict, or
      *         {@code null} if there is no such active {@code Transaction}
      */
-    public Transaction getConflictingTransaction(Transaction txn);
+    Transaction getConflictingTransaction(Transaction txn);
 
 }

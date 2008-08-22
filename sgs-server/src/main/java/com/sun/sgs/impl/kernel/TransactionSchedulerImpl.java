@@ -574,7 +574,7 @@ final class TransactionSchedulerImpl
                     return true;
                 } catch (InterruptedException ie) {
                     // make sure the transaction was aborted
-                    if ((transaction != null) && (! transaction.isAborted()))
+                    if (! transaction.isAborted())
                         transaction.abort(ie);
                     profileCollector.finishTask(task.getTryCount(), ie);
                     // if the task didn't finish because of the interruption
