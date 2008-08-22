@@ -16,7 +16,7 @@ Version 0.9.7:
   #34)
 - Add a transactional log manager (issue #20)
 - Require Java 6
-- Also fixed issues #6, #10, #13, #22 and #69
+- Also fix issues #6, #10, #13, #22 and #69
 
 Version 0.9.6:
 - Support multi-node operation

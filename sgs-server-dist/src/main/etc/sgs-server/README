@@ -47,9 +47,9 @@ processors:
 This distribution requires Java(TM) Platform, Standard Edition 6 (Java
 SE platform 6), or greater.
 
-It has been tested with version 1.6.0_07-b06 of Java SE platform 6 on
-Solaris, Windows, and Linux platforms, and version 1.6.0_05-b13 on Mac
-OS X platforms.
+It has been tested with version 1.6.0_07 of Java SE platform 6 on
+Solaris, Windows, and Linux platforms, and version 1.6.0_05 on Mac OS X
+platforms.
 
 REQUIRED LIBRARIES
 
