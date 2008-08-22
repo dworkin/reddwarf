@@ -21,8 +21,6 @@ package com.sun.sgs.profile;
 
 import com.sun.sgs.kernel.AccessedObject;
 
-import java.math.BigInteger;
-
 import java.util.List;
 
 
@@ -72,6 +70,6 @@ public interface AccessedObjectsDetail {
      *         or {@code null} if there was no conflict or the accessor
      *         is unknown
      */
-    BigInteger getConflictingId();
+    byte [] getConflictingId();
 
 }

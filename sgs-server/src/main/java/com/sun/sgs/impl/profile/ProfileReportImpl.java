@@ -28,8 +28,6 @@ import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileReport;
 
-import java.math.BigInteger;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,7 +67,7 @@ class ProfileReportImpl implements ProfileReport {
 
     // the other fields, set directly by the ProfileCollectorImpl
     boolean transactional = false;
-    BigInteger transactionId = null;
+    byte [] transactionId = null;
     boolean succeeded = false;
     long runningTime = 0;
     int tryCount = 0;
@@ -223,7 +221,7 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public BigInteger getTransactionId() {
+    public byte [] getTransactionId() {
         return transactionId;
     }
 

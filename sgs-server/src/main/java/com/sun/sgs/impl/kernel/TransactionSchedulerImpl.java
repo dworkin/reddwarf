@@ -50,8 +50,6 @@ import java.beans.PropertyChangeEvent;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-import java.math.BigInteger;
-
 import java.util.LinkedList;
 import java.util.Properties;
 import java.util.Queue;
@@ -540,13 +538,11 @@ final class TransactionSchedulerImpl
 
                 try {
                     // setup the transaction state
-		    
                     TransactionHandle handle =
                         transactionCoordinator.createTransaction(unbounded);
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
-                    profileCollector.
-                        noteTransactional(new BigInteger(transaction.getId()));
+                    profileCollector.noteTransactional(transaction.getId());
 
                     // increment the try count and notify the access
                     // coordinator of the new transaction
@@ -578,7 +574,7 @@ final class TransactionSchedulerImpl
                     return true;
                 } catch (InterruptedException ie) {
                     // make sure the transaction was aborted
-                    if (! transaction.isAborted())
+                    if ((transaction != null) && (! transaction.isAborted()))
                         transaction.abort(ie);
                     profileCollector.finishTask(task.getTryCount(), ie);
                     // if the task didn't finish because of the interruption
@@ -600,7 +596,7 @@ final class TransactionSchedulerImpl
                     throw ie;
                 } catch (Throwable t) {
                     // make sure the transaction was aborted
-                    if (! transaction.isAborted())
+                    if ((transaction != null) && (! transaction.isAborted()))
                         transaction.abort(t);
                     profileCollector.finishTask(task.getTryCount(), t);
                     // some error occurred, so see if we should re-try

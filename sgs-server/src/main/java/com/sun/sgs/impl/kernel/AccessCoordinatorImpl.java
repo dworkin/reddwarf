@@ -32,8 +32,6 @@ import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
-import java.math.BigInteger;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -162,9 +160,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     public Transaction getConflictingTransaction(Transaction txn) {
 	if (txn == null)
 	    throw new NullPointerException("txn cannot be null");
-
-        // until we manage conflict, there aren't really any active
-        // transactions to return..
+        // given that we're not actively managing contention yet (which
+        // means that there aren't many active conflicts) and the scheduler
+        // isn't trying to optimize using this interface, we don't try
+        // to track these cases yet
         return null;
     }
 
@@ -298,8 +297,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private class AccessedObjectsDetailImpl implements AccessedObjectsDetail
     {
         // the id of the transaction for this detail
-        private final BigInteger txnId =
-            new BigInteger(txnProxy.getCurrentTransaction().getId());
+        private final byte [] txnId = txnProxy.getCurrentTransaction().getId();
 
 	/**
 	 * The ordered set of accesses for all sources, which includes
@@ -332,7 +330,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // information about why the transaction failed.
         private boolean failed = false;
 	private ConflictType conflictType = ConflictType.NONE;
-        private BigInteger idOfConflictingTxn = null;
+        private byte [] idOfConflictingTxn = null;
 
         /** Implement AccessObjectsDetail. */
 	
@@ -345,7 +343,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             return conflictType;
         }
         /** {@inheritDoc} */
-        public BigInteger getConflictingId() {
+        public byte [] getConflictingId() {
             return idOfConflictingTxn;
         }
 	
@@ -511,8 +509,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
         /**
 	 * Returns {@code true} if the other object is an instance of
-	 * {@code AccessedObjectImpl} and has the same object Id and
-	 * access type.
+	 * {@code AccessedObjectImpl} and has the same object Id, access
+	 * type and source.
 	 */
 	public boolean equals(Object o) {
 	    if ((o != null) && (o instanceof AccessedObjectImpl)) {
@@ -525,10 +523,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
 	/**
 	 * Returns the hash code of the object Id xor'd with the hash
-	 * code of the access type.
+	 * code of the access type and the hash code of the source.
 	 */
 	public int hashCode() {
-	    return objId.hashCode() ^ type.hashCode();
+	    return objId.hashCode() ^ type.hashCode() ^ source.hashCode();
 	}
 
     }
@@ -538,10 +536,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * start managing conflict then the {@code notifyObjectAccess} calls
      * will need to start tracking access and check that this doesn't cause
      * some transaction to fail.
-     * <p>
-     * TODO: until conflict management is implemented, this only serves
-     * to provide detail to the profiling stream, so these methods should
-     * probably only keep this data if the profiling level is high enough.
      */
     private class AccessReporterImpl<T> implements AccessReporter<T> {
 	private final String source;
@@ -554,51 +548,15 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         }
 
         /** {@inheritDoc} */
-        public void reportObjectAccess(Transaction txn, T objId, AccessType type) {
-	    if (txn == null)
-		throw new NullPointerException("txn cannot be null");
-	    if (objId == null)
-		throw new NullPointerException("objId cannot be null");
-	    if (type == null)
-		throw new NullPointerException("type cannot be null");
-
-
-            AccessedObjectsDetailImpl detail = txnMap.get(txn);
-            detail.addAccess(new AccessedObjectImpl(objId, type, source,
-                                                    detail));
-        }
-
-        /** {@inheritDoc} */
-	public void reportObjectAccess(Transaction txn, T objId, AccessType type, 
-				       Object description) {
-	    if (txn == null)
-		throw new NullPointerException("txn cannot be null");
-	    if (objId == null)
-		throw new NullPointerException("objId cannot be null");
-	    if (type == null)
-		throw new NullPointerException("type cannot be null");
-
-	    AccessedObjectsDetailImpl detail = txnMap.get(txn);
-	    detail.addAccess(new AccessedObjectImpl(objId, type, source,
-						    detail));
-            detail.setDescription(source, objId, description);
-	}
-
-        /** {@inheritDoc} */
-	public void setObjectDescription(Transaction txn, T objId, Object description) {
-	    if (txn == null)
-		throw new NullPointerException("txn cannot be null");
-	    if (objId == null)
-		throw new NullPointerException("objId cannot be null");
-
-            AccessedObjectsDetailImpl detail =
-                txnMap.get(txn);
-            detail.setDescription(source, objId, description);
-        }
-
-        /** {@inheritDoc} */
         public void reportObjectAccess(T objId, AccessType type) {
-	    reportObjectAccess(txnProxy.getCurrentTransaction(), objId, type);
+	    reportObjectAccess(txnProxy.getCurrentTransaction(), objId, type,
+                               null);
+        }
+
+        /** {@inheritDoc} */
+        public void reportObjectAccess(Transaction txn, T objId,
+                                       AccessType type) {
+            reportObjectAccess(txn, objId, type, null);
         }
 
         /** {@inheritDoc} */
@@ -609,9 +567,48 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	}
 
         /** {@inheritDoc} */
+	public void reportObjectAccess(Transaction txn, T objId,
+                                       AccessType type, Object description) {
+	    if (txn == null)
+		throw new NullPointerException("txn cannot be null");
+	    if (objId == null)
+		throw new NullPointerException("objId cannot be null");
+	    if (type == null)
+		throw new NullPointerException("type cannot be null");
+
+	    AccessedObjectsDetailImpl detail = txnMap.get(txn);
+            if (detail == null)
+                throw new IllegalArgumentException("Unknown transaction: " +
+                                                   txn);
+	    detail.addAccess(new AccessedObjectImpl(objId, type, source,
+                                                    detail));
+            if (description != null)
+                detail.setDescription(source, objId, description);
+	}
+
+        /** {@inheritDoc} */
 	public void setObjectDescription(T objId, Object description) {
 	    setObjectDescription(txnProxy.getCurrentTransaction(), 
 				 objId, description);
         }
+
+        /** {@inheritDoc} */
+	public void setObjectDescription(Transaction txn, T objId,
+                                         Object description) {
+	    if (txn == null)
+		throw new NullPointerException("txn cannot be null");
+	    if (objId == null)
+		throw new NullPointerException("objId cannot be null");
+
+            if (description == null)
+                return;
+
+            AccessedObjectsDetailImpl detail = txnMap.get(txn);
+            if (detail == null)
+                throw new IllegalArgumentException("Unknown transaction: " +
+                                                   txn);
+            detail.setDescription(source, objId, description);
+        }
     }
+
 }

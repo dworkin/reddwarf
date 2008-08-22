@@ -23,8 +23,6 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
-import java.math.BigInteger;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,7 +62,7 @@ public interface ProfileReport {
      *
      * @return the transaction identifier or <code>null</code>
      */
-    BigInteger getTransactionId();
+    byte [] getTransactionId();
     
     /**
      * Returns detail about each participant in the transaction, or an

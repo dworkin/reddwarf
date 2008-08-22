@@ -21,6 +21,8 @@ package com.sun.sgs.impl.profile.listener;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.util.TransactionId;
+
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 
@@ -31,12 +33,11 @@ import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
-import java.math.BigInteger;
-
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
+
 
 /**
  * An implementation of {@code ProfileListener} that prints access detail.
@@ -44,26 +45,29 @@ import java.util.Properties;
  * accesses for that transaction and the accesses, if known, for the
  * transaction that caused the conflict.
  * <p>
- * Note that in this current implementation, conflict detail will only be
+ * Note that in the current implementation, conflict detail will only be
  * provided if the {@code AccessCoordinator} is using a backlog to track
  * finished transactions. See {@code AccessCoordinatorImpl} for more
  * detail.
+ * <p>
+ * By default, the set of accesses displayed for a given transaction
+ * will be limited to the first 20. This can be changed by setting the
+ * {@code com.sun.sgs.impl.profile.listener.AccessedObjectsListener.access.count}
+ * property with a positive integer value.
  */
 public class AccessedObjectsListener implements ProfileListener {
 
     // a local backlog of the past access detail
-    private final BoundedLinkedHashMap<BigInteger,AccessedObjectsDetail>
+    private final BoundedLinkedHashMap<TransactionId,AccessedObjectsDetail>
         backlogMap;
 
-    private static final String ACCESS_COUNT_PROPERTY = 
+    /** Property that defines the maximum number of accesses to display. */
+    public static final String ACCESS_COUNT_PROPERTY = 
 	AccessedObjectsListener.class.getName() + ".access.count";
 
+    // the default and configured number of accesses to display
     private static final int DEFAULT_ACCESS_COUNT = 20;
-
-    /**
-     * The number of accesses to show when outputting text
-     */
-    private int accessesToShow;
+    private final int accessesToShow;
 
     /**
      * Creates an instance of {@code AccessedObjectsListener}.
@@ -74,6 +78,8 @@ public class AccessedObjectsListener implements ProfileListener {
      * @param registry the {@code ComponentRegistry} containing the
      *        available system components
      *
+     * @throws IllegalArgumentException if either of the backlog or count
+     *                                  properties is provided but invalid
      */
     public AccessedObjectsListener(Properties properties, Identity owner,
 				   ComponentRegistry registry) {
@@ -86,7 +92,7 @@ public class AccessedObjectsListener implements ProfileListener {
         if (backlogProp != null) {
             try {
                 backlogMap = new BoundedLinkedHashMap
-                    <BigInteger,AccessedObjectsDetail>(Integer.
+                    <TransactionId,AccessedObjectsDetail>(Integer.
                                                        parseInt(backlogProp));
             } catch (NumberFormatException nfe) {
                 throw new IllegalArgumentException("Backlog size must be a " +
@@ -96,21 +102,17 @@ public class AccessedObjectsListener implements ProfileListener {
             backlogMap = null;
         }
 
-	String accessCountStr = properties.getProperty(ACCESS_COUNT_PROPERTY);
-	if (accessCountStr == null) {
-	    accessesToShow = DEFAULT_ACCESS_COUNT;
-	}
-	else {
+	String countProp = properties.getProperty(ACCESS_COUNT_PROPERTY);
+	if (countProp != null) {
 	    try {
-		int accessesToShow = Integer.parseInt(accessCountStr);
-		
+		accessesToShow = Integer.parseInt(countProp);
 	    } catch (NumberFormatException nfe) {
 		throw new IllegalArgumentException("Access count moust be a " +
-						   "number: " + accessCountStr);
+						   "number: " + countProp);
 	    }
-	    
-	}
-
+	} else {
+            accessesToShow = DEFAULT_ACCESS_COUNT;
+        }
     }
 
     /**
@@ -130,30 +132,35 @@ public class AccessedObjectsListener implements ProfileListener {
             return;
 
         // if a backlog is in use, then store the new detail
-        if (backlogMap != null)
-            backlogMap.put(profileReport.getTransactionId(), detail);
+        TransactionId txnId = null;
+        if (backlogMap != null) {
+            txnId = new TransactionId(profileReport.getTransactionId());
+            backlogMap.put(txnId, detail);
+        }
 
         // if there was conflict, then figure out what to display
         if (detail.getConflictType() != ConflictType.NONE) {
-
+            if (txnId == null)
+                txnId = new TransactionId(profileReport.getTransactionId());
             // print out the detail for the failed transaction
 	    System.out.printf("Task type %s failed due to conflict.  Details:"
-			      + "%n  accesor id: %d, try count %d; objects "
+			      + "%n  accesor id: %s, try count %d; objects "
 			      + "accessed ordered by first access:%n%s" 
 			      + "conflict type: %s%n",
 			      profileReport.getTask().getBaseTaskType(),
-			      profileReport.getTransactionId().longValue(), 
-			      profileReport.getRetryCount(),
+			      txnId, profileReport.getRetryCount(),
 			      formatAccesses(detail.getAccessedObjects()),
 			      detail.getConflictType());
 
             // see if the conflicting transaction is known, otherwise we've
             // shown all the detail we know
-            BigInteger conflictingId = detail.getConflictingId();
-            if (conflictingId == null) {
+            byte [] conflictingBytes = detail.getConflictingId();
+            if (conflictingBytes == null) {
                 System.out.printf("%n");
                 return;
             }
+
+            TransactionId conflictingId = new TransactionId(conflictingBytes);
 
             // if we're keeping a backlog, look through it to see if we
             // have the detail on the conflicting id
@@ -165,9 +172,9 @@ public class AccessedObjectsListener implements ProfileListener {
 
                 // if we found the conflicting detail, display it and return
                 if (conflictingDetail != null) {
-                    System.out.printf("Conflicting transaction id: %d, objects"
+                    System.out.printf("Conflicting transaction id: %s, objects"
                                       + " accessed, ordered by first access:"
-                                      + "%n%s%n", conflictingId.longValue(),
+                                      + "%n%s%n", conflictingId,
                                       formatAccesses(conflictingDetail.
                                                      getAccessedObjects()));
 
@@ -177,50 +184,51 @@ public class AccessedObjectsListener implements ProfileListener {
 
             // we don't know anything else, so just print out the id
             System.out.printf("ID of conflicting accessor %s%n%n",
-                              conflictingId.toString());
+                              conflictingId);
 	}
     }
 
     /** 
-     * Returns a formatted list of locks with one lock per line.
+     * Returns a formatted list of accesses with one access per line.
      *
-     * @param locks the locks to generated a formatted string for
+     * @param accessedObjects a {@code List} of {@code AccessedObject}
      * 
-     * @return a formatted list of locks
+     * @return a formatted representation of the accessed objects
      */
     private String formatAccesses(List<AccessedObject> accessedObjects) {
 	String formatted = "";
         int count = 0;
 
 	for (AccessedObject object : accessedObjects) {
-            if (count++ < accessesToShow) {
-		try {
-		    formatted += String.format("[source: %s] %-5s %s, "
-					       +"description: %s%n",
-					       object.getSource(),
-					       object.getAccessType(),
-					       object.getObjectId(),
-					       object.getDescription());
-		} catch (Throwable t) {
-		    // the first three calls are guaranteed not to
-		    // throw an exception since we control their
-		    // implementation.  However, the description is
-		    // provided at run time and therefore may have
-		    // thrown an exception, so we mark it as such.
-		    formatted += 
-			String.format("[source %s] %-5s %s [%s.toString() threw"
-				      + " exception: %s]%n", object.getSource(), 
-				      object.getAccessType(), 
-				      object.getObjectId(),					      
-				      object.getDescription().getClass(), t);
-		}
-	    }
-	    else {
-		break;
-	    }
-	}
+            if (++count > accessesToShow)
+                break;
 
-	if (count == accessesToShow)
+            try {
+                formatted += String.format("[source: %s] %-5s %s, " +
+                                           "description: %s%n",
+                                           object.getSource(),
+                                           object.getAccessType(),
+                                           object.getObjectId(),
+                                           object.getDescription());
+            } catch (Throwable t) {
+                // calling toString() on the object id or the description
+                // may have failed, though in practice (in the current
+                // implementation) only the description will have caused
+                // any trouble, so we can include some detail about
+                // both the access and the failure
+                formatted += 
+                    String.format("[source %s] %-5s %s [%s.toString() threw " +
+                                  "exception: %s]%n",
+                                  object.getSource(),
+                                  object.getAccessType(),
+                                  object.getObjectId(),
+                                  object.getDescription().getClass(), t);
+            }
+        }
+
+        // if we went over the max count then it means there was still
+        // more to show, so add a message about the truncation
+	if (--count == accessesToShow)
 	    formatted += String.format("[%d further accesses truncated]%n",
 				       accessedObjects.size() - accessesToShow);
 

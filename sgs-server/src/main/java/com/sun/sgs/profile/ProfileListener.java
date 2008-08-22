@@ -21,6 +21,7 @@ package com.sun.sgs.profile;
 
 import java.beans.PropertyChangeEvent;
 
+
 /**
  * This interface is used to listen for profiling data as reported by
  * the system. Unlike the individual operations provided to
@@ -55,8 +56,7 @@ public interface ProfileListener {
      * implementations.  The value assigned to the property must be an
      * integer.
      */
-    public static final String WINDOW_SIZE_PROPERTY = 
-	"com.sun.sgs.profile.listener.window.size";
+    String WINDOW_SIZE_PROPERTY = "com.sun.sgs.profile.listener.window.size";
     
     /**
      * Notifies this listener of a new change in the system

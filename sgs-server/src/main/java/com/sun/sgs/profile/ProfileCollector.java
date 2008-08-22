@@ -23,10 +23,9 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
-import java.math.BigInteger;
-
 import java.util.List;
 import java.util.Map;
+
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -88,7 +87,6 @@ public interface ProfileCollector {
     /** 
      * Shuts down the ProfileCollector, reclaiming resources as necessary.
      */
-    
     void shutdown();
     
     /**
@@ -122,7 +120,6 @@ public interface ProfileCollector {
      * @throws Exception if any were generated during instantiation
      */
     void addListener(String listenerClassName) throws Exception;
-    
 
     /**
      * Returns a read-only list of {@code ProfileListener}s which have been
@@ -175,7 +172,7 @@ public interface ProfileCollector {
      * @param readyCount the number of ready tasks at the scheduler
      */
     void startTask(KernelRunnable task, Identity owner,
-                          long scheduledStartTime, int readyCount);
+                   long scheduledStartTime, int readyCount);
 
     /**
      * Tells the collector that the current task associated with the calling
@@ -188,7 +185,7 @@ public interface ProfileCollector {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    void noteTransactional(BigInteger transactionId);
+    void noteTransactional(byte [] transactionId);
 
     /**
      * Tells the collector about a participant of a transaction when that
