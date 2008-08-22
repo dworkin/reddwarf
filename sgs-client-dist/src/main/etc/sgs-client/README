@@ -43,9 +43,9 @@ processors:
 This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
 greater.
 
-It has been tested with version 1.5.0_16-b02 of the J2SE(TM) Runtime
+It has been tested with version 1.5.0_16 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
-1.5.0_15-b04 on Mac OS X platforms.
+1.5.0_13 on Mac OS X platforms.
 
 DEVELOPING AND RUNNING
 
