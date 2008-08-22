@@ -44,16 +44,6 @@
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
-    <!-- Unpack the berkeleydb binaries into the bdb directory -->
-    <dependencySet>
-      <includes>
-        <include>com.projectdarkstar.ext.berkeleydb:db-binaries:zip</include>
-      </includes>
-      <unpack>true</unpack>
-      <outputDirectory></outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-    
     <!-- Include the mina-core jar in the mina directory -->
     <dependencySet>
       <includes>
@@ -131,14 +121,34 @@
 
     <!-- This is here just to get an empty bdb directory in lib -->
     <fileSet>
-       <directory>${project.build.directory}</directory>
+       <directory>${java.io.tmpdir}</directory>
        <outputDirectory>sgs-server-${sgs.version}/lib/bdb</outputDirectory>
        <excludes>
            <exclude>**/*</exclude>
         </excludes>
     </fileSet>
 
-    
+    <!-- Include all of the Berkeley DB binaries except for the Windows
+	 DLL -->
+    <fileSet>
+      <directory>${project.build.directory}/bdb-${bdb.version}</directory>
+      <outputDirectory>bdb-${bdb.version}</outputDirectory>
+      <excludes>
+	<exclude>win32-x86/libdb_java45.dll</exclude>
+      </excludes>
+    </fileSet>
+
+    <!-- Include the Windows DLL from the Berkeley DB binaries, and make
+	 it executable -->
+    <fileSet>
+      <directory>${project.build.directory}/bdb-${bdb.version}</directory>
+      <outputDirectory>bdb-${bdb.version}</outputDirectory>
+      <includes>
+	<include>win32-x86/libdb_java45.dll</include>
+      </includes>
+      <fileMode>755</fileMode>
+    </fileSet>
+
   </fileSets>
   
 
