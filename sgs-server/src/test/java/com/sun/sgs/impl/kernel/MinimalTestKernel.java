@@ -27,6 +27,7 @@ import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.Service;
@@ -41,7 +42,7 @@ import java.util.Properties;
 public final class MinimalTestKernel {
 
     // the single proxy for the system
-    private static final DummyTransactionProxy proxy =
+    static final DummyTransactionProxy proxy =
         new DummyTransactionProxy();
     // the simple test context
     private static SimpleAppContext ctx = null;
@@ -51,10 +52,9 @@ public final class MinimalTestKernel {
 	ComponentRegistryImpl registry = new ComponentRegistryImpl();
 	MinimalTestKernel.ctx = new SimpleAppContext(registry);
 
-        ProfileCollector collector = 
-            new ProfileCollectorImpl(ProfileLevel.MIN, null, registry);
+        ProfileCollector collector = DummyProfileCoordinator.getCollector();
         AccessCoordinatorImpl accessCoordinator =
-            new AccessCoordinatorImpl(new Properties(), proxy, collector);
+            new TestAccessCoordinator(collector);
 	TransactionSchedulerImpl txnScheduler =
 	    new TransactionSchedulerImpl(new Properties(),
 					 new TestTransactionCoordinator(),
@@ -175,6 +175,38 @@ public final class MinimalTestKernel {
         public String toString() {
             return "DummyApplication" + registry;
         }
+    }
+
+    /** A dummy extension of {@code AccessCoordinatorImpl}. */
+    private static class TestAccessCoordinator extends AccessCoordinatorImpl {
+        /** {@inheritDoc} */
+        TestAccessCoordinator(ProfileCollector profileCollector) {
+            super(new Properties(), MinimalTestKernel.proxy,
+                  profileCollector);
+        }
+        public <T> AccessReporter<T> registerAccessSource
+            (String sourceName, Class<T> objectIdType)
+        {
+            return new AccessReporter<T>() {
+                public void reportObjectAccess(T objId, AccessType type) {}
+                public void reportObjectAccess(Transaction txn, T objId,
+                                               AccessType type) {}
+                public void reportObjectAccess(T objId, AccessType type, 
+                                               Object description) {}
+                public void reportObjectAccess(Transaction txn, T objId,
+                                               AccessType type,
+                                               Object description) {}
+                public void setObjectDescription(T objId, Object description) {}
+                public void setObjectDescription(Transaction txn, T objId, 
+                                                 Object description) {}
+            };
+        }
+        /** {@inheritDoc} */
+        public Transaction getConflictingTransaction(Transaction txn) {
+            return null;
+        }
+        /** {@inheritDoc} */
+        void notifyNewTransaction(long requestedStartTime, int tryCount) {}
     }
 
 }

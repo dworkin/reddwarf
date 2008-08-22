@@ -64,6 +64,11 @@ public class DummyProfileCoordinator {
         collector.addListener(listener, true);
     }
 
+    /** Get the singleton, backing collector. */
+    public static ProfileCollectorImpl getCollector() {
+        return instance.collector;
+    }
+
     /** Get the singleton registrar, used for creating services. */
     public static ProfileRegistrar getRegistrar() {
         return instance.registrar;
