@@ -145,8 +145,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
     /** 
      * {@inheritDoc} 
-     *
-     * @throws NullPointerException if any of the arguments are {@code null}
      */
     public <T> AccessReporter<T> registerAccessSource
 	(String sourceName, Class<T> objectIdType)

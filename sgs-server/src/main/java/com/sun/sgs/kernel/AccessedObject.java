@@ -35,14 +35,14 @@ public interface AccessedObject {
      *
      * @return the identifier for the accessed object
      */
-    public Object getObjectId();
+    Object getObjectId();
 
     /**
      * Returns the type of access requested.
      *
      * @return the {@code AccessType}
      */
-    public AccessType getAccessType();
+    AccessType getAccessType();
 
     /**
      * Returns the supplied description of the object, if any.
@@ -51,13 +51,13 @@ public interface AccessedObject {
      *
      * @see AccessReporter#setObjectDescription(Object,Object)
      */
-    public Object getDescription();
+    Object getDescription();
 
     /**
      * Returns the name of the source that reported this object access.
      *
      * @return the object's source
      */
-    public String getSource();
+    String getSource();
 
 }

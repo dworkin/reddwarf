@@ -679,7 +679,8 @@ public final class DataServiceImpl implements DataService {
 	    long nextOid = context.nextObjectId(oid);
 	    BigInteger result =
 		(nextOid == -1) ? null : BigInteger.valueOf(nextOid);
-	    oidAccesses.reportObjectAccess(result, AccessType.READ);
+	    if (nextOid != -1)
+		oidAccesses.reportObjectAccess(result, AccessType.READ);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "nextObjectId objectId:{0} returns {1}",
@@ -823,7 +824,7 @@ public final class DataServiceImpl implements DataService {
 	try {
 	    context = getContext();
 	    String internalName = getInternalName(name, serviceBinding);
-	    // mark that this name has been write locked
+	    // mark that this name has been read locked
 	    boundNameAccesses.
                 reportObjectAccess(internalName, AccessType.READ);	    
 	    String result = getExternalName(context.nextBoundName(internalName),

@@ -55,7 +55,7 @@ public interface ProfileListener {
      * implementations.  The value assigned to the property must be an
      * integer.
      */
-    static final String WINDOW_SIZE_PROPERTY = 
+    public static final String WINDOW_SIZE_PROPERTY = 
 	"com.sun.sgs.profile.listener.window.size";
     
     /**

@@ -196,7 +196,7 @@ public class AccessedObjectsListener implements ProfileListener {
             if (count++ < accessesToShow) {
 		try {
 		    formatted += String.format("[source: %s] %-5s %s, "
-					       +"desciption: %s%n",
+					       +"description: %s%n",
 					       object.getSource(),
 					       object.getAccessType(),
 					       object.getObjectId(),

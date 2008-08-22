@@ -107,7 +107,7 @@ public class TestAccessCoordinatorImpl extends Assert {
      */
    
     @Test(expected=NullPointerException.class)
-    public void testConstructorNullProperties() throws Exception {
+    public void testGetConflictWithNull() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {

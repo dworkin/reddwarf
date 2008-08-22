@@ -335,6 +335,8 @@ final class ManagedReferenceImpl<T>
     @SuppressWarnings("fallthrough")
     T get(boolean checkContext) {
 	try {
+	    // mark that we read the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
 	    }
@@ -376,9 +378,7 @@ final class ManagedReferenceImpl<T>
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
-	    // mark that we read the object
-	    context.oidAccesses.
-		reportObjectAccess(getId(), AccessType.READ, result);
+	    context.oidAccesses.setObjectDescription(getId(), result);
 	    return result;
 	} catch (TransactionNotActiveException e) {
 	    throw new TransactionNotActiveException(
@@ -399,6 +399,8 @@ final class ManagedReferenceImpl<T>
     public T getForUpdate() {
 	RuntimeException exception;
 	try {
+	    // mark that we acquired a write lock on the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.WRITE);
 	    DataServiceImpl.checkContext(context);
 	    switch (state) {
 	    case EMPTY:
@@ -437,9 +439,7 @@ final class ManagedReferenceImpl<T>
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
-	    // mark that we acquired a write lock on the object
-	    context.oidAccesses.
-		reportObjectAccess(getId(), AccessType.WRITE, result);
+	    context.oidAccesses.setObjectDescription(getId(), result);	    
 	    return result;
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(

@@ -47,7 +47,7 @@ import com.sun.sgs.service.Transaction;
 public interface AccessReporter<T> {
 
     /** The type of access requested. */
-    public enum AccessType {
+    enum AccessType {
         /** The object is being accessed, but not modified. */
         READ,
         /** The object is being modified. */
@@ -68,10 +68,8 @@ public interface AccessReporter<T> {
      *
      * @param objId an identifier for the object being accessed
      * @param type the {@code AccessType} being requested
-     *
-     * @throws NullPointerException if any of the parameters are {@code null}.
      */
-    public void reportObjectAccess(T objId, AccessType type);
+    void reportObjectAccess(T objId, AccessType type);
 
     /**
      * Reports to the coordinator that object access has been
@@ -96,9 +94,8 @@ public interface AccessReporter<T> {
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
-     * @throws NullPointerException if any of the parameters are {@code null}.
      */
-    public void reportObjectAccess(Transaction txn, T objId, AccessType type);
+    void reportObjectAccess(Transaction txn, T objId, AccessType type);
 
     /**
      * Reports to the coordinator that an object access with the provided
@@ -118,8 +115,6 @@ public interface AccessReporter<T> {
      * from this method if the object access causes the calling transaction
      * to fail (e.g., due to conention).
      *
-     * @param txn the transaction in which the provided {@code objId}
-     *        was accessed
      * @param objId an identifier for the object being accessed
      * @param type the {@code AccessType} being requested
      * @param description an arbitrary object that contains a
@@ -127,10 +122,8 @@ public interface AccessReporter<T> {
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
-     * @throws NullPointerException if {@code objId} or {@code type}
-     *                              is {@code null}.
      */
-    public void reportObjectAccess(T objId, AccessType type, 
+    void reportObjectAccess(T objId, AccessType type, 
 				   Object description);
 
     /**
@@ -160,11 +153,9 @@ public interface AccessReporter<T> {
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
-     * @throws NullPointerException if {@code txn}, {@code objId} or
-     *                              {@code type} is {@code null}.
      */
-    public void reportObjectAccess(Transaction txn, T objId, AccessType type, 
-				   Object description);
+    void reportObjectAccess(Transaction txn, T objId, AccessType type, 
+			    Object description);
 
 
     /**
@@ -178,25 +169,25 @@ public interface AccessReporter<T> {
      * so. At that point the description's {@code toString} method may
      * be called, or the object itself might even be cast to some
      * known type to extract more detail about the accessed object.
-     *
      * <p>
      * Note that this may be called before the associated object is
      * actually accessed, and therefore before {@code notifyObjectAccess}
      * is called for the given {@code objId}. Use of this method is
      * optional, and only used to provide additional detail for profiling
      * and debugging.
+     * <p>
+     * If the provided description is {@code null}, no {@code
+     * NullPointerException} is thrown.  Instead, id's current
+     * description will be left unchanged.
      *
-     * @param txn the transaction in which the provided {@code objId}
-     *        was accessed
      * @param objId the identifier for the associated object
      * @param description an arbitrary {@code Object} that contains a
      *        description of the objId being accessed
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
-     * @throws NullPointerException if {@code objId} is {@code null}.
      */
-    public void setObjectDescription(T objId, Object description);
+    void setObjectDescription(T objId, Object description);
 
     /**
      * In the provided transaction, associates the given object with
@@ -209,13 +200,16 @@ public interface AccessReporter<T> {
      * so. At that point the description's {@code toString} method may
      * be called, or the object itself might even be cast to some
      * known type to extract more detail about the accessed object.
-     *
      * <p>
      * Note that this may be called before the associated object is
      * actually accessed, and therefore before {@code notifyObjectAccess}
      * is called for the given {@code objId}. Use of this method is
      * optional, and only used to provide additional detail for profiling
      * and debugging.
+     * <p>
+     * If the provided description is {@code null}, no {@code
+     * NullPointerException} is thrown.  Instead, id's current
+     * description will be left unchanged.
      *
      * @param txn the transaction in which the provided {@code objId}
      *        was accessed
@@ -225,10 +219,8 @@ public interface AccessReporter<T> {
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
-     * @throws NullPointerException if {@code txn} or {@code objId} is
-     *                              {@code null}.
      */
-    public void setObjectDescription(Transaction txn, T objId, 
-				     Object description);
+    void setObjectDescription(Transaction txn, T objId, 
+			      Object description);
 
 }

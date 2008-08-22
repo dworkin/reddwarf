@@ -35,7 +35,7 @@ import java.util.List;
 public interface AccessedObjectsDetail {
 
     /** Identifies a known type of conflict. */
-    public static enum ConflictType {
+    static enum ConflictType {
         /** Some access resulted in deadlock between transactions. */
         DEADLOCK,
         /**
@@ -55,14 +55,14 @@ public interface AccessedObjectsDetail {
      *
      * @return a {@code List} of {@code AccessedObject}s
      */
-    public List<AccessedObject> getAccessedObjects();
+    List<AccessedObject> getAccessedObjects();
 
     /**
      * The type of conflict, if any, caused by these object accesses.
      *
      * @return the {@code ConflictType}
      */
-    public ConflictType getConflictType();
+    ConflictType getConflictType();
 
     /**
      * Returns the identifier of the transaction that caused this access to
@@ -72,6 +72,6 @@ public interface AccessedObjectsDetail {
      *         or {@code null} if there was no conflict or the accessor
      *         is unknown
      */
-    public BigInteger getConflictingId();
+    BigInteger getConflictingId();
 
 }
