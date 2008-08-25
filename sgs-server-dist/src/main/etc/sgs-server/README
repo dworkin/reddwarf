@@ -16,8 +16,8 @@ In addition to the documents, APIs and examples, this distribution
 contains a complete single-system version of the Project Darkstar
 Server.
 
-See the CHANGELOG file for a summary of recent changes, and the
-API-CHANGES file for a detailed list of recent changes to the API.
+See the CHANGELOG file for a summary of recent changes, and the RELEASE
+COMPATIBILITY section below for information about compatibility.
 
 CONTENTS
 
@@ -127,16 +127,23 @@ To run the Project Darkstar server:
 
 RELEASE COMPATIBILITY
 
-Release 0.9.7 of the Project Darkstar Server API is compatible with the
-0.9.6 release.
+Release 0.9.7:
 
-Release 0.9.7 is compatible with persistent data created by applications
-running with release 0.9.6.  Running an application using release 0.9.7
-will automatically upgrade persistent data to the current release
-format, which is incompatible with earlier releases.
+- Running an application using release 0.9.7 with persistent data
+  created using release 0.9.6 will automatically upgrade the data to the
+  current release format, which is incompatible with earlier releases.
 
-Note that persistent data created using Berkeley DB is incompatible with
-data created using Berkeley DB Java edition.
+- The following configuration properties were changed incompatibly:
+
+  com.sun.sgs.impl.kernel.profile.level
+  com.sun.sgs.impl.kernel.profile.listeners
+
+Release 0.9.6:
+
+- See the API-CHANGES file for a detailed list of changes to the API in
+  this release.
+
+- Does not support persistent data from earlier releases.
 
 
 KNOWN ISSUES
