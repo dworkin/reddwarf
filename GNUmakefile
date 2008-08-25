@@ -35,7 +35,7 @@ dist:
 	-mkdir -p $(TOPDIR)/target/$(DIST_DIR)
 	-cp GNUmakefile LICENSE README $(TOPDIR)/target/$(DIST_DIR)
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/etc
-	-cp etc/*.mk $(TOPDIR)/target/$(DIST_DIR)/etc
+	-cp etc/*.mk etc/*.bat $(TOPDIR)/target/$(DIST_DIR)/etc
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs
 	-cp sgs/*.c sgs/*.h $(TOPDIR)/target/$(DIST_DIR)/sgs
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs/private
