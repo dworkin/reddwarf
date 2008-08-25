@@ -12,7 +12,7 @@
 	<include>com.projectdarkstar.client:sgs-tutorial-client:jar</include>
       </includes>
       <outputDirectory>tutorial</outputDirectory>
-      <outputFileNameMapping>tutorial.jar</outputFileNameMapping>
+      <outputFileNameMapping>tutorial-client.jar</outputFileNameMapping>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
