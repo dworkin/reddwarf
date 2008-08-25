@@ -19,7 +19,11 @@ import java.awt.Image;
 
 import java.awt.image.BufferedImage;
 
-import java.util.Map;
+import java.io.IOException;
+
+import java.util.Properties;
+
+import java.util.logging.Logger;
 
 import javax.swing.JPanel;
 
@@ -27,19 +31,25 @@ import javax.swing.JPanel;
 /**
  * This panel renders a dungeon level, and accepts input from the player.
  */
-class BoardPanel extends JPanel implements BoardListener
-{
+class BoardPanel extends JPanel implements BoardListener {
 
+    private static final Logger logger = 
+	Logger.getLogger(BoardPanel.class.getName());
+    
     private static final long serialVersionUID = 1;
-
-    // the sprite map used to render the current board
-    private Map<Integer,Image> spriteMap;
 
     // the off-screen copy of the graphics
     private BufferedImage offscreen;
 
-    // the size of each sprite
-    private int spriteSize = 0;
+    /**
+     * The size of width and height of each sprite
+     */
+    private final int spriteSize;
+
+    /**
+     * The sprite map used to load images based on a tile's Id
+     */
+    private final SpriteMap spriteMap;
 
     /**
      * Creates an instance of <code>BoardPanel</code>.
@@ -52,6 +62,9 @@ class BoardPanel extends JPanel implements BoardListener
         g.setColor(Color.GRAY);
         g.fillRect(0, 0, offscreen.getWidth(), offscreen.getHeight());
         g.dispose();
+
+	this.spriteMap = new SpriteMap();
+	this.spriteSize = spriteMap.getSpriteSize();
     }
 
     /**
@@ -66,18 +79,6 @@ class BoardPanel extends JPanel implements BoardListener
         g.setColor(Color.BLACK);
         g.drawString("Loading...", 20, 30);
         g.dispose();
-    }
-
-    /**
-     * Sets the mapping from identifier to image that is used for the
-     * current board.
-     *
-     * @param spriteSize the size of each sprite
-     * @param spriteMap the mapping of identifier to image
-     */
-    public void setSpriteMap(int spriteSize, Map<Integer,Image> spriteMap) {
-        this.spriteSize = spriteSize;
-        this.spriteMap = spriteMap;
     }
 
     /**
@@ -112,7 +113,7 @@ class BoardPanel extends JPanel implements BoardListener
      */
     private void updateSpace(Graphics g, int x, int y, int [] ids) {
         for (int i = 0; i < ids.length; i++)
-            g.drawImage(spriteMap.get(ids[i]), x * spriteSize, y * spriteSize,
+            g.drawImage(spriteMap.getSprite(ids[i]), x * spriteSize, y * spriteSize,
                         this);
     }
 

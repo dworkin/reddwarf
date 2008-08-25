@@ -106,7 +106,7 @@ public class Client extends JFrame implements SimpleClientListener {
      * @throws Exception if there is any problem with the initial setup
      */
     public Client() throws Exception {
-        super("Hack 0.4");
+        super("Hack 0.5");
 
         // listen for events on the root window
         addWindowListener(new BasicWindowMonitor());
@@ -330,21 +330,6 @@ public class Client extends JFrame implements SimpleClientListener {
 			(Collection<CharacterStats>)(getObject(message));
 		    lobbyManager.setCharacters(characters);		    
 		    break; 
-
-		/*
-		 * When we first join a dungeon, the server will send us
-		 * the sprite map that is used by the dungeon.
-		 */
-		case NEW_SPRITE_MAP:
-		    // we were sent game membership updates
-		    Object[] sizeAndSprites = (Object[])(getObject(message));
-		    Integer spriteSize = (Integer)(sizeAndSprites[0]);
-		    @SuppressWarnings("unchecked")
-			Map<Integer,byte[]> spriteMap =
-			(Map<Integer,byte[]>)(sizeAndSprites[1]);
-		    dungeonManager.setSpriteMap(spriteSize,
-					  convertMap(spriteMap));
-		    break;
 
 		/*
 		 * When we join a dungeon or move between levels in a

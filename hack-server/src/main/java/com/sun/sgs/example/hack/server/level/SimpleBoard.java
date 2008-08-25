@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.StreamTokenizer;
 
 import java.util.Set;
-//import java.util.HashSet;
 import java.util.Map;
 
 /**
@@ -102,10 +101,9 @@ public class SimpleBoard implements LevelBoard {
      *
      * @throws IOException if the stream isn't formatted correctly
      */
-    public static SimpleBoard parse(StreamTokenizer stok,
-				    Set<Integer> impassableSprites) 
-	throws IOException
-    {
+    public static SimpleBoard parse(StreamTokenizer stok)
+	throws IOException {
+
         // get the width and height
         stok.nextToken();
         int width = (int)(stok.nval);
@@ -126,12 +124,28 @@ public class SimpleBoard implements LevelBoard {
                 stok.nextToken();
                 int id = (int)(stok.nval);
 		board.setGridSpace(x, y, 
-				   ((impassableSprites.contains(id))
+				   (isImpassible(id)
 				    ? new ImpassableTile(id)
 				    : new PassableTile(id)));
             }
         }
 	return board;
+    }
+
+    /**
+     * A temporary placeholder method for determing whether a tileId
+     * is impassible.  This method will be replaced in a forthcoming
+     * patch to replace integer tile Ids with enums.
+     */
+    private static boolean isImpassible(int tileId) {
+	// set of impassible sprites ids:
+	// 5 6 7 8 9 10 11 12 15 16 19 20
+	return 
+	    (tileId>= 5 && tileId<= 12) ||
+	    tileId== 15 ||
+	    tileId== 16 ||
+	    tileId== 19 ||
+	    tileId== 20;
     }
 
     private void checkBounds(int x, int y) {

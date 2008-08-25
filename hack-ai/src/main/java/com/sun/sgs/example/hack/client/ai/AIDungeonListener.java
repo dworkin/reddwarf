@@ -64,7 +64,6 @@ public class AIDungeonListener implements BoardListener, PlayerListener {
         }
     }
 
-    public void setSpriteMap(int spriteSize, Map<Integer,Image> spriteMap) {}
     public void changeBoard(Board board) {}
     public void updateSpaces(BoardSpace [] spaces) {}
     public void hearMessage(String message) {}

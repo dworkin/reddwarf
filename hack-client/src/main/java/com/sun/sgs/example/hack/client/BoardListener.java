@@ -24,15 +24,6 @@ public interface BoardListener
 {
 
     /**
-     * Notifies the listener of the sprite map that should be used. This is
-     * typically called each time the player enters a new dungeon.
-     *
-     * @param spriteSize the size, in pixels, of the sprites
-     * @param spriteMap a map from sprite identifier to sprite image
-     */
-    public void setSpriteMap(int spriteSize, Map<Integer,Image> spriteMap);
-
-    /**
      * Notifies the listener that the board has changed.
      *
      * @param board the new board where the player is playing

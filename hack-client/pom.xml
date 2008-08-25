@@ -52,6 +52,27 @@
 	  <plugin>
             <artifactId>maven-antrun-plugin</artifactId>
 	    <executions>
+
+
+	  <!-- Copies the Hack client-side data (sprite maps, etc.) to
+	       the build directory.  Runs in the
+	       generate-test-resources phase -->
+          <execution>
+            <id>copy-game-data</id>
+            <phase>generate-test-resources</phase>
+	    <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <tasks>
+                <copy todir="${project.build.directory}/data">
+		  <fileset dir="${basedir}/data"/>
+		</copy>
+              </tasks>
+            </configuration>
+          </execution>
+
+
 	      <execution>
 		<id>test-run</id>
 		<phase>process-test-resources</phase>
@@ -69,6 +90,10 @@
 				   value="${hack.host}"/>
 		      <sysproperty key="port"
 				   value="${hack.port}"/>
+		      <sysproperty key="com.sun.sgs.example.hack.client.gui.SpriteMap.sprite.map"
+				   value="${sprite.map.file}"/>
+		      <sysproperty key="com.sun.sgs.example.hack.client.gui.SpriteMap.sprite.size"
+				   value="${sprite.size}"/>
 		      <classpath>
 			<path refid="maven.test.classpath"/>
 		      </classpath>
@@ -85,6 +110,8 @@
   </profiles>
 
   <properties>
+    <sprite.map.file>data/standard.png</sprite.map.file>
+    <sprite.size>24</sprite.size>
     <run.jvm.args></run.jvm.args>
     <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
     <hack.host>localhost</hack.host>

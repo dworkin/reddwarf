@@ -383,20 +383,6 @@ public final class Messages {
     /*
      * START DUNGEON MESSAGES
      */
-
-    /**
-     * Sends a new mapping from identifiers to sprite images. This is
-     * typically done with each level.
-     *
-     * @param spriteMap the mapping from identifier to sprite
-     */
-    public static void sendSpriteMap(ClientSession session, 
-				     SpriteMap spriteMap) {
-
-        sendToClient(session, Command.NEW_SPRITE_MAP, 
-		     new Integer(spriteMap.getSpriteSize()), 
-		     spriteMap.getSpriteMap());
-    }
     
     /**
      * Sends a complete <code>Board</code> to a client.

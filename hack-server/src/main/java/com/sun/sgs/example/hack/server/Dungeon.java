@@ -144,12 +144,6 @@ public class Dungeon implements Game, Serializable {
         // Notify the manager that our membership count changed
         sendCountChanged();
 
-        // Notify the client of the sprites we're using
-        SpriteMap spriteMap = (SpriteMap) dataManager.getBinding(
-	    SpriteMap.NAME_PREFIX + spriteMapId);
-
-        Messages.sendSpriteMap(session, spriteMap);
-
         Messages.broadcastPlayerJoined(dungeonCommandsChannel.get(), playerID);
       
         // Finally, throw the player into the game through the starting

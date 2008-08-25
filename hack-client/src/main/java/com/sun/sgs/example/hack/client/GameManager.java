@@ -141,18 +141,6 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
-     * Notifies the manager of the sprite map that should be used. This
-     * notifies all of the registered listeners.
-     *
-     * @param spriteSize the size, in pixels, of the sprites
-     * @param spriteMap a map from sprite identifier to sprite image
-     */
-    public void setSpriteMap(int spriteSize, Map<Integer,Image> spriteMap) {
-        for (BoardListener listener : boardListeners)
-            listener.setSpriteMap(spriteSize, spriteMap);
-    }
-
-    /**
      * Notifies the manager that the board has changed. This notifies all
      * of the registered listeners.
      *

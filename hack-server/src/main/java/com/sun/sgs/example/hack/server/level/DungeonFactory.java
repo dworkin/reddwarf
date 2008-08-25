@@ -59,7 +59,6 @@ public class DungeonFactory {
      *
      * @param stok the stream to tokenize
      * @param gameName the name of the dungeon this is being loaded into
-     * @param impassableSprites the set of identifiers that are impassable
      * @param lobby the lobby
      *
      * @return a <code>GameConnector</code> that is the
@@ -67,11 +66,10 @@ public class DungeonFactory {
      *
      * @throws IOException if the stream isn't formatted correctly
      */
-    public static GameConnector
-        loadDungeon(StreamTokenizer stok, String gameName,
-                    Set<Integer> impassableSprites, Game lobby)
-        throws IOException
-    {
+    public static GameConnector loadDungeon(StreamTokenizer stok, 
+					    String gameName,
+					    Game lobby) throws IOException {
+	
         DataManager dataManager = AppContext.getDataManager();
 
         // the prefix for all level names
@@ -119,8 +117,8 @@ public class DungeonFactory {
 		    logger.warning("duplicate name defined for level: " + 
 				   levelName);		    
 		}
-                boards.put(levelName, SimpleBoard.parse(stok,
-							impassableSprites));
+                boards.put(levelName, SimpleBoard.parse(stok));
+
             } else if (stok.sval.equals("Connection")) {
                 connections.add(readConnection(stok, levelPrefix));
             } else if (stok.sval.equals("OneWayConnection")) {

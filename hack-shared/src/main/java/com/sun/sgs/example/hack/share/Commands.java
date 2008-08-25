@@ -58,7 +58,6 @@ public final class Commands {
 	    NOTIFY_PLAYABLE_CHARACTERS,
 
 	    // dungeon commands
-	    NEW_SPRITE_MAP,
 	    NEW_BOARD,
 	    UPDATE_BOARD_SPACES,
 	    NEW_SERVER_MESSAGE,

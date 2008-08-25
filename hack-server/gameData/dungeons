@@ -6,7 +6,7 @@
 # SpriteMap ID SPRITE_SIZE FILENAME
 # Dungeon NAME SPRITEMAP_ID FILENAME (NAME may be quoted to include whitespace)
 #
-SpriteMap 0 24 "gameData/standard.png"
+#SpriteMap 0 24 "gameData/standard.png"
 #SpriteMap 1 40 "gameData/sc.png"
 Dungeon SimpleDungeon1 0 "gameData/SimpleDungeon"
 Dungeon SimpleDungeon2 0 "gameData/SimpleDungeon"
