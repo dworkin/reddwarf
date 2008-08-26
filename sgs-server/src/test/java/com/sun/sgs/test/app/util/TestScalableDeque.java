@@ -46,11 +46,13 @@ import java.lang.reflect.Method;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 
 import java.util.Map.Entry;
 
@@ -119,6 +121,24 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
 
+
+    @Test public void testOneArgConstructorTrue() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    new ScalableDeque<Integer>(true);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testOneArgConstructorFalse() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    new ScalableDeque<Integer>(false);
+		}
+	    }, taskOwner);
+    }
 
     @Test public void testCopyConstructor() throws Exception {
 
@@ -278,6 +298,74 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
     
+
+    /*
+     * Test clear
+     */
+    @Test public void testClear() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.offer(1);
+		    assertFalse(d.isEmpty());
+		    d.clear();
+		    assertTrue(d.isEmpty());
+		    assertEquals(0, d.size());
+		    assertEquals(null, d.poll());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testClearOnEmptyMap() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    assertTrue(d.isEmpty());
+		    d.clear();
+		    assertTrue(d.isEmpty());
+		    assertEquals(0, d.size());
+		    assertEquals(null, d.poll());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testMultipleClears() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    assertTrue(d.isEmpty());
+		    d.clear();
+		    d.clear();
+		    d.clear();
+		    assertTrue(d.isEmpty());
+		    assertEquals(0, d.size());
+		    assertEquals(null, d.poll());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testClearThenAdd() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    assertTrue(d.isEmpty());
+		    d.clear();
+		    d.add(5);
+		    assertFalse(d.isEmpty());
+		    assertEquals(1, d.size());
+		    assertEquals(5, d.getFirst());
+		}
+	    }, taskOwner);
+    }
+
 
     /*
      * Test contains
@@ -447,6 +535,265 @@ public class TestScalableDeque extends Assert {
 		}
 	    }, taskOwner);
     }
+
+    @Test public void testOffer() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    d.offer(1);		    		   
+		    assertEquals(1, d.getFirst());
+
+		}
+	    }, taskOwner);
+    }
+
+
+    @Test public void testMultipleOffers() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.offer(i);
+		    		   
+		    for (int i = 0; i < 10; ++i) 
+			assertEquals(i, d.remove());
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testOfferFirst() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    d.offerFirst(1);		    		   
+		    assertEquals(1, d.getFirst());
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testMultipleOfferFirst() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    for (int i = 0; i < 10; ++i)
+			d.offerFirst(i);		    		   
+		    assertEquals(9, d.getFirst());
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testOfferLast() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    d.offerLast(1);		    		   
+		    assertEquals(1, d.getLast());
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testMultipleOfferLast() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    for (int i = 0; i < 10; ++i)
+			d.offerLast(i);		    		   
+		    assertEquals(9, d.getLast());
+		}
+	    }, taskOwner);
+    }
+
+
+    @Test public void testAddLastNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    try {
+			d.addLast(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+			
+		    }
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testAddFirstNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
+		    try {
+			d.addFirst(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+			
+		    }
+		}
+	    }, taskOwner);
+    }
+
+    /*
+     * Test peek/get/element access operations
+     */
+    @Test public void testElement() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.add(2);		    		   		    
+		    assertEquals(2, d.element());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testElementOnEmptyDeque() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.element();
+			fail("expected NoSuchElementException");
+		    }
+		    catch (NoSuchElementException nsee) {
+
+		    }
+		}
+	    }, taskOwner);
+    }
+
+
+
+    @Test public void testPeek() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.add(2);		    		   		    
+		    assertEquals(2, d.peek());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testPeekOnEmptyDeque() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    assertEquals(null, d.peek());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testPeekFirst() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.add(2);
+		    d.add(3);
+		    assertEquals(2, d.peekFirst());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testPeekLast() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.add(2);
+		    d.add(3);
+		    assertEquals(3, d.peekLast());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testGetFirst() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.add(2);
+		    d.add(3);
+		    assertEquals(2, d.getFirst());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testGetLast() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    d.add(2);
+		    d.add(3);
+		    assertEquals(3, d.getLast());
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testGetFirstOnEmptyDeque() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.getFirst();
+			fail("expected NoSuchElementException");
+		    } catch (NoSuchElementException nsee) {
+
+		    }
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testGetLastOnEmptyDeque() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.getLast();
+			fail("expected NoSuchElementException");
+		    } catch (NoSuchElementException nsee) {
+
+		    }
+		}
+	    }, taskOwner);
+    }
+
+
   
     /*
      * Test remove operations
@@ -691,7 +1038,7 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
     
-    @Test public void testRemoveAllOccurrencesOccurrenceNotPresent() throws Exception {
+    @Test public void testRemoveAllOccurrencesWhenOccurrenceNotPresent() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
@@ -702,6 +1049,164 @@ public class TestScalableDeque extends Assert {
 		    assertFalse(d.removeAllOccurrences(10));  
 		    assertEquals(10, d.size());
 		    assertFalse(d.contains(10));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveAll() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(5);
+		    assertTrue(d.removeAll(c));		    
+		    assertEquals(9, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveAllWithMultipleOccurrences() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(5);		    
+		    assertTrue(d.removeAll(c));		    
+		    assertEquals(27, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveAllWithMultipleRemoves() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(5);		    
+		    c.add(6);
+		    assertTrue(d.removeAll(c));		    
+		    assertEquals(24, d.size());
+		    assertFalse(d.contains(5));
+		    assertFalse(d.contains(6));
+		}
+	    }, taskOwner);
+    }
+    
+    @Test public void testRemoveAllWhenOccurrenceNotPresent() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(10);		    
+		    assertFalse(d.removeAll(c));  
+		    assertEquals(10, d.size());
+		    assertFalse(d.contains(10));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.remove(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+
+		    }		    
+		}
+	    }, taskOwner);
+    }
+    
+    @Test public void testRemoveFirstOccurrenceNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.removeFirstOccurrence(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+
+		    }		    
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveLastOccurrenceNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.removeLastOccurrence(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+
+		    }		    
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveAllOccurrencesNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.removeAllOccurrences(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+
+		    }		    
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testRemoveAllNull() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    try {
+			d.removeAll(null);
+			fail("expected NullPointerException");
+		    } catch (NullPointerException npe) {
+
+		    }		    
 		}
 	    }, taskOwner);
     }
@@ -892,8 +1397,294 @@ public class TestScalableDeque extends Assert {
     }
     
 
+    /*
+     * Test serializability
+     */
+
+    @Test public void testDequeSeriazable() throws Exception {
+	final String name = "test-deque";
+
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.add(i);
+		    AppContext.getDataManager().setBinding(name, d);
+		}
+	    }, taskOwner);
+
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    ScalableDeque<Integer> d = 
+			(ScalableDeque)(AppContext.
+					getDataManager().getBinding(name));
+		    assertEquals(10, d.size());
+		    int i = 0;
+		    for (Integer inDeque : d) {
+			assertEquals(i++, inDeque);
+		    }
+		    
+		    AppContext.getDataManager().removeBinding(name);
+		}
+	    }, taskOwner);
+
+    }
+
+    @Test public void testIteratorSeriazable() throws Exception {
+	final String name = "test-iterator";
+
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.add(i);
+		    AppContext.getDataManager().setBinding(name, d.iterator());
+		}
+	    }, taskOwner);
+
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    Iterator<Integer> it = 
+			(Iterator)(AppContext.
+				   getDataManager().getBinding(name));
+
+		    int i = 0;
+		    while (it.hasNext())
+			assertEquals(i++, it.next());
+		    assertEquals(10, i);
+
+		    AppContext.getDataManager().removeBinding(name);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testIteratorSeriazableWithRemovals() throws Exception {
+	final String name = "test-iterator";
+	final String name2 = "test-deque";
+
+	// create the deque
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.add(i);
+		    AppContext.getDataManager().setBinding(name, d.iterator());
+		    AppContext.getDataManager().setBinding(name2, d);
+		}
+	    }, taskOwner);
+
+	// remove some elements while the iterator is serialized
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = 
+			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+		    for (int i = 1; i < 10; i+=2) 
+			d.remove(i);		    
+		}
+	    }, taskOwner);
 
 
+	// load the iterator back
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    Iterator<Integer> it = 
+			(Iterator)(AppContext.
+				   getDataManager().getBinding(name));
+
+		    int i = 0;
+		    while (it.hasNext()) {
+			assertEquals(i, it.next());
+			i += 2;
+		    }
+		    assertEquals(10, i);
+
+		    AppContext.getDataManager().removeBinding(name);
+		    AppContext.getDataManager().removeBinding(name2);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testConcurrentIteratorSeriazableWithRemovalOfNextElements() 
+	throws Exception {
+
+	final String name = "test-iterator";
+	final String name2 = "test-deque";
+
+	// create the deque
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(true);
+		    for (int i = 0; i < 10; ++i) 
+			d.add(i);
+		    AppContext.getDataManager().setBinding(name, d.iterator());
+		    AppContext.getDataManager().setBinding(name2, d);
+		}
+	    }, taskOwner);
+
+	// remove the iterator's first 5 elements while the
+	// iterator is serialized
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = 
+			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+		    for (int i = 0; i < 5; i++) 
+			d.remove(i);		    
+		}
+	    }, taskOwner);
+
+
+	// load the iterator back
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    Iterator<Integer> it = 
+			(Iterator)(AppContext.
+				   getDataManager().getBinding(name));
+
+		    int i = 5;
+		    while (it.hasNext()) {
+			assertEquals(i, it.next());
+			i ++;
+		    }
+		    assertEquals(10, i);
+
+		    AppContext.getDataManager().removeBinding(name);
+		    AppContext.getDataManager().removeBinding(name2);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testNonConcurrentIteratorSeriazableWithRemovalOfNextElements() 
+	throws Exception {
+
+	final String name = "test-iterator";
+	final String name2 = "test-deque";
+
+	// create the deque
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.add(i);
+		    AppContext.getDataManager().setBinding(name, d.iterator());
+		    AppContext.getDataManager().setBinding(name2, d);
+		}
+	    }, taskOwner);
+
+	// remove the iterator's first 5 elements while the
+	// iterator is serialized
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = 
+			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+		    for (int i = 0; i < 5; i++) 
+			d.remove();		    
+		}
+	    }, taskOwner);
+
+
+	// load the iterator back
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    Iterator<Integer> it = 
+			(Iterator)(AppContext.
+				   getDataManager().getBinding(name));
+
+		    try {
+			it.next();
+			fail("expected ConcurrentModificationException"); 
+		    } catch (ConcurrentModificationException cme) {
+			// it should throw this
+		    } finally {
+			AppContext.getDataManager().removeBinding(name);
+			AppContext.getDataManager().removeBinding(name2);
+		    }
+		}
+	    }, taskOwner);
+    }
+
+
+
+    @Test public void testIteratorRemovalWhereCurrentElementWasAlreadyRemoved() 
+	throws Exception {
+
+	final String name = "test-iterator";
+	final String name2 = "test-deque";
+
+	// create the deque
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.add(i);
+		    Iterator<Integer> it = d.iterator();
+		    // advance the iterator forward one set
+		    it.next();		    
+		    AppContext.getDataManager().setBinding(name, it);
+		    AppContext.getDataManager().setBinding(name2, d);
+		}
+	    }, taskOwner);
+
+	// remove the iterator's first 5 elements while the
+	// iterator is serialized
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = 
+			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+		    // remove the first element, which the iterator
+		    // already advanced over
+		    d.removeFirst();
+		}
+	    }, taskOwner);
+
+
+	// load the iterator back
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    
+		    Iterator<Integer> it = 
+			(Iterator)(AppContext.
+				   getDataManager().getBinding(name));
+
+		    // now try to remove the already-removed element
+		    // from the iterator
+		    it.remove();
+		    
+		    // the above call shouldn't throw an object not
+		    // found exception
+		}
+	    }, taskOwner);
+    }
 
 
 
