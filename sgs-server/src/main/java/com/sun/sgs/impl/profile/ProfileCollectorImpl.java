@@ -22,6 +22,9 @@ package com.sun.sgs.impl.profile;
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
+
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
@@ -34,6 +37,7 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 import java.beans.PropertyChangeEvent;
 
 import java.lang.reflect.Constructor;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EmptyStackException;
@@ -45,6 +49,9 @@ import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 
 /**
  * This is the implementation of {@code ProfileCollector} used by the
@@ -52,6 +59,11 @@ import java.util.concurrent.LinkedBlockingQueue;
  * consume and report profiling data.
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
+
+    // the logger for this class
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(ProfileCollectorImpl.
+                                           class.getName()));
     
     // A map from profile consumer name to profile consumer object
     private final ConcurrentHashMap<String, ProfileConsumerImpl> consumers;
@@ -383,7 +395,14 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                         unmodifiableSet(profileReport.participants);
 
                     for (ProfileListener listener : listeners.keySet()) {
-                        listener.report(profileReport);
+                        try {
+                            listener.report(profileReport);
+                        } catch (Throwable t) {
+                            if (logger.isLoggable(Level.WARNING))
+                                logger.logThrow(Level.WARNING, t,
+                                                "{0}: report method failed",
+                                                listener.getClass());
+                        }
                     }
                 }
             } catch (InterruptedException ie) { }

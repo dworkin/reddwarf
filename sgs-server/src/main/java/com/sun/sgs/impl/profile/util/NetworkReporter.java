@@ -26,6 +26,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 import java.util.HashSet;
+import java.util.Iterator;
 
 
 /**
@@ -66,13 +67,15 @@ public final class NetworkReporter {
      * @param message the message to send
      */
     public synchronized void report(String message) {
-        for (Socket socket : listeners) {
+        Iterator<Socket> it = listeners.iterator();
+        while (it.hasNext()) {
+            Socket socket = it.next();
             try {
                 OutputStream stream = socket.getOutputStream();
                 stream.write(message.getBytes());
                 stream.flush();
             } catch (IOException ioe) {
-                listeners.remove(socket);
+                it.remove();
             }
         }
     }
