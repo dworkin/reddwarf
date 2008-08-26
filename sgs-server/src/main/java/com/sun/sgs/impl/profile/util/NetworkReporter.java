@@ -75,7 +75,7 @@ public final class NetworkReporter {
                 stream.write(message.getBytes());
                 stream.flush();
             } catch (IOException ioe) {
-                listeners.remove(socket);
+                it.remove();
             }
         }
     }
