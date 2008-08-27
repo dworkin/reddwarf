@@ -1241,6 +1241,77 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals("name-1", store.nextBoundName(txn, null));
     }
 
+    public void testNextBoundNameDeadlock() throws Exception {
+	final long id2 = store.createObject(txn);
+	for (int i = 100; i < 300; i++) {
+	    store.setBinding(txn, "name-" + i, id);
+	}
+	txn.commit();
+	txn = new DummyTransaction();
+	store.setBinding(txn, "name-299", id2);
+	final Semaphore flag = new Semaphore(1);
+	flag.acquire();
+	class MyRunnable implements Runnable {
+	    Exception exception2;
+	    public void run() {
+		DummyTransaction txn2 = null;
+		try {
+		    txn2 = new DummyTransaction();
+		    store.setBinding(txn2, "name-101", id2);
+		    flag.release();
+		    String name = "name-101";
+		    while (name != null) {
+			name = store.nextBoundName(txn2, name);
+		    }
+		    txn2.commit();
+		} catch (TransactionAbortedException e) {
+		    System.err.println("txn2: " + e);
+		    exception2 = e;
+		} catch (Exception e) {
+		    System.err.println("txn2: " + e);
+		    if (txn2 != null) {
+			txn2.abort(new RuntimeException("abort txn2"));
+		    }
+		}
+	    }
+	}
+	MyRunnable runnable = new MyRunnable();
+	Thread thread = new Thread(runnable, "testNextBoundNameDeadlock");
+	thread.start();
+	Thread.sleep(10);
+	flag.acquire();
+	Exception exception = null;
+	String name = "name-100";
+	try {
+	    while (name != null) {
+		name = store.nextBoundName(txn, name);
+	    }
+	    txn.commit();
+	} catch (TransactionAbortedException e) {
+	    System.err.println("txn: " + e);
+	    exception = e;
+	} catch (Exception e) {
+	    System.err.println("txn: " + e);
+	    if (txn != null) {
+		txn.abort(new RuntimeException("abort txn"));
+	    }
+	}
+	thread.join();
+	if (exception == null && runnable.exception2 == null) {
+	    fail("Expected TransactionAbortedException");
+	} else if (runnable.exception2 != null &&
+		   !(runnable.exception2
+		     instanceof TransactionAbortedException))
+	{
+	    throw runnable.exception2;
+	} else if (exception != null &&
+		   !(exception instanceof TransactionAbortedException))
+	{
+	    throw exception;
+	}
+	txn = null;
+    }
+
     /* -- Test abort -- */
 
     public void testAbortNullTxn() throws Exception {

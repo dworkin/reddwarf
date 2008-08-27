@@ -349,7 +349,7 @@ public class DataStoreImpl
 	 */
 	void prepare(byte[] gid) {
 	    prepareFreeObjectIds();
-	    maybeCloseCursors();
+	    maybeCloseCursors(false);
 	    dbTxn.prepare(gid);
 	}
 
@@ -359,7 +359,7 @@ public class DataStoreImpl
 	 */
 	void prepareAndCommit() {
 	    prepareFreeObjectIds();
-	    maybeCloseCursors();
+	    maybeCloseCursors(false);
 	    dbTxn.commit();
 	}
 
@@ -414,7 +414,7 @@ public class DataStoreImpl
 	    freeObjectIds.abort(objectIdInfo, emptyObjectIdInfo);
 	    objectIdInfo = null;
 	    emptyObjectIdInfo = null;
-	    maybeCloseCursors();
+	    maybeCloseCursors(true);
 	    dbTxn.abort();
 	}
 
@@ -492,16 +492,38 @@ public class DataStoreImpl
 	 * since the Berkeley DB API doesn't permit closing a cursor after an
 	 * attempt to close it.
 	 */
-	private void maybeCloseCursors() {
+	private void maybeCloseCursors(boolean forAbort) {
 	    if (namesCursor != null) {
 		DbCursor c = namesCursor;
 		namesCursor = null;
-		c.close();
+		try {
+		    c.close();
+		} catch (TransactionAbortedException e) {
+		    if (forAbort) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "Ignoring exception thrown when closing" +
+			    " cursor during an abort");
+		    } else {
+			throw e;
+		    }
+		}
 	    }
 	    if (oidsCursor != null) {
 		DbCursor c = oidsCursor;
 		oidsCursor = null;
-		c.close();
+		try {
+		    c.close();
+		} catch (TransactionAbortedException e) {
+		    if (forAbort) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "Ignoring exception thrown when closing" +
+			    " cursor during an abort");
+		    } else {
+			throw e;
+		    }
+		}
 	    }
 	}
 
