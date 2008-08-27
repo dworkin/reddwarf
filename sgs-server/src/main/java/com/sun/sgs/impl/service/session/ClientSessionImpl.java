@@ -23,6 +23,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
@@ -34,6 +35,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -644,20 +646,12 @@ public class ClientSessionImpl
 	    sessionService.scheduleNonTransactionalTask(
 	        new AbstractKernelRunnable() {
 		    public void run() {
-			try {
-			    sessionServer.serviceEventQueue(idBytes);
-			} catch (IOException e) {
-			    /*
-			     * It is likely that the session's node failed.
-			     */
-			    if (logger.isLoggable(Level.FINEST)) {
-				logger.logThrow(
-				    Level.FINEST, e,
-				    "serviceEventQueue session:{0} node:{1} " +
-				    "throws", HexDumper.toHexString(idBytes),
-				    nodeId);
-			    }
-			}
+			sessionService.runIoTask(
+			    new IoRunnable() {
+				public void run() throws IOException {
+				    sessionServer.serviceEventQueue(idBytes);
+				}},
+			    nodeId);
 		    }
 		}, identity);
 	}
@@ -767,7 +761,9 @@ public class ClientSessionImpl
     /**
      * The session's event queue.
      */
-    private static class EventQueue implements ManagedObject, Serializable {
+    private static class EventQueue
+	implements ManagedObjectRemoval, Serializable
+    {
 
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -890,6 +886,19 @@ public class ClientSessionImpl
 		}
 
 		event.serviceEvent(this);
+	    }
+	}
+
+	/* -- Implement ManagedObjectRemoval -- */
+
+	/** {@inheritDoc} */
+	public void removingObject() {
+	    try {
+		DataService dataService =
+		    ClientSessionServiceImpl.getDataService();
+		dataService.removeObject(queueRef.get());
+	    } catch (ObjectNotFoundException e) {
+		// already removed.
 	    }
 	}
     }

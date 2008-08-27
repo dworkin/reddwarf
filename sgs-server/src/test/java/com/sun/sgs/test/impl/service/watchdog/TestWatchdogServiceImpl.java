@@ -127,7 +127,7 @@ public class TestWatchdogServiceImpl extends TestCase {
                 Integer.toString(SgsTestNode.getNextAppPort()));
         renewTime = Integer.valueOf(
             serviceProps.getProperty(
-                "com.sun.sgs.impl.service.watchdog.renew.interval"));
+                "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
 
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
         taskOwner = txnProxy.getCurrentOwner();
@@ -177,8 +177,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructor() throws Exception {
         WatchdogServiceImpl watchdog = null;
         try {
-            watchdog =
-                new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+            watchdog = new WatchdogServiceImpl(
+		SgsTestNode.getDefaultProperties(
+		    "TestWatchdogServiceImpl", null, null),
+		systemRegistry, txnProxy);  
             WatchdogServerImpl server = watchdog.getServer();
             System.err.println("watchdog server: " + server);
             server.shutdown();
@@ -323,7 +325,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
-    public void testConstructorStartServerRenewIntervalTooLarge()
+    public void testConstructorStartServerWithLargeRenewInterval()
 	throws Exception
     {
         WatchdogServiceImpl watchdog = null;
@@ -332,13 +334,13 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, "20000",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
-	    WatchdogServerPropertyPrefix + ".renew.interval", "10001");
+	    WatchdogServerPropertyPrefix + ".renew.interval",
+		Integer.toString(Integer.MAX_VALUE));
 	try {
 	    watchdog =
                 new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
-	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
+	    fail("Unexpected IllegalArgumentException");
 	} finally {
             if (watchdog != null) watchdog.shutdown();
         }
@@ -367,7 +369,10 @@ public class TestWatchdogServiceImpl extends TestCase {
 		}}, taskOwner);
 
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    new WatchdogServiceImpl(
+		SgsTestNode.getDefaultProperties(
+		    "TestWatchdogServiceImpl", null, null),
+		systemRegistry, txnProxy);  
 	watchdog.shutdown();
     }
 
@@ -432,7 +437,10 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     public void testGetLocalNodeIdServiceShuttingDown() throws Exception {
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	    new WatchdogServiceImpl(
+		SgsTestNode.getDefaultProperties(
+		    "TestWatchdogServiceImpl", null, null),
+		systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.getLocalNodeId();
@@ -493,8 +501,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testIsLocalNodeAliveServiceShuttingDown() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.isLocalNodeAlive();
@@ -526,6 +536,10 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             StandardProperties.APP_PORT, 
                 Integer.toString(SgsTestNode.getNextAppPort()),
+	    "com.sun.sgs.impl.service.nodemap.client.port",
+	        String.valueOf(SgsTestNode.getNextUniquePort()),
+	    "com.sun.sgs.impl.service.watchdog.client.port",
+	        String.valueOf(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
@@ -552,8 +566,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testIsLocalNodeAliveNonTransactionalServiceShuttingDown()
 	throws Exception
     {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.isLocalNodeAliveNonTransactional();
@@ -607,8 +623,10 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 
     public void testGetNodesServiceShuttingDown() throws Exception {
-	final WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy);
 	watchdog.shutdown();
 
         txnScheduler.runTask(new AbstractKernelRunnable() {
@@ -659,8 +677,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testGetNodeServiceShuttingDown() throws Exception {
-	final WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy);
 	watchdog.shutdown();
         txnScheduler.runTask(new AbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -698,8 +718,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test addNodeListener -- */
 
     public void testAddNodeListenerServiceShuttingDown() throws Exception {
-	final WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy);
 	watchdog.shutdown();
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() throws Exception {
@@ -843,8 +865,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- test addRecoveryListener -- */
 
     public void testAddRecoveryListenerServiceShuttingDown() throws Exception {
-	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);
+	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
+	    SgsTestNode.getDefaultProperties(
+		"TestWatchdogServiceImpl", null, null),
+	    systemRegistry, txnProxy);
 	watchdog.shutdown();
 	try {
 	    watchdog.addRecoveryListener(new DummyRecoveryListener());
@@ -1103,6 +1127,10 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testReuseHostPort() throws Exception {
         addNodes(null, 1);
         Properties props = additionalNodes[0].getServiceProperties();
+	props.setProperty("com.sun.sgs.impl.service.nodemap.client.port",
+			  String.valueOf(SgsTestNode.getNextUniquePort()));
+	props.setProperty("com.sun.sgs.impl.service.watchdog.client.port",
+			  String.valueOf(SgsTestNode.getNextUniquePort()));
         SgsTestNode node = null;
         try {
             node = new SgsTestNode(serverNode, null, props);
@@ -1133,15 +1161,16 @@ public class TestWatchdogServiceImpl extends TestCase {
         SgsTestNode node = null;
         SgsTestNode node1 = null;
         try {
-            node = new SgsTestNode(appName, null,
-                                   getPropsForApplication(appName), true);
+ 	    Properties props = getPropsForApplication(appName);
+	    node = new SgsTestNode(appName, null, props, true);
             
             // This node is independent of the one above;  it'll have a new
             // server.  We expect to see a socket BindException rather
             // than an IllegalArgumentException.
-            node1 = new SgsTestNode(appName, null,
-                                    getPropsForApplication(appName + "1"),
-                                    true);
+ 	    Properties props1 = getPropsForApplication(appName + "1");
+ 	    props1.setProperty(StandardProperties.APP_PORT,
+ 			       props.getProperty(StandardProperties.APP_PORT));
+	    node1 = new SgsTestNode(appName, null, props1, true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {
             System.err.println(e);
@@ -1152,7 +1181,7 @@ public class TestWatchdogServiceImpl extends TestCase {
                 target = ((InvocationTargetException) target).getTargetException();
             }
             if (!(target instanceof BindException)) {
-                fail("Expected BindException");
+                fail("Expected BindException, got " + target);
             }
         } finally {
             if (node != null) {
@@ -1216,6 +1245,12 @@ public class TestWatchdogServiceImpl extends TestCase {
             // to see the failed node - the entire system crashed, and the
             // check for reuse is implemented with a transient data structure.
             System.err.println("attempting to restart failed single node");
+	    props.setProperty(
+		"com.sun.sgs.impl.service.nodemap.server.port",
+		String.valueOf(SgsTestNode.getNextUniquePort()));
+	    props.setProperty(
+		"com.sun.sgs.impl.service.watchdog.server.port",
+		String.valueOf(SgsTestNode.getNextUniquePort()));
             node1 = new SgsTestNode(appName, null, null, props, false);
         } finally {
             if (node1 != null) {
@@ -1228,10 +1263,13 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     /** Creates node properties with a db directory based on the app name. */
-    private Properties getPropsForApplication(String appName) {
+    private Properties getPropsForApplication(String appName)
+	throws Exception
+    {
         String dir = System.getProperty("java.io.tmpdir") +
             File.separator + appName + ".db";
-        Properties props = new Properties(serviceProps);
+        Properties props =
+	    SgsTestNode.getDefaultProperties(appName, null, null);
         props.setProperty(
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
             dir);

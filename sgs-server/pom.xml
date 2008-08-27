@@ -66,7 +66,9 @@
             </manifest>
 	    <manifestEntries>
 	      <Class-Path>
-		bdb/db.jar sgs-shared-${sgs-shared.version}.jar
+		bdb/db.jar
+		je-${bdb.je.version}.jar
+		sgs-shared-${sgs-shared.version}.jar
 	      </Class-Path>
 	    </manifestEntries>
           </archive>
@@ -166,10 +168,15 @@
 	      <name>java.io.tmpdir</name>
 	      <value>${test.output}</value>
 	    </property>
+	    <property>
+	      <name>com.sun.sgs.txn.timeout</name>
+	      <value>${com.sun.sgs.txn.timeout}</value>
+	    </property>
 	  </systemProperties>
 	  <argLine>
 	    ${test.jvm.args} -Djava.library.path=${run.javapath}
 	  </argLine>
+	  <reportsDirectory>${test.reports}</reportsDirectory>
         </configuration>
       </plugin>
 
@@ -236,9 +243,13 @@
 	 tests, for storing database files, etc.  The directory is
 	 removed and recreated for each test run. -->
     <test.output>target/test-output</test.output>
+    <!-- The directory for storing tests results -->
+    <test.reports>target/test-reports</test.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>
+    <!-- The default transaction timeout -->
+    <com.sun.sgs.txn.timeout>100</com.sun.sgs.txn.timeout>
   </properties>
 
 </project>

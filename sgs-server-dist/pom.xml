@@ -61,10 +61,24 @@
   </dependencies>
 
 
-  <!-- Zip artifact is generated with the assembly plugin
-       and assembled according to the dist.xml assembly descriptor -->
   <build>
     <plugins>
+
+    <!-- Unpack the Berkeley DB binaries first so that they are
+	 available for use by the assembly plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-dependency-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>unpack-bdb-binaries</id>
+	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Zip artifact is generated with the assembly plugin
+	   and assembled according to the dist.xml assembly descriptor -->
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
         <configuration>

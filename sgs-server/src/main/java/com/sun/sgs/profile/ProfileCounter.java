@@ -35,7 +35,7 @@ public interface ProfileCounter {
      *
      * @return the counter's name
      */
-    public String getCounterName();
+    String getCounterName();
 
     /**
      * Returns whether this is a task-local counter.
@@ -43,18 +43,18 @@ public interface ProfileCounter {
      * @return <code>true</code> if this counter is task-local,
      *         <code>false</code> if this counter is aggregated
      */
-    public boolean isTaskLocal();
+    boolean isTaskLocal();
 
     /**
      * Increments the counter by <code>1</code>.
      */
-    public void incrementCount();
+    void incrementCount();
 
     /**
      * Increments the counter by the given value.
      *
      * @param value the amount to increment the counter
      */
-    public void incrementCount(long value);
+    void incrementCount(long value);
 
 }

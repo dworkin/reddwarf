@@ -26,6 +26,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 import java.util.HashSet;
+import java.util.Iterator;
 
 
 /**
@@ -35,10 +36,12 @@ import java.util.HashSet;
  * intended only as a means for reporting in testing and development
  * systems. In deployment, a more robust mechanism should be used.
  */
-public class NetworkReporter {
+public final class NetworkReporter {
 
     // the set of connected clients
     private HashSet<Socket> listeners;
+    private final ServerSocket serverSocket;
+    private final Thread reporterThread;
 
     /**
      * Creates an instance of <code>NetworkReporter</code>.
@@ -51,8 +54,9 @@ public class NetworkReporter {
         throws IOException
     {
         listeners = new HashSet<Socket>();
-        (new Thread(new NetworkReporterRunnable(new ServerSocket(port)))).
-            start();
+        serverSocket = new ServerSocket(port);
+        reporterThread = new Thread(new NetworkReporterRunnable());
+        reporterThread.start();
     }
 
     /**
@@ -63,27 +67,37 @@ public class NetworkReporter {
      * @param message the message to send
      */
     public synchronized void report(String message) {
-        for (Socket socket : listeners) {
+        Iterator<Socket> it = listeners.iterator();
+        while (it.hasNext()) {
+            Socket socket = it.next();
             try {
                 OutputStream stream = socket.getOutputStream();
                 stream.write(message.getBytes());
                 stream.flush();
             } catch (IOException ioe) {
-                listeners.remove(socket);
+                it.remove();
             }
         }
     }
 
+    /**
+     * Cleans up.
+     */
+    public void shutdown() {
+        try {
+            reporterThread.interrupt();
+            serverSocket.close();
+        } catch (IOException ioe) {
+            // do nothing
+        }
+    }
     /**
      * A private class used to run the long-lived server task. It simply
      * listens for connecting clients, and adds them to the set of connected
      * clients. If accepting a client fails, then the server socket is closed.
      */
     private class NetworkReporterRunnable implements Runnable {
-        private final ServerSocket serverSocket;
-        NetworkReporterRunnable(ServerSocket serverSocket) {
-            this.serverSocket = serverSocket;
-        }
+        NetworkReporterRunnable() { }
         public void run() {
             try {
                 while (true) {
@@ -94,7 +108,7 @@ public class NetworkReporter {
             } catch (IOException e) {
                 try {
                     serverSocket.close();
-                } catch (IOException ioe) {}
+                } catch (IOException ioe) { }
             }
         }
     }

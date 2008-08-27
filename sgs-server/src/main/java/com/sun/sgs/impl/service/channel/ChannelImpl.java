@@ -24,11 +24,13 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -37,11 +39,13 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
@@ -50,10 +54,11 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Set;
@@ -357,27 +362,17 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return;
 	    }
 	    final long coord = coordNodeId;
-	    ChannelServiceImpl.getTaskService().scheduleNonDurableTask(
+	    final ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    channelService.getTaskService().scheduleNonDurableTask(
 	        new AbstractKernelRunnable() {
-		    public void run() {
-			try {
-			    coordinator.serviceEventQueue(channelId);
-			} catch (IOException e) {
-			    /*
-			     * It is likely that the coordinator's node failed
-			     * and hasn't recovered yet.   When the
-			     * coordinator recovers, it will resume
-			     * servicing events, so ignore this exception.
-			     */
-			    if (logger.isLoggable(Level.FINEST)) {
-				logger.logThrow(
-				    Level.FINEST, e,
-				    "serviceEventQueue channel:{0} coord:{1} " +
-				    "throws", HexDumper.toHexString(channelId),
-				    coord);
-			    }
-			}
-		    }
+		  public void run() {
+		      channelService.runIoTask(
+ 			new IoRunnable() {
+			  public void run() throws IOException {
+			      coordinator.serviceEventQueue(channelId);
+			  }}, coord);
+		  }
 		}, false);
 	}
     }
@@ -608,11 +603,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * com.sun.sgs.impl.service.channel.
      *		session.<channelId>.
      */
-    private String getSessionPrefix() {
+    private static String getSessionPrefix(byte[] channelId) {
 	return PKG_NAME +
 	    SESSION_COMPONENT + HexDumper.toHexString(channelId) + ".";
     }
 
+    /**
+     * Returns the prefix for accessing all client sessions on this
+     * channel.  The prefix has the following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		session.<channelId>.
+     */
+    private String getSessionPrefix() {
+	return getSessionPrefix(channelId);
+    }
+    
     /**
      * Returns the prefix for accessing all the client sessions on
      * this channel that are connected to the node with the specified
@@ -621,8 +627,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * com.sun.sgs.impl.service.channel.
      *		session.<channelId>.<nodeId>.
      */
-    private String getSessionNodePrefix(long nodeId) {
-	return getSessionPrefix() + nodeId + ".";
+    private static String getSessionNodePrefix(byte[] channelId, long nodeId) {
+	return getSessionPrefix(channelId) + nodeId + ".";
     }
 
     /**
@@ -646,10 +652,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      *		session.<channelId>.<nodeId>.<sessionId>
      */
     private String getSessionKey(long nodeId, byte[] sessionIdBytes) {
-	return getSessionNodePrefix(nodeId) +
+	return getSessionNodePrefix(channelId, nodeId) +
 	    HexDumper.toHexString(sessionIdBytes);
     }
 
+    /**
+     * Returns a prefix for accessing the event queues for channels
+     * coordinated on the given {@code nodeId}.  The prefix has the
+     * following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		eventq.<nodeId>.
+     */
     private static String getEventQueuePrefix(long nodeId) {
 	return PKG_NAME + QUEUE_COMPONENT + nodeId + ".";
     }
@@ -659,7 +673,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * coordinator.  The key has the following form:
      *
      * com.sun.sgs.impl.service.channel.
-     *		queue.<coordNodeId>.<channelId>
+     *		eventq.<coordNodeId>.<channelId>
      */
     private String getEventQueueKey() {
 	return getEventQueueKey(coordNodeId, channelId);
@@ -671,50 +685,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * nodeId}. The key has the following form:
      *
      * com.sun.sgs.impl.service.channel.
-     *		queue.<nodeId>.<channelId>
+     *		eventq.<nodeId>.<channelId>
      */
     private static String getEventQueueKey(long nodeId, byte[] channelId) {
 	return getEventQueuePrefix(nodeId) +
 	    HexDumper.toHexString(channelId);
-    }
-
-    /**
-     * Returns the prefix for accessing channel sets for all sessions
-     * connected to the node with the specified {@code nodeId}.  The
-     * prefix has the following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		set.<nodeId>.
-     */
-    private static String getChannelSetPrefix(long nodeId) {
-	return PKG_NAME +
-	    SET_COMPONENT + nodeId + ".";
-    }
-
-    /**
-     * Returns a key for accessing the channel set for the specified
-     * {@code session}.  The key has the following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		set.<nodeId>.<sessionId>
-     */
-    private static String getChannelSetKey(ClientSession session) {
-	return getChannelSetKey(
-	    getNodeId(session), getSessionIdBytes(session));
-    }
-
-    /**
-     * Returns a key for accessing the channel set for the session
-     * with the specified {@code sessionIdBytes} that is connected to
-     * the node with the specified {@code nodeId}.  The key has the
-     * following form:
-     *
-     * com.sun.sgs.impl.service.channel.
-     *		set.<nodeId>.<sessionId>
-     */
-    private static String getChannelSetKey(long nodeId, byte[] sessionIdBytes) {
-	return getChannelSetPrefix(nodeId) +
-	    HexDumper.toHexString(sessionIdBytes);
     }
 
     /* -- Other methods -- */
@@ -811,27 +786,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
 
-	/*
-	 * Add channel to session's channel set.
-	 */
-	String channelSetKey = getChannelSetKey(session);
-	ChannelSet channelSet;
-	try {
-	    channelSet =
-		(ChannelSet) dataService.getServiceBinding(channelSetKey);
-	} catch (NameNotBoundException e) {
-	    channelSet = new ChannelSet(dataService, session);
-	    dataService.setServiceBinding(channelSetKey, channelSet);
-	} catch (ObjectNotFoundException e) {
-	    logger.logThrow(
-		Level.SEVERE, e,
-		"ChannelSet binding:{0} exists, but object removed",
-		channelSetKey);
-	    throw e;
-	}
-	if (channelSet.add(this)) {
-	    dataService.markForUpdate(channelSet);
-	}
 	return true;
     }
 
@@ -845,6 +799,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
+     * Removes the binding with the given {@code sessionKey} (and the
+     * associated object) and throws {@code NameNotBoundException} if the
+     * key is not bound.
+     */
+    private void removeSessionBinding(String sessionKey) {
+	ClientSessionInfo sessionInfo = (ClientSessionInfo)
+	    dataService.getServiceBinding(sessionKey);
+	dataService.removeServiceBinding(sessionKey);
+	dataService.removeObject(sessionInfo);
+    }
+
+    /**
      * Removes from this channel the member session with the specified
      * {@code sessionIdBytes} that is connected to the node with the
      * specified {@code nodeId}, notifies the session's server that the
@@ -853,11 +819,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * invoked.  If the session is not a member of this channel, then no
      * action is taken and {@code false} is returned.
      */
-    private boolean removeSession(long nodeId, final byte[] sessionIdBytes) {
+    private boolean removeSession(
+	final long nodeId, final byte[] sessionIdBytes)
+    {
 	// Remove session binding.
 	String sessionKey = getSessionKey(nodeId, sessionIdBytes);
 	try {
-	    dataService.removeServiceBinding(sessionKey);
+	    removeSessionBinding(sessionKey);
 	} catch (NameNotBoundException e) {
 	    return false;
 	}
@@ -872,30 +840,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    servers.remove(nodeId);
 	}
 
-	/*
-	 * Remove channel from session's channel set.  If the channel
-	 * is the last one to be removed from the session's channel
-	 * set, then remove the channel set object and binding.
-	 */
-	try {
-	    String channelSetKey = getChannelSetKey(nodeId, sessionIdBytes);
-	    ChannelSet channelSet =
-		(ChannelSet) dataService.getServiceBinding(channelSetKey);
-	    boolean removed = channelSet.remove(this);
-	    if (channelSet.isEmpty()) {
-		dataService.removeServiceBinding(channelSetKey);
-		dataService.removeObject(channelSet);
-	    } else if (removed) {
-		dataService.markForUpdate(channelSet);
-	    }
-
-	} catch (NameNotBoundException e) {
-	    logger.logThrow(
-		Level.WARNING, e,
-		"Channel set for session:{0} prematurely removed",
-		HexDumper.toHexString(sessionIdBytes));
-	}
-
 	final ChannelServer server = getChannelServer(nodeId);
 	/*
 	 * If there is no channel server for the session's node,
@@ -905,26 +849,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * the failed server.
 	 */
 	if (server != null) {
-	    ChannelServiceImpl.addChannelTask(
+	    ChannelServiceImpl.getChannelService().addChannelTask(
 		new BigInteger(1, channelId),
-		new AbstractKernelRunnable() {
-		    public void run() {
-			try {
-			    server.leave(channelId, sessionIdBytes);
-			} catch (IOException e) {
-			    /*
-			     * If the channel server can't be contacted, it
-			     * has failed or is shut down, so there is no
-			     * need to contact it to update its membership
-			     * cache, so ignore this exception.
-			     */
-			    logger.logThrow(
-			        Level.FINE, e,
-				"unable to contact channel server:{0} to " +
-				"handle event:{1}", server, this);
-			}
-		    }
-		});
+		new IoRunnable() {
+		    public void run() throws IOException {
+			server.leave(channelId, sessionIdBytes);
+		    }},
+		nodeId);
 	}
 	return true;
     }
@@ -1018,28 +949,27 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Removes the client session with the specified {@code
-     * sessionIdBytes} that is connected to the node with the
-     * specified {@code nodeId} from all channels that it is currently
-     * a member of.  This method is invoked when a session is
-     * disconnected from this node, gracefully or otherwise, or if
-     * this node is recovering for a failed node whose sessions all
-     * became disconnected.
+     * Removes the client session with the specified {@code sessionIdBytes}
+     * from the channel with the specified {@code channelRefId}.  This
+     * method is invoked when a session is disconnected from this node
+     * (with the specified {@code nodeId}) gracefully or otherwise, or if
+     * this node is recovering for a failed node whose sessions all became
+     * disconnected.  The {@code nodeId} specifies the node that the
+     * session was previously connected to, which is not necessarily
+     * the local node's ID.
      *
      * This method should be called within a transaction.
      */
-    static void removeSessionFromAllChannels(
-	long nodeId, byte[] sessionIdBytes)
+    static void removeSessionFromChannel(
+	long nodeId, byte[] sessionIdBytes, BigInteger channelRefId)
     {
-	Set<byte[]> channelIds = getChannelsForSession(nodeId, sessionIdBytes);
-	for (byte[] channelId : channelIds) {
-	    ChannelImpl channel = (ChannelImpl) getObjectForId(
-		new BigInteger(1, channelId));
-	    if (channel != null) {
-		channel.removeSession(nodeId, sessionIdBytes);
-	    } else {
+	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
+	if (channel != null) {
+	    channel.removeSession(nodeId, sessionIdBytes);
+	} else {
+	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "channel already removed:{0}",
-			   HexDumper.toHexString(channelId));
+		    HexDumper.toHexString(channelRefId.toByteArray()));
 	    }
 	}
     }
@@ -1049,6 +979,17 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private static long getLocalNodeId() {
 	return ChannelServiceImpl.getLocalNodeId();
+    }
+
+    /**
+     * Returns {@code true} if the node with the associated {@code nodeId}
+     * is alive, otherwise returns {@code false}.
+     *
+     * This method must be called from outside a transaction or an
+     * {@code IllegalStateException} will be thrown.
+     */
+    private static boolean isAlive(long nodeId) {
+	return ChannelServiceImpl.getChannelService().isAlive(nodeId);
     }
 
     /**
@@ -1078,46 +1019,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns a set containing the IDs of each channel that the
-     * client session (specified by {@code nodeId} and {@code
-     * sessionIdBytes} is a member of.
+     * Returns a list containing the node IDs of the channel servers for
+     * this channel. 
      */
-    private static Set<byte[]> getChannelsForSession(
-		long nodeId, byte[] sessionIdBytes)
-    {
-	DataService dataService = ChannelServiceImpl.getDataService();
-	ChannelSet channelSet = null;
-
-	try {
-	    String channelSetKey = getChannelSetKey(nodeId, sessionIdBytes);
-	    channelSet =
-		(ChannelSet) dataService.getServiceBinding(channelSetKey);
-	} catch (NameNotBoundException e) {
-	    // ignore; session may not be a member of any channel
-	}
-
-	if (channelSet != null) {
-	    return channelSet.getChannelIds();
-	} else {
-	    Set<byte[]> emptySet = Collections.emptySet();
-	    return emptySet;
-	}
+    private List<Long> getChannelServerNodeIds() {
+	return new ArrayList<Long>(servers);
     }
-
-    /**
-     * Returns a set containing all the channel servers for this channel.
-     */
-    private Set<ChannelServer> getChannelServers() {
-	Set<ChannelServer> channelServers = new HashSet<ChannelServer>();
-	for (Long nodeId : servers) {
-	    ChannelServer channelServer = getChannelServer(nodeId);
-	    if (channelServer != null) {
-		channelServers.add(channelServer);
-	    }
-	}
-	return channelServers;
-    }
-
+    
     /**
      * Removes all sessions from this channel and clears the list of
      * channel servers for this channel.  This method should be called
@@ -1171,7 +1079,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * to the node with the specified {@code nodeId}.
      */
     private boolean hasSessionsOnNode(long nodeId) {
-	String keyPrefix = getSessionNodePrefix(nodeId);
+	String keyPrefix = getSessionNodePrefix(channelId, nodeId);
 	return dataService.nextServiceBoundName(keyPrefix).
 	    startsWith(keyPrefix);
     }
@@ -1338,47 +1246,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return null;
 	    }
 	}
-    }
 
-    /**
-     * Contains a set of channels (by ID) that a session is a member of.
-     */
-    private static class ChannelSet extends ClientSessionInfo {
-
-	private static final long serialVersionUID = 1L;
-
-	/** The set of channel IDs that the client session is a member of. */
-	private final Set<BigInteger> set = new HashSet<BigInteger>();
-
-	ChannelSet(DataService dataService, ClientSession session) {
-	    super(dataService, session);
-	}
-
-	boolean add(ChannelImpl channel) {
-	    return set.add(new BigInteger(1, channel.channelId));
-	}
-
-	boolean remove(ChannelImpl channel) {
-	    return set.remove(new BigInteger(1, channel.channelId));
-	}
-
-	Set<byte[]> getChannelIds() {
-	    HashSet<byte[]> ids = new HashSet<byte[]>();
-	    for (BigInteger refId : set) {
-		ids.add(refId.toByteArray());
-	    }
-	    return ids;
-	}
-
-	boolean isEmpty() {
-	    return set.isEmpty();
+	/** {@inheritDoc} */
+	@Override
+	public String toString() {
+	    return getClass().getName() +
+		"[" + HexDumper.toHexString(sessionIdBytes) + "]";
 	}
     }
-
+    
     /**
      * The channel's event queue.
      */
-    private static class EventQueue implements ManagedObject, Serializable {
+    private static class EventQueue
+	implements ManagedObjectRemoval, Serializable
+    {
 
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -1523,36 +1405,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     */
 	    boolean serviceAllEvents = sendRefresh;
 	    if (sendRefresh) {
-		final Set<ChannelServer> channelServers =
-		    channel.getChannelServers();
-		final BigInteger channelRefId = getChannelRefId();
+		BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
 		final String channelName = channel.name;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelIdBytes));
 		}
-		ChannelServiceImpl.addChannelTask(
-		    channelRefId,
-		    new AbstractKernelRunnable() {
-			public void run() {
-			    for (ChannelServer server : channelServers) {
-				try {
+		for (final long nodeId : channel.getChannelServerNodeIds()) {
+		    channelService.addChannelTask(
+		    	channelRefId,
+			new IoRunnable() {
+			    public void run() throws IOException {
+				ChannelServer server = getChannelServer(nodeId);
+				if (server != null) {
 				    server.refresh(channelName, channelIdBytes);
-				} catch (IOException e) {
-				    /*
-				     * It is possible that the channel server's
-				     * node is no longer running (because of
-				     * shutdown/crash), so ignore this exception
-				     * and continue.
-				     */
-				    logger.log(
-					Level.FINE,
-					"unable to contact server:{0}", server);
 				}
-			    }
-			}
-		    });
+			    }},
+			nodeId);
+		}
 		dataService.markForUpdate(this);
 		sendRefresh = false;
 	    }
@@ -1585,6 +1456,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		event.serviceEvent(this);
 
 	    } while (serviceAllEvents || --eventsToService > 0);
+	}
+
+	/* -- Implement ManagedObjectRemoval -- */
+
+	/** {@inheritDoc} */
+	public void removingObject() {
+	    try {
+		DataService dataService = ChannelServiceImpl.getDataService();
+		dataService.removeObject(queueRef.get());
+	    } catch (ObjectNotFoundException e) {
+		// already removed.
+	    }
 	}
     }
 
@@ -1647,7 +1530,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    if (!channel.addSession(session)) {
 		return;
 	    }
-	    final long nodeId = getNodeId(session);
+	    long nodeId = getNodeId(session);
 	    final ChannelServer server = getChannelServer(nodeId);
 	    if (server == null) {
 		/*
@@ -1659,27 +1542,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 */
 		return;
 	    }
-	    ChannelServiceImpl.addChannelTask(
+	    final String channelName = channel.name;
+	    final byte[] channelIdBytes = channel.channelId;
+	    ChannelServiceImpl.getChannelService().addChannelTask(
 		eventQueue.getChannelRefId(),
-		new AbstractKernelRunnable() {
-		    public void run() {
-		        try {
-			    server.join(channel.name, channel.channelId,
-					sessionId);
-			} catch (IOException e) {
-			    /*
-			     * If the channel server can't be contacted, it
-			     * has failed or is shut down, so there is no
-			     * need to contact it to update its membership
-			     * cache, so ignore this exception.
-			     */
-			    logger.logThrow(
-			        Level.FINE, e,
-				"unable to contact channel server:{0} to " +
-				"handle event:{1}", server, this);
-			}
-		    }
-		});
+		new IoRunnable() {
+		    public void run() throws IOException {
+			server.join(channelName, channelIdBytes, sessionId);
+		    }},
+		nodeId);
 	}
 
 	/** {@inheritDoc} */
@@ -1747,32 +1618,23 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 
-	    final ChannelImpl channel = eventQueue.getChannel();
+	    ChannelImpl channel = eventQueue.getChannel();
 	    channel.removeAllSessions();
-	    final Set<ChannelServer> servers = channel.getChannelServers();
-	    ChannelServiceImpl.addChannelTask(
-		eventQueue.getChannelRefId(),
-		new AbstractKernelRunnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
-			    try {
-				server.leaveAll(channel.channelId);
-			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted,
-				 * it has failed or is shut down, so there
-				 * is no need to contact it to update its
-				 * membership cache, so ignore this
-				 * exception and continue.
-				 */
-				logger.logThrow(
-				    Level.FINE, e,
-				    "unable to contact channel server:{0} " +
-				    "to handle event:{1}", server, this);
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    final byte[] channelIdBytes = channel.channelId;
+	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+		channelService.addChannelTask(
+		    eventQueue.getChannelRefId(),
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.leaveAll(channelIdBytes);
 			    }
-			}
-		    }
-		});
+			}},
+		    nodeId);
+	    }
 	}
 
 	/** {@inheritDoc} */
@@ -1820,7 +1682,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Verfiy that the sending session (if any) is a member of this
 	     * channel.
 	     */
-	    final ChannelImpl channel = eventQueue.getChannel();
+	    ChannelImpl channel = eventQueue.getChannel();
 	    if (senderId != null) {
 		ClientSession sender =
 		    (ClientSession) getObjectForId(new BigInteger(1, senderId));
@@ -1832,35 +1694,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue a channel task to forward the message to the
 	     * channel's servers for delivery.
 	     */
-	    final Set<ChannelServer> servers = channel.getChannelServers();
-	    ChannelServiceImpl.addChannelTask(
-		eventQueue.getChannelRefId(),
-		new AbstractKernelRunnable() {
-		    public void run() {
-			for (ChannelServer server : servers) {
-			    try {
-				server.send(channel.channelId, message);
-			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted, it
-				 * has failed or is shut down and the sessions
-				 * connected to that node have been
-				 * disconnected, so there is no need to contact
-				 * it to forward the message to its local
-				 * member sessions, so ignore this exception
-				 * and continue.
-				 */
-				logger.logThrow(
-				    Level.FINE, e,
-				    "unable to contact channel server:{0} " +
-				    "to handle event:{1}", server, this);
+	    ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    final byte[] channelIdBytes = channel.channelId;
+	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+		channelService.addChannelTask(
+		    eventQueue.getChannelRefId(),
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.send(channelIdBytes, message);
 			    }
-			    // TBD: need to update queue that all
-			    // channel servers have been notified of
-			    // the 'send'.
-			}
-		    }
-		});
+			}},
+		    nodeId);
+	    }
+
+	    // TBD: need to add a task to update queue that all
+	    // channel servers have been notified of
+	    // the 'send'.
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -1901,35 +1753,31 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public void serviceEvent(EventQueue eventQueue) {
 
-	    final ChannelImpl channel = eventQueue.getChannel();
-	    final Set<ChannelServer> servers = channel.getChannelServers();
+	    ChannelImpl channel = eventQueue.getChannel();
 	    final BigInteger channelRefId = eventQueue.getChannelRefId();
 	    channel.removeChannel();
-	    ChannelServiceImpl.addChannelTask(
+	    final ChannelServiceImpl channelService =
+		ChannelServiceImpl.getChannelService();
+	    final byte[] channelIdBytes = channel.channelId;
+	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+		channelService.addChannelTask(
+		    channelRefId,
+		    new IoRunnable() {
+			public void run() throws IOException {
+			    ChannelServer server = getChannelServer(nodeId);
+			    if (server != null) {
+				server.close(channelIdBytes);
+			    }
+			}},
+		    nodeId);
+	    }
+	    
+	    channelService.addChannelTask(
 		channelRefId,
 		new AbstractKernelRunnable() {
 		    public void run() {
-			for (ChannelServer server : servers) {
-			    try {
-				server.close(channel.channelId);
-			    } catch (IOException e) {
-				/*
-				 * If a channel server can't be contacted,
-				 * it has failed or is shut down, so there
-				 * is no need to contact it to update its
-				 * membership cache, so ignore this
-				 * exception and continue.
-				 */
-				logger.logThrow(
-			            Level.FINE, e,
-				    "unable to contact channel server:{0} " +
-				    "to handle event:{1}", server, this);
-			    }
-			}
-			ChannelServiceImpl.getChannelService().
-			    closedChannel(channelRefId);
-		    }
-		});
+			channelService.closedChannel(channelRefId);
+		    }});
 	}
 
 	/** {@inheritDoc} */
@@ -2004,65 +1852,285 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the next service bound name that starts with the given
-     * {@code prefix}, or {@code null} if there is none.
+     * Returns the next service bound name after the given {@code key} that
+     * starts with the given {@code prefix}, or {@code null} if there is none.
      */
     private static String nextServiceBoundNameWithPrefix(
-	DataService dataService, String prefix)
+ 	DataService dataService, String key, String prefix)
     {
-	String name = dataService.nextServiceBoundName(prefix);
+	String name = dataService.nextServiceBoundName(key);
 	return
 	    (name != null && name.startsWith(prefix)) ? name : null;
     }
 
     /**
-     * Removes the next client session for the specified {@code nodeId}
-     * from all channels that it is currently a member of and returns
-     * {@code true}.  If there is no client session for the specified
-     * {@code nodeId}, then {@code false} is returned.
+     * A persistent task to reassign channel coordinators on a failed node
+     * to another node. In a single task, only one failed coordinator is
+     * reassigned.  A task for one coordinator schedules a task for the
+     * next reassignment, if there are coordinators on the failed node left
+     * to be reassigned.
      */
-    static boolean removeNextSessionFromAllChannels(
-	DataService dataService, long nodeId)
+    static class ReassignCoordinatorsTask
+	implements Task, Serializable
     {
-	String key = nextServiceBoundNameWithPrefix(
-	    dataService, getChannelSetPrefix(nodeId));
-	if (key == null) {
-	    return false;
+	/** The serialVersionUID for this class. */
+	private final static long serialVersionUID = 1L;
+
+	/** The node ID of the failed node. */
+	private final long nodeId;
+
+	/**
+	 * Constructs an instance of this class with the specified
+	 * {@code nodeId} of the failed node.
+	 */
+	ReassignCoordinatorsTask(long nodeId) {
+	    this.nodeId = nodeId;
 	}
-	ChannelSet channelSet =
-	    (ChannelSet) dataService.getServiceBinding(key);
-	removeSessionFromAllChannels(nodeId, channelSet.sessionIdBytes);
-	return true;
+
+	/**
+	 * Reassigns the next coordinator for the {@code nodeId} to another
+	 * node with member sessions (or the local node if there are no
+	 * member sessions), schedules a task to remove failed sessions for
+	 * the channel, and then reschedules this task to reassign the next
+	 * coordinator.  If there are no more coordinators for the
+	 * specified {@code nodeId}, then no action is taken.
+	 */
+	public void run() {
+	    WatchdogService watchdogService =
+		ChannelServiceImpl.getWatchdogService();
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    TaskService taskService = ChannelServiceImpl.getTaskService();
+	    String prefix = getEventQueuePrefix(nodeId);
+	    String key = nextServiceBoundNameWithPrefix(
+ 		dataService, prefix, prefix);
+	    if (key == null) {
+		return;
+	    }
+	    EventQueue eventQueue =
+		(EventQueue) dataService.getServiceBinding(key);
+	    BigInteger channelRefId = eventQueue.getChannelRefId();
+	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
+	    if (channel != null) {
+		channel.reassignCoordinator(nodeId);
+		byte[] channelId = channel.channelId;
+		// Schedule a task to remove failed sessions for channel.
+		taskService.scheduleTask(
+		    new RemoveFailedSessionsFromChannelTask(
+			channelId, nodeId, channelRefId));
+		/*
+		 * If other channel servers have failed, remove their
+		 * sessions too.  This covers the case where a channel
+		 * coordinator (informed of a node failure) fails before it
+		 * has a chance to schedule a task to remove member
+		 * sessions for another failed node (cascading failure
+		 * during recovery).
+		 */
+		for (long serverNodeId : channel.servers) {
+		    if (serverNodeId != nodeId) {
+			Node serverNode = watchdogService.getNode(serverNodeId);
+			if (serverNode == null || !serverNode.isAlive()) {
+			    taskService.scheduleTask(
+			        new RemoveFailedSessionsFromChannelTask(
+				    channelId, serverNodeId, channelRefId));
+			}
+		    }
+		}
+	    } else {
+		// channel removed, so just remove the service binding.
+		dataService.removeServiceBinding(key);
+	    }
+	    // Schedule a task to reassign the next channel coordinator.
+	    taskService.scheduleTask(this);
+	}
     }
 
     /**
-     * Reassigns the next coordinator for the specified {@code nodeId} to
-     * another node with member sessions, or the local node if there are no
-     * member sessions and returns {@code true}.  If there is no
-     * coordinator for the specified {@code nodeId}, then {@code false} is
-     * returned.
+     * A persistent task to remove sessions, connected to a failed node,
+     * from locally coordinated channels.  This task handles a single
+     * locally-coordinated channel, and then schedules another task to
+     * handle the next one.
      */
-    static boolean reassignNextCoordinator(
-	DataService dataService, long nodeId)
+    static class RemoveFailedSessionsFromLocalChannelsTask
+	implements Task, Serializable
     {
-	String key = nextServiceBoundNameWithPrefix(
-	    dataService, getEventQueuePrefix(nodeId));
-	if (key == null) {
-	    return false;
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private String localNodePrefix;
+	private String eventQueueKey;
+	private final long failedNodeId;
+
+	/**
+	 * Constructs an instance with the specified {@code localNodeId}
+	 * and {@code failedNodeId}.
+	 */
+	RemoveFailedSessionsFromLocalChannelsTask(
+	    long localNodeId, long failedNodeId)
+	{
+	    this.localNodePrefix = getEventQueuePrefix(localNodeId);
+	    this.eventQueueKey = this.localNodePrefix;
+	    this.failedNodeId = failedNodeId;
 	}
-	EventQueue eventQueue =
-	    (EventQueue) dataService.getServiceBinding(key);
-	BigInteger channelRefId = eventQueue.getChannelRefId();
-	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	if (channel != null) {
-	    channel.reassignCoordinator(nodeId);
-	} else {
-	    // channel removed, so just remove the service binding.
-	    dataService.removeServiceBinding(key);
+
+	/**
+	 * Finds the next locally-coordinated channel and schedules a
+	 * task to remove the failed sessions from that channel, and
+	 * reschedules this task to handle the next locally-coordinated
+	 * channel. If there are no more locally-coordinated channels,
+	 * then this task takes no action.
+	 */
+	public void run() {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    TaskService taskService = ChannelServiceImpl.getTaskService();
+	    eventQueueKey = nextServiceBoundNameWithPrefix(
+		dataService, eventQueueKey, localNodePrefix);
+	    if (eventQueueKey != null) {
+		BigInteger channelRefId =
+		    getLastComponentAsBigInteger(eventQueueKey);
+		taskService.scheduleTask(
+		    new RemoveFailedSessionsFromChannelTask(
+			    channelRefId.toByteArray(), failedNodeId,
+			    channelRefId));
+		    
+		// Schedule a task to remove failed sessions from next
+		// locally coordinated channel.
+		taskService.scheduleTask(this);
+	    }
 	}
-	return true;
     }
 
+    /**
+     * A persistent task to remove all failed sessions (specified by the
+     * {@code sessionPrefix} on a given node for a channel.  In a single
+     * task, only one failed session is removed from the channel.  A task
+     * for one session schedules a task for the next session to be removed
+     * if there are sessions left to be removed.
+     */
+    private static class RemoveFailedSessionsFromChannelTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private final String sessionPrefix;
+	private String sessionKey;
+	private final BigInteger channelRefId;
+	private final long failedNodeId;
+
+	/** Constructs an instance. */
+	RemoveFailedSessionsFromChannelTask(
+ 	    byte[] channelId, long failedNodeId, BigInteger channelRefId)
+	{
+	    this.sessionPrefix = getSessionNodePrefix(channelId, failedNodeId);
+	    this.sessionKey = sessionPrefix;
+	    this.channelRefId = channelRefId;
+	    this.failedNodeId = failedNodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    sessionKey =
+		nextServiceBoundNameWithPrefix(
+		    dataService, sessionKey, sessionPrefix);
+	    if (sessionKey != null) {
+		ChannelImpl channel =
+		    (ChannelImpl) getObjectForId(channelRefId);
+		if (channel != null) {
+		    BigInteger sessionRefId =
+			getLastComponentAsBigInteger(sessionKey);
+		    channel.removeSession(
+			failedNodeId, sessionRefId.toByteArray());
+		} else {
+		    // This shouldn't happen, but remove the binding anyway.
+		    channel.removeSessionBinding(sessionKey);
+		}	
+		ChannelServiceImpl.getTaskService().scheduleTask(this);
+	    }
+	}
+    }
+
+    /**
+     * Returns the prefix for accessing channel sets for all sessions
+     * connected to the node with the specified {@code nodeId}.  The
+     * prefix has the following form:
+     *
+     * com.sun.sgs.impl.service.channel.
+     *		set.<nodeId>.
+     *
+     * This method is only included to locate obsolete channel sets to be
+     * removed. 
+     */
+    private static String getChannelSetPrefix(long nodeId) {
+	return PKG_NAME +
+	    SET_COMPONENT + nodeId + ".";
+    }
+
+    /**
+     * Obsolete {@code ChannelSet} representation.  The serialized form is
+     * here just so that obsolete channel sets can be removed by 
+     * {@code ChannelServiceImpl} upon recovery.
+     */
+    private static class ChannelSet extends ClientSessionInfo {
+	
+	private final static long serialVersionUID = 1L;
+
+	/** The set of channel IDs that the client session is a member of. */
+	private final Set<BigInteger> set = new HashSet<BigInteger>();
+
+	/**
+	 * Constructs an instance.  This constructor is only present for
+	 * testing purposes.
+	 */
+	public ChannelSet(DataService dataService, ClientSession session) {
+	    super(dataService, session);
+	}
+    }
+    
+
+    /**
+     * A task to remove any obsolete channel sets left over from previous
+     * ChannelServiceImpl version.
+     */
+    static class RemoveObsoleteChannelSetsTask
+	implements Task, Serializable
+    {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private final long failedNodeId;
+
+	/**
+	 * Constructs an instance.
+	 * @param failedNodeId the ID of the failed node
+	 */
+	RemoveObsoleteChannelSetsTask(long failedNodeId) {
+	    this.failedNodeId = failedNodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    String prefix = getChannelSetPrefix(failedNodeId);
+	    String key =
+		nextServiceBoundNameWithPrefix(dataService, prefix, prefix);
+	    if (key != null) {
+		try {
+		    ManagedObject channelSet =
+			dataService.getServiceBinding(key);
+		    dataService.removeObject(channelSet);
+		} catch (ObjectNotFoundException e) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"Cleaning up obsolete channel set:{0} throws",
+			key);
+		}
+		dataService.removeServiceBinding(key);
+		ChannelServiceImpl.getTaskService().scheduleTask(this);
+	    }
+	}
+    }
+    
     /**
      * Returns a set containing session identifiers (as obtained by
      * {@link ManagedReference#getId ManagedReference.getId}) for all
@@ -2078,15 +2146,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	if (channel != null) {
 	    for (String sessionKey :
 		     BoundNamesUtil.getServiceBoundNamesIterable(
-			dataService, channel.getSessionNodePrefix(nodeId)))
+			dataService,
+			channel.getSessionNodePrefix(channel.channelId, nodeId)))
 	    {
-		int index = sessionKey.lastIndexOf('.');
-		sessionKey = sessionKey.substring(index + 1);
-		// convert to BigInteger
-		BigInteger sessionRefId = new BigInteger(sessionKey, 16);
+		BigInteger sessionRefId =
+		    getLastComponentAsBigInteger(sessionKey);
 		members.add(sessionRefId);
 	    }
 	}
 	return members;
+    }
+
+    /**
+     * Returns the last component of the given {@code key} as a BigInteger.
+     */
+    private static BigInteger getLastComponentAsBigInteger(String key) {
+	int index = key.lastIndexOf('.');
+	return new BigInteger(key.substring(index + 1), 16);
     }
 }

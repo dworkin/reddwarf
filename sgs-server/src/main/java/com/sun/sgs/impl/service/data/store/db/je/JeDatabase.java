@@ -37,7 +37,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import java.io.FileNotFoundException;
 
-/** Provides a database implementation using Berkeley DB, Java Edition. */
+/** Provides a database implementation using Berkeley DB Java Edition. */
 public class JeDatabase implements DbDatabase {
 
     /** An empty array returned when Berkeley DB returns null for a value. */

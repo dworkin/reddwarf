@@ -202,14 +202,47 @@ effect on application nodes.
 
 </dl>
 
+<a name="Db"></a>
+<h4>Database Properties</h4>
+
+These properties are the subset of the properties supported by
+the <code>DataService</code> that select the implementation of the
+underlying database.  Setting these properties has no effect on
+application nodes.
+<dl>
+
+<a name="com.sun.sgs.impl.service.data.store.db.environment.class"></a>
+<dt>com.sun.sgs.impl.service.data.store.db.environment.class
+<span class="default">
+  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+</span>
+<dd>The name of the class that implements the underlying database.  The
+  default value selects a database implementation based
+  on <a href="http://www.oracle.com/database/berkeley-db/db/index.html">
+  Berkeley DB</a>.  Specifying
+  <code>com.sun.sgs.impl.service.data.store.db.je.JeEnvironment</code>
+  selects a database implementation based on
+  <a href="http://www.oracle.com/database/berkeley-db/je/index.html">
+  Berkeley DB Java Edition</a>.  Other values should specify the fully
+  qualified name of a class that satisfies the requirements specified by
+  the <code>
+  com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory.getEnvironment
+  </code> method. <p>
+
+  Note that persistent data created using Berkeley DB is incompatible
+  with data created using Berkeley DB Java edition
+</dl>
+
 <a name="Bdb"></a>
 <h4>Berkeley DB Properties</h4>
 
 These properties are the subset of the properties supported by
-the <code>DataService</code> that control the implementation of the
-underlying Berkeley DB database. Setting these properties has no
-effect on application nodes.
-
+the <code>DataService</code> that control the behavior of the Berkeley
+DB database, when it has been specified as the implementation of the
+underlying database using the
+<a href="#com.sun.sgs.impl.service.data.store.db.environment.class"><code>
+com.sun.sgs.impl.service.data.store.db.environment.class</code></a>
+property. Setting these properties has no effect on application nodes.
 <dl>
 
 <dt>com.sun.sgs.impl.service.data.store.db.bdb.cache.size
@@ -234,18 +267,31 @@ Setting these properties has no effect on application nodes.
 <dl>
 
 <dt>com.sun.sgs.impl.service.watchdog.server.renew.interval
-<span class="default">1000 (one second)</span>
+<span class="default">1000 (for a multi-node configuration) or
+Integer.MAX_VALUE (for a single node configuration) </span>
 <dd>The time interval, in milliseconds, in which application nodes must
   contact the watchdog service's internal server in order to be considered
   alive. This time interval is sent to each application node during start up, 
   when the application node registers with the watchdog's internal server. The 
-  interval must be greater than or equal to <code>5</code> milliseconds and 
-  less than or equal to <code>10000</code> milliseconds (10 seconds).  Using a 
-  renew interval that is too small may cause some application nodes to be 
-  considered failed by the <code>WatchdogService</code> when they are very busy.
-  Using an interval that is too large will increase the amount of time the 
+  interval must be greater than or equal to <code>100</code> milliseconds.
+  Using a renew interval that is too small may cause some application nodes to
+  be considered failed by the <code>WatchdogService</code> when they are very
+  busy. Using an interval that is too large will increase the amount of time the 
   system takes to respond to failed nodes.
 
+</dl>
+
+<a name="ClientSessionService"></a>
+<h3>ClientSessionService Properties</h3>
+These properties control the implementation of the
+<code>ClientSessionService</code>.
+<dl>
+
+<dt>com.sun.sgs.impl.service.session.disconnect.delay
+<span class="default">1000</span>
+<dd>The time, in milliseconds, in which a disconnecting client is allowed to close a
+connection before it is closed by the server. The delay must be greater than or
+equal to <code>200</code> milliseconds.
 </dl>
 
 <a name="System"></a>
@@ -263,18 +309,22 @@ system including identity management, profiling, and task scheduling.
   authenticator simply accepts any name-password pair.
     
 <dt>com.sun.sgs.impl.kernel.profile.level
-<span class="default">off</span>
-<dd>Whether to perform profiling.  Profiling is enabled if the value is
-  <code>on</code>.
+<span class="default">min</span>
+<dd>The profiling level. Valid levels are
+<ul>
+    <li><code>min</code> - minimal profiling data is collected. 
+    <li><code>medium</code>  - more data is collected, but is still appropriate 
+                             for monitoring a production system.
+    <li><code>max</code> - all available profiling data is collected.  This 
+                         level may only be appropriate for debugging systems in
+                         development.
+</ul>
 
 <dt>com.sun.sgs.impl.kernel.profile.listeners
-<span class="default">
-    com.sun.sgs.impl.profile.listener.AggregateProfileListener</span>
+<span class="nodefault"/>
 <dd>A colon separated list of profile listeners, which consume profile output.
-  The <code>AggregateProfileListener</code> reports its findings on a server
-  socket, by default on port <code>43005</code>.  To configure this and other
-  available listeners, see the individual class javadoc for profile listener
-  implementations.
+  To configure the available listeners, see the individual class javadoc for 
+  profile listener implementations.
 
 <dt>com.sun.sgs.impl.kernel.transaction.threads
 <span class="default">4</span>

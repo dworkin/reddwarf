@@ -24,6 +24,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.TransactionNotActiveException;
 import java.io.Serializable;
 import java.util.AbstractQueue;
 import java.util.Iterator;
@@ -94,6 +95,7 @@ public class ManagedQueue<E>
    }
 
     /** {@inheritDoc} */
+    @Override
     public boolean offer(E o) {
 	if (o == null) {
 	    throw new NullPointerException("null element");
@@ -114,6 +116,7 @@ public class ManagedQueue<E>
     }
 
     /** {@inheritDoc} */
+    @Override
     public E peek() {
 	return
 	    (headRef != null) ?
@@ -122,6 +125,7 @@ public class ManagedQueue<E>
     }
 
     /** {@inheritDoc} */
+    @Override
     public E poll() {
 	E element = null;
 	if (headRef != null) {
@@ -144,11 +148,13 @@ public class ManagedQueue<E>
      *
      * <p> This method is not supported.
      */
+    @Override
     public int size() {
 	throw new UnsupportedOperationException("size not supported");
     }
 
     /** {@inheritDoc} */ 
+    @Override
     public boolean isEmpty() {
 	return headRef == null;
     }
@@ -157,21 +163,28 @@ public class ManagedQueue<E>
      *
      * <p> This method is not supported.
      */
+    @Override
     public Iterator<E> iterator() {
 	throw new UnsupportedOperationException("iterator not supported");
     }
 
-    /* -- Implement Object.toString -- */
+    /* -- Implement Object.hashCode -- */
 
     /** {@inheritDoc} */
+    @Override
     public int hashCode() {
 	DataManager dataManager = AppContext.getDataManager();
 	return dataManager.createReference(this).getId().hashCode();
     }
 
     /** {@inheritDoc} */
+    @Override
     public String toString() {
-	return getClass().getName() + '@' + Integer.toHexString(hashCode());
+	try {
+	    return getClass().getName() + '@' + Integer.toHexString(hashCode());
+	} catch (TransactionNotActiveException e) {
+	    return super.toString();
+	}
     }
 
     /* -- Implement ManagedObjectRemoval -- */

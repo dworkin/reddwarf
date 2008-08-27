@@ -68,4 +68,11 @@ public interface DbEnvironment {
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
     void close();
+
+    /**
+     * Specifies whether object allocations in this environment should use a
+     * placeholder at the end of each allocation block to avoid allocation
+     * concurrency conflicts.
+     */
+    boolean useAllocationBlockPlaceholders();
 }

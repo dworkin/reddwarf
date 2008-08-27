@@ -74,10 +74,9 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
     // the number of threads reported as running in the scheduler
     private long threadCount = 0;
 
-    private int maxOp = 0;
-    private Map<Integer,ProfileOperation> registeredOps =
-        new HashMap<Integer,ProfileOperation>();
-    private Map<Integer,Long> opCounts = new HashMap<Integer,Long>();
+    // counts of the registered operations
+    private Map<ProfileOperation, Long> opCounts =
+            new HashMap<ProfileOperation, Long>();
 
 
     // the commit/abort total counts, and the reported running time total
@@ -93,7 +92,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 
     // a mapping from local counters to their aggregated counts for the
     // current snapshot
-    private Map<String,Long> localCounters;
+    private Map<String, Long> localCounters;
 
     /**
      * Creates an instance of <code>OperationLoggingProfileOpListener</code>.
@@ -110,46 +109,48 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
     {
         logOps = (new PropertiesWrapper(properties)).
             getIntProperty(LOG_OPS_PROPERTY, DEFAULT_LOG_OPS);
-	localCounters = new HashMap<String,Long>();
+	localCounters = new HashMap<String, Long>();
     }
 
     /** {@inheritDoc} */
     public void propertyChange(PropertyChangeEvent event) {
-	if (event.getPropertyName().equals("com.sun.sgs.profile.newop")) {          
-	    ProfileOperation op = (ProfileOperation)(event.getNewValue());
-	    int id = op.getId();
-	    if (id > maxOp)
-		maxOp = id;
-	    registeredOps.put(id,op);
-	}
-	else {
+	if (event.getPropertyName().
+                equals("com.sun.sgs.profile.newop")) 
+        {        
+	    ProfileOperation op = (ProfileOperation) (event.getNewValue());
+	    opCounts.put(op, 0L);
+	} else {
 	    if (event.getPropertyName().
-		    equals("com.sun.sgs.profile.threadcount")) 
-		threadCount = ((Integer)(event.getNewValue())).intValue();	    
+                    equals("com.sun.sgs.profile.threadcount")) 
+            {
+		threadCount = ((Integer) (event.getNewValue())).intValue();
+            }
 	}
     }
 
     /** {@inheritDoc} */
     public void report(ProfileReport profileReport) {
-        if (profileReport.wasTaskSuccessful())
+        if (profileReport.wasTaskSuccessful()) {
             commitCount++;
-        else
+        } else {
             abortCount++;
+        }
 
         totalRunningTime += profileReport.getRunningTime();
 
         for (ProfileOperation op : profileReport.getReportedOperations()) {
-	    Long i = opCounts.get(op.getId());
-	    opCounts.put(op.getId(), Long.valueOf(i == null ? 1 : i + 1));
+	    Long i = opCounts.get(op);
+	    opCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	}
 
-	Map<String,Long> counterMap = profileReport.getUpdatedTaskCounters();
+	Map<String, Long> counterMap = profileReport.getUpdatedTaskCounters();
 	if (counterMap != null) {
-	    for (Entry<String,Long> entry : counterMap.entrySet()) {
+	    for (Entry<String, Long> entry : counterMap.entrySet()) {
 		String key = entry.getKey();
 		long value = 0;
-		if (localCounters.containsKey(key))
+		if (localCounters.containsKey(key)) {
 		    value = localCounters.get(key);
+                }
 		localCounters.put(key, entry.getValue() + value);
 	    }
 	}
@@ -158,25 +159,28 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
             if (logger.isLoggable(Level.FINE)) {
                 long now = System.currentTimeMillis();
                 Formatter opCountTally = new Formatter();
-                for (int i = 0; i <= maxOp; i++) {
-                    if (i != 0)
+                boolean first = true;
+                for (ProfileOperation op : opCounts.keySet()) {
+                    if (!first) {
                         opCountTally.format("%n");
-		    Long count = opCounts.get(i);
-                    opCountTally.format(
-			"  %s: %d", registeredOps.get(i),
+                    }
+                    first = false;
+		    Long count = opCounts.get(op);
+                    opCountTally.format("  %s: %d", op,
 			(count == null) ? 0 : count.longValue());
-                    opCounts.put(i,0L);
+                    opCounts.put(op, 0L);
                 }
 
 		Formatter counterTally = new Formatter();
-		if (! localCounters.isEmpty()) {
+		if (!localCounters.isEmpty()) {
 		    counterTally.format("[task counters]%n");
-		    for (Entry<String,Long> entry : localCounters.entrySet())
+		    for (Entry<String, Long> entry : localCounters.entrySet()) {
 			counterTally.format(
 			    "  %s: %d%n", entry.getKey(), entry.getValue());
+                    }
 		}
 
-                logger.log(Level.FINE, "Operations [logOps=" + logOps +"]:\n" +
+                logger.log(Level.FINE, "Operations [logOps=" + logOps + "]:\n" +
                            "  succeeded: " + commitCount +
                            "  failed: " + abortCount + "\n" +
                            "  elapsed time: " + (now - lastReport) + " ms\n" +
@@ -185,8 +189,9 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 			   opCountTally.toString() + "\n" +
 			   counterTally.toString());
             } else {
-                for (int i = 0; i <= maxOp; i++)
-                    opCounts.put(i,0L);
+                for (ProfileOperation op : opCounts.keySet()) {
+                    opCounts.put(op, 0L);
+                }
             }
 
             commitCount = 0;

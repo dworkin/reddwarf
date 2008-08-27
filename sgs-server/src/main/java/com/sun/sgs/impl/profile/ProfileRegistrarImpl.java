@@ -22,7 +22,6 @@ package com.sun.sgs.impl.profile;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileProducer;
 import com.sun.sgs.profile.ProfileRegistrar;
 
 import java.util.logging.Level;
@@ -50,19 +49,21 @@ public class ProfileRegistrarImpl implements ProfileRegistrar {
      * @param profileCollector the backing collector for all producers
      */
     public ProfileRegistrarImpl(ProfileCollectorImpl profileCollector) {
-        if (profileCollector == null)
+        if (profileCollector == null) {
             throw new NullPointerException("Collector must not be null");
+        }
         this.profileCollector = profileCollector;
     }
 
     /**
      * {@inheritDoc}
      */
-    public ProfileConsumer registerProfileProducer(ProfileProducer producer) {
-        if (logger.isLoggable(Level.CONFIG))
+    public ProfileConsumer registerProfileProducer(String name) {
+        if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "Registering profile producer {0}",
-                       producer);
-        return new ProfileConsumerImpl(producer, profileCollector);
+                       name);
+        }
+        return profileCollector.registerProfileProducer(name);
     }
 
 }

@@ -68,14 +68,12 @@ class IdentityMO implements ManagedObject, Serializable {
     }
     
     /** {@inheritDoc} */
-    @Override
-    public String toString() {
+    @Override public String toString() {
         return "IdentityMO[id:" + id + ", nodeId:" + nodeId + "]";
     }
     
     /** {@inheritDoc} */
-    @Override
-    public boolean equals(Object obj) {
+    @Override public boolean equals(Object obj) {
         if (this == obj) {
             return true;
         } else if (obj == null) {
@@ -88,13 +86,12 @@ class IdentityMO implements ManagedObject, Serializable {
     }
     
     /** {@inheritDoc} */
-    @Override
-    public int hashCode() {
+    @Override public int hashCode() {
         // Recipe from Effective Java
         if (hashCode == 0) {
             int result = 17;
-            result = 37*result + id.hashCode();
-            result = 37*result + (int) (nodeId ^ (nodeId >>>32));
+            result = 37 * result + id.hashCode();
+            result = 37 * result + (int) (nodeId ^ (nodeId >>> 32));
             hashCode = result;
         }
         return hashCode;

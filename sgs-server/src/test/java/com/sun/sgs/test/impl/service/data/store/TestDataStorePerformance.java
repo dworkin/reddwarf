@@ -21,7 +21,7 @@ package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.profile.ProfileProducer;
+import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -142,8 +142,6 @@ public class TestDataStorePerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
-        if (store instanceof ProfileProducer)
-            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -185,8 +183,6 @@ public class TestDataStorePerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
-        if (store instanceof ProfileProducer)
-            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -217,8 +213,6 @@ public class TestDataStorePerformance extends TestCase {
 
     public void testReadNames() throws Exception {
 	store = getDataStore();
-        if (store instanceof ProfileProducer)
-            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -242,8 +236,6 @@ public class TestDataStorePerformance extends TestCase {
 
     public void testWriteNames() throws Exception {
 	store = getDataStore();
-        if (store instanceof ProfileProducer)
-            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -273,7 +265,10 @@ public class TestDataStorePerformance extends TestCase {
 
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
-	return new DataStoreImpl(props);
+	DataStore store = new DataStoreProfileProducer(
+	    new DataStoreImpl(props), DummyProfileCoordinator.getRegistrar());
+        DummyProfileCoordinator.startProfiling();
+	return store;
     }
 
     /** Creates a per-test directory. */

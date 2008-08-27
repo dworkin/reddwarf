@@ -32,7 +32,7 @@ public class LinearHistogram implements Histogram {
     /**
      * the longest bar in the histogram
      */
-    private final static int MAX_HIST_LENGTH = 40;	
+    private static final int MAX_HIST_LENGTH = 40;	
 
     /**
      * The inclusive lower bound for the histogram
@@ -93,18 +93,20 @@ public class LinearHistogram implements Histogram {
      *         strictly positive     
      */
     public LinearHistogram(int lBound, int uBound, long stepSize) {
-	if (lBound >= uBound)
-	    throw new IllegalArgumentException("Lower bound must be less "
-					       + "than upper bound");
-	if (stepSize <= 0)
-	    throw new IllegalArgumentException("Step size must be "
-					       + "strictly positive");
+	if (lBound >= uBound) {
+	    throw new IllegalArgumentException("Lower bound must be less " +
+					       "than upper bound");
+        }
+	if (stepSize <= 0) {
+	    throw new IllegalArgumentException("Step size must be " +
+					       "strictly positive");
+        }
 
 	this.lBound = lBound;
 	this.uBound = uBound;
 	this.stepSize = stepSize;
 
-	bins = new int[(int)((uBound - lBound) / stepSize) + 1];
+	bins = new int[(int) ((uBound - lBound) / stepSize) + 1];
 
 	maxIndex = Integer.MIN_VALUE;
 	minIndex = Integer.MAX_VALUE;
@@ -120,31 +122,41 @@ public class LinearHistogram implements Histogram {
      * or values that are greater than the upper bound are not counted.
      */ 
     public void bin(long value) {
-	if (value < lBound || value > uBound)
+	if (value < lBound || value > uBound) {
 	    return;
+        }
 	
 	// find the appropriate bin for this value, starting at the
 	// lower bound and increasing by the provided step size
 	int bin = 0;
-	for (long i = lBound + stepSize; i < uBound && value > (i += stepSize); bin++)
-	    ;
+        long i = lBound + stepSize;
+        while (i < uBound) {
+            i += stepSize;
+            if (value > i) {
+                bin++;
+            } else {
+                break;
+            }
+        }
 		
 	maxIndex = Math.max(maxIndex, bin);
 	minIndex = Math.min(minIndex, bin);
 	
 	// keep track of which bin has the most number of elements,
 	// after incrementing the bin's count
-	int count;
-	if ((count = bins[bin]++) > maxCount)
-	    maxCount = count;       
+	int count = bins[bin]++;
+	if (count  > maxCount) {
+	    maxCount = count;
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void clear() {
-	for (int i = 0; i < bins.length; ++i) 
+	for (int i = 0; i < bins.length; ++i) {
 	    bins[i] = 0;
+        }
 	maxIndex = Integer.MIN_VALUE;
 	minIndex = Integer.MAX_VALUE;
 	maxCount = 0;
@@ -210,19 +222,22 @@ public class LinearHistogram implements Histogram {
 		Long.toString(Math.min(lBound + (i * stepSize), uBound));
 
 	    // make the bars all line up evenly by padding with spaces	    
-	    for (int j = binName.length(); j < maxLength; ++j)
+	    for (int j = binName.length(); j < maxLength; ++j) {
 		b.append(" ");
+            }
 	    b.append(binName).append("binLabel").append(" |");
 
 	    // scale the bar length relative to the max
-	    int bars = (int)((bins[i] / (double)maxCount) * MAX_HIST_LENGTH);
+	    int bars = (int) ((bins[i] / (double) maxCount) * MAX_HIST_LENGTH);
 
 	    // bump all non-empty buckets by one, so we can tell the
 	    // difference
-	    if (bins[i] > 0) 
+	    if (bins[i] > 0) {
 		bars++;
-	    for (int j = 0; j < bars; ++j)
+            }
+	    for (int j = 0; j < bars; ++j) {
 		b.append("*");
+            }
 	    b.append("\n");
 	}
 	
