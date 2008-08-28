@@ -73,4 +73,7 @@ public interface AccessCoordinator {
      */
     Transaction getConflictingTransaction(Transaction txn);
 
+    // TEST
+    void validate(Transaction txn);
+
 }

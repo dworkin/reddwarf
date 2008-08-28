@@ -120,7 +120,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 
 
     public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
-	if (dataArray.length == 0 || oids.length != dataArray[0].length) {
+	if (/*dataArray.length == 0 ||*/ oids.length != dataArray.length) {
 	    throw new IllegalArgumentException(
 		"The oids and dataArray must be the same length");
 	}
@@ -318,7 +318,9 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 		oidMap.remove(oid);
 	    oidMap.putAll(oidUpdates);
 	    
-		
+            for (String name : removedNames)
+                boundNameMap.remove(name);
+            boundNameMap.putAll(nameUpdates);
 	}
 
 	private void checkOid(long oid) {

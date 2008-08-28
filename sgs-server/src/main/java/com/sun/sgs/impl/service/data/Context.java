@@ -280,6 +280,8 @@ final class Context extends TransactionContext {
 	    isPrepared = true;
 	    txn.setInactive();
 	    ManagedReferenceImpl.flushAll(this);
+            // TEST
+            service.accessCoordinator.validate(txn.originalTxn);
 	    boolean result;
 	    if (storeParticipant == null) {
 		isCommitted = true;
@@ -328,6 +330,8 @@ final class Context extends TransactionContext {
 	    isCommitted = true;
 	    txn.setInactive();
 	    ManagedReferenceImpl.flushAll(this);
+            // TEST
+            service.accessCoordinator.validate(txn.originalTxn);
 	    if (storeParticipant != null) {
 		storeParticipant.prepareAndCommit(txn);
 	    }

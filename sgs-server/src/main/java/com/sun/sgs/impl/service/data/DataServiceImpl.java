@@ -186,6 +186,9 @@ public final class DataServiceImpl implements DataService {
     /** The proxy for notifying of bound name accesses */
     private final AccessReporter<String> boundNameAccesses;
 
+    // TEST; just for testing
+    final AccessCoordinator accessCoordinator;
+
     /**
      * The transaction context map, or null if configure has not been called.
      */
@@ -397,7 +400,7 @@ public final class DataServiceImpl implements DataService {
 	    // notify the AccessCoordinator that the DataService is a
 	    // source of contention for ManagedObjects and name
 	    // bindings.
-	    AccessCoordinator accessCoordinator = 
+	    accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    oidAccesses = accessCoordinator.
 		registerAccessSource(CLASSNAME, BigInteger.class);

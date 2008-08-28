@@ -19,6 +19,10 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.TransactionConflictException;
+
+import com.sun.sgs.impl.kernel.ConflictChecker.ConflictResult;
+
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.AccessReporter;
@@ -103,6 +107,9 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     // system components
     private final TransactionProxy txnProxy;
     private final ProfileCollector profileCollector;
+
+    // TEST: a conflict checker
+    ConflictChecker checker = new ConflictChecker();
  
     /**
      * Creates an instance of {@code AccessCoordinatorImpl}.
@@ -167,6 +174,11 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         return null;
     }
 
+    // TEST
+    public void validate(Transaction txn) {
+        checkResult(txnMap.get(txn), txn, checker.validate(txn));
+    }
+
     /**
      * TODO: Notes for when we look at conflict reolution...
      * The idea here is that a resolver needs to know who else might be
@@ -194,9 +206,13 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      */
     public boolean prepare(Transaction txn) {
         AccessedObjectsDetailImpl detail = txnMap.get(txn);
+        detail.markPrepared();
+
         // TODO: this is the last chance to abort because of conflict,
         // when we're actually managing the contention
-        detail.markPrepared();
+        // TEST:
+        //checkResult(detail, txn, checker.validate(txn));
+
         return false;
     }
 
@@ -211,13 +227,16 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public void prepareAndCommit(Transaction txn) {
-        reportDetail(txn, true);
+        // TEST:
+        if (! prepare(txn))
+            commit(txn);
     }
 
     /**
      * {@inheritDoc} 
      */
     public void abort(Transaction txn) {
+        checker.finished(txn);
         reportDetail(txn, false);
     }
 
@@ -239,6 +258,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private void reportDetail(Transaction txn, boolean succeeded) {
         AccessedObjectsDetailImpl detail = txnMap.remove(txn);
 
+        // TEST: we should always know about what caused failure, right?
+        /*
 	// if the task failed try to determine why
         if (! succeeded) {
 	    // mark the type with an initial guess of unknown and then
@@ -266,6 +287,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             while (! backlog.offer(detail))
                 backlog.poll();
         }
+        */
 
         profileCollector.setAccessedObjectsDetail(detail);
     }
@@ -283,11 +305,28 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         Transaction txn = txnProxy.getCurrentTransaction();
         txn.join(this);
         txnMap.put(txn, new AccessedObjectsDetailImpl());
+        // TEST
+        checker.started(txn);
     }
 
     // NOTE: there will be another version of the notifyNewTransaction
     // method that takes a specific resolution policy (once we get that
     // feature implemented)
+
+    /** Abort and throw an exception if the result is conflict. */
+    private static void checkResult(AccessedObjectsDetailImpl detail,
+                                    Transaction txn, ConflictResult result) {
+        if (result.conflictType != ConflictType.NONE) {
+            detail.conflictType = result.conflictType;
+            detail.idOfConflictingTxn = result.conflictingTxn.getId();
+            RuntimeException re =
+                new TransactionConflictException("Failed due to conflict " +
+                                                 "over object with id: " +
+                                                 result.conflictingObjId);
+            txn.abort(re);
+            throw re;
+        }
+    }
 
     /*
      * Class implementations.
@@ -579,8 +618,30 @@ class AccessCoordinatorImpl implements AccessCoordinator,
                                                    txn);
 	    detail.addAccess(new AccessedObjectImpl(objId, type, source,
                                                     detail));
+
             if (description != null)
                 detail.setDescription(source, objId, description);
+
+            // TEST:
+            checkResult(detail, txn, checker.
+                        checkAccess(txn, objId, type, source));
+            /*
+            ConflictResult result =
+                checker.checkAccess(txn, objId, type, source);
+            if (result != null) {
+                checkResult(detail, txn, result);
+            } else {
+                System.out.println("Object Id was: " + objId);
+                Object dsc = detail.getDescription(source, objId);
+                if (dsc != null) {
+                    try {
+                        System.out.println("Description: " + dsc);
+                    } catch (Exception e) {
+                        System.out.println("Description Type: " +
+                                           dsc.getClass());
+                    }
+                }
+                }*/
 	}
 
         /** {@inheritDoc} */
