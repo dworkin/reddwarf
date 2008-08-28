@@ -412,7 +412,7 @@ public final class ClientSessionServiceImpl
 	    monitorDisconnectingSessionsTaskHandle =
 		taskScheduler.scheduleRecurringTask(
  		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, 0,
+		    taskOwner, System.currentTimeMillis(),
 		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY)/2);
 	    monitorDisconnectingSessionsTaskHandle.start();
 	    
@@ -472,6 +472,11 @@ public final class ClientSessionServiceImpl
             } 
 	}
 
+	for (ClientSessionHandler handler : handlers.values()) {
+	    handler.shutdown();
+	}
+	handlers.clear();
+	
 	if (asyncChannelGroup != null) {
 	    asyncChannelGroup.shutdown();
 	    boolean groupShutdownCompleted = false;
@@ -514,10 +519,6 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 	    
-	for (ClientSessionHandler handler : handlers.values()) {
-	    handler.shutdown();
-	}
-	handlers.clear();
 	disconnectingHandlersMap.clear();
 
 	synchronized (flushContextsLock) {

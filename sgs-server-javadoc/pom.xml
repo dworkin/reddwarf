@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.7-SNAPSHOT</version>
+    <version>0.9.8-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-javadoc</artifactId>
@@ -105,7 +105,7 @@
 	    </goals>
 	    <configuration>
 	      <links>
-		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
+		<link>http://java.sun.com/javase/6/docs/api/</link>
 		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
 	      <show>package</show>
@@ -138,7 +138,7 @@
 	    </goals>
 	    <configuration>
 	      <links>
-		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
+		<link>http://java.sun.com/javase/6/docs/api/</link>
 		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
 	      <show>public</show>
