@@ -394,7 +394,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	
 	void removeBinding(String name) {
 	    checkBinding(name);
-	    if (!boundNameMap.containsKey(name) ||
+	    if (!boundNameMap.containsKey(name) &&
 		!nameUpdates.containsKey(name))
 		throw new NameNotBoundException(name + " is not bound");
 
