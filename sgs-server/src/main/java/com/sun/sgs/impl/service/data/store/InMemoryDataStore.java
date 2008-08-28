@@ -36,8 +36,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -97,7 +99,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 
     public long createObject(Transaction txn) {
 	// This knowingly could waste an Oid should the calling
-	// transaction abort.  We do this to improve concurrency.
+	// transaction abort.  We allow this to improve concurrency.
 	return oidCounter.getAndIncrement();
     }
 
@@ -154,7 +156,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 
     public String nextBoundName(Transaction txn, String name) {
 	TxnInfo info = getInfo(txn);
-	return boundNameMap.higherKey(name);
+	return info.nextBoundName(name);
     }
 
 
@@ -290,7 +292,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 
 	private final Map<Long,byte[]> oidUpdates;
 
-	private final Map<String,Long> nameUpdates;
+	private final NavigableMap<String,Long> nameUpdates;
 
 	private final Transaction txn;
 
@@ -303,7 +305,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	    removedIds = new HashSet<Long>();
 	    removedNames = new HashSet<String>();
 	    oidUpdates = new HashMap<Long,byte[]>();
-	    nameUpdates = new HashMap<String,Long>();
+	    nameUpdates = new TreeMap<String,Long>();
 	}
 
 	/**
@@ -362,7 +364,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	}
 	
 	void setObject(long oid, byte[] data) {
-	    checkOid(oid);
+	    //checkOid(oid);
 	    oidUpdates.put(oid, data);
 	}
 	
@@ -387,7 +389,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	}
 	
 	void setBinding(String name, long oid) {
-	    checkBinding(name);	    
+	    //checkBinding(name);	    
 	    nameUpdates.put(name, oid);
 	}
 	
@@ -402,28 +404,49 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	    nameUpdates.remove(name);
 	}
 
+	String nextBoundName(String name) {
+	    // find the next name in the backing name mapping that
+	    // hasn't been removed
+	    String next = name;
+	    do {
+		next = boundNameMap.higherKey(next);
+	    } while (next != null && !(removedNames.contains(next)));
+
+	    // then check whether we have a newly-added name that
+	    // would have come before this name
+	    String recentNext = nameUpdates.higherKey(name);
+	    if (next == null)
+		return recentNext;
+	    else if (recentNext == null)
+		return next;
+	    else return (next.compareTo(recentNext) < 0) ? next : recentNext;
+	}
     }
 
     private static class ByteArrayWrapper {
 	
 	final byte[] b;
+
+	final int hash;
 	
 	ByteArrayWrapper(byte[] b) {
 	    this.b = b;
-	}
 
-	public boolean equals(Object o) {
-	    if (o == null || !(o instanceof byte[]))
-		return false;
-	    byte[] arr = (byte[])o;
-	    return Arrays.equals(b, arr);
-	}
-
-	public int hashCode() {
 	    int h = 0;
 	    for (byte c : b) 
 		h += c;
-	    return h;
+	    hash = h;
+	}
+
+	public boolean equals(Object o) {
+	    if (o == null || !(o instanceof ByteArrayWrapper))
+		return false;
+	    ByteArrayWrapper bar = (ByteArrayWrapper)o;
+	    return Arrays.equals(b, bar.b);
+	}
+
+	public int hashCode() {
+	    return hash;
 	}
     }
 
