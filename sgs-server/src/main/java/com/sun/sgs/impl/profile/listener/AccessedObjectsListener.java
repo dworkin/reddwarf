@@ -142,12 +142,19 @@ public class AccessedObjectsListener implements ProfileListener {
         if (detail.getConflictType() != ConflictType.NONE) {
             if (txnId == null)
                 txnId = new TransactionId(profileReport.getTransactionId());
+            // get the root cause of the failure
+            Throwable cause = profileReport.getFailureCause();
+            Throwable t;
+            while ((t = cause.getCause()) != null)
+                cause = t;
             // print out the detail for the failed transaction
-	    System.out.printf("Task type %s failed due to conflict.  Details:"
-			      + "%n  accesor id: %s, try count %d; objects "
+	    System.out.printf("Task type %s failed due to conflict.%n"
+                              + "  Message: %s%n  Details:"
+			      + " accesor id: %s, try count %d; objects "
 			      + "accessed ordered by first access:%n%s" 
 			      + "conflict type: %s%n",
 			      profileReport.getTask().getBaseTaskType(),
+                              cause.getMessage(),
 			      txnId, profileReport.getRetryCount(),
 			      formatAccesses(detail.getAccessedObjects()),
 			      detail.getConflictType());

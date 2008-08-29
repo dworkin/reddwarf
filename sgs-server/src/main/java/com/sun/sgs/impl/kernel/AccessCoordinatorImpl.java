@@ -21,7 +21,10 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionConflictException;
 
-import com.sun.sgs.impl.kernel.ConflictChecker.ConflictResult;
+import com.sun.sgs.impl.kernel.conflict.ConflictChecker;
+import com.sun.sgs.impl.kernel.conflict.ConflictResult;
+import com.sun.sgs.impl.kernel.conflict.NullConflictChecker;
+import com.sun.sgs.impl.kernel.conflict.TestConflictChecker;
 
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
@@ -69,6 +72,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * Note that with each transaction failure this backlog will be scanned
  * to find a conflicting transaction, so a larger backlog may provide more
  * detail about failure but will also be more compute-intensive.
+ * <p>
+ * This implementation also provides an (experimental) ability to manage
+ * conflict. This is useful if you want to experiment with data stores
+ * that don't already provide this feature (e.g. {@code InMemoryDataStore}).
+ * Conflict management is off by default but can be enabled by setting
+ * {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.conflict.manage}
+ * to {@code true}.
  */
 class AccessCoordinatorImpl implements AccessCoordinator,
                                        NonDurableTransactionParticipant {
@@ -108,9 +118,13 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private final TransactionProxy txnProxy;
     private final ProfileCollector profileCollector;
 
-    // TEST: a conflict checker
-    ConflictChecker checker = new ConflictChecker();
- 
+    // TEST: an optional conflict checker
+    final ConflictChecker checker;
+
+    /** TEST: the property to set to enable conflict management. */
+    static final String CONFLICT_MANAGE_PROPERTY =
+        AccessCoordinatorImpl.class.getName() + ".conflict.manage";
+
     /**
      * Creates an instance of {@code AccessCoordinatorImpl}.
      *
@@ -138,6 +152,13 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             }
         } else {
             backlog = null;
+        }
+
+        String manageProp = properties.getProperty(CONFLICT_MANAGE_PROPERTY);
+        if ((manageProp != null) && (manageProp.equals("true"))) {
+            checker = new TestConflictChecker();
+        } else {
+            checker = new NullConflictChecker();
         }
 
         this.txnProxy = txnProxy;
@@ -207,12 +228,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     public boolean prepare(Transaction txn) {
         AccessedObjectsDetailImpl detail = txnMap.get(txn);
         detail.markPrepared();
-
-        // TODO: this is the last chance to abort because of conflict,
-        // when we're actually managing the contention
-        // TEST:
-        //checkResult(detail, txn, checker.validate(txn));
-
         return false;
     }
 
@@ -227,7 +242,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public void prepareAndCommit(Transaction txn) {
-        // TEST:
         if (! prepare(txn))
             commit(txn);
     }
@@ -258,19 +272,13 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private void reportDetail(Transaction txn, boolean succeeded) {
         AccessedObjectsDetailImpl detail = txnMap.remove(txn);
 
-        // TEST: we should always know about what caused failure, right?
-        /*
-	// if the task failed try to determine why
+	// if the task didn't succeed then try to determine why
         if (! succeeded) {
-	    // mark the type with an initial guess of unknown and then
-	    // try to refine it.
-	    detail.conflictType = ConflictType.UNKNOWN;
-
-            // NOTE: in the current system we don't really see transactions
-            // fail because of conflict with another active transaction,
-            // so currently this is only for looking through a backlog
-	    if (backlog != null) {
-                // look through the backlog for a conflict
+            // if we don't already know the cause, and we're keeping a
+            // backlog, look through there to see if a conflicting
+            // transaction can be found
+	    if ((detail.conflictType == ConflictType.UNKNOWN) &&
+                (backlog != null)) {
 		for (AccessedObjectsDetailImpl oldDetail : backlog) {
 		    if (detail.conflictsWith(oldDetail)) {
 			detail.setConflict(ConflictType.ACCESS_NOT_GRANTED,
@@ -279,7 +287,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 		    }
 		}
 	    }
-	}
+	} else {
+            // there was no conflict, so note this in the detail
+            detail.conflictType = ConflictType.NONE;
+        }
 
         // if we're keeping a backlog, then add the reported detail...if
         // the backlog is full, then evict old data until there is room
@@ -287,7 +298,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             while (! backlog.offer(detail))
                 backlog.poll();
         }
-        */
 
         profileCollector.setAccessedObjectsDetail(detail);
     }
@@ -366,7 +376,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	private final AtomicBoolean prepared = new AtomicBoolean(false);
 
         // information about why the transaction failed, if it failed
-	private ConflictType conflictType = ConflictType.NONE;
+	private ConflictType conflictType = ConflictType.UNKNOWN;
         private byte [] idOfConflictingTxn = null;
 
         /** Implement AccessObjectsDetail. */
@@ -625,23 +635,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             // TEST:
             checkResult(detail, txn, checker.
                         checkAccess(txn, objId, type, source));
-            /*
-            ConflictResult result =
-                checker.checkAccess(txn, objId, type, source);
-            if (result != null) {
-                checkResult(detail, txn, result);
-            } else {
-                System.out.println("Object Id was: " + objId);
-                Object dsc = detail.getDescription(source, objId);
-                if (dsc != null) {
-                    try {
-                        System.out.println("Description: " + dsc);
-                    } catch (Exception e) {
-                        System.out.println("Description Type: " +
-                                           dsc.getClass());
-                    }
-                }
-                }*/
 	}
 
         /** {@inheritDoc} */
