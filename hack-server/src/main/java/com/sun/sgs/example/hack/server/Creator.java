@@ -18,6 +18,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.io.Serializable;
 
@@ -126,7 +127,7 @@ public class Creator implements Game, Serializable {
         Messages.broadcastPlayerJoined(creatorCommandsChannel.get(), clientID);
 
 	// send the player an initial set of stats
-	messageHandler.rollForStats(player, 1);
+	messageHandler.rollForStats(player, CreatureType.BARBARIAN);
 
 	return messageHandler;
     }

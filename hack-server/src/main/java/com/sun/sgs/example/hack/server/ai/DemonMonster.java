@@ -20,6 +20,7 @@ import com.sun.sgs.example.hack.server.NSidedDie;
 
 import com.sun.sgs.example.hack.share.KeyMessages;
 
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 import com.sun.sgs.example.hack.share.CharacterStats;
 
 import java.io.Serializable;
@@ -43,19 +44,10 @@ public class DemonMonster extends MonsterCharacter implements Serializable {
      * @param mgr this character's manager
      */
     public DemonMonster(AICharacterManager mgr) {
-        this(68, mgr);
-    }
+        super(CreatureType.DEMON, "Demon", mgr);
+	stats = new CharacterStats("Demon", 20, 10, 15, 15, 15, 18,
+				   50, 50);
 
-    /**
-     * Creates an instance of <code>DemonMonster</code>.
-     *
-     * @param id the identifier for this character
-     * @param mgr this character's manager
-     */
-    public DemonMonster(int id, AICharacterManager mgr) {
-        super(id, "demon", mgr);
-
-        regenerate();
     }
 
     /**

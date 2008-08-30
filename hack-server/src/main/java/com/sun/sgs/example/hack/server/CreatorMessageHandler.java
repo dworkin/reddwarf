@@ -15,6 +15,9 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
 
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+
 import java.io.Serializable;
 
 import java.nio.ByteBuffer;
@@ -30,7 +33,8 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 
     // the current character stats
     private CharacterStats currentStats;
-    private int characterClassId;
+
+    private CreatureType currentCharacterClassType;
 
     /**
      * Creates a new <code>CreatorMessageHandler</code>.
@@ -58,8 +62,14 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 
 	case ROLL_FOR_STATS:
 	    // get the id and create the stats
-	    int characterId = data.getInt();
-	    rollForStats(player, characterId);
+	    int encodedCharacterCreatureType = data.getInt();
+	    CreatureType creatureType = 
+		CreatureInfo.decodeCreatureType(encodedCharacterCreatureType);
+
+	    if (!CreatureInfo.isPlayableCreatureType(creatureType)) {
+		// do something bad
+	    }
+	    rollForStats(player, creatureType);
 	    break;
 	case CREATE_CURRENT_CLIENT_CHARACTER:
 	    // get the name...
@@ -83,10 +93,11 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 	}
     }
 
-    void rollForStats(Player player, int characterClassId) {
-	this.characterClassId = characterClassId;
-	currentStats = getNewStats(characterClassId);
-	player.sendCharacterStats(-1, currentStats);
+    void rollForStats(Player player, CreatureType characterClassType) {
+
+	currentCharacterClassType = characterClassType;
+	currentStats = getNewStats(characterClassType);
+	player.sendCharacterStats(characterClassType, currentStats);
     }
 
 
@@ -97,16 +108,21 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
      *
      * @return the new stats for the character
      */
-    static CharacterStats getNewStats(int characterClassId) {
+    static CharacterStats getNewStats(CreatureType characterClassType) {
         // NOTE: this should change based on the character class, but
         //       for now it's purely random
-        int hp = NSidedDie.roll20Sided() + NSidedDie.roll20Sided();
-        return new CharacterStats("", NSidedDie.roll20Sided(),
-                                  NSidedDie.roll20Sided(),
-                                  NSidedDie.roll20Sided(),
-                                  NSidedDie.roll20Sided(),
-                                  NSidedDie.roll20Sided(),
-                                  NSidedDie.roll20Sided(), hp, hp);
+	CharacterStats stats = null;
+	switch (characterClassType) {
+	default:
+	    int hp = NSidedDie.roll20Sided() + NSidedDie.roll20Sided();
+	    stats = new CharacterStats("", NSidedDie.roll20Sided(),
+				       NSidedDie.roll20Sided(),
+				       NSidedDie.roll20Sided(),
+				       NSidedDie.roll20Sided(),
+				       NSidedDie.roll20Sided(),
+				       NSidedDie.roll20Sided(), hp, hp);
+	}
+	return stats;
     }
 
     /**
@@ -129,7 +145,8 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
                                currentStats.getHitPoints(),
                                currentStats.getMaxHitPoints());
 
-        return new PlayerCharacter(player, characterClassId, stats);
+        return new PlayerCharacter(player, 
+				   currentCharacterClassType, stats);
     }
 
     /**

@@ -21,6 +21,9 @@ import com.sun.sgs.example.hack.server.ai.AICharacterManager;
 import com.sun.sgs.example.hack.server.ai.MonsterFactory;
 import com.sun.sgs.example.hack.server.ai.NPCharacter;
 
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.StreamTokenizer;
@@ -132,7 +135,7 @@ public class DungeonFactory {
                 stok.nextToken();
                 String npcName = stok.sval;
                 stok.nextToken();
-                int id = (int)(stok.nval);
+                int encodedCreatureType = (int)(stok.nval);
                 stok.nextToken();
                 int count = (int)(stok.nval);
                 String [] messages = new String[count];
@@ -144,8 +147,12 @@ public class DungeonFactory {
                 // create the manager for the NPC and the NPC itself
                 AICharacterManager aiCMR =
                     AICharacterManager.newInstance();
+		
+		CreatureType creatureType = 
+		    CreatureInfo.decodeCreatureType(encodedCreatureType);
+		//System.out.println("loaded npc: " + creatureType);
                 NPCharacter npc =
-                    new NPCharacter(id, npcName, messages, aiCMR);
+                    new NPCharacter(creatureType, npcName, messages, aiCMR);
                 aiCMR.setCharacter(npc);
 
                 // put it into a bucket for the given level, creating the
@@ -165,11 +172,13 @@ public class DungeonFactory {
                 stok.nextToken();
                 String type = stok.sval;
                 stok.nextToken();
-                int id = (int)(stok.nval);
-
+                int encodedCreatureType = (int)(stok.nval);
+		CreatureType creatureType = 
+		    CreatureInfo.decodeCreatureType(encodedCreatureType);
+		//System.out.println("loaded monster: " + creatureType);
                 // create the manager and get the right instance
                 AICharacterManager aiCMR =
-                    MonsterFactory.getMonster(id, type);
+                    MonsterFactory.getMonster(creatureType);
 
                 // put the monster into a bucket for the given level, creating
                 // the bucket if it doesn't already exist

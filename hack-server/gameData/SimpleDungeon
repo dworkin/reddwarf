@@ -11,39 +11,39 @@
 EntryPoint one 1 1
 DefineLevel one
 10 8 false
-2 2 2 2 2 2 2 2 2 2
-2 13 2 2 2 2 2 2 2 2
-2 2 2 2 2 2 2 14 2 2
-2 2 2 2 2 2 2 2 2 2
-2 2 1 2 2 2 2 2 2 2
-2 2 2 2 2 2 2 20 2 2
-2 2 2 2 2 2 2 2 2 2
-2 2 2 2 2 2 2 2 2 2
-NPC one Karl 50 4 "leverage synergies" "think outside the box" "I'm logisticating right now" "drink martinis"
-NPC one Steve 51 3 "wah chu gaht?" "huh?" "that's really cool"
-NPC one Miriam 54 3 "there's a form for that" "I designed your multicast stack" "try these cookies"
-Monster one Rodent 59
+1 1 1 1 1 1 1 1 1 1
+1 11 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 12 1 1
+1 1 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 16 1 1
+1 1 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 1 1 1
+NPC one Karl 25 4 "leverage synergies" "think outside the box" "I'm logisticating right now" "drink martinis"
+NPC one Steve 21 3 "wah chu gaht?" "huh?" "that's really cool"
+NPC one Miriam 11 3 "there's a form for that" "I designed your multicast stack" "try these cookies"
+Monster one Rodent 28
 DefineLevel one-hidden
 5 5 false
-12 6 6 6 8
-5 2 2 2 5
-5 2 1 2 5
-5 2 2 2 5
-9 6 6 6 11
+3 3 3 3 3
+3 1 1 1 3
+3 1 11 1 3
+3 1 1 1 3
+3 3 3 3 3
 PlayerConnection one 2 4 one-hidden 2 2
 DefineLevel two
 10 8 false
-2 2 2 2 2 2 2 2 2 2
-2 2 2 2 2 2 2 2 2 2
-2 2 2 2 2 2 2 13 2 2
-2 2 2 2 2 2 2 2 2 2
-2 2 2 2 2 2 2 2 2 2
-2 2 2 3 2 2 2 2 2 2
-2 2 2 19 2 2 2 2 2 2
-2 2 2 2 2 2 2 2 2 2
-NPC two Karl 50 3 "leverage synergies" "think outside the box" "drink martinis"
-NPC two Steve 51 3 "wah chu gaht?" "huh?" "that's really cool"
-NPC two Miriam 54 3 "there's a form for that" "I designed your multicast stack" "try these cookies"
-Monster two Demon 68
+1 1 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 11 1 1
+1 1 1 1 1 1 1 1 1 1
+1 1 1 1 1 1 1 1 1 1
+1 1 13 13 13 1 1 1 1 1
+1 1 13 15 13 1 1 1 1 1
+1 1 13 13 13 1 1 1 1 1
+NPC two Karl 25 3 "leverage synergies" "think outside the box" "drink martinis"
+NPC two Steve 21 3 "wah chu gaht?" "huh?" "that's really cool"
+NPC two Miriam 11 3 "there's a form for that" "I designed your multicast stack" "try these cookies"
+Monster two Demon 3
 Connection one 7 2 two 7 2
 OneWayConnection two 3 5 one 1 1

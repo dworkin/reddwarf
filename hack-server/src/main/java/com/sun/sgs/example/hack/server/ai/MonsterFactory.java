@@ -12,6 +12,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 /**
  * This class is a prototype example of a pluggable object creator; so
@@ -35,20 +36,21 @@ public class MonsterFactory {
      * @throws IllegalArgumentException if {@code type} is not a
      *         recognized character type.
      */
-    public static AICharacterManager getMonster(int id, String type) {
+    public static AICharacterManager getMonster(CreatureType type) {
         // create a manager
         MonsterCharacter character = null;
         AICharacterManager charMgr =
             AICharacterManager.newInstance();
 
         // figute out what kind of monster we're creating
-        if (type.equals("Demon")) {
-            character = new DemonMonster(id, charMgr);
-        } else if (type.equals("Rodent")) {
-            character = new RodentMonster(id, charMgr);
-        } else if (type.equals("Collect")) {
-            character = new CollectMonster(id, charMgr);
-        } else {
+	switch (type) {
+	case DEMON:
+	    character = new DemonMonster(charMgr);
+	    break;
+	case RODENT:
+            character = new RodentMonster(charMgr);
+	    break;
+	default:
             DataManager dataManager = AppContext.getDataManager();
             dataManager.removeBinding(charMgr.toString());
             dataManager.removeObject(charMgr);

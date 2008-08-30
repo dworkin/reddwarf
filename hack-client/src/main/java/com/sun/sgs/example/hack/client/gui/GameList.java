@@ -12,9 +12,12 @@ import com.sun.sgs.example.hack.client.LobbyListener;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 
-import java.util.ArrayList;
+
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 import javax.swing.ListModel;
 import javax.swing.SwingUtilities;
@@ -31,10 +34,10 @@ class GameList implements ListModel, LobbyListener
 {
 
     // the backing list data
-    private ArrayList<GameDetail> data;
+    private Map<String,Integer> gameToPlayerCount;
 
     // the listeners who are listening for list changes
-    private HashSet<ListDataListener> listeners;
+    private Set<ListDataListener> listeners;
 
     // the panel that owns the list
     private LobbyPanel lobbyPanel;
@@ -45,7 +48,7 @@ class GameList implements ListModel, LobbyListener
      * @param lobbyPanel the panel that shows the list this model is backing
      */
     public GameList(LobbyPanel lobbyPanel) {
-        data = new ArrayList<GameDetail>();
+        gameToPlayerCount = new LinkedHashMap<String,Integer>();
         listeners = new HashSet<ListDataListener>();
 
         this.lobbyPanel = lobbyPanel;
@@ -55,7 +58,7 @@ class GameList implements ListModel, LobbyListener
      * Clears the contents of this list.
      */
     public void clearList() {
-        data.clear();
+        gameToPlayerCount.clear();
         notifyChange();
     }
 
@@ -66,7 +69,7 @@ class GameList implements ListModel, LobbyListener
      * @param game the name of the game
      */
     public void gameAdded(String game) {
-        data.add(new GameDetail(game, 0));
+        gameToPlayerCount.put(game, 0);
         notifyChange();
     }
 
@@ -76,14 +79,8 @@ class GameList implements ListModel, LobbyListener
      * @param game the name of the game
      */
     public void gameRemoved(String game) {
-        for (GameDetail detail : data) {
-            if (detail.name.equals(game)) {
-                data.remove(detail);
-                break;
-            }
-        }
-
-        notifyChange();
+	if (gameToPlayerCount.remove(game) != null)
+	    notifyChange();
     }
 
     /**
@@ -102,13 +99,7 @@ class GameList implements ListModel, LobbyListener
      * @param count the new membership count
      */
     public void playerCountUpdated(String game, int count) {
-        for (GameDetail detail : data) {
-            if (detail.name.equals(game)) {
-                detail.count = count;
-                break;
-            }
-        }
-
+	gameToPlayerCount.put(game, count);
         notifyChange();
     }
 
@@ -131,7 +122,7 @@ class GameList implements ListModel, LobbyListener
         // the current scale of the game the current mechanism is easier.
         final ListDataEvent event =
             new ListDataEvent(this, ListDataEvent.CONTENTS_CHANGED,
-                              0, data.size() - 1);
+                              0, gameToPlayerCount.size() - 1);
         
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
@@ -165,7 +156,12 @@ class GameList implements ListModel, LobbyListener
      * @param index the list index
      */
     public Object getElementAt(int index) {
-        return data.get(index);
+	int i = 0;
+	for (Map.Entry<String,Integer> e : gameToPlayerCount.entrySet()) {
+	    if (i == index)
+		return new GameDetail(e.getKey(), e.getValue());
+	}
+	return null;
     }
 
     /**
@@ -175,7 +171,12 @@ class GameList implements ListModel, LobbyListener
      * @param index the list index
      */
     public String getNameAt(int index) {
-        return data.get(index).name;
+	int i = 0;
+	for (Map.Entry<String,Integer> e : gameToPlayerCount.entrySet()) {
+	    if (i == index)
+		return e.getKey();
+	}
+        return null;
     }
 
     /**
@@ -184,7 +185,7 @@ class GameList implements ListModel, LobbyListener
      * @return the list size
      */
     public int getSize() {
-        return data.size();
+        return gameToPlayerCount.size();
     }
 
     /**

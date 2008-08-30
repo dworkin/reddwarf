@@ -15,7 +15,7 @@
   <artifactId>hack</artifactId>
   <name>Hack Example</name>
   <packaging>pom</packaging>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.1-SNAPSHOT</version>
   <description>
     Parent POM for the Project Darkstar Hack example.
   </description>
@@ -76,10 +76,10 @@
   </repositories>
 
   <properties>
-     <sgs.version>0.9.6.3</sgs.version>
+    <sgs.version>0.9.7</sgs.version>
     <!-- to run against the latest version of the trunk uncomment the
     following line and comment out the line above this comment -->
-    <!-- <sgs.version>0.9.7-SNAPSHOT</sgs.version> -->
+    <!-- <sgs.version>0.9.8-SNAPSHOT</sgs.version>-->
     <sgs-shared.version>1.0</sgs-shared.version>
   </properties>
 

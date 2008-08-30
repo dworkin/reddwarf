@@ -9,7 +9,7 @@
 package com.sun.sgs.example.hack.server.level;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
-import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.ServerItem;
 
 import com.sun.sgs.example.hack.share.Board;
 
@@ -55,7 +55,7 @@ public interface LevelBoard extends Board {
      *
      * @return true if the operation succeeded, false otherwise
      */
-    public boolean addItemAt(int x, int y, Item item);
+    public boolean addItemAt(int x, int y, ServerItem item);
 
     /**
      * Tries to remove an item from the given location.
@@ -66,7 +66,7 @@ public interface LevelBoard extends Board {
      *
      * @return true if the operation succeeded, false otherwise
      */
-    public boolean removeItemAt(int x, int y, Item item);
+    public boolean removeItemAt(int x, int y, ServerItem item);
 
     /**
      * Tests to see if a move would be possible to the given location for

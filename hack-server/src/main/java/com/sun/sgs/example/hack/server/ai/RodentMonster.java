@@ -18,6 +18,7 @@ import com.sun.sgs.example.hack.server.NSidedDie;
 import com.sun.sgs.example.hack.server.level.Level;
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.KeyMessages;
 
@@ -43,19 +44,9 @@ public class RodentMonster extends MonsterCharacter implements Serializable {
      * @param mgr the manager
      */
     public RodentMonster(AICharacterManager mgr) {
-        this(59, mgr);
-    }
-
-    /**
-     * Creates an instance of <code>RodentMonster</code>.
-     *
-     * @param id the rodent's identifier
-     * @param mgr the manager
-     */
-    public RodentMonster(int id, AICharacterManager mgr) {
-        super(id, "rodent", mgr);
-
-        regenerate();
+        super(CreatureType.RODENT, "Rodent", mgr);
+	stats = new CharacterStats("Rodent", 20, 10, 15, 15, 15, 18,
+				   10, 10);
     }
 
     /**

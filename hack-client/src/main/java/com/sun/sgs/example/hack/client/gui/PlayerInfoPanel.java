@@ -11,6 +11,8 @@ package com.sun.sgs.example.hack.client.gui;
 import com.sun.sgs.example.hack.client.PlayerListener;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
@@ -92,7 +94,8 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
      * @param id the sprite id for the character
      * @param stats the statistics for the character
      */
-    public void setCharacter(int id, CharacterStats stats) {
+    public void setCharacter(CreatureType characterClassType,
+			     CharacterStats stats) {
         setLabels(stats.getName(), stats.getStrength(),
                   stats.getIntelligence(), stats.getDexterity(),
                   stats.getWisdom(), stats.getConstitution(),

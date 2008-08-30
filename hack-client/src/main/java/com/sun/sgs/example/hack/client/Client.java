@@ -20,13 +20,22 @@ import com.sun.sgs.example.hack.client.gui.GamePanel;
 import com.sun.sgs.example.hack.client.gui.LobbyPanel;
 import com.sun.sgs.example.hack.client.gui.PasswordDialog;
 
-
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.Creature;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
+import com.sun.sgs.example.hack.share.ItemInfo;
+import com.sun.sgs.example.hack.share.ItemInfo.Item;
+import com.sun.sgs.example.hack.share.ItemInfo.ItemType;
+import com.sun.sgs.example.hack.share.SimpleCreature;
+import com.sun.sgs.example.hack.share.SimpleItem;
+import com.sun.sgs.example.hack.share.RoomInfo;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
 
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -47,6 +56,7 @@ import java.net.PasswordAuthentication;
 
 import java.nio.ByteBuffer;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -267,7 +277,6 @@ public class Client extends JFrame implements SimpleClientListener {
 	    try {
 		int encodedCmd = (int)(message.getInt());
 		Command cmd = Commands.decode(encodedCmd);
-		
 		switch(cmd) {
 
 		/*
@@ -275,10 +284,29 @@ public class Client extends JFrame implements SimpleClientListener {
 		 * a bulk mapping of all the player-ids to their names.
 		*/
 		case ADD_BULK_PLAYER_IDS:
-		    @SuppressWarnings("unchecked")
-			Map<BigInteger,String> playerIdsToNames = 
-			(Map<BigInteger,String>)(getObject(message));
-		    
+
+		    int numIds = message.getInt();
+
+		    Map<BigInteger,String> playerIdsToNames = 
+			new HashMap<BigInteger,String>();
+
+		    for (int id = 0; id < numIds; ++id) {
+			System.out.println("id: " + id);
+			int idLength = message.getInt();
+			byte[] bytes = new byte[idLength];
+			for (int i = 0; i < idLength; ++i) 
+			    bytes[i] = message.get();
+			BigInteger playerId = new BigInteger(bytes);
+	
+			int nameLength = message.getInt();
+			char[] arr = new char[nameLength];
+			for (int i = 0; i < nameLength; ++i) 
+			    arr[i] = message.getChar();
+			String playerName = new String(arr);
+
+			playerIdsToNames.put(playerId, playerName);
+		    }
+ 		    
 		    chatPanel.addPlayerIdMappings(playerIdsToNames);
 		    break;
 	    
@@ -287,10 +315,13 @@ public class Client extends JFrame implements SimpleClientListener {
 		 * new stats for the character.
 		 */
 		case NEW_CHARACTER_STATS:
-		    Object[] idAndStats = (Object[])(getObject(message));
-		    Integer id = (Integer)(idAndStats[0]);
-		    CharacterStats stats = (CharacterStats)(idAndStats[1]);
-		    creatorManager.changeStatistics(id, stats);
+		    //Object[] idAndStats = (Object[])(getObject(message));
+		    //Integer  = (Integer)(idAndStats[0]);
+		    int encodedCharacterClass = message.getInt();
+		    CreatureType characterClassType = 
+			CreatureInfo.decodeCreatureType(encodedCharacterClass);
+		    CharacterStats stats = decodeStats(message);
+		    creatorManager.changeStatistics(characterClassType, stats);
 		    break;
 
 		/*
@@ -298,10 +329,24 @@ public class Client extends JFrame implements SimpleClientListener {
 		 * message of all the available games
 		 */
 		case UPDATE_AVAILABLE_GAMES: 
-		    // we were sent game membership updates
-		    @SuppressWarnings("unchecked")
-			Collection<GameMembershipDetail> details =
-			(Collection<GameMembershipDetail>)(getObject(message));
+
+		    int numGames = message.getInt();
+		    		
+		    Collection<GameMembershipDetail> details = 
+			new ArrayList<GameMembershipDetail>(numGames);
+    
+		    for (int i = 0; i < numGames; ++i) {
+			int gameNameLen = message.getInt();
+			char[] arr = new char[gameNameLen];
+			for (int j = 0; j < gameNameLen; ++j) {
+			    arr[j] = message.getChar();
+			}
+			String gameName = new String(arr);
+			int playerCount = message.getInt();
+			
+			details.add(new GameMembershipDetail(gameName, playerCount));
+		    }
+
 		    for (GameMembershipDetail detail : details) {
 			// for each update, see if it's about the lobby
 			// or some specific dungeon
@@ -325,9 +370,15 @@ public class Client extends JFrame implements SimpleClientListener {
 		case NOTIFY_PLAYABLE_CHARACTERS: 
 		    // we got updated with some character statistics...these
 		    // are characters that the client is allowed to play
-		    @SuppressWarnings("unchecked")
-			Collection<CharacterStats> characters =
-			(Collection<CharacterStats>)(getObject(message));
+
+		    int numCharacters = message.getInt();
+
+		    Collection<CharacterStats> characters =
+			new ArrayList<CharacterStats>(numCharacters);
+		    for (int i = 0; i < numCharacters; ++i) {
+			characters.add(decodeStats(message));
+		    }
+		    
 		    lobbyManager.setCharacters(characters);		    
 		    break; 
 
@@ -339,8 +390,24 @@ public class Client extends JFrame implements SimpleClientListener {
 		 * similar to the UPDATE_BOARD_SPACES command.
 		 */		
 		case NEW_BOARD:
-		    // we got a complete board update
-		    Board board = (Board)(getObject(message));
+		    // we got an update to reset the client's current
+		    // board, so create a new client-side board based
+		    // on the dimensions sent to us.  This board will
+		    // have unknown floors and will be all empty.
+		    int width = message.getInt();
+		    int height = message.getInt();
+		    ClientSideBoard board = new ClientSideBoard(width, height);
+
+		    // next read off any positions the server will
+		    // send to us.  These will include information
+		    // about the floor type, creature and item at that
+		    // location.
+		    for (int i = 0; i < width; ++i) {
+			for (int j = 0; j < height; ++j) {
+			    readAndUpdateBoardSpace(board, i, j, message);
+			}
+		    }
+
 		    dungeonManager.changeBoard(board);
 		    break;
 
@@ -350,9 +417,31 @@ public class Client extends JFrame implements SimpleClientListener {
 		 */
 		case NEW_SERVER_MESSAGE:
 		    // we heard some message from the server
-		    char[] chars = (char[])(getObject(message));
+		    int mesgLength = message.getInt();
+		    char[] chars = new char[mesgLength];
+		    for (int i = 0; i < mesgLength; ++i)
+			chars[i] = message.getChar();
 		    String msg = new String(chars);
 		    dungeonManager.hearMessage(msg);
+		    break;
+		    		    
+		/*
+		 * The client sent an unhandled command to the server,
+		 * so the server has sent us back notice of what it
+		 * was
+		 */
+		case UNHANDLED_COMMAND:
+		    int encodedUnhandledCommand = message.getInt();
+		    Command unhandled = Commands.decode(encodedUnhandledCommand);
+		    int stringLength = message.getInt(); // unused
+		    char[] arr = new char[stringLength];
+		    for (int i = 0; i < stringLength; ++i) {
+			arr[i] = message.getChar();
+		    }
+		    String channelName = new String(arr);
+		    System.out.printf("This client sent the following " + 
+				      "unhandled command %s to channel %s%n",
+				      unhandled, channelName);
 		    break;
 
 		default:
@@ -366,6 +455,62 @@ public class Client extends JFrame implements SimpleClientListener {
 				   "message from server");
 		ioe.printStackTrace();
 	    }
+	}
+    }
+
+    private static CharacterStats decodeStats(ByteBuffer data) {
+	int charNameLength = data.getInt();
+	char[] arr = new char[charNameLength];
+	for (int j = 0; j < charNameLength; ++j)
+	    arr[j] = data.getChar();
+	String characterName = new String(arr);
+	return new CharacterStats(characterName,
+				  data.getInt(), // str
+				  data.getInt(), // int
+				  data.getInt(), // dex
+				  data.getInt(), // wis
+				  data.getInt(), // con
+				  data.getInt(), // chr
+				  data.getInt(), // hp
+				  data.getInt()); // max hp   
+    }
+
+
+    private static void readAndUpdateBoardSpace(ClientSideBoard board,
+						int x, int y,
+						ByteBuffer data) 
+	throws IOException {
+
+	int encodedFloorType = data.getInt();
+	FloorType floorType = RoomInfo.decodeFloorType(encodedFloorType);
+	board.setAt(x, y, floorType);
+
+	// if the item name length is 0, then no item is present
+	int itemNameLength = data.getInt();
+	if (itemNameLength > 0) {
+	    char[] arr = new char[itemNameLength];
+	    for (int i = 0; i < itemNameLength; ++i) 
+		arr[i] = data.getChar();
+	    String itemName = new String(arr);
+	    long itemId = data.getLong();
+	    int encodedItemType = data.getInt();
+	    ItemType itemType = ItemInfo.decodeItemType(encodedItemType);
+	    board.setAt(x, y, new SimpleItem(itemType, itemId, itemName));
+	}
+	
+	// the creature has a 0-length name, no creature is present
+	int creatureNameLength = data.getInt();
+	if (creatureNameLength > 0) {
+	    char[] arr = new char[creatureNameLength];
+	    for (int i = 0; i < creatureNameLength; ++i) 
+		arr[i] = data.getChar();
+	    String creatureName = new String(arr);
+	    long creatureId = data.getLong();
+	    int encodedCreatureType = data.getInt();
+	    CreatureType creatureType = 
+		CreatureInfo.decodeCreatureType(encodedCreatureType);
+	    board.setAt(x, y, new SimpleCreature(creatureType, 
+						 creatureId, creatureName));
 	}
     }
 
@@ -383,7 +528,7 @@ public class Client extends JFrame implements SimpleClientListener {
 	    ObjectInputStream ois = new ObjectInputStream(bin);
 	    return ois.readObject();
 	} catch (ClassNotFoundException cnfe) {
-	    throw new IOException(cnfe.getMessage());
+	    throw new IOException(cnfe.getMessage(), cnfe);
 	}
     }
     

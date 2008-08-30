@@ -23,6 +23,7 @@ import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.Commands.Command;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -330,7 +331,8 @@ public class Player
      * @param character the character who's statistics will be sent
      */
     public void sendCharacter(PlayerCharacter character) {
-        Messages.sendCharacter(getCurrentSession(), character.getID(), 
+        Messages.sendCharacter(getCurrentSession(), 
+			       character.getCreatureType(), 
 			       character.getStatistics());                               
     }
 
@@ -340,8 +342,9 @@ public class Player
      * @param id the character's identifier
      * @param stats the character statistics
      */
-    public void sendCharacterStats(int id, CharacterStats stats) {
-        Messages.sendCharacter(getCurrentSession(), id, stats);
+    public void sendCharacterStats(CreatureType characterClassType,
+				   CharacterStats stats) {
+        Messages.sendCharacter(getCurrentSession(), characterClassType, stats);
     }
 
     /**

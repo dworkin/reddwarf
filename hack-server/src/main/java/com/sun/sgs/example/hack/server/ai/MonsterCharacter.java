@@ -17,7 +17,7 @@ import com.sun.sgs.example.hack.server.Character;
 import com.sun.sgs.example.hack.server.CharacterManager;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
-
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 /**
  * This abstract implementation of <code>AICharacter</code> is the base
@@ -34,8 +34,9 @@ public abstract class MonsterCharacter extends AICharacter {
      * @param id the identifier for this character
      * @param name the name for this character
      */
-    protected MonsterCharacter(int id, String name, AICharacterManager mgr) {
-        super(id, name);
+    protected MonsterCharacter(CreatureType creatureType, String name,
+			       AICharacterManager mgr) {
+        super(creatureType, name);
 
         mgrRef = AppContext.getDataManager().createReference(mgr);
     }

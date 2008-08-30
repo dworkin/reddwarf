@@ -15,6 +15,16 @@ import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.Creature;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+import com.sun.sgs.example.hack.share.ItemInfo;
+import com.sun.sgs.example.hack.share.ItemInfo.Item;
+import com.sun.sgs.example.hack.share.ItemInfo.ItemType;
+import com.sun.sgs.example.hack.share.SimpleCreature;
+import com.sun.sgs.example.hack.share.SimpleItem;
+import com.sun.sgs.example.hack.share.RoomInfo;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
 
 import java.awt.Image;
 
@@ -71,15 +81,10 @@ public class DungeonChannelListener extends GameChannelListener
 
 	int encodedCmd = (int)(data.getInt());
 	Command cmd = Commands.decode(encodedCmd);
-
 	try {
 	    switch (cmd) {
 	    case ADD_PLAYER_ID:
-		@SuppressWarnings("unchecked")
-		BigInteger playerID = (BigInteger)(getObject(data));
-		@SuppressWarnings("unchecked")
-		String playerName = (String)(getObject(data));
-		addPlayerIdMapping(playerID, playerName);
+		addPlayerId(data);
 		break;
 
 	    case PLAYER_JOINED:
@@ -96,12 +101,13 @@ public class DungeonChannelListener extends GameChannelListener
 	     * to all the players in the dungeon.
 	     */
 	    case UPDATE_BOARD_SPACES:
-		// we got some selective space updates
-		@SuppressWarnings("unchecked")
-                    Collection<BoardSpace> spaces =		    
-		    (Collection<BoardSpace>)(getObject(data));
-		BoardSpace [] s = new BoardSpace[spaces.size()];
-		blistener.updateSpaces(spaces.toArray(s));
+		int numBoardSpaces = data.getInt();
+		BoardSpace[] spaces = new BoardSpace[numBoardSpaces];
+
+		for (int i = 0; i < numBoardSpaces; ++i)
+		    spaces[i] = decodeBoardSpace(data);
+
+		blistener.updateSpaces(spaces);
                 break;
 
 	    default:
@@ -116,4 +122,44 @@ public class DungeonChannelListener extends GameChannelListener
 	    ioe.printStackTrace();
 	}
     }
+
+    private static BoardSpace decodeBoardSpace(ByteBuffer data) {
+
+	int x = data.getInt();
+	int y = data.getInt();
+	int encodedFloorType = data.getInt();
+	FloorType floorType = RoomInfo.decodeFloorType(encodedFloorType);
+
+	BoardSpace space = new BoardSpace(x, y, floorType);
+
+	// if the item name length is 0, then no item is present
+	int itemNameLength = data.getInt();
+	if (itemNameLength > 0) {
+	    char[] arr = new char[itemNameLength];
+	    for (int i = 0; i < itemNameLength; ++i) 
+		arr[i] = data.getChar();
+	    String itemName = new String(arr);
+	    long itemId = data.getLong();
+	    int encodedItemType = data.getInt();
+	    ItemType itemType = ItemInfo.decodeItemType(encodedItemType);
+	    space.setItem(new SimpleItem(itemType, itemId, itemName));	    
+	}
+	
+	// the creature has a 0-length name, no creature is present
+	int creatureNameLength = data.getInt();
+	if (creatureNameLength > 0) {
+	    char[] arr = new char[creatureNameLength];
+	    for (int i = 0; i < creatureNameLength; ++i) 
+		arr[i] = data.getChar();
+	    String creatureName = new String(arr);
+	    long creatureId = data.getLong();
+	    int encodedCreatureType = data.getInt();
+	    CreatureType creatureType = 
+		CreatureInfo.decodeCreatureType(encodedCreatureType);
+	    space.setCreature(new SimpleCreature(creatureType, 
+						 creatureId, creatureName));
+	}
+	return space;
+    }
+    
 }

@@ -61,11 +61,7 @@ public class CreatorChannelListener extends GameChannelListener
 	try {
 	    switch(cmd) {
 	    case ADD_PLAYER_ID:
-		@SuppressWarnings("unchecked")
-		BigInteger playerID = (BigInteger)(getObject(data));
-		@SuppressWarnings("unchecked")
-		String playerName = (String)(getObject(data));
-		addPlayerIdMapping(playerID, playerName);
+		addPlayerId(data);
 		break;
 
 	    case PLAYER_JOINED:
@@ -87,11 +83,11 @@ public class CreatorChannelListener extends GameChannelListener
 				  "Creator channel%n", cmd, encodedCmd);
 	    }
 	}	
-	catch (IOException ioe) {
+	catch (Throwable t) {
  	    // NOTE: this should probably handle the error a little
  	    //       more gracefully, but it's unclear what the right
  	    //       approach is
- 	    ioe.printStackTrace();
+ 	    t.printStackTrace();
  	}
     }
 

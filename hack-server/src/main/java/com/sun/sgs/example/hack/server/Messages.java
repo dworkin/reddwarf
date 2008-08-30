@@ -21,12 +21,21 @@ import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.Creature;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.GameMembershipDetail;
+import com.sun.sgs.example.hack.share.ItemInfo;
+import com.sun.sgs.example.hack.share.ItemInfo.Item;
+import com.sun.sgs.example.hack.share.ItemInfo.ItemType;
+import com.sun.sgs.example.hack.share.RoomInfo;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
 
 import com.sun.sgs.impl.sharedutil.HexDumper;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -41,6 +50,8 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import java.util.logging.Logger;
+
 /**
  * This class provides a single point for static methods that send messages
  * the client. This is provided both as a convenience, and also as a way
@@ -48,6 +59,10 @@ import java.util.HashSet;
  * message code definition is done here.
  */
 public final class Messages {
+
+
+    private static final Logger logger =
+	Logger.getLogger(Messages.class.getName());
 
     /**
      * The maximum number of Player ID to Name mappings to send during
@@ -66,34 +81,32 @@ public final class Messages {
     // Actual data-sending methods
     //
 
-    private static void broadcastToClients(Channel channel,
-					   Command command,
-					   Object... args) {
-	byte [] bytes = encodeObjects(args);
+//     private static void broadcastToClients(Channel channel,
+// 					   Command command,
+// 					   byte[] args) {
 
-        // create a buffer for the message code and the object bytes
-	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
-	bb.putInt(Commands.encode(command));
-	bb.put(bytes);
-	bb.rewind();
+//         // create a buffer for the message code and the object bytes
+// 	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
+// 	bb.putInt(Commands.encode(command));
+// 	bb.put(bytes);
+// 	bb.rewind();
 	
-	channel.send(null, bb);	
-    }
+// 	channel.send(null, bb);	
+//     }
     
     
-    private static void sendToClient(ClientSession session,
-				     Command command,
-				     Object... args) {
-	byte [] bytes = encodeObjects(args);
+//     private static void sendToClient(ClientSession session,
+// 				     Command command,
+// 				     byte[] args) {
         
-        // create a buffer for the message code and the object bytes
-	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
-	bb.putInt(Commands.encode(command));
-	bb.put(bytes);
-	bb.rewind();
+//         // create a buffer for the message code and the object bytes
+// 	ByteBuffer bb = ByteBuffer.allocate(bytes.length + 4);
+// 	bb.putInt(Commands.encode(command));
+// 	bb.put(bytes);
+// 	bb.rewind();
 	
-	session.send(bb);
-    }
+// 	session.send(bb);
+//     }
 
 
     //
@@ -112,30 +125,42 @@ public final class Messages {
      *         only one was provided, or of an {@Object[]} containing
      *         all the arguments if more than one was provided.
      */
-    private static byte [] encodeObjects(Object... args) {
-	try {
-	    // serialize each object to a stream
-	    ByteArrayOutputStream bout = new ByteArrayOutputStream();
-	    ObjectOutputStream oos = new ObjectOutputStream(bout);
+//     private static byte [] encodeObjects(Object... args) {
+// 	try {
+// 	    // serialize each object to a stream
+// 	    ByteArrayOutputStream bout = new ByteArrayOutputStream();
+// 	    ObjectOutputStream oos = new ObjectOutputStream(bout);
 	    
-	    if (args.length == 1)
-		oos.writeObject(args[0]);
-	    else
-		oos.writeObject(args);
-	    oos.close();
+// 	    if (args.length == 1)
+// 		oos.writeObject(args[0]);
+// 	    else
+// 		oos.writeObject(args);
+// 	    oos.close();
 	    
-	    // return the bytes
-	    return bout.toByteArray();
-        } catch (IOException ioe) {
-            throw new IllegalArgumentException("couldn't encode object", ioe);
-        }
-    }
+// 	    // return the bytes
+// 	    return bout.toByteArray();
+//         } catch (IOException ioe) {
+//             throw new IllegalArgumentException("couldn't encode object", ioe);
+//         }
+//     }
 
-    public static void sendNotificationOfUnhandledCommand(ClientSession session,
-							  String channelName, 
-							  Command command) {
-	sendToClient(session, Command.UNHANDLED_COMMAND, channelName, 
-		     new Integer(Commands.encode(command)));
+    public static void 
+	sendNotificationOfUnhandledCommand(ClientSession session,
+					   String channelName, 
+					   Command unhandledCommand) {
+
+	// space for the length of the string, the encoded command and
+	// the name of the channel that the command was sent to
+	ByteBuffer bb = ByteBuffer.allocate(12 + (channelName.length() * 2));
+	bb.putInt(Commands.encode(Command.UNHANDLED_COMMAND));
+	bb.putInt(Commands.encode(unhandledCommand));
+	bb.putInt(channelName.length());
+	char[] arr = channelName.toCharArray();
+	for (char c : arr)
+	    bb.putChar(c);
+
+	bb.rewind();
+	session.send(bb);
     }
     
     //
@@ -148,8 +173,15 @@ public final class Messages {
      */
     public static void broadcastPlayerJoined(Channel channel,
 					     BigInteger playerID) {
-        broadcastToClients(channel, Command.PLAYER_JOINED,
-			   playerID);
+	byte[] id = playerID.toByteArray();
+	ByteBuffer bb = ByteBuffer.allocate(8 + id.length);
+	bb.putInt(Commands.encode(Command.PLAYER_JOINED));
+	bb.putInt(id.length);
+	for (byte b : id)
+	    bb.put(b);
+
+	bb.rewind();
+	channel.send(null, bb);
     }
 
     /**
@@ -158,8 +190,15 @@ public final class Messages {
      */
     public static void broadcastPlayerLeft(Channel channel,
 					   BigInteger playerID) {
-        broadcastToClients(channel, Command.PLAYER_LEFT, 
-			   playerID);
+	byte[] id = playerID.toByteArray();
+	ByteBuffer bb = ByteBuffer.allocate(8 + id.length);
+	bb.putInt(Commands.encode(Command.PLAYER_LEFT));
+	bb.putInt(id.length);
+	for (byte b : id)
+	    bb.put(b);
+
+	bb.rewind();
+	channel.send(null, bb);
     }
 
     /**
@@ -169,8 +208,20 @@ public final class Messages {
     public static void broadcastPlayerID(Channel channel,
 					 String playerName,
 					 BigInteger playerID) {
-	broadcastToClients(channel, Command.ADD_PLAYER_ID, playerName,
-			   playerID);
+	byte[] id = playerID.toByteArray();
+	char[] arr = playerName.toCharArray();
+
+	ByteBuffer bb = ByteBuffer.allocate(12 + id.length + (arr.length * 2));
+	bb.putInt(Commands.encode(Command.ADD_PLAYER_ID));
+	bb.putInt(id.length);
+	for (byte b : id)
+	    bb.put(b);
+	bb.putInt(arr.length);
+	for (char c : arr)
+	    bb.putChar(c);
+
+	bb.rewind();
+	channel.send(null, bb);
     }
 
     /**	
@@ -193,34 +244,79 @@ public final class Messages {
                     (ScalableHashMap<ManagedReference<ClientSession>,String>)
 		        playerToName, session));
 	}
-	// if we know we can call size() on it, see how big the map is
-	// See ScalableHashMap.size() on why we can't call it in this
-	// case
-	else if (playerToName.size() > 200) {
+// 	// if we know we can call size() on it, see how big the map is
+// 	// See ScalableHashMap.size() on why we can't call it in this
+// 	// case
+// 	else if (playerToName.size() > 200) {
 
-	    // if the map is too big to send at once, then we'll start
-	    // a task to iterate over a fixed number of names and
-	    // enqueue itself again to do the rest if necessary.
-	    AppContext.getTaskManager().
-		scheduleTask(new HashMapBulkIdSender(playerToName, session));
-	}
+// 	    // if the map is too big to send at once, then we'll start
+// 	    // a task to iterate over a fixed number of names and
+// 	    // enqueue itself again to do the rest if necessary.
+// 	    AppContext.getTaskManager().
+// 		scheduleTask(new HashMapBulkIdSender(playerToName, session));
+// 	}
 	// otherwise, it's okay to send the entire map at once.
 	else {
+
+	    // allocate a stream to write the data, as it will be too
+	    // much work to determine the size for preallocating a
+	    // ByteBuffer
+	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    DataOutputStream dos = new DataOutputStream(baos);
+
+	    try {
+		dos.writeInt(Commands.encode(Command.ADD_BULK_PLAYER_IDS));
+		dos.writeInt(playerToName.size());
+	    } catch (IOException ioe) {
+		// this should never happen, but log in case it
+		// ever does
+		logger.severe("unexpected error: " + ioe);
+	    }	
 	    
-	    // convert the ClientSession to a BigInteger identifier
+	    // convert each reference to ClientSession to a BigInteger
+	    // identifier
 	    Map<BigInteger,String> idsToNames = 
 		new HashMap<BigInteger,String>();
 
 	    for (Map.Entry<ManagedReference<ClientSession>,String> e :
 		     playerToName.entrySet()) {
 		
-		idsToNames.put(e.getKey().getId(), e.getValue());
+		BigInteger playerId = e.getKey().getId();
+		String playerName = e.getValue();
+
+		byte[] id = playerId.toByteArray();
+		char[] nm = playerName.toCharArray();
+
+		try {
+		    dos.writeInt(id.length);
+		    dos.write(id);
+		    dos.writeInt(nm.length);
+		    for (char c : nm)
+			dos.writeChar(c);
+		} catch (IOException ioe) {
+		    // this should never happen, but log in case it
+		    // ever does
+		    logger.severe("unexpected error: " + ioe);
+		}		
 	    }
 	    
-	    sendToClient(session, Command.ADD_BULK_PLAYER_IDS,
-			 idsToNames);	    
+	    try {
+		baos.close();
+		dos.close();
+	    } catch (IOException ioe) {
+		// this should never happen, but log in case it ever
+		// does
+		logger.severe("unexpected error: " + ioe);
+	    }
+
+	    // wrap all the data that we just wrote in a byte buffer
+	    ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
+	    bb.rewind();
+	    session.send(bb);
 	}
     }
+    
+
 	
     private static final class ScalableMapBulkIdSender 
 	implements Task, ManagedObject, Serializable {
@@ -248,73 +344,123 @@ public final class Messages {
 	public void run() {
 	    AppContext.getDataManager().markForUpdate(this);
 
-	    Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
-	    while (idsToNames.size() < MAX_ID_SEND &&
-		   iter.hasNext()) {
-		Map.Entry<ManagedReference<ClientSession>,String> e = 
-		    iter.next();
-		idsToNames.put(e.getKey().getId(), e.getValue());
-	    }
-	    
-	    Messages.sendToClient(sessionRef.get(), Command.ADD_BULK_PLAYER_IDS,
-				  idsToNames);	    
-	    
-	    if (iter.hasNext())
-		AppContext.getTaskManager().scheduleTask(this);
-	}
-    }
-
-    private static final class HashMapBulkIdSender 
-	implements Task, ManagedObject, Serializable {
-
-	private static final long serialVersionUID = 1L;
-
-	private final 
-	    Map<ManagedReference<ClientSession>,String> remaining;
-
-	private final ManagedReference<ClientSession> sessionRef;
-	
-	public HashMapBulkIdSender(
-	    Map<ManagedReference<ClientSession>,String> playerToName,
-	    ClientSession session)
-	{
-	    // make a copy of the map since we'll be mutating it
-	    remaining = new HashMap<ManagedReference<ClientSession>,String>(
-                playerToName);
-	    this.sessionRef = 
-		AppContext.getDataManager().createReference(session);
-	}
-	
-	/**
-	 * Iterates over a finite number of IDs and sends them over.
-	 * Then reschedules itself if more IDs remain.
-	 */
-	public void run() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    
-	    Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
-
-	    Iterator<Map.Entry<ManagedReference<ClientSession>,String>> iter =
-		remaining.entrySet().iterator();
-
-	    while (idsToNames.size() < MAX_ID_SEND &&
-		   iter.hasNext()) {
-		Map.Entry<ManagedReference<ClientSession>,String> e = 
-		    iter.next();
-		// remove the entry from the map so that we don't send
-		// this id again.
-		iter.remove();
+	    // allocate a stream to write the data, as it will be too
+	    // much work to determine the size for preallocating a
+	    // ByteBuffer
+	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    DataOutputStream dos = new DataOutputStream(baos);	    
 		
-		idsToNames.put(e.getKey().getId(), e.getValue());
+	    int idCount = 0;
+
+	    while (idCount < MAX_ID_SEND && iter.hasNext()) {
+		
+		Map.Entry<ManagedReference<ClientSession>,String> e = 
+		    iter.next();
+
+		BigInteger playerId = e.getKey().getId();
+		String playerName = e.getValue();
+
+		byte[] id = playerId.toByteArray();
+		char[] nm = playerName.toCharArray();
+
+		try {
+		    dos.writeInt(id.length);
+		    dos.write(id);
+		    dos.writeInt(nm.length);
+
+		    for (char c : nm)
+			dos.writeChar(c);
+		
+		} catch (IOException ioe) {
+		    // this should never happen, but log in case it ever
+		    // does
+		    logger.severe("unexpected error: " + ioe);
+		}
+		
+		idCount++;
 	    }
 	    
-	    Messages.sendToClient(sessionRef.get(), Command.ADD_BULK_PLAYER_IDS,
-				  idsToNames);	    
-	    
+	    try {
+		baos.close();
+		dos.close();
+	    } catch (IOException ioe) {
+		// this should never happen, but log in case it ever
+		// does
+		logger.severe("unexpected error: " + ioe);
+	    }
+
+	    byte[] bulkIds = baos.toByteArray();
+	    ByteBuffer bb = ByteBuffer.allocate(8 + bulkIds.length);
+
+	    bb.putInt(Commands.encode(Command.ADD_BULK_PLAYER_IDS));
+	    bb.putInt(idCount);	    
+	    // wrap all the data that we just wrote in a byte buffer
+	    bb.put(bulkIds);
+	    bb.rewind();
+
+	    sessionRef.get().send(bb);
+	
+	    // reschedule this task if there are still more ids to
+	    // send
 	    if (iter.hasNext())
 		AppContext.getTaskManager().scheduleTask(this);
+	    // otherwise, remove this object from the data store
+	    else
+		AppContext.getDataManager().removeObject(this);
 	}
     }
+
+//     private static final class HashMapBulkIdSender 
+// 	implements Task, ManagedObject, Serializable {
+
+// 	private static final long serialVersionUID = 1L;
+
+// 	private final 
+// 	    Map<ManagedReference<ClientSession>,String> remaining;
+
+// 	private final ManagedReference<ClientSession> sessionRef;
+	
+// 	public HashMapBulkIdSender(
+// 	    Map<ManagedReference<ClientSession>,String> playerToName,
+// 	    ClientSession session)
+// 	{
+// 	    // make a copy of the map since we'll be mutating it
+// 	    remaining = new HashMap<ManagedReference<ClientSession>,String>(
+//                 playerToName);
+// 	    this.sessionRef = 
+// 		AppContext.getDataManager().createReference(session);
+// 	}
+	
+// 	/**
+// 	 * Iterates over a finite number of IDs and sends them over.
+// 	 * Then reschedules itself if more IDs remain.
+// 	 */
+// 	public void run() {
+// 	    AppContext.getDataManager().markForUpdate(this);
+	    
+// 	    Map<BigInteger,String> idsToNames = new HashMap<BigInteger,String>();
+
+// 	    Iterator<Map.Entry<ManagedReference<ClientSession>,String>> iter =
+// 		remaining.entrySet().iterator();
+
+// 	    while (idsToNames.size() < MAX_ID_SEND &&
+// 		   iter.hasNext()) {
+// 		Map.Entry<ManagedReference<ClientSession>,String> e = 
+// 		    iter.next();
+// 		// remove the entry from the map so that we don't send
+// 		// this id again.
+// 		iter.remove();
+		
+// 		idsToNames.put(e.getKey().getId(), e.getValue());
+// 	    }
+	    
+// 	    Messages.sendToClient(sessionRef.get(), Command.ADD_BULK_PLAYER_IDS,
+// 				  idsToNames);	    
+	    
+// 	    if (iter.hasNext())
+// 		AppContext.getTaskManager().scheduleTask(this);
+// 	}
+//     }
     
 	  
 
@@ -333,7 +479,34 @@ public final class Messages {
 				       Collection<GameMembershipDetail> games) 
     {
 
-        sendToClient(session, Command.UPDATE_AVAILABLE_GAMES, games);
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	DataOutputStream dos = new DataOutputStream(baos);	    
+	
+	try {
+	    for (GameMembershipDetail d : games) {
+		String gameName = d.getGame();
+		dos.writeInt(gameName.length());
+		char[] nm = gameName.toCharArray();
+		for (char c : nm)
+		    dos.writeChar(c);
+		dos.writeInt(d.getCount());
+	    }
+	    dos.close();
+	    baos.close();
+	} catch (IOException ioe) {
+	    // this should never happen, but log in case it ever
+	    // does
+	    logger.severe("unexpected error: " + ioe);
+	}
+
+	byte[] data = baos.toByteArray();
+	ByteBuffer bb = ByteBuffer.allocate(8 + data.length);
+	bb.putInt(Commands.encode(Command.UPDATE_AVAILABLE_GAMES));
+	bb.putInt(games.size());
+	bb.put(data);
+	bb.rewind();
+
+	session.send(bb);
     }
 
     /**
@@ -346,8 +519,16 @@ public final class Messages {
     public static void broadcastGameCountChanged(Channel channel,
 						 int count, String name) {
 
-	broadcastToClients(channel, Command.UPDATE_GAME_MEMBER_COUNT, 
-			   new Integer(count), name);
+	ByteBuffer bb = ByteBuffer.allocate(12 + (name.length() * 2));
+	bb.putInt(Commands.encode(Command.UPDATE_GAME_MEMBER_COUNT));
+	bb.putInt(count);
+	bb.putInt(name.length());
+	char[] arr = name.toCharArray();
+	for (char c : arr)
+	    bb.putChar(c);
+	
+	bb.rewind();
+	channel.send(null, bb);
     }
 
     /**
@@ -357,7 +538,15 @@ public final class Messages {
      */
     public static void broadcastGameAdded(Channel channel, String name) {
 
-        broadcastToClients(channel, Command.GAME_ADDED, name);
+	ByteBuffer bb = ByteBuffer.allocate(8 + (name.length() * 2));
+	bb.putInt(Commands.encode(Command.GAME_ADDED));
+	bb.putInt(name.length());
+	char[] arr = name.toCharArray();
+	for (char c : arr)
+	    bb.putChar(c);
+	
+	bb.rewind();
+	channel.send(null, bb);
     }
 
     /**
@@ -367,17 +556,62 @@ public final class Messages {
      */
     public static void broadcastGameRemoved(Channel channel, String name) {
 
-        broadcastToClients(channel, Command.GAME_REMOVED, name);
+	ByteBuffer bb = ByteBuffer.allocate(8 + (name.length() * 2));
+	bb.putInt(Commands.encode(Command.GAME_REMOVED));
+	bb.putInt(name.length());
+	char[] arr = name.toCharArray();
+	for (char c : arr)
+	    bb.putChar(c);
+	
+	bb.rewind();
+	channel.send(null, bb);
     }
 
     /**
-     * Sends a <code>Collection</code> of player statistics.
+     * Sends a <code>Collection</code> of player characters that a
+     * client may choose from when selecting which character to play.
+     * This message is sent when the client is in the Lobby game
+     * state.
      *
      * @param stats the collection of character statistics
      */
     public static void sendPlayableCharacters(ClientSession session,
-					    Collection<CharacterStats> stats) {
-        sendToClient(session, Command.NOTIFY_PLAYABLE_CHARACTERS, stats);
+					      Collection<CharacterStats> stats) {
+
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	DataOutputStream dos = new DataOutputStream(baos);	    
+	
+	try {
+	    for (CharacterStats s : stats) {
+		char[] nm = s.getName().toCharArray();
+		dos.writeInt(nm.length);
+		for (char c : nm)
+		    dos.writeChar(c);
+		dos.writeInt(s.getStrength());
+		dos.writeInt(s.getIntelligence());
+		dos.writeInt(s.getDexterity());
+		dos.writeInt(s.getWisdom());
+		dos.writeInt(s.getConstitution());
+		dos.writeInt(s.getCharisma());
+		dos.writeInt(s.getHitPoints());
+		dos.writeInt(s.getMaxHitPoints());
+	    }
+	    dos.close();
+	    baos.close();
+	} catch (IOException ioe) {
+	    // this should never happen, but log in case it ever
+	    // does
+	    logger.severe("unexpected error: " + ioe);
+	}
+
+	byte[] data = baos.toByteArray();
+	ByteBuffer bb = ByteBuffer.allocate(8 + data.length);
+	bb.putInt(Commands.encode(Command.NOTIFY_PLAYABLE_CHARACTERS));
+	bb.putInt(stats.size());
+	bb.put(data);
+	bb.rewind();
+
+	session.send(bb);
     }
 
     /*
@@ -390,8 +624,43 @@ public final class Messages {
      * @param board the <code>Board</code> to send
      */
     public static void sendBoard(ClientSession session, Board board) {
+
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	DataOutputStream dos = new DataOutputStream(baos);	    
 	
-        sendToClient(session, Command.NEW_BOARD, board);
+	try {
+	    int width = board.getWidth();
+	    int height = board.getHeight();
+
+	    dos.writeInt(width);
+	    dos.writeInt(height);
+
+	    // as a part of this command, we assume that the client
+	    // will know that we are sending all the squares in this
+	    // order
+	    for (int i = 0; i < width; ++i) {
+		for (int j = 0; j < height; ++j) {
+		    BoardSpace s = board.getAt(i, j);
+		    writeBoardSpace(dos, s, false);
+		}
+	    }
+
+	    dos.close();
+	    baos.close();
+	} catch (IOException ioe) {
+	    // this should never happen, but log in case it ever
+	    // does
+	    logger.severe("unexpected error: " + ioe);
+	}
+	
+	byte[] data = baos.toByteArray();
+
+	ByteBuffer bb = ByteBuffer.allocate(4 + data.length);
+	bb.putInt(Commands.encode(Command.NEW_BOARD));
+	bb.put(data);
+	bb.rewind();
+
+	session.send(bb);
     }
 
     /**
@@ -400,10 +669,86 @@ public final class Messages {
      * @param spaces the spaces that are being updated
      */
     public static void broadcastBoardUpdate(Channel channel,
-					    Collection<BoardSpace> spaces) 
-    {
-        broadcastToClients(channel, Command.UPDATE_BOARD_SPACES, spaces);
+					    Collection<BoardSpace> spaces) {
+	
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	DataOutputStream dos = new DataOutputStream(baos);	    
+
+	try {
+	    for (BoardSpace s : spaces) {
+		writeBoardSpace(dos, s, true);
+	    }
+	    dos.close();
+	    baos.close();
+	} catch (IOException ioe) {
+	    // this should never happen, but log in case it ever
+	    // does
+	    logger.severe("unexpected error: " + ioe);
+	}
+
+	byte[] data = baos.toByteArray();
+
+	ByteBuffer bb = ByteBuffer.allocate(8 + data.length);
+	bb.putInt(Commands.encode(Command.UPDATE_BOARD_SPACES));
+	bb.putInt(spaces.size());
+	bb.put(data);
+	bb.rewind();
+
+	channel.send(null, bb);
     }
+
+
+    private static void writeBoardSpace(DataOutputStream dos,
+					BoardSpace s, boolean writeCoords) 
+	throws IOException {
+
+	if (writeCoords) {
+	    dos.writeInt(s.getX());
+	    dos.writeInt(s.getY());
+	}
+
+	// floor
+	int encodedFloorType = 
+	    RoomInfo.encodeFloorType(s.getFloorType());
+	dos.writeInt(encodedFloorType);
+	
+	// item.  If the item was null, then write 0 for the length of
+	// the name.  The client will recognize this as no item
+	// present.
+	Item item = s.getItem();
+	if (item == null)
+	    dos.writeInt(0);
+	else {
+	    String itemName = item.getName();
+	    dos.writeInt(itemName.length());
+	    char[] arr = itemName.toCharArray();
+	    for (char c : arr)
+		dos.writeChar(c);
+	    dos.writeLong(item.getItemId());
+	    int encodedItemType = 
+		ItemInfo.encodeItemType(item.getItemType());
+	    dos.writeInt(encodedItemType);
+	}
+	
+	// if no creature is present, then write 0 for the length of
+	// the creature's name.  The client will recognize this as no
+	// creature present
+	Creature creature = s.getCreature();
+	if (creature == null)
+	    dos.writeInt(0);
+	else {
+	    String creatureName = creature.getName();
+	    dos.writeInt(creatureName.length());
+	    char[] arr = creatureName.toCharArray();
+	    for (char c : arr)
+		dos.writeChar(c);
+	    dos.writeLong(creature.getCreatureId());
+	    int encodedCreatureType = 
+		CreatureInfo.encodeCreatureType(creature.getCreatureType());
+	    dos.writeInt(encodedCreatureType);
+	}
+
+    } 
 
     /**
      * Sends a text message to the client. These are messages generated by
@@ -412,8 +757,16 @@ public final class Messages {
      * @param message the message to send
      */
     public static void sendServerMessage(ClientSession session, String message) {
+	ByteBuffer bb = ByteBuffer.allocate(8 + (message.length() * 2));
 
-        sendToClient(session, Command.NEW_SERVER_MESSAGE, message.toCharArray());
+	bb.putInt(Commands.encode(Command.NEW_SERVER_MESSAGE));
+	char[] arr = message.toCharArray();
+	bb.putInt(arr.length);
+	for (char c : arr)
+	    bb.putChar(c);
+
+	bb.rewind();
+	session.send(bb);
     }
 
     /*
@@ -426,11 +779,31 @@ public final class Messages {
      * @param id the character's id
      * @param stats the character's statistics
      */
-    public static void sendCharacter(ClientSession session, int id,
+    public static void sendCharacter(ClientSession session, 
+				     CreatureType creatureType,
 				     CharacterStats stats) {
 
-        sendToClient(session, Command.NEW_CHARACTER_STATS, new Integer(id), 
-		     stats);
+	char[] nm = stats.getName().toCharArray();
+
+	// 4 for command, 4 for creature type, 4 for name length,
+	// 4 * 8 for stats, name length
+	ByteBuffer bb = ByteBuffer.allocate(44 + (nm.length * 2));
+	bb.putInt(Commands.encode(Command.NEW_CHARACTER_STATS));
+	bb.putInt(CreatureInfo.encodeCreatureType(creatureType));
+	bb.putInt(nm.length);	
+	for (char c : nm)
+	    bb.putChar(c);
+	bb.putInt(stats.getStrength());
+	bb.putInt(stats.getIntelligence());
+	bb.putInt(stats.getDexterity());
+	bb.putInt(stats.getWisdom());
+	bb.putInt(stats.getConstitution());
+	bb.putInt(stats.getCharisma());
+	bb.putInt(stats.getHitPoints());
+	bb.putInt(stats.getMaxHitPoints());
+
+	bb.rewind();
+	session.send(bb);
     }
 
 }

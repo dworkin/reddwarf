@@ -12,6 +12,8 @@ import com.sun.sgs.example.hack.server.CharacterManager;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
+
 import java.io.Serializable;
 
 
@@ -27,10 +29,10 @@ public class ImpassableTile extends BasicTile implements Serializable {
     /**
      * Creates an instance of <code>ImpassableTile</code>
      *
-     * @param id the tile's identifier
+     * @param floorType the floor type of this tile
      */
-    public ImpassableTile(int id) {
-        super(id);
+    public ImpassableTile(FloorType floorType) {
+        super(floorType);
     }
 
     /**

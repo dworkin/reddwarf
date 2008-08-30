@@ -54,9 +54,12 @@ public abstract class GameChannelListener implements ClientChannelListener
      * Notifies the game that a player has joined.
      */
     protected void notifyJoin(ByteBuffer data) {
-        byte [] bytes = new byte[data.remaining()];
-        data.get(bytes);
-        BigInteger sessionId = new BigInteger(1, bytes);
+	int idLength = data.getInt();
+        byte[] bytes = new byte[idLength];
+	for (int i = 0; i < idLength; ++i) 
+	    bytes[i] = data.get();
+        BigInteger sessionId = new BigInteger(bytes);
+
 	chatListener.playerJoined(sessionId);
     }
 
@@ -64,9 +67,12 @@ public abstract class GameChannelListener implements ClientChannelListener
      * Notifies the game that a player has left.
      */
     protected void notifyLeave(ByteBuffer data) {
-        byte [] bytes = new byte[data.remaining()];
-        data.get(bytes);
-        BigInteger sessionId = new BigInteger(1, bytes);
+	int idLength = data.getInt();
+        byte[] bytes = new byte[idLength];
+	for (int i = 0; i < idLength; ++i) 
+	    bytes[i] = data.get();
+        BigInteger sessionId = new BigInteger(bytes);
+
 	chatListener.playerLeft(sessionId);
     }
 
@@ -77,10 +83,26 @@ public abstract class GameChannelListener implements ClientChannelListener
      * @param data the chat message
      */
     protected void notifyChatMessage(ByteBuffer data) {
-        byte [] bytes = new byte[data.remaining()];
-        data.get(bytes);
-        String message = new String(bytes);
-        chatListener.messageArrived(message);
+//         byte [] bytes = new byte[data.remaining()];
+//         data.get(bytes);
+//         String message = new String(bytes);
+//         chatListener.messageArrived(message);
+    }
+
+    protected void addPlayerId(ByteBuffer data) throws IOException {
+	int idLength = data.getInt();
+	byte[] bytes = new byte[idLength];
+	for (int i = 0; i < idLength; ++i) 
+	    bytes[i] = data.get();
+	BigInteger playerId = new BigInteger(bytes);
+	
+	int nameLength = data.getInt();
+	char[] arr = new char[nameLength];
+	for (int i = 0; i < nameLength; ++i) 
+	    arr[i] = data.getChar();
+	String playerName = new String(arr);
+	
+	addPlayerIdMapping(playerId, playerName);
     }
 
     /**

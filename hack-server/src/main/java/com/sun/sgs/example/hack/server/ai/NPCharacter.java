@@ -21,6 +21,8 @@ import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.KeyMessages;
 
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+
 import java.io.Serializable;
 
 
@@ -54,9 +56,10 @@ public class NPCharacter extends AICharacter implements Serializable {
      * @param messages the set of messages that this NPC says when hit
      * @param mgr the controlling manager
      */
-    public NPCharacter(int id, String name, String [] messages,
+    public NPCharacter(CreatureType creatureType, String name, 
+		       String [] messages,
                        AICharacterManager mgr) {
-        super(id, name);
+        super(creatureType, name);
 
         this.currentMessage = 0;
         this.messages = messages;

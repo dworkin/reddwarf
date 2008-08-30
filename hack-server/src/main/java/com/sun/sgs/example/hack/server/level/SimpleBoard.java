@@ -14,8 +14,14 @@ import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.app.util.ScalableHashMap;
 
+import com.sun.sgs.example.hack.server.Character;
 import com.sun.sgs.example.hack.server.CharacterManager;
-import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.ServerItem;
+
+import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.RoomInfo;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
+import com.sun.sgs.example.hack.share.SimpleCreature;
 
 import java.awt.Point;
 
@@ -24,6 +30,8 @@ import java.io.StreamTokenizer;
 
 import java.util.Set;
 import java.util.Map;
+
+import java.util.logging.Logger;
 
 /**
  * A server-side {@link LevelBoard} implementation that utilizes
@@ -42,6 +50,9 @@ import java.util.Map;
 public class SimpleBoard implements LevelBoard {
 
     private static final long serialVersionUID = 1;
+
+    private static final Logger logger = 
+	Logger.getLogger(SimpleBoard.class.getName());
 
     /** 
      * the width dimension of this board 
@@ -122,11 +133,13 @@ public class SimpleBoard implements LevelBoard {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 stok.nextToken();
-                int id = (int)(stok.nval);
+                int encodedFloorType = (int)(stok.nval);
+		FloorType floorType = 
+		    RoomInfo.decodeFloorType(encodedFloorType);
 		board.setGridSpace(x, y, 
-				   (isImpassible(id)
-				    ? new ImpassableTile(id)
-				    : new PassableTile(id)));
+				   (isImpassible(floorType)
+				    ? new ImpassableTile(floorType)
+				    : new PassableTile(floorType)));
             }
         }
 	return board;
@@ -137,15 +150,27 @@ public class SimpleBoard implements LevelBoard {
      * is impassible.  This method will be replaced in a forthcoming
      * patch to replace integer tile Ids with enums.
      */
-    private static boolean isImpassible(int tileId) {
-	// set of impassible sprites ids:
-	// 5 6 7 8 9 10 11 12 15 16 19 20
-	return 
-	    (tileId>= 5 && tileId<= 12) ||
-	    tileId== 15 ||
-	    tileId== 16 ||
-	    tileId== 19 ||
-	    tileId== 20;
+    private static boolean isImpassible(FloorType floorType) {
+	switch (floorType) {
+	case FLOOR:
+	case OUTSIDE_WALL:
+	case STAIRS_UP:
+	case STAIRS_DOWN:
+	case HOLY_GROUND:
+	case OPENED_DOOR:
+	    return false;
+	    
+	case GRANITE:
+	case PERMANENT_WALL:
+	case CLOSED_DOOR:
+	case SECRET_DOOR:
+	case ALTAR:
+	case FOUNTAIN:
+	    return true;	    
+	default:
+	    logger.warning("unknown if " + floorType + " is impassible");
+	    return true;
+	}
     }
 
     private void checkBounds(int x, int y) {
@@ -200,7 +225,7 @@ public class SimpleBoard implements LevelBoard {
      */
     public void setAsConnector(int x, int y, Connector connector) {
         Tile tile = getGridSpace(x, y);
-        setGridSpace(x, y, new ConnectorTile(tile.getID(), connector));
+        setGridSpace(x, y, new ConnectorTile(tile.getFloorType(), connector));
     }
 
     /**
@@ -229,9 +254,26 @@ public class SimpleBoard implements LevelBoard {
      *
      * @return the set of identifiers at this space
      */
-    public int [] getAt(int x, int y) {
-        return getGridSpace(x, y).getIdStack();
+    public BoardSpace getAt(int x, int y) {
+        return covertToBoardSpace(getGridSpace(x, y), x, y);
     }
+
+    private static BoardSpace covertToBoardSpace(Tile t, int x, int y) {
+	BoardSpace space = new BoardSpace(x, y, t.getFloorType());
+	ServerItem i = t.getItem();
+	if (i != null)
+	    space.setItem(i);
+	CharacterManager cm = t.getCharacterManager();
+	Character c;
+	if (cm != null &&
+	    (c = cm.getCurrentCharacter()) != null)
+	    space.setCreature(new SimpleCreature(c.getCreatureType(),
+						 c.getCharacterId(),
+						 c.getName()));
+	return space;
+    }
+
+    
 
     /**
      * Returns whether or not this board is dark.
@@ -279,7 +321,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @return true if the operation succeeded, false otherwise
      */
-    public boolean addItemAt(int x, int y, Item item) {
+    public boolean addItemAt(int x, int y, ServerItem item) {
         return getGridSpace(x, y).addItem(item);
     }
 
@@ -292,7 +334,7 @@ public class SimpleBoard implements LevelBoard {
      *
      * @return true if the operation succeeded, false otherwise
      */
-    public boolean removeItemAt(int x, int y, Item item) {
+    public boolean removeItemAt(int x, int y, ServerItem item) {
         return getGridSpace(x, y).removeItem(item);
     }
 

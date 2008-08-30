@@ -9,6 +9,7 @@
 package com.sun.sgs.example.hack.server.ai;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
 
@@ -34,7 +35,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
     private static final long serialVersionUID = 1;
 
     // the character we're managing
-    private AICharacter character;
+    private ManagedReference<AICharacter> characterRef;
 
     /**
      * Creates an instance of <code>AICharacter</code>.
@@ -47,6 +48,8 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
 	//       DataManager.nextBoundName() to locate a unique name
 	//       for this entity
         super("ai:" + String.valueOf(Math.random()));
+
+	characterRef = null;
     }
 
     /**
@@ -70,7 +73,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * @return the current character
      */
     public Character getCurrentCharacter() {
-        return character;
+        return (characterRef == null) ? null : characterRef.get();
     }
 
     /**
@@ -79,16 +82,17 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * @param character the character to manage
      */
     public void setCharacter(AICharacter character) {
-        AppContext.getDataManager().markForUpdate(this);
+	DataManager dm = AppContext.getDataManager();
+	dm.markForUpdate(this);
 
-        this.character = character;
+        characterRef = dm.createReference(character);
     }
 
     /**
      * Tells the AI creature that it's their turn to take some action.
      */
     public void run() throws Exception {
-        character.run();
+        characterRef.get().run();
     }
 
     /**
@@ -101,7 +105,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
         //       decide how and where to place a new character ... for
         //       now, we take the simple approach of just adding a new
         //       character
-        character.regenerate();
+        characterRef.get().regenerate();
         getCurrentLevel().addCharacter(this);
     }
 

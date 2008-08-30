@@ -39,7 +39,7 @@ public interface Board extends Serializable {
      *
      * @return the stack of isentifiers at the given location
      */
-    public int [] getAt(int x, int y);
+    public BoardSpace getAt(int x, int y);
 
     /**
      * Returns whether or not the level is dark. A dark board is one where
@@ -48,6 +48,6 @@ public interface Board extends Serializable {
      *
      * @return whether the level is dark
      */
-    public boolean isDark();
+    //public boolean isDark();
 
 }

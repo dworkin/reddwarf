@@ -9,7 +9,7 @@
 package com.sun.sgs.example.hack.client;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
-
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 /**
  * This interface defines a class that listens for creator messages.
@@ -23,6 +23,7 @@ public interface CreatorListener
      * @param id the character's identifier
      * @param stats the new statistics
      */
-    public void changeStatistics(int id, CharacterStats stats);
+    public void changeStatistics(CreatureType characterClassType, 
+				 CharacterStats stats);
 
 }

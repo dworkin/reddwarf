@@ -11,10 +11,14 @@ package com.sun.sgs.example.hack.server.level;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.example.hack.server.Character;
 import com.sun.sgs.example.hack.server.CharacterManager;
-import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.ServerItem;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
+
+import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
 
 import java.io.Serializable;
 
@@ -33,8 +37,8 @@ public interface Tile extends Serializable, ManagedObject {
      *
      * @return the tile's identifier
      */
-    public int getID();
-
+    //public int getID();
+    
     /**
      * Returns a stack of identifiers, specifying everything on this
      * <code>Tile</code>. The the zeroeith index is always the same value
@@ -45,7 +49,9 @@ public interface Tile extends Serializable, ManagedObject {
      *
      * @return the set of identifiers for the things at this space
      */
-    public int [] getIdStack();
+    //public BoardSpace getBoardSpace();
+
+    public FloorType getFloorType();
 
     /**
      * Returns whether or not this space could be entered by the given
@@ -100,7 +106,7 @@ public interface Tile extends Serializable, ManagedObject {
      *
      * @return whether or not the item was added successfully
      */
-    public boolean addItem(Item item);
+    public boolean addItem(ServerItem item);
 
     /**
      * Removes the given item from this tile, if and only if this item
@@ -110,7 +116,12 @@ public interface Tile extends Serializable, ManagedObject {
      *
      * @return whether or not the item was removed successfully
      */
-    public boolean removeItem(Item item);
+    public boolean removeItem(ServerItem item);
+
+    public ServerItem getItem();
+
+    public CharacterManager getCharacterManager();
+    
 
     /**
      * Test to move the given character to this tile. Note that this does

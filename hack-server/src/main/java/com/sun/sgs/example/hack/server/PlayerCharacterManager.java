@@ -9,7 +9,10 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
+
+import com.sun.sgs.app.util.ScalableHashMap;
 
 import com.sun.sgs.example.hack.server.level.Level;
 
@@ -36,11 +39,15 @@ public class PlayerCharacterManager extends BasicCharacterManager
     // a reference to the owning player
     private ManagedReference<Player> playerRef;
 
-    // the characters currently owned by this manager
-    private HashMap<String,PlayerCharacter> characterMap;
+    /**
+     * A mapping from character names to the characters currently
+     * owned by this player's manager
+     */
+    private ManagedReference<ScalableHashMap<String,PlayerCharacter>> 
+	characterMapRef;
 
     // the currently playing character
-    private PlayerCharacter currentCharacter;
+    private ManagedReference<PlayerCharacter> currentCharacterRef;
 
     /**
      * Creates an instance of <code>PlayerCharacterManager</code>.
@@ -50,10 +57,13 @@ public class PlayerCharacterManager extends BasicCharacterManager
     public PlayerCharacterManager(Player player) {
         super("player:" + player.getName());
 
-        playerRef = AppContext.getDataManager().createReference(player);
+	DataManager dm = AppContext.getDataManager();
+        playerRef = dm.createReference(player);
 
-        characterMap = new HashMap<String,PlayerCharacter>();
-        currentCharacter = null;
+        ScalableHashMap<String,PlayerCharacter> characterMap = 
+	    new ScalableHashMap<String,PlayerCharacter>();
+	characterMapRef = dm.createReference(characterMap);
+        currentCharacterRef = null;
     }
 
     /**
@@ -73,11 +83,13 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @return true if the current character was set, false otherwise
      */
     public boolean setCurrentCharacter(String characterName) {
-        AppContext.getDataManager().markForUpdate(this);
+	DataManager dm = AppContext.getDataManager();
+        dm.markForUpdate(this);
 
-        currentCharacter = characterMap.get(characterName);
+	PlayerCharacter pc = characterMapRef.get().get(characterName);
+        currentCharacterRef = (pc == null) ? null : dm.createReference(pc);
 
-        return (currentCharacter != null);
+        return (currentCharacterRef != null);
     }
 
     /**
@@ -86,7 +98,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @return the current character
      */
     public Character getCurrentCharacter() {
-        return currentCharacter;
+        return (currentCharacterRef == null) ? null : currentCharacterRef.get();
     }
 
     /**
@@ -95,7 +107,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @return the number of manager characters
      */
     public int getCharacterCount() {
-        return characterMap.size();
+        return characterMapRef.get().size();
     }
 
     /**
@@ -104,7 +116,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @return the managed characters
      */
     public Collection<PlayerCharacter> getCharacters() {
-        return characterMap.values();
+        return characterMapRef.get().values();
     }
 
     /**
@@ -113,7 +125,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * @return the names of the managed characters 
      */
     public Set<String> getCharacterNames() {
-        return characterMap.keySet();
+        return characterMapRef.get().keySet();
     }
 
     /**
@@ -124,7 +136,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
     public void addCharacter(PlayerCharacter character) {
         AppContext.getDataManager().markForUpdate(this);
 
-        characterMap.put(character.getName(), character);
+        characterMapRef.get().put(character.getName(), character);
     }
 
     /**
@@ -135,7 +147,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
     public void removeCharacter(String name) {
         AppContext.getDataManager().markForUpdate(this);
 
-        characterMap.remove(name);
+        characterMapRef.get().remove(name);
     }
 
     /**
@@ -160,7 +172,8 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * Sends the current character's stats to the player.
      */
     public void sendCharacter() {
-        playerRef.get().sendCharacter(currentCharacter);
+        playerRef.get().sendCharacter((currentCharacterRef == null) 
+				      ? null : currentCharacterRef.get());
     }
 
 }

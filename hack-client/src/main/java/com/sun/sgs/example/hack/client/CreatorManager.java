@@ -13,6 +13,8 @@ import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.nio.ByteBuffer;
 
@@ -20,7 +22,8 @@ import java.util.HashSet;
 
 
 /**
- * This manager handles all messages from and to the creator on the server.
+ * This manager handles all messages from and to the creator on the
+ * server.
  */
 public class CreatorManager implements CreatorListener
 {
@@ -64,11 +67,11 @@ public class CreatorManager implements CreatorListener
      *
      * @param charClass the type of character
      */
-    public void rollForStats(int charClass) {
+    public void rollForStats(CreatureType characterClassType) {
         ByteBuffer bb = ByteBuffer.allocate(8);
 
         bb.putInt(Commands.encode(Command.ROLL_FOR_STATS));
-        bb.putInt(charClass);
+        bb.putInt(CreatureInfo.encodeCreatureType(characterClassType));
         bb.rewind();
 
         try {
@@ -120,9 +123,10 @@ public class CreatorManager implements CreatorListener
      * @param id the character's identifier
      * @param stats the new statistics
      */
-    public void changeStatistics(int id, CharacterStats stats) {
+    public void changeStatistics(CreatureType characterClassType, 
+				 CharacterStats stats) {
         for (CreatorListener listener : listeners)
-            listener.changeStatistics(id, stats);
+            listener.changeStatistics(characterClassType, stats);
     }
 
 }

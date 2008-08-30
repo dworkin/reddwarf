@@ -63,11 +63,7 @@ public class LobbyChannelListener extends GameChannelListener {
 	    switch (cmd) {
 
 	    case ADD_PLAYER_ID:
-		@SuppressWarnings("unchecked")
-		BigInteger playerID = (BigInteger)(getObject(data));
-		@SuppressWarnings("unchecked")
-		String playerName = (String)(getObject(data));
-		addPlayerIdMapping(playerID, playerName);
+		addPlayerId(data);
 		break;
 
 	    case PLAYER_JOINED:
@@ -80,40 +76,46 @@ public class LobbyChannelListener extends GameChannelListener {
 				
 	    case UPDATE_GAME_MEMBER_COUNT: {
 
-		// we got a membership count update for some game
-		Object[] countAndName = (Object[])(getObject(data));
-		Integer count = (Integer)(countAndName[0]);
-		String name = (String)(countAndName[1]);
-                
+		int gameMemberCount = data.getInt();
+		int gameNameLength = data.getInt();
+		char[] arr = new char[gameNameLength];
+		for (int i = 0; i < gameNameLength; ++i)
+		    arr[i] = data.getChar();
+		String gameName = new String(arr);
+
 		// see if it's the lobby or some specific dungeon, and
 		// update the count appropriately
-		if (name.equals("game:lobby"))
-		    llistener.playerCountUpdated(count);
-		    else
-			llistener.playerCountUpdated(name, count);
+		if (gameName.equals("game:lobby"))
+		    llistener.playerCountUpdated(gameMemberCount);
+		else
+		    llistener.playerCountUpdated(gameName, gameMemberCount);
+		
+		break;
 	    }
 
 	    case GAME_ADDED: {
 		// we heard about a new game
-		byte [] bytes = new byte[data.remaining()];
 
-		// NOTE: This is a temporary kludge to stop the client
-		// from adding 0-length names, as described in Issue
-		// 19.  This code should be removed with the
-		// service-side source that sends these messages has
-		// been stopped.
-		if (bytes.length > 0) {
-		    data.get(bytes);
-		    llistener.gameAdded(new String(bytes));
-		}
+		int gameNameLength = data.getInt();
+		char[] arr = new char[gameNameLength];
+		for (int i = 0; i < gameNameLength; ++i)
+		    arr[i] = data.getChar();
+		String gameName = new String(arr);
+
+		llistener.gameAdded(gameName);
+
 		break; 
 	    }
 
 	    case GAME_REMOVED: {
 		// we heard that a game was removed
-		byte [] bytes = new byte[data.remaining()];
-		data.get(bytes);
-		llistener.gameRemoved(new String(bytes));
+		int gameNameLength = data.getInt();
+		char[] arr = new char[gameNameLength];
+		for (int i = 0; i < gameNameLength; ++i)
+		    arr[i] = data.getChar();
+		String gameName = new String(arr);
+
+		llistener.gameRemoved(gameName);
 		break; 
 	    }
 

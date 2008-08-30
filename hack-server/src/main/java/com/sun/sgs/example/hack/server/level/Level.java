@@ -11,7 +11,7 @@ package com.sun.sgs.example.hack.server.level;
 import com.sun.sgs.app.ManagedObject;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
-import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.ServerItem;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.KeyMessages;
@@ -68,18 +68,18 @@ public interface Level extends ManagedObject {
     /**
      * Adds an item to this level at some random position.
      *
-     * @param itemRef a reference to the <code>Item</code>
+     * @param itemRef a reference to the <code>ServerItem</code>
      */
-    public void addItem(Item item);
+    public void addItem(ServerItem item);
 
     /**
      * Adds an item to this level at the given position.
      *
-     * @param itemRef a reference to the <code>Item</code>
+     * @param itemRef a reference to the <code>ServerItem</code>
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
      */
-    public void addItem(Item item, int startX, int startY);
+    public void addItem(ServerItem item, int startX, int startY);
 
     /**
      * Returns a snapshot (ie, static) view of the level.

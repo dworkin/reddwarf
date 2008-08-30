@@ -8,7 +8,12 @@
 
 package com.sun.sgs.example.hack.server.ai;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedObject;
+
 import com.sun.sgs.example.hack.server.Character;
+
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.io.Serializable;
 
@@ -17,15 +22,18 @@ import java.io.Serializable;
  * This implementation of <code>Character</code> is the base for all AI
  * creatures (ie, Monsters and NPCs).
  */
-public abstract class AICharacter implements Character, Serializable {
+public abstract class AICharacter 
+    implements Character, ManagedObject, Serializable {
 
     private static final long serialVersionUID = 1;
 
-    // the character's identifier
-    private int id;
+    // the character's creature type
+    private final CreatureType creatureType;
 
     // the character's name
-    private String name;
+    private final String name;
+    
+    private final long id;
 
     /**
      * Creates an instance of <code>AICharacter</code>.
@@ -33,9 +41,18 @@ public abstract class AICharacter implements Character, Serializable {
      * @param id the character's identifier
      * @param name the character's name
      */
-    public AICharacter(int id, String name) {
-        this.id = id;
+    public AICharacter(CreatureType creatureType, String name) {
+        this.creatureType = creatureType;
         this.name = name;
+	this.id = AppContext.getDataManager().createReference(this).
+	    getId().longValue();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public CreatureType getCreatureType() {
+	return creatureType;
     }
 
     /**
@@ -44,7 +61,7 @@ public abstract class AICharacter implements Character, Serializable {
      *
      * @return the identifier
      */
-    public int getID() {
+    public long getCharacterId() {
         return id;
     }
 

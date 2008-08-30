@@ -12,6 +12,11 @@ import com.sun.sgs.example.hack.client.BoardListener;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.CreatureInfo.Creature;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
+import com.sun.sgs.example.hack.share.ItemInfo.Item;
+import com.sun.sgs.example.hack.share.ItemInfo.ItemType;
 
 import java.awt.Color;
 import java.awt.Graphics;
@@ -63,7 +68,7 @@ class BoardPanel extends JPanel implements BoardListener {
         g.fillRect(0, 0, offscreen.getWidth(), offscreen.getHeight());
         g.dispose();
 
-	this.spriteMap = new SpriteMap();
+	this.spriteMap = SpriteMapLoader.loadSystemSpriteMap();
 	this.spriteSize = spriteMap.getSpriteSize();
     }
 
@@ -95,14 +100,14 @@ class BoardPanel extends JPanel implements BoardListener {
 
         Graphics g = offscreen.createGraphics();
         
-        if (board.isDark()) {
-            g.setColor(Color.BLACK);
-            g.fillRect(0, 0, offscreen.getWidth(), offscreen.getHeight());
-        } else {
+//         if (board.isDark()) {
+//             g.setColor(Color.BLACK);
+//             g.fillRect(0, 0, offscreen.getWidth(), offscreen.getHeight());
+//         } else {
             for (int x = 0; x < board.getWidth(); x++)
                 for (int y = 0; y < board.getHeight(); y++)
                     updateSpace(g, x, y, board.getAt(x, y));
-        }
+//         }
 
         g.dispose();
         repaint();
@@ -111,10 +116,25 @@ class BoardPanel extends JPanel implements BoardListener {
     /**
      * Private helper that renders a single space.
      */
-    private void updateSpace(Graphics g, int x, int y, int [] ids) {
-        for (int i = 0; i < ids.length; i++)
-            g.drawImage(spriteMap.getSprite(ids[i]), x * spriteSize, y * spriteSize,
-                        this);
+    private void updateSpace(Graphics g, int x, int y, BoardSpace space) {
+
+	// first, draw the floor type
+	g.drawImage(spriteMap.getFloorSprite(space.getFloorType()), 
+		    x * spriteSize, y * spriteSize, this);
+	
+	// next, draw all the items on the floor
+	Item i = space.getItem();
+	if (i != null) {
+	    g.drawImage(spriteMap.getItemSprite(i.getItemType()),
+			x * spriteSize, y * spriteSize, this);
+	}
+	
+	// finally, draw all the creatures on the floor
+	Creature c = space.getCreature();
+	if (c != null) {
+	    g.drawImage(spriteMap.getCreatureSprite(c.getCreatureType()),
+			x * spriteSize, y * spriteSize, this);
+	}
     }
 
     /**
@@ -122,12 +142,11 @@ class BoardPanel extends JPanel implements BoardListener {
      *
      * @param spaces an array of updates to specific spaces
      */
-    public void updateSpaces(BoardSpace [] spaces) {
+    public void updateSpaces(BoardSpace[] spaces) {
         Graphics g = offscreen.createGraphics();
 
         for (int i = 0; i < spaces.length; i++)
-            updateSpace(g, spaces[i].getX(), spaces[i].getY(),
-                        spaces[i].getIdentifiers());
+            updateSpace(g, spaces[i].getX(), spaces[i].getY(), spaces[i]);
 
         g.dispose();
         repaint();

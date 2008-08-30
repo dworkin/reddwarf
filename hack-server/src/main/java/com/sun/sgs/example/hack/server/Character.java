@@ -12,6 +12,8 @@ import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
 
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+
 
 /**
  * The is the <code>Character</code> interface. All interactive things
@@ -21,12 +23,17 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 public interface Character {
 
     /**
-     * Returns this entity's identifier. Typically this maps to the sprite
-     * used on the client-side to render this entity.
+     * Returns this entity's creature type.  Typically this maps to
+     * the sprite used on the client-side to render this entity.
      *
      * @return the identifier
      */
-    public int getID();
+    public CreatureType getCreatureType();
+
+    /**
+     * Returns the unique Id for this character
+     */
+    public long getCharacterId();
 
     /**
      * Returns the name of this entity.

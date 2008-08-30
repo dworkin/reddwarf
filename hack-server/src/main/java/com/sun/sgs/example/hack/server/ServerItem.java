@@ -12,18 +12,13 @@ import com.sun.sgs.app.ManagedObject;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
+import com.sun.sgs.example.hack.share.ItemInfo.Item;
 
 /**
- * This is the interface for all items in the game.
+ * This is the interface for server-side representation all items in
+ * the game.
  */
-public interface Item extends ManagedObject {
-
-    /**
-     * Returns the item's identifier.
-     *
-     * @return the identifier
-     */
-    public int getID();
+public interface ServerItem extends ManagedObject, Item {
 
     /**
      * Called when this {@code Item} is being given to the character.

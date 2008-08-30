@@ -18,7 +18,7 @@ public class SnapshotBoard implements Board {
     private static final long serialVersionUID = 1;
 
     // the state is just a 3-dimensional array of ints
-    int [][][] boardData;
+    BoardSpace[][] boardData;
 
     // whether it's dark
     private boolean isDark;
@@ -30,13 +30,12 @@ public class SnapshotBoard implements Board {
      * @param board the <code>Board</code> to snapshot
      */
     public SnapshotBoard(Board board) {
-        this.isDark = board.isDark();
+        this.isDark = false;
 
         // iterate through the given board, and capture the identifier
         // stack at each position
-        boardData = new int[board.getWidth()][][];
+        boardData = new BoardSpace[board.getWidth()][board.getHeight()];
         for (int x = 0; x < board.getWidth(); x++) {
-            boardData[x] = new int[board.getHeight()][];
             for (int y = 0; y < board.getHeight(); y++) {
                 boardData[x][y] = board.getAt(x, y);
             }
@@ -69,7 +68,7 @@ public class SnapshotBoard implements Board {
      *
      * @return the stack of isentifiers at the given location
      */
-    public int [] getAt(int x, int y) {
+    public BoardSpace getAt(int x, int y) {
         return boardData[x][y];
     }
 

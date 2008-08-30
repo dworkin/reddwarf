@@ -19,7 +19,7 @@ import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
 import com.sun.sgs.example.hack.server.Game;
-import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.ServerItem;
 import com.sun.sgs.example.hack.server.Messages;
 import com.sun.sgs.example.hack.server.NSidedDie;
 import com.sun.sgs.example.hack.server.Player;
@@ -226,8 +226,7 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
         mgr.sendBoard(getBoardSnapshot());
 
         // finally, update everyone about the new charcater
-        sendUpdate(new BoardSpace(startX, startY,
-                                  board.getAt(startX, startY)));
+        sendUpdate(board.getAt(startX, startY));
 
         return true;
     }
@@ -254,7 +253,7 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
             AppContext.getDataManager().markForUpdate(this);
             // remove them from the board, and notify everyone
             if (board.removeCharacterAt(x, y, mgr))
-                sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
+                sendUpdate(board.getAt(x, y));
         }
 
 	// NOTE: this code is related to Issue 25 where we need to
@@ -280,9 +279,9 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
     /**
      * Adds an item to this level at some random position.
      *
-     * @param item the <code>Item</code>
+     * @param item the <code>ServerItem</code>
      */
-    public void addItem(Item item) {
+    public void addItem(ServerItem item) {
         // FIXME: how should I actually pick this spot?
         int x = NSidedDie.rollNSided(levelWidth) - 1;
         int y = NSidedDie.rollNSided(levelHeight) - 1;
@@ -296,7 +295,7 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
      */
-    public void addItem(Item item, int startX, int startY) {
+    public void addItem(ServerItem item, int startX, int startY) {
         board.addItemAt(startX, startY, item);
     }
 
@@ -363,8 +362,8 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
         // ...and generate updates for the vacant space and the new position,
         // and broadcast the update to the level
         HashSet<BoardSpace> updates = new HashSet<BoardSpace>();
-        updates.add(new BoardSpace(origX, origY, board.getAt(origX, origY)));
-        updates.add(new BoardSpace(x, y, board.getAt(x, y)));
+        updates.add(board.getAt(origX, origY));
+	updates.add(board.getAt(x, y));
         sendUpdates(updates);
 
         return true;
@@ -397,7 +396,7 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
         }
 
         // let everyone know that we got the item
-        sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
+        sendUpdate(board.getAt(x, y));
 
         // NOTE: for better reporting, we should add additional
         //       messages to let the character know that they got the
@@ -447,7 +446,7 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
         if (characterRefs.remove(AppContext.getDataManager().
                                  createReference(mgr))) {
             AppContext.getDataManager().markForUpdate(this);
-            sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
+            sendUpdate(board.getAt(x, y));
         }
 
 	// NOTE: this code is related to Issue 25 where we need to
@@ -469,5 +468,6 @@ public class SimpleLevel implements Level, Serializable, ChannelListener {
 	    levelUpdatesChannelRef.get().leave(session);
 	}
     }
+
 
 }

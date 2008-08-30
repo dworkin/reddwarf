@@ -8,7 +8,11 @@
 
 package com.sun.sgs.example.hack.server;
 
+import com.sun.sgs.app.AppContext;
+
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
+
+import com.sun.sgs.example.hack.share.ItemInfo.ItemType;
 
 import java.io.Serializable;
 
@@ -17,20 +21,36 @@ import java.io.Serializable;
  * This is a simple implementation of <code>Item</code> that provides
  * non-interactive items.
  */
-public class SimpleItem implements Item, Serializable {
+public class SimpleItem implements ServerItem, Serializable {
 
     private static final long serialVersionUID = 1;
 
-    // the identifier of this item
-    private int id;
+    /** 
+     * The type of this item
+     */
+    private final ItemType itemType;
+
+    private final String name;
+
+    private final long id;
 
     /**
      * Creates an instance of <code>SimpleItem</code>.
      *
      * @param id the item's identifier
      */
-    public SimpleItem(int id) {
-        this.id = id;
+    public SimpleItem(ItemType itemType, String name) {
+        this.itemType = itemType;
+	this.name = name;
+	this.id = AppContext.getDataManager().createReference(this).
+	    getId().longValue();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public ItemType getItemType() {
+	return itemType;
     }
 
     /**
@@ -38,8 +58,15 @@ public class SimpleItem implements Item, Serializable {
      *
      * @return the identifier
      */
-    public int getID() {
+    public long getItemId() {
         return id;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getName() {
+	return name;
     }
 
     /**
@@ -51,4 +78,7 @@ public class SimpleItem implements Item, Serializable {
         return ActionResult.SUCCESS;
     }
 
+    public String toString() {
+	return itemType + "(" + id + ") \"" + name + "\"";
+    }
 }

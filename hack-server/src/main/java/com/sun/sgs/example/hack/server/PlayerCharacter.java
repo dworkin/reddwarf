@@ -9,11 +9,13 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.io.Serializable;
 
@@ -22,7 +24,8 @@ import java.io.Serializable;
  * This is an implementation of <code>Character</code> used by all
  * <code>Player</code>s.
  */
-public class PlayerCharacter implements Character, Serializable {
+public class PlayerCharacter 
+    implements Character, Serializable, ManagedObject {
 
     private static final long serialVersionUID = 1;
 
@@ -30,10 +33,12 @@ public class PlayerCharacter implements Character, Serializable {
     private ManagedReference<Player> playerRef;
 
     // the id of this character
-    private int id;
+    private long characterId;
 
     // the statistics for this character
     private CharacterStats stats;
+
+    private CreatureType characterClassType;
 
     /**
      * Creates an instance of <code>PlayerCharacter</code>.
@@ -42,9 +47,12 @@ public class PlayerCharacter implements Character, Serializable {
      * @param id the identifier for this character
      * @param stats the statistics for this character
      */
-    public PlayerCharacter(Player player, int id, CharacterStats stats) {
+    public PlayerCharacter(Player player, CreatureType characterClassType,
+			   CharacterStats stats) {
         playerRef = AppContext.getDataManager().createReference(player);
-        this.id = id;
+        this.characterId = AppContext.getDataManager().createReference(this).
+	    getId().longValue();
+	this.characterClassType = characterClassType;
         this.stats = stats;
     }
 
@@ -54,10 +62,14 @@ public class PlayerCharacter implements Character, Serializable {
      *
      * @return the identifier
      */
-    public int getID() {
-        return id;
+    public long getCharacterId() {
+        return characterId;
     }
 
+    public CreatureType getCreatureType() {
+	return characterClassType;
+    }
+    
     /**
      * Returns the name of this entity.
      *

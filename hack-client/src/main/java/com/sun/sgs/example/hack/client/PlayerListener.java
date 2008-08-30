@@ -9,7 +9,8 @@
 package com.sun.sgs.example.hack.client;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
-
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 /**
  * This interface is used to listen for player character events. Examples
@@ -26,7 +27,8 @@ public interface PlayerListener
      * @param id the character's identifier, which specifies their sprite
      * @param stats the characters's statistics
      */
-    public void setCharacter(int id, CharacterStats stats);
+    public void setCharacter(CreatureType characterClassType,
+			     CharacterStats stats);
 
     /**
      * Called to update aspects of the player's currrent character.

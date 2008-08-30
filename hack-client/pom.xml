@@ -94,6 +94,8 @@
 				   value="${sprite.map.file}"/>
 		      <sysproperty key="com.sun.sgs.example.hack.client.gui.SpriteMap.sprite.size"
 				   value="${sprite.size}"/>
+		      <sysproperty key="com.sun.sgs.example.hack.client.gui.SpriteMap.sprite.class"
+				   value="${sprite.map.class}"/>
 		      <classpath>
 			<path refid="maven.test.classpath"/>
 		      </classpath>
@@ -112,6 +114,7 @@
   <properties>
     <sprite.map.file>data/standard.png</sprite.map.file>
     <sprite.size>24</sprite.size>
+    <sprite.map.class>com.sun.sgs.example.hack.client.gui.DefaultSpriteMap</sprite.map.class>
     <run.jvm.args></run.jvm.args>
     <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
     <hack.host>localhost</hack.host>

@@ -16,6 +16,7 @@ import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.Commands;
 import com.sun.sgs.example.hack.share.Commands.Command;
 import com.sun.sgs.example.hack.share.KeyMessages;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import com.sun.sgs.impl.sharedutil.HexDumper;
 
@@ -180,9 +181,10 @@ public class GameManager implements BoardListener, PlayerListener,
      * @param id the character's identifier, which specifies their sprite
      * @param stats the characters's statistics
      */
-    public void setCharacter(int id, CharacterStats stats) {
+    public void setCharacter(CreatureType characterClassType,
+			     CharacterStats stats) {
         for (PlayerListener listener : playerListeners)
-            listener.setCharacter(id, stats);
+            listener.setCharacter(characterClassType, stats);
     }
 
     /**

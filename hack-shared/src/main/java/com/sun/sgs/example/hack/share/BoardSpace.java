@@ -8,9 +8,17 @@
 
 package com.sun.sgs.example.hack.share;
 
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+import com.sun.sgs.example.hack.share.CreatureInfo.Creature;
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
+import com.sun.sgs.example.hack.share.ItemInfo.ItemType;
+import com.sun.sgs.example.hack.share.ItemInfo.Item;
+
 import java.io.Serializable;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collection;
+
 
 /**
  * This represents a single space on a level. It encodes location and
@@ -23,11 +31,14 @@ public class BoardSpace implements Serializable {
     private static final long serialVersionUID = 1;
 
     // the location
-    private final int x;
-    private final int y;
+    protected final int x;
+    protected final int y;
 
-    // the identifiers at the location
-    private final int [] identifiers;
+    protected FloorType floorType;
+
+    protected Creature creature;
+
+    protected Item item;
 
     /**
      * Creates an instance of <code>BoardSpace</code>.
@@ -35,11 +46,17 @@ public class BoardSpace implements Serializable {
      * @param x the x-coordinate
      * @param y the y-coordinate
      * @param identifiers the identifier stack
+     *
+     * @throws IllegalArgumentException if {@code floorType} is {@code null}
      */
-    public BoardSpace(int x, int y, int [] identifiers) {
+    public BoardSpace(int x, int y, FloorType floorType) {
+	if (floorType == null)
+	    throw new IllegalArgumentException("floor type cannot be null");
         this.x = x;
         this.y = y;
-        this.identifiers = identifiers;
+        this.floorType = floorType;
+	creature = null;
+	item = null;
     }
 
     /**
@@ -60,17 +77,30 @@ public class BoardSpace implements Serializable {
         return y;
     }
 
-    /**
-     * Returns the stack of identifiers at this space.
-     *
-     * @return the identifier stack
-     */
-    public int [] getIdentifiers() {
-        return identifiers;
+
+    public FloorType getFloorType() {
+	return floorType;
+    }
+    
+    public void setItem(Item item) {
+	this.item = item;
+    }
+
+    public Item getItem() {
+	return item;
+    }
+
+    public Creature getCreature() {
+	return creature;
+    }
+    
+    public void setCreature(Creature creature) {
+	this.creature = creature;
     }
 
     public String toString() {
-	return String.format("(%d,%d) = %s", x, y, Arrays.toString(identifiers));
+	return String.format("(%d,%d)[%s] = <%s,%s>", x, y, floorType,
+			     item, creature);
     }
 
 }

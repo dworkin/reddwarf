@@ -12,6 +12,8 @@ import com.sun.sgs.example.hack.client.CreatorListener;
 import com.sun.sgs.example.hack.client.CreatorManager;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.CreatureInfo;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -39,16 +41,17 @@ public class CreatorPanel extends JPanel
     // the popup with the list of charcater classes
     JComboBox characterClassPopup;
 
-    // the names of the charcter classes
-    // NOTE: hard-coded for now, so we just include a few
-    private static final String [] classNames = { "Barbarian",
-                                                  "Mexican Wrestler",
-                                                  "Priest", "Thief",
-                                                  "Warrior", "Wizard" };
-
-    // the identifiers for the character classes
-    // NOTE: hard-coded for now
-    private static final int [] classIdentifiers = { 47, 3, 43, 44, 41, 42 };
+    private static final CreatureType[] playableCharacterClasses =
+    {
+	CreatureType.BARBARIAN,
+	CreatureType.PRIEST,
+	CreatureType.THIEF,
+	CreatureType.ARCHAEOLOGIST,
+	CreatureType.WARRIOR,
+	CreatureType.VALKYRIE,
+	CreatureType.GUARD,
+	CreatureType.TOURIST
+    };
 
     // the panel that displays character details
     private PlayerInfoPanel playerInfoPanel;
@@ -74,7 +77,13 @@ public class CreatorPanel extends JPanel
         namePanel.add(nameField);
         add(namePanel);
 
+	String[] classNames = new String[playableCharacterClasses.length];
+	for (int i = 0; i < classNames.length; ++i)
+	    classNames[i] = 
+		CreatureInfo.getPrintableName(playableCharacterClasses[i]);
+
         characterClassPopup = new JComboBox(classNames);
+	characterClassPopup.addActionListener(this);
         JPanel classPanel = new JPanel();
         classPanel.add(new JLabel("Class: "));
         classPanel.add(characterClassPopup);
@@ -108,11 +117,10 @@ public class CreatorPanel extends JPanel
             // get a reference to the popup widget and get the stats
             JComboBox cb = (JComboBox)(e.getSource());
             int index = cb.getSelectedIndex();
-            
             if (index > 0) {
                 // clear stats
                 playerInfoPanel.clearCharacter();
-                creatorManager.rollForStats(classIdentifiers[index]);
+                creatorManager.rollForStats(playableCharacterClasses[index]);
             }
         } else {
             // see which button got hit
@@ -127,7 +135,7 @@ public class CreatorPanel extends JPanel
             } else {
                 // get new stats
                 int index = characterClassPopup.getSelectedIndex();
-                creatorManager.rollForStats(classIdentifiers[index]);
+                creatorManager.rollForStats(playableCharacterClasses[index]);
             }
         }
     }
@@ -138,8 +146,9 @@ public class CreatorPanel extends JPanel
      * @param id the character's identifier
      * @param stats the new statistics
      */
-    public void changeStatistics(int id, CharacterStats stats) {
-        playerInfoPanel.setCharacter(id, stats);
+    public void changeStatistics(CreatureType characterClassType,
+				 CharacterStats stats) {
+        playerInfoPanel.setCharacter(characterClassType, stats);
     }
 
 }

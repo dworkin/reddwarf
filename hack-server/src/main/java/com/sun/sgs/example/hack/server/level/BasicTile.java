@@ -13,9 +13,11 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
-import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.ServerItem;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
+
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
 
 import java.io.Serializable;
 
@@ -31,22 +33,22 @@ public abstract class BasicTile implements Tile {
     private static final long serialVersionUID = 1;
 
     // the id of this tile
-    private int tileTypeId;
+    private FloorType floorType;
 
     // the character manager for any character that is currently on
     // this space
     private ManagedReference<CharacterManager> mgrRef;
 
     // the item on this space, if any
-    private ManagedReference<Item> itemRef;
+    private ManagedReference<ServerItem> itemRef;
 
     /**
      * Creates an instance of <code>BasicTile</code>.
      *
      * @param id the tile's identifier
      */
-    protected BasicTile(int tileTypeId) {
-        this.tileTypeId = tileTypeId;
+    protected BasicTile(FloorType floorType) {
+        this.floorType = floorType;
         this.mgrRef = null;
         this.itemRef = null;
     }
@@ -56,43 +58,43 @@ public abstract class BasicTile implements Tile {
      *
      * @return the tile's identifier
      */
-    public int getID() {
-        return tileTypeId;
+    public FloorType getFloorType() {
+        return floorType;
     }
 
-    /**
-     * Returns a stack of identifiers, specifying everything on this
-     * <code>Tile</code>.
-     *
-     * @return the set of identifiers for the things at this space
-     */
-    public int [] getIdStack() {
-        // the array of ids that we will return
-        int [] ids = null;
+//     /**
+//      * Returns a stack of identifiers, specifying everything on this
+//      * <code>Tile</code>.
+//      *
+//      * @return the set of identifiers for the things at this space
+//      */
+//     public int [] getIdStack() {
+//         // the array of ids that we will return
+//         int [] ids = null;
 
-        // NOTE: This is a fairly un-optimized approach to generating this
-        // stack, and since this is done reasonably frequently, it would
-        // be nice to re-visit this method
+//         // NOTE: This is a fairly un-optimized approach to generating this
+//         // stack, and since this is done reasonably frequently, it would
+//         // be nice to re-visit this method
 
-        // if there's no item, create an array with just the tile's id,
-        // otherwise put both in an array
-        if (itemRef == null)
-            ids = new int [] {tileTypeId};
-        else
-            ids = new int [] {tileTypeId, itemRef.get().getID()};
+//         // if there's no item, create an array with just the tile's id,
+//         // otherwise put both in an array
+//         if (itemRef == null)
+//             ids = new int [] {tileTypeId};
+//         else
+//             ids = new int [] {tileTypeId, itemRef.get().getID()};
 
-        // if there is a character here, create a new array that's 1 index
-        // bigger, and put the character at the end
-        if (mgrRef != null) {
-            int [] tmp = new int [ids.length + 1];
-            for (int i = 0; i < ids.length; i++)
-                tmp[i] = ids[i];
-            tmp[ids.length] = mgrRef.get().getCurrentCharacter().getID();
-            ids = tmp;
-        }
+//         // if there is a character here, create a new array that's 1 index
+//         // bigger, and put the character at the end
+//         if (mgrRef != null) {
+//             int [] tmp = new int [ids.length + 1];
+//             for (int i = 0; i < ids.length; i++)
+//                 tmp[i] = ids[i];
+//             tmp[ids.length] = mgrRef.get().getCurrentCharacter().getID();
+//             ids = tmp;
+//         }
 
-        return ids;
-    }
+//         return ids;
+//     }
 
     /**
      * Checks if the there is anything currently occupying this tile that
@@ -139,6 +141,10 @@ public abstract class BasicTile implements Tile {
         return true;
     }
 
+    public CharacterManager getCharacterManager() {
+	return (mgrRef == null) ? null : mgrRef.get();
+    }
+
     /**
      * Removes the given character from this tile, if and only if this
      * character is already on this tile.
@@ -178,7 +184,7 @@ public abstract class BasicTile implements Tile {
      *
      * @return whether or not the item was added successfully
      */
-    public boolean addItem(Item item) {
+    public boolean addItem(ServerItem item) {
         // check that there isn't an item here
         if (itemRef != null)
             return false;
@@ -198,7 +204,7 @@ public abstract class BasicTile implements Tile {
      *
      * @return whether or not the item was removed successfully
      */
-    public boolean removeItem(Item item) {
+    public boolean removeItem(ServerItem item) {
         // check that there's an item here
         if (itemRef == null)
             return false;
@@ -212,6 +218,10 @@ public abstract class BasicTile implements Tile {
 	dm.markForUpdate(this);
 
         return true;
+    }
+
+    public ServerItem getItem() {
+	return (itemRef == null) ? null : itemRef.get();
     }
 
     /**

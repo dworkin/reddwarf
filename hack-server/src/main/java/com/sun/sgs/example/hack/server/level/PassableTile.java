@@ -12,6 +12,8 @@ import com.sun.sgs.example.hack.server.CharacterManager;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
+import com.sun.sgs.example.hack.share.RoomInfo.FloorType;
+
 import java.io.Serializable;
 
 
@@ -28,8 +30,8 @@ public class PassableTile extends BasicTile implements Serializable {
      *
      * @param id the tile's identifier
      */
-    public PassableTile(int id) {
-        super(id);
+    public PassableTile(FloorType floorType) {
+        super(floorType);
     }
 
     /**

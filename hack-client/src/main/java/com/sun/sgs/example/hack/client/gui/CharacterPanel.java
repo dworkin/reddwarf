@@ -9,6 +9,7 @@
 package com.sun.sgs.example.hack.client.gui;
 
 import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
 
 import java.awt.BorderLayout;
 
@@ -98,15 +99,18 @@ public class CharacterPanel extends JPanel implements ActionListener
     public void actionPerformed(ActionEvent e) {
         // get a reference to the popup widget and get the stats
         JComboBox cb = (JComboBox)(e.getSource());
-        CharacterStats stats = characters.get((String)cb.getSelectedItem());
+	String selected = (String)(cb.getSelectedItem());
 
-        if (stats != null) {
+        CharacterStats stats;
+
+        if (selected != null && (stats = characters.get(selected)) != null) {
             // we selected something valid, so track that current selection
-            playerInfoPanel.setCharacter(-1, stats);
+	    System.out.println("selected: " + selected);
+            playerInfoPanel.setCharacter(CreatureType.BARBARIAN, stats);
             currentCharacter = stats.getName();
         } else {
             // we de-selected, so go to the null character
-            playerInfoPanel.setCharacter(-1, nullStats);
+            playerInfoPanel.setCharacter(CreatureType.BARBARIAN, nullStats);
             currentCharacter = "";
         }
     }
