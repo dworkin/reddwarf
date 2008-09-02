@@ -327,17 +327,11 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	    oidMap.putAll(oidUpdates);
 	    
             for (String name : removedNames) {
-		if (checkString(name)) {
-		    System.err.println("removing name: " + name);
-		}
                 boundNameMap.remove(name);
 	    }
 
             boundNameMap.putAll(nameUpdates);
 	    for (String name : nameUpdates.keySet()) {
-		if (checkString(name)) {
-		    System.err.println("adding name: " + name + "\n" + boundNameMap);
-		}
 	    }
 
 	}
@@ -415,7 +409,6 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	
 	
 	void removeBinding(String name) {
-	    checkString(name);
 	    checkBindingNotAlreadyRemoved(name);
 	    if (!boundNameMap.containsKey(name) &&
 		!nameUpdates.containsKey(name))
