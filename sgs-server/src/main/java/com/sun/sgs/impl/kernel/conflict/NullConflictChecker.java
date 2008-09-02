@@ -11,7 +11,7 @@ public final class NullConflictChecker implements ConflictChecker {
 
     private static final ConflictResult NO_CONFLICT = new ConflictResult();
 
-    public void started(Transaction txn) {}
+    public void started(Transaction txn, ConflictResolver resolver) {}
 
     public ConflictResult checkAccess(Transaction txn, Object objId,
                                       AccessType type, String source) {
@@ -22,6 +22,6 @@ public final class NullConflictChecker implements ConflictChecker {
         return NO_CONFLICT;
     }
 
-    public void finished(Transaction txn) {}
+    public void abort(Transaction txn) {}
 
 }

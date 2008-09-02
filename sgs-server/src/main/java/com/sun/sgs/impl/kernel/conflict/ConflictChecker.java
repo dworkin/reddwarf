@@ -10,7 +10,7 @@ import com.sun.sgs.service.Transaction;
 public interface ConflictChecker {
 
     /** Starts tracking the given transaction. */
-    void started(Transaction txn);
+    void started(Transaction txn, ConflictResolver resolver);
 
     /** Checks a given access within a started transaction. */
     ConflictResult checkAccess(Transaction txn, Object objId, AccessType type,
@@ -19,7 +19,7 @@ public interface ConflictChecker {
     /** Validates and finishes tracking the given transaction. */
     ConflictResult validate(Transaction txn);
 
-    /** Finishes tracking the given transaction. */
-    void finished(Transaction txn);
+    /** Aborts and finishes tracking the given transaction. */
+    void abort(Transaction txn);
 
 }

@@ -43,23 +43,36 @@ import java.util.Properties;
  * An implementation of {@code ProfileListener} that prints access detail.
  * For any transaction that fails due to conflict this will display the
  * accesses for that transaction and the accesses, if known, for the
- * transaction that caused the conflict.
+ * transaction that caused the conflict. This detail is displaye to standard
+ * out.
  * <p>
- * Note that in the current implementation, conflict detail will only be
- * provided if the {@code AccessCoordinator} is using a backlog to track
- * finished transactions. See {@code AccessCoordinatorImpl} for more
- * detail.
+ * This listener can keep a bounded backlog of finished transactions. This is
+ * used, when a transaction fails due to conflict, to see if the conflicting
+ * transaction has already completed and therefore if its access detail is
+ * available to display. Depending on the {@code ConflictChecker} being
+ * used, keeping a backlog may or may not be helpful and in all cases checking
+ * the backlog is worst-case linear. A longer backlog may produce more
+ * detail about a failure, but will certainly be more expensive to use. By
+ * default no backlog is tracked, but it may be enabled by setting the
+ * {@code com.sun.sgs.impl.profile.listener.AccessedObjectsListener.backlog.size}
+ * property to a non-negative value representing the number of past transactions
+ * to track in the backlog.
  * <p>
- * By default, the set of accesses displayed for a given transaction
- * will be limited to the first 20. This can be changed by setting the
+ * For each failed transaction an ordered list of the accessed objects is
+ * shown. By default, this list will be limited to the first 20 accesss. The
+ * number of diplayed acesses can be changed by setting the
  * {@code com.sun.sgs.impl.profile.listener.AccessedObjectsListener.access.count}
- * property with a positive integer value.
+ * property to a positive integer. 
  */
 public class AccessedObjectsListener implements ProfileListener {
 
-    // a local backlog of the past access detail
+    // an optional local backlog of the past access detail
     private final BoundedLinkedHashMap<TransactionId,AccessedObjectsDetail>
         backlogMap;
+
+    /** Property that defines the non-negative size of the backlog. */
+    public static final String BACKLOG_PROPERTY =
+        AccessedObjectsDetail.class.getName() + "backlog.size";
 
     /** Property that defines the maximum number of accesses to display. */
     public static final String ACCESS_COUNT_PROPERTY = 
@@ -86,14 +99,16 @@ public class AccessedObjectsListener implements ProfileListener {
         if (properties == null)
             throw new NullPointerException("Properties cannot be null");
 
-        String backlogProp =
-            properties.getProperty("com.sun.sgs.impl.kernel." +
-                                   "AccessCoordinatorImpl.queue.size");
+        String backlogProp = properties.getProperty(BACKLOG_PROPERTY);
         if (backlogProp != null) {
             try {
-                backlogMap = new BoundedLinkedHashMap
-                    <TransactionId,AccessedObjectsDetail>(Integer.
-                                                       parseInt(backlogProp));
+                int size = Integer.parseInt(backlogProp);
+                if (size != 0) {
+                    backlogMap = new BoundedLinkedHashMap
+                        <TransactionId,AccessedObjectsDetail>(size);
+                } else {
+                    backlogMap = null;
+                }
             } catch (NumberFormatException nfe) {
                 throw new IllegalArgumentException("Backlog size must be a " +
                                                    "number: " + backlogProp);
@@ -102,15 +117,19 @@ public class AccessedObjectsListener implements ProfileListener {
             backlogMap = null;
         }
 
-	String countProp = properties.getProperty(ACCESS_COUNT_PROPERTY);
-	if (countProp != null) {
-	    try {
-		accessesToShow = Integer.parseInt(countProp);
-	    } catch (NumberFormatException nfe) {
-		throw new IllegalArgumentException("Access count moust be a " +
-						   "number: " + countProp);
-	    }
-	} else {
+        String countProp = properties.getProperty(ACCESS_COUNT_PROPERTY);
+        if (countProp != null) {
+            try {
+                accessesToShow = Integer.parseInt(countProp);
+                if (accessesToShow < 0)
+                    throw new IllegalArgumentException("Access count must be " +
+                                                       "non-negative: " +
+                                                       accessesToShow);
+            } catch (NumberFormatException nfe) {
+                throw new IllegalArgumentException("Access count moust be a " +
+                                                   "number: " + countProp);
+            }
+        } else {
             accessesToShow = DEFAULT_ACCESS_COUNT;
         }
     }

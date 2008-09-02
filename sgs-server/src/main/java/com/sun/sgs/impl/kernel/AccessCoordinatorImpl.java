@@ -22,6 +22,7 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.app.TransactionConflictException;
 
 import com.sun.sgs.impl.kernel.conflict.ConflictChecker;
+import com.sun.sgs.impl.kernel.conflict.ConflictResolver;
 import com.sun.sgs.impl.kernel.conflict.ConflictResult;
 import com.sun.sgs.impl.kernel.conflict.NullConflictChecker;
 import com.sun.sgs.impl.kernel.conflict.TestConflictChecker;
@@ -65,7 +66,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * This implementation provides the option to keep detail on a backlog of
  * past transactions to discover what may have caused conflict. This is
- * currently only useful for {@code ProfileListener}s that wish to diplay
+ * currently only useful for {@code ProfileListener}s that wish to display
  * this detail. By default this backlog tracking is disabled. To enable,
  * set the {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.queue.size}
  * property to some positive value indicating the length of backlog to use.
@@ -74,11 +75,15 @@ import java.util.concurrent.atomic.AtomicLong;
  * detail about failure but will also be more compute-intensive.
  * <p>
  * This implementation also provides an (experimental) ability to manage
- * conflict. This is useful if you want to experiment with data stores
+ * and resolve conflict. This is useful when experimenting with data stores
  * that don't already provide this feature (e.g. {@code InMemoryDataStore}).
- * Conflict management is off by default but can be enabled by setting
- * {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.conflict.manage}
- * to {@code true}.
+ * Conflict management is off by default but can be enabled by setting the
+ * {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.conflict.checker}
+ * property to the name of a fully qualified implementation of
+ * {@code ConflictChecker}. If this is set, then setting the
+ * {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.conflict.resolver}
+ * property to an implementation of {@code ConflictResolver} will define the
+ * default resolver to use when conflict is detected.
  */
 class AccessCoordinatorImpl implements AccessCoordinator,
                                        NonDurableTransactionParticipant {
@@ -119,11 +124,25 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     private final ProfileCollector profileCollector;
 
     // TEST: an optional conflict checker
-    final ConflictChecker checker;
+    private final ConflictChecker checker;
 
-    /** TEST: the property to set to enable conflict management. */
-    static final String CONFLICT_MANAGE_PROPERTY =
-        AccessCoordinatorImpl.class.getName() + ".conflict.manage";
+    /**
+     * TEST: the property to set to enable conflict management and
+     * define which checker to use.
+     */
+    static final String CONFLICT_CHECKER_PROPERTY =
+        AccessCoordinatorImpl.class.getName() + ".conflict.checker";
+
+    // TEST: the default conflict resolver
+    private final ConflictResolver defaultConflictResolver;
+
+    /**  TEST: the property to set to define the default conflict resolver. */
+    static final String CONFLICT_RESOLVER_PROPERTY =
+        AccessCoordinatorImpl.class.getName() + ".conflict.resolver";
+
+    // TEST: the default resolver
+    private static final String DEFAULT_CONFLICT_RESOLVER =
+        "com.sun.sgs.impl.kernel.conflict.AbortCallerConflictResolver";
 
     /**
      * Creates an instance of {@code AccessCoordinatorImpl}.
@@ -154,11 +173,37 @@ class AccessCoordinatorImpl implements AccessCoordinator,
             backlog = null;
         }
 
-        String manageProp = properties.getProperty(CONFLICT_MANAGE_PROPERTY);
-        if ((manageProp != null) && (manageProp.equals("true"))) {
-            checker = new TestConflictChecker();
+        // TEST
+        boolean checking = false;
+        String checkerProp = properties.getProperty(CONFLICT_CHECKER_PROPERTY);
+        if (checkerProp != null) {
+            try {
+                Class<?> checkerClass = Class.forName(checkerProp);
+                checker = (ConflictChecker)(checkerClass.newInstance());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Failed to create " +
+                                                   "conflict checker: " +
+                                                   checkerProp, e);
+            }
+            checking = true;
         } else {
             checker = new NullConflictChecker();
+        }
+        if (checking) {
+            String resolverProp =
+                properties.getProperty(CONFLICT_RESOLVER_PROPERTY,
+                                       DEFAULT_CONFLICT_RESOLVER);
+            try {
+                Class<?> resolverClass = Class.forName(resolverProp);
+                defaultConflictResolver =
+                    (ConflictResolver)(resolverClass.newInstance());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Failed to create " +
+                                                   "conflict resolver: " +
+                                                   resolverProp, e);
+            }
+        } else {
+            defaultConflictResolver = null;
         }
 
         this.txnProxy = txnProxy;
@@ -250,7 +295,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public void abort(Transaction txn) {
-        checker.finished(txn);
+        checker.abort(txn);
         reportDetail(txn, false);
     }
 
@@ -306,7 +351,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * Package-private methods.
      */
 
-    /** 
+    /**
      * Notifies the coordinator that a new transaction is starting. 
      */
     void notifyNewTransaction(long requestedStartTime, int tryCount) {
@@ -316,7 +361,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         txn.join(this);
         txnMap.put(txn, new AccessedObjectsDetailImpl());
         // TEST
-        checker.started(txn);
+        checker.started(txn, null);
     }
 
     // NOTE: there will be another version of the notifyNewTransaction

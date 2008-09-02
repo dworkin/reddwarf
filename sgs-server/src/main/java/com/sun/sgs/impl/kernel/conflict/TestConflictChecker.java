@@ -27,12 +27,12 @@ public class TestConflictChecker implements ConflictChecker {
         txnMap = new ConcurrentHashMap<Transaction,AccessInfo>();
     }
 
-    /** Notify the checker of a new transaction for the active set. */
-    public void started(Transaction txn) {
-        txnMap.put(txn, new AccessInfo());
+    /** {@inheritDoc} */
+    public void started(Transaction txn, ConflictResolver resolver) {
+        txnMap.put(txn, new AccessInfo(resolver));
     }
 
-    /** Checks if the requested access causes conflict. */
+    /** {@inheritDoc} */
     public synchronized ConflictResult checkAccess(Transaction txn,
                                                    Object objId,
                                                    AccessType type,
@@ -63,7 +63,7 @@ public class TestConflictChecker implements ConflictChecker {
         return NO_CONFLICT;
     }
 
-    /** Validates the given transaction and removes it from the active set. */
+    /** {@inheritDoc} */
     public synchronized ConflictResult validate(Transaction txn) {
         AccessInfo localInfo = txnMap.remove(txn);
 
@@ -91,17 +91,21 @@ public class TestConflictChecker implements ConflictChecker {
         return NO_CONFLICT;
     }
 
-    /** Try to remove the transaction from the active set. */
-    public void finished(Transaction txn) {
+    /** {@inheritDoc} */
+    public void abort(Transaction txn) {
         txnMap.remove(txn);
     }
 
     /** Simple class that tracks read and write sets, indexed by the source. */
     private static class AccessInfo {
+        final ConflictResolver resolver;
         final HashMap<String,Set<Object>> readMap =
             new HashMap<String,Set<Object>>();
         final HashMap<String,Set<Object>> writeMap =
             new HashMap<String,Set<Object>>();
+        AccessInfo(ConflictResolver resolver) {
+            this.resolver = resolver;
+        }
     }
 
 }
