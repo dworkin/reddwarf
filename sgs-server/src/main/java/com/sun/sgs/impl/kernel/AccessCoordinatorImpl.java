@@ -25,7 +25,6 @@ import com.sun.sgs.impl.kernel.conflict.ConflictChecker;
 import com.sun.sgs.impl.kernel.conflict.ConflictResolver;
 import com.sun.sgs.impl.kernel.conflict.ConflictResult;
 import com.sun.sgs.impl.kernel.conflict.NullConflictChecker;
-import com.sun.sgs.impl.kernel.conflict.TestConflictChecker;
 
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
