@@ -710,17 +710,17 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    context = getContext();
 	    ManagedObject result;
-	    try {
+ 	    try {
                 String internalName = getInternalName(name, serviceBinding);
 		// mark that this name has been read locked
 		boundNameAccesses.
 		    reportObjectAccess(internalName, AccessType.READ);	    
 		result = context.getBinding(internalName);
 		boundNameAccesses.setObjectDescription(internalName, result);
-	    } catch (NameNotBoundException e) {
-		throw new NameNotBoundException(
-		    "Name '" + name + "' is not bound");
-	    }
+ 	    } catch (NameNotBoundException e) {
+ 		throw new NameNotBoundException(
+ 		    "Name '" + name + "' is not bound");
+ 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -830,8 +830,23 @@ public final class DataServiceImpl implements DataService {
 	    // mark that this name has been read locked
 	    boundNameAccesses.
                 reportObjectAccess(internalName, AccessType.READ);	    
-	    String result = getExternalName(context.nextBoundName(internalName),
+
+	    String nextBoundName = context.nextBoundName(internalName);
+
+	    String result = getExternalName(nextBoundName,
 					    serviceBinding);
+	    if (nextBoundName != null) {
+		boundNameAccesses.
+		    reportObjectAccess(nextBoundName, AccessType.READ);  
+		
+		// we are write-locking the name after next to ensure
+		// a consistent view
+		String nameAfterNext = context.nextBoundName(nextBoundName);
+		if (nameAfterNext != null)
+		    boundNameAccesses.
+			reportObjectAccess(nameAfterNext, AccessType.WRITE);
+	    }		
+		
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "{0} tid:{1,number,#}, name:{2} returns {3}",

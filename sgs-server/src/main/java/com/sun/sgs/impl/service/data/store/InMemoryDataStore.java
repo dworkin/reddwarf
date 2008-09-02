@@ -72,7 +72,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
     private final ConcurrentMap<Long,byte[]> oidMap;
 
     /*
-     * Implementation Note: use a skip list to support searching by
+     * Implementation Note: use a sorted list to support searching by
      * name ordering using nextBoundName
      */
     private final ConcurrentNavigableMap<String,Long> boundNameMap;
@@ -98,6 +98,8 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
     
 
     public long createObject(Transaction txn) {
+	TxnInfo info = getInfo(txn);
+
 	// This knowingly could waste an Oid should the calling
 	// transaction abort.  We allow this to improve concurrency.
 	return oidCounter.getAndIncrement();
@@ -122,7 +124,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 
 
     public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
-	if (/*dataArray.length == 0 ||*/ oids.length != dataArray.length) {
+	if (oids.length != dataArray.length) {
 	    throw new IllegalArgumentException(
 		"The oids and dataArray must be the same length");
 	}
@@ -177,7 +179,6 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	if (info == null) {
 	    throw new IllegalStateException("Transaction is not active");
 	}
-	// info.abort();
     }
 
     /**
@@ -233,9 +234,14 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 
     public long nextObjectId(Transaction txn, long oid) {
 	TxnInfo txnInfo = openTxns.get(txn);
-	// this is a hack
+
+	// nextObjectId is currently only used by the testing
+	// framework.  Since we only use a counter for binding names,
+	// and do not keep track of which ones are currently used, we
+	// use an expensive operation here to sort the active oids.
 	TreeSet<Long> sortedOids = new TreeSet<Long>(oidMap.keySet());
-	return sortedOids.higher(oid);
+	Long higher = sortedOids.higher(oid);
+	return (higher == null) ? -1 : higher.longValue();
     }
 
 
@@ -320,12 +326,23 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 		oidMap.remove(oid);
 	    oidMap.putAll(oidUpdates);
 	    
-            for (String name : removedNames)
+            for (String name : removedNames) {
+		if (checkString(name)) {
+		    System.err.println("removing name: " + name);
+		}
                 boundNameMap.remove(name);
+	    }
+
             boundNameMap.putAll(nameUpdates);
+	    for (String name : nameUpdates.keySet()) {
+		if (checkString(name)) {
+		    System.err.println("adding name: " + name + "\n" + boundNameMap);
+		}
+	    }
+
 	}
 
-	private void checkOid(long oid) {
+	private void checkOidNotAlreadyRemoved(long oid) {
 	    if (removedIds.contains(oid)) {
 		throw new ObjectNotFoundException("oid " + oid + " has already "
 						  + "been removed in this "
@@ -333,7 +350,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	    }
 	}
 
-	private void checkBinding(String name) {
+	private void checkBindingNotAlreadyRemoved(String name) {
 	    if (removedNames.contains(name)) {
 		throw new NameNotBoundException("name " + name + " has already "
 						+ "been removed in this "
@@ -342,12 +359,12 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	}
 
 	void markForUpdate(long oid) {
-	    checkOid(oid);
+	    checkOidNotAlreadyRemoved(oid);
 	    oidUpdates.put(oid, oidMap.get(oid));
 	}
 	
 	byte[] getObject(long oid, boolean forUpdate) {
-	    checkOid(oid);
+	    checkOidNotAlreadyRemoved(oid);
 	    if (!oidMap.containsKey(oid) &&
 		!oidUpdates.containsKey(oid))
 		throw new ObjectNotFoundException("Object id " + oid + " is " +
@@ -364,38 +381,42 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	}
 	
 	void setObject(long oid, byte[] data) {
-	    //checkOid(oid);
+	    checkOidNotAlreadyRemoved(oid);	    
 	    oidUpdates.put(oid, data);
 	}
 	
 	void removeObject(long oid) {
-	    checkOid(oid);
+	    checkOidNotAlreadyRemoved(oid);
 	    if (!oidMap.containsKey(oid) &&
 		!oidUpdates.containsKey(oid))
 		throw new ObjectNotFoundException("Object id " + oid + " is " +
 						  "not valid");
 	    removedIds.add(oid);
 	    oidUpdates.remove(oid);
-	}
-	
+	}	
+
 	long getBinding(String name) {
-	    checkBinding(name);
+	    checkBindingNotAlreadyRemoved(name);
 	    Long oid = (nameUpdates.containsKey(name))
 		? nameUpdates.get(name)
 		: boundNameMap.get(name);
-	    if (oid == null) 
+	    if (oid == null) {
 		throw new NameNotBoundException(name + " is not bound");
+	    }
 	    return oid.longValue();
 	}
 	
 	void setBinding(String name, long oid) {
-	    //checkBinding(name);	    
+	    
+	    checkBindingNotAlreadyRemoved(name);	 
+	    removedNames.remove(name);
 	    nameUpdates.put(name, oid);
 	}
 	
 	
 	void removeBinding(String name) {
-	    checkBinding(name);
+	    checkString(name);
+	    checkBindingNotAlreadyRemoved(name);
 	    if (!boundNameMap.containsKey(name) &&
 		!nameUpdates.containsKey(name))
 		throw new NameNotBoundException(name + " is not bound");
@@ -410,7 +431,7 @@ public class InMemoryDataStore implements DataStore, TransactionParticipant {
 	    String next = name;
 	    do {
 		next = boundNameMap.higherKey(next);
-	    } while (next != null && !(removedNames.contains(next)));
+	    } while (next != null && removedNames.contains(next));
 
 	    // then check whether we have a newly-added name that
 	    // would have come before this name
