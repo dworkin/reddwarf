@@ -44,6 +44,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -1241,28 +1242,28 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals("name-1", store.nextBoundName(txn, null));
     }
 
-    public void testNextBoundNameDeadlock() throws Exception {
+    public void testNextBoundNameTimeout() throws Exception {
 	final long id2 = store.createObject(txn);
 	for (int i = 100; i < 300; i++) {
 	    store.setBinding(txn, "name-" + i, id);
 	}
 	txn.commit();
-	txn = new DummyTransaction();
-	store.setBinding(txn, "name-299", id2);
 	final Semaphore flag = new Semaphore(1);
+	final Semaphore flag2 = new Semaphore(1);
 	flag.acquire();
+	flag2.acquire();
 	class MyRunnable implements Runnable {
 	    Exception exception2;
 	    public void run() {
 		DummyTransaction txn2 = null;
 		try {
-		    txn2 = new DummyTransaction();
-		    store.setBinding(txn2, "name-101", id2);
+		    txn2 = new DummyTransaction(
+			UsePrepareAndCommit.ARBITRARY, 2000);
+		    /* Get write lock on name-299 and notify txn */
+		    store.setBinding(txn2, "name-299", id2);
 		    flag.release();
-		    String name = "name-101";
-		    while (name != null) {
-			name = store.nextBoundName(txn2, name);
-		    }
+		    /* Wait for txn, then commit */
+		    flag2.tryAcquire(1000, TimeUnit.MILLISECONDS);
 		    txn2.commit();
 		} catch (TransactionAbortedException e) {
 		    System.err.println("txn2: " + e);
@@ -1277,39 +1278,28 @@ public class TestDataStoreImpl extends TestCase {
 	}
 	MyRunnable runnable = new MyRunnable();
 	Thread thread = new Thread(runnable, "testNextBoundNameDeadlock");
+	/* Start txn2 and wait for it to write lock name-299 */
 	thread.start();
-	Thread.sleep(10);
 	flag.acquire();
-	Exception exception = null;
 	String name = "name-100";
+	txn = new DummyTransaction();
 	try {
+	    /* Walk names, expecting to timeout on name-299 */
 	    while (name != null) {
 		name = store.nextBoundName(txn, name);
+		store.removeBinding(txn, name);
 	    }
-	    txn.commit();
+	    fail("Expected TransactionAbortedException");
 	} catch (TransactionAbortedException e) {
 	    System.err.println("txn: " + e);
-	    exception = e;
+	    txn = null;
 	} catch (Exception e) {
-	    System.err.println("txn: " + e);
-	    if (txn != null) {
-		txn.abort(new RuntimeException("abort txn"));
-	    }
+	    fail("Unexpected exception: " + e);
+	} finally {
+	    flag2.release();
+	    thread.join(1000);
+	    assertFalse("Thread should not be alive", thread.isAlive());
 	}
-	thread.join();
-	if (exception == null && runnable.exception2 == null) {
-	    fail("Expected TransactionAbortedException");
-	} else if (runnable.exception2 != null &&
-		   !(runnable.exception2
-		     instanceof TransactionAbortedException))
-	{
-	    throw runnable.exception2;
-	} else if (exception != null &&
-		   !(exception instanceof TransactionAbortedException))
-	{
-	    throw exception;
-	}
-	txn = null;
     }
 
     /* -- Test abort -- */
