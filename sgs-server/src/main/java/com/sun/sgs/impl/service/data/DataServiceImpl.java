@@ -403,9 +403,9 @@ public final class DataServiceImpl implements DataService {
 	    accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    oidAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME, BigInteger.class);
+		registerAccessSource(CLASSNAME + "(objects)", BigInteger.class);
 	    boundNameAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME, String.class);
+		registerAccessSource(CLASSNAME + "(names)", String.class);
 
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);

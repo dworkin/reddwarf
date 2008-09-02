@@ -16,14 +16,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 /** A simple test class that does optimistic forward-validation. */
-public class TestConflictChecker implements ConflictChecker {
+public class OptimisticForwardChecker implements ConflictChecker {
 
     private final ConcurrentHashMap<Transaction,AccessInfo> txnMap;
 
     private static final ConflictResult NO_CONFLICT = new ConflictResult();
 
-    /** Creates an instance of {@code TestConflictChecker}. */
-    public TestConflictChecker() {
+    /** Creates an instance of {@code OptimisticForwardChecker}. */
+    public OptimisticForwardChecker() {
         txnMap = new ConcurrentHashMap<Transaction,AccessInfo>();
     }
 

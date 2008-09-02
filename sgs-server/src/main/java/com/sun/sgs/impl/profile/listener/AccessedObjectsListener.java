@@ -50,9 +50,9 @@ import java.util.Properties;
  * used, when a transaction fails due to conflict, to see if the conflicting
  * transaction has already completed and therefore if its access detail is
  * available to display. Depending on the {@code ConflictChecker} being
- * used, keeping a backlog may or may not be helpful and in all cases checking
- * the backlog is worst-case linear. A longer backlog may produce more
- * detail about a failure, but will certainly be more expensive to use. By
+ * used, keeping a backlog may or may not be helpful. A longer backlog may
+ * produce more detail about a failure because a conflicting transaction
+ * is more likely to still be in the backlog at any given time. By
  * default no backlog is tracked, but it may be enabled by setting the
  * {@code com.sun.sgs.impl.profile.listener.AccessedObjectsListener.backlog.size}
  * property to a non-negative value representing the number of past transactions
@@ -72,7 +72,7 @@ public class AccessedObjectsListener implements ProfileListener {
 
     /** Property that defines the non-negative size of the backlog. */
     public static final String BACKLOG_PROPERTY =
-        AccessedObjectsDetail.class.getName() + "backlog.size";
+        AccessedObjectsListener.class.getName() + ".backlog.size";
 
     /** Property that defines the maximum number of accesses to display. */
     public static final String ACCESS_COUNT_PROPERTY = 
@@ -242,7 +242,7 @@ public class AccessedObjectsListener implements ProfileListener {
                 // implementation) only the description will have caused
                 // any trouble, so we can include some detail about
                 // both the access and the failure
-                formatted.append(String.format("[source %s] %-5s %s [%s." +
+                formatted.append(String.format("[source: %s] %-5s %s [%s." +
                                                "toString() threw: %s]%n",
                                                object.getSource(),
                                                object.getAccessType(),
