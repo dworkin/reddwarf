@@ -1277,7 +1277,7 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 	MyRunnable runnable = new MyRunnable();
-	Thread thread = new Thread(runnable, "testNextBoundNameDeadlock");
+	Thread thread = new Thread(runnable, "testNextBoundNameTimeout");
 	/* Start txn2 and wait for it to write lock name-299 */
 	thread.start();
 	flag.acquire();
