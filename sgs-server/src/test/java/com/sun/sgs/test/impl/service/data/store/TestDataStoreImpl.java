@@ -44,6 +44,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -1239,6 +1240,66 @@ public class TestDataStoreImpl extends TestCase {
 	txn.abort(new RuntimeException("abort"));
 	txn = new DummyTransaction();
 	assertEquals("name-1", store.nextBoundName(txn, null));
+    }
+
+    public void testNextBoundNameTimeout() throws Exception {
+	final long id2 = store.createObject(txn);
+	for (int i = 100; i < 300; i++) {
+	    store.setBinding(txn, "name-" + i, id);
+	}
+	txn.commit();
+	final Semaphore flag = new Semaphore(1);
+	final Semaphore flag2 = new Semaphore(1);
+	flag.acquire();
+	flag2.acquire();
+	class MyRunnable implements Runnable {
+	    Exception exception2;
+	    public void run() {
+		DummyTransaction txn2 = null;
+		try {
+		    txn2 = new DummyTransaction(
+			UsePrepareAndCommit.ARBITRARY, 2000);
+		    /* Get write lock on name-299 and notify txn */
+		    store.setBinding(txn2, "name-299", id2);
+		    flag.release();
+		    /* Wait for txn, then commit */
+		    flag2.tryAcquire(1000, TimeUnit.MILLISECONDS);
+		    txn2.commit();
+		} catch (TransactionAbortedException e) {
+		    System.err.println("txn2: " + e);
+		    exception2 = e;
+		} catch (Exception e) {
+		    System.err.println("txn2: " + e);
+		    if (txn2 != null) {
+			txn2.abort(new RuntimeException("abort txn2"));
+		    }
+		}
+	    }
+	}
+	MyRunnable runnable = new MyRunnable();
+	Thread thread = new Thread(runnable, "testNextBoundNameTimeout");
+	/* Start txn2 and wait for it to write lock name-299 */
+	thread.start();
+	flag.acquire();
+	String name = "name-100";
+	txn = new DummyTransaction();
+	try {
+	    /* Walk names, expecting to timeout on name-299 */
+	    while (name != null) {
+		name = store.nextBoundName(txn, name);
+		store.removeBinding(txn, name);
+	    }
+	    fail("Expected TransactionAbortedException");
+	} catch (TransactionAbortedException e) {
+	    System.err.println("txn: " + e);
+	    txn = null;
+	} catch (Exception e) {
+	    fail("Unexpected exception: " + e);
+	} finally {
+	    flag2.release();
+	    thread.join(1000);
+	    assertFalse("Thread should not be alive", thread.isAlive());
+	}
     }
 
     /* -- Test abort -- */
