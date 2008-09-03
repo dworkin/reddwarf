@@ -19,20 +19,30 @@ import java.io.Serializable;
 
 
 /**
- * This implementation of <code>Character</code> is the base for all AI
- * creatures (ie, Monsters and NPCs).
+ * This implementation of {@code Character} is the base for all AI
+ * creatures (ie, Creature and NPCs).
+ *
+ * @see CreatureCharacter
+ * @see NPCharacter
  */
 public abstract class AICharacter 
     implements Character, ManagedObject, Serializable {
 
     private static final long serialVersionUID = 1;
 
-    // the character's creature type
+    /**
+     * The character's creature type
+     */
     private final CreatureType creatureType;
 
-    // the character's name
+    /**
+     * The character's name
+     */
     private final String name;
     
+    /**
+     * The unique Id of this instance
+     */
     private final long id;
 
     /**
@@ -56,8 +66,9 @@ public abstract class AICharacter
     }
 
     /**
-     * Returns this entity's identifier. Typically this maps to the sprite
-     * used on the client-side to render this entity.
+     * Returns this entity's unqiue identifier.  This can be used to
+     * distinguish this entity from other entities with the same type
+     * and name.
      *
      * @return the identifier
      */
@@ -79,12 +90,5 @@ public abstract class AICharacter
      * processing.
      */
     public abstract void run();
-
-    /**
-     * Resets the character's details and makes them ready to re-enter
-     * a level. This typically happens after the character has been killed,
-     * and it's being re-spawned.
-     */
-    public abstract void regenerate();
 
 }
