@@ -144,7 +144,7 @@ public class AccessedObjectsListener implements ProfileListener {
                 txnId = new TransactionId(profileReport.getTransactionId());
             // print out the detail for the failed transaction
 	    System.out.printf("Task type %s failed due to conflict.  Details:"
-			      + "%n  accesor id: %s, try count %d; objects "
+			      + "%n  accessor id: %s, try count %d; objects "
 			      + "accessed ordered by first access:%n%s" 
 			      + "conflict type: %s%n",
 			      profileReport.getTask().getBaseTaskType(),

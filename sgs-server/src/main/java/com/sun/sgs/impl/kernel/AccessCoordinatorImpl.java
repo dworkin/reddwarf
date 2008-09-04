@@ -394,8 +394,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         }
 
         /** Sets the cause and source of conflict for this access detail. */
-	synchronized void setConflict(ConflictType conflictReason, 
-                                      AccessedObjectsDetailImpl conflicting) {
+        void setConflict(ConflictType conflictReason, 
+                         AccessedObjectsDetailImpl conflicting) {
 	    conflictType = conflictReason;
 	    this.idOfConflictingTxn = conflicting.txnId;
 	}

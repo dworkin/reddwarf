@@ -84,6 +84,7 @@ final class Context extends TransactionContext {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /** The proxy for notifying of object accesses. */
     final AccessReporter<BigInteger> oidAccesses;
 
     /**
@@ -105,7 +106,7 @@ final class Context extends TransactionContext {
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
-	    classesTable != null;
+	    classesTable != null && oidAccesses != null;
 	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);

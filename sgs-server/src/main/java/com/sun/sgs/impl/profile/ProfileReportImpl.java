@@ -66,7 +66,6 @@ class ProfileReportImpl implements ProfileReport {
     final long actualStartTime;
 
     // the other fields, set directly by the ProfileCollectorImpl
-    boolean transactional = false;
     byte [] transactionId = null;
     boolean succeeded = false;
     long runningTime = 0;
@@ -215,7 +214,7 @@ class ProfileReportImpl implements ProfileReport {
      * {@inheritDoc}
      */
     public boolean wasTaskTransactional() {
-        return transactional;
+        return transactionId != null;
     }
 
     /**
