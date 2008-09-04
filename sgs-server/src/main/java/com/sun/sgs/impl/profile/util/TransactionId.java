@@ -40,6 +40,8 @@ public final class TransactionId {
      * @param txnId the transaction identifier
      */
     public TransactionId(byte [] txnId) {
+        // assert that this really fits into a long
+        assert txnId.length <= 8;
         this.txnId = (new BigInteger(1, txnId)).longValue();
     }
 

@@ -30,8 +30,8 @@ import com.sun.sgs.service.Transaction;
  * as provided by the {@code DataService}.
  * <p>
  * Each {@code sourceName} determines a unique namespace of objects.  Any
- * {@link AccessReporter} registered with the same {@code sourceName} though
- * a given {@code AccessCoordinator} instance, independent of the
+ * {@link AccessReporter} registered with the same {@code sourceName}
+ * through a given {@code AccessCoordinator} instance, independent of the
  * {@code objectIdType}, is considered to report accesses to the same set
  * of shared objects. Conflicting accesses to a single object can be reported
  * to different {@code AccessReporter}s if those reporters were obtained from
