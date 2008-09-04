@@ -335,11 +335,11 @@ final class ManagedReferenceImpl<T>
     @SuppressWarnings("fallthrough")
     T get(boolean checkContext) {
 	try {
-	    // mark that we read the object
-	    context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
 	    }
+	    // mark that we read the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	    switch (state) {
 	    case EMPTY:
 		ManagedObject tempObject = deserialize(
