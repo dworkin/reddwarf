@@ -169,6 +169,14 @@ public final class DataServiceImpl implements DataService {
     public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
+    /**
+     * The name that represents the end of the bound name namespace.  This name
+     * is never stored within the data store.  It is used for locking purposes
+     * when range-locking is required.
+     */
+    private static final String END_OF_NAMESPACE =
+	CLASSNAME + ": end of bound name namespace";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -679,8 +687,13 @@ public final class DataServiceImpl implements DataService {
 	    long nextOid = context.nextObjectId(oid);
 	    BigInteger result =
 		(nextOid == -1) ? null : BigInteger.valueOf(nextOid);
-	    if (nextOid != -1)
+	    if (nextOid != -1) {
+		/* NOTE: really, we are locking all the object Ids
+		 * between the provided one and this one inclusive,
+		 * but we have no way of representing that
+		 * efficiently */
 		oidAccesses.reportObjectAccess(result, AccessType.READ);
+	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "nextObjectId objectId:{0} returns {1}",
@@ -709,12 +722,27 @@ public final class DataServiceImpl implements DataService {
 	    ManagedObject result;
 	    try {
                 String internalName = getInternalName(name, serviceBinding);
-		// mark that this name has been read locked
+		/* mark that this name has been read locked */
 		boundNameAccesses.
 		    reportObjectAccess(internalName, AccessType.READ);	    
 		result = context.getBinding(internalName);
 		boundNameAccesses.setObjectDescription(internalName, result);
 	    } catch (NameNotBoundException e) {
+		/* if the provided name was not bound, then we need read lock
+		 * the next bound name after this one for consistency
+		 * purposes */
+		String nextBoundName = 
+		    nextBoundNameInternal(name, serviceBinding);
+		if (nextBoundName == null) {
+		    boundNameAccesses.
+			reportObjectAccess(END_OF_NAMESPACE, AccessType.READ);		    
+		}
+		else {
+		    /* use the internal name for access reporting */
+		    boundNameAccesses.reportObjectAccess(
+			getInternalName(nextBoundName, serviceBinding), 
+                            AccessType.READ);		    
+		}
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
 	    }
@@ -753,11 +781,25 @@ public final class DataServiceImpl implements DataService {
 	    checkManagedObject(object);
 	    context = getContext();
             String internalName = getInternalName(name, serviceBinding);
-	    // mark that this name has been write locked
+	    /* mark that this name has been write locked */
 	    boundNameAccesses.
                 reportObjectAccess(internalName, AccessType.WRITE, object);
+	    /* mark that the next name is also write locked.  By write- locking
+	     * the next name, we ensure a consistent view of the name space for
+	     * any readers.  However, this has a severe concurrency impact on
+	     * writers */
+	    String nextBoundName = nextBoundNameInternal(name, serviceBinding);
+	    if (nextBoundName == null) {
+		boundNameAccesses.
+		    reportObjectAccess(END_OF_NAMESPACE, AccessType.WRITE);
+	    }
+	    else {
+		/* use the internal name for access reporting */
+		boundNameAccesses.reportObjectAccess(
+		    getInternalName(nextBoundName, serviceBinding),
+                        AccessType.WRITE);		    
+	    }
             context.setBinding(internalName, object);
-
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -792,9 +834,25 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    try {
                 String internalName = getInternalName(name, serviceBinding);
-		// mark that this name has been write locked
+		/* mark that this name has been write locked */
 		boundNameAccesses.
                     reportObjectAccess(internalName, AccessType.WRITE);
+		/* mark that the next name is also write locked.  By write- locking
+		 * the next name, we ensure a consistent view of the name space for
+		 * any readers.  However, this has a severe concurrency impact on
+		 * writers */
+		String nextBoundName = 
+		    nextBoundNameInternal(name, serviceBinding);
+		if (nextBoundName == null) {
+		    boundNameAccesses.
+			reportObjectAccess(END_OF_NAMESPACE, AccessType.WRITE);
+		}
+		else {
+		    /* use the internal name for access reporting */
+		    boundNameAccesses.reportObjectAccess(
+			getInternalName(nextBoundName, serviceBinding),
+                            AccessType.WRITE);		    
+		}
 		context.removeBinding(internalName);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
@@ -824,11 +882,23 @@ public final class DataServiceImpl implements DataService {
 	try {
 	    context = getContext();
 	    String internalName = getInternalName(name, serviceBinding);
-	    // mark that this name has been read locked
-	    boundNameAccesses.
-                reportObjectAccess(internalName, AccessType.READ);	    
-	    String result = getExternalName(context.nextBoundName(internalName),
-					    serviceBinding);
+	    if (name != null) {
+		// mark that this name has been read locked
+		boundNameAccesses.
+		    reportObjectAccess(internalName, AccessType.READ);	    
+	    }
+	    String nextBoundName = context.nextBoundName(internalName);
+	    String result = getExternalName(nextBoundName, serviceBinding);
+	    /* NOTE: to ensure that no additional name could be inserted after
+	     * the provided name and the end of the namespace, we read-lock a
+	     * phantom name that isn't actually in the namepace.  Any
+	     * concurrent writers adding a name at the end of the namespace
+	     * will have to write-lock this name, and therefore only one will
+	     * proceed after conflict resolution */
+	    if (nextBoundName == null) {
+		boundNameAccesses.reportObjectAccess(END_OF_NAMESPACE,
+						     AccessType.READ);
+	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "{0} tid:{1,number,#}, name:{2} returns {3}",
