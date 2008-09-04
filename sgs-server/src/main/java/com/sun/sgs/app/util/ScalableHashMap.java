@@ -1797,7 +1797,7 @@ public class ScalableHashMap<K,V>
      *
      * @see ManagedSerializable
      */
-    private static class PrefixEntry<K,V>
+    static class PrefixEntry<K,V>
 	implements Entry<K,V>, Serializable {
 
 	/** The version of the serialized form. */
