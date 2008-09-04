@@ -34,13 +34,6 @@ public interface ProfileOperation {
     String getOperationName();
 
     /**
-     * Returns the identifier for this operation.
-     *
-     * @return the identifier
-     */
-    int getId();
-
-    /**
      * Tells this operation to report that it is happening. This may be
      * called any number of times during a single task.
      *
