@@ -41,7 +41,7 @@ import java.util.logging.Logger;
  * object.
  */
 final class ManagedReferenceImpl<T>
-    implements ManagedReference<T>, Serializable
+    implements InternalManagedReference<T>, Serializable
 {
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
@@ -198,7 +198,7 @@ final class ManagedReferenceImpl<T>
 	    context.refs.find(object));
 	if (ref == null) {
 	    ref = new ManagedReferenceImpl<T>(context, object);
-	    context.refs.add(ref);
+	    context.refs.add(ref);	    
 	} else if (ref.isRemoved()) {
 	    throw new ObjectNotFoundException("Object has been removed");
 	}
@@ -250,75 +250,6 @@ final class ManagedReferenceImpl<T>
 	this.oid = oid;
 	state = State.EMPTY;
 	validate();
-    }
-
-    /* -- Methods for DataService -- */
-
-    @SuppressWarnings("fallthrough")
-    void removeObject() {
-	switch (state) {
-	case EMPTY:
-	    context.store.removeObject(context.txn, oid);
-	    state = State.REMOVED_EMPTY;
-	    break;
-	case MAYBE_MODIFIED:
-	    /* Call store before modifying fields, in case the call fails */
-	    context.store.removeObject(context.txn, oid);
-	    unmodifiedBytes = null;
-	    state = State.REMOVED_FETCHED;
-	    break;
-	case NOT_MODIFIED:
-	case MODIFIED:
-	    context.store.removeObject(context.txn, oid);
-	    /* Fall through */
-	case NEW:
-	    state = State.REMOVED_FETCHED;
-	    break;
-	case FLUSHED:
-	    throw new TransactionNotActiveException(
-		"No transaction is in progress");
-	case REMOVED_EMPTY:
-	case REMOVED_FETCHED:
-	    throw new ObjectNotFoundException("The object is not found");
-	default:
-	    throw new AssertionError();
-	}
-    }
-
-    @SuppressWarnings("fallthrough")
-    void markForUpdate() {
-	switch (state) {
-	case EMPTY:
-	    /*
-	     * Presumably this object is being marked for update because it
-	     * will be modified, so fetch the object now.
-	     */
-	    object = deserialize(
-		context.store.getObject(context.txn, oid, true));
-	    context.refs.registerObject(this);
-	    state = State.MODIFIED;
-	    break;
-	case MAYBE_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
-	    unmodifiedBytes = null;
-	    state = State.MODIFIED;
-	    break;
-	case NOT_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
-	    state = State.MODIFIED;
-	    break;
-	case MODIFIED:
-	case NEW:
-	    break;
-	case FLUSHED:
-	    throw new TransactionNotActiveException(
-		"No transaction is in progress");
-	case REMOVED_EMPTY:
-	case REMOVED_FETCHED:
-	    throw new ObjectNotFoundException("The object is not found");
-	default:
-	    throw new AssertionError();
-	}
     }
 
     /* -- Implement ManagedReference -- */
@@ -493,6 +424,121 @@ final class ManagedReferenceImpl<T>
 	 * 32 bits of a long field, and add a non-zero constant.
 	 */
 	return (int) (oid ^ (oid >>> 32)) + 6883;
+    }
+
+    /* -- Implement InternalManagedObject -- */
+
+    /** {@inheritDoc} */
+    public long getOid() {
+	return oid;
+    }
+
+    /** {@inheritDoc} */
+    @SuppressWarnings("fallthrough")
+    public void markForUpdate() {
+	switch (state) {
+	case EMPTY:
+	    /*
+	     * Presumably this object is being marked for update because it
+	     * will be modified, so fetch the object now.
+	     */
+	    object = deserialize(
+		context.store.getObject(context.txn, oid, true));
+	    context.refs.registerObject(this);
+	    state = State.MODIFIED;
+	    break;
+	case MAYBE_MODIFIED:
+	    context.store.markForUpdate(context.txn, oid);
+	    unmodifiedBytes = null;
+	    state = State.MODIFIED;
+	    break;
+	case NOT_MODIFIED:
+	    context.store.markForUpdate(context.txn, oid);
+	    state = State.MODIFIED;
+	    break;
+	case MODIFIED:
+	case NEW:
+	    break;
+	case FLUSHED:
+	    throw new TransactionNotActiveException(
+		"No transaction is in progress");
+	case REMOVED_EMPTY:
+	case REMOVED_FETCHED:
+	    throw new ObjectNotFoundException("The object is not found");
+	default:
+	    throw new AssertionError();
+	}
+    }
+
+
+    /** {@inheritDoc} */
+    @SuppressWarnings("fallthrough")
+    public void removeObject() {
+	switch (state) {
+	case EMPTY:
+	    context.store.removeObject(context.txn, oid);
+	    state = State.REMOVED_EMPTY;
+	    break;
+	case MAYBE_MODIFIED:
+	    /* Call store before modifying fields, in case the call fails */
+	    context.store.removeObject(context.txn, oid);
+	    unmodifiedBytes = null;
+	    state = State.REMOVED_FETCHED;
+	    break;
+	case NOT_MODIFIED:
+	case MODIFIED:
+	    context.store.removeObject(context.txn, oid);
+	    /* Fall through */
+	case NEW:
+	    state = State.REMOVED_FETCHED;
+	    break;
+	case FLUSHED:
+	    throw new TransactionNotActiveException(
+		"No transaction is in progress");
+	case REMOVED_EMPTY:
+	case REMOVED_FETCHED:
+	    throw new ObjectNotFoundException("The object is not found");
+	default:
+	    throw new AssertionError();
+	}
+    }
+
+    /** {@inheritDoc} */
+    public void setObject(ManagedObject o) {
+	switch (state) {
+	case EMPTY:	    
+	    if (context.detectModifications) {
+		unmodifiedBytes = SerialUtil.serialize(
+		    o, context.classSerial);
+		state = State.MAYBE_MODIFIED;
+	    } else {
+		state = State.NOT_MODIFIED;
+	    }
+	    /* Do after creating unmodified bytes, in case that fails */
+	    object = o;
+	    context.refs.registerObject(this);
+	    break;
+	case NEW:
+	case NOT_MODIFIED:
+	case MAYBE_MODIFIED:
+	case MODIFIED:
+	case REMOVED_EMPTY:
+	case REMOVED_FETCHED:
+	    throw new IllegalStateException(
+                "Cannot set the object of a non-empty ManagedReferenceImpl");
+	case FLUSHED:
+	    throw new TransactionNotActiveException(
+		"No transaction is in progress");
+	default:
+	    throw new AssertionError();
+	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"setObject tid:{0,number,#}, oid:{1,number,#} value" +
+		" type:{2}",
+		context.getTxnId(), oid, DataServiceImpl.typeName(object));
+	}
     }
 
     /* -- Implement Serializable -- */

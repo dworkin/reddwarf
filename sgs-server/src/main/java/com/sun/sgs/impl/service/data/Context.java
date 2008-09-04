@@ -21,11 +21,15 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.annotation.ReadOnly;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.kernel.AccessReporter;
+import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.math.BigInteger;
@@ -45,6 +49,12 @@ final class Context extends TransactionContext {
 
     /** The data store. */
     final DataStore store;
+
+    /**
+     * The read-only data cache for those ManagedObject instances
+     * marked with the ReadOnly annotation
+     */
+    final DataCache cache;
 
     /**
      * The wrapped transaction, to be passed to the data store.  The wrapping
@@ -84,6 +94,13 @@ final class Context extends TransactionContext {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /**
+     * A table for recording data for all the {@link
+     * ReadOnlyReference} instances created during the context of the
+     * current transaction.
+     */
+    final ReadOnlyReferenceTable readOnlyRefs = new ReadOnlyReferenceTable();
+
     final AccessReporter<BigInteger> oidAccesses;
 
     /**
@@ -97,6 +114,7 @@ final class Context extends TransactionContext {
     /** Creates an instance of this class. */
     Context(DataServiceImpl service,
 	    DataStore store,
+	    DataCache cache,
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
@@ -108,6 +126,7 @@ final class Context extends TransactionContext {
 	    classesTable != null;
 	this.service = service;
 	this.store = store;
+	this.cache = cache;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
@@ -211,31 +230,102 @@ final class Context extends TransactionContext {
     /* -- Methods for obtaining references -- */
 
     /** Obtains the reference associated with the specified object. */
-    <T> ManagedReferenceImpl<T> getReference(T object) {
-	return ManagedReferenceImpl.getReference(this, object);
+    <T> InternalManagedReference<T> getReference(T object) {
+	return (isReadOnly(object))
+	    ? ReadOnlyReference.getOrCreateIfNotPresent(this, object)
+	    : ManagedReferenceImpl.getReference(this, object);
     }
 
     /**
-     * Finds the existing reference associated with the specified object,
-     * returning null if it is not found.  Throws ObjectNotFoundException if
-     * the object has been removed.
+     * Finds the existing reference associated with the specified
+     * object, returning null if it is not found.  Throws
+     * ObjectNotFoundException if the object has already been removed
+     * during the current transaction.
+     *
+     * @throws ObjectNotFoundException if the object has been removed.
      */
-    <T> ManagedReferenceImpl<T> findReference(T object) {
-	return ManagedReferenceImpl.findReference(this, object);
+    <T> InternalManagedReference<T> findReference(T object) {
+	if (isReadOnly(object)) {
+	    ReadOnlyReference<T> ref = 
+		ReadOnlyReference.getReference(this, object);
+	    if (ref != null && ref.isRemoved())
+		throw new ObjectNotFoundException("object has already " + 
+						  "been removed");
+	    return ref;
+	}
+	else
+	    return ManagedReferenceImpl.findReference(this, object);
     }
 
     /**
      * Finds the existing reference associated with the specified object,
      * returning null if it is not found or has been removed.
      */
-    <T> ManagedReferenceImpl<T> safeFindReference(T object) {
+    <T> InternalManagedReference<T> safeFindReference(T object) {
+
+	if (isReadOnly(object)) {
+	    ReadOnlyReference<T> ref = 
+		ReadOnlyReference.getReference(this, object);
+	    return ref;
+	}
+
 	return ManagedReferenceImpl.safeFindReference(this, object);
     }
 
-    /** Obtains the reference associated with the specified ID. */
-    ManagedReferenceImpl<?> getReference(long oid) {
-	return ManagedReferenceImpl.getReference(this, oid);
+    /** 
+     * Obtains the reference associated with the specified ID.  Note that this
+     * method will eagerly load the object from the data store.
+     */
+    InternalManagedReference<?> getReference(long oid) {
+
+	// Given that we know nothing about the type of the object, we require
+	// obtaining an instance of it to determine which type of reference to
+	// return
+	InternalManagedReference<?> ref;
+
+	// first check whether the oid is already contained within any of the
+	// reference tables.  We have to do this before trying to load the
+	// object from memory because if the object was created within the
+	// current transaction it will not be in the backing data store
+	if ((ref = refs.find(oid)) != null)
+	    return ref;
+	else if ((ref = readOnlyRefs.get(oid)) != null)
+	    return ref;       
+
+	// Otherwise, the object has not been created or loading during the
+	// current transaction so we have to pay the penalty of getting the
+	// object up front in order to ensure that we return the right type of
+	// reference.
+	//
+	// In practice we assume that this will not actually be much additonal
+	// overhead since the only caller of this method is when a
+	// ManagedReference is being created by an oid.  Most often in this
+	// case, the caller will immediately call .get() on the reference and
+	// so the penalty will be offset.
+	Object o = SerialUtil.deserialize(store.getObject(txn, oid, false),
+					  classSerial);
+	oidAccesses.reportObjectAccess(BigInteger.valueOf(oid), 
+				       AccessType.READ);
+	ref = (isReadOnly(o))
+	    ? ReadOnlyReference.getOrCreateIfNotPresent(this, oid)
+	    : ManagedReferenceImpl.getReference(this, oid);	    
+
+	// Once the right type of reference has been created, set the value
+	// contained by that reference.  This avoid having the reference
+	// re-fetch the item from the data store when .get() is called.
+	ref.setObject((ManagedObject)o);
+ 
+	return ref;
     }
+
+    /**
+     * Returns {@code true} if the provided object is annotated with a
+     * read-only marker.
+     */
+    private static boolean isReadOnly(Object o) {
+	return o.getClass().getAnnotation(ReadOnly.class) != null;
+    }
+
 
     /* -- Methods for bindings -- */
 
@@ -243,12 +333,12 @@ final class Context extends TransactionContext {
     ManagedObject getBinding(String internalName) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return (ManagedObject) getReference(id).get(false);
+	return (ManagedObject) getReference(id).get();
     }
 
     /** Sets the object associated with the specified internal name. */
     void setBinding(String internalName, Object object) {
-	store.setBinding(txn, internalName, getReference(object).oid);
+	store.setBinding(txn, internalName, getReference(object).getOid());
     }
 
     /** Removes the object associated with the specified internal name. */

@@ -42,7 +42,7 @@ final class ReferenceTable {
      */
     private final Map<ManagedObject, ManagedReferenceImpl<?>> objects =
 	new IdentityHashMap<ManagedObject, ManagedReferenceImpl<?>>();
-
+    
     /** Creates an instance of this class. */
     ReferenceTable() { }
 

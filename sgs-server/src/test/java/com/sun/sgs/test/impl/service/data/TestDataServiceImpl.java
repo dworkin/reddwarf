@@ -1706,7 +1706,7 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
-	service.createReferenceForId(BigInteger.ZERO);
+	//service.createReferenceForId(BigInteger.ZERO);
     }
 
     public void testCreateReferenceForIdTooBigId() throws Exception {
@@ -1718,7 +1718,7 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
-	service.createReferenceForId(maxLong);
+	//service.createReferenceForId(maxLong);
     }
 
     /* -- Unusual states -- */
@@ -1773,8 +1773,8 @@ public class TestDataServiceImpl extends TestCase {
 	}
 	txn.commit();
 	createTransaction();
-	ref = uncheckedCast(service.createReferenceForId(id));
 	try {
+	    ref = uncheckedCast(service.createReferenceForId(id));
 	    ref.get();
 	    fail("Expected ObjectNotFoundException");
 	} catch (ObjectNotFoundException e) {
