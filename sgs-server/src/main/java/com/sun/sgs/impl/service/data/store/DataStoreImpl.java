@@ -349,7 +349,7 @@ public class DataStoreImpl
 	 */
 	void prepare(byte[] gid) {
 	    prepareFreeObjectIds();
-	    maybeCloseCursors();
+	    maybeCloseCursors(false);
 	    dbTxn.prepare(gid);
 	}
 
@@ -359,7 +359,7 @@ public class DataStoreImpl
 	 */
 	void prepareAndCommit() {
 	    prepareFreeObjectIds();
-	    maybeCloseCursors();
+	    maybeCloseCursors(false);
 	    dbTxn.commit();
 	}
 
@@ -414,7 +414,7 @@ public class DataStoreImpl
 	    freeObjectIds.abort(objectIdInfo, emptyObjectIdInfo);
 	    objectIdInfo = null;
 	    emptyObjectIdInfo = null;
-	    maybeCloseCursors();
+	    maybeCloseCursors(true);
 	    dbTxn.abort();
 	}
 
@@ -490,18 +490,40 @@ public class DataStoreImpl
 	/**
 	 * Close the cursors if they are open.  Always null the cursor fields,
 	 * since the Berkeley DB API doesn't permit closing a cursor after an
-	 * attempt to close it.
+	 * attempt to close it.  If forAbort is true, then we are aborting the
+	 * transaction.  In that case, ignore abort exceptions when closing the
+	 * cursors, to make sure we complete the operations needed on abort.
 	 */
-	private void maybeCloseCursors() {
+	private void maybeCloseCursors(boolean forAbort) {
 	    if (namesCursor != null) {
-		DbCursor c = namesCursor;
-		namesCursor = null;
-		c.close();
+		try {
+		    namesCursor.close();
+		} catch (TransactionAbortedException e) {
+		    if (forAbort) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "Exception closing names cursor during abort");
+		    } else {
+			throw e;
+		    }
+		} finally {
+		    namesCursor = null;
+		}
 	    }
 	    if (oidsCursor != null) {
-		DbCursor c = oidsCursor;
-		oidsCursor = null;
-		c.close();
+		try {
+		    oidsCursor.close();
+		} catch (TransactionAbortedException e) {
+		    if (forAbort) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "Exception closing OIDs cursor during abort");
+		    } else {
+			throw e;
+		    }
+		} finally {
+		    oidsCursor = null;
+		}
 	    }
 	}
 
