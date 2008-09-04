@@ -60,13 +60,24 @@ import java.util.Iterator;
  * {@link Serializable}.  Attempting to add elements to the set that do not
  * implement {@code Serializable} will result in an {@link
  * IllegalArgumentException} being thrown.  If an element is an instance of
- * {@code Serializable} but does not implement {@code ManagedObject}, this
- * class will persist the element as necessary; when such an element is removed
- * from the set, it is also removed from the {@code DataManager}.  If an
- * element is an instance of {@code ManagedObject}, the developer will be
- * responsible for removing these objects from the {@code DataManager} when
- * done with them.  Developers should not remove these object from the {@code
- * DataManager} prior to removing them from the set.
+ * {@code Serializable} but does not implement {@code ManagedObject}, this class
+ * will persist the element as necessary; when such an element is removed from
+ * the set, it is also removed from the {@code DataManager}.  It is encouraged
+ * that all non-{@code ManagedObject} elements added to this set will not be
+ * modified.  If the element will need to be mutated throughout the lifetime of
+ * this set, the element should implement {@code ManagedObject} or be contained
+ * within one by using {@link ManagedSerializable}.  Modifying a non-{@code
+ * ManagedObject} stored in the set will still have the correct behavior.
+ * However the set has no way of detecting these changes and therefore must rely
+ * on the commit-time modification checking by the {@link DataManager}.
+ * 
+ * <p>
+ *
+ * If an element is an instance of {@code ManagedObject}, the developer will be
+ * responsible for removing these objects from the {@code DataManager} when done
+ * with them.  Developers should not remove these object from the {@code
+ * DataManager} prior to removing them from the set.  Any state change to an
+ * element should still be marked using {@code markForUpdate}.
  *
  * <p>
  *

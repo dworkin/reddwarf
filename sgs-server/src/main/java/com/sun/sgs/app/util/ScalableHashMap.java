@@ -84,13 +84,25 @@ import java.util.Stack;
  * implement {@link Serializable}.  Attempting to add keys or values to the map
  * that do not implement {@code Serializable} will result in an {@link
  * IllegalArgumentException} being thrown.  If a key or value is an instance of
- * {@code Serializable} but does not implement {@code ManagedObject}, this
- * class will persist the object as necessary; when such an object is removed
- * from the map, it is also removed from the {@code DataManager}.  If a key or
- * value is an instance of {@code ManagedObject}, the developer will be
- * responsible for removing these objects from the {@code DataManager} when
+ * {@code Serializable} but does not implement {@code ManagedObject}, this class
+ * will persist the object as necessary; when such an object is removed from the
+ * map, it is also removed from the {@code DataManager}.  It is encouraged that
+ * all non-{@code ManagedObject} values added to this map will not be modified.
+ * If the state keys and values will need to be mutated throughout the lifetime
+ * of this map, the keys and values should implement {@code ManagedObject} or
+ * contained within one by using {@link ManagedSerializable}.  Modifying a
+ * non-{@code ManagedObject} stored in the map will still have the correct
+ * behavior.  However the map has no way of detecting these changes and
+ * therefore must rely on the commit-time modification checking by the {@link
+ * DataManager}.
+ *
+ * <p>
+ *
+ * If a key or value is an instance of {@code ManagedObject}, the developer will
+ * be responsible for removing these objects from the {@code DataManager} when
  * done with them.  Developers should not remove these object from the {@code
- * DataManager} prior to removing them from the map.
+ * DataManager} prior to removing them from the map.  Any state change to a key
+ * or a value should still be marked using {@code markForUpdate}.
  *
  * <p>
  *
@@ -1197,7 +1209,7 @@ public class ScalableHashMap<K,V>
 		if (returnOldValue) {
 		    return e.setValue(value);
 		} else {
-		    e.setValueInternal(value);
+		    e.setValue(value);
 		    return null;
 		}
 	    }
@@ -1797,38 +1809,135 @@ public class ScalableHashMap<K,V>
      *
      * @see ManagedSerializable
      */
-    static class PrefixEntry<K,V>
-	implements Entry<K,V>, Serializable {
+    static class PrefixEntry<K,V> implements Entry<K,V>, Serializable {
 
-	/** The version of the serialized form. */
+	/** 
+	 * The version of the serialized form. 
+	 */
 	private static final long serialVersionUID = 1;
 
-	/** The state bit mask for when the key is wrapped. */
-	private static final int KEY_WRAPPED = 1;
+	/**
+	 * An enum for keeping track of how to access the key and value for this
+	 * entry based on which combination of the two implement {@code
+	 * ManagedObject}.  The state of this enum is also used to determine how
+	 * to serialize and deserialize this object.
+	 */
+	private enum KeyValueState {
 
-	/** The state bit mask for when the value is wrapped. */
-	private static final int VALUE_WRAPPED = 2;
+	    /**
+	     * The state of the entry for when the key is not an instance of
+	     * {@code ManagedObject} and the value <i>is</i> an instance of
+	     * {@code ManagedObject}.
+	     *
+	     * @see ScalableHashMap$PrefixEntry#wrappedKeyRef
+	     * @see ScalableHashMap$PrefixEntry#valueRef
+	     */
+	    KEY_NOT_MANAGED_OBJECT_VALUE_IS,
 
-	/** The state value for when the key and value are stored as a pair. */
-	private static final int KEY_VALUE_PAIR = 4;
+	    /**
+	     * The state of the entry for when the value is not an instance of
+	     * {@code ManagedObject} and the key <i>is</i> an instance of {@code
+	     * ManagedObject}.
+	     *	     
+	     * @see ScalableHashMap$PrefixEntry#keyRef
+	     * @see ScalableHashMap$PrefixEntry#wrappedValueRef
+	     */
+	     VALUE_NOT_MANAGED_OBJECT_KEY_IS,
+
+	    /**
+	     * The state of the entry for when both the key and value are not
+	     * instances of {@code ManagedObject} are stored as a {@link
+	     * ScalableHashMap$KeyValuePair}.
+	     *
+	     * @see ScalableHashMap$PrefixEntry#keyAndValueRef
+	     */
+	    KEY_AND_VALUE_NOT_MANAGED_OBJECTS,
+
+	    /**
+	     * The state of the entry for when both the key and the value are
+	     * instances of {@code ManagedObject} and are refered to directly by
+	     * {@code ManagedReference} instances
+	     *
+	     * @see ScalableHashMap$PrefixEntry#keyRef
+	     * @see ScalableHashMap$PrefixEntry#valueRef
+	     */
+	    KEY_AND_VALUE_MANAGED_OBJECTS
+	}
+
+
+	/*
+	 * The following five fields are conditionally initialized based on what
+	 * combination of key and value are ManagedObjects.  The current
+	 * combination is reflected in the state of the entry and can be used to
+	 * determine which references to use to access the key and value.
+	 *
+	 * KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+	 * wrappedKeyRef
+	 * valueRef
+	 *
+	 * VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+	 * keyRef
+	 * valueRef
+	 *		
+	 * KEY_AND_VALUE_MANAGED_OBJECTS: 
+	 * keyRef
+	 * valueRef
+	 *
+	 * KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+	 * keyAndValueRef
+	 *
+	 * All fields not specified will be set to null and should not be used
+	 */
 
 	/**
-	 * A reference to the key, or key and value pair, for this entry. The
-	 * class type of this reference will depend on whether the map is
-	 * managing the key, and whether the key and value are paired.
-	 *
-	 * @serial
+	 * If both the key and value do not implement {@code ManagedObject},
+	 * this field will contain a reference to a {@link
+	 * ScalableHashMap$KeyValuePair KeyValuePair} that contains their
+	 * values.
 	 */
-	private final ManagedReference<?> keyOrPairRef;
+	private transient ManagedReference<
+	    ManagedSerializable<KeyValuePair<K,V>>> keyAndValueRef;
+       
+	/**
+	 * If the key does not implement {@code ManagedObject} but the value
+	 * does, then this field will contain a reference to a {@code
+	 * ManagedSerializable} wrapper around the key's value.
+	 */
+	private transient 
+	    ManagedReference<ManagedSerializable<K>> wrappedKeyRef;
 
 	/**
-	 * A reference to the value, or null if the key and value are paired.
-	 * The class type of this reference will depend on whether this map is
-	 * managing the value.
-	 *
-	 * @serial
+	 * If the value does not implement {@code ManagedObject} but the key
+	 * does, then this field will contain a reference to a {@code
+	 * ManagedSerializable} wrapper around the value's value.
 	 */
-	private ManagedReference<?> valueRef;
+	private transient 
+	    ManagedReference<ManagedSerializable<V>> wrappedValueRef;
+
+	/**
+	 * If the key implements {@code ManagedObject} this field will contain a
+	 * {@code ManagedReference} directly to the key.
+	 */
+	private transient ManagedReference<K> keyRef;
+
+	/**
+	 * If the value implements {@code ManagedObject} this field will contain
+	 * a {@code ManagedReference} directly to the value.
+	 */
+	private transient ManagedReference<V> valueRef;
+
+	/**
+	 * The state of the current entry with respect to how the key and value
+	 * for this entry are stored.
+	 *
+	 * <p>
+	 *
+	 * The since the number of enum values is small, at serialization time
+	 * we compress the state into a {@code byte} rather using the standard
+	 * {@code Enum} serialization space of an {@code int}, and then upon
+	 * deserialization, initialize this field to its correct value.
+	 */
+	private transient KeyValueState state;
 
 	/**
 	 * The next chained entry in this entry's bucket.
@@ -1844,16 +1953,7 @@ public class ScalableHashMap<K,V>
 	 * @serial
 	 */
 	final int hash;
-
-	/**
-	 * The state of the key and value, which is either a non-zero
-	 * combination of the KEY_WRAPPED and VALUE_WRAPPED, or is
-	 * KEY_VALUE_PAIR.
-	 *
-	 * @serial
-	 */
-	byte state = 0;
-
+	
 	/**
 	 * Constructs a new {@code PrefixEntry}.
 	 *
@@ -1865,70 +1965,48 @@ public class ScalableHashMap<K,V>
 	    this.hash = h;
 
 	    DataManager dm = AppContext.getDataManager();
+	    
+	    boolean isKeyMO = k != null && k instanceof ManagedObject;
+	    boolean isValueMO = v != null && v instanceof ManagedObject;
 
 	    // if both the key and value are not ManagedObjects, we can save a
-	    // get() and createReference() call each by merging them in a
-	    // single KeyValuePair
-	    if (!(k instanceof ManagedObject) &&
-		!(v instanceof ManagedObject))
-	    {
-		setKeyValuePair();
-		keyOrPairRef = dm.createReference(
-		    new ManagedSerializable<Object>(
+	    // get() and createReference() call each by merging them in a single
+	    // KeyValuePair
+	    if (!isKeyMO && !isValueMO) {
+	    
+		state = KeyValueState.KEY_AND_VALUE_NOT_MANAGED_OBJECTS;
+
+		keyAndValueRef = dm.createReference(
+		    new ManagedSerializable<KeyValuePair<K,V>>(
 			new KeyValuePair<K,V>(k, v)));
-	    } else {
-		// For the key and value, if each is already a ManagedObject,
-		// then we obtain a ManagedReference to the object itself,
-		// otherwise, we need to wrap it in a ManagedSerializable and
-		// get a ManagedReference to that
-		setKeyWrapped(!(k instanceof ManagedObject));
-		keyOrPairRef = dm.createReference(
-		    isKeyWrapped() ? new ManagedSerializable<Object>(k) : k);
-		setValueWrapped(!(v instanceof ManagedObject));
-		valueRef = dm.createReference(
-		    isValueWrapped() ? new ManagedSerializable<V>(v) : v);
+	    } 
+
+	    // Otherwise, if we can't use a KeyValuePair, for the key and value,
+	    // if each is already a ManagedObject, then we obtain a
+	    // ManagedReference to the object itself, otherwise, we need to wrap
+	    // it in a ManagedSerializable and get a ManagedReference to that
+	    else if (isKeyMO && isValueMO) {
+
+		// we can use ManagedReferences for both
+		state = KeyValueState.KEY_AND_VALUE_MANAGED_OBJECTS;
+		keyRef = uncheckedCast(dm.createReference((ManagedObject)k));
+		valueRef = uncheckedCast(dm.createReference((ManagedObject)v));
 	    }
-	}
+	    else if (isKeyMO && !isValueMO) {
 
-	/** Returns whether the key and value are stored as a pair. */
-	private boolean isKeyValuePair() {
-	    return state == KEY_VALUE_PAIR;
-	}
-
-	/** Notes that the key and value are stored as a pair. */
-	private void setKeyValuePair() {
-	    state = KEY_VALUE_PAIR;
-	}
-
-	/** Returns whether the key is wrapped. */
-	private boolean isKeyWrapped() {
-	    return (state & KEY_WRAPPED) != 0;
-	}
-
-	/** Notes whether the key is wrapped. */
-	private void setKeyWrapped(boolean wrapped) {
-	    if (wrapped) {
-		state &= ~KEY_VALUE_PAIR;
-		state |= KEY_WRAPPED;
-	    } else {
-		assert state != KEY_VALUE_PAIR;
-		state &= ~KEY_WRAPPED;
-	    }
-	}
-
-	/** Returns whether the value is wrapped. */
-	private boolean isValueWrapped() {
-	    return (state & VALUE_WRAPPED) != 0;
-	}
-
-	/** Notes whether the value is wrapped. */
-	private void setValueWrapped(boolean wrapped) {
-	    if (wrapped) {
-		state &= ~KEY_VALUE_PAIR;
-		state |= VALUE_WRAPPED;
-	    } else {
-		assert state != KEY_VALUE_PAIR;
-		state &= ~VALUE_WRAPPED;
+		// we need to wrap the value but not the key
+		state = KeyValueState.VALUE_NOT_MANAGED_OBJECT_KEY_IS;
+		keyRef = uncheckedCast(dm.createReference((ManagedObject)k));
+		wrappedValueRef = 
+		    dm.createReference(new ManagedSerializable<V>(v));
+	    }	    
+	    else {
+		
+		// we need to wrap the key, but not the value
+		state = KeyValueState.KEY_NOT_MANAGED_OBJECT_VALUE_IS;
+		wrappedKeyRef = 
+		    dm.createReference(new ManagedSerializable<K>(k));
+		valueRef = uncheckedCast(dm.createReference((ManagedObject)v));
 	    }
 	}
 
@@ -1942,33 +2020,54 @@ public class ScalableHashMap<K,V>
 	 *         removed prior to this call
 	 */
 	public final K getKey() {
-	    if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
-		    uncheckedCast(keyOrPairRef.get());
-		return msPair.get().getKey();
-	    } else if (isKeyWrapped()) {
-		ManagedSerializable<K> msKey =
-		    uncheckedCast(keyOrPairRef.get());
-		return msKey.get();
-	    } else {
-		@SuppressWarnings("unchecked")
-		K result = (K) keyOrPairRef.get();
-		return result;
+	    switch (state) {
+
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		// the key is wrapped by a ManagedSerializable.
+		ManagedSerializable<K> wrappedKey = wrappedKeyRef.get();
+		return wrappedKey.get();
+		
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:  // fall through
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+		return keyRef.get();
+
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+		// the key and value are stored in a KeyValuePair
+		ManagedSerializable<KeyValuePair<K,V>> keyAndValue = 
+		    keyAndValueRef.get();
+		return keyAndValue.get().getKey();
+	    default:
+		throw new AssertionError();
 	    }
 	}
 
 	/**
-	 * Returns the {@code ManagedReference} for the key used in this entry.
-	 * These references are not guaranteed to stay valid across
-	 * transactions and should therefore not be used except for
+	 * Returns the {@code ManagedReference} that stores the key value used
+	 * by this entry.  The returned reference should not be accessed and is
+	 * intended to be used entirely for comparisons between other entry's
+	 * key references.  These references are not guaranteed to stay valid
+	 * across transactions and should therefore not be used except for
 	 * comparisons.
 	 *
 	 * @return the {@code ManagedReference} for the key
 	 *
-	 * @see ConcurrentIterator
+	 * @see ScalableHashMap$ConcurrentIterator
 	 */
 	ManagedReference<?> keyRef() {
-	    return keyOrPairRef;
+	    switch (state) {
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		return wrappedKeyRef;
+		
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:  // fall through
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+		return keyRef;
+
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+		return keyAndValueRef;
+
+	    default:
+		throw new AssertionError();
+	    }
 	}
 
 	/**
@@ -1981,17 +2080,26 @@ public class ScalableHashMap<K,V>
 	 *         removed prior to this call
 	 */
 	public final V getValue() {
-	    if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
-		    uncheckedCast(keyOrPairRef.get());
-		return msPair.get().getValue();
-	    } else if (isValueWrapped()) {
-		ManagedSerializable<V> msValue = uncheckedCast(valueRef.get());
-		return msValue.get();
-	    } else {
-		@SuppressWarnings("unchecked")
-		V value = (V) valueRef.get();
-		return value;
+
+	    switch (state) {
+
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:  // fall through
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		return valueRef.get();
+		
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+		// value is wrapped by a ManagedSerializable
+		ManagedSerializable<V> wrappedValue = wrappedValueRef.get();
+		return wrappedValue.get();
+
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+		// the key and value are stored in a KeyValuePair
+		ManagedSerializable<KeyValuePair<K,V>> keyAndValue =
+		    keyAndValueRef.get();
+		return keyAndValue.get().getValue();
+
+	    default:
+		throw new AssertionError();
 	    }
 	}
 
@@ -2003,57 +2111,115 @@ public class ScalableHashMap<K,V>
 	 */
 	public final V setValue(V newValue) {
 	    checkSerializable(newValue, "newValue");
-	    V oldValue = getValue();
-	    setValueInternal(newValue);
-	    return oldValue;
-	}
 
-	/**
-	 * Replaces the previous value of this entry with the provided value.
-	 * Does not check if the new value is serializable or return the old
-	 * value.
-	 *
-	 * @param newValue the value to be stored
-	 */
-	void setValueInternal(V newValue) {
+	    V oldValue = null;
 	    DataManager dm = AppContext.getDataManager();
-	    if (newValue instanceof ManagedObject) {
-		if (isKeyValuePair()) {
-		    /* Switch from wrapping key/value pair to wrapping key */
-		    ManagedSerializable<KeyValuePair<K,V>> msPair =
-			uncheckedCast(keyOrPairRef.get());
-		    ManagedSerializable<K> msKey =
-			uncheckedCast(keyOrPairRef.get());
-		    msKey.set(msPair.get().getKey());
-		    setKeyWrapped(true);
-		} else if (isValueWrapped()) {
-		    dm.removeObject(valueRef.get());
-		    setValueWrapped(false);
+	    
+
+	    boolean isNewValueMO = newValue != null 
+		&& newValue instanceof ManagedObject;
+	    
+
+	    switch (state) {
+
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:		 
+		oldValue = valueRef.get();
+
+		if (isNewValueMO) {
+		    // no state change; just update the managed reference to the
+		    // object itself
+		    valueRef = dm.createReference(newValue);
 		}
-		valueRef = dm.createReference(newValue);
-	    } else if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
-		    uncheckedCast(keyOrPairRef.get());
-		msPair.get().setValue(newValue);
-	    } else if (isKeyWrapped()) {
-		/* Switch from wrapping key to wrapping key/value pair */
-		ManagedSerializable<K> msKey =
-		    uncheckedCast(keyOrPairRef.get());
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
-		    uncheckedCast(keyOrPairRef.get());
-		msPair.set(new KeyValuePair<K,V>(msKey.get(), newValue));
-		if (isValueWrapped()) {
-		    dm.removeObject(valueRef.get());
+		else {
+		    // value is now wrapped by a ManagedSerializable
+		    state = KeyValueState.VALUE_NOT_MANAGED_OBJECT_KEY_IS;
+		    valueRef = null;
+		    wrappedValueRef = dm.
+			createReference(new ManagedSerializable<V>(newValue));		   
 		}
-		setKeyValuePair();
-	    } else if (isValueWrapped()) {
-		ManagedSerializable<V> ms = uncheckedCast(valueRef.get());
-		ms.set(newValue);
-	    } else {
-		valueRef = dm.createReference(
-		    new ManagedSerializable<V>(newValue));
-		setValueWrapped(true);
+		break;
+
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		oldValue = valueRef.get();
+
+		if (isNewValueMO) {
+		    // no state change; just update the managed reference to the
+		    // object itself
+		    valueRef = dm.createReference(newValue);
+		}
+		else {
+		    // neither key nor value is a ManagedObject, so combine them
+		    // using a KeyValuePair
+		    state = KeyValueState.KEY_AND_VALUE_NOT_MANAGED_OBJECTS;
+
+		    ManagedSerializable<K> wrappedKey = wrappedKeyRef.get();
+		    K key = wrappedKey.get();
+
+		    // remove the old key's wrapper
+		    dm.removeObject(wrappedKey);
+		    wrappedKeyRef = null;
+		    
+		    // create a new KeyValuePair to hold both objects
+		    keyAndValueRef = dm.createReference(
+		        new ManagedSerializable<KeyValuePair<K,V>>(
+			    new KeyValuePair<K,V>(key, newValue)));
+		}
+		break;
+		
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+
+		ManagedSerializable<V> wrappedValue = wrappedValueRef.get();
+		oldValue = wrappedValue.get();
+
+		if (isNewValueMO) {
+		    // value used to be wrapped by a ManagedSerializable, but
+		    // now can be accessed using a ManagedReference
+		    state = KeyValueState.KEY_AND_VALUE_MANAGED_OBJECTS;
+ 		    dm.removeObject(wrappedValue);
+		    wrappedValueRef = null;
+		    valueRef = dm.createReference(newValue);		    
+		}
+		else {
+		    // no state change; update the wrapper's value.
+		    // Note that the set() call will property mark the
+		    // wrapper for update
+		    wrappedValue.set(newValue);
+		}
+		break;
+
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+
+		// the key and value are stored in a KeyValuePair
+		ManagedSerializable<KeyValuePair<K,V>> keyAndValue = 
+		    keyAndValueRef.get();
+		oldValue = keyAndValue.get().getValue();
+
+		if (isNewValueMO) {
+		    // no longer combine the key and value together.
+		    state = KeyValueState.KEY_NOT_MANAGED_OBJECT_VALUE_IS;
+		    dm.removeObject(keyAndValue);
+		    keyAndValueRef = null;
+
+		    // update the key to use a wrapper; update the
+		    // value to use a managed reference
+		    wrappedKeyRef = dm.createReference(
+			new ManagedSerializable<K>(keyAndValue.get().getKey()));
+		    valueRef = dm.createReference(newValue);
+		}
+		else {
+		    // no state change; update the keyValuePair and
+		    // mark its wrapper for update
+		    dm.markForUpdate(keyAndValue);
+		    keyAndValue.get().setValue(newValue);
+		}
+		break;
+	    
+	    default:
+		throw new AssertionError();
+
 	    }
+	    
+	    return oldValue;
 	}
 
 	/**
@@ -2082,7 +2248,7 @@ public class ScalableHashMap<K,V>
 	}
 
 	/**
-	 * Returns the string form of this entry as {@code entry}={@code
+	 * Returns the string form of this entry as {@code key}={@code
 	 * value}.
 	 */
 	public String toString() {
@@ -2099,28 +2265,143 @@ public class ScalableHashMap<K,V>
 	 */
 	final void unmanage() {
 	    DataManager dm = AppContext.getDataManager();
+	    switch (state) {
 
-	    if (isKeyValuePair()) {
-		try {
-		    dm.removeObject(keyOrPairRef.get());
-		} catch (ObjectNotFoundException onfe) {
-		    // silent
-		}
-	    } else {
-		if (isKeyWrapped()) {
-		    try {
-			dm.removeObject(keyOrPairRef.get());
-		    } catch (ObjectNotFoundException onfe) {
-			// silent
-		    }
-		}
-		if (isValueWrapped()) {
-		    try {
-			dm.removeObject(valueRef.get());
-		    } catch (ObjectNotFoundException onfe) {
-			// silent
-		    }
-		}
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		dm.removeObject(wrappedKeyRef.get());
+		break;
+		 
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+		dm.removeObject(keyAndValueRef.get());
+		break;
+
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+		dm.removeObject(wrappedValueRef.get());
+		break;
+		
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:  
+		// do nothing since the user is responsible for the
+		// lifetime of these objects
+	    }
+	}
+
+	/**
+	 * Reconstructs the {@code PrefixEntry} from the provided stream by
+	 * first reading in the non-transient state, and then reading in the
+	 * {@code byte} that corresponds to the state of the entry.  This value
+	 * is then used to determine which {@code KeyValueState} the entry is
+	 * in, and subsequently to read in the active fields for the entry.
+	 *
+	 * @see ScalalbeHashMap$PrefixEntry#state
+	 */
+	private void readObject(ObjectInputStream s)
+	    throws IOException, ClassNotFoundException {
+	    
+	    // read in all the non-transient state
+	    s.defaultReadObject();
+	    
+	    // write out the state of this entry using a byte instead
+	    // of an int to save space
+	    byte encodedState = s.readByte();
+	    switch (encodedState) {
+	    case 0: 
+		state = KeyValueState.KEY_NOT_MANAGED_OBJECT_VALUE_IS;
+		break;
+	    case 1: 
+		state = KeyValueState.VALUE_NOT_MANAGED_OBJECT_KEY_IS;
+		break;
+	    case 2:
+		state = KeyValueState.KEY_AND_VALUE_NOT_MANAGED_OBJECTS;
+		break;
+	    case 3:
+		state = KeyValueState.KEY_AND_VALUE_MANAGED_OBJECTS;
+		break;
+	    default:
+		throw new IOException("invalid PrefixEntry state");		
+	    }
+	    
+	    // based on the state, read in all the out the currently
+	    // active fields, and initialize the remaining transient
+	    // fields to null
+	    switch (state) {
+
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		wrappedKeyRef = uncheckedCast(s.readObject());
+		valueRef = uncheckedCast(s.readObject());
+		
+		// unused transient fields
+		keyRef = null;
+		wrappedValueRef = null;
+		keyAndValueRef = null;
+		break;	       
+
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+		keyRef = uncheckedCast(s.readObject());
+		wrappedValueRef = uncheckedCast(s.readObject());
+
+		// unused transient fields
+		wrappedKeyRef = null;
+		valueRef = null;
+		keyAndValueRef = null;
+		break;
+		
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:  
+		keyRef = uncheckedCast(s.readObject());
+		valueRef = uncheckedCast(s.readObject());
+
+		// unused transient fields
+		wrappedKeyRef = null;
+		wrappedValueRef = null;
+		keyAndValueRef = null;
+		break;
+
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+		keyAndValueRef = uncheckedCast(s.readObject());
+
+		// unused transient fields
+		keyRef = null;
+		valueRef = null;
+		wrappedKeyRef = null;
+		wrappedValueRef = null;
+	    }
+	}
+	
+	/**
+	 * Writes out all the non-transient state and then conditionally writes
+	 * the active references to the key and value based on the current state
+	 * of the entry.  The state of the entry is compressed into a {@code
+	 * byte} based on the ordinal of the {@code KeyValueState} enum.
+	 *
+	 * @see ScalableHashMap$PrefixEntry#state
+	 */
+	private void writeObject(ObjectOutputStream out) throws IOException {
+	    out.defaultWriteObject();
+
+	    // write out the state of this entry using a byte instead
+	    // of an int to save space
+	    out.writeByte((byte)(state.ordinal()));
+	    
+	    // based on the state, write out the currently active fields
+	    switch (state) {
+
+	    case KEY_NOT_MANAGED_OBJECT_VALUE_IS:
+		out.writeObject(wrappedKeyRef);
+		out.writeObject(valueRef);
+		break;	       
+
+	    case VALUE_NOT_MANAGED_OBJECT_KEY_IS:
+		out.writeObject(keyRef);
+		out.writeObject(wrappedValueRef);
+		break;
+
+		
+	    case KEY_AND_VALUE_MANAGED_OBJECTS:  
+		out.writeObject(keyRef);
+		out.writeObject(valueRef);
+		break;
+
+	    case KEY_AND_VALUE_NOT_MANAGED_OBJECTS:
+		out.writeObject(keyAndValueRef);
 	    }
 	}
     }
@@ -2176,7 +2457,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
+	protected final ManagedReference<ScalableHashMap<K,V>> rootRef;
 
 	/**
 	 * A reference to the leaf containing the current position of the
@@ -2184,7 +2465,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private ManagedReference<ScalableHashMap<K,V>> currentLeafRef = null;
+	protected ManagedReference<ScalableHashMap<K,V>> currentLeafRef = null;
 
 	/**
 	 * The hash code of the current entry, if any.
@@ -2313,8 +2594,8 @@ public class ScalableHashMap<K,V>
 	}
 
 	/**
-	 * Returns the next entry in the {@code ScalableHashMap}.  Note that
-	 * due to the concurrent nature of this iterator, this method may skip
+	 * Returns the next entry in the {@code ScalableHashMap}.  Note that due
+	 * to the concurrent nature of this iterator, this method may skip
 	 * elements that have been added after the iterator was constructed.
 	 * Likewise, it may return new elements that have been added.  This
 	 * implementation is guaranteed never to return an element more than
@@ -2391,7 +2672,69 @@ public class ScalableHashMap<K,V>
 	 * {@inheritDoc}
 	 */
 	public Entry<K,V> next() {
-	    return nextEntry();
+	    return new ModificationAwareEntry<K,V>(nextEntry());
+	}
+
+	/**
+	 * A wrapper around {@link ScalableHashMap$PrefixEntry PrefixEntry} that
+	 * calls {@link DataManager#markForUpdate markForUpdate} on the leaf
+	 * node when {@code setValue} is called on the entry.  The entries do
+	 * not contain references to the backing map, and since they are not
+	 * {@code ManagedObject}s when their values change, they cannot properly
+	 * mark their containing {@code ManagedObject}, the leaf node, for
+	 * update.  This class uses the {@link
+	 * ScalableHashMap$ConcurrentIterator#currentLeafRef currentLeafRef}
+	 * field in {@link ConcurrentIterator} to ensure that when a value is
+	 * set, the leaf node will be marked for update.
+	 */
+	class ModificationAwareEntry<K,V> implements Entry<K,V> {
+	    
+	    private final Entry<K,V> e;
+
+	    ModificationAwareEntry(Entry<K,V> e) {
+		this.e = e;
+	    }
+	    
+	    /**
+	     * {@inheritDoc}
+	     */
+	    public boolean equals(Object o) {
+		return e.equals(o);
+	    }
+
+	    /**
+	     * {@inheritDoc}
+	     */
+	    public K getKey() {
+		return e.getKey();
+	    }
+
+	    /**
+	     * {@inheritDoc}
+	     */
+	    public V getValue() {
+		return e.getValue();
+	    }
+
+	    /**
+	     * {@inheritDoc}
+	     */
+	    public int hashCode() {
+		return e.hashCode();
+	    }
+
+	    /**
+	     * {@inheritDoc}
+	     */
+	    public V setValue(V newValue) {
+		// find the leaf node that contains the entry that we will be
+		// modifying.  Since the entry cannot mark this node for update
+		// (as it does not know about the backing map), we mark the node
+		// to avoid commit-time modification detection.
+		ScalableHashMap leafWithEntry = currentLeafRef.get();
+		AppContext.getDataManager().markForUpdate(leafWithEntry);
+		return e.setValue(newValue);
+	    }
 	}
     }
 
