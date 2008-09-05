@@ -94,14 +94,15 @@ final class Context extends TransactionContext {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /** The proxy for notifying of object accesses. */
+    final AccessReporter<BigInteger> oidAccesses;
+
     /**
      * A table for recording data for all the {@link
      * ReadOnlyReference} instances created during the context of the
      * current transaction.
      */
     final ReadOnlyReferenceTable readOnlyRefs = new ReadOnlyReferenceTable();
-
-    final AccessReporter<BigInteger> oidAccesses;
 
     /**
      * A map that records all managed objects that are currently having
@@ -123,7 +124,7 @@ final class Context extends TransactionContext {
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
-	    classesTable != null;
+	    classesTable != null && oidAccesses != null;
 	this.service = service;
 	this.store = store;
 	this.cache = cache;

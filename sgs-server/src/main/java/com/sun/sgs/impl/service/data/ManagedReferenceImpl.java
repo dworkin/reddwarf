@@ -271,6 +271,8 @@ final class ManagedReferenceImpl<T>
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
 	    }
+	    // mark that we read the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	    switch (state) {
 	    case EMPTY:
 		ManagedObject tempObject = deserialize(
@@ -333,6 +335,8 @@ final class ManagedReferenceImpl<T>
 	    // mark that we acquired a write lock on the object
 	    context.oidAccesses.reportObjectAccess(getId(), AccessType.WRITE);
 	    DataServiceImpl.checkContext(context);
+	    // mark that we acquired a write lock on the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.WRITE);
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(

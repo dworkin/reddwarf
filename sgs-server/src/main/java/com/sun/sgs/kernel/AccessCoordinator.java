@@ -29,12 +29,15 @@ import com.sun.sgs.service.Transaction;
  * any transaction on any node. An example would be a {@code ManagedObject}
  * as provided by the {@code DataService}.
  * <p>
- * Implementations should require that each given {@code AccessReporter} will
- * report on a unique set of objects. That is, even if two different
- * {@code AccessReporter} instances report access to an object with the
- * same identifier, it should be assumed that these are different objects.
- * Think of each {@code AccessReporter} as reporting on objects within a
- * unique namespace.
+ * Each {@code sourceName} determines a unique namespace of objects.  Any
+ * {@link AccessReporter} registered with the same {@code sourceName}
+ * through a given {@code AccessCoordinator} instance, independent of the
+ * {@code objectIdType}, is considered to report accesses to the same set
+ * of shared objects. Conflicting accesses to a single object can be reported
+ * to different {@code AccessReporter}s if those reporters were obtained from
+ * the same access coordinator using the same source name. Object accesses
+ * reported to {@code AccessReporter}s obtained from registering access
+ * sources with different names will never conflict.
  */
 public interface AccessCoordinator {
 

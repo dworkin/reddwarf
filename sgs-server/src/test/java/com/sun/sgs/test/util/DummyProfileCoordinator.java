@@ -53,6 +53,9 @@ public class DummyProfileCoordinator {
     // a lock to ensure shutdown is done correctly
     private static final Object lockObject = new String("lock");
 
+    // a test transaction id used in reporting
+    private static final byte [] dummyTxnId = {0x01};
+
     /** Creates an instance of DummyProfileCoordinator */
     private DummyProfileCoordinator() {
         collector = new ProfileCollectorImpl(ProfileLevel.MIN, 
@@ -95,7 +98,7 @@ public class DummyProfileCoordinator {
                 try {
                     instance.collector.
                         startTask(task, owner, System.currentTimeMillis(), 0);
-                    instance.collector.noteTransactional(null);
+                    instance.collector.noteTransactional(dummyTxnId);
                 } catch (Exception e) { e.printStackTrace(); }
             }
         }
