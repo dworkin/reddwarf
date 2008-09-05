@@ -3,8 +3,6 @@ package com.sun.sgs.impl.kernel.conflict;
 
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 
-import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
-
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 

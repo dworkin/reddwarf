@@ -372,7 +372,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
                                     Transaction txn, ConflictResult result) {
         if (result.conflictType != ConflictType.NONE) {
             detail.conflictType = result.conflictType;
-            detail.idOfConflictingTxn = result.conflictingTxn.getId();
+            if (result.conflictingTxn != null)
+                detail.idOfConflictingTxn = result.conflictingTxn.getId();
             RuntimeException re =
                 new TransactionConflictException("Failed due to conflict " +
                                                  "over object with id: " +
