@@ -21,10 +21,17 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.TreeMap;
+
+import java.util.logging.Logger;
 
 /**
  * Stores the shared state of all {@link ReadOnlyReference} instances created
@@ -55,8 +62,29 @@ import java.util.TreeMap;
  * @see ReadOnlyReference#getReference(Context,Object)
  * @see ReadOnlyReference#getOrCreateIfNotPresent(Context,Object)
  * @see ReadOnlyReference#getOrCreateIfNotPresent(Context,long)
+ * @see ReadOnlyDataCache
  */
 final class ReadOnlyReferenceTable {
+
+    /**
+     * The logger for reporting modifications to read-only data if modification
+     * detection is enabled.
+     *
+     * @see #modificationCheckingEnabled
+     */
+    private static final Logger readOnlyModificationDetection = 
+	Logger.getLogger(ReadOnlyDataCache.class.getName() +
+			 ".object.modifications");
+
+    /**
+     * A class variable for determining whether all instances of this class
+     * will have modification checking enabled.  This value is currently set by
+     * the {@link ReadOnlyDataCache} upon its construction based on the
+     * specified system properties.
+     *
+     * @see ReadOnlyDataCache
+     */
+    static boolean modificationCheckingEnabled = false;
 
     /**
      * A mapping from a {@code ManagedObject} instance to the {@code
@@ -73,18 +101,40 @@ final class ReadOnlyReferenceTable {
      * within the current transaction context.
      */
     private final Map<Long,ReadOnlyReference<?>> oidToRef;
+
+    
+    private final Map<Long,byte[]> serializedFormOfCachedObjects;
     
     
     ReadOnlyReferenceTable() { 
 	cachedObjects = 
 	    new IdentityHashMap<ManagedObject,ReadOnlyReference<?>>();
 	oidToRef = new HashMap<Long,ReadOnlyReference<?>>();
+
+	serializedFormOfCachedObjects = 
+	    (modificationCheckingEnabled) ? new HashMap<Long,byte[]>() : null;
     }
     
 
+    /**
+     *
+     *
+     * @see ReadOnlyReference#getOrCreateIfNotPresent(Context,Object)
+     * @see ReadOnlyReference#setObject(ManagedObject)
+     */
     void put(ManagedObject object, ReadOnlyReference<?> ref) {
 	cachedObjects.put(object, ref);
 	oidToRef.put(ref.oid, ref);
+
+	// If modification checking is enabled, store the serialized form of
+	// this object.  Caching the serialized form at this point relies on
+	// the fact that ReadOnlyReference will always call put() before
+	// returning the object to the application.  This ensures that a
+	// canonical copy can be serialized before any modifications could take
+	// place.
+	if (serializedFormOfCachedObjects != null) {
+	    serializedFormOfCachedObjects.put(ref.getOid(), serialize(object));
+	}
     }
     
     void put(Long oid, ReadOnlyReference<?> ref) {
@@ -99,4 +149,46 @@ final class ReadOnlyReferenceTable {
 	return oidToRef.get(oid);
     }
 
+    /**
+     * Returns the serialized form of the provided object.
+     *
+     * @param o the object to serialize
+     *
+     * @return the serialized form of the object
+     */
+    private static byte[] serialize(Object o) {
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	try {
+	    ObjectOutputStream oos = new ObjectOutputStream(baos);
+	    oos.writeObject(o);
+	    oos.close();
+	} catch (IOException ioe) {
+	    // figure out what to do in the case
+	}
+	return baos.toByteArray();
+    }
+    
+    /**
+     * If modification detection is enabled, checks that all the objects
+     * accessed during the current transaction have not been modified.  If
+     * modification detection is disabled, the method does nothing.
+     *
+     * @see #modificationDetectionEnabled
+     */
+    void validate() {
+	if (serializedFormOfCachedObjects != null) {
+	    for (Map.Entry<ManagedObject,ReadOnlyReference<?>> e : 
+		     cachedObjects.entrySet()) {
+		ReadOnlyReference<?> ref = e.getValue();
+		byte[] unmodified = 
+		    serializedFormOfCachedObjects.get(ref.getOid());
+		ManagedObject accessedObj = e.getKey();
+		if (!Arrays.equals(unmodified, serialize(accessedObj))) {
+		    readOnlyModificationDetection.warning(
+			"Read-only object modified! id: " + ref.oid + 
+			" value: " + accessedObj);
+		}
+	    }
+	}
+    }
 }

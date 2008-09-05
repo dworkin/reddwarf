@@ -37,7 +37,34 @@ import java.io.Serializable;
 import java.math.BigInteger;
 
 /**
- *	
+ * An implementation of {@code ManagedReference} that accesses {@code
+ * ManagedObject} instances that have been annotated with {@link ReadOnly}.
+ * This class works in tandem with the run-time system's {@link DataCache}
+ * implementation if object caching is enabled.
+ *
+ * <p>
+ *  
+ * Attempts to modify the object by {@link #getForUpdate()}, {@link
+ * #markForUpdate} or {@link #remove()} will all throw an {@link
+ * UnsupportedOperationException}.  This class makes no guarantees about
+ * detecting modifications to the object referred to by this reference outside
+ * of these calls.  
+ *
+ * <p>
+ *
+ * Instances of this class are created for a single transaction.  Within the
+ * context of that transaction only one canonical instance will be created for
+ * an object based on that object's id.  As new {@code ReadOnlyReference}
+ * instances are created they are registered with the {@link
+ * ReadOnlyReferenceTable}, which maintains the tranaction-specific mappings
+ * from id to reference.  The {@code ReadOnlyReferenceTable} should be
+ * considered a logical part of this class in that it maintains all the shared
+ * state for all instances created during a single transaction.
+ * 
+ *
+ * @see DataCache
+ * @see ReadOnlyReferenceTable
+ * @see ReadOnlyDataCache
  */
 final class ReadOnlyReference<T> 
     implements InternalManagedReference<T>, Serializable {
@@ -51,8 +78,8 @@ final class ReadOnlyReference<T>
     private static final long serialVersionUID = 2;
 
     /**
-     * The object identifier used to locate the {@code ManagedObject}
-     * in the backing data store
+     * The object identifier used to locate the {@code ManagedObject} in the
+     * backing data store
      *
      * @serial
      */
@@ -64,8 +91,8 @@ final class ReadOnlyReference<T>
     private transient BigInteger id;
 
     /**
-     * The context of the current transaction.  This is initialized
-     * when the reference is first created or when it is deserialized.
+     * The context of the current transaction.  This is initialized when the
+     * reference is first created or when it is deserialized.
      */
     private transient Context context;
 
@@ -75,15 +102,15 @@ final class ReadOnlyReference<T>
     private transient ManagedObject object;
 
     /**
-     * The state of this reference.  This is used to determine whether
-     * a reference's object has already been removed during the
-     * current transaction.
+     * The state of this reference.  This is used to determine whether a
+     * reference's object has already been removed during the current
+     * transaction.
      */
     private transient State state;
 
     /**
-     * Constructs an empty {@code ReadOnlyReference} that refers to
-     * the {@code ManagedObject} with the provided object identifier.
+     * Constructs an empty {@code ReadOnlyReference} that refers to the {@code
+     * ManagedObject} with the provided object identifier.
      */
     private ReadOnlyReference(Context context, long oid) {
 	this.context = context;
@@ -93,12 +120,11 @@ final class ReadOnlyReference<T>
     }
     
     /**
-     * Constructs a new {@code ReadOnlyReference} and stores the
-     * provided {@code object} in the data store.  This constructor
-     * should only be used the very first time an object has a {@code
-     * ReadOnlyReference} created for it.  If this constructor were to
-     * be used more than once, then a single object would have
-     * multiple oids associated with it.
+     * Constructs a new {@code ReadOnlyReference} and stores the provided
+     * {@code object} in the data store.  This constructor should only be used
+     * the very first time an object has a {@code ReadOnlyReference} created
+     * for it.  If this constructor were to be used more than once, then a
+     * single object would have multiple oids associated with it.
      *
      * @param context the context of the current transactions
      * @param object the object to which this reference should refer
@@ -109,10 +135,10 @@ final class ReadOnlyReference<T>
 	this.object = (ManagedObject)object;
 	state = State.FETCHED;
 
-	// since this is the very first time the object has had a
-	// reference created for it, persist it in the data store so
-	// any ReadOnlyReference instances on other nodes can load it
-	// into their node's cache.
+	// since this is the very first time the object has had a reference
+	// created for it, persist it in the data store so any
+	// ReadOnlyReference instances on other nodes can load it into their
+	// node's cache.
 	byte[] serialized = SerialUtil.serialize((ManagedObject)object,
 						 context.classSerial);
 	context.store.setObject(context.txn, oid, serialized);
@@ -122,19 +148,21 @@ final class ReadOnlyReference<T>
      * Implement ManagedReference
      */
 
+    /**
+     * {@inheritDoc}
+     */
     public T get() {
 	context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	switch (state) {
 	case FETCHED:
-	    // This is a no-op since in this state this instance
-	    // already has a value
+	    // This is a no-op since in this state this instance already has a
+	    // value
 	    break;
 	case EMPTY:
-	    // This instance was created based on an object id, so
-	    // load the data for this object either from the
-	    // node-local data cache, or if this is the first time
-	    // this id has been loaded on this node, from the backing
-	    // store
+	    // This instance was created based on an object id, so load the
+	    // data for this object either from the node-local data cache, or
+	    // if this is the first time this id has been loaded on this node,
+	    // from the backing store
 	    ManagedObject tempObject;
 	    if (context.cache.contains(oid)) {
 		tempObject = context.cache.lookup(oid);
@@ -149,11 +177,10 @@ final class ReadOnlyReference<T>
 	    object = tempObject;
 	    state = State.FETCHED; 
 
-	    // the first time we load in an object from the data
-	    // store, we mark in our reference table that all future
-	    // references created for this object in the current
-	    // transaction will refer to this instance instead of
-	    // creating a new one
+	    // the first time we load in an object from the data store, we mark
+	    // in our reference table that all future references created for
+	    // this object in the current transaction will refer to this
+	    // instance instead of creating a new one
 	    context.readOnlyRefs.put(object, this);
 	    break;
 	case REMOVED:
@@ -167,18 +194,21 @@ final class ReadOnlyReference<T>
     }
 
     /**
-     * Throws an {@code IllegalStateException}, as {@code
-     * ReadOnlyReferences} cannot be updated.
+     * Throws an {@code IllegalStateException}, as {@code ReadOnlyReferences}
+     * cannot be updated.
      *
      * @return {@inheritDoc}
      *
      * @throws IllegalStateException if called
      */
     public T getForUpdate() {
-	throw new IllegalStateException("Cannot mark reference to ReadOnly " +
-					"object for update");
+	throw new UnsupportedOperationException(
+	    "Cannot mark reference to a read-only object for update");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public BigInteger getId() {
 	if (id == null) {
 	    id = BigInteger.valueOf(oid);
@@ -186,12 +216,18 @@ final class ReadOnlyReference<T>
 	return id;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public boolean equals(Object object) {
 	return (object != null && object instanceof ReadOnlyReference)
 	    ? oid == ((ReadOnlyReference)object).oid
 	    : false;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public int hashCode() {
 	return (int)oid;
     }
@@ -208,12 +244,20 @@ final class ReadOnlyReference<T>
 	return oid;
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public void markForUpdate() {
-	throw new IllegalStateException("TODO");
+	throw new UnsupportedOperationException(
+	    "Cannot mark reference to a read-only object for update");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void removeObject() {
-	// Implement later
+	throw new UnsupportedOperationException(
+	    "Cannot remove a read-only reference");	
     }
 
     /**
@@ -221,23 +265,36 @@ final class ReadOnlyReference<T>
      */
     public void setObject(ManagedObject o) {
 
-	// update the object in the cache for future instances.  Note
-	// that even if this call is redundant, the access in will
-	// keep the object valid in cache.
-	context.cache.cacheObject(oid, o);	    
-	object = o;
-	state = State.FETCHED; 
+	switch (state) {
+	case EMPTY:
+	    // update the object in the cache for future instances.  Note that
+	    // even if this call is redundant, the access in will keep the
+	    // object valid in cache.
+	    context.cache.cacheObject(oid, o);
+	    
+	    // mark in the reference table that any future references to the
+	    // provided object should return this reference.  This update is
+	    // guaranteed to be unique since setObject() can never be called
+	    // twice.
+	    context.readOnlyRefs.put(object, this);
+	    object = o;
+	    state = State.FETCHED; 
+	default:
+	    throw new IllegalStateException(
+		"Cannot set the value of a ReadOnlyReference after the " +
+		"value has already been set");
+	}
     }
 
     /*
-     * Package-private methods that Context uses to create and look up
-     * new references of this type
+     * Package-private methods that Context uses to create and look up new
+     * references of this type
      */
 
     /**
-     * Returns any {@code ReadOnlyReference} created for the provided
-     * {@code object} or {@code null} if no reference has been created
-     * for the object.  This method will not create a new reference.
+     * Returns any {@code ReadOnlyReference} created for the provided {@code
+     * object} or {@code null} if no reference has been created for the object.
+     * This method will not create a new reference.
      *
      * @param context the context of the current transaction
      * @param object the object refered to by any returned reference
@@ -248,8 +305,8 @@ final class ReadOnlyReference<T>
     static <T> ReadOnlyReference<T> getReference(Context context, T object) {
 	checkReadOnly(object);
 
-	// look in the reference table to see whether we have already
-	// created a new ReadOnlyReference for this object.
+	// look in the reference table to see whether we have already created a
+	// new ReadOnlyReference for this object.
 	ReadOnlyReference<T> ref = Objects.
 	    uncheckedCast(context.readOnlyRefs.get((ManagedObject)object));
 	
@@ -268,19 +325,19 @@ final class ReadOnlyReference<T>
     static <T> ReadOnlyReference<T> getOrCreateIfNotPresent(Context context, T object) {
 	checkReadOnly(object);
 	
-	// look in the reference table to see whether we have already
-	// created a new ReadOnlyReference for this object.
+	// look in the reference table to see whether we have already created a
+	// new ReadOnlyReference for this object.
 	ReadOnlyReference<T> ref = Objects.
 	    uncheckedCast(context.readOnlyRefs.get((ManagedObject)object));
 
-	// if we haven't already created a reference for this object
-	// within the current transaction
+	// if we haven't already created a reference for this object within the
+	// current transaction
 	if (ref == null) {
 	    ref = new ReadOnlyReference<T>(context, object);
 
-	    // update the reference table so any future calls to
-	    // create a reference for this object during this
-	    // transaction will return this instasnce
+	    // update the reference table so any future calls to create a
+	    // reference for this object during this transaction will return
+	    // this instasnce
 	    context.readOnlyRefs.put((ManagedObject)object, ref);
 	}
 	// check that the reference hasn't already been removed
@@ -301,25 +358,25 @@ final class ReadOnlyReference<T>
      */
     static ReadOnlyReference<?> getOrCreateIfNotPresent(Context context, long oid) {
 
-	// look in the reference table to see if we have already
-	// created a ReadOnlyReference with this oid.  If so, we want
-	// to use the same reference during the transaction.
+	// look in the reference table to see if we have already created a
+	// ReadOnlyReference with this oid.  If so, we want to use the same
+	// reference during the transaction.
 	ReadOnlyReference<?> ref = context.readOnlyRefs.get(oid);
 
-	// if we haven't already created a reference for this oid,
-	// then create one now
+	// if we haven't already created a reference for this oid, then create
+	// one now
 	if (ref == null) {
 	    
 	    ref = new ReadOnlyReference(context, oid);
 
-	    // update the reference table so that any future calls
-	    // during this transaction to get a reference for this oid
-	    // will return this instance
+	    // update the reference table so that any future calls during this
+	    // transaction to get a reference for this oid will return this
+	    // instance.
 	    context.readOnlyRefs.put(oid, ref);
 	}
-	// If we had already created a reference for this oid within
-	// the current transaction, ensure that we haven't asked for a
-	// reference to an object that has just been removed.
+	// If we had already created a reference for this oid within the
+	// current transaction, ensure that we haven't asked for a reference to
+	// an object that has just been removed.
 	else if (ref.state.equals(State.REMOVED)) {
 	    throw new ObjectNotFoundException("Object has been removed");
 	}
@@ -329,12 +386,11 @@ final class ReadOnlyReference<T>
 
 
     /**
-     * Returns {@code true} if the object refered to by this reference
-     * has been removed during the current transaction.  Note that
-     * even if this method returns {@code false}, a subsequent call to
-     * {@link #get()} may still throw an {@link
-     * ObjectNotFoundException} if the object was remove during a
-     * different transaction.
+     * Returns {@code true} if the object refered to by this reference has been
+     * removed during the current transaction.  Note that even if this method
+     * returns {@code false}, a subsequent call to {@link #get()} may still
+     * throw an {@link ObjectNotFoundException} if the object was remove during
+     * a different transaction.
      *
      * @return {@code true} if the object refered to by this reference
      *         has been removed during the current transaction
@@ -344,10 +400,9 @@ final class ReadOnlyReference<T>
     }
 
     /**
-     * Returns the object refered to by this reference if it has
-     * already been loaded from the cache or datastore, or returns
-     * {@code null} if this instance was created with just an oid and
-     * has not yet loaded the object.  
+     * Returns the object refered to by this reference if it has already been
+     * loaded from the cache or datastore, or returns {@code null} if this
+     * instance was created with just an oid and has not yet loaded the object.
      *
      * @return the object refered to by this reference or {@null} if
      *         it has not been accessed
@@ -367,10 +422,9 @@ final class ReadOnlyReference<T>
 
 
     /** 
-     * Returns this instance if this is the first time a reference for
-     * this instance's {@code oid} has been created, or replaces this
-     * instance with a canonical instance if an instance had been
-     * created prior.
+     * Returns this instance if this is the first time a reference for this
+     * instance's {@code oid} has been created, or replaces this instance with
+     * a canonical instance if an instance had been created prior.
      *
      * @return the canonical instance for the oid
      */
@@ -394,9 +448,9 @@ final class ReadOnlyReference<T>
 
 
     /**
-     * Returns the managed object associated with serialized data and
-     * checks that the return value is not {@code null} and has as
-     * {@link ReadOnly} annotation.
+     * Returns the managed object associated with serialized data and checks
+     * that the return value is not {@code null} and has as {@link ReadOnly}
+     * annotation.
      *
      * @param data
      *

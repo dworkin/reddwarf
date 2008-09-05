@@ -371,6 +371,7 @@ final class Context extends TransactionContext {
 	    isPrepared = true;
 	    txn.setInactive();
 	    ManagedReferenceImpl.flushAll(this);
+	    readOnlyRefs.validate();
             // TEST
             service.accessCoordinator.validate(txn.originalTxn);
 	    boolean result;
@@ -421,6 +422,7 @@ final class Context extends TransactionContext {
 	    isCommitted = true;
 	    txn.setInactive();
 	    ManagedReferenceImpl.flushAll(this);
+	    readOnlyRefs.validate();
             // TEST
             service.accessCoordinator.validate(txn.originalTxn);
 	    if (storeParticipant != null) {

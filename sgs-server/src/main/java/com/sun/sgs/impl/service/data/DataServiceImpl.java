@@ -442,7 +442,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 
 	    // configurable?
-	    cache = new DataCacheImpl(properties);
+	    cache = new ReadOnlyDataCache(properties);
 
             storeToShutdown = baseStore;
             ProfileRegistrar registrar = 
