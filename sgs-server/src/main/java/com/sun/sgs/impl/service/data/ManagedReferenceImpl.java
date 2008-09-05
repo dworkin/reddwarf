@@ -399,9 +399,9 @@ final class ManagedReferenceImpl<T>
     public T getForUpdate() {
 	RuntimeException exception;
 	try {
+	    DataServiceImpl.checkContext(context);
 	    // mark that we acquired a write lock on the object
 	    context.oidAccesses.reportObjectAccess(getId(), AccessType.WRITE);
-	    DataServiceImpl.checkContext(context);
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
