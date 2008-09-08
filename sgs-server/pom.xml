@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.7-SNAPSHOT</version>
+    <version>0.9.8-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server</artifactId>
@@ -176,6 +176,7 @@
 	  <argLine>
 	    ${test.jvm.args} -Djava.library.path=${run.javapath}
 	  </argLine>
+	  <reportsDirectory>${test.reports}</reportsDirectory>
         </configuration>
       </plugin>
 
@@ -242,6 +243,8 @@
 	 tests, for storing database files, etc.  The directory is
 	 removed and recreated for each test run. -->
     <test.output>target/test-output</test.output>
+    <!-- The directory for storing tests results -->
+    <test.reports>target/test-reports</test.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>

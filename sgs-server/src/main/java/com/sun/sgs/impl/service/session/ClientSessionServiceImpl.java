@@ -412,7 +412,7 @@ public final class ClientSessionServiceImpl
 	    monitorDisconnectingSessionsTaskHandle =
 		taskScheduler.scheduleRecurringTask(
  		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, 0,
+		    taskOwner, System.currentTimeMillis(),
 		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY)/2);
 	    monitorDisconnectingSessionsTaskHandle.start();
 	    
