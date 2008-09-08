@@ -1,3 +1,23 @@
+Version 0.9.7:
+- Improve channel service concurrency by removing channel sets (issue
+  #18), and by caching channel server proxies (issue #19)
+- Improve concurrency of channel server notifications sent by channel
+  coordinators
+- Improve task service concurrency (issue #46)
+- Add support for Berkeley DB Java edition, including improved
+  allocation concurrency in the data service (issue #16)
+- Modify the watchdog service to always consider the node alive in
+  single node mode (issue #4)
+- Modify the client session and channel services to retry tasks after
+  network failures (issues #1 and #2)
+- Modify the client session handler to allow clients to disconnect on
+  login failures and on logout (issues #7, #8 and #9)
+- Add support for dynamic and finer-grained profiling (issues #33 and
+  #34)
+- Add a transactional log manager (issue #20)
+- Require Java 6
+- Also fix issues #6, #10, #13, #22 and #69
+
 Version 0.9.6:
 - Support multi-node operation
   - Add WatchdogService and NodeMappingService
