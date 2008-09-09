@@ -101,6 +101,9 @@ class ClientSessionHandler {
     /** The identity for this session. */
     private volatile Identity identity;
 
+    /** The login status. */
+    private volatile boolean loggedIn;
+
     /** The lock for accessing the following fields: {@code state},
      * {@code messageQueue}, {@code disconnectHandled}, and {@code shutdown}.
      */
@@ -178,8 +181,15 @@ class ClientSessionHandler {
     /**
      * Sends the specified login protocol {@code message}, followed by any
      * enqueued messages, and sets the state to LOGIN_HANDLED.
+     *
+     * @param	message the login protocol message
+     * @param	delivery the delivery requirement
+     * @param	success if {@code true}, login is successful
+     *
      */
-    void sendLoginProtocolMessage(byte[] message, Delivery delivery) {
+    void sendLoginProtocolMessage(
+	byte[] message, Delivery delivery, boolean success)
+    {
 	synchronized (lock) {
 	    if (state != State.CONNECTED) {
 		if (logger.isLoggable(Level.WARNING)) {
@@ -191,6 +201,8 @@ class ClientSessionHandler {
 		throw new IllegalStateException("unexpected state: " +
 						state.toString());
 	    }
+
+	    loggedIn = success;
 	    
 	    writeToWriteHandler(ByteBuffer.wrap(message));
 	    state = State.LOGIN_HANDLED;
@@ -674,10 +686,11 @@ class ClientSessionHandler {
 	    }
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		if (identity == null) {
+		if (! loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
-			"session message received before login:{0}", this);
+			"session message received before login completed:{0}",
+			this);
 		    break;
 		}
 		final ByteBuffer clientMessage =
@@ -703,10 +716,11 @@ class ClientSessionHandler {
 		break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-		if (identity == null) {
+		if (! loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
-			"session message received before login:{0}", this);
+			"channel message received before login completed:{0}",
+			this);
 		    break;
 		}
 		final BigInteger channelRefId =
@@ -858,7 +872,7 @@ class ClientSessionHandler {
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			sendLoginProtocolMessage(
-			    loginRedirectMessage, Delivery.RELIABLE);
+ 			    loginRedirectMessage, Delivery.RELIABLE, false);
 			handleDisconnect(false, false);
 		    }});
 	    }
@@ -874,7 +888,7 @@ class ClientSessionHandler {
 	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		public void run() {
 		    sendLoginProtocolMessage(
-			loginFailureMessage, Delivery.RELIABLE);
+ 			loginFailureMessage, Delivery.RELIABLE, false);
 		    handleDisconnect(false, false);
 		}});
 	}
@@ -1052,8 +1066,8 @@ class ClientSessionHandler {
 		sessionImpl.putClientSessionListener(
 		    dataService, returnedListener);
 
-		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE, false);
+		sessionService.sendLoginAck(
+		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE, true);
 		
 		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
@@ -1084,8 +1098,8 @@ class ClientSessionHandler {
 		} else {
 		    throw ex;
 		}
-		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, loginFailureMessage, Delivery.RELIABLE, true);
+		sessionService.sendLoginAck(
+		    sessionImpl, loginFailureMessage, Delivery.RELIABLE, false);
 		sessionImpl.disconnect();
 	    }
 	}
