@@ -472,8 +472,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient("dummy");
 	try {
 	    client.connect(serverNode.getAppPort());
-	    client.login(false);
-	    client.waitForLogin();
+	    client.login(true);
 	    client.sendMessages(1, 1, null);
 	} finally {
             client.disconnect();
@@ -1290,8 +1289,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
-	    //checkLoggedIn();
-
 	    MessageBuffer buf =
 		new MessageBuffer(1+ message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).

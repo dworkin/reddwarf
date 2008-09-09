@@ -768,8 +768,8 @@ public final class ClientSessionServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addLoginAck:{0} session:{1}, message:{2}",
-			success, session, message);
+			"Context.addLoginAck success:{0} session:{1}," +
+			"message:{2}", success, session, message);
 		}
 		checkPrepared();
 
