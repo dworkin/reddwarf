@@ -140,6 +140,43 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
 
+
+    @Test public void testTwoArgConstructorTrueFalse() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    new ScalableDeque<Integer>(true, false);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testTwoArgConstructorTrueTrue() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    new ScalableDeque<Integer>(true, true);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testTwoArgConstructorFalseFalse() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    new ScalableDeque<Integer>(false, false);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testTwoArgConstructorFalseTrue() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    new ScalableDeque<Integer>(false, true);
+		}
+	    }, taskOwner);
+    }
+
     @Test public void testCopyConstructor() throws Exception {
 
 	final Deque<Integer> control = new ArrayDeque<Integer>();
@@ -418,6 +455,63 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) 
+			d.offer(1);
+		    		   
+		    assertTrue(d.contains(1));
+
+		}
+	    }, taskOwner);
+    }
+
+
+    @Test public void testSlowContains() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    d.offer(1);
+		    assertTrue(d.contains(1));
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowContainsOnEmptyMap() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    assertFalse(d.contains(1));
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowContainsWithMultipleElements() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i) 
+			d.offer(i);
+		    
+		    for (int i = 0; i < 10; ++i) 
+			assertTrue(d.contains(i));
+
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowContainsWithMultipleSameElements() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
 		    for (int i = 0; i < 10; ++i) 
 			d.offer(1);
 		    		   
@@ -792,8 +886,6 @@ public class TestScalableDeque extends Assert {
 		}
 	    }, taskOwner);
     }
-
-
   
     /*
      * Test remove operations
@@ -1212,6 +1304,282 @@ public class TestScalableDeque extends Assert {
     }
 
     /*
+     * Test remove operations when fast random access is not supported
+     */
+
+    @Test public void testSlowRemoveFirstOccurrence() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    assertTrue(d.removeFirstOccurrence(5));		    
+		    assertEquals(9, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveFirstOccurrenceNotPresent() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    assertFalse(d.removeFirstOccurrence(10));  
+		    assertEquals(10, d.size());
+		    assertFalse(d.contains(10));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveFirstOccurrenceWithMultipleOccurrences() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    assertTrue(d.removeFirstOccurrence(5));		    
+		    assertEquals(29, d.size());
+		    assertTrue(d.contains(5));
+
+		    // the first instance of 5 should be at element 14 now
+		    int iterCount = 0;
+		    Iterator<Integer> iter = d.iterator();
+		    while (iter.hasNext()) {
+			int i = iter.next();
+			if (i == 5)
+			    break;
+			iterCount++;
+		    }
+		    assertEquals(14, iterCount);
+		    iterCount++;
+
+		    // check that we still have the second instance as
+		    // well
+		    while (iter.hasNext()) {
+			int i = iter.next();
+			if (i == 5)
+			    break;
+			iterCount++;
+		    }
+		    // the second instances is at 24
+		    assertEquals(24, iterCount);
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveLastOccurrence() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    assertTrue(d.removeLastOccurrence(5));		    
+		    assertEquals(9, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveLastOccurrenceWithMultipleOccurrences() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    assertTrue(d.removeLastOccurrence(5));		    
+		    assertEquals(29, d.size());
+		    assertTrue(d.contains(5));
+
+		    // the first instance of 5 should be at element 5 still
+		    int iterCount = 0;
+		    Iterator<Integer> iter = d.iterator();
+		    while (iter.hasNext()) {
+			int i = iter.next();
+			if (i == 5)
+			    break;
+			iterCount++;
+		    }
+		    assertEquals(5, iterCount);
+		    iterCount++;
+
+		    // check that we still have the second instance as
+		    // well
+		    while (iter.hasNext()) {
+			int i = iter.next();
+			if (i == 5)
+			    break;
+			iterCount++;
+		    }
+		    // the second instances is at 15
+		    assertEquals(15, iterCount);
+		}
+	    }, taskOwner);
+    }
+    
+    @Test public void testSlowRemoveLastOccurrenceNotPresent() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    assertFalse(d.removeLastOccurrence(10));  
+		    assertEquals(10, d.size());
+		    assertFalse(d.contains(10));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveAllOccurrences() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    assertTrue(d.removeAllOccurrences(5));		    
+		    assertEquals(9, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveAllOccurrencesWithMultipleOccurrences() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    assertTrue(d.removeAllOccurrences(5));		    
+		    assertEquals(27, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+    
+    @Test public void testSlowRemoveAllOccurrencesWhenOccurrenceNotPresent() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    assertFalse(d.removeAllOccurrences(10));  
+		    assertEquals(10, d.size());
+		    assertFalse(d.contains(10));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveAll() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(5);
+		    assertTrue(d.removeAll(c));		    
+		    assertEquals(9, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveAllWithMultipleOccurrences() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(5);		    
+		    assertTrue(d.removeAll(c));		    
+		    assertEquals(27, d.size());
+		    assertFalse(d.contains(5));
+		}
+	    }, taskOwner);
+    }
+
+    @Test public void testSlowRemoveAllWithMultipleRemoves() 
+	throws Exception {
+	
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int j = 0; j < 3; ++j) {
+			for (int i = 0; i < 10; ++i)
+			    d.add(i);	
+		    }
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(5);		    
+		    c.add(6);
+		    assertTrue(d.removeAll(c));		    
+		    assertEquals(24, d.size());
+		    assertFalse(d.contains(5));
+		    assertFalse(d.contains(6));
+		}
+	    }, taskOwner);
+    }
+    
+    @Test public void testSlowRemoveAllWhenOccurrenceNotPresent() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(false, false);
+		    for (int i = 0; i < 10; ++i)
+			d.add(i);	
+		    Collection<Integer> c = new LinkedList<Integer>();
+		    c.add(10);		    
+		    assertFalse(d.removeAll(c));  
+		    assertEquals(10, d.size());
+		    assertFalse(d.contains(10));
+		}
+	    }, taskOwner);
+    }
+
+
+    /*
      * Test push/pop
      */
     @Test public void testPush() throws Exception {
@@ -1420,8 +1788,7 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.
-					getDataManager().getBinding(name));
+			uncheckedCast(AppContext.getDataManager().getBinding(name));
 		    assertEquals(10, d.size());
 		    int i = 0;
 		    for (Integer inDeque : d) {
@@ -1453,8 +1820,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    int i = 0;
 		    while (it.hasNext())
@@ -1489,7 +1856,7 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.getDataManager().getBinding(name2));
 		    for (int i = 1; i < 10; i+=2) 
 			d.remove(i);		    
 		}
@@ -1502,8 +1869,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    int i = 0;
 		    while (it.hasNext()) {
@@ -1544,7 +1911,7 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.getDataManager().getBinding(name2));
 		    for (int i = 0; i < 5; i++) 
 			d.remove(i);		    
 		}
@@ -1557,8 +1924,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    int i = 5;
 		    while (it.hasNext()) {
@@ -1599,7 +1966,7 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.getDataManager().getBinding(name2));
 		    for (int i = 0; i < 5; i++) 
 			d.remove();		    
 		}
@@ -1612,8 +1979,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    try {
 			it.next();
@@ -1659,7 +2026,7 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.getDataManager().getBinding(name2));
 		    // remove the first element, which the iterator
 		    // already advanced over
 		    d.removeFirst();
@@ -1673,8 +2040,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    // now try to remove the already-removed element
 		    // from the iterator

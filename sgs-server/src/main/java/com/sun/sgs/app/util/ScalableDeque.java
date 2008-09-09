@@ -52,131 +52,134 @@ import java.util.Set;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 
 /**
- * A scalable {@code Deque} implementation.  This implementation
- * supports concurrent writers at each of the deque's ends.  The
- * internal representation of the deque is segmented so that
- * operations do not access the data of entire deque.  Note that
- * concurrent read and write operations on the <i>same</i> end of the
- * deque will still cause contention.
+ * A scalable {@code Deque} implementation.  This implementation supports
+ * concurrent writers at each of the deque's ends.  The internal representation
+ * of the deque is segmented so that operations do not access the data of entire
+ * deque.  Note that concurrent read and write operations on the <i>same</i> end
+ * of the deque will still cause contention.
  *
  * <p>
  *
- * Developers should use this as a drop-in replaced for any {@code
- * Deque} or {@link Queue} implementation if the size of the data
- * structure will be more than a small number of elements, or if the
- * data structure needs to support concurrent writers for putting and
- * removing.  A standard {@code Deque} or {@code Queue} implementation
- * will likely perform better that an instance of this class if the
- * number of elements is small, or if the usage instance happens
- * entirely during the lifetime of a task and the instance is never
+ * Developers should use this as a drop-in replaced for any {@code Deque} or
+ * {@link Queue} implementation if the size of the data structure will be more
+ * than a small number of elements, or if the data structure needs to support
+ * concurrent writers for putting and removing.  A standard {@code Deque} or
+ * {@code Queue} implementation will likely perform better that an instance of
+ * this class if the number of elements is small, or if the usage instance
+ * happens entirely during the lifetime of a task and the instance is never
  * persisted.
  *
  * <p> 
  *
- * This class provides one parameter for tuning performance.  The
- * {@code supportsConcurrentIterators} constructor parameter
- * determines how a deque's iterators will behavior when the deque is
- * concurrently modified during traversal.  If the parameter is set to
- * {@code true}, iterators will correctly traverse all elements of the
- * deque, even if the iterator's next element is removed between
- * tasks.  Also, the iterator will never throw a {@link
- * ConcurrentModificationException}.  However, in this case, using
- * multiple iterators at the same time will cause contention.  In
- * addition each mutating operation incurs a small performance penalty
- * for keeping the iterators consistent with the state of the deque.
- * Developers should use this feature if they will need to iterator
- * over the deque at the same time it is being modified and want to
- * ensure that the iterator will traverse all the elements.
+ * This class provides two parameters for tuning performance.  The {@code
+ * supportsConcurrentIterators} constructor parameter determines how a deque's
+ * iterators will behavior when the deque is concurrently modified during
+ * traversal.  If the parameter is set to {@code true}, iterators will correctly
+ * traverse all elements of the deque, even if the iterator's next element is
+ * removed between tasks.  Also, the iterator will never throw a {@link
+ * ConcurrentModificationException}.  However, in this case, using multiple
+ * iterators at the same time will cause contention.  In addition each mutating
+ * operation incurs a small performance penalty for keeping the iterators
+ * consistent with the state of the deque.  Developers should use this feature
+ * if they will need to iterator over the deque at the same time it is being
+ * modified and want to ensure that the iterator will traverse all the elements.
  *
  * <p>
  *
- * If the {@code supportsConcurrentIterators} parameter is {@code
- * false}, the iterator will only make a best-effort to reflect any
- * concurrent change to the deque.  If the next element that the
- * iterator is to return was been removed during a separate task, the
- * iterator <i>will</i> throw a {@code
+ * If the {@code supportsConcurrentIterators} parameter is {@code false}, the
+ * iterator will only make a best-effort to reflect any concurrent change to the
+ * deque.  If the next element that the iterator is to return was been removed
+ * during a separate task, the iterator <i>will</i> throw a {@code
  * ConcurrentModificationException}.  In this behavior, not supporting
- * concurrent updates incur no performance overhead for mutating
- * operations.  Furthermore, multiple iterators will not cause any
- * addtional contention.
+ * concurrent updates incur no performance overhead for mutating operations.
+ * Furthermore, multiple iterators will not cause any addtional contention.
  *
  * <p>
  *
- * Most operations run in constant time.  However, there are several
- * key difference in operation cost between this class and other
- * {@code Deque} implementations.  The operations {@link
+ * The second tuning parameter is {@code supportsFastArbitraryAccess}, which is
+ * {@code true} by default.  When enabled, the operations {@link
  * ScalableDeque#remove(Object) remove}, {@link
  * ScalableDeque#removeAll(Collection) removeAll}, {@link
- * ScalableDeque#removeFirstOccurrence(Object) removeFirstOccurrence},
- * and {@link ScalableDeque#removeLastOccurrence(Object)
- * removeLastOccurrence} run in time linear to the number of instances
- * of that object in the deque, not the number of elements in the
- * deque.  In addition, the {@link ScalableDeque#contains(Object)
- * contains} operation is constant time.  Due to the distribute nature
- * of the deque, the {@link ScalableDeque#size() size} operation takes
- * time linear to the size of the deque.  For large deques, this
- * method should not be called, as it would take longer than the time
- * available to a {@code Task}.  Similarly, the {@link
- * ScalableDeque#toArray() toArray} and {@link
- * ScalableDeque#toArray(Object[]) toArray(T[])} operations should not
- * be used for anything but small deques.  The {@link
- * ScalableDeque#isEmpty() isEmpty} and {@link ScalableDeque#clear()
+ * ScalableDeque#removeFirstOccurrence(Object) removeFirstOccurrence}, and
+ * {@link ScalableDeque#removeLastOccurrence(Object) removeLastOccurrence} run
+ * in time linear to the number of instances of that object in the deque, not
+ * the number of elements in the deque.  In addition, the {@link
+ * ScalableDeque#contains(Object) contains} operation is constant time.  When
+ * enabled, this features allows these operations to be used on a deque instance
+ * of any size.  This feature requires a slightly larger constant cost for the
+ * addition and removal operations.  Furthermore this feature requires that all
+ * elements have a stable {@code hashCode} and {@code equals} operation,
+ * consistent with use in a {@link Map}.  Failure to do so will result in the
+ * {@code contains}, {@code remove}, {@code removeFirstOccurrrence}, {@code
+ * removeLastOccurrence} and {@code removeAll} operations not working as
+ * expected.  The remaining operations will still operate as normal, however.
+ *
+ * <p>
+ *
+ * If an instance of the deque will only have elements removed from the head and
+ * tail, this feature may be disabled for a small performance increase.
+ * However, if {@code supportsFastArbitraryAccess} is disabled, the
+ * aforementioned calls become linear with respect to the number of elements in
+ * the deque and will be unusable for larger deques.  Deque instance that will
+ * contain objects whose hash codes will change should set {@code
+ * supportsFastArbitraryAccess} to {@code false}.
+ * 
+ * <p>
+ *
+ * Most operations run in constant time.  However, there are several key
+ * difference in operation cost between this class and other {@code Deque}
+ * implementations.  Due to the distribute nature of the deque, the {@link
+ * ScalableDeque#size() size} operation takes time linear to the size of the
+ * deque.  For large deques, this method should not be called, as it would take
+ * longer than the time available to a {@code Task}.  Similarly, the {@link
+ * ScalableDeque#toArray() toArray} and {@link ScalableDeque#toArray(Object[])
+ * toArray(T[])} operations should not be used for anything but small deques.
+ * The {@link ScalableDeque#isEmpty() isEmpty} and {@link ScalableDeque#clear()
  * clear} operations however are still constant time.
  *
  * <p>
  *
- * All elements stored by this deque must be instances of {@link
- * Serializable}.  This class supports additionally supports elements
- * that are instances of {@code ManagedObject}.  If a {@code
- * ManagedObject} is stored within this deque, the developer is still
- * responsible for removing it from the data store at the end of its
- * lifetime.  Removing a {@code ManagedObject} from the deque by any
- * operation, including {@code clear}, <i>will not</i> remove that
- * object from the data store.  These objects should be removed from
- * the data store after they have been removed from the deque.
+ * All elements stored by this deque must be instances of {@link Serializable}.
+ * This class supports additionally supports elements that are instances of
+ * {@code ManagedObject}.  If a {@code ManagedObject} is stored within this
+ * deque, the developer is still responsible for removing it from the data store
+ * at the end of its lifetime.  Removing a {@code ManagedObject} from the deque
+ * by any operation, including {@code clear}, <i>will not</i> remove that object
+ * from the data store.  These objects should be removed from the data store
+ * after they have been removed from the deque.
  *
  * <p>
  *
- * This class requires that all elements have a meaningful {@code
- * hashCode} and {@code equals} operation.  Failure to do so will
- * result in the {@code contains}, {@code remove}, {@code
- * removeFirstOccurrrence}, {@code removeLastOccurrence} and {@code
- * removeAll} operations not working.  The remaining operations will
- * still operate as normal, however.
- *
- * <p>
- *
- * This class and its iterator mark themselves for update as
- * necessary; no additional calls to the {@link DataManager} are
- * necessary when modifying the deque.  Developers should not need to
- * call {@code markForUpdate} or {@code getForUpdate} on an deque
- * instance, as this will eliminate all the concurrency benefits of
- * this class.  However, calling {@code getForUpdate} or {@code
- * markForUpdate} can be used if a operation needs to prevent all
- * access to the map.  
+ * This class and its iterator mark themselves for update as necessary; no
+ * additional calls to the {@link DataManager} are necessary when modifying the
+ * deque.  Developers should not need to call {@code markForUpdate} or {@code
+ * getForUpdate} on an deque instance, as this will eliminate all the
+ * concurrency benefits of this class.  However, calling {@code getForUpdate} or
+ * {@code markForUpdate} can be used if a operation needs to prevent all access
+ * to the map.
  *
  * <p>
  * 
- * This class's {@link Iterator} implements {@link ManagedObject} and
- * may be persisted.  A single {@code Iterator} instance should not be
- * shared between mutliple {@link Task} instances.  When an iterator
- * is done being used it should be removed from the data store using
- * {@link DataManager#removeObject(Object) removeObject}.  If using
- * concurrent iterators, failure to remove unused iterators will
- * result in degrated performance linear to the number of excess
- * iterator instances.
+ * This class's {@link Iterator} implements {@link ManagedObject} and may be
+ * persisted.  A single {@code Iterator} instance should not be shared between
+ * mutliple {@link Task} instances.  When an iterator is done being used it
+ * should be removed from the data store using {@link
+ * DataManager#removeObject(Object) removeObject}.  If using concurrent
+ * iterators, failure to remove unused iterators will result in degrated
+ * performance linear to the number of excess iterator instances.
  *
  * <p>
  *
- * This class and its iterator support all the optional {@link
- * Collection} and {@code Iterator} operations.  This class does not
- * support {@code null} elements.
+ * This class and its iterator support all the optional {@link Collection} and
+ * {@code Iterator} operations.  This class does not support {@code null}
+ * elements.
  *
  * @param <E> the type of elements held by this deque
  *
  * @see Deque
  * @see ManagedObject
  * @see Serializable
+ * @see Object#hashCode()
  */
 public class ScalableDeque<E> extends AbstractCollection<E>
     implements Deque<E>, Serializable, ManagedObjectRemoval {
@@ -184,68 +187,72 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     /*
      * IMPLEMENTATION NOTES:
      *
-     * The deque is implemented as a doubly-linked list of Element
-     * objects, which are stored in a ScalableHashMap.  We use a
-     * ScalableHashMap instead of a ScalableHashSet, as the Set
-     * implementations is wrapper around Map (just like this class), and
-     * therefore would cause an extra data access penalty.  Currently, the
-     * value stored in the Map is not meaningful.
+     * In general, a deque need not support random access to the elements other
+     * than the head and tail.  However, this implementation optionally supports
+     * an efficient method for accessing arbitrary elements in the middle.  This
+     * feature was added due to the inefficiency of the O(n) implementation.
+     * Note that the O(n) implementation would not be usable for a large deque,
+     * just as size() is not usable.  The following section outlines how this
+     * behavior is implemented. 
      *
-     * A deque may have multiple elements with the same value.  Since a
-     * Map is used to store the Element instances, we have to impose an
-     * additional factor to ensure each Element's uniqueness.  Thefefore
-     * each Element has an associated Id based on when it was inserted
-     * into the deque.
+     * The deque is implemented as a doubly-linked list of Element objects,
+     * which are optionally stored in a ScalableHashMap if fast arbitrary access
+     * is enabled.  We use a ScalableHashMap instead of a ScalableHashSet, as
+     * the Set implementations is wrapper around Map (just like this class), and
+     * therefore would cause an extra data access penalty.  Currently, the value
+     * stored in the Map is not meaningful.
+     *
+     * Note that a deque may have multiple elements with the same value.  Since
+     * a Map is used to store the Element instances, we have to impose an
+     * additional factor to ensure each Element's uniqueness.  Therefore each
+     * Element has an associated Id based on where it was inserted into the
+     * deque.
      * 
-     * Ids are generated by keeping two counters, one for the head of the
-     * list and one for the tail.  The head counter is decremented when an
-     * item is added to the head of the list, whilst the tail counter is
-     * incremented.  This invariant ensures a total monotonic ordering of
-     * Ids in the deque.  Furthermore, these counters do not impose any
-     * additional contention, since only one is updated depending on which
-     * end of the deque the element is inserted.
+     * Ids are generated by keeping two counters, one for the head of the list
+     * and one for the tail.  The head counter is decremented when an item is
+     * added to the head of the list, whilst the tail counter is incremented.
+     * This invariant ensures a total monotonic ordering of Ids in the deque.
+     * Furthermore, these counters do not impose any additional contention,
+     * since only one is updated depending on which end of the deque the element
+     * is inserted.
      *
      * The Element Ids allow this class to support the removal operations
-     * defined in the Deque interface.  For example, removeFirst(Object)
-     * would look for all elements that have that same value as Object and
-     * choose the one with the lowest Id.
+     * defined in the Deque interface.  For example,
+     * removeFirstOccurrence(Object) would look for all elements that have that
+     * same value as Object and choose the one with the lowest Id.
      *
-     * In general, a deque need not support random access to the elements
-     * other than the head and tail.  However, to properly support the
-     * removal operations, we cannot traverse the entire map's keyset to
-     * find all the elements with the provided value.  Therefore, we use
-     * an indexing technique to locate the Elements based on using a
-     * substitute class, ElementMatcher that is equivalent to an Element
+     * To properly support the removal operations, we cannot traverse the entire
+     * map's keyset to find all the elements with the provided value.
+     * Therefore, we use an indexing technique to locate the Elements based on
+     * using a substitute class, ElementMatcher that is equivalent to an Element
      * that is being searched for.
      *
-     * Random access to the elements occurs as follows.  Each Element the
-     * of map uses the hashCode of the value that it stores.  Multiple
-     * Element instances with the same value will still be unique by way
-     * of their Ids.  The Map.Entry instances that contain the Element can
-     * be obtained from the backing map using the package-private
-     * ScalableMap.getEntry(Object key) method.
+     * Random access to the elements occurs as follows.  Each Element the of map
+     * uses the hashCode of the value that it stores.  Multiple Element
+     * instances with the same value will still be unique by way of their Ids.
+     * The Map.Entry instances that contain the Element can be obtained from the
+     * backing map using the package-private ScalableMap.getEntry(Object key)
+     * method.
      *
      * To locate an Element, we use the ScalableDeque-internal class
-     * ElementMatcher as the key for getEntry().  The ElementMatcher
-     * constructor takes in the value of the Element that we are trying to
-     * find and the class's hashCode method returns the hashCode of that
-     * value.  This enables us to find all the Element instances with that
-     * value's hashCode in the backing map.  When the map is comparing the
-     * ElementMatcher instance to the Element instances (by doing its
-     * key-comparisons), the ElementMatcher will return true if the Element
-     * has the same value as the one stored in the ElementMatcher.  This
-     * basic behavior is all that is necessary to support
-     * Deque.contains(Object)
+     * ElementMatcher as the key for getEntry().  The ElementMatcher constructor
+     * takes in the value of the Element that we are trying to find and the
+     * class's hashCode method returns the hashCode of that value.  This enables
+     * us to find all the Element instances with that value's hashCode in the
+     * backing map.  When the map is comparing the ElementMatcher instance to
+     * the Element instances (by doing its key-comparisons), the ElementMatcher
+     * will return true if the Element has the same value as the one stored in
+     * the ElementMatcher.  This basic behavior is all that is necessary to
+     * support Deque.contains(Object)
      *
-     * To support the removal operations, we impose one additional
-     * complexity, by allowing ElementMatcher instances to filter their
-     * comparisons based on the Id of the Element.  For example, an
-     * ElementMatcher would not return true for equals() when compared to
-     * an Element that had an Id it had already seen.  This behavior lets
-     * us find *all* the Element instances with the provided Id.  Since
-     * the Ids are monotonically ordered, we can then do Id comparisons to
-     * determine the first and last occurrences for the respective remove
-     * operations.
+     * To support the removal operations, we impose one additional complexity,
+     * by allowing ElementMatcher instances to filter their comparisons based on
+     * the Id of the Element.  For example, an ElementMatcher would not return
+     * true for equals() when compared to an Element that had an Id it had
+     * already seen.  This behavior lets us find *all* the Element instances
+     * with the provided Id.  Since the Ids are monotonically ordered, we can
+     * then do Id comparisons to determine the first and last occurrences for
+     * the respective remove operations.
      */
     
     /** 
@@ -322,27 +329,49 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     private transient ScalableHashMap<Element<E>,Long> backingMap;
     
     /**
-     * Creates a new empty {@code ScalableDeque} that does not support
-     * concurrent iterators.
+     * Creates a new empty {@code ScalableDeque} that supports fast arbitrary
+     * removals but does not support concurrent iterators.
      */
     public ScalableDeque() {
-	this(false);
-    }
-
+	this(false, true);
+    }    
+    
     /**
-     * Creates a new empty {@code ScalableDeque} that does supports
-     * concurrent iterators if the the parameter is {@code true}.
-     * Users of this constructor should refer to the class javadoc
-     * regarding the performance behavior of concurrent iterators.
+     * Creates a new empty {@code ScalableDeque} that supports fast arbitrary
+     * removals and optionally supports concurrent iterators if the parameter is
+     * {@code true}.  Users of this constructor should refer to the class
+     * javadoc regarding the performance behavior of concurrent iterators.
      *
      * @param supportsConcurrentIterators whether this deque should
      *        support concurrent iterators
      */
     public ScalableDeque(boolean supportsConcurrentIterators) {
-	backingMap = new ScalableHashMap<Element<E>,Long>();
+	this(supportsConcurrentIterators, true);
+    }
 
+    /**
+     * Creates a new empty {@code ScalableDeque} that optionally supports fast
+     * arbitrary removals and concurrent iterators if the respective parameter
+     * is {@code true}.  Users of this constructor should refer to the class
+     * javadoc regarding the performance behavior of concurrent iterators and
+     * fast arbitrary access.
+     *
+     * @param supportsConcurrentIterators whether this deque should
+     *        support concurrent iterators
+     * @param supportsFastArbitraryAccess whether this deque should allow fast
+     *        arbitrary access to elements in the middle of the deque
+     */
+    public ScalableDeque(boolean supportsConcurrentIterators,
+			 boolean supportsFastArbitraryAccess) {
+	
 	DataManager dm = AppContext.getDataManager();	
-	backingMapRef = dm.createReference(backingMap);
+
+	if (supportsFastArbitraryAccess) {
+	    backingMap = new ScalableHashMap<Element<E>,Long>();
+	    backingMapRef = dm.createReference(backingMap);
+	}
+	else
+	    backingMapRef = null;
 
 	// initialize the pointers to the front and end of the deque
 	// to null.  However, the reference to these pointers will
@@ -419,8 +448,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	Long tailCount = getAndIncrementTailCounter();
 	Element<E> element = new Element<E>(e, tailCount);
 
-	// add the element to the backing map so its persisted
-	map().put(element, tailCount);
+	if (supportsFastArbitraryAccess()) {
+	    // add the element to the backing map so its persisted
+	    map().put(element, tailCount);
+	}
 
 	// then link after the last element
 	addToTail(element);
@@ -440,8 +471,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	Long headCount = getAndDecrementHeadCounter();
 	Element<E> element = new Element<E>(e, headCount);
 
-	// add it to the backing map
-	map().put(element, headCount);
+	if (supportsFastArbitraryAccess()) {
+	    // add it to the backing map
+	    map().put(element, headCount);
+	}
 
 	// link it before the first element
 	addToHead(element);
@@ -555,7 +588,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * {@inheritDoc}
      */
     public void clear() {
-	map().clear();
+
+	if (supportsFastArbitraryAccess())
+	    map().clear();
 
 	ManagedReference<Element<E>> headRef = headElement.get().get();
 
@@ -588,10 +623,19 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}.  This operation runs in constant time.
+     * {@inheritDoc}.  If this deque supports fast arbitrary access, this
+     * operation runs in constant time.
      */
     public boolean contains(Object o) {
-	return map().containsKey(new ElementMatcher(o));
+	if (supportsFastArbitraryAccess())
+	    return map().containsKey(new ElementMatcher(o));
+	else {
+	    for (E e : this) {
+		if (e.equals(o))
+		    return true;
+	    }
+	    return false;
+	}
     }
 
     /**
@@ -819,9 +863,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc} Note that this implementation takes time
-     * proportinal to the number of instances of {@code o} in the
-     * deque, <i>not</i> the number of elements.
+     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is
+     * enabled, this implementation takes time proportinal to the number of
+     * instances of {@code o} in the deque, <i>not</i> the number of elements.
      *
      * @param o {@inheritDoc}
      *
@@ -832,7 +876,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is
+     * enabled, this implementation takes time proportinal to the number of
+     * instances of all the elements in the provided collection that are in the
+     * deque, <i>not</i> the number of elements in the deque itself.
      */
     public boolean removeAll(Collection<?> c) {
 	if (c == null) {
@@ -849,10 +896,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * Removes all occurrences of the provided object from the deque.
-     * Note that this implementation takes time proportinal to the
-     * number of instances of {@code o} in the deque, <i>not</i> the
-     * number of elements.
+     * Removes all occurrences of the provided object from the deque.  Note that
+     * if {@code supportsFastArbitraryAccess} is enabled, this implementation
+     * takes time proportinal to the number of instances of {@code o} in the
+     * deque, <i>not</i> the number of elements.
      *
      * @param o the object to to be removed
      *
@@ -865,26 +912,42 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 					   "null elements");
 	}
 
-	// repeatedly use the same matcher to look for elements with
-	// the provided object in the backing map
-	ElementMatcher matcher = new ElementMatcher(o);
-	ScalableHashMap.PrefixEntry<Element<E>,Long> entry = 
-	    map().getEntry(matcher);
-	Element<E> e = (entry == null) ? null : entry.getKey();
-
-	while (e != null) {
-
-	    // each time we find an object, we first remove it from
-	    // the map, then we add its id to the matcher and continue
-	    // looking
-	    removeElement(e);
-	    matcher.addId(e.getId());
-
-	    entry = map().getEntry(matcher);
-	    e = (entry == null) ? null : entry.getKey();
+	if (supportsFastArbitraryAccess()) {
+	    // repeatedly use the same matcher to look for elements with the
+	    // provided object in the backing map
+	    ElementMatcher matcher = new ElementMatcher(o);
+	    ScalableHashMap.PrefixEntry<Element<E>,Long> entry = 
+		map().getEntry(matcher);
+	    Element<E> e = (entry == null) ? null : entry.getKey();
+	    
+	    while (e != null) {
+		
+		// each time we find an object, we first remove it from the map,
+		// then we add its id to the matcher and continue looking
+		removeElement(e);
+		matcher.addId(e.getId());
+		
+		entry = map().getEntry(matcher);
+		e = (entry == null) ? null : entry.getKey();
+	    }
+	    
+	    return !(matcher.alreadySeen.isEmpty());
 	}
-	
-	return !(matcher.alreadySeen.isEmpty());
+	else {
+	    // iterate through the elements one at a time looking for any whose
+	    // value matched the provided object
+	    Element<E> e = headElement();
+	    boolean updated = false;
+	    while (e != null) {
+		if (e.getValue().equals(o)) {
+		    removeElement(e);
+		    updated = true;
+		}
+		e = e.next();
+	    }
+
+	    return updated;
+	}
     }
 
     /**
@@ -905,7 +968,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	    return null;
 
 	E value = e.getValue();
-	map().remove(e);
+	if (supportsFastArbitraryAccess())
+	    map().remove(e);
 
 	// remove e from the deque's backing list
 	Element<E> prev = e.prev();
@@ -947,9 +1011,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc} Note that this implementation takes time
-     * proportinal to the number of instances of {@code o} in the
-     * deque, <i>not</i> the number of elements.
+     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is enabled,
+     * this implementation takes time proportinal to the number of instances of
+     * {@code o} in the deque, <i>not</i> the number of elements.
      *
      * @param o {@inheritDoc}
      *
@@ -961,46 +1025,62 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 					   "null elements");
 	}
 
-	// repeatedly use the same matcher to look for elements with
-	// the provided object in the backing map
-	ElementMatcher matcher = new ElementMatcher<E>(o);
-
-	ScalableHashMap.PrefixEntry<Element<E>,Long> entry = 
-	    map().getEntry(matcher);
-	Element<E> e = (entry == null) ? null : entry.getKey();
-
-	// this value represents the highest value any element could
-	// have so any element present will be less than this value
-	long leftMost = Long.MAX_VALUE;
-	Element<E> firstOccurrence = null;
-
-	while (e != null) {
-
-	    // each time we find an element, we check to see if its id
-	    // is lower than the left most we've seen so far.  If it
-	    // is closer to the head, then we mark that as the first
-	    // occurrence and keep searching for any additional
-	    // elements in the deque that match the provided object.
-	    Long id = e.getId();
-	    if (id.longValue() < leftMost) {
-		leftMost = id.longValue();
-		firstOccurrence = e;
+	if (supportsFastArbitraryAccess()) {
+	    // repeatedly use the same matcher to look for elements with
+	    // the provided object in the backing map
+	    ElementMatcher matcher = new ElementMatcher<E>(o);
+	    
+	    ScalableHashMap.PrefixEntry<Element<E>,Long> entry = 
+		map().getEntry(matcher);
+	    Element<E> e = (entry == null) ? null : entry.getKey();
+	    
+	    // this value represents the highest value any element could
+	    // have so any element present will be less than this value
+	    long leftMost = Long.MAX_VALUE;
+	    Element<E> firstOccurrence = null;
+	    
+	    while (e != null) {
+		
+		// each time we find an element, we check to see if its id
+		// is lower than the left most we've seen so far.  If it
+		// is closer to the head, then we mark that as the first
+		// occurrence and keep searching for any additional
+		// elements in the deque that match the provided object.
+		Long id = e.getId();
+		if (id.longValue() < leftMost) {
+		    leftMost = id.longValue();
+		    firstOccurrence = e;
+		}
+		
+		matcher.addId(id);
+		entry = map().getEntry(matcher);
+		e = (entry == null) ? null : entry.getKey();
 	    }
 
-	    matcher.addId(id);
-	    entry = map().getEntry(matcher);
-	    e = (entry == null) ? null : entry.getKey();
+	    // once we've searched the map for all elements matching the
+	    // provided object, remove the first occurrence (the one with
+	    // the lowest id) if it was found
+	    if (firstOccurrence != null) {
+		removeElement(firstOccurrence);
+		return true;
+	    }
+	    else 
+		return false;
 	}
-
-	// once we've searched the map for all elements matching the
-	// provided object, remove the first occurrence (the one with
-	// the lowest id) if it was found
-	if (firstOccurrence != null) {
-	    removeElement(firstOccurrence);
-	    return true;
+	else {
+	    // iterate through the elements one at a time looking for the first
+	    // element whose value matched the provided object
+	    Element<E> e = headElement();
+	    boolean updated = false;
+	    while (e != null) {
+		if (e.getValue().equals(o)) {
+		    removeElement(e);
+		    return true;
+		}
+		e = e.next();
+	    }
+	    return false;	
 	}
-	else 
-	    return false;
     }
 
     /**
@@ -1014,9 +1094,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc} Note that this implementation takes time
-     * proportinal to the number of instances of {@code o} in the
-     * deque, <i>not</i> the number of elements.
+     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is enabled,
+     * this implementation takes time proportinal to the number of instances of
+     * {@code o} in the deque, <i>not</i> the number of elements.
      *
      * @param o {@inheritDoc}
      *
@@ -1027,47 +1107,64 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	    throw new NullPointerException("this deque does not support " + 
 					   "null elements");
 	}
-	// repeatedly use the same matcher to look for elements with
-	// the provided object in the backing map
-	ElementMatcher matcher = new ElementMatcher<E>(o);
 
-	ScalableHashMap.PrefixEntry<Element<E>,Long> entry = 
-	    map().getEntry(matcher);
-	Element<E> e = (entry == null) ? null : entry.getKey();
-
-	// this value represents the lowest value any element could
-	// have, so any element present will be greater than this
-	// value
-	long rightMost = Long.MIN_VALUE;
-	Element<E> lastOccurrence = null;
-
-	while (e != null) {
-
-	    // each time we find an element, we check to see if its id
-	    // is higher than the right most we've seen so far.  If it
-	    // is closer to the tail, then we mark that as the last
-	    // occurrence and keep searching for any additional
-	    // elements in the deque that match the provided object.
-	    Long id = e.getId();
-	    if (id.longValue() > rightMost) {
-		rightMost = id.longValue();
-		lastOccurrence = e;
+	if (supportsFastArbitraryAccess()) {
+	    // repeatedly use the same matcher to look for elements with
+	    // the provided object in the backing map
+	    ElementMatcher matcher = new ElementMatcher<E>(o);
+	    
+	    ScalableHashMap.PrefixEntry<Element<E>,Long> entry = 
+		map().getEntry(matcher);
+	    Element<E> e = (entry == null) ? null : entry.getKey();
+	    
+	    // this value represents the lowest value any element could
+	    // have, so any element present will be greater than this
+	    // value
+	    long rightMost = Long.MIN_VALUE;
+	    Element<E> lastOccurrence = null;
+	    
+	    while (e != null) {
+		
+		// each time we find an element, we check to see if its id
+		// is higher than the right most we've seen so far.  If it
+		// is closer to the tail, then we mark that as the last
+		// occurrence and keep searching for any additional
+		// elements in the deque that match the provided object.
+		Long id = e.getId();
+		if (id.longValue() > rightMost) {
+		    rightMost = id.longValue();
+		    lastOccurrence = e;
+		}
+		
+		matcher.addId(id);
+		entry = map().getEntry(matcher);
+		e = (entry == null) ? null : entry.getKey();
 	    }
-
-	    matcher.addId(id);
-	    entry = map().getEntry(matcher);
-	    e = (entry == null) ? null : entry.getKey();
+	    
+	    // once we've searched the map for all elements matching the
+	    // provided object, remove the last occurrence (the one with
+	    // the highest id) if it was found
+	    if (lastOccurrence != null) {
+		removeElement(lastOccurrence);
+		return true;
+	    }
+	    else 
+		return false;
 	}
-
-	// once we've searched the map for all elements matching the
-	// provided object, remove the last occurrence (the one with
-	// the highest id) if it was found
-	if (lastOccurrence != null) {
-	    removeElement(lastOccurrence);
-	    return true;
-	}
-	else 
+	else {
+	    // iterate backwards through the elements one at a time looking for
+	    // the first element whose value matched the provided object
+	    Element<E> e = tailElement();
+	    boolean updated = false;
+	    while (e != null) {
+		if (e.getValue().equals(o)) {
+		    removeElement(e);
+		    return true;
+		}
+		e = e.prev();
+	    }
 	    return false;
+	}
     }
 
     /**
@@ -1094,7 +1191,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	return size;
     }
 
-
     /**
      * Returns whether this deque will support concurrent iterators.
      * If {@code false}, the iterators of this deque will not receive
@@ -1107,6 +1203,17 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      */
     private boolean supportsConcurrentIterators() {
 	return serializedIteratorsNextElementsRef != null;
+    }
+
+    /**
+     * Returns whether this deque supports fast arbitrary removals by peristing
+     * all the elements in a {@code ScalableHashMap} and using indexing
+     * techniques to find arbitrary elements within the deque.
+     *
+     * @see ScalableDeque#ScalableDeque(boolean,boolean)
+     */
+    private boolean supportsFastArbitraryAccess() {
+	return backingMapRef != null;
     }
 
     /**
