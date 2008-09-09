@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="compatibility" default="build" basedir=".">
+  <description>
+    Compatibility tests for Project Darkstar
+  </description>
+
+  <!-- First load the user's properties -->
+  <property name="user.properties.file"
+	    location="${user.home}/.build.properties"/>
+  <property file="${user.properties.file}"/>
+
+
+  <!-- Variable Definitions -->
+
+
+  <!-- Values for controlling compilation -->
+  <property name="client.java.version" value="1.5"/>
+  <property name="server.java.version" value="1.6"/>
+  <property name="javac.compilerargs" value="-Xlint"/>
+
+  <!-- Location of the test installations -->
+  <property name="sgs.server.dir" location="sgs-server/sgs-server"/>
+  <available property="sgs.server.dir.present" file="${sgs.server.dir}"/>
+  <property name="sgs.client.dir" location="sgs-client"/>
+  <available property="sgs.client.dir.present" file="${sgs.client.dir}"/>
+
+  <!-- File/directory locations -->
+  <property name="target.dir" location="target"/>
+
+  <!-- Set use.je to test with BDB Java Edition -->
+  <condition property="bdb.env"
+             value="com.sun.sgs.impl.service.data.store.db.je.JeEnvironment"
+             else="com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment">
+    <isset property="use.je"/>
+  </condition>
+
+
+  <!-- Target Definitions -->
+
+
+  <target name="run-server-clean"
+	  description="Runs the test application with a fresh environment"
+	  depends="server-clean, run-server"/>
+
+  <target name="server-clean"
+	  description="Initializes a fresh server environment">
+    <delete dir="${target.dir}/server"/>
+    <mkdir dir="${target.dir}/server/root/dsdb"/>
+  </target>
+
+  <target name="run-server"
+	  description="Runs the test application"
+	  depends="build-server">
+    <!-- Copy the application properties file and append properties for
+	 the root directory and data store class -->
+    <copy file="src/main/etc/CompatibleApp.properties"
+	  todir="${target.dir}/server"/>
+    <echo file="${target.dir}/server/CompatibleApp.properties"
+	  append="true">
+      com.sun.sgs.app.root=${target.dir}/server/root
+      com.sun.sgs.impl.service.data.store.db.environment.class=${bdb.env}
+    </echo>
+    <exec executable="${sgs.server.dir}/sgs.sh"
+	  failonerror="true">
+      <env key="SGSHOME" file="${sgs.server.dir}"/>
+      <arg file="${target.dir}/classes/server"/>
+      <arg file="${target.dir}/server/CompatibleApp.properties"/>
+    </exec>
+  </target>
+
+  <target name="run-client"
+	  description="Runs the test client"
+	  depends="build-client">
+    <java classname="com.sun.sgs.test.compat.client.CompatibleClient"
+	  classpath="${target.dir}/classes/client :
+		     ${sgs.client.dir}/lib/sgs-client.jar"
+	  fork="true"
+	  failonerror="true"/>
+  </target>
+
+  <target name="build"
+	  description="Builds everything"
+	  depends="build-client, build-server"/>
+
+  <target name="build-client"
+	  description="Builds the client">
+    <fail unless="sgs.client.dir.present"
+	  message="SGS client installation not found: ${sgs.client.dir}"/>
+    <mkdir dir="${target.dir}/classes/client"/>
+    <depend srcdir="src/main/java"
+	    destdir="${target.dir}/classes/client"
+	    cache="${target.dir}/depend">
+      <include name="com/sun/sgs/test/compat/client/*.java"/>
+    </depend>
+    <javac srcdir="src/main/java"
+	   destdir="${target.dir}/classes/client"
+	   includes="com/sun/sgs/test/compat/client/**"
+	   classpath="${sgs.client.dir}/lib/sgs-client.jar"
+	   source="${client.java.version}"
+	   target="${client.java.version}">
+      <compilerarg line="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <target name="build-server"
+	  description="Builds the server">
+    <fail unless="sgs.server.dir.present"
+	  message="SGS server installation not found: ${sgs.server.dir}"/>
+    <mkdir dir="${target.dir}/classes/server"/>
+    <depend srcdir="src/main/java"
+	    destdir="${target.dir}/classes/server"
+	    cache="${target.dir}/depend">
+      <include name="com/sun/sgs/test/compat/server/*.java"/>
+    </depend>
+    <javac srcdir="src/main/java"
+	   destdir="${target.dir}/classes/server"
+	   includes="com/sun/sgs/test/compat/server/**"
+	   classpath="${sgs.server.dir}/lib/sgs-server.jar"
+	   source="${server.java.version}"
+	   target="${server.java.version}">
+      <compilerarg line="${javac.compilerargs}"/>
+    </javac>
+  </target>
+ 
+  <target name="clean"
+	  description="Removes all build artifacts">
+    <delete dir="${target.dir}"/>
+  </target>
+
+</project>
