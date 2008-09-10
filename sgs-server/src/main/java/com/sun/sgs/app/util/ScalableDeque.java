@@ -60,12 +60,12 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  *
  * <p>
  *
- * Developers should use this as a drop-in replaced for any {@code Deque} or
+ * Developers should use this as a drop-in replacement for any {@code Deque} or
  * {@link Queue} implementation if the size of the data structure will be more
  * than a small number of elements, or if the data structure needs to support
  * concurrent writers for putting and removing.  A standard {@code Deque} or
- * {@code Queue} implementation will likely perform better that an instance of
- * this class if the number of elements is small, or if the usage instance
+ * {@code Queue} implementation will likely perform better than an instance of
+ * this class if the number of elements is small, or if usage of the instance
  * happens entirely during the lifetime of a task and the instance is never
  * persisted.
  *
@@ -127,7 +127,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * <p>
  *
  * Most operations run in constant time.  However, there are several key
- * difference in operation cost between this class and other {@code Deque}
+ * differences in operation cost between this class and other {@code Deque}
  * implementations.  Due to the distribute nature of the deque, the {@link
  * ScalableDeque#size() size} operation takes time linear to the size of the
  * deque.  For large deques, this method should not be called, as it would take
@@ -140,13 +140,16 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * <p>
  *
  * All elements stored by this deque must be instances of {@link Serializable}.
- * This class supports additionally supports elements that are instances of
- * {@code ManagedObject}.  If a {@code ManagedObject} is stored within this
- * deque, the developer is still responsible for removing it from the data store
- * at the end of its lifetime.  Removing a {@code ManagedObject} from the deque
- * by any operation, including {@code clear}, <i>will not</i> remove that object
- * from the data store.  These objects should be removed from the data store
- * after they have been removed from the deque.
+ * This class additionally supports elements that are instances of {@code
+ * ManagedObject}.  Therefore the two declarations of {@code
+ * ScalableDeque<ManagedReference<ManagedObject>>} and {@code
+ * ScalableDeque<ManagedObject>} are equivalent in performance.  If a {@code
+ * ManagedObject} is stored within this deque, the developer is still
+ * responsible for removing it from the data store at the end of its lifetime.
+ * Removing a {@code ManagedObject} from the deque by any operation, including
+ * {@code clear}, <i>will not</i> remove that object from the data store.  These
+ * objects should be removed from the data store after they have been removed
+ * from the deque.
  *
  * <p>
  *
@@ -165,7 +168,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * mutliple {@link Task} instances.  When an iterator is done being used it
  * should be removed from the data store using {@link
  * DataManager#removeObject(Object) removeObject}.  If using concurrent
- * iterators, failure to remove unused iterators will result in degrated
+ * iterators, failure to remove unused iterators will result in degraded
  * performance linear to the number of excess iterator instances.
  *
  * <p>
