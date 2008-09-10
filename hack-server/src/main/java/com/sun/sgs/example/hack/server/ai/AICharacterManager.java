@@ -21,6 +21,7 @@ import com.sun.sgs.example.hack.server.level.Level;
 
 import com.sun.sgs.example.hack.share.Board;
 import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureAttribute;
 
 import java.util.Collection;
 
@@ -40,7 +41,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
     /**
      * Creates an instance of <code>AICharacter</code>.
      */
-    private AICharacterManager() {
+    protected AICharacterManager() {
         // since we need a unique identifier for all managers (which players
         // get through their login names), we just use a UUID
 
@@ -96,17 +97,21 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
     }
 
     /**
-     * Notify the manager that its character has died. This will typically
-     * result in re-generation of the character after some period of time.
+     * Notify the manager that its character has died. This will
+     * typically result in removal of the AI creature and the stopping
+     * of its movement.
      */
     public void notifyCharacterDied() {
-        // NOTE: based on some aspect of the character's stats, and
-        //       possibly other parameters that aren't here yet, we
-        //       decide how and where to place a new character ... for
-        //       now, we take the simple approach of just adding a new
-        //       character
-        characterRef.get().regenerate();
-        getCurrentLevel().addCharacter(this);
+	// upon character death, remove the current character from the
+	// level that it was on and then stop its movement
+	Level level = getCurrentLevel();
+	if (level != null) {
+	    level.removeCharacter(this);
+	    
+	    // stop ourselves from moving by removing this
+	    // CharacterManager, which is an instance of Task
+	    AppContext.getDataManager().removeObject(this);
+	}
     }
 
     /**

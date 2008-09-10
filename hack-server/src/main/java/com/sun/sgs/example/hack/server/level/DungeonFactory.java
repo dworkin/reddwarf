@@ -18,7 +18,9 @@ import com.sun.sgs.example.hack.server.Game;
 import com.sun.sgs.example.hack.server.GameConnector;
 
 import com.sun.sgs.example.hack.server.ai.AICharacterManager;
-import com.sun.sgs.example.hack.server.ai.MonsterFactory;
+import com.sun.sgs.example.hack.server.ai.CreatureCharacterManager;
+import com.sun.sgs.example.hack.server.ai.CreatureFactory;
+import com.sun.sgs.example.hack.server.ai.CreatureRespawner;
 import com.sun.sgs.example.hack.server.ai.NPCharacter;
 
 import com.sun.sgs.example.hack.share.CreatureInfo;
@@ -98,9 +100,10 @@ public class DungeonFactory {
         // to AICharacterManager
         HashMap<String,HashSet<ManagedReference<AICharacterManager>>> npcMap =
             new HashMap<String,HashSet<ManagedReference<AICharacterManager>>>();
-        HashMap<String,HashSet<ManagedReference<AICharacterManager>>> aiMap =
-            new HashMap<
-		String, HashSet<ManagedReference<AICharacterManager>>>();
+        HashMap<String,HashSet<ManagedReference<
+	    CreatureCharacterManager>>> aiMap =
+            new HashMap<String,HashSet<
+	    ManagedReference<CreatureCharacterManager>>>();
 
         // first, parse the data file itself
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
@@ -177,15 +180,16 @@ public class DungeonFactory {
 		    CreatureInfo.decodeCreatureType(encodedCreatureType);
 		//System.out.println("loaded monster: " + creatureType);
                 // create the manager and get the right instance
-                AICharacterManager aiCMR =
-                    MonsterFactory.getMonster(creatureType);
-
+                CreatureCharacterManager aiCMR =
+                    CreatureFactory.getCreature(creatureType);
+		
                 // put the monster into a bucket for the given level, creating
                 // the bucket if it doesn't already exist
-                HashSet<ManagedReference<AICharacterManager>> set =
+                HashSet<ManagedReference<CreatureCharacterManager>> set =
 		    aiMap.get(levelName);
                 if (set == null) {
-                    set = new HashSet<ManagedReference<AICharacterManager>>();
+                    set = new HashSet<ManagedReference<
+			CreatureCharacterManager>>();
                     aiMap.put(levelName, set);
                 }
                 set.add(dataManager.createReference(aiCMR));
@@ -266,7 +270,7 @@ public class DungeonFactory {
         // now that the levels are all set, add the NPC characters to the
         // levels and the timer
         for (String levelName : npcMap.keySet()) {
-            Level level = levelRefs.get(levelName).get();
+            Level level = levelRefs.get(levelName).get();	    
             for (ManagedReference<AICharacterManager> mgrRef :
 		     npcMap.get(levelName))
 	    {
@@ -277,15 +281,19 @@ public class DungeonFactory {
             }
         }
 
-        // add the Monsters too
+        // add the Creatures too
         for (String levelName : aiMap.keySet()) {
             Level level = levelRefs.get(levelName).get();
-            for (ManagedReference<AICharacterManager> mgrRef :
+	    CreatureRespawner respawner = new CreatureRespawner(level);
+            for (ManagedReference<CreatureCharacterManager> mgrRef :
 		     aiMap.get(levelName)) {
-                AICharacterManager mgr = mgrRef.get();
+                CreatureCharacterManager mgr = mgrRef.get();
                 taskManager.schedulePeriodicTask(mgr, 0, 1100);
                 //eventAg.addCharacterMgr(mgr);
                 level.addCharacter(mgr);
+		// set up the creature managers to use the respawner
+		// associated with their level.
+		mgr.setCreatureRespawner(respawner);
             }
         }
         

@@ -12,7 +12,18 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
+import com.sun.sgs.example.hack.server.ai.CreatureCharacter;
+
+import com.sun.sgs.example.hack.server.ai.logic.RandomWalkAILogic;
+
+import com.sun.sgs.example.hack.server.util.Dice;
+
+import com.sun.sgs.example.hack.share.CharacterStats;
+
 import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
+import com.sun.sgs.example.hack.share.CreatureInfo.CreatureAttribute;
+
+import java.util.EnumSet;
 
 /**
  * This class is a prototype example of a pluggable object creator; so
@@ -24,32 +35,61 @@ import com.sun.sgs.example.hack.share.CreatureInfo.CreatureType;
  * provided as an example of where to start in future implementations
  * or revisions.
  */
-public class MonsterFactory {
+public class CreatureFactory {
 
     /**
      * Creates an instance of {@code AICharacterManager} and returns a
      * reference to the new instance
      *
-     * @param id the character's identifier
-     * @param type the chatacter's name
+     * @param type the creatures's type
      *
      * @throws IllegalArgumentException if {@code type} is not a
      *         recognized character type.
      */
-    public static AICharacterManager getMonster(CreatureType type) {
+    public static CreatureCharacterManager 
+	getCreature(CreatureType type) {
         // create a manager
-        MonsterCharacter character = null;
-        AICharacterManager charMgr =
-            AICharacterManager.newInstance();
+        CreatureCharacter character = null;
 
+        CreatureCharacterManager charMgr =
+            new CreatureCharacterManager();
+	
         // figute out what kind of monster we're creating
 	switch (type) {
-	case DEMON:
-	    character = new DemonMonster(charMgr);
+	case DEMON: {
+	    CharacterStats stats = 
+		new CharacterStats("Demon", 20, 10, 15, 15, 15, 18, 50, 50);
+	    
+	    character = 
+		new CreatureCharacter(charMgr,
+				      new RandomWalkAILogic(),
+				      CreatureType.DEMON,
+				      "Demon",
+				      stats,
+				      new Dice(2, 5),
+				      10, // alertness
+				      5,  // sight ability
+				      250,
+				      EnumSet.of(CreatureAttribute.RESPAWNS));
 	    break;
-	case RODENT:
-            character = new RodentMonster(charMgr);
+	}
+	case RODENT: {
+	    CharacterStats stats = 
+		new CharacterStats("Rodent", 20, 10, 15, 15, 15, 18, 10, 10);
+
+            character = 		
+		new CreatureCharacter(charMgr,
+				      new RandomWalkAILogic(),
+				      CreatureType.RODENT,
+				      "Rodent",
+				      stats,
+				      new Dice(1, 3),
+				      1, // alertness
+				      1, // sight ability
+				      100,
+				      EnumSet.of(CreatureAttribute.RESPAWNS));
 	    break;
+	}
 	default:
             DataManager dataManager = AppContext.getDataManager();
             dataManager.removeBinding(charMgr.toString());
@@ -58,9 +98,8 @@ public class MonsterFactory {
                                                type);
         }
 
-        // if we're still here then connect the character and manager, and
-        // return the manager
-        charMgr.setCharacter(character);
+	charMgr.setCharacter(character);
+       
         return charMgr;
     }
 
