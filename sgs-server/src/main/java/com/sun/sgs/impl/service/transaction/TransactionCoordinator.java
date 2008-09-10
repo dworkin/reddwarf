@@ -39,4 +39,15 @@ public interface TransactionCoordinator {
      * @return	a handle for managing the newly created transaction.
      */
     TransactionHandle createTransaction(boolean unbounded);
+
+    /**
+     * Creates a new transaction with the specified timeout, and returns a
+     * handle for managing it.
+     * 
+     * @param timeout the timeout for the created transaction
+     *
+     * @return	a handle for managing the newly created transaction.
+     */
+    TransactionHandle createTransaction(long timeout);
+    
 }

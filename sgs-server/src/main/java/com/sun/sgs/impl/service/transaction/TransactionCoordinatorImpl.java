@@ -145,4 +145,11 @@ public final class TransactionCoordinatorImpl
 					     boundedTimeout, collector);
 	}
     }
+
+    /** {@inheritDoc} */
+    public TransactionHandle createTransaction(long timeout) {
+	return new TransactionHandleImpl(nextTid.getAndIncrement(),
+					     timeout, collector);
+    }
+
 }

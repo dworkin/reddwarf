@@ -206,6 +206,10 @@ class PendingTask implements ManagedObject, Serializable {
         }
     }
 
+    Task getTask() {
+	return (taskRef == null) ? task : taskRef.get();
+    }
+
     /**
      * This is a convenience method used to correctly resolve the pending
      * task and run it, throwing any exceptions raised by the task. Note

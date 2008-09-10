@@ -31,6 +31,7 @@ import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
+import com.sun.sgs.kernel.AnnotatedKernelRunnable;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.PriorityScheduler;
@@ -502,6 +503,14 @@ final class TransactionSchedulerImpl
      * value as specified by the value of the
      * {@code TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY} property.
      * <p>
+     * If the schedule task's runnable is an instance of {@link
+     * AnnotatedKernelRunnable}, then the specifications provided by the
+     * developer's annotations are used to determine the timeouts for the task.
+     * Specifically, if the {@code AnnotatedKernelRunnable} is unbounded, then
+     * an unbounded transaction is created as mentioned above.  Otherwise, if a
+     * timeout has been manually specified, then that that timeout is used to
+     * limit the duration of the transaciton.
+     * <p>
      * This method returns {@code true} if the task was completed or failed
      * permanently, and {@code false} otherwise. If {@code false} is returned
      * then the task is scheduled to be re-tried at some point in the future,
@@ -537,9 +546,38 @@ final class TransactionSchedulerImpl
                 Transaction transaction = null;
 
                 try {
-                    // setup the transaction state
-                    TransactionHandle handle =
-                        transactionCoordinator.createTransaction(unbounded);
+		    // setup the transaction state
+		    TransactionHandle handle;
+
+		    // an AnnotatedKernelRunnable will exist if the developer
+		    // has specified some additional information about how a
+		    // task should be run by annotating using the
+		    // com.sun.sgs.app.annotation classes.  In this case, we
+		    // take into account the information provided
+		    KernelRunnable kRun = task.getTask();
+		    if (kRun instanceof AnnotatedKernelRunnable) {
+			AnnotatedKernelRunnable annotated = 
+			    (AnnotatedKernelRunnable)kRun;
+			// if the task is to run unbounded, create an unbounded
+			// handle.  Note that we ignore the duration if a task
+			// is marked as unbounded
+			if (annotated.isUnbounded()) {
+			    handle = transactionCoordinator.
+				createTransaction(true);
+			}
+			// otherwise, the task must have had a @Duration
+			// annotation, so we use the value
+			else {
+			    handle = transactionCoordinator.
+				createTransaction(annotated.getTimeout());
+			}
+		    }
+		    // otherwise, the KernelRunnable had no specified
+		    // parameters
+		    else {
+			handle = 
+			    transactionCoordinator.createTransaction(unbounded);
+		    }
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
                     profileCollector.noteTransactional(transaction.getId());
@@ -553,7 +591,7 @@ final class TransactionSchedulerImpl
 
                     try {
                         // run the task in the new transactional context
-                        task.getTask().run();
+                        kRun.run();
                     } finally {
                         // regardless of the outcome, always clear the current
                         // transaction state before proceeding...

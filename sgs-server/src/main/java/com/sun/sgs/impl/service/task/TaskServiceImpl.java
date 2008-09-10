@@ -27,9 +27,15 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.app.annotation.Timeout;
+import com.sun.sgs.app.annotation.Unbounded;
+
 import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
+
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -38,6 +44,7 @@ import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 
+import com.sun.sgs.kernel.AnnotatedKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
@@ -60,6 +67,8 @@ import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.WatchdogService;
 
 import java.io.Serializable;
+
+import java.lang.reflect.Method;
 
 import java.math.BigInteger;
 
@@ -203,6 +212,9 @@ public class TaskServiceImpl
     // the actual amount of time to wait between hand-off checks
     private final long handoffPeriod;
 
+    // the default task timeout duration for the system
+    private final long defaultTimeout;
+
     // a handle to the periodic hand-off task
     private RecurringTaskHandle handoffTaskHandle = null;
 
@@ -313,6 +325,11 @@ public class TaskServiceImpl
         if (handoffPeriod < 0)
             throw new IllegalStateException("Handoff Period property must " +
                                             "be non-negative");
+
+	// get the default timeout for the system
+	defaultTimeout = wrappedProps.getLongProperty(
+	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+	    TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
 
         // create our profiling info
         ProfileRegistrar registrar = 
@@ -595,8 +612,64 @@ public class TaskServiceImpl
             logger.log(Level.FINEST, "created pending task {0} for {1}",
                        objId, identity);
 
-        return new TaskRunner(objId, task.getClass().getName(), identity);
+	long timeout = getTaskTimeout(task);
+	boolean isUnbounded = isTaskUnbounded(task);
+
+
+        return new TaskRunner(objId, task.getClass().getName(), identity,
+			      timeout, isUnbounded);
     }
+
+    /**
+     * Returns the timeout for the task if specified by a {@link Timeout}
+     * annotation on the {@code run} method, or the default timeout duration
+     * for the system.
+     *
+     * @param task a task to be run
+     *
+     * @return the timeout for the task if specified by an annotation, or the
+     *         default timeout duration for the system.
+     */ 
+    private long getTaskTimeout(Task task) {
+	try {
+	    Method runMethod = task.getClass().getMethod("run", new Class[0]);
+	    Timeout t = runMethod.getAnnotation(Timeout.class);
+	    if (t != null) {
+		long duration = t.duration();
+		if (duration <= 0) {
+		    throw new IllegalArgumentException(
+			"Task duration must be positive: " + duration);
+		}
+		return duration;
+	    }	    
+	}
+	catch (NoSuchMethodException nsme) {
+	    // this should never get thrown since every Task by contract must
+	    // implement run()
+	    if (logger.isLoggable(Level.WARNING))
+		logger.log(Level.WARNING, "Task of type " +
+			   task.getClass().getName() + 
+			   " does not have a run method");
+	}
+	return defaultTimeout;
+    }
+    
+    private boolean isTaskUnbounded(Task task) {
+	try {
+	    Method runMethod = task.getClass().getMethod("run", new Class[0]);
+	    return runMethod.getAnnotation(Unbounded.class) != null;
+	}
+	catch (NoSuchMethodException nsme) {
+	    // this should never get thrown since every Task by contract must
+	    // implement run()
+	    if (logger.isLoggable(Level.WARNING))
+		logger.log(Level.WARNING, "Task of type " + 
+			   task.getClass().getName() + 
+			   " does not have a run method");
+	}
+	return false;	
+    }
+    
 
     /** Helper that generates the name for a pending object. */
     private static String generateObjName(Identity owner, BigInteger objId) {
@@ -1008,20 +1081,32 @@ public class TaskServiceImpl
      * Private implementation of {@code KernelRunnable} that is used to
      * run the {@code Task}s scheduled by the application.
      */
-    private class TaskRunner implements KernelRunnable {
+    private class TaskRunner implements AnnotatedKernelRunnable {
         private final BigInteger objId;
         private final String objTaskType;
         private final Identity taskIdentity;
+	private final long timeout;
+	private final boolean isUnbounded;
         private boolean doLocalCheck = true;
-        TaskRunner(BigInteger objId, String objTaskType,
-                   Identity taskIdentity) {
+        TaskRunner(BigInteger objId, String objTaskType, Identity taskIdentity,
+		   long timeout, boolean isUnbounded) {
             this.objId = objId;
             this.objTaskType = objTaskType;
             this.taskIdentity = taskIdentity;
+	    this.timeout = timeout;
+	    this.isUnbounded = isUnbounded;
         }
         BigInteger getObjId() {
             return objId;
         }
+	/** {@inheritDoc} */
+	public long getTimeout() {
+	    return timeout;
+	}
+	/** {@inheritDoc} */
+	public boolean isUnbounded() {
+	    return isUnbounded;
+	}
         /**
          * This method is used in the case where the associated identity is
          * not mapped to the local node, but no assignment exists yet. In
@@ -1184,8 +1269,12 @@ public class TaskServiceImpl
             return;
         }
 
+	Task task = ptask.getTask();
+	long timeout = getTaskTimeout(task);
+	boolean isUnbounded = isTaskUnbounded(task);
+
         TaskRunner runner = new TaskRunner(objId, ptask.getBaseTaskType(),
-                                           identity);
+                                           identity, timeout, isUnbounded);
         runner.markIgnoreIsLocal();
 
         if (ptask.getPeriod() == PERIOD_NONE) {
