@@ -20,7 +20,7 @@ import java.util.EnumSet;
  * class also provides utility methods for encoding and decoding its
  * enums.
  *
- * @see ItemInfo
+c * @see ItemInfo
  * @see RoomInfo
  */
 public class CreatureInfo {
@@ -137,9 +137,12 @@ public class CreatureInfo {
 
     public enum CreatureAttribute {
 
-	    DROP_GOOD,
-	    DROP_GREAT
-	    
+	DROP_GOOD,
+	    DROP_GREAT,
+	    INFRAVISION,
+	    REPRODUCES,
+	    RETALIATES,
+	    RESPAWNS,
     }
 
 
