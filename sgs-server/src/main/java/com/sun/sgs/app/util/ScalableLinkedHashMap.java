@@ -255,13 +255,15 @@ public class ScalableLinkedHashMap<K,V>
      * The bound name for the first entry in this map according to
      * the defined iteration order
      */
-    private ManagedReference<LinkedNode<K,V>> firstEntry;
+    private final ManagedReference<ManagedSerializable
+	<ManagedReference<LinkedNode<K,V>>>> firstEntry;
 
     /**
      * The bound name for the last entry in this map according to
      * the defined iteration order
      */
-    private ManagedReference<LinkedNode<K,V>> lastEntry;
+    private final ManagedReference<ManagedSerializable
+	<ManagedReference<LinkedNode<K,V>>>> lastEntry;
 
     /**
      * A mapping from each of the current, usable {@link
@@ -291,11 +293,6 @@ public class ScalableLinkedHashMap<K,V>
     private transient ScalableHashMap<LinkedNode<K,V>,Marker> backingMap;
 
     /**
-     * The size of this map
-     */
-    private int size;
-
-    /**
      * If {@code true}, this map should order its entries from least
      * recently accessed to most recently accessed.
      */
@@ -320,8 +317,16 @@ public class ScalableLinkedHashMap<K,V>
 	
 	backingMapRef = dm.createReference(backingMap);
 	
-	firstEntry = null;
-	lastEntry = null;
+	// initialize the pointers to the front and end of the entry
+	// list to null.  However, the reference to these pointers
+	// will always be non-null
+	ManagedSerializable<ManagedReference<LinkedNode<K,V>>> first =
+	    new ManagedSerializable<ManagedReference<LinkedNode<K,V>>>(null);
+	ManagedSerializable<ManagedReference<LinkedNode<K,V>>> last =
+	    new ManagedSerializable<ManagedReference<LinkedNode<K,V>>>(null);
+	firstEntry = dm.createReference(first);
+	lastEntry = dm.createReference(last);	    
+
 
 	ManagedSerializable<Map<BigInteger,ManagedReference<LinkedNode<K,V>>>>
 	    serializedIteratorsNextElements = new ManagedSerializable<
@@ -329,9 +334,7 @@ public class ScalableLinkedHashMap<K,V>
 	        new HashMap<BigInteger,ManagedReference<LinkedNode<K,V>>>());
 	    
 	serializedIteratorsNextElementsRef = 
-	    dm.createReference(serializedIteratorsNextElements);
-	
-	size = 0;
+	    dm.createReference(serializedIteratorsNextElements);	
     }
 
     /**
@@ -396,7 +399,6 @@ public class ScalableLinkedHashMap<K,V>
 
 	// clear the backing map
 	map().clear();
-	size = 0;
 	
 	DataManager dm = AppContext.getDataManager();
 	dm.markForUpdate(this);
@@ -405,10 +407,11 @@ public class ScalableLinkedHashMap<K,V>
 	// nodes in the entry-list using a dedicated task.
 	if (firstEntry != null) {
 	    AppContext.getTaskManager().
-		scheduleTask(new AsynchronousClearTask<K,V>(firstEntry));
+		scheduleTask(new AsynchronousClearTask<K,V>(firstEntry.
+							    get().get()));
 	}
-	firstEntry = null;
-	lastEntry = null;
+	firstEntry.get().set(null);
+	lastEntry.get().set(null);
 	
 	// let all the iterators know that the map has been cleared by
 	// setting their next element to null
@@ -465,14 +468,26 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * Returns the first entry in the map according to insertion
-     * order.  This method is used by the iterator for a starting
-     * point.
+     * Returns the first entry in the map according to iteration
+     * order.  
      *
      * @return the first entry in the map
      */
-    private LinkedNode<K,V> firstEntry() {
-	return (firstEntry == null) ? null : firstEntry.get();
+    LinkedNode<K,V> firstEntry() {
+	ManagedReference<LinkedNode<K,V>> ref = firstEntry.get().get();
+	return (ref == null) ? null : ref.get();
+    }
+
+
+    /**
+     * Returns the last entry in the map according to iteration
+     * order.  
+     *
+     * @return the first entry in the map
+     */
+    LinkedNode<K,V> lastEntry() {
+	ManagedReference<LinkedNode<K,V>> ref = lastEntry.get().get();
+	return (ref == null) ? null : ref.get();
     }
 
     /**
@@ -528,18 +543,18 @@ public class ScalableLinkedHashMap<K,V>
 	if (entry == null) {
 	    entry = new LinkedNode<K,V>(key,value);
 	    map().put(entry, Marker.MARKER);
-	    size++;
 	    
 	    // add the entry to the list
 	    addLast(entry);	
 
 	    // call the hook after adding the node to the list so any
 	    // subclasses can enforce any sizing policies they have
-	    if (removeEldestEntry(firstEntry.get().toEntry())) {	    
+	    LinkedNode<K,V> eldest = firstEntry();
+	    if (removeEldestEntry(eldest.toEntry())) {	    
 
 		// the first entry is the least recently access or the
 		// last recently added, and therefore the eldest
-		removeNode(firstEntry.get());
+		removeNode(eldest);
 	    }
 	}
 
@@ -578,25 +593,60 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
+     * Adds the provided node to the the first position in the linked
+     * entry list.  This method updates the {@link #firstEntry} and
+     * {@link #lastEntry} references as necessary.  
+     *
+     * <p>
+     *
+     * Note that this method is not used by this class but is provided
+     * as a routine for subclasses and other classes in this package
+     * that may wish to support additional features based on the entry
+     * queue.
+     *
+     * @param e the node to add to the end of the list
+     */
+    void addFirst(LinkedNode<K,V> e) {
+	DataManager dm = AppContext.getDataManager();
+
+	// short-circuit case for adding to a map of which this new
+	// entry is the only mapping
+	if (firstEntry.get().get() == null) {
+	    ManagedReference<LinkedNode<K,V>> ref = dm.createReference(e);
+	    firstEntry.get().set(ref);
+	    lastEntry.get().set(ref);
+	    return;
+	}
+	    
+	LinkedNode<K,V> second = firstEntry();
+	firstEntry.get().set(dm.createReference(e));
+	e.setPrev(null);
+	e.setNext(second);
+	second.setPrev(e);
+    }
+
+
+    /**
      * Adds the provided node to the the last position in the linked
      * entry list.  This method updates the {@link #firstEntry} and
      * {@link #lastEntry} references as necessary.
      *
      * @param e the node to add to the end of the list
      */
-    private void addLast(LinkedNode<K,V> e) {
+    void addLast(LinkedNode<K,V> e) {
 	DataManager dm = AppContext.getDataManager();
 
 	// short-circuit case for adding to a map of which this new
 	// entry is the only mapping
-	if (lastEntry == null) {
+	if (firstEntry.get().get() == null) {
 	    ManagedReference<LinkedNode<K,V>> ref = dm.createReference(e);
-	    firstEntry = lastEntry = ref;	    
+	    firstEntry.get().set(ref);
+	    lastEntry.get().set(ref);
 	    return;
 	}
 	    
-	LinkedNode<K,V> prev = lastEntry.get();
-	lastEntry = dm.createReference(e);
+	LinkedNode<K,V> prev = lastEntry();
+	lastEntry.get().set(dm.createReference(e));
 	e.setPrev(prev);
 	e.setNext(null);
 	prev.setNext(e);
@@ -609,7 +659,7 @@ public class ScalableLinkedHashMap<K,V>
      *
      * @param e the node to remove
      */
-    private void removeNodeFromList(LinkedNode<K,V> e) {
+    void removeNodeFromList(LinkedNode<K,V> e) {
 	LinkedNode<K,V> prev = e.prev();
 	LinkedNode<K,V> next = e.next();
 	if (prev != null)
@@ -618,13 +668,16 @@ public class ScalableLinkedHashMap<K,V>
 	    next.setPrev(prev);
 	
 	// update the references to the front and back of the list, if
-	// necessary
+	// necessary.  We rely on the invariants that the previous and
+	// next entry references will only be null if an entry is at
+	// an end of the list.
 	DataManager dm = AppContext.getDataManager();
-	ManagedReference<LinkedNode<K,V>> ref = dm.createReference(e);
-	if (ref.equals(firstEntry)) 
-	    firstEntry = (next == null) ? null : dm.createReference(next);
-	if (ref.equals(lastEntry))
-	    lastEntry = (prev == null) ? null : dm.createReference(prev);
+	if (e.prevEntry == null) 
+	    firstEntry.get().set((next == null) 
+				 ? null : dm.createReference(next));
+	if (e.nextEntry == null)
+	    lastEntry.get().set((prev == null) 
+				? null : dm.createReference(prev));
     }
 
     /**
@@ -647,13 +700,24 @@ public class ScalableLinkedHashMap<K,V>
      * {@inheritDoc}
      */
     public boolean isEmpty() {
-	return size == 0;
+	return firstEntry.get().get() == null;
     }
 
     /**
      * {@inheritDoc}
+     *
+     * <p>
+     *
+     * Note that calling this method on a map with more than just a
+     * few elements will result in a large execution time.
      */
     public int size() {
+	int size = 0;
+	LinkedNode n = firstEntry();
+	while (n != null) {
+	    size++;
+	    n = n.next();
+	}
 	return size;
     }
 
@@ -704,7 +768,6 @@ public class ScalableLinkedHashMap<K,V>
 	checkIterators(node);
 	
 	AppContext.getDataManager().markForUpdate(this);
-	size--;
 	
 	return v;
     }
@@ -845,7 +908,7 @@ public class ScalableLinkedHashMap<K,V>
     /**
      * A class used to store the key-value mapping in the backing map.
      */
-    private static class LinkedNode<K,V>
+    static class LinkedNode<K,V>
 	implements ManagedObject, Serializable {
 
 
@@ -1143,8 +1206,7 @@ public class ScalableLinkedHashMap<K,V>
 
     /**
      * A concurrent, persistable {@code Iterator} implementation for
-     * the {@code ScalableLinkedHashMap}.  This implementation returns
-     * entries in the order of their insertion.
+     * the {@code ScalableLinkedHashMap}.  
      *
      * <p>
      *
@@ -1814,6 +1876,7 @@ public class ScalableLinkedHashMap<K,V>
 		LinkedNode node = curNode.get();
 		AppContext.getDataManager().removeObject(node);
 		curNode = node.nextEntry;
+		removed++;
 	    }
 	    
 	    // if there are still have more nodes to clean up, then

@@ -1895,6 +1895,32 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }
 
+    /*
+     * Test isEmpty
+     */
+
+    @Test public void testIsEmpty() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>();
+
+		    assertTrue(test.isEmpty());
+
+		    test.put(0, 0);
+
+		    assertFalse(test.isEmpty());
+
+		    test.remove(0);
+
+		    assertTrue(test.isEmpty());
+
+		}
+	    }, taskOwner);
+    }
+
+
      /*
       * Test iterators
       */
