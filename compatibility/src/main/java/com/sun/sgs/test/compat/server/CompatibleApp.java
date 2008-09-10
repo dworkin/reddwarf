@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -103,6 +104,7 @@ public class CompatibleApp implements AppListener, Serializable {
 	taskManager.scheduleTask(new NonManagedTask());
 	AppContext.getChannelManager().createChannel(
 	    channelName, new MyChannelListener(), Delivery.RELIABLE);
+	CheckPersistentScalableHashMap.initialize();
     }
 
     /* -- Utility classes -- */
@@ -465,6 +467,39 @@ public class CompatibleApp implements AppListener, Serializable {
 
     static {
 	new CheckExistingChannelTask();
+    }
+
+    /** Test persistent ScalableHashMap **/
+
+    private static class CheckPersistentScalableHashMap extends CheckTask {
+	private static final long serialVersionUID = 1;
+	private static final String name = "scalableHashMap";
+	CheckPersistentScalableHashMap() { }
+	static void initialize() {
+	    Map<Integer, String> map = new ScalableHashMap<Integer, String>();
+	    for (int i = 0; i < 100; i++) {
+		map.put(i, String.valueOf(i));
+	    }
+	    dataManager.setBinding(name, map);
+	}
+	public void run() {
+	    @SuppressWarnings("unchecked")
+	    Map<Integer, String> map =
+		(Map<Integer, String>) dataManager.getBinding(name);
+	    for (int i = 0; i < 100; i++) {
+		String expected = String.valueOf(i);
+		String value = map.get(i);
+		if (!expected.equals(value)) {
+		    throw new RuntimeException(
+			"Found " + value + ", expected " + expected);
+		}
+	    }
+	    completed();
+	}
+    }
+
+    static {
+	new CheckPersistentScalableHashMap();
     }
 
     /* -- API Checks -- */
