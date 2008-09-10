@@ -1,0 +1,53 @@
+The files in this directory are intended to be used to test
+compatibility of APIs and persistent data structures across releases of
+Project Darkstar.
+
+There are three Ant targets of interest:
+
+* run-server-clean - Runs the application, but first creates an empty
+  directory for holding persistent state.
+
+* run-server - Runs the application using existing persistent state
+
+* run-client - Runs the client against the application
+
+Both the client and server are intended to run against installations of
+the distributions.  You specify the locations of the installations using
+the following properties:
+
+* sgs.server.dir - The directory containing the SGS server installation.
+  Note that this should be the directory that contains the sgs.sh file,
+  not the higher level directory that also contains Berkeley DB and
+  other third party libraries.  Note, too, that you need to have copied
+  the third party libraries into this directory before attempting to use
+  it.
+
+* sgs.client.dir - The directory containing the SGS java client
+  installation.
+
+Here's the order of events for performing a compatibility test:
+
+* Run the server with an empty persistence directory against the old
+  release:
+
+  ant -Dsgs.server.dir=SGS_SERVER_OLD run-server-clean
+
+* Run the client against the old release:
+
+  ant -Dsgs.client.dir=SGS_CLIENT_OLD run-client
+
+* Kill the server
+
+* Run the server with the existing persistence directory against the new
+  release:
+
+  ant -Dsgs.server.dir=SGS_SERVER_NEW run-server-clean
+
+* Run the client against the new release:
+
+  ant -Dsgs.client.dir=SGS_CLIENT_NEW run-client
+
+* Kill the server
+
+Note that the client should exit cleanly each time if the test worked
+properly.

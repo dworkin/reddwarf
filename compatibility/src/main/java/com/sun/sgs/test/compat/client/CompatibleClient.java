@@ -26,7 +26,11 @@ public class CompatibleClient
     /** The client. */
     private final SimpleClient client;
 
+    /** Whether the server's checks are completed. */
     private boolean checksCompleted;
+
+    /** Whether the server's checks passed. */
+    private boolean checksPassed;
 
     /** Whether disconnected has been called. */
     private boolean disconnected;
@@ -35,10 +39,16 @@ public class CompatibleClient
     public static void main(String[] args) throws IOException {
 	CompatibleClient client = new CompatibleClient();
 	client.awaitChecks();
+	if (!client.checksPassed) {
+	    System.exit(1);
+	}
 	client.logout(true);
 	client.awaitDisconnected();
 	client = new CompatibleClient();
 	client.awaitChecks();
+	if (!client.checksPassed) {
+	    System.exit(1);
+	}
     }
 
     /**
@@ -122,9 +132,13 @@ public class CompatibleClient
     public void receivedMessage(ByteBuffer message) {
 	String messageString = bufferToString(message);
 	System.out.println("Received session message: " + messageString);
-	if (messageString.equals("Checks completed")) {
+	String completedMessage = "Checks completed, failures: ";
+	if (messageString.startsWith(completedMessage)) {
+	    int failures = Integer.parseInt(
+		messageString.substring(completedMessage.length()));
 	    synchronized (this) {
 		checksCompleted = true;
+		checksPassed = (failures == 0);
 		notifyAll();
 	    }
 	}

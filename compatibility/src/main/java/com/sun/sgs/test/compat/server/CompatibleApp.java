@@ -44,14 +44,15 @@ import java.util.Properties;
 import java.util.Set;
 
 /**
- * An application to use for checking compatibility across releases.
+ * An application to use for checking compatibility across releases, both for
+ * persistent data structures and APIs.
  */
 public class CompatibleApp implements AppListener, Serializable {
 
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
-    /** How long to wait in between running tasks. */
+    /** How many milliseconds to wait in between running tasks. */
     private static final long DELAY = 2000;
 
     /** The name of the persistent channel to create. */
@@ -67,134 +68,34 @@ public class CompatibleApp implements AppListener, Serializable {
     /** The task manager. */
     private static final TaskManager taskManager = AppContext.getTaskManager();
 
+    /** Objects to initialize. */
+    private static final List<Initialize> initializers =
+	new ArrayList<Initialize>();
+
     /** Creates an instance of this class. */
     public CompatibleApp() { }
 
-    /** Converts a byte buffer into a string using UTF-8 encoding. */
-    static String bufferToString(ByteBuffer buffer) {
-	byte[] bytes = new byte[buffer.remaining()];
-	buffer.get(bytes);
-	try {
-	    return new String(bytes, "UTF-8");
-	} catch (UnsupportedEncodingException e) {
-	    throw new AssertionError(e);
-	}
-    }
-
-    /** Converts a string into a byte buffer using UTF-8 encoding. */
-    static ByteBuffer stringToBuffer(String string) {
-	try {
-	    return ByteBuffer.wrap(string.getBytes("UTF-8"));
-	} catch (UnsupportedEncodingException e) {
-	    throw new AssertionError(e);
-	}
-    }
-
     /* -- Implement AppListener -- */
 
-    /** Returns client session listener. */
+    /** Returns the client session listener. */
     public ClientSessionListener loggedIn(ClientSession session) {
 	return new MyClientSessionListener(session);
     }
 
-    /** Creates persistent tasks and channel. */
+    /** Runs initializers. */
     public void initialize(Properties props) {
-	taskManager.schedulePeriodicTask(new PeriodicTask(), 0, DELAY);
-	taskManager.scheduleTask(new ManagedTask());
-	taskManager.scheduleTask(new NonManagedTask());
-	AppContext.getChannelManager().createChannel(
-	    channelName, new MyChannelListener(), Delivery.RELIABLE);
-	CheckPersistentScalableHashMap.initialize();
+	for (Initialize init : initializers) {
+	    init.initialize();
+	}
     }
 
-    /* -- Utility classes -- */
+    /* -- Implement ClientSessionListener -- */
 
     /**
-     * An abstract base class for creating tasks the perform checks and notify
-     * the client when the checks pass.
+     * The client session listener.  Responsible for calling {@link
+     * CheckTask#runChecks CheckTask.runChecks} when it receives the proper
+     * request from the client.
      */
-    abstract static class CheckTask
-	implements ManagedObject, Serializable, Task
-    {
-	private static final long serialVersionUID = 1;
-	private static final String counterBinding = "checkTaskCounter";
-	private static final List<CheckTask> checks =
-	    new ArrayList<CheckTask>();
-	static final String requestChecks = "Run checks";
-	static final String checksCompleted = "Checks completed";
-	private final int index;
-	private ManagedReference<ClientSession> session;
-	private int numChecks;
-
-	/**
-	 * Creates an instance of this class, and adds it to the list of tasks
-	 * to be run.
-	 */
-	CheckTask() {
-	    checks.add(this);
-	    this.index = checks.size();
-	}
-
-	/** Runs the check tasks. */
-	static void runChecks(ClientSession session) {
-	    try {
-		ManagedCounter counter =
-		    (ManagedCounter) dataManager.getBinding(counterBinding);
-		counter.reset();
-	    } catch (NameNotBoundException e) {
-	    }
-	    int numChecks = checks.size();
-	    for (CheckTask task : checks) {
-		task.setSession(session);
-		task.setNumChecks(numChecks);
-		taskManager.scheduleTask(task);
-	    }
-	}
-
-	/** Returns the client session. */
-	ClientSession getSession() {
-	    if (session == null) {
-		throw new IllegalStateException("Session must be set first");
-	    }
-	    return session.get();
-	}
-	
-	/**
-	 * Subclasses should call this method when their run method determines
-	 * that the check has passed.
-	 */
-	void completed() {
-	    getSession().send(
-		stringToBuffer(
-		    this + ": Completed " + index + " of " + checks.size()));
-	    ManagedCounter counter;
-	    try {
-		counter =
-		    (ManagedCounter) dataManager.getBinding(counterBinding);
-	    } catch (NameNotBoundException e) {
-		counter = new ManagedCounter();
-		dataManager.setBinding(counterBinding, counter);
-	    }
-	    counter.incrementCount();
-	    if (numChecks == counter.getCount()) {
-		getSession().send(stringToBuffer("Checks completed"));
-	    }
-	}
-
-	/** Stores the client session. */
-	private void setSession(ClientSession session) {
-	    dataManager.markForUpdate(this);
-	    this.session = dataManager.createReference(session);
-	}
-
-	/** Stores the total number of checks. */
-	private void setNumChecks(int numChecks) {
-	    dataManager.markForUpdate(this);
-	    this.numChecks = numChecks;
-	}
-    }
-
-    /** The client session listener. */
     private static class MyClientSessionListener
 	implements ClientSessionListener, ManagedObject, Serializable
     {
@@ -222,6 +123,8 @@ public class CompatibleApp implements AppListener, Serializable {
 	}
     }
 
+    /* -- Implement ChannelListener -- */
+
     /** The channel listener. */
     private static class MyChannelListener
 	implements ChannelListener, ManagedObject, Serializable
@@ -240,36 +143,58 @@ public class CompatibleApp implements AppListener, Serializable {
 	}
     }
 
-    /** A simple managed object. */
-    private static class Marker implements ManagedObject, Serializable {
-	private static final long serialVersionUID = 1;
-	Marker() { }
-    }
+    /* -- Persistent checks -- */
 
-    /** A managed object counter. */
-    private static class ManagedCounter
-	implements ManagedObject, Serializable, ManagedObjectRemoval
+    /**
+     * Checks that periodic tasks get run. <p>
+     *
+     * When the application first starts up, the {@code initialize} method
+     * schedules an instance of {@link PeriodicTask} to run periodically. <p>
+     *
+     * When the client requests that checks be performed, the run method sets a
+     * flag asking {@code PeriodicTask} to increment a counter, and then checks
+     * that the counter has been incremented.
+     */
+    private static class CheckPeriodicTask extends CheckTask
+	implements Initialize
     {
 	private static final long serialVersionUID = 1;
-	private int count = 0;
-	ManagedCounter() { }
-	int getCount() {
-	    return count;
+	private boolean started;
+	private int count;
+	CheckPeriodicTask() {
+	    initializers.add(this);
 	}
-	void incrementCount() {
-	    dataManager.markForUpdate(this);
-	    count++;
+	public void initialize() {
+	    taskManager.schedulePeriodicTask(new PeriodicTask(), 0, DELAY);
 	}
-	void reset() {
-	    dataManager.markForUpdate(this);
-	    count = 0;
+	boolean runInternal() {
+	    if (!started) {
+		dataManager.markForUpdate(this);
+		started = true;
+		PeriodicTask.requestNotify();
+		count = PeriodicTask.getCurrentCount();
+	    } else {
+		int currentCount = PeriodicTask.getCurrentCount();
+		if (currentCount > count) {
+		    return true;
+		}
+	    }
+	    taskManager.scheduleTask(this, DELAY);
+	    return false;
 	}
-	public void removingObject() { }
     }
 
-    /* -- Checks and associated classes -- */
+    static {
+	new CheckPeriodicTask();
+    }
 
-    /** A persistent periodic task. */
+    /**
+     * A persistent periodic task. <p>
+     *
+     * Each time this task is run, it checks to see if {@code
+     * periodicTaskNotify} is bound.  If so, it clears the binding and
+     * increments the counter bound to {@code periodicTaskCounter}.
+     */
     private static class PeriodicTask extends ManagedCounter implements Task {
 	private static final long serialVersionUID = 1;
 	private static final String notifyBinding = "periodicTaskNotify";
@@ -302,33 +227,58 @@ public class CompatibleApp implements AppListener, Serializable {
 	}
     }
 
-    private static class CheckPeriodicTask extends CheckTask {
+    /**
+     * Checks that non-managed tasks get run. <p>
+     *
+     * When the application first starts up, the initialize method schedules an
+     * instance of {@link NonManagedTask} to run.  That task reschedules itself
+     * each time it runs. <p>
+     *
+     * When the client requests that checks be performed, the run method sets a
+     * flag asking {@code NonManagedTask} to increment a counter, and then
+     * checks that the counter has been incremented.
+     */
+    private static class CheckNonManagedTask extends CheckTask
+	implements Initialize
+    {
 	private static final long serialVersionUID = 1;
 	private boolean started;
 	private int count;
-	CheckPeriodicTask() { }
-	public void run() {
+	CheckNonManagedTask() {
+	    initializers.add(this);
+	}
+	public void initialize() {
+	    taskManager.scheduleTask(new NonManagedTask());
+	}
+	boolean runInternal() {
 	    if (!started) {
 		dataManager.markForUpdate(this);
 		started = true;
-		PeriodicTask.requestNotify();
-		count = PeriodicTask.getCurrentCount();
+		NonManagedTask.requestNotify();
+		count = NonManagedTask.getCurrentCount();
 	    } else {
-		int currentCount = PeriodicTask.getCurrentCount();
+		int currentCount = NonManagedTask.getCurrentCount();
 		if (currentCount > count) {
-		    completed();
-		    return;
+		    return true;
 		}
 	    }
 	    taskManager.scheduleTask(this, DELAY);
+	    return false;
 	}
     }
 
     static {
-	new CheckPeriodicTask();
+	new CheckNonManagedTask();
     }
 
-    /** A persistent non-managed task. */
+    /**
+     * A persistent non-managed task. <p>
+     *
+     * Each time this task is run, it checks to see if {@code
+     * nonManagedTaskNotify} is bound.  If so, it clear the binding and
+     * increments the counter bound to {@code nonManagedTaskCounter}.  The task
+     * always reschedules itself.
+     */
     private static class NonManagedTask implements Serializable, Task {
 	private static final long serialVersionUID = 1;
 	private static final String notifyBinding = "nonManagedTaskNotify";
@@ -369,33 +319,58 @@ public class CompatibleApp implements AppListener, Serializable {
 	}
     }
 
-    private static class CheckNonManagedTask extends CheckTask {
+    /**
+     * Checks that managed tasks get run. <p>
+     *
+     * When the application first starts up, the initialize method schedules an
+     * instance of {@link ManagedTask} to run.  That task reschedules itself
+     * each time it runs. <p>
+     *
+     * When the client requests that checks be performed, the run method sets a
+     * flag asking {@code ManagedTask} to increment a counter, and then checks
+     * that the counter has been incremented.
+     */
+    private static class CheckManagedTask extends CheckTask
+	implements Initialize
+    {
 	private static final long serialVersionUID = 1;
 	private boolean started;
 	private int count;
-	CheckNonManagedTask() { }
-	public void run() {
+	CheckManagedTask() {
+	    initializers.add(this);
+	}
+	public void initialize() {
+	    taskManager.scheduleTask(new ManagedTask());
+	}
+	boolean runInternal() {
 	    if (!started) {
 		dataManager.markForUpdate(this);
 		started = true;
-		NonManagedTask.requestNotify();
-		count = NonManagedTask.getCurrentCount();
+		ManagedTask.requestNotify();
+		count = ManagedTask.getCurrentCount();
 	    } else {
-		int currentCount = NonManagedTask.getCurrentCount();
+		int currentCount = ManagedTask.getCurrentCount();
 		if (currentCount > count) {
-		    completed();
-		    return;
+		    return true;
 		}
 	    }
 	    taskManager.scheduleTask(this, DELAY);
+	    return false;
 	}
     }
 
     static {
-	new CheckNonManagedTask();
+	new CheckManagedTask();
     }
 
-    /** A persistent managed class. */
+    /**
+     * A persistent managed task. <p>
+     * 
+     * Each time this task is run, it checks to see if {@code
+     * managedTaskNotify} is bound.  If so, it clears the binding and
+     * increments the counter bound to {@code managedTaskCounter}.  The task
+     * always reschedules itself.
+     */
     private static class ManagedTask extends ManagedCounter implements Task {
 	private static final long serialVersionUID = 1;
 	private static final String notifyBinding = "managedTaskNotify";
@@ -429,39 +404,22 @@ public class CompatibleApp implements AppListener, Serializable {
 	}
     }
 
-    private static class CheckManagedTask extends CheckTask {
+    /** Checks that we can find an existing channel. */
+    private static class CheckExistingChannelTask extends CheckTask
+	implements Initialize
+    {
 	private static final long serialVersionUID = 1;
-	private boolean started;
-	private int count;
-	CheckManagedTask() { }
-	public void run() {
-	    if (!started) {
-		dataManager.markForUpdate(this);
-		started = true;
-		ManagedTask.requestNotify();
-		count = ManagedTask.getCurrentCount();
-	    } else {
-		int currentCount = ManagedTask.getCurrentCount();
-		if (currentCount > count) {
-		    completed();
-		    return;
-		}
-	    }
-	    taskManager.scheduleTask(this, DELAY);
+	CheckExistingChannelTask() {
+	    initializers.add(this);
 	}
-    }
-
-    static {
-	new CheckManagedTask();
-    }
-
-    private static class CheckExistingChannelTask extends CheckTask {
-	private static final long serialVersionUID = 1;
-	CheckExistingChannelTask() { }
-	public void run() {
+	public void initialize() {
+	    AppContext.getChannelManager().createChannel(
+		channelName, new MyChannelListener(), Delivery.RELIABLE);
+	}
+	boolean runInternal() {
 	    channelManager.getChannel(channelName).send(
 		null, stringToBuffer("Message from server to channel"));
-	    completed();
+	    return true;
 	}
     }
 
@@ -469,24 +427,28 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckExistingChannelTask();
     }
 
-    /** Test persistent ScalableHashMap **/
-
-    private static class CheckPersistentScalableHashMap extends CheckTask {
+    /** Tests an existing {@lnk ScalableHashMap}. **/
+    private static class CheckPersistentScalableHashMap extends CheckTask
+	implements Initialize
+    {
 	private static final long serialVersionUID = 1;
+	private static final int size = 20;
 	private static final String name = "scalableHashMap";
-	CheckPersistentScalableHashMap() { }
-	static void initialize() {
+	CheckPersistentScalableHashMap() {
+	    initializers.add(this);
+	}
+	public void initialize() {
 	    Map<Integer, String> map = new ScalableHashMap<Integer, String>();
-	    for (int i = 0; i < 100; i++) {
+	    for (int i = 0; i < size; i++) {
 		map.put(i, String.valueOf(i));
 	    }
 	    dataManager.setBinding(name, map);
 	}
-	public void run() {
+	boolean runInternal() {
 	    @SuppressWarnings("unchecked")
 	    Map<Integer, String> map =
 		(Map<Integer, String>) dataManager.getBinding(name);
-	    for (int i = 0; i < 100; i++) {
+	    for (int i = 0; i < size; i++) {
 		String expected = String.valueOf(i);
 		String value = map.get(i);
 		if (!expected.equals(value)) {
@@ -494,7 +456,7 @@ public class CompatibleApp implements AppListener, Serializable {
 			"Found " + value + ", expected " + expected);
 		}
 	    }
-	    completed();
+	    return true;
 	}
     }
 
@@ -502,17 +464,51 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckPersistentScalableHashMap();
     }
 
+    /** Tests an existing {@link ScalableHashSet}. **/
+    private static class CheckPersistentScalableHashSet extends CheckTask
+	implements Initialize
+    {
+	private static final long serialVersionUID = 1;
+	private static final int size = 20;
+	private static final String name = "scalableHashSet";
+	CheckPersistentScalableHashSet() {
+	    initializers.add(this);
+	}
+	public void initialize() {
+	    Set<Integer> map = new ScalableHashSet<Integer>();
+	    for (int i = 0; i < size; i++) {
+		map.add(i);
+	    }
+	    dataManager.setBinding(name, map);
+	}
+	boolean runInternal() {
+	    @SuppressWarnings("unchecked")
+	    Set<Integer> set = (Set<Integer>) dataManager.getBinding(name);
+	    for (int i = 0; i < size; i++) {
+		if (!set.contains(i)) {
+		    throw new RuntimeException("Value not found: " + i);
+		}
+	    }
+	    return true;
+	}
+    }
+
+    static {
+	new CheckPersistentScalableHashSet();
+    }
+
     /* -- API Checks -- */
 
+    /** Checks the API of the {@link AppContext} class. */
     private static class CheckAppContextTask extends CheckTask {
 	private static final long serialVersionUID = 1;	
 	CheckAppContextTask() { }
-	public void run() {
+	boolean runInternal() {
 	    AppContext.getChannelManager();
 	    AppContext.getDataManager();
 	    AppContext.getManager(DataManager.class);
 	    AppContext.getTaskManager();
-	    completed();
+	    return true;
 	}
     }
 
@@ -522,10 +518,11 @@ public class CompatibleApp implements AppListener, Serializable {
 
     /* AppListener already checked */
 
+    /** Checks API of the {@link Channel} interface. */
     private static class CheckChannelTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckChannelTask() { }
-	public void run() {
+	boolean runInternal() {
 	    Channel channel = channelManager.createChannel(
 		"some channel", null, Delivery.RELIABLE);
 	    channel.getDeliveryRequirement();
@@ -541,7 +538,7 @@ public class CompatibleApp implements AppListener, Serializable {
 	    channel.leaveAll();
 	    channel.send(getSession(), stringToBuffer("hi"));
 	    dataManager.removeObject(channel);
-	    completed();
+	    return true;
 	}
     }
 
@@ -553,14 +550,15 @@ public class CompatibleApp implements AppListener, Serializable {
 
     /* ChannelManager already checked */
 
+    /** Checks the API of the {@link ClientSession} interface. */
     private static class CheckClientSessionTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckClientSessionTask() { }
-	public void run() {
+	boolean runInternal() {
 	    getSession().getName();
 	    getSession().isConnected();
 	    getSession().send(stringToBuffer("hi"));
-	    completed();
+	    return true;
 	}
     }
 
@@ -570,10 +568,11 @@ public class CompatibleApp implements AppListener, Serializable {
 
     /* ClientSessionListener already checked */
 
+    /** Checks the API of the {@link DataManager} interface. */
     private static class CheckDataManagerTask extends CheckTask {
 	private static final long serialVersionUID = 1;	
 	CheckDataManagerTask() { }
-	public void run() {
+	boolean runInternal() {
 	    ManagedCounter counter = new ManagedCounter();
 	    dataManager.createReference(counter);
 	    dataManager.setBinding("Binding1", counter);
@@ -582,7 +581,7 @@ public class CompatibleApp implements AppListener, Serializable {
 	    dataManager.nextBoundName(null);
 	    dataManager.markForUpdate(counter);
 	    dataManager.removeObject(counter);
-	    completed();
+	    return true;
 	}
     }
 
@@ -590,15 +589,16 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckDataManagerTask();
     }
 
+    /** Checks the API of the {@link Delivery} interface. */
     private static class CheckDeliveryTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckDeliveryTask() { }
-	public void run() {
+	boolean runInternal() {
 	    Delivery[] d = new Delivery[] {
 		Delivery.ORDERED_UNRELIABLE, Delivery.RELIABLE,
 		Delivery.UNORDERED_RELIABLE, Delivery.UNRELIABLE
 	    };
-	    completed();
+	    return true;
 	}
     }
 
@@ -606,10 +606,11 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckDeliveryTask();
     }
 
+    /** Checks the APIs of the various exception classes. */
     private static class CheckExceptionsTask extends CheckTask {
 	private static final long serialVersionUID = 1;	
 	CheckExceptionsTask() { }
-	public void run() {
+	boolean runInternal() {
 	    new ManagerNotFoundException("");
 	    new ManagerNotFoundException("", new Error());
 	    ResourceUnavailableException rue = new MessageRejectedException("");
@@ -637,7 +638,7 @@ public class CompatibleApp implements AppListener, Serializable {
 	    new TransactionNotActiveException("", new Error());
 	    ers = new TransactionTimeoutException("");
 	    new TransactionTimeoutException("", new Error());
-	    completed();
+	    return true;
 	}
     }
 
@@ -649,10 +650,11 @@ public class CompatibleApp implements AppListener, Serializable {
 
     /* ManagedObjectRemoval already checked */
 
+    /** Checks the API of the {@link ManagedReference} interface. */
     private static class CheckManagedReferenceTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckManagedReferenceTask() { }
-	public void run() {
+	boolean runInternal() {
 	    DataManager dataManager = AppContext.getDataManager();
 	    ManagedCounter counter = new ManagedCounter();
 	    ManagedReference<ManagedCounter> reference =
@@ -660,7 +662,7 @@ public class CompatibleApp implements AppListener, Serializable {
 	    reference.get();
 	    reference.getForUpdate();
 	    reference.getId();
-	    completed();
+	    return true;
 	}
     }
 
@@ -668,13 +670,14 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckManagedReferenceTask();
     }
 
+    /** Checks the API of the {@link PeriodicTaskHandle} interface. */
     private static class CheckPeriodicTaskHandleTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckPeriodicTaskHandleTask() { }
-	public void run() {
+	boolean runInternal() {
 	    taskManager.schedulePeriodicTask(
 		new DummyTask(), 1000, 1000).cancel();
-	    completed();
+	    return true;
 	}
 	private static class DummyTask implements Serializable, Task {
 	    private static final long serialVersionUID = 1;
@@ -687,10 +690,11 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckPeriodicTaskHandleTask();
     }
 
+    /** Checks the APIs for the various scalable collection classes. */
     private static class CheckScalableCollectionsTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckScalableCollectionsTask() { }
-	public void run() {
+	boolean runInternal() {
 	    new ScalableHashMap<String, String>();
 	    new ScalableHashMap<String, String>(3);
 	    new ScalableHashMap<String, String>(
@@ -698,18 +702,18 @@ public class CompatibleApp implements AppListener, Serializable {
 	    new ScalableHashSet<String>();
 	    new ScalableHashSet<String>(new ArrayList<String>());
 	    new ScalableHashSet<String>(3);
-	    completed();
+	    return true;
 	}
     }
 
     static {
 	new CheckScalableCollectionsTask();
     }
-
+    /** Checks the API of the {@link SimpleSgsProtocol} interface. */
     private static class CheckSimpleSgsProtocolTask extends CheckTask {
 	private static final long serialVersionUID = 1;
 	CheckSimpleSgsProtocolTask() { }
-	public void run() {
+	boolean runInternal() {
 	    byte[] b = new byte[] {
 		SimpleSgsProtocol.CHANNEL_JOIN,
 		SimpleSgsProtocol.CHANNEL_LEAVE,
@@ -730,7 +734,7 @@ public class CompatibleApp implements AppListener, Serializable {
 		SimpleSgsProtocol.MAX_MESSAGE_LENGTH,
 		SimpleSgsProtocol.MAX_PAYLOAD_LENGTH
 	    };
-	    completed();
+	    return true;
 	}
     }
 
@@ -741,4 +745,253 @@ public class CompatibleApp implements AppListener, Serializable {
     /* Task already checked */
 
     /* TaskManager already checked */
+
+    /* -- Utility classes -- */
+
+    /**
+     * An interface that classes should implement if they want to be called by
+     * the implementation of the {@link #initialize AppListener.initialize}
+     * method.
+     */
+    interface Initialize {
+
+	/** Perform initial operations on startup. */
+	void initialize();
+    }
+
+    /**
+     * An abstract base class for creating tasks that perform checks when
+     * requested by the client, and notify the client when the checks have
+     * passed. <p>
+     *
+     * The constructor adds the instance to the list of tasks to be run. <p>
+     *
+     * The {@link #runChecks runChecks} method runs the check tasks. <p>
+     *
+     * Each task's {@link #runInternal runInternal} method should return {@code
+     * true} if the check has passed, return {@code false} if the check is not
+     * yet completed, and should throw a non-retryable runtime exception if the
+     * check failed.  When all the checks have been completed, then it sends a
+     * message to the client.
+     */
+    abstract static class CheckTask
+	implements ManagedObject, Serializable, Task
+    {
+	/** The version of the serialized form. */
+	private static final long serialVersionUID = 1;
+
+	/**
+	 * The name that stores the counter that records how many checks have
+	 * been completed.
+	 */
+	private static final String completedBinding = "checkTaskCompleted";
+
+	/**
+	 * The name that stores the counter that records how many checks have
+	 * failed.
+	 */
+	private static final String failedBinding = "checkTaskFailed";
+
+	/** The list of check tasks. */
+	private static final List<CheckTask> checks =
+	    new ArrayList<CheckTask>();
+
+	/** The message that clients will send to request running checks. */
+	static final String requestChecks = "Run checks";
+
+	/**
+	 * The message to send to clients when checks are completed.  The
+	 * number of failures will be appended.
+	 */
+	static final String checksCompleted = "Checks completed, failures: ";
+
+	/** The position of this test in the list of checks. */
+	private final int index;
+
+	/**
+	 * A reference to the client session, for sending messages to clients.
+	 */
+	private ManagedReference<ClientSession> session;
+
+	/** The total number of checks that need to be performed. */
+	private int totalChecks;
+
+	/**
+	 * Creates an instance of this class, and adds it to the list of tasks
+	 * to be run.
+	 */
+	CheckTask() {
+	    checks.add(this);
+	    this.index = checks.size();
+	}
+
+	/** Runs the check tasks. */
+	static void runChecks(ClientSession session) {
+	    try {
+		ManagedCounter completed =
+		    (ManagedCounter) dataManager.getBinding(completedBinding);
+		completed.reset();
+		ManagedCounter failed =
+		    (ManagedCounter) dataManager.getBinding(failedBinding);
+		failed.reset();
+	    } catch (NameNotBoundException e) {
+	    }
+	    int numChecks = checks.size();
+	    for (CheckTask task : checks) {
+		/*
+		 * For each check, first store the session and the total number
+		 * of checks, and then schedule the task.
+		 */
+		task.setSession(session);
+		task.setTotalChecks(numChecks);
+		taskManager.scheduleTask(task);
+	    }
+	}
+
+	/**
+	 * Implements {@link Task#run Task.run} by calling {@link #runInternal
+	 * runInternal}.  The check will be marked completed successfully if
+	 * {@code runInternal} returns {@code true}, will be considered still
+	 * in progress if it returns {@code false}, and will be considered
+	 * failed if it throw a non-retryable runtime exception.
+	 */
+	public final void run() {
+	    try {
+		if (runInternal()) {
+		    completed(true);
+		}
+	    } catch (RuntimeException e) {
+		if (e instanceof ExceptionRetryStatus &&
+		    ((ExceptionRetryStatus) e).shouldRetry())
+		{
+		    throw e;
+		} else {
+		    System.out.println("Task " + this + " failed: " + e);
+		    e.printStackTrace();
+		    completed(false);
+		}
+	    }
+	}
+
+	/**
+	 * Performs the main operation of the task.
+	 *
+	 * @returns	{@code true} if the check passed, else {@code false} if
+	 *		the check is still in progress
+	 * @throws	RuntimeException if the check failed
+	 */
+	abstract boolean runInternal();
+
+	/** Returns the client session. */
+	ClientSession getSession() {
+	    if (session == null) {
+		throw new IllegalStateException("Session must be set first");
+	    }
+	    return session.get();
+	}
+	
+	/**
+	 * Subclasses should call this method when their run method determines
+	 * that the check has been completed.
+	 */
+	private void completed(boolean passed) {
+	    getSession().send(
+		stringToBuffer(
+		    this + ": Completed " + index + " of " + totalChecks));
+	    ManagedCounter completed;
+	    ManagedCounter failed;
+	    try {
+		completed =
+		    (ManagedCounter) dataManager.getBinding(completedBinding);
+		failed =
+		    (ManagedCounter) dataManager.getBinding(failedBinding);
+	    } catch (NameNotBoundException e) {
+		completed = new ManagedCounter();
+		dataManager.setBinding(completedBinding, completed);
+		failed = new ManagedCounter();
+		dataManager.setBinding(failedBinding, failed);
+	    }
+	    completed.incrementCount();
+	    if (!passed) {
+		failed.incrementCount();
+	    }
+	    if (totalChecks == completed.getCount()) {
+		getSession().send(
+		    stringToBuffer(checksCompleted + failed.getCount()));
+	    }
+	}
+
+	/** Stores the client session. */
+	private void setSession(ClientSession session) {
+	    dataManager.markForUpdate(this);
+	    this.session = dataManager.createReference(session);
+	}
+
+	/** Stores the total number of checks. */
+	private void setTotalChecks(int totalChecks) {
+	    dataManager.markForUpdate(this);
+	    this.totalChecks = totalChecks;
+	}
+    }
+
+    /** A simple managed object. */
+    private static class Marker implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	Marker() { }
+    }
+
+    /**
+     * A managed object counter.  Implements {@link ManagedObjectRemoval} as a
+     * simple way to make sure that interface is defined.
+     */
+    private static class ManagedCounter
+	implements ManagedObject, Serializable, ManagedObjectRemoval
+    {
+	private static final long serialVersionUID = 1;
+
+	/** The count. */
+	private int count = 0;
+
+	ManagedCounter() { }
+
+	/** Returns the current count. */
+	int getCount() {
+	    return count;
+	}
+
+	/** Increments the current count. */
+	void incrementCount() {
+	    dataManager.markForUpdate(this);
+	    count++;
+	}
+
+	/** Resets the current count to zero. */
+	void reset() {
+	    dataManager.markForUpdate(this);
+	    count = 0;
+	}
+
+	/** Implements {@link ManagedObjectRemoval}. */
+	public void removingObject() { }
+    }
+
+    /** Converts a byte buffer into a string using UTF-8 encoding. */
+    static String bufferToString(ByteBuffer buffer) {
+	byte[] bytes = new byte[buffer.remaining()];
+	buffer.get(bytes);
+	try {
+	    return new String(bytes, "UTF-8");
+	} catch (UnsupportedEncodingException e) {
+	    throw new AssertionError(e);
+	}
+    }
+
+    /** Converts a string into a byte buffer using UTF-8 encoding. */
+    static ByteBuffer stringToBuffer(String string) {
+	try {
+	    return ByteBuffer.wrap(string.getBytes("UTF-8"));
+	} catch (UnsupportedEncodingException e) {
+	    throw new AssertionError(e);
+	}
+    }
 }
