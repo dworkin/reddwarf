@@ -407,7 +407,11 @@ public class AIClient implements SimpleClientListener {
 	 * {@inheritDoc}
 	 */
 	public void leftChannel(ClientChannel channel) {
-	    dungeonListener.leftDungeon();
+	    // This is currently unused due to how each level is now
+	    // associated with a channel, but is left in as a reminder
+	    // of  where to put the dungeon-exiting code
+
+	    //dungeonListener.leftDungeon();
 	}
 
     }

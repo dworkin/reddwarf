@@ -109,8 +109,10 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
      * @param listener the listener to add
      */
     public void addGameChangeListener(GameChangeListener listener) {
-        DataManager dataManager = AppContext.getDataManager();
-        listeners.add(dataManager.createReference(listener));
+        DataManager dm = AppContext.getDataManager();
+        listeners.add(dm.createReference(listener));
+	dm.markForUpdate(this);
+	
     }
 
     /**
@@ -119,7 +121,9 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
      * @param game the name of the <code>Game</code>
      */
     public void notifyGameAdded(String game) {
-        addedGames.add(game);
+	DataManager dm = AppContext.getDataManager();
+	addedGames.add(game);
+	dm.markForUpdate(this);
 
         // if this was previous removed, cancel that notification
         removedGames.remove(game);
@@ -131,7 +135,9 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
      * @param game the name of the <code>Game</code>
      */
     public void notifyGameRemoved(String game) {
+        DataManager dm = AppContext.getDataManager();
         removedGames.add(game);
+	dm.markForUpdate(this);
 
         // if there was previous data queued about this game, remove it
         addedGames.remove(game);
@@ -145,7 +151,9 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
      * @param detail the update information
      */
     public void notifyMembershipChanged(GameMembershipDetail detail) {
+        DataManager dm = AppContext.getDataManager();
         updateMap.put(detail.getGame(), detail);
+	dm.markForUpdate(this);
     }
 
     /**
@@ -158,11 +166,14 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
         // we do send to all the listeners ... once we're done, clear the
         // collection
 
+	boolean changed = false;
+
         // send the game removed notice
         if (removedGames.size() > 0) {
             for (ManagedReference<GameChangeListener> listenerRef : listeners)
                 listenerRef.getForUpdate().gameRemoved(removedGames);
             removedGames.clear();
+	    changed = true;
         }
 
         // send the game added notice
@@ -170,6 +181,7 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
             for (ManagedReference<GameChangeListener> listenerRef : listeners)
                 listenerRef.getForUpdate().gameAdded(addedGames);
             addedGames.clear();
+	    changed = true;
         }
 
         // send the updated membership detail
@@ -178,7 +190,11 @@ public class GameChangeManager implements Task, ManagedObject, Serializable {
             for (ManagedReference<GameChangeListener> listenerRef : listeners)
                 listenerRef.getForUpdate().membershipChanged(details);
             updateMap.clear();
+	    changed = true;
         }
+
+	if (changed)
+	    AppContext.getDataManager().markForUpdate(this);
     }
 
 }

@@ -9,6 +9,7 @@
 package com.sun.sgs.example.hack.server;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
@@ -22,7 +23,7 @@ import java.io.Serializable;
  * This is an implementation of <code>Character</code> used by all
  * <code>Player</code>s.
  */
-public class PlayerCharacter implements Character, Serializable {
+public class PlayerCharacter implements Character, ManagedObject, Serializable {
 
     private static final long serialVersionUID = 1;
 
@@ -81,6 +82,8 @@ public class PlayerCharacter implements Character, Serializable {
      * notifies the player of the change.
      */
     public void notifyStatsChanged() {
+	AppContext.getDataManager().markForUpdate(this);
+
         // send the player our updated stats...
         Player player = playerRef.get();
         player.sendCharacter(this);
@@ -149,6 +152,8 @@ public class PlayerCharacter implements Character, Serializable {
      * @return boolean if any statistics changed
      */
     public boolean collidedInto(Character character) {
+	AppContext.getDataManager().markForUpdate(this);
+
         // FIXME: this isn't trying to use any stats at this point, it's
         // just using some testing values
         int damage = NSidedDie.roll6Sided();

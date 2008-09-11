@@ -9,6 +9,7 @@
 package com.sun.sgs.example.hack.server.level;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
@@ -121,8 +122,11 @@ public class ConnectorTile implements Tile, Serializable {
      * @return whether or not the character was added successfully
      */
     public boolean addCharacter(CharacterManager mgr) {
-        return characterRefs.add(AppContext.getDataManager().
-                                 createReference(mgr));
+	DataManager dm = AppContext.getDataManager();
+        boolean added = characterRefs.add(dm.createReference(mgr));
+	if (added)
+	    dm.markForUpdate(this);
+	return added;
     }
 
     /**
@@ -134,8 +138,11 @@ public class ConnectorTile implements Tile, Serializable {
      * @return whether or not the character was removed successfully
      */
     public boolean removeCharacter(CharacterManager mgr) {
-        return characterRefs.remove(AppContext.getDataManager().
-                                    createReference(mgr));
+	DataManager dm = AppContext.getDataManager();
+        boolean removed = characterRefs.remove(dm.createReference(mgr));
+	if (removed)
+	    dm.markForUpdate(this);
+	return removed;
     }
 
     /**

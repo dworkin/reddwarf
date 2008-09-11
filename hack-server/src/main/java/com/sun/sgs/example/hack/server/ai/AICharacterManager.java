@@ -70,6 +70,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * @return the current character
      */
     public Character getCurrentCharacter() {
+	AppContext.getDataManager().markForUpdate(this);
         return character;
     }
 
@@ -88,6 +89,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      * Tells the AI creature that it's their turn to take some action.
      */
     public void run() throws Exception {
+	AppContext.getDataManager().markForUpdate(this);
         character.run();
     }
 
@@ -101,6 +103,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
         //       decide how and where to place a new character ... for
         //       now, we take the simple approach of just adding a new
         //       character
+	AppContext.getDataManager().markForUpdate(this);
         character.regenerate();
         getCurrentLevel().addCharacter(this);
     }

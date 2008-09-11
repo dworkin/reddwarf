@@ -60,6 +60,11 @@ public class CreatorMessageHandler implements MessageHandler, Serializable {
 	    // get the id and create the stats
 	    int characterId = data.getInt();
 	    rollForStats(player, characterId);
+
+	    // NOTE: by rolling the stats, we have updated the
+	    // Player's messageHandler field (which is this object),
+	    // therefore mark the player for udpate
+	    AppContext.getDataManager().markForUpdate(player);
 	    break;
 	case CREATE_CURRENT_CLIENT_CHARACTER:
 	    // get the name...

@@ -84,8 +84,8 @@ public abstract class BasicCharacterManager
      * @param y the y-coordinate
      */
     public void setLevelPosition(int x, int y) {
-        AppContext.getDataManager().markForUpdate(this);
-
+	AppContext.getDataManager().markForUpdate(this);
+	
         xPos = x;
         yPos = y;
     }
