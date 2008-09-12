@@ -2402,6 +2402,47 @@ public class TestScalableHashMap extends Assert {
 	    }, taskOwner);
     }
 
+    @Test public void testEntryIteratorSetValue() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Map<Integer,Foo> test =
+			new ScalableHashMap<Integer,Foo>();
+
+		    for (int i = 0; i < 33; i++) {
+			test.put(i, new Foo(i));
+		    }
+
+		    // now iterator over the map and set every value to be a
+		    // Bar, which is a subclass of Foo
+		    for (Entry<Integer,Foo> e : test.entrySet()) {
+			e.setValue(new Bar(e.getKey() +1));
+		    }
+
+		    // assert that the value was properly set
+		    for (Entry<Integer,Foo> e : test.entrySet()) {
+			int i = e.getKey();
+			int j = e.getValue().hashCode();
+			assertEquals(i, j-1);
+		    }
+		    
+		    // then iterate once again setting the values back to
+		    // non-ManagedObjects
+		    for (Entry<Integer,Foo> e : test.entrySet()) {
+			e.setValue(new Foo(e.getKey()));
+		    }
+
+		    // assert that the value was properly set
+		    for (Entry<Integer,Foo> e : test.entrySet()) {
+			int i = e.getKey();
+			int j = e.getValue().hashCode();
+			assertEquals(i, j);
+		    }
+		}
+	    }, taskOwner);
+    }  
+
     @Test public void testInvalidRemove() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {

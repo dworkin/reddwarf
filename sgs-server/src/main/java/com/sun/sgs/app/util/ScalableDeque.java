@@ -81,7 +81,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * iterators at the same time will cause contention.  In addition each mutating
  * operation incurs a small performance penalty for keeping the iterators
  * consistent with the state of the deque.  Developers should use this feature
- * if they will need to iterator over the deque at the same time it is being
+ * if they will need to iterate over the deque at the same time it is being
  * modified and want to ensure that the iterator will traverse all the elements.
  *
  * <p>
@@ -141,9 +141,11 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  *
  * All elements stored by this deque must be instances of {@link Serializable}.
  * This class additionally supports elements that are instances of {@code
- * ManagedObject}.  Therefore the two declarations of {@code
+ * ManagedObject}.  If this is done, any {@code ManagedObject} added to the
+ * deque will automatically be stored as a {@code ManagedReference} to that
+ * object.  Therefore the two declarations of {@code
  * ScalableDeque<ManagedReference<ManagedObject>>} and {@code
- * ScalableDeque<ManagedObject>} are equivalent in performance.  If a {@code
+ * ScalableDeque<ManagedObject>} are equivalent in behavior.  If a {@code
  * ManagedObject} is stored within this deque, the developer is still
  * responsible for removing it from the data store at the end of its lifetime.
  * Removing a {@code ManagedObject} from the deque by any operation, including
@@ -440,7 +442,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Inserts the specified element into the queue represented by this deque
+     * (in other words, at the tail of this deque), returning true upon success.
+     * This method is equivalent to {@link #addLast(Object) addLast(E)}.
+     *
+     * @param e the element to add
+     *
+     * @return {@code true}
      */
     public boolean add(E e) {
 	if (e == null)
@@ -463,7 +471,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Inserts the specified element at the front of this deque.
+     *
+     * @param e the element to add
      */
     public void addFirst(E e) {
 	if (e == null)
@@ -484,7 +494,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Inserts the specified element at the end of this deque.  This method is
+     * equivalent to {@link #add(Object) add(E)}.
+     *
+     * @param e the element to add
      */
     public void addLast(E e) {
 	add(e);
@@ -588,7 +601,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Removes all the elements from this deque.
      */
     public void clear() {
 
@@ -626,8 +639,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}.  If this deque supports fast arbitrary access, this
-     * operation runs in constant time.
+     * Returns {@code true} if this deque contains the specified element.  If
+     * this deque supports fast arbitrary access, this operation runs in
+     * constant time.
+     *
+     * @param o element whose presence in this deque is to be tested
+     *
+     * @return {@code true} if this deque contains the specified element
      */
     public boolean contains(Object o) {
 	if (supportsFastArbitraryAccess())
@@ -642,14 +660,26 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Returns an iterator over the elements in this deque in reverse sequential
+     * order. The elements will be returned in order from last (tail) to first
+     * (head).  This iterator is an instance of {@link ManagedObject} and may be
+     * persisted.
+     *
+     * @return an iterator over the elements in this deque in reverse sequence
      */
     public Iterator<E> descendingIterator() {
 	return new BidirectionalDequeIterator<E>(this, true);
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves, but does not remove, the head of the queue represented by this
+     * deque (in other words, the first element of this deque). This method
+     * differs from {@link #peek() peek} only in that it throws an exception if
+     * this deque is empty.  This method is equivalent to {@link #getFirst()}.
+     *
+     * @return the head of the queue represented by this deque
+     *
+     * @throws NoSuchElementException if this deque is empty
      */
     public E element() {
 	E e = getFirst();
@@ -660,7 +690,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     
 
     /**
-     * {@inheritDoc}
+     * Returns {@code true} if {@code o} is this instance of {@code
+     * ScalableDeque}.
+     *
+     * @param o the object to be compared
+     *
+     * @return {@code true} if {@code o} is this instance of {@code
+     *         ScalableDeque}.
      */
     public boolean equals(Object o) {
 	/*
@@ -709,7 +745,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves, but does not remove, the first element of this deque. This
+     * method differs from {@link #peekFirst() peekFirst} only in that it throws
+     * an exception if this deque is empty.
+     *
+     * @return the head of this deque
+     *
+     * @throws NoSuchElementException if this deque is empty 
      */
     public E getFirst() {
 	Element<E> e = headElement();
@@ -719,7 +761,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves, but does not remove, the last element of this deque. This
+     * method differs from {@link #peekLast() peekLast} only in that it throws
+     * an exception if this deque is empty.
+     *
+     * @return the tail of this deque
+     *
+     * @throws NoSuchElementException if this deque is empty 
      */
     public E getLast() {
 	Element<E> e = tailElement();
@@ -748,22 +796,33 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
     
     /**
-     * {@inheritDoc}
+     * Returns {@code true} if this collection contains no elements.
+     *
+     * @return {@code true} if this collection contains no elements.
      */
     public boolean isEmpty() {
 	return headElement() == null;
     }
 
     /**
-     * {@inheritDoc}
+     * Returns an iterator over the elements in this deque in proper
+     * sequence. The elements will be returned in order from first (head) to
+     * last (tail).  This iterator is an instance of {@link ManagedObject} and
+     * may be persisted.
+     *
+     * @return an iterator over the elements in this deque in proper sequence
      */
     public Iterator<E> iterator() {
 	return new BidirectionalDequeIterator<E>(this, false);
     }
 
     /**
-     * {@inheritDoc}
+     * Inserts the specified element into the queue represented by this deque
+     * (in other words, at the tail of this deque), returning {@code true}.
+     * This method is equivalent to {@link #offerLast(Object) offerLast(E)}
      * 
+     * @param e the element to add
+     *
      * @return {@code true}
      */
     public boolean offer(E e) {
@@ -771,8 +830,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Inserts the specified element at the front of this deque.
      * 
+     * @param e the element to add
+     *
      * @return {@code true}
      */
     public boolean offerFirst(E e) {
@@ -783,7 +844,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Inserts the specified element at the end of this deque. This method is
+     * equivalent to {@link #offer(Object) offer(E)}
+     * 
+     * @param e the element to add
      * 
      * @return {@code true}
      */
@@ -795,14 +859,23 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 			
     /**
-     * {@inheritDoc}
+     * Retrieves, but does not remove, the head of the queue represented by this
+     * deque (in other words, the first element of this deque), or returns
+     * {@code null} if this deque is empty.  This method is equivalent to {@link
+     * #peekFirst()}.
+     *
+     * @return the head of the queue represented by this deque, or {@code null}
+     *         if this deque is empty
      */
     public E peek() {
 	return peekFirst();
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves, but does not remove, the first element of this deque, or
+     * returns {@code null} if this deque is empty.
+     *
+     * @return the head of this deque, or {@code null} if this deque is empty
      */
     public E peekFirst() {
 	Element<E> e = headElement();
@@ -810,7 +883,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }	
 
     /**
-     * {@inheritDoc}
+     * Retrieves, but does not remove, the last element of this deque, or
+     * returns {@code null} if this deque is empty.
+     *
+     * @return the tail of this deque, or {@code null} if this deque is empty
      */
     public E peekLast() {
 	Element<E> e = tailElement();
@@ -818,28 +894,46 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves and removes the head of the queue represented by this deque (in
+     * other words, the first element of this deque), or returns {@code null} if
+     * this deque is empty.  This method is equivalent to {@link #pollFirst()}.
+     *
+     * @return the first element of this deque, or {@code null} if this deque is
+     *         empty
      */
     public E poll() {
 	return pollFirst();
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves and removes the first element of this deque, or returns {@code
+     * null} if this deque is empty.
+     *
+     * @return the head of this deque, or {@code null} if this deque is empty
      */
     public E pollFirst() {
 	return removeElement(headElement());
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves and removes the last element of this deque, or returns {@code
+     * null} if this deque is empty.
+     *
+     * @return the tail of this deque, or {@code null} if this deque is empty
      */
     public E pollLast() {
 	return removeElement(tailElement());
     }
 
     /**
-     * {@inheritDoc}
+     * Pops an element from the stack represented by this deque. In other words,
+     * removes and returns the first element of this deque.
+     * This method is equivalent to {@link #removeFirst()}. 
+     *
+     * @return the element at the front of this deque (which is the top of the
+     *          stack represented by this deque)
+     *
+     * @throws NoSuchElementException if this deque is empty
      */
     public E pop() {
 	Element<E> head = headElement();
@@ -849,14 +943,25 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Pushes an element onto the stack represented by this deque (in other
+     * words, at the head of this deque).  This method is equivalent to {@link
+     * #addFirst(Object) addFirst(E)}.
+     *
+     * @param e the element to push
      */
     public void push(E e) {
 	addFirst(e);
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves and removes the head of the queue represented by this deque (in
+     * other words, the first element of this deque). This method differs from
+     * {@link #poll() poll} only in that it throws an exception if this deque is
+     * empty.  This method is equivalent to {@link #removeFirst()}.
+     *
+     * @return the head of the queue represented by this deque
+     *
+     * @throws NoSuchElementException if this deque is empty
      */
     public E remove() {
 	E e = removeFirst();
@@ -866,23 +971,48 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is
-     * enabled, this implementation takes time proportinal to the number of
-     * instances of {@code o} in the deque, <i>not</i> the number of elements.
+     * Removes the first occurrence of the specified element from this deque. If
+     * the deque does not contain the element, it is unchanged. More formally,
+     * removes the first element {@code e} such that {@code (o==null ? e==null :
+     * o.equals(e))} (if such an element exists). Returns {@code true} if this
+     * deque contained the specified element (or equivalently, if this deque
+     * changed as a result of the call).  This method is equivalent to {@link
+     * #removeFirstOccurrence(Object)}.
      *
-     * @param o {@inheritDoc}
+     * <p>
      *
-     * @return {@inheritDoc}
+     * Note that if {@code supportsFastArbitraryAccess} is enabled, this
+     * implementation takes time proportinal to the number of instances of
+     * {@code o} in the deque, <i>not</i> the number of elements.
+     *
+     * @param o element to be removed from this deque, if present
+     *
+     * @return {@code true} if an element was removed as a result of this call
      */
     public boolean remove(Object o) {
 	return removeFirstOccurrence(o);
     }
 
     /**
-     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is
+     * Removes the all occurrences of elements contained in {@code c} this
+     * deque. If the deque does not contain the element, it is unchanged. More
+     * formally, for each element {@code o} in {@code c}, examines each deque
+     * element {@code e} such that {@code (o==null ?  e==null : o.equals(e))}
+     * (if such an element exists). Returns {@code true} if this deque contained
+     * the specified element (or equivalently, if this deque changed as a result
+     * of the call).
+     *
+     * <p>
+     *     
+     * Note that if {@code supportsFastArbitraryAccess} is
      * enabled, this implementation takes time proportinal to the number of
      * instances of all the elements in the provided collection that are in the
      * deque, <i>not</i> the number of elements in the deque itself.
+     *
+     * @param c a collection of elements to be removed from this deque, if
+     *        present
+     *
+     * @return {@code true} if an element was removed as a result of this call
      */
     public boolean removeAll(Collection<?> c) {
 	if (c == null) {
@@ -899,10 +1029,17 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * Removes all occurrences of the provided object from the deque.  Note that
-     * if {@code supportsFastArbitraryAccess} is enabled, this implementation
-     * takes time proportinal to the number of instances of {@code o} in the
-     * deque, <i>not</i> the number of elements.
+     * Removes all occurrences of the provided object from the deque.  More
+     * formally, removes all elements {@code e} such that {@code (o==null ?
+     * e==null : o.equals(e))} (if such an element exists). Returns {@code true}
+     * if this deque contained the specified element (or equivalently, if this
+     * deque changed as a result of the call).
+     *
+     * <p>
+     *
+     * Note that if {@code supportsFastArbitraryAccess} is enabled, this
+     * implementation takes time proportinal to the number of instances of
+     * {@code o} in the deque, <i>not</i> the number of elements.
      *
      * @param o the object to to be removed
      *
@@ -1014,13 +1151,23 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is enabled,
-     * this implementation takes time proportinal to the number of instances of
+     * Removes the first occurrence of the specified element from this deque. If
+     * the deque does not contain the element, it is unchanged. More formally,
+     * removes the first element {@code e} such that {@code (o==null ? e==null :
+     * o.equals(e))} (if such an element exists). Returns {@code true} if this
+     * deque contained the specified element (or equivalently, if this deque
+     * changed as a result of the call).  This method is equivalent to {@link
+     * #remove(Object)}.
+     *
+     * <p>
+     *
+     * Note that if {@code supportsFastArbitraryAccess} is enabled, this
+     * implementation takes time proportinal to the number of instances of
      * {@code o} in the deque, <i>not</i> the number of elements.
      *
-     * @param o {@inheritDoc}
+     * @param o element to be removed from this deque, if present
      *
-     * @return {@inheritDoc}
+     * @return {@code true} if an element was removed as a result of this call
      */
     public boolean removeFirstOccurrence(Object o) {
 	if (o == null) {
@@ -1087,7 +1234,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}
+     * Retrieves and removes the last element of this deque. This method differs
+     * from {@link #pollLast() pollLast} only in that it throws an exception if
+     * this deque is empty.
+     *
+     * @return the tail of this deque
+     *
+     * @throws NoSuchElementException if this deque is empty
      */
     public E removeLast() {
 	Element<E> tail = tailElement();
@@ -1097,13 +1250,23 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc} Note that if {@code supportsFastArbitraryAccess} is enabled,
-     * this implementation takes time proportinal to the number of instances of
+     * Removes the last occurrence of the specified element from this deque. If
+     * the deque does not contain the element, it is unchanged. More formally,
+     * removes the last element {@code e} such that {@code (o==null ? e==null :
+     * o.equals(e))} (if such an element exists). Returns {@code true} if this
+     * deque contained the specified element (or equivalently, if this deque
+     * changed as a result of the call).  This method is equivalent to {@link
+     * #removeFirstOccurrence(Object)}.
+     *
+     * <p>
+     *
+     * Note that if {@code supportsFastArbitraryAccess} is enabled, this
+     * implementation takes time proportinal to the number of instances of
      * {@code o} in the deque, <i>not</i> the number of elements.
      *
-     * @param o {@inheritDoc}
+     * @param o element to be removed from this deque, if present
      *
-     * @return {@inheritDoc}
+     * @return {@code true} if an element was removed as a result of this call
      */
     public boolean removeLastOccurrence(Object o) {
 	if (o == null) {
@@ -1179,10 +1342,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * {@inheritDoc}.  This operation runs in time proportinal to the
-     * length of this deque.
+     * Returns the number of elements in this deque.  This operation runs in
+     * time proportinal to the length of this deque.
      *
-     * @return the size of this deque
+     * @return the number of elements in this deque
      */
     public int size() {
 	int size = 0;
@@ -1461,7 +1624,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	 * Sets the link from this {@code Element} to the next
 	 * {@code Element} in the deque to {@code next}.
 	 *
-	 * @code prev the {@code Element} after this {@code Element}
+	 * @code next the {@code Element} after this {@code Element}
 	 *       in the deque
 	 */
 	void setNext(Element<E> next) {
@@ -1490,7 +1653,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Returns the string representation of the value contained by this
+	 * element and the element's unique identifier.
 	 */
 	public String toString() {
 	    return getValue() + "~(" + id + ")";
@@ -1593,9 +1757,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	private Object toFind;
 
 	/**
-	 * Constructs an {@code ElementMatcher} to match all {@code
-	 * Element} instances that have the same value as {@code
-	 * toFind}.
+	 * Constructs an {@code ElementMatcher} to match all {@code Element}
+	 * instances that have the same value as {@code toFind}.
 	 *
 	 * @param toFind the value of the {@code Element} that this
 	 *        instance should match
@@ -1606,10 +1769,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * Adds the provided {@code ElementId} to the set of ids that
-	 * have already been seen, which has the effect this instances
-	 * will no longer match any {@code Element} instances with
-	 * the provided id.
+	 * Adds the provided {@code ElementId} to the set of ids that have
+	 * already been seen, which has the effect this instances will no longer
+	 * match any {@code Element} instances with the provided id.
 	 *
 	 * @param id an {@code Element} id that has already been seen
 	 */
@@ -1618,15 +1780,15 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * Returns {@true} if {@code o} is an instance of {@code
-	 * Element}, the element has the same value as the {@code
-	 * toFind} value provided to this instance, and the Id of the
-	 * {@code Element} is not in the {@code alreadySeen} set.
+	 * Returns {@true} if {@code o} is an instance of {@code Element}, the
+	 * element has the same value as the {@code toFind} value provided to
+	 * this instance, and the Id of the {@code Element} is not in the {@code
+	 * alreadySeen} set.
 	 *
 	 * @param o {@code inheritDoc}
 	 *
-	 * @return {@code true} if {@code o} is an {@code Element}
-	 *         that this instance should match
+	 * @return {@code true} if {@code o} is an {@code Element} that this
+	 *         instance should match
 	 */
 	public boolean equals(Object o) {
 	    if (o == null)
@@ -1646,10 +1808,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * Returns the hash code of the value provided as {@code
-	 * toFind}.
+	 * Returns the hash code of the value provided as {@code toFind}.
 	 *
-	 * @return {@inheritDoc}
+	 * @return the hash code of the value provided as {@code toFind}.
 	 */
 	public int hashCode() {
 	    return (toFind == null) ? 0 : toFind.hashCode();
@@ -1657,23 +1818,22 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * A concurrent, persistable {@code Iterator} implementation for
-     * the {@code ScalableDeque} that allows element traverse from
-     * head-to-tail or tail-to-head as required.
+     * A concurrent, persistable {@code Iterator} implementation for the {@code
+     * ScalableDeque} that allows element traverse from head-to-tail or
+     * tail-to-head as required.
      *
      * <p>
      *
-     * If an iterator is created for an empty deque, and then
-     * serialized, it will remain valid upon any subsequent
-     * deserialization.  An iterator in this state, where it has been
-     * created but {@code next} has never been called, will always
-     * begin an the first entry in the map, if any, since its
-     * deserialization.
+     * If an iterator is created for an empty deque, and then serialized, it
+     * will remain valid upon any subsequent deserialization.  An iterator in
+     * this state, where it has been created but {@code next} has never been
+     * called, will always begin an the first entry in the map, if any, since
+     * its deserialization.
      *
      * <p> 
      *
-     * Instance of this class are <i>not</i> designed to be shared
-     * between concurrent tasks.
+     * Instance of this class are <i>not</i> designed to be shared between
+     * concurrent tasks.
      *
      * @param <E> the type of elements returned by the iterator
      */
@@ -1691,8 +1851,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	private boolean currentRemoved;
 
 	/**
-	 * A reference to the next entry that this iterator will
-	 * return
+	 * A reference to the next entry that this iterator will return
 	 */
 	private ManagedReference<Element<E>> nextElement;
 
@@ -1709,11 +1868,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	private final ManagedReference<ScalableDeque<E>> dequeRef;
 
 	/**
-	 * A reference to the map where {@code DequeIterator}
-	 * instances register their next elements so that upon
-	 * deserialization, the iterator exhibits correct behavior, or
-	 * {@code null} if the backing deque does not support
-	 * concurrent iteration.
+	 * A reference to the map where {@code DequeIterator} instances register
+	 * their next elements so that upon deserialization, the iterator
+	 * exhibits correct behavior, or {@code null} if the backing deque does
+	 * not support concurrent iteration.
 	 *
 	 * @see ScalableDeque(boolean)
 	 */
@@ -1722,16 +1880,15 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	        serializedIteratorsNextElementsRef;
 
 	/**
-	 * {@code true} if this iterator was created with an empty
-	 * deque.  In this case the iterator will remain at the head
-	 * of the head and valid until {@code next} is called.
+	 * {@code true} if this iterator was created with an empty deque.  In
+	 * this case the iterator will remain at the head of the head and valid
+	 * until {@code next} is called.
 	 */
 	private boolean nextElementWasNullOnCreation;
 
 	/**
-	 * {@code true} if this iterator has just been deserialized
-	 * and needs to recheck whether its next elemente is still
-	 * valid.
+	 * {@code true} if this iterator has just been deserialized and needs to
+	 * recheck whether its next elemente is still valid.
 	 *
 	 * @see #checkForNextElementUpdates()
 	 */
@@ -1752,8 +1909,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	 * Constructs a new {@code OrderedIterator}.
 	 *
 	 * @param deque the deque that will be iterated over
-	 * @param isReverse whether this iterator should traverse the
-	 *        provided deque from tail to head
+	 * @param isReverse whether this iterator should traverse the provided
+	 *        deque from tail to head
 	 */
 	BidirectionalDequeIterator(ScalableDeque<E> deque, boolean isReverse) {
 
@@ -1801,7 +1958,11 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Returns {@code true} if the iterator has more elements.  (In other
+	 * words, returns {@code true} if {@code next} would return an element
+	 * rather than throwing an exception.)
+	 *
+	 * @return {@code true} if the iterator has more elements
 	 */
 	public boolean hasNext() {
 	    if (recheckNextElement) {
@@ -1841,15 +2002,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	    if (nextElementWasNullOnCreation) {
 
 		if (isReverse) {
-		    // see if the last element in the deque is now
-		    // non-null
+		    // see if the last element in the deque is now non-null
 		    Element<E> tail = dequeRef.get().tailElement();	    
 		    nextElement = (tail == null) ? null
 			: AppContext.getDataManager().createReference(tail);
 		}
 		else {
-		    // see if the first element in the deque is now
-		    // non-null
+		    // see if the first element in the deque is now non-null
 		    Element<E> head = dequeRef.get().headElement();
 		    nextElement = (head == null) ? null
 			: AppContext.getDataManager().createReference(head);
@@ -1863,8 +2022,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 		}
 	    }
 
-	    // Check whether this iterator has support for concurrent
-	    // updates.  
+	    // Check whether this iterator has support for concurrent updates.
 	    else if (serializedIteratorsNextElementsRef != null) {
 		// Ifo so, this iterator has seen at least one element
 		// and had updated the shared itereator-to-element map
@@ -1886,8 +2044,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 		// the map would still be valid.
 		nextElement = iteratorToNextElement.get(iteratorId).nextElement;
 		
-		// the next element has changed, mark the iterator for
-		// update
+		// the next element has changed, mark the iterator for update
 		if (!(nextElement == oldNext || 
 		      (nextElement != null && nextElement.equals(oldNext)))) {
 		    AppContext.getDataManager().markForUpdate(this);
@@ -1898,8 +2055,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * Returns the next element in the {@code ScalableDeque}.  Note that
-	 * due to the concurrent nature of this iterator, this method may skip
+	 * Returns the next element in the {@code ScalableDeque}.  Note that due
+	 * to the concurrent nature of this iterator, this method may skip
 	 * elements that have been added after the iterator was constructed.
 	 * Likewise, it may return new elements that have been added.  This
 	 * implementation is guaranteed never to return an element more than
@@ -1907,20 +2064,19 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	 *
 	 * <p>
 	 *
-	 * If the backing deque does not support concurrent iterators,
-	 * this method will throw a {@link
-	 * java.util.ConcurrentModificationException} if the next
-	 * element that the iterator was set to return has been
-	 * removed from the deque, and {@code hasNext()} as not been
-	 * called first.
+	 * If the backing deque does not support concurrent iterators, this
+	 * method will throw a {@link java.util.ConcurrentModificationException}
+	 * if the next element that the iterator was set to return has been
+	 * removed from the deque, and {@code hasNext()} as not been called
+	 * first.
 	 *
 	 * @return the next element in the {@code ScalableDeque}
 	 *
 	 * @throws NoSuchElementException if no further entries exist
-	 * @throws ConcurrentModificationException if the next element
-	 *         of this iterator has been removed from the deque
-	 *         and {@code hasNext()} had not been called prior to
-	 *         this method.
+	 * @throws ConcurrentModificationException if the backing deque does not
+	 *         support concurrent iterators and the next element of this
+	 *         iterator has been removed from the deque while the iterator
+	 *         was not active
 	 */
 	public E next() {
 	    if (!hasNext()) {
@@ -1952,8 +2108,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * Removes this iterator from the registry of active
-	 * iterators.
+	 * Removes this iterator from the registry of active iterators.
 	 */
 	public void removingObject() {
 	    // check if this iterator has been configured to receive
@@ -1994,7 +2149,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Removes from the underlying collection the last element returned by
+	 * the iterator (optional operation). This method can be called only
+	 * once per call to {@code next}.
+	 *
+	 * @throws IllegalStateException if the {@code next} method has not yet
+	 *         been called, or the {@code remove} method has already been
+	 *         called after the last call to the {@code next} method
 	 */
 	public void remove() {
 	    if (currentRemoved) {
@@ -2019,7 +2180,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Writes all the non-tranient state to {@code s}
 	 */
 	private void writeObject(ObjectOutputStream s)
 	    throws IOException {

@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.impl.util.ManagedSerializable;
 import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Collection;

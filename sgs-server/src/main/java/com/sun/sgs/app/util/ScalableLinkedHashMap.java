@@ -24,12 +24,8 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TaskManager;
-
-import com.sun.sgs.impl.service.data.store.db.DataEncoding;
 
 import com.sun.sgs.impl.util.ManagedSerializable;
 
@@ -44,16 +40,15 @@ import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.AbstractSet;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
-import java.util.Iterator;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.Stack;
 
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
@@ -62,12 +57,11 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
 /**
  * A scalable implementation of {@link Map}, which provides a predictable
  * iteration ordering like {@link LinkedHashMap}.  This implementation differs
- * from {@link ScalabeLinkedHashmap} in that it maintains a doubly-linked list
- * of all the entries according to their insertion order.  Therefore, the
- * iteration ordering is equivalent to the insertion ordering.  As with {@code
+ * from {@link ScalableHashMap} in that it maintains a doubly-linked list of all
+ * the entries according to their insertion order.  Therefore, the iteration
+ * ordering is equivalent to the insertion ordering.  As with {@code
  * LinkedHashMap} if a key is re-inserted into a map, it will not change the
- * order iteration.  Unlike the {@code LinkedHashMap} class this implementation
- * does not support iterating by access order.
+ * order iteration.
  *
  * <p>
  *
@@ -93,13 +87,12 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
  * first parameter {@code accessOrder} is provided to create a linked hash map
  * whose order of iteration is the order in which its entries were last
  * accessed, from least-recently accessed to most-recently
- * (access-order). Invoking the put or get method results in an access to the
- * corresponding entry (assuming it exists after the invocation completes). The
- * putAll method generates one entry access for each mapping in the specified
- * map, in the order that key-value mappings are provided by the specified map's
- * entry set iterator. No other methods generate entry accesses. In particular,
- * operations on collection-views do not affect the order of iteration of the
- * backing map.
+ * (access-order). Invoking the {@code put} or {@code get} methods results in an
+ * access to the corresponding entry. The {@code putAll} method generates one
+ * entry access for each mapping in the specified map, in the order that
+ * key-value mappings are provided by the specified map's entry set iterator. No
+ * other methods generate entry accesses. In particular, operations on
+ * collection-views do not affect the order of iteration of the backing map.
  *
  * <p>
  *
@@ -130,7 +123,7 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
  * Developers may override {@link #removeEldestEntry(Map.Entry)} to impose a
  * policy for removing stale mappings automatically when new mappings are added
  * to the map.  See {@link java.util.LinkedHashMap#removeEldestEntry(Map.Entry)}
- * for an example
+ * for an example.
  *
  * <p>
  *
@@ -147,6 +140,15 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
  * need to modify the map concurrently, even if the total number of mappings is
  * small.  Also note that, unlike {@code LinkedHashMap}, this class can be used
  * to store {@code ManagedObject} instances directly.
+ *
+ * <p>
+ *
+ * Keys and values that need to be mutated after they are added should typically
+ * implement {@code ManagedObject}. Although {@link Serializable} elements can
+ * also be modified, changes to those elements need to be detected by the {@link
+ * DataManager}, which may have performance implications. Note that care must be
+ * taken when modifying elements to avoid changing the way they respond to
+ * {@code equals} comparisons.
  *
  * <p>
  *
@@ -185,19 +187,6 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
  *
  * <p>
  *
- * An instance of {@code ScalableLinkedHashMap} offers one parameter for
- * performance tuning: {@code minConcurrency}, which specifies the minimum
- * number of re-insertion operations to support in parallel.  This paramenter
- * will not improve the performance of operations that modify the doubly-linked
- * list of entries.  The {@code minConcurrency} parameter acts as a hint to the
- * map on how to perform internal resizing.  As the map grows, the number of
- * supported parallel operations will also grow beyond the specified minimum.
- * Setting the minimum concurrency too high will waste space and time, while
- * setting it too low will cause conflicts until the map grows sufficiently to
- * support more concurrent operations.
- *
- * <p>
- *
  * Since the expected distribution of objects in the map is essentially random,
  * the actual concurrency will vary.  Developers are strongly encouraged to use
  * hash codes that provide a normal distribution; a large number of collisions
@@ -222,10 +211,13 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
  *
  * <p>
  *
- * The iterators do not throw {@link java.util.ConcurrentModificationException}.
- * The iterators are stable with respect to concurrent changes to the associated
- * collection.  Attempting to use an iterator when the associated map has been
- * removed from the {@code DataManager} will result in an {@code
+ * The if {@code supportConcurrentIterators} is set to {@code true}, the
+ * iterators will not throw {@link ConcurrentModificationException}.  Otherwise,
+ * the iterators will throw an {@link ConcurrentModificationException} in the
+ * event that the next element that they would return has been removed from the
+ * map.  The iterators are stable with respect to concurrent changes to the
+ * associated collection.  Attempting to use an iterator when the associated map
+ * has been removed from the {@code DataManager} will result in an {@code
  * ObjectNotFoundException} being thrown, although the {@link Iterator#remove
  * remove} method may throw {@code IllegalStateException} instead if that is
  * appropriate.
@@ -265,15 +257,17 @@ public class ScalableLinkedHashMap<K,V>
     private static final long serialVersionUID = 1;
     
     /**
-     * The bound name for the first entry in this map according to the defined
-     * iteration order
+     * The reference for the first entry in this map according to the defined
+     * iteration order.  Note that value is indirectly referenced to allow for
+     * concurrent updates to this field and {@code lastEntry}.
      */
     private final ManagedReference<ManagedSerializable
 	<ManagedReference<LinkedNode<K,V>>>> firstEntry;
 
     /**
-     * The bound name for the last entry in this map according to the defined
-     * iteration order
+     * The reference for the last entry in this map according to the defined
+     * iteration order.  Note that these are indirectly referenced to allow for
+     * concurrent updates to this field and {@code firstEntry}.
      */
     private final ManagedReference<ManagedSerializable
 	<ManagedReference<LinkedNode<K,V>>>> lastEntry;
@@ -315,17 +309,14 @@ public class ScalableLinkedHashMap<K,V>
     private final boolean accessOrder;
 
     /**
-     * Creates an empty map with the specified minimum concurrency.  Users of
-     * this constructor should refer to the class javadoc regarding the
-     * performance behavior of concurrent iterators.
+     * Creates an empty map with the provided iteration order and support of
+     * concurrent iterators.  Users of this constructor should refer to the
+     * class javadoc regarding the performance behavior of concurrent iterators.
      *
      * @param accessOrder whether the iterator order of this deque should be in
      *        order of least recent access
      * @param supportsConcurrentIterators whether this deque should
      *        support concurrent iterators
-     *
-     * @throws IllegalArgumentException if {@code minConcurrency} is
-     *	       not greater than zero
      */
     public ScalableLinkedHashMap(boolean accessOrder, 
 				 boolean supportsConcurrentIterators) {
@@ -365,8 +356,8 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * Constructs an empty map with support for concurrent iterators and option
-     * access ordering during iteration.
+     * Constructs an empty map with support for concurrent iterators and
+     * optional access ordering during iteration.
      *
      * @param accessOrder whether the iterator order of this deque should be in
      *        order of least recent access
@@ -376,7 +367,8 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * Constructs an empty map with support for concurrent iterators.
+     * Constructs an empty map with insertion order iteration and support for
+     * concurrent iterators.
      */
     public ScalableLinkedHashMap() {
 	this(false, true);
@@ -422,7 +414,7 @@ public class ScalableLinkedHashMap<K,V>
 
 	// if we had at least one entry, asychronously remove all the
 	// nodes in the entry-list using a dedicated task.
-	if (firstEntry != null) {
+	if (firstEntry.get().get() != null) {
 	    AppContext.getTaskManager().
 		scheduleTask(new AsynchronousClearTask<K,V>(firstEntry.
 							    get().get()));
@@ -479,7 +471,7 @@ public class ScalableLinkedHashMap<K,V>
 		    return true;
 	    } catch (ObjectNotFoundException onfe) {
 		// happens if the value was removed out from
-		// underneith the map but the key was not removed
+		// underneath the map but the key was not removed
 	    }
 	}
 	return false;
@@ -499,7 +491,7 @@ public class ScalableLinkedHashMap<K,V>
     /**
      * Returns the last entry in the map according to iteration order.
      *
-     * @return the first entry in the map
+     * @return the last entry in the map
      */
     LinkedNode<K,V> lastEntry() {
 	ManagedReference<LinkedNode<K,V>> ref = lastEntry.get().get();
@@ -533,7 +525,7 @@ public class ScalableLinkedHashMap<K,V>
 
     /**
      * Associates the specified key with the provided value and returns the
-     * previous value if the key was previous mapped.  This map supports both
+     * previous value if the key was already mapped.  This map supports both
      * {@code null} keys and values.
      *
      *<p>
@@ -788,11 +780,38 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * Returns {@code true} if this map should remove its eldest entry.
+     * Returns {@code true} if this map should remove its eldest entry.  This
+     * method is invoked by {@code put} and {@code putAll} after inserting a new
+     * entry into the map. It provides the implementor with the opportunity to
+     * remove the eldest entry each time a new one is added. This is useful if
+     * the map represents a cache: it allows the map to reduce memory
+     * consumption by deleting stale entries.
      *
-     * @param eldest
+     * <p>
      *
-     * @return {@code true} if this entry should be removed
+     * This method typically does not modify the map in any way, instead
+     * allowing the map to modify itself as directed by its return value. It is
+     * permitted for this method to modify the map directly, but if it does so,
+     * it must return {@code false} (indicating that the map should not attempt
+     * any further modification). The effects of returning {@code true} after
+     * modifying the map from within this method are unspecified.
+     *
+     * <p>
+     *
+     * This implementation merely returns {@code false} (so that this map acts
+     * like a normal map - the eldest element is never removed).
+     *
+     * @param eldest The least recently inserted entry in the map, or if this is
+     *               an access-ordered map, the least recently accessed
+     *               entry. This is the entry that will be removed it this
+     *               method returns {@code true}. If the map was empty prior to
+     *               the {@code put} or {@code putAll} invocation resulting in
+     *               this invocation, this will be the entry that was just
+     *               inserted; in other words, if the map contains a single
+     *               entry, the eldest entry is also the newest.
+     *
+     * @return {@code true} if the eldest entry should be removed from the map;
+     *         {@code false} if it should be retained.
      *
      * @see java.util.LinkedHashMap.removeEldestEntry(Map.Entry)
      */
@@ -804,8 +823,9 @@ public class ScalableLinkedHashMap<K,V>
      * Returns whether this deque will support concurrent iterators.  If {@code
      * false}, the iterators of this map will not receive updates regarding any
      * changes to the map and will throw {@link
-     * ConcurrentModificationException}s if next element was removed while the
-     * iterator was serialized.
+     * ConcurrentModificationException}s if the element that ab iterator was to
+     * return next was removed while the iterator was not activing within a
+     * current transaction.
      *
      * @see ScalableLinkedHashMap$OrderedIterator
      * @see ScalableLinkedHashMap#checkIterators(LinkedNode)
@@ -815,15 +835,16 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * If this map supports concurrent iterators, the methods checks the state
+     * If this map supports concurrent iterators, this methods checks the state
      * of all {@link OrderedIterator} instances to see if the provided entry,
      * which is being removed, is their next entry to return, and updates their
      * state accordingly.
      *
      * <p>
      * 
-     * Note that this effect is only meaningful to iterators that are in a
-     * serialized state at the time of this call.  This method will never be
+     * Note that this effect is only meaningful to concurrently-updated
+     * iterators that are in a serialized state (i.e. not being used in a
+     * current transaction) at the time of this call.  This method will never be
      * called if the iterator is currently traversing on the entry prior to the
      * one removed.  This is due to the fact that the {@link
      * ScalableLinkedHashMap#removeEntryFromInsertionList(LinkedNode)} method
@@ -855,7 +876,7 @@ public class ScalableLinkedHashMap<K,V>
 	    ManagedReference<LinkedNode<K,V>> nextEntry = e.getValue();
 
 	    // if the iterator was going to return the removed entry
-	    // next, then we need to update it with the nextInsert
+	    // next, then we need to update it with the nextEntry
 	    // value from the removed entry
 	    if (nextEntry != null && nextEntry.equals(entryRef)) {
 
@@ -903,7 +924,7 @@ public class ScalableLinkedHashMap<K,V>
 	/**
 	 * The key of the node for which this instance will equal.
 	 */
-	private Object key;
+	private final Object key;
 
 	/**
 	 * Constructs a {@code Finder} with the provided key.
@@ -919,9 +940,7 @@ public class ScalableLinkedHashMap<K,V>
 	 */
 	public boolean equals(Object o) {
 	    try {
-		if (o == null)
-		    return false;
-		else if (o instanceof LinkedNode) {
+		if (o instanceof LinkedNode) {
 		    LinkedNode e = (LinkedNode)o;
 		    Object oKey = e.getKey();
 		    return key == oKey || (key != null && key.equals(oKey));
@@ -959,9 +978,9 @@ public class ScalableLinkedHashMap<K,V>
      *
      * <p>
      *
-     * Notes that this class does not implement {@link Map.Entry} as it cannot
-     * support the {@link Map.Entry#hashCode() hashCode} contract.  In order for
-     * the map to be able find {@code LinkedNode} instances based on a key, this
+     * Notes that this class does not implement {@link Entry} as it cannot
+     * support the {@link Entry#hashCode() hashCode} contract.  In order for the
+     * map to be able find {@code LinkedNode} instances based on a key, this
      * class is required to use the {@code hashCode} on the key contained
      * within.  Therefore, when a {@code LinkedNode} is stored in the backing
      * map, it can be retrieved by the key alone.  See the {@link
@@ -1036,14 +1055,16 @@ public class ScalableLinkedHashMap<K,V>
 	byte state = 0;
 
 	/**
-	 * A reference to the next entry after this entry in the
-	 * linked list that represents the iteration order
+	 * A reference to the next entry after this entry in the linked list
+	 * that represents the iteration order, or {@code null} if this entry is
+	 * the first entry.
 	 */ 
 	private ManagedReference<LinkedNode<K,V>> prevEntry;
 
 	/**
-	 * A reference to the previous entry after this entry in the
-	 * linked list that represents the iteration order
+	 * A reference to the previous entry after this entry in the linked list
+	 * that represents the iteration order, or {@code null} if this entry is
+	 * the last entry.
 	 */ 
 	private ManagedReference<LinkedNode<K,V>> nextEntry;
 
@@ -1071,18 +1092,17 @@ public class ScalableLinkedHashMap<K,V>
 	}
 
 	/**
-	 * Returns {@code true} if {@code o} either is an isntance of
-	 * {@code LinkedNode} with the same key and value, <i>or</i>
-	 * if o is an instance of {@code Finder} and has the same key.
-	 * This second equals case is necessary to locate this node in
-	 * the backing map when the value is not known.
+	 * Returns {@code true} if {@code o} either is an instance of {@code
+	 * LinkedNode} with the same key and value, <i>or</i> if o is an
+	 * instance of {@code Finder} and has the same key.  This second equals
+	 * case is necessary to locate this node in the backing map when the
+	 * value is not known.
 	 */
 	public boolean equals(Object o) {
 	    if (o instanceof LinkedNode) {
 		LinkedNode<K,V> e = uncheckedCast(o);
-		K k;
-		return ((k = getKey()) == null) ? 
-		    e.getKey() == null : k.equals(e.getKey());		
+		K k = getKey();
+		return (k == null) ? e.getKey() == null : k.equals(e.getKey());
 	    }
 	    else if (o instanceof Finder) {
 		return ((Finder)o).equals(this);
@@ -1090,11 +1110,11 @@ public class ScalableLinkedHashMap<K,V>
 	    return false;
 	}
 
-	public K getKey() {
+	K getKey() {
 	    return (useKeyRef()) ? keyRef.get() : key;
 	}
 
-	public V getValue() {
+	V getValue() {
 	    return (useValueRef()) ? valueRef.get() : value;
 	}
 
@@ -1102,8 +1122,8 @@ public class ScalableLinkedHashMap<K,V>
 	 * Returns the {@code hashCode} of the key.
 	 */
 	public final int hashCode() {
-	    K k;
-	    return ((k = getKey()) == null) ? 0 : k.hashCode();
+	    K k = getKey();
+	    return (k == null) ? 0 : k.hashCode();
 	}
 
 	
@@ -1135,8 +1155,8 @@ public class ScalableLinkedHashMap<K,V>
 	 * Sets the link from this {@code LinkedNode} to the next
 	 * {@code LinkedNode} in the map to {@code next}.
 	 *
-	 * @code next the {@code LinkedNode} after this {@code LinkedNode} in
-	 *       the map according to the iteration order
+	 * @param next the {@code LinkedNode} after this {@code LinkedNode} in
+	 *        the map according to the iteration order
 	 */
 	void setNext(LinkedNode<K,V> next) {
 	    DataManager dm = AppContext.getDataManager();
@@ -1151,8 +1171,8 @@ public class ScalableLinkedHashMap<K,V>
 	 * Sets the link from this {@code LinkedNode} to the previous
 	 * {@code LinkedNode} in the map to {@code prev}.
 	 *
-	 * @code prev the {@code LinkedNode} before this {@code LinkedNode} in
-	 *       the map according to the iteration order
+	 * @param prev the {@code LinkedNode} before this {@code LinkedNode} in
+	 *        the map according to the iteration order
 	 */
 	void setPrev(LinkedNode<K,V> prev) {
 	    DataManager dm = AppContext.getDataManager();
@@ -1166,7 +1186,7 @@ public class ScalableLinkedHashMap<K,V>
 	/**
 	 * Replaces the previous value of this entry with the provided value.
 	 *
-	 * @param newValue the value to be stored
+	 * @param v the value to be stored
 	 * @return the previous value of this entry
 	 */
 	public final V setValue(V v) {
@@ -1186,7 +1206,7 @@ public class ScalableLinkedHashMap<K,V>
 	}
 
 	/**
-	 * Returns a {@link Map.Entry} instance that is backed by this
+	 * Returns a {@link Entry} instance that is backed by this
 	 * {@code LinkedNode}.
 	 *
 	 * @return a {@code Map.Entry} instance
@@ -1196,7 +1216,7 @@ public class ScalableLinkedHashMap<K,V>
 	}
 
 	/**
-	 * Returns the string form of this entry as {@code entry}={@code
+	 * Returns the string form of this entry as {@code key}={@code
 	 * value}.
 	 */
 	public String toString() {
@@ -1208,7 +1228,7 @@ public class ScalableLinkedHashMap<K,V>
 	 * {@code keyRef}.
 	 */
 	private boolean useKeyRef() {
-	    return (state & USE_KEY_REF) > 0;
+	    return (state & USE_KEY_REF) != 0;
 	}
 
 	/**
@@ -1216,7 +1236,7 @@ public class ScalableLinkedHashMap<K,V>
 	 * {@code valueRef}.
 	 */
 	private boolean useValueRef() {
-	    return (state & USE_VALUE_REF) > 0;
+	    return (state & USE_VALUE_REF) != 0;
 	}
 
 	/**
@@ -1336,11 +1356,11 @@ public class ScalableLinkedHashMap<K,V>
 	 * {@inheritDoc}
 	 */ 
 	public int hashCode() {
-	    K k; V v;
+	    K k = getKey();
+	    V v = getValue();
 	    return 
-		(((k = getKey()) == null) ? 0 : k.hashCode()) ^
-		(((v = getValue()) == null) ? 0 : v.hashCode());
-		
+		((k == null) ? 0 : k.hashCode()) ^
+		((v == null) ? 0 : v.hashCode());		
 	}
 
 	/**
@@ -1364,7 +1384,18 @@ public class ScalableLinkedHashMap<K,V>
      * ScalableLinkedHashMap}.  If the backing map does not support concurrent
      * updates to all outstanding iterators, then this class may throw a {@link
      * ConcurrentModificationException} if the entry which it would return next
-     * has been removed while this iterator was in a serialized state.
+     * has been removed while this iterator was in a serialized state.  
+     *
+     * <p>
+     *
+     * If the backing map does support concurrent iterators, then a shared state
+     * is persisted between the map and the iterator.  For every {@code next}
+     * call, the iterator will update the state with the id of the reference
+     * that it would return next.  For every removal in the backing map, the map
+     * will check whether any iterator has register the entry being removed and
+     * if so update that iterator's next entry.  The update to the shared state
+     * ensures that iterators that are not active in a transaction at the time
+     * of removal have a consistent view of the next entry to return.
      *
      * <p>
      *
@@ -1373,11 +1404,6 @@ public class ScalableLinkedHashMap<K,V>
      * state, where it has been created but {@code next} has never been called,
      * will always begin an the first entry in the map, if any, since its
      * deserialization.
-     *
-     * <p> 
-     *
-     * Instance of this class are <i>not</i> designed to be shared between
-     * concurrent tasks.
      */
     abstract static class OrderedIterator<E,K,V>
 	implements Iterator<E>, Serializable, ManagedObjectRemoval {
@@ -1393,7 +1419,7 @@ public class ScalableLinkedHashMap<K,V>
 	private boolean currentRemoved;
 
 	/**
-	 * A reference to the current entry
+	 * A reference to the next entry
 	 */
 	private ManagedReference<LinkedNode<K,V>> nextEntry;
 
@@ -1408,7 +1434,7 @@ public class ScalableLinkedHashMap<K,V>
 	private ManagedReference<ScalableLinkedHashMap<K,V>> backingMapRef;
 
 	/**
-	 * A reference to the map where {@code OrderedIterator} isntances
+	 * A reference to the map where {@code OrderedIterator} instances
 	 * register their next entry so that upon deserialization, the iterator
 	 * exhibits correct behavior.  This reference will be {@code null} if
 	 * the backing map does not support concurrent iteration.
@@ -1453,12 +1479,13 @@ public class ScalableLinkedHashMap<K,V>
 	    nextEntry = (first == null) ? null : dm.createReference(first);
 
 	    // mark if the next entry was null.  If so, if we serialize this
-	    // iterator and then deserialize it, we should refresh the first
-	    // entry in the map
+	    // iterator and then deserialize it in a different task, we should
+	    // check whether a first entry in the map exists then
 	    nextEntryWasNullOnCreation = nextEntry == null;
 
 	    // note that this field may be null, in which case, we don't update
-	    // our state and will throw a concurrent modification exception
+	    // our state and will throw a concurrent modification exception if
+	    // our nextEntry is removed while this iterator was not active
 	    serializedIteratorsNextElementsRef = 
 		backingMap.serializedIteratorsNextElementsRef;
 
@@ -1469,13 +1496,19 @@ public class ScalableLinkedHashMap<K,V>
 
 	    // last, mark in the shared map what the next element will be for
 	    // this iterator.  This ensures that if the iterator is left unused
-	    // and serialized after construction that the the next element will
-	    // be correctly updated if any future modifications occur
+	    // and persisted after construction that the the next element will
+	    // be correctly updated if any future modifications occur.  Note
+	    // that if this iterator does not share state with the backing map,
+	    // this operation is a no-op.
 	    updatePersistentNextEntry();
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Returns {@code true} if the iterator has more elements.  (In other
+	 * words, returns {@code true} if {@code next} would return an element
+	 * rather than throwing an exception.)
+	 *
+	 * @return {@code true} if the iterator has more elements
 	 */
 	public boolean hasNext() {
 	    if (recheckNextEntry) {
@@ -1525,6 +1558,7 @@ public class ScalableLinkedHashMap<K,V>
 		    nextEntryWasNullOnCreation = false;
 		}
 	    }
+
 	    // check if this iterator has a shared state with the backing map
 	    else if (isConcurrentIterator()) {
 		// otherwise, this iterator has seen at least one entry and had
@@ -1538,7 +1572,7 @@ public class ScalableLinkedHashMap<K,V>
 		// remove ourselves and assign whatever is listed as the next
 		// entry for us
 		ManagedReference<LinkedNode<K,V>> oldNext = nextEntry;
-		nextEntry = iteratorToNextEntry.remove(iteratorId);
+		nextEntry = iteratorToNextEntry.get(iteratorId);
 
 		// if the next entry has changed, mark the iterator for update
 		if (!(nextEntry == oldNext || 
@@ -1570,15 +1604,19 @@ public class ScalableLinkedHashMap<K,V>
 	 *
 	 * <p>
 	 *
-	 * If this iterator keeps a shared state with the backing map, this
-	 * method will never throw a {@link
-	 * java.util.ConcurrentModificationException}.  Otherwise it will throw
-	 * the exception if the entry that it would have returned next has been
-	 * removed while the iterator was in serialized form.
+	 * If the backing map supports concurrent iterators, this method will
+	 * never throw a {@link java.util.ConcurrentModificationException}.
+	 * Otherwise it will throw the exception only in the case where the
+	 * entry that this iterator would have returned next has been removed
+	 * while the iterator was in serialized form.
 	 *
 	 * @return the next entry in the {@code ScalableLinkedHashMap}
 	 *
 	 * @throws NoSuchElementException if no further entries exist
+	 * @throws ConcurrentModificationException if the backing map does not
+	 *         support concurrent iterators and the next element of this
+	 *         iterator has been removed from the map while the iterator was
+	 *         not active
 	 */
 	Entry<K,V> nextEntry() {
 	    if (!hasNext()) {
@@ -1643,7 +1681,13 @@ public class ScalableLinkedHashMap<K,V>
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Removes from the underlying collection the last element returned by
+	 * the iterator (optional operation). This method can be called only
+	 * once per call to {@code next}.
+	 *
+	 * @throws IllegalStateException if the {@code next} method has not yet
+	 *         been called, or the {@code remove} method has already been
+	 *         called after the last call to the {@code next} method
 	 */
 	public void remove() {
 	    if (currentRemoved) {
@@ -1665,16 +1709,10 @@ public class ScalableLinkedHashMap<K,V>
 	    AppContext.getDataManager().markForUpdate(this);
 	}
 
-	private void writeObject(ObjectOutputStream s)
-	    throws IOException {
-	    // write out all the non-transient state
-	    s.defaultWriteObject();
-	}
-
 	/**
 	 * Reconstructs the {@code OrderedIterator} from the provided stream and
 	 * marks that this iterator should check that its next entry is still
-	 * valid
+	 * valid.
 	 *
 	 * @see OrderedIterator#checkForNextEntryUpdates()
 	 */
@@ -1693,7 +1731,7 @@ public class ScalableLinkedHashMap<K,V>
     /**
      * An iterator over the entry set
      */
-    public static final class EntryIterator<K,V>
+    private static final class EntryIterator<K,V>
 	extends OrderedIterator<Entry<K,V>,K,V> {
 
 	private static final long serialVersionUID = 0x1L;
@@ -1701,7 +1739,7 @@ public class ScalableLinkedHashMap<K,V>
 	/**
 	 * Constructs the iterator
 	 *
-	 * @param root the root node of the backing trie
+	 * @param backingMap the map containing the entries
 	 */
 	EntryIterator(ScalableLinkedHashMap<K,V> backingMap) {
 	    super(backingMap);
@@ -1726,7 +1764,7 @@ public class ScalableLinkedHashMap<K,V>
 	/**
 	 * Constructs the iterator
 	 *
-	 * @param root the root node of the backing trie
+	 * @param backingMap the map containing the keys
 	 */
 	KeyIterator(ScalableLinkedHashMap<K,V> backingMap) {
 	    super(backingMap);
@@ -1751,7 +1789,7 @@ public class ScalableLinkedHashMap<K,V>
 	/**
 	 * Constructs the iterator
 	 *
-	 * @param root the root node of the backing trie
+	 * @param backingMap the map containing the values
 	 */
 	ValueIterator(ScalableLinkedHashMap<K,V> backingMap) {
 	    super(backingMap);
@@ -2040,6 +2078,8 @@ public class ScalableLinkedHashMap<K,V>
      */
     private static class AsynchronousClearTask<K,V> 
 	implements ManagedObject, Serializable, Task {
+
+	private static final long serialVersionUID = 8;
 	
 	/**
 	 * The maximum number of entries to remove in a single run of
@@ -2089,27 +2129,4 @@ public class ScalableLinkedHashMap<K,V>
 	    }
 	}
     }       
-
-    /**
-     * Saves the state of this {@code ScalableLinkedHashMap} instance
-     * to the provided stream.
-     */
-    private void writeObject(ObjectOutputStream s)
-	throws IOException {
-	// write out all the non-transient state
-	s.defaultWriteObject();
-
-    }
-
-    /**
-     * Reconstructs the {@code ScalableLinkedHashMap} from the
-     * provided stream.
-     */
-    private void readObject(ObjectInputStream s)
-	throws IOException, ClassNotFoundException {
-
-	// read in all the non-transient state
-	s.defaultReadObject();	
-
-    }
 }

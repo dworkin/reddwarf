@@ -1793,8 +1793,8 @@ public class ScalableHashMap<K,V>
      *
      * This class performs an optimization if both key and value do not
      * implement {@code ManagedObject}.  In this case, both objects will be
-     * stored together in a {@link KeyValuePair}, which reduces the number of
-     * accesses to the data store.
+     * stored together in a {@link ScalableHashMap$KeyValuePair}, which reduces
+     * the number of accesses to the data store.
      *
      * <p>
      *

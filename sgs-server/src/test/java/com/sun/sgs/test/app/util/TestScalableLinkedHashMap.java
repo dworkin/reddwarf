@@ -2128,7 +2128,7 @@ public class TestScalableLinkedHashMap extends Assert {
 		    Iterator<Map.Entry<Integer,Integer>> controlIter =
 			control.entrySet().iterator();		   
 
-		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+		    Iterator<Map.Entry<Integer,Integer>> testIter =
 			uncheckedCast(test.entrySet().iterator());
 
 		    for (int i = 0; i < a.length / 2; ++i) {
@@ -2155,7 +2155,7 @@ public class TestScalableLinkedHashMap extends Assert {
 			controlIter.next();
 		    }
 
-		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+		    Iterator<Map.Entry<Integer,Integer>> testIter =
 			uncheckedCast(AppContext.getDataManager().getBinding("test"));
 
 		    for (int i = a.length / 2; i < a.length; ++i) {
@@ -2191,7 +2191,7 @@ public class TestScalableLinkedHashMap extends Assert {
 		    Iterator<Map.Entry<Integer,Integer>> controlIter =
 			control.entrySet().iterator();		   
 
-		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+		    Iterator<Map.Entry<Integer,Integer>> testIter =
 			uncheckedCast(test.entrySet().iterator());
 
 		    for (int i = 0; i < a.length / 4; ++i) {
@@ -2223,7 +2223,7 @@ public class TestScalableLinkedHashMap extends Assert {
 			controlIter.next();
 		    }
 
-		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+		    Iterator<Map.Entry<Integer,Integer>> testIter =
 			uncheckedCast(AppContext.getDataManager().getBinding("test"));
 
 		    // check the remaining elements
@@ -2258,7 +2258,7 @@ public class TestScalableLinkedHashMap extends Assert {
 			a[i] = j;
 		    }
 		    
-		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+		    Iterator<Map.Entry<Integer,Integer>> testIter =
 			uncheckedCast(test.entrySet().iterator());
 
 		    AppContext.getDataManager().setBinding("test", testIter);
@@ -2272,7 +2272,7 @@ public class TestScalableLinkedHashMap extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 
-		    ScalableLinkedHashMap.EntryIterator<Integer,Integer> testIter =
+		    Iterator<Map.Entry<Integer,Integer>> testIter =
 			uncheckedCast(AppContext.getDataManager().getBinding("test"));
 
 		    assertFalse(testIter.hasNext());
