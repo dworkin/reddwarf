@@ -83,6 +83,9 @@ public class TransactionContextMap<T extends TransactionContext> {
             throw new TransactionNotActiveException(
                 "No transaction is active");
         }
+        if (txn.isAborted()) {
+            throw new TransactionNotActiveException("Transaction is aborted");
+        }
         T context = currentContext.get();
         if (context == null) {
             if (logger.isLoggable(Level.FINER)) {
