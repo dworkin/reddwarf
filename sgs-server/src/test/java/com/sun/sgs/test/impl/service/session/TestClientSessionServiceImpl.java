@@ -1011,6 +1011,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   " ms.");
     }
 
+    public void testRemoveSessionWhileSessionDisconnects() throws Exception {
+	final String user = "foo";
+	DummyClient client = new DummyClient(user);
+	client.connect(serverNode.getAppPort()).login();
+	client.logout();
+	client.checkDisconnectedCallback(true);
+    }
+
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
@@ -1627,8 +1635,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
-	    AppContext.getDataManager().markForUpdate(this);
+	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
 	    DummyClient client = dummyClients.get(name);
+	    ClientSession session = (ClientSession)
+		dataManager.getBinding(name);
+	    dataManager.removeObject(session);
 	    client.receivedDisconnectedCallback = true;
 	    client.graceful = graceful;
 	    synchronized (client.disconnectedCallbackLock) {
