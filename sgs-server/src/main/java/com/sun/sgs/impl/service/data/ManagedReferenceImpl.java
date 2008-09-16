@@ -26,6 +26,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
+import com.sun.sgs.kernel.AccessReporter.AccessType;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -337,6 +338,8 @@ final class ManagedReferenceImpl<T>
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
 	    }
+	    // mark that we read the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	    switch (state) {
 	    case EMPTY:
 		ManagedObject tempObject = deserialize(
@@ -375,6 +378,7 @@ final class ManagedReferenceImpl<T>
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
+	    context.oidAccesses.setObjectDescription(getId(), result);
 	    return result;
 	} catch (TransactionNotActiveException e) {
 	    throw new TransactionNotActiveException(
@@ -396,6 +400,8 @@ final class ManagedReferenceImpl<T>
 	RuntimeException exception;
 	try {
 	    DataServiceImpl.checkContext(context);
+	    // mark that we acquired a write lock on the object
+	    context.oidAccesses.reportObjectAccess(getId(), AccessType.WRITE);
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
@@ -433,6 +439,7 @@ final class ManagedReferenceImpl<T>
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
+	    context.oidAccesses.setObjectDescription(getId(), result);	    
 	    return result;
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
@@ -576,6 +583,18 @@ final class ManagedReferenceImpl<T>
     static void flushAll(Context context) {
 	FlushInfo info = context.refs.flushModifiedObjects();
 	if (info != null) {
+
+	    // mark all of the objects that are being flushed as having
+	    // been write locked.  For those objects that weren't
+	    // explicited updated with getForUpdate or markForUpdate, this
+	    // loop will add them to the list of write accesses
+	    for (long oid : info.getOids()) {
+		context.oidAccesses.
+		    reportObjectAccess(context.txn.originalTxn, 
+				       BigInteger.valueOf(oid),
+				       AccessType.WRITE);
+	    }
+
 	    context.store.setObjects(
 		context.txn, info.getOids(), info.getDataArray());
 	}
@@ -627,6 +646,13 @@ final class ManagedReferenceImpl<T>
 		SerialUtil.serialize(object, context.classSerial);
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
+		context.oidAccesses.
+		    reportObjectAccess(context.txn.originalTxn, 
+				       BigInteger.valueOf(oid),
+				       AccessType.WRITE,
+				       "object was not explicitly " +
+				       "marked for update: " +
+                                       object.getClass());
 		if (debugDetectLogger.isLoggable(Level.FINEST)) {
 		    debugDetectLogger.log(
 			Level.FINEST,

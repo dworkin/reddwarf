@@ -28,6 +28,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileListener;
@@ -153,6 +154,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
     /** {@inheritDoc} */
     public void setDefaultProfileLevel(ProfileLevel level) {
+        if (level == null)
+            throw new NullPointerException("Profile level cannot be null");
         defaultProfileLevel = level;
     }
     
@@ -166,6 +169,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     
     /** Called by the profile registrar */
     ProfileConsumer registerProfileProducer(String name) {
+        if (name == null)
+            throw new NullPointerException("Name cannot be null");
         ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
         consumers.put(pc.getName(), pc);
         return pc;
@@ -173,6 +178,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     
     /** {@inheritDoc} */
     public void addListener(ProfileListener listener, boolean canRemove) {
+        if (listener == null)
+            throw new NullPointerException("Cannot add a null listener");
         listeners.put(listener, canRemove);
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
@@ -193,6 +200,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     public void addListener(String listenerClassName) 
             throws Exception 
     {              
+        if (listenerClassName == null)
+            throw new NullPointerException("Class name cannot not be null");
         // make sure we can resolve the listener
         Class<?> listenerClass = Class.forName(listenerClassName);
         Constructor<?> listenerConstructor =
@@ -221,6 +230,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     
     /** {@inheritDoc} */
     public void removeListener(ProfileListener listener) {
+        if (listener == null)
+            throw new NullPointerException("Listener cannot be null");
         // Check to see if we're allowed to remove this listener
         Boolean canRemove = listeners.get(listener);
         if (canRemove != null && canRemove.equals(Boolean.TRUE)) {
@@ -259,13 +270,19 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     public void startTask(KernelRunnable task, Identity owner,
                           long scheduledStartTime, int readyCount)
     {
+        if (task == null)
+            throw new NullPointerException("Task cannot be null");
+        if (owner == null)
+            throw new NullPointerException("Owner cannot be null");
         profileReports.get().push(new ProfileReportImpl(task, owner,
                                                         scheduledStartTime,
                                                         readyCount));
     }
 
     /** {@inheritDoc} */
-    public void noteTransactional() {
+    public void noteTransactional(byte [] txnId) {
+        if (txnId == null)
+            throw new NullPointerException("Transaction id cannot be null");
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -274,11 +291,13 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                                             "this thread");
         }
 
-        profileReport.transactional = true;
+        profileReport.transactionId = txnId;
     }
 
     /** {@inheritDoc} */
     public void addParticipant(ProfileParticipantDetail participantDetail) {
+        if (participantDetail == null)
+            throw new NullPointerException("Participant detail cannot be null");
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -286,11 +305,28 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
         }
-        if (!profileReport.transactional) {
+        if (! profileReport.wasTaskTransactional()) {
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
         }
         profileReport.participants.add(participantDetail);
+    }
+
+    /** {@inheritDoc} */
+    public void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
+        if (detail == null)
+            throw new NullPointerException("Access detail cannot be null");
+        ProfileReportImpl profileReport = null;
+        try {
+            profileReport = profileReports.get().peek();
+        } catch (EmptyStackException ese) {
+            throw new IllegalStateException("No task is being profiled in " +
+                                            "this thread");
+        }
+        if (! profileReport.wasTaskTransactional())
+            throw new IllegalStateException("Object access cannot be added " +
+                                            "to a non-transactional task");
+        profileReport.accessedObjectsDetail = detail;
     }
 
     /** {@inheritDoc} */
