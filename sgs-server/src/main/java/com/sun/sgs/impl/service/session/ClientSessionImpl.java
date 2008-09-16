@@ -350,6 +350,10 @@ public class ClientSessionImpl
 	String listenerKey = getListenerKey();
 	String eventQueueKey = getEventQueueKey();
 
+	// Mark this session as disconnected.
+	dataService.markForUpdate(this);
+	connected = false;
+
 	/*
 	 * Get ClientSessionListener, and remove its binding and
 	 * wrapper if applicable.  The listener may not be bound

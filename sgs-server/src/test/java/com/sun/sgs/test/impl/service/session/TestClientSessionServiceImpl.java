@@ -456,6 +456,28 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	
     }
+    
+    public void testSendBeforeLoginComplete() throws Exception {
+	DummyClient client = new DummyClient("dummy");
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login(false);
+	    client.sendMessages(1, 0, null);
+	} finally {
+            client.disconnect();
+	}
+    }
+
+    public void testSendAfterLoginComplete() throws Exception {
+	DummyClient client = new DummyClient("dummy");
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login(true);
+	    client.sendMessages(1, 1, null);
+	} finally {
+            client.disconnect();
+	}
+    }
 
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
 	String name = "success";
@@ -640,7 +662,6 @@ public class TestClientSessionServiceImpl extends TestCase {
             client.disconnect();
 	}
     }
-
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	int numClients = 4;
@@ -990,6 +1011,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   " ms.");
     }
 
+    public void testRemoveSessionWhileSessionDisconnects() throws Exception {
+	final String user = "foo";
+	DummyClient client = new DummyClient(user);
+	client.connect(serverNode.getAppPort()).login();
+	client.logout();
+	client.checkDisconnectedCallback(true);
+    }
+
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
@@ -1168,10 +1197,30 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns {@code true} if login was successful, and returns
-	 * {@code false} if login was redirected.
+	 * Sends a login request and waits for it to be acknowledged,
+	 * returning {@code true} if login was successful, and {@code
+	 * false} if login was redirected.  If the login was not successful
+	 * or redirected, then a {@code RuntimeException} is thrown because
+	 * the login operation timed out before being acknowledged.
 	 */
 	boolean login() {
+	    return login(true);
+	}
+
+	/**
+	 * Sends a login request and if {@code waitForLogin} is {@code
+	 * true} waits for the request to be acknowledged, returning {@code
+	 * true} if login was successful, and {@code false} if login was
+	 * redirected, otherwise a {@code RuntimeException} is thrown
+	 * because the login operation timed out before being acknowldeged.
+	 *
+	 * If {@code waitForLogin} is false, this method returns {@code
+	 * true} if the login is known to be successful (the outcome may
+	 * not yet be known because the login operation is asynchronous),
+	 * otherwise it returns false.  Invoke {@code waitForLogin} to wait
+	 * for an expected successful login.
+	 */
+	boolean login(boolean waitForLogin) {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(toString() + " not connected");
@@ -1192,6 +1241,22 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
+	    if (waitForLogin) {
+		return waitForLogin();
+	    } else {
+		synchronized (lock) {
+		    return loginSuccess;
+		}
+	    }
+	}
+
+	/**
+	 * Waits for a login acknowledgement, and returns {@code true} if
+	 * login was successful, {@code false} if login was redirected,
+	 * otherwise a {@code RuntimeException} is thrown because the login
+	 * operation timed out before being acknowledged.
+	 */
+	boolean waitForLogin() {
 	    synchronized (lock) {
 		try {
 		    if (loginAck == false) {
@@ -1232,8 +1297,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Sends a SESSION_MESSAGE.
 	 */
 	void sendMessage(byte[] message) {
-	    checkLoggedIn();
-
 	    MessageBuffer buf =
 		new MessageBuffer(1+ message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
@@ -1572,8 +1635,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
-	    AppContext.getDataManager().markForUpdate(this);
+	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
 	    DummyClient client = dummyClients.get(name);
+	    ClientSession session = (ClientSession)
+		dataManager.getBinding(name);
+	    dataManager.removeObject(session);
 	    client.receivedDisconnectedCallback = true;
 	    client.graceful = graceful;
 	    synchronized (client.disconnectedCallbackLock) {
