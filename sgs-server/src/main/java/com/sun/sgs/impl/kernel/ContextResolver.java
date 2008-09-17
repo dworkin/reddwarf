@@ -159,7 +159,6 @@ public final class ContextResolver {
         if (txn == null)
             throw new TransactionNotActiveException("no current transaction");
 
-        // How do we check if the transaction has started preparing?
         if (txn.isAborted()) {
             throw new TransactionNotActiveException("Transaction is aborted");
         }
