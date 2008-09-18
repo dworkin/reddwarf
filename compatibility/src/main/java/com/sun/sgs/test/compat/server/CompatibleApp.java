@@ -36,7 +36,7 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +45,7 @@ import java.util.Set;
 
 /**
  * An application to use for checking compatibility across releases, both for
- * persistent data structures and APIs.
+ * persistent data structures and APIs.  Corresponds to release 0.9.7.
  */
 public class CompatibleApp implements AppListener, Serializable {
 
@@ -53,24 +53,23 @@ public class CompatibleApp implements AppListener, Serializable {
     private static final long serialVersionUID = 1;
 
     /** How many milliseconds to wait in between running tasks. */
-    private static final long DELAY = 2000;
+    static final long DELAY = 2000;
 
     /** The name of the persistent channel to create. */
-    private static final String channelName = "Channel1";
+    static final String channelName = "Channel1";
 
     /** The channel manager. */
-    private static final ChannelManager channelManager =
+    static final ChannelManager channelManager =
 	AppContext.getChannelManager();
 
     /** The data manager. */
-    private static final DataManager dataManager = AppContext.getDataManager();
+    static final DataManager dataManager = AppContext.getDataManager();
 
     /** The task manager. */
-    private static final TaskManager taskManager = AppContext.getTaskManager();
+    static final TaskManager taskManager = AppContext.getTaskManager();
 
     /** Objects to initialize. */
-    private static final List<Initialize> initializers =
-	new ArrayList<Initialize>();
+    static final List<Initialize> initializers = new ArrayList<Initialize>();
 
     /** Creates an instance of this class. */
     public CompatibleApp() { }
@@ -155,15 +154,11 @@ public class CompatibleApp implements AppListener, Serializable {
      * flag asking {@code PeriodicTask} to increment a counter, and then checks
      * that the counter has been incremented.
      */
-    private static class CheckPeriodicTask extends CheckTask
-	implements Initialize
-    {
+    private static class CheckPeriodicTask extends InitializeCheckTask {
 	private static final long serialVersionUID = 1;
 	private boolean started;
 	private int count;
-	CheckPeriodicTask() {
-	    initializers.add(this);
-	}
+	CheckPeriodicTask() { }
 	public void initialize() {
 	    taskManager.schedulePeriodicTask(new PeriodicTask(), 0, DELAY);
 	}
@@ -238,15 +233,11 @@ public class CompatibleApp implements AppListener, Serializable {
      * flag asking {@code NonManagedTask} to increment a counter, and then
      * checks that the counter has been incremented.
      */
-    private static class CheckNonManagedTask extends CheckTask
-	implements Initialize
-    {
+    private static class CheckNonManagedTask extends InitializeCheckTask {
 	private static final long serialVersionUID = 1;
 	private boolean started;
 	private int count;
-	CheckNonManagedTask() {
-	    initializers.add(this);
-	}
+	CheckNonManagedTask() { }
 	public void initialize() {
 	    taskManager.scheduleTask(new NonManagedTask());
 	}
@@ -330,15 +321,11 @@ public class CompatibleApp implements AppListener, Serializable {
      * flag asking {@code ManagedTask} to increment a counter, and then checks
      * that the counter has been incremented.
      */
-    private static class CheckManagedTask extends CheckTask
-	implements Initialize
-    {
+    private static class CheckManagedTask extends InitializeCheckTask {
 	private static final long serialVersionUID = 1;
 	private boolean started;
 	private int count;
-	CheckManagedTask() {
-	    initializers.add(this);
-	}
+	CheckManagedTask() { }
 	public void initialize() {
 	    taskManager.scheduleTask(new ManagedTask());
 	}
@@ -405,13 +392,9 @@ public class CompatibleApp implements AppListener, Serializable {
     }
 
     /** Checks that we can find an existing channel. */
-    private static class CheckExistingChannelTask extends CheckTask
-	implements Initialize
-    {
+    private static class CheckExistingChannelTask extends InitializeCheckTask {
 	private static final long serialVersionUID = 1;
-	CheckExistingChannelTask() {
-	    initializers.add(this);
-	}
+	CheckExistingChannelTask() { }
 	public void initialize() {
 	    AppContext.getChannelManager().createChannel(
 		channelName, new MyChannelListener(), Delivery.RELIABLE);
@@ -427,16 +410,14 @@ public class CompatibleApp implements AppListener, Serializable {
 	new CheckExistingChannelTask();
     }
 
-    /** Tests an existing {@lnk ScalableHashMap}. **/
-    private static class CheckPersistentScalableHashMap extends CheckTask
-	implements Initialize
+    /** Tests an existing {@link ScalableHashMap}. **/
+    private static class CheckPersistentScalableHashMap
+	extends InitializeCheckTask
     {
 	private static final long serialVersionUID = 1;
 	private static final int size = 20;
 	private static final String name = "scalableHashMap";
-	CheckPersistentScalableHashMap() {
-	    initializers.add(this);
-	}
+	CheckPersistentScalableHashMap() { }
 	public void initialize() {
 	    Map<Integer, String> map = new ScalableHashMap<Integer, String>();
 	    for (int i = 0; i < size; i++) {
@@ -465,21 +446,19 @@ public class CompatibleApp implements AppListener, Serializable {
     }
 
     /** Tests an existing {@link ScalableHashSet}. **/
-    private static class CheckPersistentScalableHashSet extends CheckTask
-	implements Initialize
+    private static class CheckPersistentScalableHashSet
+	extends InitializeCheckTask
     {
 	private static final long serialVersionUID = 1;
 	private static final int size = 20;
 	private static final String name = "scalableHashSet";
-	CheckPersistentScalableHashSet() {
-	    initializers.add(this);
-	}
+	CheckPersistentScalableHashSet() { }
 	public void initialize() {
-	    Set<Integer> map = new ScalableHashSet<Integer>();
+	    Set<Integer> set = new ScalableHashSet<Integer>();
 	    for (int i = 0; i < size; i++) {
-		map.add(i);
+		set.add(i);
 	    }
-	    dataManager.setBinding(name, map);
+	    dataManager.setBinding(name, set);
 	}
 	boolean runInternal() {
 	    @SuppressWarnings("unchecked")
@@ -695,12 +674,11 @@ public class CompatibleApp implements AppListener, Serializable {
 	private static final long serialVersionUID = 1;
 	CheckScalableCollectionsTask() { }
 	boolean runInternal() {
-	    new ScalableHashMap<String, String>();
-	    new ScalableHashMap<String, String>(3);
-	    new ScalableHashMap<String, String>(
-		new HashMap<String, String>());
-	    new ScalableHashSet<String>();
-	    new ScalableHashSet<String>(new ArrayList<String>());
+	    ManagedObjectRemoval mor = new ScalableHashMap<String, String>();
+	    Map<String, String> m = new ScalableHashMap<String, String>(3);
+	    new ScalableHashMap<String, String>(m);
+	    Collection<String> c = new ScalableHashSet<String>();
+	    mor = new ScalableHashSet<String>(c);
 	    new ScalableHashSet<String>(3);
 	    return true;
 	}
@@ -747,17 +725,6 @@ public class CompatibleApp implements AppListener, Serializable {
     /* TaskManager already checked */
 
     /* -- Utility classes -- */
-
-    /**
-     * An interface that classes should implement if they want to be called by
-     * the implementation of the {@link #initialize AppListener.initialize}
-     * method.
-     */
-    interface Initialize {
-
-	/** Perform initial operations on startup. */
-	void initialize();
-    }
 
     /**
      * An abstract base class for creating tasks that perform checks when
@@ -897,7 +864,8 @@ public class CompatibleApp implements AppListener, Serializable {
 	private void completed(boolean passed) {
 	    getSession().send(
 		stringToBuffer(
-		    this + ": Completed " + index + " of " + totalChecks));
+		    this + ": Completed " + index + " of " + totalChecks
+		    + (passed ? "" : ": FAILED")));
 	    ManagedCounter completed;
 	    ManagedCounter failed;
 	    try {
@@ -934,8 +902,29 @@ public class CompatibleApp implements AppListener, Serializable {
 	}
     }
 
+    /**
+     * An interface that classes should implement if they want to be called by
+     * the implementation of the {@link #initialize AppListener.initialize}
+     * method.
+     */
+    interface Initialize {
+
+	/** Perform initial operations on startup. */
+	void initialize();
+    }
+
+    /** An implementation of CheckTask that implements Initialize. */
+    abstract static class InitializeCheckTask extends CheckTask
+	implements Initialize
+    {
+	private final static long serialVersionUID = 1;
+	InitializeCheckTask() {
+	    initializers.add(this);
+	}
+    }
+
     /** A simple managed object. */
-    private static class Marker implements ManagedObject, Serializable {
+    static class Marker implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
 	Marker() { }
     }
@@ -944,7 +933,7 @@ public class CompatibleApp implements AppListener, Serializable {
      * A managed object counter.  Implements {@link ManagedObjectRemoval} as a
      * simple way to make sure that interface is defined.
      */
-    private static class ManagedCounter
+    static class ManagedCounter
 	implements ManagedObject, Serializable, ManagedObjectRemoval
     {
 	private static final long serialVersionUID = 1;

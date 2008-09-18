@@ -35,6 +35,10 @@
     <isset property="use.je"/>
   </condition>
 
+  <!-- The name of the application to run -->
+  <property name="app.name" value="CompatibleApp"/>
+  <property name="app.port" value="12321"/>
+
 
   <!-- Target Definitions -->
 
@@ -52,12 +56,10 @@
   <target name="run-server"
 	  description="Runs the test application"
 	  depends="build-server">
-    <!-- Copy the application properties file and append properties for
-	 the root directory and data store class -->
-    <copy file="src/main/etc/CompatibleApp.properties"
-	  todir="${target.dir}/server"/>
-    <echo file="${target.dir}/server/CompatibleApp.properties"
-	  append="true">
+    <echo file="${target.dir}/server/CompatibleApp.properties">
+      com.sun.sgs.app.listener=com.sun.sgs.test.compat.server.${app.name}
+      com.sun.sgs.app.name=${app.name}
+      com.sun.sgs.app.port=${app.port}
       com.sun.sgs.app.root=${target.dir}/server/root
       com.sun.sgs.impl.service.data.store.db.environment.class=${bdb.env}
     </echo>
