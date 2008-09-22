@@ -214,6 +214,16 @@ class ClientSessionHandler {
     }
 
     /**
+     * Returns {@code true} if the login for this session has been handled,
+     * otherwise returns {@code false}.
+     *
+     * @return	{@code true} if the login for this session has been handled
+     */
+    boolean loginHandled() {
+	return getCurrentState() != State.CONNECTED;
+    }
+
+    /**
      * Immediately sends the specified protocol {@code message} according to
      * the specified {@code delivery} requirement if the session has logged
      * in; otherwise, enqueues the message until the login ack has been sent.
@@ -321,8 +331,9 @@ class ClientSessionHandler {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
 		    }});
-
-	    deactivateIdentity(identity);
+	    if (sessionService.removeUserLogin(identity, this)) {
+		deactivateIdentity(identity);
+	    }
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
@@ -837,8 +848,14 @@ class ClientSessionHandler {
 		 * "addHandler", and schedule a task to perform client
 		 * login (call the AppListener.loggedIn method).
 		 */
-		taskQueue = sessionService.createTaskQueue();
 		identity = authenticatedIdentity;
+		if (! sessionService.validateUserLogin(
+			identity, ClientSessionHandler.this)) {
+		    // This login request is not allowed to proceed.
+		    sendLoginFailureAndDisconnect();
+		    return;
+		}
+		taskQueue = sessionService.createTaskQueue();
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();
 		try {

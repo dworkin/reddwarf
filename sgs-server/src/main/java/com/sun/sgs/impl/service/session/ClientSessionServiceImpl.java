@@ -164,6 +164,28 @@ public final class ClientSessionServiceImpl
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
+    /** The name of the same user login property. */
+    private static final String SAME_USER_LOGIN_POLICY_PROPERTY =
+	PKG_NAME + ".same.user.login.policy";
+
+    /**
+     * A value for the same user login policy property; the second user is
+     * denied login.
+     */
+    private static final String BLOCK_SAME_USER = "block";
+
+    /**
+     * A value for the same user login property; the second user preempts
+     * the first user.
+     */
+    private static final String PREEMPT_SAME_USER = "preempt";
+
+    /**
+     * The default same user login value; {@code block}.
+     */
+    private static final String DEFAULT_SAME_USER_LOGIN_POLICY =
+	BLOCK_SAME_USER;
+    
     /** The name of the disconnect delay property. */
     private static final String DISCONNECT_DELAY_PROPERTY =
 	PKG_NAME + ".disconnect.delay";
@@ -245,6 +267,13 @@ public final class ClientSessionServiceImpl
     /** The proxy for the ClientSessionServer. */
     private final ClientSessionServer serverProxy;
 
+    /** The map of logged in {@code ClientSessionHandler}s, keyed by
+     *  identity.
+     */
+    private final ConcurrentHashMap<Identity, ClientSessionHandler>
+	loggedInIdentityMap =
+	    new ConcurrentHashMap<Identity, ClientSessionHandler>();
+	
     /** The map of session task queues, keyed by session ID. */
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
@@ -261,6 +290,14 @@ public final class ClientSessionServiceImpl
 
     /** The maximum number of session events to sevice per transaction. */
     final int eventsPerTxn;
+
+    /** The flag that indicates how to handle same user logins.  If {@code
+     * true}, then if the same user logs in, the second login will be
+     * denied.  If {@code false}, then if the same user logs in, the first
+     * session will be disconnected, and the second one will be allowed to
+     * proceed. 
+     */
+    final boolean blockSameUserLogin;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -306,6 +343,12 @@ public final class ClientSessionServiceImpl
 	    disconnectDelay = wrappedProps.getLongProperty(
 		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
 		200, Long.MAX_VALUE);
+
+	    String sameUserLoginPolicy = wrappedProps.getProperty(
+		SAME_USER_LOGIN_POLICY_PROPERTY,
+		DEFAULT_SAME_USER_LOGIN_POLICY);
+	    blockSameUserLogin =
+		! sameUserLoginPolicy.equals(PREEMPT_SAME_USER);
 
 	    /*
 	     * Export the ClientSessionServer.
@@ -1194,6 +1237,70 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+    /**
+     * Validates the {@code identity} of the user logging in and returns
+     * {@code true} if the login is allowed to proceed, and {@code false}
+     * if the login is denied.
+     *
+     * <p>A user with the specified {@code identity} is allowed to log in
+     * if one of the following conditions holds:
+     *
+     * <ul>
+     * <li>the {@code identity} is not currently logged in, or
+     * <li>the {@code identity} is logged in, and the {@code
+     * com.sun.sgs.impl.service.session.same.user.login.policy} property is
+     * set to {@code preempt}.
+     * </ul>
+     * In the latter case (preemption), the previous session logged in
+     * with {@code identity} is forcibly disconnected.
+     *
+     * <p>If this method returns {@code true}, the {@link #removeUserLogin}
+     * method must be invoked when the user with the specified {@code
+     * identity} is disconnected.
+     *
+     * @param	identity the user identity
+     * @param	handler the client session handler
+     * @return	{@code true} if the user is allowed to log in with the
+     * specified {@code identity}, otherwise returns {@code false}
+     */
+    boolean validateUserLogin(Identity identity, ClientSessionHandler handler) {
+	ClientSessionHandler previousHandler =
+	    loggedInIdentityMap.putIfAbsent(identity, handler);
+	if (previousHandler == null) {
+	    // No user logged in with the same idenity; allow login.
+	    return true;
+	} else if (blockSameUserLogin) {
+	    // Same user logged in; blocking requested, so deny login.
+	    return false;
+	} else if (! previousHandler.loginHandled()) {
+	    // Same user logged in; can't preempt user in the
+	    // process of logging in; deny login.
+	    return false;
+	} else {
+	    if (loggedInIdentityMap.replace(
+		    identity, previousHandler, handler)) {
+		// Preempt previous user; allow login.
+		previousHandler.handleDisconnect(false, true);
+		return true;
+	    } else {
+		// Another same user login beat this one; deny login.	
+		return false;
+	    }
+	}
+    }
+
+    /**
+     * Notifies this service that the specified {@code identity} is no
+     * longer logged in using the specified {@code handler} so that
+     * internal bookkeeping can be adjusted accordingly.
+     *
+     * @param	identity the user identity
+     * @param	handler the client session handler
+     */
+    boolean removeUserLogin(Identity identity, ClientSessionHandler handler) {
+	return loggedInIdentityMap.remove(identity, handler);
+    }
+    
     /**
      * Adds the handler for the specified session to the internal
      * session handler map.  This method is invoked by the handler once the

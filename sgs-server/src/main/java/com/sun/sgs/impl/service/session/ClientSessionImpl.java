@@ -265,7 +265,7 @@ public class ClientSessionImpl
     /** {@inheritDoc} */
     @Override
     public String toString() {
-	return getClass().getName() + "[" + getName() + "]@[id:0x" +
+	return getClass().getName() + "[" + identity.getName() + "]@[id:0x" +
 	    id.toString(16) + ",node:" + nodeId + "]";
     }
 
@@ -411,7 +411,7 @@ public class ClientSessionImpl
 		    logger.logThrow(
 			Level.WARNING, e,
 			"invoking disconnected callback on listener:{0} " +
-			" for session:{1} throws",
+			"for session:{1} throws",
 			listener, this);
 		    sessionService.scheduleTask(
 			new AbstractKernelRunnable() {

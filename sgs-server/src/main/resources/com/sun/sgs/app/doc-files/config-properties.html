@@ -287,11 +287,21 @@ These properties control the implementation of the
 <code>ClientSessionService</code>.
 <dl>
 
+<dt>com.sun.sgs.impl.service.session.same.user.login.policy
+<span class="default">block</span>
+<dd>The policy for handling a new login request for a user that is
+already logged in, either <code>block</code> (the default) or
+<code>preempt</code>.  The <code>block</code> policy denies
+a user with the same identity from logging in.  The <code>preempt</code>
+policy disconnects the user already logged in, and allows the second login
+to proceed. 
+		
 <dt>com.sun.sgs.impl.service.session.disconnect.delay
 <span class="default">1000</span>
 <dd>The time, in milliseconds, in which a disconnecting client is allowed to close a
 connection before it is closed by the server. The delay must be greater than or
 equal to <code>200</code> milliseconds.
+	
 </dl>
 
 <a name="System"></a>
