@@ -53,7 +53,7 @@ import java.io.Serializable;
 public final class WrappedSerializable<T> implements Serializable {
 
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
     /** The managed reference for the object or wrapper.
      */

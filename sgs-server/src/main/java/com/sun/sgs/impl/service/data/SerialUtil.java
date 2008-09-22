@@ -393,7 +393,7 @@ final class SerialUtil {
 	}
 
 	/** Checks an object for bad references. */
-	private void checkObject(Object object) {
+	void checkObject(Object object) {
 	    if (object != null &&
 		!(object instanceof ManagedReference) &&
 		!seen.containsKey(object))

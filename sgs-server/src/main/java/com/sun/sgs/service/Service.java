@@ -59,7 +59,7 @@ public interface Service {
      *
      * @return the service's name
      */
-    public String getName();
+    String getName();
 
     /**
      * Notifies this {@code Service} that the application is fully
@@ -70,7 +70,7 @@ public interface Service {
      *
      * @throws Exception if an error occurs
      */
-    public void ready() throws Exception;
+    void ready() throws Exception;
 
     /** 
      * Attempts to shut down this service, returning a value indicating whether
@@ -102,6 +102,6 @@ public interface Service {
      * @throws	IllegalStateException if the {@code shutdown} method has
      *		already been called and returned {@code true}
      */
-    public boolean shutdown();
+    boolean shutdown();
 
 }

@@ -187,7 +187,7 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	    try {
 		T context = contextMap.checkTransaction(txn);
 		try {
-		    if (! context.isPrepared()) {
+		    if (!context.isPrepared()) {
 			RuntimeException e = 
 			    new IllegalStateException(
 				"transaction not prepared");
