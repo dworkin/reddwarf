@@ -192,15 +192,16 @@
 	</module>
         <module name="NoWhitespaceBefore"/>
         <module name="OperatorWrap">
-	    <!-- DARKSTAR: Remove requirements for the triglyph
-		 question mark and colon to be at the beginning or end
-		 of the line.  There doesn't seem to be agreement about
-		 the formatting style here. -->
+	    <!-- DARKSTAR: Remove requirements for the triglyph question
+		 mark and colon, as well as the plus sign used for
+		 string concatenation, to be at the beginning or end of
+		 the line.  There doesn't seem to be agreement about the
+		 formatting style here. -->
 	    <property name="option" value="eol"/>
 	    <property name="tokens"
 		      value="BAND, BOR, BSR, BXOR, DIV, EQUAL, GE, GT,
 			     LAND, LE, LITERAL_INSTANCEOF, LOR, LT,
-			     MINUS, MOD, NOT_EQUAL, PLUS, SL, SR,
+			     MINUS, MOD, NOT_EQUAL, SL, SR,
 			     STAR"/>
 	</module>
         <module name="OperatorWrap">
@@ -254,12 +255,17 @@
 			     LITERAL_WHILE, INSTANCE_INIT,
 			     STATIC_INIT"/>
 	</module>
+	<!-- DARKSTAR: We would like to require the left curly brace of
+	     a block to appear on the first line if it will fit,
+	     otherwise at the start of the next line.  But Checkstyle
+	     currently does not understand that attributes should not be
+	     included in this computation, so disable this check for
+	     now.  tjb@sun.com (09/22/2008) -->
+	<!--
         <module name="LeftCurly">
-	    <!-- DARKSTAR: Require the left curly brace of a block to
-		 appear on the first line if it will fit, otherwise at
-		 the start of the next line -->
 	    <property name="option" value="nlow"/>
 	</module>
+	-->
         <module name="NeedBraces"/>
         <module name="RightCurly"/>
 
