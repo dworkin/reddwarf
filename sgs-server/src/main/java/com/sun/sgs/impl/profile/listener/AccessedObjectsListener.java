@@ -23,6 +23,8 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.profile.util.TransactionId;
 
+import com.sun.sgs.impl.util.BoundedLinkedHashMap;
+
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.ComponentRegistry;
 
@@ -33,9 +35,7 @@ import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 
@@ -269,24 +269,5 @@ public class AccessedObjectsListener implements ProfileListener {
 	// unused
     }
 
-    /** 
-     * A private implementation of {@code LinkedHashMap} that is
-     * bounded in size.
-     */
-    private static class BoundedLinkedHashMap<K,V> extends LinkedHashMap<K,V> {
-        private static final long serialVersionUID = 1;
-
-        // the bounding size
-        private final int maxSize;
-     
-	/** Creates an instance of {@code BoundedLinkedHashMap}. */
-        BoundedLinkedHashMap(int maxSize) {
-            this.maxSize = maxSize;
-        }
-        /** Overrides to bound to a fixed size. */
-        protected boolean removeEldestEntry(Entry<K,V> eldest) {
-            return size() > maxSize;
-        }
-    }
 
 }
