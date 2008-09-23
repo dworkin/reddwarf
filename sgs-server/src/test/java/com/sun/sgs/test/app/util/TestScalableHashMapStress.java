@@ -42,7 +42,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import junit.framework.JUnit4TestAdapter;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -914,12 +913,5 @@ public class TestScalableHashMapStress extends Assert {
 	public void clearUndo() {
 	    undoOps.clear();
 	}
-    }
-
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestScalableHashMapStress.class);
     }
 }

@@ -62,8 +62,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 
-import junit.framework.JUnit4TestAdapter;
-
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -1749,12 +1747,5 @@ public class TestScalableDeque extends Assert {
 	public int hashCode() {
 	    return 0;
 	}
-    }
-
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestScalableDeque.class);
     }
 }

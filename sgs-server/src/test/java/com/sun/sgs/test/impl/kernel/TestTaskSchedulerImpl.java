@@ -38,8 +38,6 @@ import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.JUnit4TestAdapter;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -438,13 +436,4 @@ public class TestTaskSchedulerImpl {
             taskCount++;
         }
     }
-
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestTaskSchedulerImpl.class);
-    }
-
 }

@@ -47,6 +47,7 @@ import com.sun.sgs.test.util.PrivateReadResolve;
 import com.sun.sgs.test.util.ProtectedReadResolve;
 import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PackageWriteReplace;
+import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.PrivateWriteReplace;
 import com.sun.sgs.test.util.ProtectedWriteReplace;
 import com.sun.sgs.test.util.PublicWriteReplace;
@@ -59,30 +60,27 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import static org.junit.Assert.*;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
-public class TestDataServiceImpl extends TestCase {
+@RunWith(ParameterizedNameRunner.class)
+public class TestDataServiceImpl{
 
-    /** If this property is set, then only run the single named test method. */
-    private static final String testMethod = System.getProperty("test.method");
-
-    /**
-     * Specify the test suite to include all tests, or just a single method if
-     * specified.
-     */
-    public static TestSuite suite() {
-	if (testMethod == null) {
-	    return new TestSuite(TestDataServiceImpl.class);
-	}
-	TestSuite suite = new TestSuite();
-	suite.addTest(new TestDataServiceImpl(testMethod));
-	return suite;
+    @Parameterized.Parameters
+    public static Collection data() {
+        return Arrays.asList(new Object[][] {{true}, {false}});
     }
 
     /** The name of the DataStoreImpl class. */
@@ -119,6 +117,14 @@ public class TestDataServiceImpl extends TestCase {
     private static Identity taskOwner;
     private static TransactionProxy txnProxy;
 
+    /** Boolean to say if we're running with the data service as a durable
+     * participant or not.  This influences how prepare and commit is called
+     * on it (in the current transaction implementation, only one durable
+     * participant is allowed, and it has prepareAndCommit called on it,
+     * rather than prepare, and then commit at some later time).
+     */
+    private static boolean durableParticipant = false;
+    
     /** Boolean to say if this is our first test run in this class. */
     static boolean firstRun = true;
     
@@ -136,16 +142,21 @@ public class TestDataServiceImpl extends TestCase {
         }
     }
     
-    /** Creates the test. */
-    public TestDataServiceImpl(String name) {
-	super(name);
+    public TestDataServiceImpl(boolean durableParticipant) {
+        if (durableParticipant != TestDataServiceImpl.durableParticipant) {
+            // Start as if it's the first time, because we must force a
+            // new serverNode to be created if the sense of the boolean
+            // changes.
+            firstRun = true;
+            serverNode = null;
+            TestDataServiceImpl.durableParticipant = durableParticipant;
+        }
     }
-
     /**
      * Prints the test case, and then sets up the test fixtures.
      */
-    protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
+    @Before
+    public void setUp() throws Exception {
         // Insist on a clean data store directory if this is the first
         // run or if we're always using a clean server node.
         setUp(null, firstRun || alwaysInitializeServerNode);
@@ -188,7 +199,8 @@ public class TestDataServiceImpl extends TestCase {
     /**
      * Shut down the serverNode
      */
-    protected void tearDown() throws Exception {
+    @After 
+    public void tearDown() throws Exception {
         if (cleanup && serverNode != null) {
             serverNode.shutdown(alwaysInitializeServerNode);
             serverNode = null;
@@ -210,6 +222,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
+    @Test
     public void testConstructorNullArgs() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -233,6 +246,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorNoAppName() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -245,6 +259,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorBadDebugCheckInterval() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -264,6 +279,7 @@ public class TestDataServiceImpl extends TestCase {
      *
      * @throws Exception if an unexpected exception occurs
      */
+    @Test
     public void testConstructorNoDirectory() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -279,6 +295,7 @@ public class TestDataServiceImpl extends TestCase {
         testSvc.shutdown();
     }
 
+    @Test
     public void testConstructorNoDirectoryNorRoot() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -291,6 +308,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorDataStoreClassNotFound() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -304,6 +322,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorDataStoreClassNotDataStore() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -318,6 +337,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testConstructorDataStoreClassNoConstructor() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -334,6 +354,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public static class DataStoreNoConstructor extends DummyDataStore { }
 
+    @Test
     public void testConstructorDataStoreClassAbstract() throws Exception {
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
@@ -352,6 +373,7 @@ public class TestDataServiceImpl extends TestCase {
 	public DataStoreAbstract(Properties props) { }
     }
 
+    @Test
     public void testConstructorDataStoreClassConstructorFails()
 	throws Exception
     {
@@ -382,15 +404,18 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test getName -- */
 
+    @Test
     public void testGetName() {
 	assertNotNull(service.getName());
     }
 
     /* -- Test getBinding and getServiceBinding -- */
 
+    @Test
     public void testGetBindingNullArgs() throws Exception {
 	testGetBindingNullArgs(true);
     }
+    @Test
     public void testGetServiceBindingNullArgs() throws Exception {
 	testGetBindingNullArgs(false);
     }
@@ -407,9 +432,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test
     public void testGetBindingEmptyName() throws Exception {
 	testGetBindingEmptyName(true);
     }
+    @Test
     public void testGetServiceBindingEmptyName() throws Exception {
 	testGetBindingEmptyName(false);
     }
@@ -428,9 +455,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test
     public void testGetBindingNotFound() throws Exception {
 	testGetBindingNotFound(true);
     }
+    @Test
     public void testGetServiceBindingNotFound() throws Exception {
 	testGetBindingNotFound(false);
     }
@@ -494,9 +523,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test
     public void testGetBindingObjectNotFound() throws Exception {
 	testGetBindingObjectNotFound(true);
     }
+    @Test
     public void testGetServiceBindingObjectNotFound() throws Exception {
 	testGetBindingObjectNotFound(false);
     }
@@ -564,60 +595,78 @@ public class TestDataServiceImpl extends TestCase {
 	    service.getServiceBinding("dummy");
 	}
     };
+    @Test
     public void testGetBindingAborting() throws Exception {
 	testAborting(getBinding);
     }
+    @Test 
     public void testGetServiceBindingAborting() throws Exception {
 	testAborting(getServiceBinding);
     }
+    @Test
     public void testGetBindingAborted() throws Exception {
 	testAborted(getBinding);
     }
+    @Test 
     public void testGetServiceBindingAborted() throws Exception {
 	testAborted(getServiceBinding);
     }
+    @Test 
     public void testGetBindingPreparing() throws Exception {
 	testPreparing(getBinding);
     }
+    @Test 
     public void testGetServiceBindingPreparing() throws Exception {
 	testPreparing(getServiceBinding);
     }
+    @Test 
     public void testGetBindingCommitting() throws Exception {
 	testCommitting(getBinding);
     }
+    @Test 
     public void testGetServiceBindingCommitting() throws Exception {
 	testCommitting(getServiceBinding);
     }
+    @Test 
     public void testGetBindingCommitted() throws Exception {
 	testCommitted(getBinding);
     }
+    @Test 
     public void testGetServiceBindingCommitted() throws Exception {
 	testCommitted(getServiceBinding);
     }
+    @Test 
     public void testGetBindingShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(getBinding);
     }
+    @Test 
     public void testGetServiceBindingShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(getServiceBinding);
     }
+    @Test 
     public void testGetBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(getBinding);
     }
+    @Test 
     public void testGetServiceBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(getServiceBinding);
     }
+    @Test 
     public void testGetBindingShutdown() throws Exception {
         testShutdown(getBinding);
     }
+    @Test 
     public void testGetServiceBindingShutdown() throws Exception {
         testShutdown(getServiceBinding);
     }
 
+    @Test 
     public void testGetBindingDeserializationFails() throws Exception {
 	testGetBindingDeserializationFails(true);
     }
+    @Test 
     public void testGetServiceBindingDeserializationFails() throws Exception {
 	testGetBindingDeserializationFails(false);
     }
@@ -640,9 +689,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetBindingSuccess() throws Exception {
 	testGetBindingSuccess(true);
     }
+    @Test 
     public void testGetServiceBindingSuccess() throws Exception {
 	testGetBindingSuccess(false);
     }
@@ -665,6 +716,7 @@ public class TestDataServiceImpl extends TestCase {
             }}, taskOwner);
     }
 
+    @Test 
     public void testGetBindingsDifferent() throws Exception {
         final DummyManagedObject serviceDummy = new DummyManagedObject();
         txnScheduler.runTask(new InitialTestRunnable() {
@@ -684,9 +736,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetBindingTimeout() throws Exception {
 	testGetBindingTimeout(true);
     }
+    @Test 
     public void testGetServiceBindingTimeout() throws Exception {
 	testGetBindingTimeout(false);
     }
@@ -720,9 +774,11 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test setBinding and setServiceBinding -- */
 
+    @Test 
     public void testSetBindingNullArgs() throws Exception {
 	testSetBindingNullArgs(true);
     }
+    @Test 
     public void testSetServiceBindingNullArgs() throws Exception {
 	testSetBindingNullArgs(false);
     }
@@ -745,9 +801,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testSetBindingNotSerializable() throws Exception {
 	testSetBindingNotSerializable(true);
     }
+    @Test 
     public void testSetServiceBindingNotSerializable() throws Exception {
 	testSetBindingNotSerializable(false);
     }
@@ -767,9 +825,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testSetBindingNotManagedObject() throws Exception {
 	testSetBindingNotManagedObject(true);
     }
+    @Test 
     public void testSetServiceBindingNotManagedObject() throws Exception {
 	testSetBindingNotManagedObject(false);
     }
@@ -796,60 +856,78 @@ public class TestDataServiceImpl extends TestCase {
     private final Action setServiceBinding = new Action() {
 	void run() { service.setServiceBinding("dummy", dummy); }
     };
+    @Test 
     public void testSetBindingAborting() throws Exception {
 	testAborting(setBinding);
     }
+    @Test 
     public void testSetServiceBindingAborting() throws Exception {
 	testAborting(setServiceBinding);
     }
+    @Test 
     public void testSetBindingAborted() throws Exception {
 	testAborted(setBinding);
     }
+    @Test 
     public void testSetServiceBindingAborted() throws Exception {
 	testAborted(setServiceBinding);
     }
+    @Test 
     public void testSetBindingPreparing() throws Exception {
 	testPreparing(setBinding);
     }
+    @Test 
     public void testSetServiceBindingPreparing() throws Exception {
 	testPreparing(setServiceBinding);
     }
+    @Test 
     public void testSetBindingCommitting() throws Exception {
 	testCommitting(setBinding);
     }
+    @Test 
     public void testSetServiceBindingCommitting() throws Exception {
 	testCommitting(setServiceBinding);
     }
+    @Test 
     public void testSetBindingCommitted() throws Exception {
 	testCommitted(setBinding);
     }
+    @Test 
     public void testSetServiceBindingCommitted() throws Exception {
 	testCommitted(setServiceBinding);
     }
+    @Test 
     public void testSetBindingShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(setBinding);
     }
+    @Test 
     public void testSetServiceBindingShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(setServiceBinding);
     }
+    @Test 
     public void testSetBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(setBinding);
     }
+    @Test 
     public void testSetServiceBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(setServiceBinding);
     }
+    @Test 
     public void testSetBindingShutdown() throws Exception {
 	testShutdown(setBinding);
     }
+    @Test 
     public void testSetServiceBindingShutdown() throws Exception {
 	testShutdown(setServiceBinding);
     }
 
+    @Test 
     public void testSetBindingSerializationFails() throws Exception {
 	testSetBindingSerializationFails(true);
     }
+    @Test 
     public void testSetServiceBindingSerializationFails() throws Exception {
 	testSetBindingSerializationFails(false);
     }
@@ -866,21 +944,13 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (ObjectIOException e) {
 	    System.err.println(e);
 	}
-	/* Try again with opposite transaction type. */
-        try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
-                public void run() {
-                    setBinding(app, service, "dummy", new SerializationFails());
-            }}, taskOwner);
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
     }
 
+    @Test 
     public void testSetBindingRemoved() throws Exception {
 	testSetBindingRemoved(true);
     }
+    @Test 
     public void testSetServiceBindingRemoved() throws Exception {
 	testSetBindingRemoved(false);
     }
@@ -898,9 +968,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testSetBindingManagedObjectNoReference() throws Exception {
 	testSetBindingManagedObjectNoReference(true);
     }
+    @Test 
     public void testSetServiceBindingManagedObjectNoReference()
 	throws Exception
     {
@@ -939,11 +1011,13 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testSetBindingManagedObjectNotSerializableCommit()
 	throws Exception
     {
 	testSetBindingManagedObjectNotSerializableCommit(true);
     }
+    @Test 
     public void testSetServiceBindingManagedObjectNotSerializableCommit()
 	throws Exception
     {
@@ -983,9 +1057,11 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testSetBindingSuccess() throws Exception {
 	testSetBindingSuccess(true);
     }
+    @Test 
     public void testSetServiceBindingSuccess() throws Exception {
 	testSetBindingSuccess(false);
     }
@@ -1023,9 +1099,11 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test removeBinding and removeServiceBinding -- */
 
+    @Test 
     public void testRemoveBindingNullName() throws Exception {
 	testRemoveBindingNullName(true);
     }
+    @Test 
     public void testRemoveServiceBindingNullName() throws Exception {
 	testRemoveBindingNullName(false);
     }
@@ -1044,9 +1122,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveBindingEmptyName() throws Exception {
         testRemoveBindingEmptyName(true);
     }
+    @Test
     public void testRemoveServiceBindingEmptyName() throws Exception {
         testRemoveBindingEmptyName(false);
     }
@@ -1075,60 +1155,78 @@ public class TestDataServiceImpl extends TestCase {
         void setUp() { service.setServiceBinding("dummy", dummy); }
 	void run() { service.removeServiceBinding("dummy"); }
     };
+    @Test 
     public void testRemoveBindingAborting() throws Exception {
 	testAborting(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingAborting() throws Exception {
 	testAborting(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingAborted() throws Exception {
 	testAborted(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingAborted() throws Exception {
 	testAborted(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingPreparing() throws Exception {
 	testPreparing(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingPreparing() throws Exception {
 	testPreparing(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingCommitting() throws Exception {
 	testCommitting(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingCommitting() throws Exception {
 	testCommitting(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingCommitted() throws Exception {
 	testCommitted(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingCommitted() throws Exception {
 	testCommitted(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(removeServiceBinding);
     }
+    @Test 
     public void testRemoveBindingShutdown() throws Exception {
 	testShutdown(removeBinding);
     }
+    @Test 
     public void testRemoveServiceBindingShutdown() throws Exception {
 	testShutdown(removeServiceBinding);
     }
 
+    @Test 
     public void testRemoveBindingRemovedObject() throws Exception {
 	testRemoveBindingRemovedObject(true);
     }
+    @Test 
     public void testRemoveServiceBindingRemovedObject() throws Exception {
 	testRemoveBindingRemovedObject(false);
     }
@@ -1164,9 +1262,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveBindingDeserializationFails() throws Exception {
 	testRemoveBindingDeserializationFails(true);
     }
+    @Test 
     public void testRemoveServiceBindingDeserializationFails()
 	throws Exception
     {
@@ -1193,9 +1293,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveBindingSuccess() throws Exception {
 	testRemoveBindingSuccess(true);
     }
+    @Test 
     public void testRemoveServiceBindingSuccess() throws Exception {
 	testRemoveBindingSuccess(false);
     }
@@ -1228,6 +1330,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveBindingsDifferent() throws Exception {
         final DummyManagedObject serviceDummy = new DummyManagedObject();
         txnScheduler.runTask(new InitialTestRunnable() {
@@ -1261,6 +1364,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test nextBoundName and nextServiceBoundName -- */
 
+    @Test 
     public void testNextBoundNameNotFound() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1276,9 +1380,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testNextBoundNameEmpty() throws Exception {
 	testNextBoundNameEmpty(true);
     }
+    @Test 
     public void testNextServiceBoundNameEmpty() throws Exception {
 	testNextBoundNameEmpty(false);
     }
@@ -1305,60 +1411,78 @@ public class TestDataServiceImpl extends TestCase {
     private final Action nextServiceBoundName = new Action() {
 	void run() { service.nextServiceBoundName(null); }
     };
+    @Test 
     public void testNextBoundNameAborting() throws Exception {
 	testAborting(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameAborting() throws Exception {
 	testAborting(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNameAborted() throws Exception {
 	testAborted(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameAborted() throws Exception {
 	testAborted(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNamePreparing() throws Exception {
 	testPreparing(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNamePreparing() throws Exception {
 	testPreparing(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNameCommitting() throws Exception {
 	testCommitting(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameCommitting() throws Exception {
 	testCommitting(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNameCommitted() throws Exception {
 	testCommitted(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameCommitted() throws Exception {
 	testCommitted(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNameShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNameShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(nextServiceBoundName);
     }
+    @Test 
     public void testNextBoundNameShutdown() throws Exception {
 	testShutdown(nextBoundName);
     }
+    @Test 
     public void testNextServiceBoundNameShutdown() throws Exception {
 	testShutdown(nextServiceBoundName);
     }
 
+    @Test 
     public void testNextBoundNameSuccess() throws Exception {
 	testNextBoundNameSuccess(true);
     }
+    @Test 
     public void testNextServiceBoundNameSuccess() throws Exception {
 	testNextBoundNameSuccess(false);
     }
@@ -1417,9 +1541,11 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testNextBoundNameModify() throws Exception {
 	testNextBoundNameModify(true);
     }
+    @Test 
     public void testNextServiceBoundNameModify() throws Exception {
 	testNextBoundNameModify(false);
     }
@@ -1445,6 +1571,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testNextBoundNameDifferent() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1486,6 +1613,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test removeObject -- */
 
+    @Test 
     public void testRemoveObjectNull() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1499,6 +1627,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveObjectNotSerializable() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1513,6 +1642,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveObjectNotManagedObject() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1531,31 +1661,40 @@ public class TestDataServiceImpl extends TestCase {
     private final Action removeObject = new Action() {
 	void run() { service.removeObject(dummy); }
     };
+    @Test 
     public void testRemoveObjectAborting() throws Exception {
 	testAborting(removeObject);
     }
+    @Test 
     public void testRemoveObjectAborted() throws Exception {
 	testAborted(removeObject);
     }
+    @Test 
     public void testRemoveObjectPreparing() throws Exception {
 	testPreparing(removeObject);
     }
+    @Test 
     public void testRemoveObjectCommitting() throws Exception {
 	testCommitting(removeObject);
     }
+    @Test 
     public void testRemoveObjectCommitted() throws Exception {
 	testCommitted(removeObject);
     }
+    @Test 
     public void testRemoveObjectShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(removeObject);
     }
+    @Test 
     public void testRemoveObjectShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(removeObject);
     }
+    @Test 
     public void testRemoveObjectShutdown() throws Exception {
 	testShutdown(removeObject);
     }
 
+    @Test 
     public void testRemoveObjectSuccess() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1580,6 +1719,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveObjectRemoved() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1594,6 +1734,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveObjectPreviousTxn() throws Exception {
          txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
@@ -1603,6 +1744,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveObjectRemoval() throws Exception {
         class TestTask extends InitialTestRunnable {
             int count;
@@ -1644,6 +1786,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testRemoveObjectRemovalRecurse() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1688,6 +1831,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testRemoveObjectRemovalThrows() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1719,6 +1863,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test markForUpdate -- */
 
+    @Test 
     public void testMarkForUpdateNull() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1732,6 +1877,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testMarkForUpdateNotSerializable() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1746,6 +1892,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testMarkForUpdateNotManagedObject() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1760,6 +1907,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testMarkForUpdateRemoved() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1778,31 +1926,40 @@ public class TestDataServiceImpl extends TestCase {
     private final Action markForUpdate = new Action() {
 	void run() { service.markForUpdate(dummy); }
     };
+    @Test 
     public void testMarkForUpdateAborting() throws Exception {
 	testAborting(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdateAborted() throws Exception {
 	testAborted(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdatePreparing() throws Exception {
 	testPreparing(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdateCommitting() throws Exception {
 	testCommitting(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdateCommitted() throws Exception {
 	testCommitted(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdateShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdateShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(markForUpdate);
     }
+    @Test 
     public void testMarkForUpdateShutdown() throws Exception {
 	testShutdown(markForUpdate);
     }
 
+    @Test 
     public void testMarkForUpdateSuccess() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1828,6 +1985,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testMarkForUpdateLocking() throws Exception {
 	/*
 	 * Create a fresh data service -- BDB Java edition does not permit
@@ -1881,6 +2039,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test createReference -- */
 
+    @Test 
     public void testCreateReferenceNull() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -1893,6 +2052,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceNotSerializable() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -1906,6 +2066,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceNotManagedObject() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -1923,31 +2084,40 @@ public class TestDataServiceImpl extends TestCase {
     private final Action createReference = new Action() {
 	void run() { service.createReference(dummy); }
     };
+    @Test 
     public void testCreateReferenceAborting() throws Exception {
 	testAborting(createReference);
     }
+    @Test 
     public void testCreateReferenceAborted() throws Exception {
 	testAborted(createReference);
     }
+    @Test 
     public void testCreateReferencePreparing() throws Exception {
 	testPreparing(createReference);
     }
+    @Test 
     public void testCreateReferenceCommitting() throws Exception {
 	testCommitting(createReference);
     }
+    @Test 
     public void testCreateReferenceCommitted() throws Exception {
 	testCommitted(createReference);
     }
+    @Test 
     public void testCreateReferenceShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(createReference);
     }
+    @Test 
     public void testCreateReferenceShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(createReference);
     }
+    @Test 
     public void testCreateReferenceShutdown() throws Exception {
 	testShutdown(createReference);
     }
 
+    @Test 
     public void testCreateReferenceNew() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1958,6 +2128,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceExisting() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
@@ -1971,6 +2142,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceSerializationFails() throws Exception {
 	try {
 	    txnScheduler.runTask(new InitialTestRunnable() {
@@ -1984,6 +2156,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testCreateReferenceRemoved() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -1999,6 +2172,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferencePreviousTxn() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
@@ -2008,6 +2182,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceTwoObjects() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2021,6 +2196,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test createReferenceForId -- */
 
+    @Test 
     public void testCreateReferenceForIdNullId() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2033,6 +2209,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceForIdTooSmallId() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2047,6 +2224,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testCreateReferenceForIdTooBigId() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2069,33 +2247,42 @@ public class TestDataServiceImpl extends TestCase {
 	void setUp() { id = service.createReference(dummy).getId(); }
 	void run() { service.createReferenceForId(id); }
     };
+    @Test 
     public void testCreateReferenceForIdAborting() throws Exception {
 	testAborting(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdAborted() throws Exception {
 	testAborted(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdPreparing() throws Exception {
 	testPreparing(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdCommitting() throws Exception {
 	testCommitting(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdCommitted() throws Exception {
 	testCommitted(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(createReferenceForId);
     }
+    @Test 
     public void testCreateReferenceForIdShutdown() throws Exception {
 	testShutdown(createReferenceForId);
     }
 
+    @Test 
     public void testCreateReferenceForIdSuccess() throws Exception {
         class TestTask extends InitialTestRunnable {
             BigInteger id;
@@ -2141,6 +2328,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test getNextId -- */
 
+    @Test 
     public void testNextObjectIdIllegalIds() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2169,6 +2357,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testNextObjectIdBoundaryIds() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2190,6 +2379,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testNextObjectIdRemoved() throws Exception {
         class TestTask extends InitialTestRunnable {
             BigInteger dummyId;
@@ -2273,6 +2463,7 @@ public class TestDataServiceImpl extends TestCase {
      * Test that producing a reference to an object removed in another
      * transaction doesn't cause that object's ID to be returned.
      */
+    @Test 
     public void testNextObjectIdRemovedIgnoreRef() throws Exception {
         class TestTask extends InitialTestRunnable {
             BigInteger dummyId;
@@ -2324,33 +2515,42 @@ public class TestDataServiceImpl extends TestCase {
     private final Action nextObjectId = new Action() {
 	void run() { service.nextObjectId(null); }
     };
+    @Test 
     public void testNextObjectIdAborting() throws Exception {
 	testAborting(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdAborted() throws Exception {
 	testAborted(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdPreparing() throws Exception {
 	testPreparing(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdCommitting() throws Exception {
 	testCommitting(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdCommitted() throws Exception {
 	testCommitted(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdShuttingDownNewTxn() throws Exception {
 	testShuttingDownNewTxn(nextObjectId);
     }
+    @Test 
     public void testNextObjectIdShutdown() throws Exception {
 	testShutdown(nextObjectId);
     }
 
     /* -- Test ManagedReference.get -- */
 
+    @Test 
     public void testGetReferenceNotFound() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2384,29 +2584,37 @@ public class TestDataServiceImpl extends TestCase {
 	void run() { ref.get(); }
     };
     /* Can't get a reference when the service is uninitialized */
+    @Test 
     public void testGetReferenceAborting() throws Exception {
 	testAborting(getReference);
     }
+    @Test 
     public void testGetReferenceAborted() throws Exception {
 	testAborted(getReference);
     }
+    @Test 
     public void testGetReferencePreparing() throws Exception {
 	testPreparing(getReference);
     }
+    @Test 
     public void testGetReferenceCommitting() throws Exception {
 	testCommitting(getReference);
     }
+    @Test 
     public void testGetReferenceCommitted() throws Exception {
 	testCommitted(getReference);
     }
+    @Test 
     public void testGetReferenceShuttingDownExistingTxn() throws Exception {
 	testShuttingDownExistingTxn(getReference);
     }
     /* Can't get a reference as the first operation in a new transaction */
+    @Test 
     public void testGetReferenceShutdown() throws Exception {
 	testShutdown(getReference);
     }
 
+    @Test 
     public void testGetReferenceDeserializationFails() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2426,6 +2634,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetReferenceOldTxn() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2444,6 +2653,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetReferenceTimeout() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2486,6 +2696,7 @@ public class TestDataServiceImpl extends TestCase {
      * throws TransactionTimeoutException if the deserialization of the
      * reference occurs after the transaction timeout.
      */
+    @Test 
     public void testGetReferenceTimeoutReadResolve() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -2531,6 +2742,7 @@ public class TestDataServiceImpl extends TestCase {
      * Test detecting managed objects with readResolve and writeReplace
      * methods.
      */
+    @Test 
     public void testManagedObjectReadResolveWriteReplace() throws Exception {
 	objectIOExceptionOnCommit(new MOPublicReadResolve());
 	objectIOExceptionOnCommit(new MOPublicWriteReplace());
@@ -2758,6 +2970,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test ManagedReference.getForUpdate -- */
 
+    @Test 
     public void testGetReferenceUpdateNotFound() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2784,6 +2997,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetReferenceForUpdateMaybeModified() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
@@ -2801,6 +3015,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetReferenceUpdateSuccess() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2832,31 +3047,39 @@ public class TestDataServiceImpl extends TestCase {
 	void run() { ref.getForUpdate(); }
     };
     /* Can't get a referenceUpdate when the service is uninitialized */
+    @Test 
     public void testGetReferenceUpdateAborting() throws Exception {
 	testAborting(getReferenceUpdate);
     }
+    @Test 
     public void testGetReferenceUpdateAborted() throws Exception {
 	testAborted(getReferenceUpdate);
     }
+    @Test 
     public void testGetReferenceUpdatePreparing() throws Exception {
 	testPreparing(getReferenceUpdate);
     }
+    @Test 
     public void testGetReferenceUpdateCommitting() throws Exception {
 	testCommitting(getReferenceUpdate);
     }
+    @Test 
     public void testGetReferenceUpdateCommitted() throws Exception {
 	testCommitted(getReferenceUpdate);
     }
+    @Test 
     public void testGetReferenceUpdateShuttingDownExistingTxn()
 	throws Exception
     {
 	testShuttingDownExistingTxn(getReferenceUpdate);
     }
     /* Can't get a reference as the first operation in a new transaction */
+    @Test 
     public void testGetReferenceUpdateShutdown() throws Exception {
 	testShutdown(getReferenceUpdate);
     }
 
+    @Test 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2876,6 +3099,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetReferenceUpdateOldTxn() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -2894,6 +3118,7 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testGetReferenceUpdateLocking() throws Exception {
 	/*
 	 * Create a fresh data service -- BDB Java edition does not permit
@@ -2949,6 +3174,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test ManagedReference.getId -- */
 
+    @Test 
     public void testReferenceGetId() throws Exception {
         class TestTask extends InitialTestRunnable {
             BigInteger id;
@@ -2979,6 +3205,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test ManagedReference.equals -- */
 
+    @Test 
     public void testReferenceEquals() throws Exception {
         class TestTask extends InitialTestRunnable {
             ManagedReference<DummyManagedObject> reference;
@@ -3020,6 +3247,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test shutdown -- */
 
+    @Test 
     public void testShutdownAgain() throws Exception {
         serverNode.shutdown(false);
         // Note:  do not null out serverNode here;  it will be used
@@ -3040,6 +3268,7 @@ public class TestDataServiceImpl extends TestCase {
         }
     }
 
+    @Test 
     public void testShutdownInterrupt() throws Exception {
         try {
             txnScheduler.runTask(new InitialTestRunnable() {
@@ -3069,6 +3298,7 @@ public class TestDataServiceImpl extends TestCase {
         }
     }
 
+    @Test 
     public void testConcurrentShutdownInterrupt() throws Exception {
         class TestTask extends InitialTestRunnable {
             ShutdownServiceAction action2;
@@ -3110,6 +3340,7 @@ public class TestDataServiceImpl extends TestCase {
         }
     }
 
+    @Test 
     public void testConcurrentShutdownRace() throws Exception {
         class TestTask extends InitialTestRunnable {
             ShutdownServiceAction action1;
@@ -3161,6 +3392,7 @@ public class TestDataServiceImpl extends TestCase {
         }
     }
 
+    @Test 
     public void testShutdownRestart() throws Exception {
 
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
@@ -3176,60 +3408,57 @@ public class TestDataServiceImpl extends TestCase {
 //    /* -- Other tests -- */
 //
 
-//    public void testCommitNoStoreParticipant() throws Exception {
-//	txn.commit();
-//	txn = new DummyTransaction(UsePrepareAndCommit.NO);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.removeObject(dummy);
-//	txn.commit();
-//	txn = new DummyTransaction(UsePrepareAndCommit.YES);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.removeObject(dummy);
-//	txn.commit();
-//	txn = null;
-//    }
-//
-//    public void testAbortNoStoreParticipant() throws Exception {
-//	txn.commit();
-//	txn = new DummyTransaction(UsePrepareAndCommit.NO);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.removeObject(dummy);
-//	txn.abort(new RuntimeException("abort"));
-//	txn = new DummyTransaction(UsePrepareAndCommit.YES);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.removeObject(dummy);
-//	txn.abort(new RuntimeException("abort"));
-//	txn = null;
-//    }
-//
-//    public void testCommitReadOnly() throws Exception {
-//	txn.commit();
-//	txn = new DummyTransaction(UsePrepareAndCommit.NO);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.getBinding("dummy");
-//	txn.commit();
-//	txn = new DummyTransaction(UsePrepareAndCommit.YES);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.getBinding("dummy");
-//	txn.commit();
-//	createTransaction();
-//	service.getBinding("dummy");
-//    }
-//
-//    public void testAbortReadOnly() throws Exception {
-//	txn.commit();
-//	txn = new DummyTransaction(UsePrepareAndCommit.NO);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.getBinding("dummy");
-//	txn.abort(new RuntimeException("abort"));
-//	txn = new DummyTransaction(UsePrepareAndCommit.YES);
-//	txnProxy.setCurrentTransaction(txn);
-//	service.getBinding("dummy");
-//	txn.abort(new RuntimeException("abort"));
-//	createTransaction();
-//	service.getBinding("dummy");
-//    }
-//
+    @Test 
+    public void testCommitNoStoreParticipant() throws Exception {
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        // We use dummy outside of the transaction - it is transient here.
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+            public void run() {
+                service.removeObject(dummy);
+        }}, taskOwner);
+    }
+
+    @Test (expected=TestAbortedTransactionException.class)
+    public void testAbortNoStoreParticipant() throws Exception {
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        // We use dummy outside of the transaction - it is transient here.
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+            public void run() {
+                service.removeObject(dummy);
+                Transaction txn = txnProxy.getCurrentTransaction();
+                txn.abort(new TestAbortedTransactionException("abort"));
+        }}, taskOwner);
+    }
+
+    @Test 
+    public void testCommitReadOnly() throws Exception {
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+            public void run() {
+                service.getBinding("dummy");
+        }}, taskOwner);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+            public void run() {
+                service.getBinding("dummy");
+        }}, taskOwner);
+    }
+
+    @Test (expected=TestAbortedTransactionException.class)
+    public void testAbortReadOnly() throws Exception {
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+            public void run() {
+                service.getBinding("dummy");
+                Transaction txn = txnProxy.getCurrentTransaction();
+                txn.abort(new TestAbortedTransactionException("abort"));
+        }}, taskOwner);
+        txnScheduler.runTask(new AbstractKernelRunnable() {
+            public void run() {
+                service.getBinding("dummy");
+        }}, taskOwner);
+    }
+
+    @Test 
     public void testContentEquals() throws Exception {
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
@@ -3243,10 +3472,12 @@ public class TestDataServiceImpl extends TestCase {
         }}, taskOwner);
     }
 
+    @Test 
     public void testSerializeReferenceToEnclosing() throws Exception {
 	serializeReferenceToEnclosingInternal();
     }
 
+    @Test 
     public void testSerializeReferenceToEnclosingToStringFails()
 	throws Exception
     {
@@ -3258,6 +3489,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testSerializeReferenceToEnclosingHashCodeFails()
 	throws Exception
     {
@@ -3461,6 +3693,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testDeadlock() throws Exception {
         Properties properties = getProperties();
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
@@ -3578,6 +3811,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testModifiedNotSerializable() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
@@ -3593,6 +3827,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    @Test 
     public void testNotSerializableAfterDeserialize() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
@@ -3646,8 +3881,11 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Other methods and classes -- */
 
     /** Creates a unique directory. */
+    static AtomicInteger fileNumber = new AtomicInteger();
     String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
+        String name = "temp" + fileNumber.toString();
+        fileNumber.getAndIncrement();
+	File dir = File.createTempFile(name, "dbdir");
 	if (!dir.delete()) {
 	    throw new RuntimeException("Problem deleting file: " + dir);
 	}
@@ -3684,6 +3922,9 @@ public class TestDataServiceImpl extends TestCase {
         p.setProperty("com.sun.sgs.finalService", "DataService");
         p.setProperty(
                 DataServiceImplClassName + ".debug.check.interval", "0");
+        p.setProperty(
+                DataServiceImpl.TEST_CONTEXT_PROPERTY, 
+                durableParticipant ? "true" : "false");
         return p;
     }
 
