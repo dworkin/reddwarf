@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>6</version>
+  <version>7</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -551,12 +551,12 @@
 
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.2.23</bdb.je.version>
-    <junit.version>4.2</junit.version>
+    <junit.version>4.5</junit.version>
     <org.apache.mina.version>1.1.0</org.apache.mina.version>
     <slf4j-api.version>1.4.0</slf4j-api.version>
     <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
 
-    <checkstyle.version>4.1</checkstyle.version>
+    <checkstyle.version>4.4</checkstyle.version>
     <!-- Locations of checkstyle files
 	 Configure these in the individual modules that use the
 	 checkstyle plugin -->
