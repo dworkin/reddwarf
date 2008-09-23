@@ -84,7 +84,7 @@ public class ClientSessionImpl
     private transient BigInteger id;
 
     /** The session ID bytes.
-     * TODO: this should be a transient field.
+     * TBD: this should be a transient field.
      */
     private final byte[] idBytes;
 
@@ -181,7 +181,7 @@ public class ClientSessionImpl
 		throw new IllegalStateException("client session not connected");
 	    }
             /*
-             * TODO: Possible optimization: if we have passed our own special
+             * TBD: Possible optimization: if we have passed our own special
              * buffer to the app, we can detect that here and possibly avoid a
              * copy.  Our special buffer could be one we passed to the
              * receivedMessage callback, or we could add a special API to
@@ -654,7 +654,7 @@ public class ClientSessionImpl
 			    new IoRunnable() {
 				public void run() throws IOException {
 				    sessionServer.serviceEventQueue(idBytes);
-				}},
+				} },
 			    nodeId);
 		    }
 		}, identity);
@@ -747,7 +747,7 @@ public class ClientSessionImpl
 	private static final long serialVersionUID = 1L;
 
 	/** Constructs a disconnect event. */
-	DisconnectEvent() {}
+	DisconnectEvent() { }
 
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
@@ -933,7 +933,8 @@ public class ClientSessionImpl
 	 * {@code nodeId}.
 	 */
 	HandleNextDisconnectedSessionTask(long nodeId) {
-	    this.nodePrefix = this.lastKey = getNodePrefix(nodeId);
+	    nodePrefix = getNodePrefix(nodeId);
+	    lastKey = nodePrefix;
 	}
 
 	/** {@inheritDoc} */

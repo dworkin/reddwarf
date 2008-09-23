@@ -583,8 +583,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client1 = new DummyClient(name);
 	DummyClient client2 = new DummyClient(name);
 	int port = serverNode.getAppPort();
+	client1.connect(port).login();
 	try {
-	    client1.connect(port).login();
 	    client2.connect(port).login();
 	    fail("expected client2 login failure");
 	} catch (RuntimeException e) {
@@ -606,8 +606,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    SgsTestNode.getDefaultProperties(APP_NAME, null,
 					     DummyAppListener.class);
 	props.setProperty(
-	    "com.sun.sgs.impl.service.session.same.user.login.policy",
-	    "preempt");
+ 	    "com.sun.sgs.impl.service.session.allow.new.login", "true");
 	setUp(props, false);
 	String name = "dummy";
 	
