@@ -118,8 +118,8 @@ public class Exporter<T extends Remote> {
 	}
 	this.server = server;
 	ServerSocketFactory ssf = new ServerSocketFactory();
-	proxy =
-	    type.cast(UnicastRemoteObject.exportObject(server, port, null, ssf));
+	proxy = type.cast(
+	    UnicastRemoteObject.exportObject(server, port, null, ssf));
 	return ssf.getLocalPort();
     }
 
@@ -148,7 +148,7 @@ public class Exporter<T extends Remote> {
 	    throw new IllegalStateException(
 		"The server is already shut down");
 	}
-        if (registry != null ) {
+        if (registry != null) {
 	    try {
 		UnicastRemoteObject.unexportObject(registry, true);
 		registry = null;

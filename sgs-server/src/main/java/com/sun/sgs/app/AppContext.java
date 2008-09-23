@@ -24,8 +24,12 @@ import com.sun.sgs.impl.kernel.ContextResolver;
 
 /**
  * Provides access to facilities available in the current application context.
+ * This class should not be instantiated.
  */
 public final class AppContext {
+
+    /** This class should not be instantiated. */
+    private AppContext() { }
 
     /**
      * Returns the {@code ChannelManager} for use by the current

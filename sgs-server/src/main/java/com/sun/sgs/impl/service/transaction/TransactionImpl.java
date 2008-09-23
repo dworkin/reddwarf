@@ -98,7 +98,7 @@ final class TransactionImpl implements Transaction {
     /** Collected profiling data on each participant, created only if
      *  global profiling is set to MEDIUM at the start of the transaction.
      */
-    private final HashMap<String,ProfileParticipantDetailImpl> detailMap;
+    private final HashMap<String, ProfileParticipantDetailImpl> detailMap;
 
     /**
      * Creates an instance with the specified transaction ID, timeout, and
@@ -113,7 +113,7 @@ final class TransactionImpl implements Transaction {
 	state = State.ACTIVE;
 	if (collector.getDefaultProfileLevel().ordinal() >= 
                 ProfileLevel.MEDIUM.ordinal()) {
-	    detailMap = new HashMap<String,ProfileParticipantDetailImpl>();
+	    detailMap = new HashMap<String, ProfileParticipantDetailImpl>();
 	} else {
 	    detailMap = null;
 	}
@@ -205,8 +205,9 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public void abort(Throwable cause) {
 	assert Thread.currentThread() == owner : "Wrong thread";
-	if (cause == null)
+	if (cause == null) {
 	    throw new NullPointerException("The cause cannot be null");
+	}
 	logger.log(Level.FINER, "abort {0}", this);
 	switch (state) {
 	case ACTIVE:
@@ -348,8 +349,9 @@ final class TransactionImpl implements Transaction {
 		    }
 		    if (readOnly) {
 			iter.remove();
-			if (detail != null)
+			if (detail != null) {
 			    collector.addParticipant(detail);
+			}
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,

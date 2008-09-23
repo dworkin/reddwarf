@@ -32,7 +32,7 @@ import java.util.NoSuchElementException;
 public final class BoundNamesUtil {
 
     /** Prevents instantiation. */
-    private BoundNamesUtil() {}
+    private BoundNamesUtil() { }
 
     /**
      * Returns an {@code Iterable} that can be used to obtain an
@@ -166,10 +166,11 @@ public final class BoundNamesUtil {
 	/** {@inheritDoc} */
 	public String next() {
 	    try {
-		if (! hasNext()) {
+		if (!hasNext()) {
 		    throw new NoSuchElementException();
 		}
-		keyReturnedByNext = key = nextName;
+		keyReturnedByNext = nextName;
+		key = nextName;
 		return keyReturnedByNext;
 	    } finally {
 		nextName = null;
