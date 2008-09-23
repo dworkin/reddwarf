@@ -26,7 +26,7 @@ import java.util.Properties;
 
 /**
  * Provides a factory for obtaining an environment for interacting with a
- * database implementation.
+ * database implementation.  This class should not be instantiated.
  */
 public final class DbEnvironmentFactory {
 
@@ -34,6 +34,9 @@ public final class DbEnvironmentFactory {
      * #ENVIRONMENT_CLASS_PROPERTY}. */
     public static final String ENVIRONMENT_CLASS_PROPERTY =
 	"com.sun.sgs.impl.service.data.store.db.environment.class";
+
+    /** This class should not be instantiated. */
+    private DbEnvironmentFactory() { }
 
     /**
      * Returns the environment for interacting with the database implementation

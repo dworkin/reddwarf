@@ -73,6 +73,9 @@ public interface DbEnvironment {
      * Specifies whether object allocations in this environment should use a
      * placeholder at the end of each allocation block to avoid allocation
      * concurrency conflicts.
+     *
+     * @return	whether object allocations should use an end-of-block
+     *		placeholder
      */
     boolean useAllocationBlockPlaceholders();
 }
