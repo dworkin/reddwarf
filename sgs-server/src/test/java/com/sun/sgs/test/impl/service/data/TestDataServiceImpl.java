@@ -33,6 +33,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -117,13 +118,13 @@ public class TestDataServiceImpl{
     private static Identity taskOwner;
     private static TransactionProxy txnProxy;
 
-    /** Boolean to say if we're running with the data service as a durable
-     * participant or not.  This influences how prepare and commit is called
-     * on it (in the current transaction implementation, only one durable
-     * participant is allowed, and it has prepareAndCommit called on it,
-     * rather than prepare, and then commit at some later time).
+    /** 
+     * Boolean to say if we should run with transaction that disable
+     * the prepareAndCommit optimization (in which the last participant
+     * prepared has prepareAndCommit called, rather than prepare, and
+     * at a later point commit).
      */
-    private static boolean durableParticipant = false;
+    private static boolean disableTxnCommitOpt = false;
     
     /** Boolean to say if this is our first test run in this class. */
     static boolean firstRun = true;
@@ -142,8 +143,15 @@ public class TestDataServiceImpl{
         }
     }
     
-    public TestDataServiceImpl(boolean durableParticipant) {
-        if (durableParticipant != TestDataServiceImpl.durableParticipant) {
+    /**
+     * Create this test class.
+     * @param disableTxnCommitOpt if {@true}, don't call prepareAndCommit
+     *     on the last transaction participant to be commited.  This parameter
+     *     is set by the parameterized test runner, using the {@link data}
+     *     method.
+     */
+    public TestDataServiceImpl(boolean disableTxnCommitOpt) {
+        if (disableTxnCommitOpt != TestDataServiceImpl.disableTxnCommitOpt) {
             // Start as if it's the first time, because we must force a
             // new serverNode to be created if the sense of the boolean
             // changes.
@@ -154,7 +162,7 @@ public class TestDataServiceImpl{
                 System.err.println("Unexpected exception caught" + e);
             }
             firstRun = true;
-            TestDataServiceImpl.durableParticipant = durableParticipant;
+            TestDataServiceImpl.disableTxnCommitOpt = disableTxnCommitOpt;
         }
     }
     /**
@@ -1741,11 +1749,11 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testRemoveObjectPreviousTxn() throws Exception {
-         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+        txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
-            service.removeObject(dummy);
+                service.removeObject(dummy);
         }}, taskOwner);
     }
 
@@ -2672,23 +2680,15 @@ public class TestDataServiceImpl{
 
         try {
             txnScheduler.runTask(new AbstractKernelRunnable() {
-                boolean gotTimeout = false;
                 public void run() throws Exception {
                     try {
                         dummy =
                             (DummyManagedObject) service.getBinding("dummy");
-                        Transaction txn = txnProxy.getCurrentTransaction();
-                        if (gotTimeout) {
-                            txn.abort(
-                                new TestAbortedTransactionException("abort"));
-                            return;
-                        }
                         Thread.sleep(200);
                         dummy.getNext();
                         fail("Expected TransactionTimeoutException");
                     } catch (TransactionTimeoutException e) {
-                        gotTimeout = true;
-                        System.err.println(e);
+                        throw new TestAbortedTransactionException("abort", e);
                     }
             }}, taskOwner);
         } catch (TestAbortedTransactionException e) {
@@ -2716,15 +2716,8 @@ public class TestDataServiceImpl{
 
         try {
             txnScheduler.runTask(new AbstractKernelRunnable() {
-                boolean gotTimeout = false;
                 public void run() {
                     try {
-                        if (gotTimeout) {
-                            Transaction txn = txnProxy.getCurrentTransaction();
-                            txn.abort(
-                                new TestAbortedTransactionException("abort"));
-                            return;
-                        }
                         DeserializationDelayed.delay = 200;
                         DeserializationDelayed dummy =
                             (DeserializationDelayed)
@@ -2732,8 +2725,7 @@ public class TestDataServiceImpl{
                         System.err.println(dummy);
                         fail("Expected TransactionTimeoutException");
                     } catch (TransactionTimeoutException e) {
-                        gotTimeout = true;
-                        System.err.println(e);
+                        throw new TestAbortedTransactionException("abort", e);
                     }
             }}, taskOwner);
         } catch (TestAbortedTransactionException e) {
@@ -3409,9 +3401,8 @@ public class TestDataServiceImpl{
                 assertEquals(dummy, service.getBinding("dummy"));
         }}, taskOwner);
     }
-//
-//    /* -- Other tests -- */
-//
+
+    /* -- Other tests -- */
 
     @Test 
     public void testCommitNoStoreParticipant() throws Exception {
@@ -3451,12 +3442,16 @@ public class TestDataServiceImpl{
     @Test (expected=TestAbortedTransactionException.class)
     public void testAbortReadOnly() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
-        txnScheduler.runTask(new AbstractKernelRunnable() {
-            public void run() {
-                service.getBinding("dummy");
-                Transaction txn = txnProxy.getCurrentTransaction();
-                txn.abort(new TestAbortedTransactionException("abort"));
-        }}, taskOwner);
+        try {
+            txnScheduler.runTask(new AbstractKernelRunnable() {
+                public void run() {
+                    service.getBinding("dummy");
+                    Transaction txn = txnProxy.getCurrentTransaction();
+                    txn.abort(new TestAbortedTransactionException("abort"));
+            }}, taskOwner);
+        } catch (TestAbortedTransactionException e) {
+            System.err.println(e);
+        }
         txnScheduler.runTask(new AbstractKernelRunnable() {
             public void run() {
                 service.getBinding("dummy");
@@ -3932,10 +3927,10 @@ public class TestDataServiceImpl{
         Properties p = SgsTestNode.getDefaultProperties(APP_NAME, null, null);
         p.setProperty("com.sun.sgs.finalService", "DataService");
         p.setProperty(
-                DataServiceImplClassName + ".debug.check.interval", "0");
+            DataServiceImplClassName + ".debug.check.interval", "0");
         p.setProperty(
-                DataServiceImpl.TEST_CONTEXT_PROPERTY, 
-                durableParticipant ? "true" : "false");
+            TransactionCoordinator.TXN_DISABLE_PREPAREANDCOMMIT_OPT_PROPERTY,
+            disableTxnCommitOpt ? "true" : "false");
         return p;
     }
 
@@ -4446,6 +4441,9 @@ public class TestDataServiceImpl{
         private static final long serialVersionUID = 1;
         TestAbortedTransactionException(String message) {
             super(message);
+        }
+        TestAbortedTransactionException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 

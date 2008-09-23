@@ -73,6 +73,9 @@ public final class TransactionCoordinatorImpl
     /** The default for unbounded timeout. */
     public static final long UNBOUNDED_TIMEOUT_DEFAULT = Long.MAX_VALUE;
 
+    /** Should we use prepareAndCommit() or separate calls? */
+    private final boolean disablePrepareAndCommitOpt;
+    
     /** An implementation of TransactionHandle. */
     private static final class TransactionHandleImpl
 	implements TransactionHandle
@@ -81,12 +84,14 @@ public final class TransactionCoordinatorImpl
 	private final TransactionImpl txn;
 
 	/**
-	 * Creates a transaction with the specified ID, timeout, and
-	 * collector.
+	 * Creates a transaction with the specified ID, timeout, 
+         * prepareAndCommit optimization boolean, and collector.
 	 */
 	TransactionHandleImpl(long tid, long timeout,
+                              boolean disablePrepareAndCommitOpt,
 			      ProfileCollector collector) {
-	    txn = new TransactionImpl(tid, timeout, collector);
+	    txn = new TransactionImpl(tid, timeout, 
+                                      disablePrepareAndCommitOpt, collector);
 	}
 
 	public String toString() {
@@ -133,16 +138,25 @@ public final class TransactionCoordinatorImpl
 				  TXN_UNBOUNDED_TIMEOUT_PROPERTY,
 				  UNBOUNDED_TIMEOUT_DEFAULT, 1,
 				  Long.MAX_VALUE);
+        this.disablePrepareAndCommitOpt =
+            props.getBooleanProperty(
+                TransactionCoordinator.
+                    TXN_DISABLE_PREPAREANDCOMMIT_OPT_PROPERTY,
+                false);
     }
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction(boolean unbounded) {
 	if (unbounded) {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
-					     unboundedTimeout, collector);
+					     unboundedTimeout, 
+                                             disablePrepareAndCommitOpt,
+                                             collector);
 	} else {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
-					     boundedTimeout, collector);
+					     boundedTimeout, 
+                                             disablePrepareAndCommitOpt,
+                                             collector);
 	}
     }
 }

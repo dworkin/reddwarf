@@ -36,7 +36,6 @@ import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.AccessCoordinator;
@@ -170,13 +169,6 @@ public final class DataServiceImpl implements DataService {
     public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
-    /**
-     * The property that specifies whether to start in a special test context,
-     * used for unit testing;  defaults to false.
-     */
-    public static final String TEST_CONTEXT_PROPERTY =
-        CLASSNAME + "test.context";
-            
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -277,7 +269,7 @@ public final class DataServiceImpl implements DataService {
     }
 
     /** Defines the transaction context factory for this class. */
-    private class ContextFactory
+    private final class ContextFactory
 	extends TransactionContextFactory<Context>
     {
 	ContextFactory(TransactionContextMap<Context> contextMap) {
@@ -304,85 +296,6 @@ public final class DataServiceImpl implements DataService {
 	}
     }
 
-    /**
-     *  For testing, we add the ability to run in a different mode.
-     *  Instead of the data store being the only durable transaction 
-     *  participant, we allow a mode where the data store is a non-durable
-     *  participant, but a durable participant (which does nothing) is
-     *  added when the data service joins a transaction.
-     * <p>
-     *  This causes the transaction's prepare and then commit methods to
-     *  be called on a committing transaction, rather than prepareAndCommit.
-     *  We add the dummy durable participant so we know it will be the
-     *  participant that has prepareAndCommit called on it (the current
-     *  transaction implementation forces the single durable participant,
-     *  if there is one, to be the last participant in a list, and the last
-     *  list element is the one that has prepareAndCommit called).
-     */
-    
-    /** A context factory for our durable participant. */
-    private class TestDurableParticipantContextFactory
-	extends TransactionContextFactory<TestContext>
-    {
-	TestDurableParticipantContextFactory(TransactionProxy txnProxy) {
-	    super(txnProxy, "TestDurableParticipantContextFactory");
-	}
-	
-	/** {@inheritDoc} */
-	public TestContext createContext(Transaction txn) {
-	    return new TestContext(txn);
-	}
-        @Override protected TransactionParticipant createParticipant() {
-	    /* Create a durable participant */
-	    return new Participant();
-	}
-    }
-
-    private final class TestContext extends TransactionContext {
-	/**
-	 * Constructs a context with the specified transaction.
-	 */
-        private TestContext(Transaction txn) {
-	    super(txn);
-	}
-	
-	/** {@inheritDoc} */
-	public void abort(boolean retryable) {
-	    // Does nothing
-	}
-
-	/** {@inheritDoc} */
-	public void commit() {
-	    isCommitted = true;
-        }
-    }
-    /** Defines the transaction context factory for this class. */
-    private final class TestContextFactory
-	extends ContextFactory
-    {
-        private final TestDurableParticipantContextFactory 
-                testDummyContextFactory;
-	TestContextFactory(TransactionContextMap<Context> contextMap, 
-                           TransactionProxy txnProxy) 
-        {
-	    super(contextMap);
-            testDummyContextFactory = 
-                    new TestDurableParticipantContextFactory(txnProxy);
-	}
-        
-	@Override protected TransactionParticipant createParticipant() {
-	    /* Create a non-durable participant */
-	    return new NonDurableParticipant();
-	}
-        @Override public Context joinTransaction() {
-            // Join the durable participant 
-            testDummyContextFactory.joinTransaction();
-            
-            // Join the transaction as a non-durable participant
-            return super.joinTransaction();
-        }
-    }
-    
     /**
      * Provides an implementation of Scheduler that uses the TaskScheduler and
      * TaskOwner.  Note that this class is created in the DataServiceImpl
@@ -528,14 +441,7 @@ public final class DataServiceImpl implements DataService {
 		    contextMap = new ContextMap(txnProxy);
 		}
 	    }
-            
-            boolean useTestContext = 
-                wrappedProps.getBooleanProperty(TEST_CONTEXT_PROPERTY, false);
-            if (useTestContext) {
-                contextFactory = new TestContextFactory(contextMap, txnProxy);
-            } else {
-                contextFactory = new ContextFactory(contextMap);
-            }
+	    contextFactory = new ContextFactory(contextMap);
 	    synchronized (stateLock) {
 		state = State.RUNNING;
 	    }

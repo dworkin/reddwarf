@@ -72,6 +72,9 @@ final class TransactionImpl implements Transaction {
     /** The thread associated with this transaction. */
     private final Thread owner;
 
+    /** Whether the prepareAndCommit optimization should be used. */
+    private final boolean disablePrepareAndCommitOpt;
+    
     /** The state of the transaction. */
     private State state;
 
@@ -101,12 +104,15 @@ final class TransactionImpl implements Transaction {
     private final HashMap<String, ProfileParticipantDetailImpl> detailMap;
 
     /**
-     * Creates an instance with the specified transaction ID, timeout, and
-     * collector.
+     * Creates an instance with the specified transaction ID, timeout, 
+     * prepare and commit optimization flag, and collector.
      */
-    TransactionImpl(long tid, long timeout, ProfileCollector collector) {
+    TransactionImpl(long tid, long timeout, boolean usePrepareAndCommitOpt,
+                    ProfileCollector collector) 
+    {
 	this.tid = tid;
 	this.timeout = timeout;
+        this.disablePrepareAndCommitOpt = usePrepareAndCommitOpt;
 	this.collector = collector;
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
@@ -341,7 +347,7 @@ final class TransactionImpl implements Transaction {
 		startTime = System.currentTimeMillis();
 	    }
 	    try {
-		if (iter.hasNext()) {
+		if (iter.hasNext() || disablePrepareAndCommitOpt) {
 		    boolean readOnly = participant.prepare(this);
 		    if (detail != null) {
 			detail.setPrepared(System.currentTimeMillis() -
