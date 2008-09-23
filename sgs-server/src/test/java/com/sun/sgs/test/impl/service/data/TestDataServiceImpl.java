@@ -147,8 +147,13 @@ public class TestDataServiceImpl{
             // Start as if it's the first time, because we must force a
             // new serverNode to be created if the sense of the boolean
             // changes.
+            cleanup = true;
+            try {
+                tearDown();
+            } catch (Exception e) {
+                System.err.println("Unexpected exception caught" + e);
+            }
             firstRun = true;
-            serverNode = null;
             TestDataServiceImpl.durableParticipant = durableParticipant;
         }
     }
@@ -3705,21 +3710,20 @@ public class TestDataServiceImpl{
                 service.setBinding("dummy2", new DummyManagedObject());
         }}, taskOwner);
 
-        final Semaphore flag = new Semaphore(1);
-        // Both threads must release before an acquire can occur
-        final Semaphore doneFlag = new Semaphore(2);
-
         class TestTask1 extends AbstractKernelRunnable {
             Exception exception = null;
             private final int runNumber;
+            private final Semaphore flag;
+            private final Semaphore doneFlag;
             private boolean firstTry = true;
-            TestTask1(int runNumber) {
+            TestTask1(int runNumber, Semaphore flag, Semaphore doneFlag) {
                 this.runNumber = runNumber;
+                this.flag = flag;
+                this.doneFlag = doneFlag;
             }
             public void run() throws Exception {
                 Transaction txn = txnProxy.getCurrentTransaction();
                 if (!firstTry) {     
-                    flag.release();
                     // Don't want to loop forever with retriable exceptions
                     throw new RuntimeException("just kill it");             
                 }
@@ -3729,6 +3733,8 @@ public class TestDataServiceImpl{
 
                 // We can only hope the second task gets a chance
                 Thread.sleep(runNumber * 500);
+                System.err.println(runNumber + " task 1 ("
+                                 + txn + "): woke from sleep, acquiring flag");
                 flag.acquire();
                 try {
                     ((DummyManagedObject)
@@ -3749,20 +3755,24 @@ public class TestDataServiceImpl{
             Exception exception = null;
             Transaction txn = null;
             private final int runNumber;
+            private final Semaphore flag;
+            private final Semaphore doneFlag;
             private boolean firstTry = true;
-            TestTask2(int runNumber) {
+            TestTask2(int runNumber, Semaphore flag, Semaphore doneFlag) {
                 this.runNumber = runNumber;
+                this.flag = flag;
+                this.doneFlag = doneFlag;
             }
             public void run() {
                 txn = txnProxy.getCurrentTransaction();
                 if (!firstTry) {
-                    flag.release();
                     throw new RuntimeException("just kill it");
                 }
                 firstTry = false;
                 service.getBinding("dummy2");
                 flag.release();
-
+                System.err.println(runNumber + " task 2 ("
+                                 + txn + "): released flag");
                 try {
                     ((DummyManagedObject)
                          service.getBinding("dummy")).setValue(runNumber);
@@ -3778,13 +3788,12 @@ public class TestDataServiceImpl{
             }
         }
 
-        // Acquire our both doneFlag permits.  Each task must release it
-        // in order to finish the test.  
-        doneFlag.acquire(2);
-        
 	for (int i = 0; i < 5; i++) {
-            TestTask1 task1 = new TestTask1(i);
-            TestTask2 task2 = new TestTask2(i);
+            final Semaphore flag = new Semaphore(1);
+            // Both threads must release before an acquire can occur
+            final Semaphore doneFlag = new Semaphore(2);   
+            TestTask1 task1 = new TestTask1(i, flag, doneFlag);
+            TestTask2 task2 = new TestTask2(i, flag, doneFlag);
       
             // Note that we're using schedule task here, not run task,
             // which allows the tasks to run concurrently.
@@ -3792,6 +3801,8 @@ public class TestDataServiceImpl{
             // (default number of consumer threads allows this)
 
             flag.acquire();
+            doneFlag.acquire(2);
+            System.err.println(i + " main loop, acquired flags");
             txnScheduler.scheduleTask(task1, taskOwner);
             txnScheduler.scheduleTask(task2, taskOwner);
 
