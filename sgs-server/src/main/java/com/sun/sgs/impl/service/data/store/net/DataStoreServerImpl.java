@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
+import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -336,8 +337,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void abort(Throwable cause) {
-	    if (cause == null)
+	    if (cause == null) {
 	        throw new NullPointerException("Cause cannot be null");
+	    }
 	    if (!aborting) {
 		aborting = true;
 		abortCause = cause;
@@ -446,9 +448,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    /* Loop while there is another potentially expired entry */
 	    while (nextId != null) {
 		Txn txn = table.get(nextId);
-		if (txn != null
-		    && txn.getCreationTime() + txn.getTimeout() < now 
-		    && txn.setReaping())
+		if (txn != null &&
+		    txn.getCreationTime() + txn.getTimeout() < now &&
+		    txn.setReaping())
 		{
 		    result.add(txn);
 		}
