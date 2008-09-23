@@ -359,7 +359,7 @@ public class TestScalableDeque extends Assert {
 		    d.add(5);
 		    assertFalse(d.isEmpty());
 		    assertEquals(1, d.size());
-		    assertEquals(5, d.getFirst());
+		    assertEquals(5, (int) d.getFirst());
 		}
 	    }, taskOwner);
     }
@@ -436,7 +436,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    d.add(1);		    		   
-		    assertEquals(1, d.getFirst());
+		    assertEquals(1, (int) d.getFirst());
 
 		}
 	    }, taskOwner);
@@ -453,7 +453,7 @@ public class TestScalableDeque extends Assert {
 			d.add(i);
 		    		   
 		    for (int i = 0; i < 10; ++i) 
-			assertEquals(i, d.remove());
+			assertEquals(i, (int) d.remove());
 
 		}
 	    }, taskOwner);
@@ -488,7 +488,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    d.addFirst(1);		    		   
-		    assertEquals(1, d.getFirst());
+		    assertEquals(1, (int) d.getFirst());
 
 		}
 	    }, taskOwner);
@@ -502,7 +502,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    for (int i = 0; i < 10; ++i)
 			d.addFirst(i);		    		   
-		    assertEquals(9, d.getFirst());
+		    assertEquals(9, (int) d.getFirst());
 
 		}
 	    }, taskOwner);
@@ -515,7 +515,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    d.addLast(1);		    		   
-		    assertEquals(1, d.getLast());
+		    assertEquals(1, (int) d.getLast());
 
 		}
 	    }, taskOwner);
@@ -529,7 +529,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    for (int i = 0; i < 10; ++i)
 			d.addLast(i);		    		   
-		    assertEquals(9, d.getLast());
+		    assertEquals(9, (int) d.getLast());
 		}
 	    }, taskOwner);
     }
@@ -541,7 +541,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    d.offer(1);		    		   
-		    assertEquals(1, d.getFirst());
+		    assertEquals(1, (int) d.getFirst());
 
 		}
 	    }, taskOwner);
@@ -558,7 +558,7 @@ public class TestScalableDeque extends Assert {
 			d.offer(i);
 		    		   
 		    for (int i = 0; i < 10; ++i) 
-			assertEquals(i, d.remove());
+			assertEquals(i, (int) d.remove());
 
 		}
 	    }, taskOwner);
@@ -571,7 +571,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    d.offerFirst(1);		    		   
-		    assertEquals(1, d.getFirst());
+		    assertEquals(1, (int) d.getFirst());
 
 		}
 	    }, taskOwner);
@@ -585,7 +585,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    for (int i = 0; i < 10; ++i)
 			d.offerFirst(i);		    		   
-		    assertEquals(9, d.getFirst());
+		    assertEquals(9, (int) d.getFirst());
 
 		}
 	    }, taskOwner);
@@ -598,7 +598,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    d.offerLast(1);		    		   
-		    assertEquals(1, d.getLast());
+		    assertEquals(1, (int) d.getLast());
 
 		}
 	    }, taskOwner);
@@ -612,7 +612,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
 		    for (int i = 0; i < 10; ++i)
 			d.offerLast(i);		    		   
-		    assertEquals(9, d.getLast());
+		    assertEquals(9, (int) d.getLast());
 		}
 	    }, taskOwner);
     }
@@ -660,7 +660,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);		    		   		    
-		    assertEquals(2, d.element());
+		    assertEquals(2, (int) d.element());
 		}
 	    }, taskOwner);
     }
@@ -691,7 +691,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);		    		   		    
-		    assertEquals(2, d.peek());
+		    assertEquals(2, (int) d.peek());
 		}
 	    }, taskOwner);
     }
@@ -715,7 +715,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);
 		    d.add(3);
-		    assertEquals(2, d.peekFirst());
+		    assertEquals(2, (int) d.peekFirst());
 		}
 	    }, taskOwner);
     }
@@ -728,7 +728,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);
 		    d.add(3);
-		    assertEquals(3, d.peekLast());
+		    assertEquals(3, (int) d.peekLast());
 		}
 	    }, taskOwner);
     }
@@ -741,7 +741,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);
 		    d.add(3);
-		    assertEquals(2, d.getFirst());
+		    assertEquals(2, (int) d.getFirst());
 		}
 	    }, taskOwner);
     }
@@ -754,7 +754,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);
 		    d.add(3);
-		    assertEquals(3, d.getLast());
+		    assertEquals(3, (int) d.getLast());
 		}
 	    }, taskOwner);
     }
@@ -803,7 +803,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);		    		   		    
-		    assertEquals(2, d.remove());
+		    assertEquals(2, (int) d.remove());
 		}
 	    }, taskOwner);
     }
@@ -815,7 +815,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);		    		   		    
-		    assertEquals(2, d.removeFirst());
+		    assertEquals(2, (int) d.removeFirst());
 		}
 	    }, taskOwner);
     }
@@ -828,7 +828,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    for (int i = 0; i < 10; ++i)
 			d.add(i);		    		   		    
-		    assertEquals(0, d.removeFirst());
+		    assertEquals(0, (int) d.removeFirst());
 		}
 	    }, taskOwner);
     }
@@ -840,7 +840,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(2);		    		   		    
-		    assertEquals(2, d.removeLast());
+		    assertEquals(2, (int) d.removeLast());
 		}
 	    }, taskOwner);
     }
@@ -853,7 +853,7 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    for (int i = 0; i < 10; ++i)
 			d.add(i);		    		   		    
-		    assertEquals(9, d.removeLast());
+		    assertEquals(9, (int) d.removeLast());
 		}
 	    }, taskOwner);
     }
@@ -1219,7 +1219,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.push(1);
-		    assertEquals(1, d.remove());
+		    assertEquals(1, (int) d.remove());
 		}
 	    }, taskOwner);
     }
@@ -1231,7 +1231,7 @@ public class TestScalableDeque extends Assert {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    d.add(1);
-		    assertEquals(1, d.pop());
+		    assertEquals(1, (int) d.pop());
 		}
 	    }, taskOwner);
     }
@@ -1268,7 +1268,7 @@ public class TestScalableDeque extends Assert {
 		    Iterator<Integer> iter = d.iterator();
 		    int count = 0;
 		    while (iter.hasNext())
-			assertEquals(count++, iter.next());
+			assertEquals(count++, (int) iter.next());
 		    assertEquals(10, count);
 		}
 	    }, taskOwner);
@@ -1386,7 +1386,7 @@ public class TestScalableDeque extends Assert {
 		    Iterator<Integer> iter = d.descendingIterator();
 		    int count = 9;
 		    while (iter.hasNext())
-			assertEquals(count--, iter.next());
+			assertEquals(count--, (int) iter.next());
 		    // if we've gone through all 10 elements, count
 		    // should be 9 - 10 = -1
 		    assertEquals(-1, count);
@@ -1418,12 +1418,12 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.
+			uncheckedCast(AppContext.
 					getDataManager().getBinding(name));
 		    assertEquals(10, d.size());
 		    int i = 0;
 		    for (Integer inDeque : d) {
-			assertEquals(i++, inDeque);
+			assertEquals(i++, (int) inDeque);
 		    }
 		    
 		    AppContext.getDataManager().removeBinding(name);
@@ -1451,12 +1451,12 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    int i = 0;
 		    while (it.hasNext())
-			assertEquals(i++, it.next());
+			assertEquals(i++, (int) it.next());
 		    assertEquals(10, i);
 
 		    AppContext.getDataManager().removeBinding(name);
@@ -1487,7 +1487,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.
+                                      getDataManager().getBinding(name2));
 		    for (int i = 1; i < 10; i+=2) 
 			d.remove(i);		    
 		}
@@ -1500,12 +1501,12 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    int i = 0;
 		    while (it.hasNext()) {
-			assertEquals(i, it.next());
+			assertEquals(i, (int) it.next());
 			i += 2;
 		    }
 		    assertEquals(10, i);
@@ -1542,7 +1543,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.
+                                      getDataManager().getBinding(name2));
 		    for (int i = 0; i < 5; i++) 
 			d.remove(i);		    
 		}
@@ -1555,12 +1557,12 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    int i = 5;
 		    while (it.hasNext()) {
-			assertEquals(i, it.next());
+			assertEquals(i, (int) it.next());
 			i ++;
 		    }
 		    assertEquals(10, i);
@@ -1597,7 +1599,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.
+                                      getDataManager().getBinding(name2));
 		    for (int i = 0; i < 5; i++) 
 			d.remove();		    
 		}
@@ -1610,8 +1613,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    try {
 			it.next();
@@ -1657,7 +1660,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
-			(ScalableDeque)(AppContext.getDataManager().getBinding(name2));
+			uncheckedCast(AppContext.
+                                      getDataManager().getBinding(name2));
 		    // remove the first element, which the iterator
 		    // already advanced over
 		    d.removeFirst();
@@ -1671,8 +1675,8 @@ public class TestScalableDeque extends Assert {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
-			(Iterator)(AppContext.
-				   getDataManager().getBinding(name));
+			uncheckedCast(AppContext.
+				      getDataManager().getBinding(name));
 
 		    // now try to remove the already-removed element
 		    // from the iterator

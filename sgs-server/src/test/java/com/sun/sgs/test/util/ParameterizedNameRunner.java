@@ -19,8 +19,6 @@
 
 package com.sun.sgs.test.util;
 
-import org.junit.internal.runners.InitializationError; 
-
 import org.junit.runner.Description;
 
 import org.junit.runner.notification.RunListener;
@@ -39,9 +37,9 @@ public class ParameterizedNameRunner extends Parameterized {
 
     private static String testName;
 
-    public ParameterizedNameRunner(Class<?> c) throws InitializationError,
-                                                      Exception {
+    public ParameterizedNameRunner(Class<?> c) throws Throwable {
         super(c);
+        filter(new NamedTestFilter());
     }
 
     public void run(RunNotifier runNotifier) {
