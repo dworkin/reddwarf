@@ -152,6 +152,10 @@ implements 	ManagedObject, Serializable {
 			throw new IllegalArgumentException("Cluster size must "+
 					"be an integer larger than 0");
 		}
+		if (maxChildSize < 2){
+			throw new IllegalArgumentException("Max child size must "+
+					"be an integer larger than 1");
+		}
 		this.clusterSize = clusterSize; 
 	}
 	
@@ -161,20 +165,20 @@ implements 	ManagedObject, Serializable {
 	 * creating an {@code Object} object.
 	 * @param obj The {@code Object} to be appended to the list.
 	 */
-	public boolean add(Object obj){
+	public boolean add(E e){
 		boolean result = false;
 		
-		if (obj == null){
+		if (e == null){
 			throw new IllegalArgumentException("Element cannot be null");
 		}
 		
 		// first item to add into the list
 		if (tailRef == null){
-			return addFirstEntry(obj);
+			return addFirstEntry(e);
 		}
 		// otherwise, add it at the end since no index
 		// and propagate change to parents
-		result = tailRef.get().get().append(obj);
+		result = tailRef.get().get().append(e);
 		
 		// check location of headTreeNodeRef, in case the
 		// append introduced a new TreeNode root. The
@@ -192,14 +196,14 @@ implements 	ManagedObject, Serializable {
 	 * @param obj The {@code Object} to be added to the beginning 
 	 * of the list.
 	 */
-	public void prepend(Object obj){
+	public void prepend(E e){
 		// first item to add into the list
 		if (headRef == null){
-			addFirstEntry(obj);
+			addFirstEntry(e);
 			return;
 		}
 		// otherwise, add it to the beginning
-		headRef.get().get().prepend(obj);
+		headRef.get().get().prepend(e);
 	}
 	
 	
@@ -211,12 +215,12 @@ implements 	ManagedObject, Serializable {
 	 * @param index The location to add the {@code Object}.
 	 * @param obj The {@code Object} to add.
 	 */
-	public void add(int index, Object obj){
+	public void add(int index, E e){
 		isValidIndex(index);
-		if (obj == null){
+		if (e == null){
 			throw new IllegalArgumentException("Element cannot be null");
 		} else if (headRef == null && index == 0){
-			addFirstEntry(obj);
+			addFirstEntry(e);
 			return;
 		} else if (headRef == null){
 			throw new IllegalArgumentException("Cannot add to index "+
@@ -226,7 +230,7 @@ implements 	ManagedObject, Serializable {
 		// otherwise, add it to the specified index.
 		// This requires a search of the list nodes.
 		ListNode n = getNode(index);
-		n.insert(index - n.getSubList().getOffset(), obj);
+		n.insert(index - n.getSubList().getOffset(), e);
 		
 		updateTreeNodeRefs();
 	}
@@ -239,8 +243,8 @@ implements 	ManagedObject, Serializable {
 	 * @return True if the operation occurred successfully, and
 	 * false otherwise.
 	 */
-	public boolean addAll(int index, Collection<?> c){
-		Iterator<?> iter = c.iterator();
+	public boolean addAll(int index, Collection<E> c){
+		Iterator<E> iter = c.iterator();
 		while (iter.hasNext()){
 			add(index, iter.next());
 			index++;
@@ -300,7 +304,7 @@ implements 	ManagedObject, Serializable {
 	 * @param o the {@code Object} to locate in the list
 	 * @return the index where it is last located
 	 */
-	public int lastIndexOf(Object o){
+	public int lastIndexOf(E e){
 		int listIndex = 0;
 		int absIndex = -1;
 		int index = -1;
@@ -313,7 +317,7 @@ implements 	ManagedObject, Serializable {
 		while (iter.hasNext()){
 			n = iter.next();
 			listIndex += n.size();
-			index = n.getSubList().lastIndexOf(o);
+			index = n.getSubList().lastIndexOf(e);
 			
 			// Save the most recent occurrence of a matching index
 			// but keep searching in case we find another in another
@@ -609,11 +613,11 @@ implements 	ManagedObject, Serializable {
 	 * @param obj
 	 * @return
 	 */
-	private boolean addFirstEntry(Object obj){
-		if (obj == null){
+	private boolean addFirstEntry(E e){
+		if (e == null){
 			throw new IllegalArgumentException("Element cannot be null");
 		}
-		TreeNode t = new TreeNode(null, maxChildSize, clusterSize, obj);
+		TreeNode t = new TreeNode(null, maxChildSize, clusterSize, e);
 		DataManager dm = AppContext.getDataManager();
 		headTreeNodeRef = dm.createReference(t);
 		ListNode n = (ListNode) t.getChild();
@@ -627,7 +631,7 @@ implements 	ManagedObject, Serializable {
 	 * represents a segment of the overall list.
 	 * @return the head node
 	 */
-	public ManagedReference<ListNode> getHeadRef(){
+	protected ManagedReference<ListNode> getHeadRef(){
 		return headRefLink;
 	}
 	
@@ -636,7 +640,7 @@ implements 	ManagedObject, Serializable {
 	 * represents a segment of the overall list.
 	 * @return the tail node
 	 */
-	public ManagedReference<ListNode> getTailRef(){
+	protected ManagedReference<ListNode> getTailRef(){
 		return tailRefLink;
 	}
 	
@@ -668,7 +672,7 @@ implements 	ManagedObject, Serializable {
 	 * the tree and find the root.
 	 * @return the root {@code TreeNode} of the tree.
 	 */
-	public void updateTreeNodeRefs(){
+	protected void updateTreeNodeRefs(){
 		TreeNode treeHead = headTreeNodeRef.get();
 		
 		// Percolate up the tree until we are at the
@@ -683,8 +687,6 @@ implements 	ManagedObject, Serializable {
 		// operations.
 		headTreeNodeRef = AppContext.getDataManager()
 			.createReference(treeHead);
-		
-		// Find the tail
 		
 	}
 	
