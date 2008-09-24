@@ -3439,7 +3439,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
-    @Test (expected=TestAbortedTransactionException.class)
+    @Test
     public void testAbortReadOnly() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
         try {
