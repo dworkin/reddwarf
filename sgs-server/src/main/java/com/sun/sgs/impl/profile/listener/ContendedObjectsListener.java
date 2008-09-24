@@ -164,8 +164,6 @@ public class ContendedObjectsListener implements ProfileListener {
         
         // if there was conflict, then figure out what to display
         if (detail.getConflictType() != ConflictType.NONE) {
-            if (txnId == null)
-                txnId = new TransactionId(profileReport.getTransactionId());
 
             byte [] conflictingBytes = detail.getConflictingId();
 
