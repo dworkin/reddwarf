@@ -3708,12 +3708,16 @@ public class TestDataServiceImpl{
         class TestTask1 extends AbstractKernelRunnable {
             Exception exception = null;
             private final int runNumber;
-            private final Semaphore flag;
+            private final Semaphore flag1;
+            private final Semaphore flag2;
             private final Semaphore doneFlag;
             private boolean firstTry = true;
-            TestTask1(int runNumber, Semaphore flag, Semaphore doneFlag) {
+            TestTask1(int runNumber, Semaphore flag1, 
+                      Semaphore flag2, Semaphore doneFlag) 
+            {
                 this.runNumber = runNumber;
-                this.flag = flag;
+                this.flag1 = flag1;
+                this.flag2 = flag2;
                 this.doneFlag = doneFlag;
             }
             public void run() throws Exception {
@@ -3726,11 +3730,13 @@ public class TestDataServiceImpl{
                 firstTry = false;
                 dummy = (DummyManagedObject) service.getBinding("dummy");
 
+                // First step is done, let the other task proceed
+                flag1.release();
                 // We can only hope the second task gets a chance
                 Thread.sleep(runNumber * 500);
                 System.err.println(runNumber + " task 1 ("
                                  + txn + "): woke from sleep, acquiring flag");
-                flag.acquire();
+                flag2.acquire();
                 try {
                     ((DummyManagedObject)
                         service.getBinding("dummy2")).setValue(runNumber);
@@ -3750,22 +3756,28 @@ public class TestDataServiceImpl{
             Exception exception = null;
             Transaction txn = null;
             private final int runNumber;
-            private final Semaphore flag;
+            private final Semaphore flag1;
+            private final Semaphore flag2;
             private final Semaphore doneFlag;
             private boolean firstTry = true;
-            TestTask2(int runNumber, Semaphore flag, Semaphore doneFlag) {
+            TestTask2(int runNumber, Semaphore flag1, 
+                      Semaphore flag2, Semaphore doneFlag) 
+            {
                 this.runNumber = runNumber;
-                this.flag = flag;
+                this.flag1 = flag1;
+                this.flag2 = flag2;
                 this.doneFlag = doneFlag;
             }
-            public void run() {
+            public void run() throws Exception {
                 txn = txnProxy.getCurrentTransaction();
                 if (!firstTry) {
                     throw new RuntimeException("just kill it");
                 }
                 firstTry = false;
+                flag1.acquire();
                 service.getBinding("dummy2");
-                flag.release();
+                // Let the other task proceed
+                flag2.release();
                 System.err.println(runNumber + " task 2 ("
                                  + txn + "): released flag");
                 try {
@@ -3784,18 +3796,20 @@ public class TestDataServiceImpl{
         }
 
 	for (int i = 0; i < 5; i++) {
-            final Semaphore flag = new Semaphore(1);
+            final Semaphore flag1 = new Semaphore(1);
+            final Semaphore flag2 = new Semaphore(1);
             // Both threads must release before an acquire can occur
             final Semaphore doneFlag = new Semaphore(2);   
-            TestTask1 task1 = new TestTask1(i, flag, doneFlag);
-            TestTask2 task2 = new TestTask2(i, flag, doneFlag);
+            TestTask1 task1 = new TestTask1(i, flag1, flag2, doneFlag);
+            TestTask2 task2 = new TestTask2(i, flag1, flag2, doneFlag);
       
             // Note that we're using schedule task here, not run task,
             // which allows the tasks to run concurrently.
             // We should guarantee that these two can run concurrently
             // (default number of consumer threads allows this)
 
-            flag.acquire();
+            flag1.acquire();
+            flag2.acquire();
             doneFlag.acquire(2);
             System.err.println(i + " main loop, acquired flags");
             txnScheduler.scheduleTask(task1, taskOwner);
