@@ -96,6 +96,15 @@ import static com.sun.sgs.app.util.ScalableHashMap.checkSerializable;
  *
  * <p>
  *
+ * If {@code accessOrder} is used, special care must be taken when using an
+ * iterator.  Since the iteration order will change based on accesses, an
+ * iterator may loop indefinitely if the backing map is modified while the
+ * iterator is not active in a current transaction.  If {@code accessOrder} is
+ * enabled, when iterating, the backing map should not be used in such a way
+ * that would generate an access.
+ *
+ * <p>
+ *
  * The second parameter {@code supportsConcurrentIterators} is used to tune the
  * {@code Iterator} behavior for this class.  If the parameter is set to {@code
  * true}, iterators will correctly traverse all entries of the map, even if the
@@ -273,7 +282,7 @@ public class ScalableLinkedHashMap<K,V>
 	<ManagedReference<LinkedNode<K,V>>>> lastEntry;
 
     /**
-     * A mapping from each of the current, usable {@link OrderedIterator}
+     * A mapping from each of the current, usable {@link ScalableLinkedHashMap$OrderedIterator}
      * instances to the element that they would next return or {@code null} if
      * this map does not support concurrent iteration.  This mapping is used to
      * update the next element of any iterators that are in a serialized state
@@ -813,7 +822,7 @@ public class ScalableLinkedHashMap<K,V>
      * @return {@code true} if the eldest entry should be removed from the map;
      *         {@code false} if it should be retained.
      *
-     * @see java.util.LinkedHashMap.removeEldestEntry(Map.Entry)
+     * @see java.util.LinkedHashMap#removeEldestEntry(Entry)
      */
     protected boolean removeEldestEntry(Entry<K,V> eldest) {
 	return false;
@@ -823,7 +832,7 @@ public class ScalableLinkedHashMap<K,V>
      * Returns whether this deque will support concurrent iterators.  If {@code
      * false}, the iterators of this map will not receive updates regarding any
      * changes to the map and will throw {@link
-     * ConcurrentModificationException}s if the element that ab iterator was to
+     * ConcurrentModificationException}s if the element that an iterator was to
      * return next was removed while the iterator was not activing within a
      * current transaction.
      *
@@ -835,10 +844,10 @@ public class ScalableLinkedHashMap<K,V>
     }
 
     /**
-     * If this map supports concurrent iterators, this methods checks the state
-     * of all {@link OrderedIterator} instances to see if the provided entry,
-     * which is being removed, is their next entry to return, and updates their
-     * state accordingly.
+     * If this map supports concurrent iterators, this method checks the state
+     * of all {@link ScalableLinkedHashMap$OrderedIterator} instances to see if
+     * the provided entry, which is being removed, is their next entry to
+     * return, and updates their state accordingly.
      *
      * <p>
      * 

@@ -2709,7 +2709,6 @@ public class TestScalableLinkedHashMap extends Assert {
 	    }, taskOwner);
     }     
 
-
     @Test public void testAccessOrderWithEndAccesses() throws Exception {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
@@ -2736,6 +2735,48 @@ public class TestScalableLinkedHashMap extends Assert {
 			test.get(arr[i]);
 			control.get(arr[i]);
 		    }
+			
+		    // now test the iterator order
+		    Iterator<Integer> testIter = test.keySet().iterator();
+		    Iterator<Integer> controlIter = control.keySet().iterator();
+
+		    while (controlIter.hasNext()) {
+			assertEquals(controlIter.next(), testIter.next());
+		    }
+		    
+		    assertFalse(testIter.hasNext());
+		}
+	    }, taskOwner);
+    }     
+
+    @Test public void testAccessOrderIsUnffactedByView() throws Exception {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+
+		    Map<Integer,Integer> test =
+			new ScalableLinkedHashMap<Integer,Integer>(true);
+
+		    LinkedHashMap<Integer,Integer> control =
+			new LinkedHashMap<Integer,Integer>(16, .75f, true);
+		    
+		    int[] arr = new int[36];
+		    
+		    // insert into the map, keeping track of the order
+		    for (int i = 0; i < arr.length; i++) {
+			int j = RANDOM.nextInt();
+			test.put(j,j);
+			control.put(j,j);
+			arr[(arr.length - 1) - i] = j;
+		    }
+		    
+		    // create a view on the test set and then iterate half way
+		    // through it, which shouldn't have any effect on the
+		    // iteration order
+		    Set<Entry<Integer,Integer>> s = test.entrySet();
+		    Iterator<Entry<Integer,Integer>> it = s.iterator();
+		    for (int i = 0; i < s.size() / 2; ++i)
+			it.next();
 			
 		    // now test the iterator order
 		    Iterator<Integer> testIter = test.keySet().iterator();
