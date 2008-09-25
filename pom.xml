@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>5</version>
+    <version>7</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -112,10 +112,12 @@
 	<configuration>
 	  <effort>Max</effort>
 	  <excludeFilterFile>
-	    src/main/etc/findbugs-exclude.xml
+	    ${basedir}/src/main/etc/findbugs-exclude.xml
 	  </excludeFilterFile>
 	  <threshold>Low</threshold>
 	  <xmlOutput>true</xmlOutput>
+	  <findbugsXmlOutput>true</findbugsXmlOutput>
+	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
 	</configuration>
       </plugin>
 
