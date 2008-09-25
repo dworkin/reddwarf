@@ -1,0 +1,29 @@
+	EMBEDDED
+name:PDSInstall
+source:/targets/
+file:pds-server.zip
+destination:./pds-server/
+
+	EMBEDDED
+name:BDB
+source:/targets/
+file:bdb.zip
+destination:./pds-server/lib/bdb/
+
+	EMBEDDED
+name:MINA
+source:/targets/
+file:mina-core.zip
+destination:./pds-server/lib/
+
+	EMBEDDED
+name:slf4j
+source:/targets/
+file:slf4j.zip
+destination:./pds-server/lib/
+
+	EMBEDDED
+name:CLIENT
+source:/targets/
+file:pds-client.zip
+destination:./pds-client/
