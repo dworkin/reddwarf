@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import junit.framework.JUnit4TestAdapter;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -1023,12 +1022,5 @@ public class TestScalableHashSet extends Assert {
 		System.err.println(id + ": " + e);
 	    }
 	}
-    }
-
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestScalableHashSet.class);
     }
 }
