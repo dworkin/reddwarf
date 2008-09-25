@@ -57,6 +57,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -154,8 +155,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** The shared data service. */
     private DataService dataService;
 
-    /** The test clients, keyed by user name. */
-    private static Map<String, DummyClient> dummyClients;
+    /** The test clients, keyed by client session ID. */
+    private static Map<BigInteger, DummyClient> dummyClients;
     
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -173,16 +174,18 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
-        dummyClients = new HashMap<String, DummyClient>();
+        dummyClients = new HashMap<BigInteger, DummyClient>();
         System.err.println("Testcase: " + getName());
-        setUp(true);
+        setUp(null, true);
     }
 
     /** Creates and configures the session service. */
-    protected void setUp(boolean clean) throws Exception {
-        Properties props = 
-            SgsTestNode.getDefaultProperties(APP_NAME, null, 
-                                             DummyAppListener.class);
+    protected void setUp(Properties props, boolean clean) throws Exception {
+	if (props == null) {
+	    props = 
+                SgsTestNode.getDefaultProperties(APP_NAME, null, 
+						 DummyAppListener.class);
+	}
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	serverNode = 
@@ -575,6 +578,53 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testLoginTwiceBlockUser() throws Exception {
+	String name = "dummy";
+	DummyClient client1 = new DummyClient(name);
+	DummyClient client2 = new DummyClient(name);
+	int port = serverNode.getAppPort();
+	client1.connect(port).login();
+	try {
+	    client2.connect(port).login();
+	    fail("expected client2 login failure");
+	} catch (RuntimeException e) {
+	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		System.err.println("login refused");
+	    } else {
+		fail("unexpected login failure: " + e);
+	    }
+	} finally {
+	    client1.disconnect();
+	    client2.disconnect();
+	}
+    }
+
+    public void testLoginTwicePreemptUser() throws Exception {
+	// Set up ClientSessionService to preempt user if same user logs in
+	tearDown(false);
+	Properties props =
+	    SgsTestNode.getDefaultProperties(APP_NAME, null,
+					     DummyAppListener.class);
+	props.setProperty(
+ 	    "com.sun.sgs.impl.service.session.allow.new.login", "true");
+	setUp(props, false);
+	String name = "dummy";
+	
+	DummyClient client1 = new DummyClient(name);
+	DummyClient client2 = new DummyClient(name);
+	int port = serverNode.getAppPort();
+	try {
+	    client1.connect(port).login();
+	    client2.connect(port).login();
+	    client1.checkDisconnectedCallback(false);
+	    assertTrue(client2.isConnected());
+	    
+	} finally {
+	    client1.disconnect();
+	    client2.disconnect();
+	}
+    }
+    
     public void testDisconnectFromServerAfterLogout() throws Exception {
 	final String name = "logout";
 	DummyClient client = new DummyClient(name);
@@ -692,7 +742,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             // Simulate "crash"
             tearDown(false);
 	    String failedNodeKey = nodeKeys.get(0);
-            setUp(false);
+            setUp(null, false);
 
 	    for (DummyClient client : dummyClients.values()) {
 		client.checkDisconnectedCallback(false);
@@ -1110,6 +1160,7 @@ public class TestClientSessionServiceImpl extends TestCase {
      */
     private class DummyClient {
 
+
 	private String name;
 	private String password;
 	private Connector<SocketAddress> connector;
@@ -1140,7 +1191,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	DummyClient(String name) {
 	    this.name = name;
-	    dummyClients.put(name, this);
 	}
 
 	DummyClient connect(int port) {
@@ -1458,6 +1508,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
 		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
+		    dummyClients.put(
+			new BigInteger(1, reconnectKey), DummyClient.this);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1571,9 +1623,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		throw new RuntimeException("loggedIn throwing an exception");
 	    } else if (name.equals(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION) ||
 		       name.startsWith("badClient")) {
-		listener = new DummyClientSessionListener(name, true);
+		listener = new DummyClientSessionListener(name, session, true);
 	    } else {
-		listener = new DummyClientSessionListener(name, false);
+		listener = new DummyClientSessionListener(name, session, false);
 	    }
 	    DataManager dataManager = AppContext.getDataManager();
 	    ManagedReference<ClientSession> sessionRef =
@@ -1620,14 +1672,18 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
+	private final BigInteger sessionRefId;
 	private final boolean disconnectedThrowsException;
 	private int seq = -1;
 
 
 	DummyClientSessionListener(
-	    String name, boolean disconnectedThrowsException)
+	    String name, ClientSession session, boolean disconnectedThrowsException)
 	{
 	    this.name = name;
+	    session = ((ClientSessionWrapper) session).getClientSession();
+	    this.sessionRefId =
+		AppContext.getDataManager().createReference(session).getId();
 	    this.disconnectedThrowsException = disconnectedThrowsException;
 	}
 
@@ -1637,7 +1693,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			       "] disconnected invoked with " + graceful);
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.markForUpdate(this);
-	    DummyClient client = dummyClients.get(name);
+	    DummyClient client = dummyClients.get(sessionRefId);
 	    ClientSession session = (ClientSession)
 		dataManager.getBinding(name);
 	    dataManager.removeObject(session);
@@ -1657,7 +1713,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             byte[] bytes = new byte[message.remaining()];
             message.asReadOnlyBuffer().get(bytes);
 	    int num = message.getInt();
-	    DummyClient client = dummyClients.get(name);
+	    DummyClient client = dummyClients.get(sessionRefId);
 	    System.err.println("receivedMessage: " + num + 
 			       "\nthrowException: " + client.throwException);
 	    if (num <= seq) {
