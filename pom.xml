@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>6</version>
+    <version>7</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
