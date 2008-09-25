@@ -42,12 +42,19 @@ package com.sun.sgs.protocol.simple;
  * <li> optional content, depending on the operation code.
  * </ul>
  * <p>
- * A {@code ByteArray} is encoded as follows:
+ * A {@code ByteArray} is encoded in a context dependent fashion. If the ByteArray
+ * is the only content, or if the ByteArray is the last piece of content (that is,
+ * if the length of the ByteArray can be determined by the payload length and
+ * the length of what has come before), the ByteArray is encoded as
  * <ul>
  * <li> (byte[]) the bytes in the array
  * </ul>
- * <b>Note:</b> Messages may need to include explicit array length fields
- * if they include more than one ByteArray.
+ * If there is other content that follows the ByteArray, then the ByteArray 
+ * is encoded as
+ * <ul>
+ * <li> (unsigned short) number of bytes in the array
+ * <li> (byte[]) content
+ * </ul>
  * <p>
  * A {@code String} is encoded as follows:
  * <ul>
@@ -55,6 +62,17 @@ package com.sun.sgs.protocol.simple;
  * <li> (byte[]) String encoded in modified UTF-8 as described
  * in {@link java.io.DataInput}
  * </ul>
+ * Note that these encodings only apply to those data items that are specified
+ * explicitly in the protocol. Application data, passed as a ByteArray, may 
+ * contain any information, but will need to be parsed (and, if necessary, 
+ * converted to and from a network representation) by the application or 
+ * client.
+ * <p>
+ * The total length of a message must not be greater than 65535 bytes; given the
+ * header information this means that the payload of a message cannot be 
+ * greater than 65532 bytes. If a message larger than this must be sent, it is
+ * the responsibility of the sender to break the message into pieces and
+ * of the receiver to re-assemble those pieces.
  */
 public interface SimpleSgsProtocol {
     
@@ -74,7 +92,8 @@ public interface SimpleSgsProtocol {
     final byte VERSION = 0x04;
 
     /**
-     * Login request from a client to a server.
+     * Login request from a client to a server. This message should only be 
+     * received by a server; if received by a client it should be ignored.
      * <br>
      * Opcode: {@code 0x10}
      * <br>
@@ -84,11 +103,24 @@ public interface SimpleSgsProtocol {
      * <li>(String) name
      * <li>(String) password
      * </ul>
+     * The protocol version will be checked by the server to insure that the
+     * client and server are using the same protocol; if the two do not match
+     * the server will disconnect from the client. Since the protocols being used
+     * are not the same, no other communication between the client and the 
+     * server can be guaranteed to be understood.
+     * <p>
+     * The name and password strings will be passed to the server's authentication
+     * mechanism. The result of attempting to login will be the sending of
+     * either a {@link #LOGIN_SUCCESS}, {@link #LOGIN_FAILURE}, or 
+     * {@link #LOGIN_REDIRECT} message from the server to the client.
+     * <p>
+     * Sending a login request on a session that is currently logged in will 
+     * result in 
      */
     final byte LOGIN_REQUEST = 0x10;
 
     /**
-     * Login success.  Server response to a client's {@link #LOGIN_REQUEST}.
+     * Login success.  Server response to a client's {@link #LOGIN_REQUEST}. 
      * <br>
      * Opcode: {@code 0x11}
      * <br>
@@ -96,6 +128,12 @@ public interface SimpleSgsProtocol {
      * <ul>
      * <li> (ByteArray) reconnectionKey
      * </ul>
+     * The reconnectionKey is an opaque reference that can be held by the client
+     * for use in case the client is disconnected and wishes to reconnect to the
+     * server with the same identity using a {@link #RECONNECT_REQUEST}. 
+     * <p>
+     * This message should only be received by a client; if received by a server 
+     * the client sending the message will be disconnected.
      */
     final byte LOGIN_SUCCESS = 0x11;
 
@@ -108,6 +146,12 @@ public interface SimpleSgsProtocol {
      * <ul>
      * <li> (String) reason
      * </ul>
+     * This message indicates a failure of the login process initiated by a 
+     * LOGIN_REQUEST. The reason for the failure is encoded in the String returned
+     * as the reason; the interpretation of the reason is application specific.
+     * <p>
+     * This message should only be received by a client; if received by a server 
+     * the client sending the message will be disconnected.
      */
     final byte LOGIN_FAILURE = 0x12;
 
@@ -121,6 +165,16 @@ public interface SimpleSgsProtocol {
      * <li> (String) hostname
      * <li> (int) port
      * </ul>
+     * This message indicates a redirection from the 
+     * machine to which the {@link #LOGIN_REQUEST} was sent to another machine.
+     * The client receiving this request should shut down the connection to the
+     * original machine and establish a connection to the redirection machine, 
+     * indicated by the hostname and port in the payload. The client should 
+     * then attempt to log in to the machine to which it has been redirected
+     * by sending a {@link #LOGIN_REQUEST} to that machine.
+     * <p>
+     * This message should only be received by a client; if received by a server 
+     * the client sending the message will be disconnected.
      */
     final byte LOGIN_REDIRECT = 0x13;
 
@@ -175,6 +229,10 @@ public interface SimpleSgsProtocol {
      * <ul>
      * <li> (ByteArray) message
      * </ul>
+     * <p>
+     * If this message is sent by a client to a server and the client is not
+     * currently logged in to the server, the message will be ignored. The
+     * parsing of the message by the recipient is an application-level task.
      */
     final byte SESSION_MESSAGE = 0x30;
 
@@ -185,6 +243,12 @@ public interface SimpleSgsProtocol {
      * Opcode: {@code 0x40}
      * <br>
      * No payload.
+     * <p>
+     * This message will cause the client to be logged out of the server, and
+     * the connection to be closed. Membership in any channels by the client will 
+     * be dropped. Any message (other than {@link #LOGIN_REQUEST} sent by the
+     * client will be ignored, and any message will need to be sent on a 
+     * new connection to the server.
      */
     final byte LOGOUT_REQUEST = 0x40;
 
@@ -194,7 +258,10 @@ public interface SimpleSgsProtocol {
      * Opcode: {@code 0x41}
      * <br>
      * No payload.
-     */
+      * <p>
+     * This message should only be received by a client; if received by a server 
+     * the client sending the message will be disconnected.
+    */
     final byte LOGOUT_SUCCESS = 0x41;
 
 
