@@ -10,6 +10,11 @@
   <packaging>pom</packaging>
   <version>0.1-SNAPSHOT</version>
   <url>http://www.projectdarkstar.com</url>
+  <scm>
+    <connection>scm:svn:https://dtc.dev.java.net/svn/dtc/trunk</connection>
+    <developerConnection>scm:svn:https://dtc.dev.java.net/svn/dtc/trunk</developerConnection>
+    <url>https://dtc.dev.java.net/source/browse/dtc/trunk</url>
+  </scm>
 
   <modules>
     <module>dtc-domain</module>
