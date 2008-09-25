@@ -70,7 +70,7 @@ public interface TransactionParticipant {
      *                               if this participant is not participating
      *                               in the given transaction
      */
-    public boolean prepare(Transaction txn) throws Exception;
+    boolean prepare(Transaction txn) throws Exception;
 
     /**
      * Tells the participant to commit its state associated with the given
@@ -84,7 +84,7 @@ public interface TransactionParticipant {
      *                               if this participant is not participating
      *                               in the given transaction
      */
-    public void commit(Transaction txn);
+    void commit(Transaction txn);
 
     /**
      * Tells the participant to both prepare and commit its state associated
@@ -98,7 +98,7 @@ public interface TransactionParticipant {
      *                               if this participant is not participating
      *                               in the given transaction
      */
-    public void prepareAndCommit(Transaction txn) throws Exception;
+    void prepareAndCommit(Transaction txn) throws Exception;
 
     /**
      * Tells the participant to abort its involvement with the given
@@ -111,7 +111,7 @@ public interface TransactionParticipant {
      *                               participant is not participating in
      *                               the given transaction
      */
-    public void abort(Transaction txn);
+    void abort(Transaction txn);
     
     /**
      * Returns the fully qualified type name of the participant.
@@ -120,5 +120,5 @@ public interface TransactionParticipant {
      * 
      * @return the name of the participant
      */
-     public String getTypeName();
+    String getTypeName();
 }

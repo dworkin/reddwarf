@@ -44,8 +44,6 @@ import com.sun.sgs.test.util.SgsTestNode;
 
 import java.util.Properties;
 
-import junit.framework.JUnit4TestAdapter;
-
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -324,14 +322,4 @@ public class TestAccessCoordinatorImpl extends Assert {
 		}
 	    }, taskOwner);
     }
-    
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestAccessCoordinatorImpl.class);
-    }
-
-
-
 }
