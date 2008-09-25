@@ -19,12 +19,12 @@
 
 package com.projectdarkstar.tools.dtc.beans;
 
-import com.projectdarkstar.tools.dtc.api.RuntimeExecutionsService;
+import com.projectdarkstar.tools.dtc.service.RuntimeExecutionsService;
 import com.projectdarkstar.tools.dtc.data.LogFileDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultClientDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultProbeDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultValueDTO;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import javax.ejb.Stateless;
 import javax.ejb.Remote;
 import javax.persistence.PersistenceContext;
@@ -38,8 +38,27 @@ import javax.persistence.EntityManager;
 @Remote(RuntimeExecutionsService.class)
 public class RuntimeExecutionsServiceBean implements RuntimeExecutionsService
 {
+    
     @PersistenceContext(unitName = "dtc")
     private EntityManager em;
+
+    public void appendClientLog(Long clientLogId,
+                                String chunk)
+            throws DTCServiceException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    public void appendProbeLog(Long probeLogId,
+                               String chunk)
+            throws DTCServiceException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    public void appendServerLog(Long serverLogId,
+                                String chunk)
+            throws DTCServiceException {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 
     public void addClientDataPoint(Long testExecutionResultId, 
                                    TestExecutionResultClientDataDTO data)

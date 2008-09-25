@@ -19,11 +19,11 @@
 
 package com.projectdarkstar.tools.dtc.beans;
 
-import com.projectdarkstar.tools.dtc.api.ConfigResourcesService;
+import com.projectdarkstar.tools.dtc.service.ConfigResourcesService;
 import com.projectdarkstar.tools.dtc.data.HardwareResourceDTO;
 import com.projectdarkstar.tools.dtc.data.HardwareResourceFamilyDTO;
 import com.projectdarkstar.tools.dtc.data.PkgLibraryDTO;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import java.util.Map;
 import javax.ejb.Remote;
 import javax.ejb.Stateless;

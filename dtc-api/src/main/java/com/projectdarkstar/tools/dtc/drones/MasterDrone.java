@@ -17,19 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.service;
+package com.projectdarkstar.tools.dtc.drones;
 
 /**
- * Thrown whenever data validation occurs for a DTC service
+ * The master drone serves two functions.
+ * First, it monitors the test queue in persistent storage and initiates
+ * tests by calling the appropriate test runners.  Second, it serves as a
+ * result collector by receiving messages from slaves (which represent
+ * log files and other result information) and forwarding the information
+ * to the appropriate test runners controlling the tests for those slaves.
  */
-public class DTCInvalidDataException extends DTCServiceException
+public interface MasterDrone 
 {
-    public DTCInvalidDataException(String message) {
-        super(message);
-    }
-    
-    public DTCInvalidDataException(String message, Throwable cause) {
-        super(message, cause);
-    }
 
 }

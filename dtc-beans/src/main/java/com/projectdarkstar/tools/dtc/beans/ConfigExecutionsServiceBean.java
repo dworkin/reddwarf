@@ -19,8 +19,8 @@
 
 package com.projectdarkstar.tools.dtc.beans;
 
-import com.projectdarkstar.tools.dtc.api.ConfigExecutionsService;
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.service.ConfigExecutionsService;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import java.util.Map;
 import javax.ejb.Remote;
 import javax.ejb.Stateless;

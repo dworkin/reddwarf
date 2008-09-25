@@ -17,9 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.projectdarkstar.tools.dtc.api;
+package com.projectdarkstar.tools.dtc.service;
 
-import com.projectdarkstar.tools.dtc.service.DTCServiceException;
+import com.projectdarkstar.tools.dtc.exceptions.DTCServiceException;
 import com.projectdarkstar.tools.dtc.data.LogFileDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultClientDataDTO;
 import com.projectdarkstar.tools.dtc.data.TestExecutionResultProbeDataDTO;
@@ -48,6 +48,18 @@ public interface RuntimeExecutionsService
             throws DTCServiceException;
     
     /**
+     * Update the logFile attribute of the TestExecutionResultServerLog
+     * object by appending the given chunk of the log to the end.
+     * 
+     * @param serverLogId id of the TestExecutionResultServerLog to update
+     * @param chunk piece of the log file to append to the end
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
+    public void appendServerLog(Long serverLogId,
+                                String chunk)
+            throws DTCServiceException;
+    
+    /**
      * Update the logFile attribute of the TestExecutionResultClientLog
      * object with the given id.
      * 
@@ -60,6 +72,19 @@ public interface RuntimeExecutionsService
             throws DTCServiceException;
     
     /**
+     * Update the logFile attribute of the TestExecutionResultClientLog
+     * object with the given id by appending the given chunk of the log
+     * to the end
+     * 
+     * @param clientLogId id of the TestExecutionResultClientLog to update
+     * @param chunk piece of the log file to append to the end
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
+    public void appendClientLog(Long clientLogId,
+                                String chunk)
+            throws DTCServiceException;
+    
+    /**
      * Update the logFile attribute of the TestExecutionResultProbeLog
      * object with the given id.
      * 
@@ -69,6 +94,19 @@ public interface RuntimeExecutionsService
      */
     public void updateProbeLog(Long probeLogId,
                                LogFileDTO logFile)
+            throws DTCServiceException;
+    
+    /**
+     * Update the logFile attribute of the TestExecutionResultProbeLog
+     * object with the given id by appending the given chunk of the log
+     * to the end.
+     * 
+     * @param probeLogId id of the TestExecutionResultProbeLog to update
+     * @param chunk piece of the log file to append to the end
+     * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
+     */
+    public void appendProbeLog(Long probeLogId,
+                               String chunk)
             throws DTCServiceException;
     
     
