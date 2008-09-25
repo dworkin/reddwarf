@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Properties;
+import java.util.Random;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -30,7 +31,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import com.sun.sgs.app.util.ScalableHashMap;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ScalableList;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -40,7 +41,7 @@ import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 
 /**
- * Test the {@link ScalableHashMap} class.
+ * Test the {@link ScalableList} class.
  */
 @RunWith(NameRunner.class)
 public class TestScalableList extends Assert {
@@ -110,6 +111,55 @@ public class TestScalableList extends Assert {
 	    }, taskOwner);
     }
     
+    
+    /**
+     * Tests instantiating a ScalableList with illegal
+     * argument(s).
+     * @throws Exception
+     */
+    @Test public void testConstructorWithLegalArgs()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list;
+		    try {
+		    	list = new ScalableList<Integer>(2, 1);
+		    } catch (Exception e) {
+		    	fail("Did not expect exception: " + e.getLocalizedMessage());
+		    }
+		    
+		    try {
+		    	list = new ScalableList<Integer>(99, 99);
+		    } catch (Exception e) {
+		    	fail("Did not expect exception: " + e.getLocalizedMessage());
+		    }
+		    
+		    try {
+		    	list = new ScalableList<Integer>(2, 999);
+		    } catch (Exception e) {
+		    	fail("Did not expect exception: " + e.getLocalizedMessage());
+		    }
+		    
+		    try {
+		    	list = new ScalableList<Integer>(999, 2);
+		    } catch (Exception e) {
+		    	fail("Did not expect exception: " + e.getLocalizedMessage());
+		    }
+		    
+		    try {
+		    	Random random = new Random();
+		    	int rand1 = random.nextInt(999) + 2;
+		    	int rand2 = random.nextInt(999) + 1;
+		    	list = new ScalableList<Integer>(rand1, rand2);
+		    } catch (Exception e) {
+		    	fail("Did not expect exception: " + e.getLocalizedMessage());
+		    }
+		}
+	    }, taskOwner);
+    }
+    
     /*
      *  ///////////////////////////////////////////////////
      *  	NON-EXCEPTIONAL (NORMAL) USE CASES
@@ -126,7 +176,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    
 		    assertEquals(1, list.size());
@@ -136,7 +186,7 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests appending a value to the list
      * @throws Exception
      */
     @Test public void testAppendingToList()
@@ -145,7 +195,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    
@@ -155,7 +205,7 @@ public class TestScalableList extends Assert {
     }
 
     /**
-     * 
+     * Tests appending a value to a non-empty list
      * @throws Exception
      */
     @Test public void testPrependToNonEmptyList()
@@ -164,17 +214,18 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.prepend(2);
 		    
 		    assertEquals(2, list.size());
+		    assertEquals("2", list.get(0).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests prepending a value into an empty list
      * @throws Exception
      */
     @Test public void testPrependIntoEmptyList()
@@ -183,7 +234,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.prepend(1);
 		    
 		    assertEquals(1, list.size());
@@ -192,7 +243,7 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests inserting a value into a populated list
      * @throws Exception
      */
     @Test public void testInsertIntoList()
@@ -201,19 +252,21 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(1, 999);
 		    
 		    assertEquals(3, list.size());
+		    assertEquals("999", list.get(1));
 		}
 	    }, taskOwner);
     }
     
    
     /**
-     * 
+     * Tests adding all the elements in a collection to an 
+     * empty list.
      * @throws Exception
      */
     @Test public void testAddingAllToEmptyList()
@@ -222,7 +275,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 			Collection<Integer> c = new ArrayList<Integer>();
 			c.add(1);
 			c.add(2);
@@ -236,7 +289,8 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests appending all elements in a collection to a
+     * non-empty list.
      * @throws Exception
      */
     @Test public void testAppendingAllToNonEmptyList()
@@ -245,7 +299,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(8, 8);
 			list.add(1);
 			list.add(2);
 			
@@ -260,9 +314,32 @@ public class TestScalableList extends Assert {
 	    }, taskOwner);
     }
     
+    /**
+     * Tests whether two lists with identical elements
+     * are seen as being equal.
+     * @throws Exception
+     */
+    @Test public void testEquals()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(8, 8);
+			ManagedReference<ScalableList<String>> list1Ref = 
+				dataService.createReference(list);
+			ManagedReference<ScalableList<String>> list2Ref = 
+				dataService.createReference(list);
+			
+			assertTrue(list1Ref.get().equals(list2Ref.get()));
+		}
+	    }, taskOwner);
+    }
+    
     
     /**
-     * 
+     * Tests whether a collection of elements can be added
+     * successfully to the middle of a populated list
      * @throws Exception
      */
     @Test public void testAddingAllMiddleToNonEmptyList()
@@ -271,7 +348,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(8, 8);
 			list.add(1);
 			list.add(5);
 			
@@ -283,7 +360,27 @@ public class TestScalableList extends Assert {
 			assertTrue(list.addAll(1, c));
 		    assertEquals(5, list.size());
 		    // get the middle element
-		    assertEquals(3, list.get(2));
+		    assertEquals("3", list.get(2).toString());
+		}
+	    }, taskOwner);
+    }
+    
+    
+    /**
+     * Tests whether the head element of the list
+     * can be retrieved when the list size is unity
+     * @throws Exception
+     */
+    @Test public void testGetHeadFromListOfSizeOne()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
+		    list.add(1);
+		    
+		    assertEquals("1", list.get(0).toString());
 		}
 	    }, taskOwner);
     }
@@ -293,16 +390,59 @@ public class TestScalableList extends Assert {
      * 
      * @throws Exception
      */
-    @Test public void testGetHeadFromListOfSizeOne()
+    @Test public void testGetFirstElement()
 	throws Exception
     {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
+		    list.add(2);
+		    list.add(3);
 		    
-		    assertEquals(1, list.get(0));
+		    assertEquals("1", list.getFirst().toString());
+		}
+	    }, taskOwner);
+    }
+    
+    
+    /**
+     * Tests whether the last element of the list can be retrieved
+     * @throws Exception
+     */
+    @Test public void testGetLastElement()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
+		    list.add(1);
+		    list.add(2);
+		    list.add(3);
+		    
+		    assertEquals("3", list.getLast().toString());
+		}
+	    }, taskOwner);
+    }
+    
+    
+    /**
+     * Tests whether the first and last element in the
+     * list are the same when the list size is unity.
+     * @throws Exception
+     */
+    @Test public void testGetFirstAndLastElementWithOneEntry()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+		    list.add("only child");
+		    
+		    assertEquals(list.getFirst(), list.getLast());
 		}
 	    }, taskOwner);
     }
@@ -318,18 +458,19 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
 		    
-		    assertEquals(1, list.get(0));
+		    assertEquals("1", list.get(0).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests the accuracy of retrieving a value from the middle
+     * of the list.
      * @throws Exception
      */
     @Test public void testGetMiddleFromListOfArbitrarySize()
@@ -338,18 +479,19 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
 		    
-		    assertEquals(2, list.get(1));
+		    assertEquals("2", list.get(1).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests the list's ability to retrieve the last element
+     * using the get method.
      * @throws Exception
      */
     @Test public void testGetEndFromListOfArbitrarySize()
@@ -358,18 +500,18 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
 		    
-		    assertEquals(3, list.get(2));
+		    assertEquals("3", list.get(2).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests if the head can be successfully removed from the list
      * @throws Exception
      */
     @Test public void testRemoveHeadFromList()
@@ -378,18 +520,20 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
 		    list.remove(0);
 		    assertEquals(2, list.size());
+		    assertEquals("2", list.get(0).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests if a middle element can be removed successfully from
+     * the list
      * @throws Exception
      */
     @Test public void testRemoveMiddleFromList()
@@ -398,7 +542,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -406,12 +550,14 @@ public class TestScalableList extends Assert {
 		    list.remove(1);
 		    
 		    assertEquals(2, list.size());
+		    assertEquals("3", list.get(1).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests whether the tail (last) element can be removed 
+     * from the list
      * @throws Exception
      */
     @Test public void testRemoveEndFromList()
@@ -420,7 +566,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -428,12 +574,13 @@ public class TestScalableList extends Assert {
 		    list.remove(2);
 		    
 		    assertEquals(2, list.size());
+		    assertEquals("2", list.get(1).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests whether the removed item contains the expected value.
      * @throws Exception
      */
     @Test public void testRemoveAndVerifyResult()
@@ -442,7 +589,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -455,7 +602,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests the removal of the head using the designated
+     * method call.
      * @throws Exception
      */
     @Test public void testRemoveHead()
@@ -464,7 +612,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -478,7 +626,7 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests that the removed value has an expected value
      * @throws Exception
      */
     @Test public void testRemoveHeadAndVerifyResult()
@@ -487,7 +635,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -500,7 +648,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests the removal of the tail (last) element using
+     * the designated method call.
      * @throws Exception
      */
     @Test public void testRemoveTail()
@@ -509,7 +658,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -522,7 +671,9 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests the removal of the tail using the designated
+     * API call and verifies that the value is the expected
+     * one.
      * @throws Exception
      */
     @Test public void testRemoveTailAndVerifyResult()
@@ -531,7 +682,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -546,7 +697,7 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests the removal of elements using their reference
      * @throws Exception
      */
     @Test public void testRemoveUsingObjectReference()
@@ -555,7 +706,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Object> list = new ScalableList<Object>(5, 5);
+			ScalableList<Object> list = new ScalableList<Object>(6, 6);
 			Object obj = new Object();
 			
 		    list.add("A");
@@ -570,7 +721,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests the removal of an object by using its reference
+     * and testing that the value is equal to the reference
      * @throws Exception
      */
     @Test public void testRemoveUsingObjectReferenceAndVerify()
@@ -579,7 +731,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Object> list = new ScalableList<Object>(5, 5);
+			ScalableList<Object> list = new ScalableList<Object>(6, 6);
 			Object obj = new Object();
 			
 		    list.add("A");
@@ -595,7 +747,8 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests whether the iterator identifies the proper quantity
+     * and value for the list's elements.
      * @throws Exception
      */
     @Test public void testIterator()
@@ -604,7 +757,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(0);
 		    list.add(1);
 		    list.add(2);
@@ -633,7 +786,7 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests whether the list can determine if it is empty or not.
      * @throws Exception
      */
     @Test public void testIsEmpty()
@@ -642,7 +795,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    
 			assertTrue(list.isEmpty());
 			
@@ -660,7 +813,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests whether a valid index of an object in the list 
+     * can be properly retrieved
      * @throws Exception
      */
     @Test public void testIndexOf()
@@ -669,7 +823,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -680,7 +834,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests whether the last index of a valid element can be
+     * properly found.
      * @throws Exception
      */
     @Test public void testLastIndexOf()
@@ -689,7 +844,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<String> list = new ScalableList<String>(5, 5);
+			ScalableList<String> list = new ScalableList<String>(6, 6);
 			String s1 = new String("A");
 			String s2 = new String("B");
 			
@@ -705,7 +860,7 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests whether a valid index can be set
      * @throws Exception
      */
     @Test public void testSet()
@@ -714,7 +869,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -737,7 +892,8 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests scalability by appending elements exceeding the
+     * cluster size
      * @throws Exception
      */
     @Test public void testScalableAppendByVerifyingSize()
@@ -771,7 +927,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests scalability by prepending elements until the
+     * list exceeds its clusterSize
      * @throws Exception
      */
     @Test public void testScalablePrependByVerifyingSize()
@@ -780,7 +937,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(3, 3);
 		    list.add(12);
 		    list.prepend(1);
 		    list.add(1,11);
@@ -803,7 +960,8 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests scalability by appending values in excess of its
+     * cluster size and checking if the values are consistent.
      * @throws Exception
      */
     @Test public void testScalableAppendByVerifyingValues()
@@ -812,7 +970,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(3, 3);
 		    list.add(1);
 		    list.add(2);
 		    list.add(3);
@@ -838,7 +996,10 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests scalability by inserting values until the
+     * number of elements in the list exceeds the 
+     * cluster size. The test also verifies that the
+     * values are consistent.
      * @throws Exception
      */
     @Test public void testScalableInsertByVerifyingValues()
@@ -847,7 +1008,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(3, 3);
 		    list.add(1);
 		    list.add(12);
 		    list.add(1,11);
@@ -873,7 +1034,9 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests scalability by prepending elements in excess
+     * of the cluster size, and verifies that the values
+     * are consistent.
      * @throws Exception
      */
     @Test public void testScalablePrependByVerifyingValues()
@@ -882,7 +1045,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Integer> list = new ScalableList<Integer>(5, 5);
+			ScalableList<Integer> list = new ScalableList<Integer>(3, 3);
 		    list.add(12);
 		    list.prepend(11);
 		    list.prepend(10);
@@ -910,7 +1073,9 @@ public class TestScalableList extends Assert {
     
     
     /**
-     * 
+     * Tests scalability by adding a collection to make the
+     * list's size exceed that specified by the cluster
+     * size
      * @throws Exception
      */
     @Test public void testScalableAddAll()
@@ -966,7 +1131,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests scalability by removing elements from a
+     * large list and verifying the expected size.
      * @throws Exception
      */
     @Test public void testScalableRemoveByVerifyingSize()
@@ -987,7 +1153,9 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests scalability by removing elements from a
+     * large list and verifying that the values are
+     * consistent.
      * @throws Exception
      */
     @Test public void testScalableRemoveByVerifyingValues()
@@ -1019,7 +1187,8 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests scalability by assessing the
+     * index of values in a large list
      * @throws Exception
      */
     @Test public void testScalableIndexOf()
@@ -1037,7 +1206,9 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests scalability by assessing the last
+     * index of duplicated elements in a large
+     * list.
      * @throws Exception
      */
     @Test public void testScalableLastIndexOf()
@@ -1058,7 +1229,10 @@ public class TestScalableList extends Assert {
     }
     
     /**
-     * 
+     * Tests scalability by assessing the accuracy
+     * of the retrieved element from a set operation,
+     * as well as its value after the operation
+     * takes place.
      * @throws Exception
      */
     @Test public void testScalableSet()
@@ -1068,18 +1242,19 @@ public class TestScalableList extends Assert {
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
 			ScalableList<Integer> list = makeList();
-			list.set(2, 999);
+			assertEquals("2", list.set(2, 999).toString());
 		    assertEquals("999", list.get(2).toString());
-		    list.set(8, 9999);
+		    assertEquals("8", list.set(8, 9999).toString());
 		    assertEquals("9999", list.get(8).toString());
-		    list.set(11, 99999);
+		    assertEquals("11", list.set(11, 99999).toString());
 		    assertEquals("99999", list.get(11).toString());
 		}
 	    }, taskOwner);
     }
     
     /**
-     * 
+     * Tests scalability by verifying an iterator's
+     * size and values for a large list. 
      * @throws Exception
      */
     @Test public void testScalableIterator()
@@ -1109,6 +1284,290 @@ public class TestScalableList extends Assert {
 		}
 	    }, taskOwner);
     }    
+    
+    
+    /**
+     * Tests scalability by obtaining the head element
+     * from a large list.
+     * @throws Exception
+     */
+    @Test public void testScalableGetFirst()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = makeList();
+			
+			assertEquals("0", list.getFirst().toString());
+		}
+	    }, taskOwner);
+    }    
+    
+    
+    
+    /**
+     * Tests scalability by retrieving the tail element
+     * from a large list.
+     * @throws Exception
+     */
+    @Test public void testScalableGetLast()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = makeList();
+			
+			assertEquals("11", list.getLast().toString());
+		}
+	    }, taskOwner);
+    }    
+    
+    
+    /*
+     *  //////////////////////////////////////////////////////////////
+     *  	EXCEPTIONAL USE CASES (THESE SHOULD THROW EXCEPTIONS)
+     *  //////////////////////////////////////////////////////////////
+     */
+    
         
+    /**
+     * Tests the lists ability to detect when an element is
+     * trying to be added to an invalid index.
+     * @throws Exception
+     */
+    @Test public void testAddingToInvalidIndex()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
+			list.add(1);
+			list.add(2);
+			
+			try {
+				list.add(5, 999);
+				fail("Expected an IllegalArgumentException when adding to "+
+						"an invalid index");
+			} catch (IllegalArgumentException iae ){
+			}
+			
+		}
+	    }, taskOwner);
+    }    
+    
+    
+    /**
+     * Tests the list's ability to throw an exception when
+     * trying to retrieve a value from an invalid index.
+     * @throws Exception
+     */
+    @Test public void testGettingElementFromInvalidUpperIndex()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
+			list.add(1);
+			list.add(2);
+			
+			try {
+				list.get(2);
+				fail("Expecting IllegalArgumentException for accessing "+
+						"element outside of range.");
+			} catch (IllegalArgumentException iae ){
+			}
+			
+		}
+	    }, taskOwner);
+    }    
+    
+    /**
+     * Tests the list's ability to throw an exception when
+     * trying to retrieve an element using a negative
+     * index.
+     * @throws Exception
+     */
+    @Test public void testGettingElementFromInvalidLowerIndex()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
+			list.add(1);
+			list.add(2);
+			
+			try {
+				list.get(-1);
+				fail("Expecting IllegalArgumentException for accessing "+
+						"element outside of range");
+			} catch (IllegalArgumentException iae){
+			}
+			
+		}
+	    }, taskOwner);
+    }    
+    
+    /**
+     * Tests the list's ability to prevent a null element from being
+     * added.
+     * @throws Exception
+     */
+    @Test public void testAddingNullElement()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			list.add("A");
+			list.add("B");
+			
+			try {
+				list.add(null);
+				fail("Expecting NullPointerException");
+			} catch (NullPointerException npe){
+			}
+		}
+	    }, taskOwner);
+    }    
+    
+    /**
+     * Tests the list's ability to detect a null element
+     * inside a collection to be added.
+     * @throws Exception
+     */
+    @Test public void testAddingAllUsingCollectionContainingNull()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			list.add("A");
+			
+			Collection<String> c = new ArrayList<String>();
+			c.add("B");
+			c.add(null);
+			
+			try {
+				list.addAll(c);
+				fail("Expecting NullPointerException");
+			} catch (NullPointerException npe){
+			}
+			
+		}
+	    }, taskOwner);
+    }    
+    
+    /**
+     * Tests the list's ability to detect a null element
+     * in a collection when inserting the collection in 
+     * the middle of the list.
+     * @throws Exception
+     */
+    @Test public void testAddingAllInMiddleUsingCollectionContainingNull()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			list.add("A");
+			list.add("C");
+			Collection<String> c = new ArrayList<String>();
+			c.add("B");
+			c.add(null);
+			
+			try {
+				list.addAll(1, c);
+				fail("Expecting NullPointerException");
+			} catch (NullPointerException npe){
+			}
+			
+		}
+	    }, taskOwner);
+    }    
+    
+    /**
+     * Tests the list's ability to detect that a list
+     * is not empty.
+     * @throws Exception
+     */
+    @Test public void testIsEmptyShouldReturnFalse()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<Integer> list = new ScalableList<Integer>(6, 6);
+			list.add(1);
+			assertFalse(list.isEmpty());
+			
+			list.add(2);
+			list.removeFirst();
+			assertFalse(list.isEmpty());
+		}
+	    }, taskOwner);
+    }    
+    
+    /**
+     * Tests the list's ability to not find a particular
+     * entry using {@code indexOf} after it has been removed.
+     * @throws Exception
+     */
+    @Test public void testIndexOfNonExistentUsingRemovals()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			list.add("A");
+			list.add("B");
+			list.add("C");
+			list.remove(2);
+			
+			assertEquals(-1, list.indexOf("C"));
+			
+			list.add("C");
+			list.remove("C");
+			assertEquals(-1, list.indexOf("C"));
+		}
+	    }, taskOwner);
+    }    
+    
+        
+
+    /**
+     * Tests the list's ability to not find a duplicated
+     * object after it has been removed, using the
+     * lastIndexOf() method.
+     * @throws Exception
+     */
+    @Test public void testLastIndexOfNonExistentUsingRemovals()
+	throws Exception
+    {
+	txnScheduler.runTask(
+	    new AbstractKernelRunnable() {
+		public void run() throws Exception {
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			list.add("A");
+			list.add("B");
+			list.add("C");
+			list.remove(2);
+			assertEquals(-1, list.lastIndexOf("C"));
+
+			list.add("C");
+			list.remove("C");
+			assertEquals(-1, list.lastIndexOf("C"));
+		}
+	    }, taskOwner);
+    }   
+    
     
 }

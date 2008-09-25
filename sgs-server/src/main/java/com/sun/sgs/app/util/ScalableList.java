@@ -36,18 +36,17 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
-import com.sun.xml.internal.bind.v2.schemagen.xmlschema.Particle;
 
 /**
  *  This class represents an {@code AbstractCollection} which supports 
- *  concurrency and introduces tools which achieve this. This data 
- *  structure builds upon the AbstractList class by implementing 
- *  methods specific to concurrent operations.<p>
+ *  a concurrent and scalable behavior. This data structure builds 
+ *  upon the AbstractList class by implementing methods specific to 
+ *  concurrent and scalable operations.<p>
  *  
- *  The class achieves concurrency by partitioning an ordinary
- *  list into a number of smaller lists contained in {@code ListNode}
- *  objects, and joining the nodes as a linked-list. This 
- *  implementation bears similarity to a shallow skip-list in 
+ *  The class achieves scalability and concurrency by partitioning 
+ *  an ordinary list into a number of smaller lists contained in 
+ *  {@code ListNode} objects, and joining the nodes in a tree format. 
+ *  This implementation bears similarity to a skip-list in 
  *  that access to arbitrary elements occurs through initially
  *  large jumps, and then through a finer iteration of the
  *  contained list. To allow for this behaviour, each {@code ListNode} 
@@ -58,15 +57,30 @@ import com.sun.xml.internal.bind.v2.schemagen.xmlschema.Particle;
  *  siblings. This enables intermediate changes to have no effect 
  *  on neighbouring nodes, such as re-indexing. <p>
  *  
+ *  The {@code branchingFactor} is a user-defined parameter which
+ *  describes how the underlying tree is organized. A large
+ *  {@code branchingFactor} means that each node in the tree
+ *  contains a large number of children, providing for a shallower
+ *  tree, but many more sibling traversals. Concurrency is somewhat
+ *  compromised since parent nodes containing a large number of
+ *  children are locked during modification. A smaller branching
+ *  factor reduces the sibling traversals, but makes the tree
+ *  deeper, somewhat affecting performance during split operations.
+ *  Depending on the use of the list, it may be desirable to have
+ *  a large {@code branchingFactor}, such as for improved scalability,
+ *  or a smaller {@code branchingFactor}, such as for better
+ *  concurrency. <p>
+ *  
  *  When the nodes require modification, iterators are responsible
- *  for interpreting the node sizes and dealing with changes
- *  due to concurrency. When iterators propagate through the list,
- *  they generate the list size based on knowledge of the 
- *  {@code ListNode}'s size, thereby making the {@code size()} 
- *  operation uncharacteristically more expensive. However, it is 
+ *  for interpreting the node sizes and dealing with changes. 
+ *  Iterators are responsible for determining attributes of the
+ *  list, like size, in roughly O(1) time.
+ *  As mentioned earlier, performing splits and removing unused nodes
+ *  can be somewhat expensive, depending on the values set for
+ *  the {@code branchingFactor} and {@code clusterSize}. However, it is 
  *  seen that the benefits provided by the partitioning of the 
  *  list that enable concurrency outweigh the performance hit for 
- *  this operation. <p>
+ *  these operations. <p>
  *  
  *  When an element is requested from the data structure, the
  *  iterator's position is not affected by modifications to the
@@ -75,7 +89,7 @@ import com.sun.xml.internal.bind.v2.schemagen.xmlschema.Particle;
  *  will be involved in the iteration. Therefore, in the event
  *  that such a modification takes place, this
  *  implementation does not guarantee that the element at the
- *  specified index will be the one accessed. <p>
+ *  specified index will be the one accessed.
  */
 public class ScalableList<E> 
 extends AbstractCollection<E>
@@ -107,10 +121,10 @@ implements 	ManagedObject, Serializable {
 	
 	/**
 	 * The maximum number of children contained in a TreeNode;
-	 * this paramter is passed to the TreeNode during
+	 * this parameter is passed to the TreeNode during
 	 * instantiation.
 	 */
-	private int maxChildSize = 5;
+	private int branchingFactor = 5;
 	
 	
 	/*
@@ -136,12 +150,18 @@ implements 	ManagedObject, Serializable {
 	/**
 	 * Constructor which creates a {@code ScalableList} object
 	 * with the resolution and cluster size supplied as a parameter.
+	 * The clusterSize can be any integer larger than 0, however
+	 * the {@code branchingFactor} must be larger than 1 so that 
+	 * the tree can be meaningful. Otherwise, it would only be 
+	 * able to grow to a maximum size of {@code clusterSize} 
+	 * since branching could not introduce any additional children. 
+	 * @param branchingFactor The number of children each node
+	 * should have. A {@code branchingFactor} of 2 means that the
+	 * list structure incorporates a binary tree.
 	 * @param clusterSize The size of each partitioned list. This
 	 * value must be a positive integer (larger than 0).
-	 * @param resolution Whether the {@code ScalableList} should
-	 * perform resolution. True if so, and false otherwise.
 	 */
-	public ScalableList(int maxChildSize, int clusterSize){
+	public ScalableList(int branchingFactor, int clusterSize){
 		headRef = null;
 		tailRef = null;
 		headRefLink = null;
@@ -152,7 +172,7 @@ implements 	ManagedObject, Serializable {
 			throw new IllegalArgumentException("Cluster size must "+
 					"be an integer larger than 0");
 		}
-		if (maxChildSize < 2){
+		if (branchingFactor < 2){
 			throw new IllegalArgumentException("Max child size must "+
 					"be an integer larger than 1");
 		}
@@ -264,7 +284,7 @@ implements 	ManagedObject, Serializable {
 		AppContext.getTaskManager().scheduleTask(new AsynchronousClearTask(headTreeNodeRef));
 		
 		// Create a new ListNode and link everything to it.
-		TreeNode t = new TreeNode(null, maxChildSize, clusterSize);
+		TreeNode t = new TreeNode(null, branchingFactor, clusterSize);
 		ListNode n = (ListNode) t.getChild();
 		headRefLink = AppContext.getDataManager().createReference((ListNode) n);
 		headRef = AppContext.getDataManager().createReference(headRefLink);
@@ -417,8 +437,20 @@ implements 	ManagedObject, Serializable {
 	 * @return the {@code Object} which previously existed in the list
 	 */
 	public Object set(int index, Object obj){
+		Object old = null;
+		if (obj == null){
+			throw new NullPointerException(
+					"Value for set operation cannot be null");
+		}
+		Element e = null;
 		SubList n = getNode(index).getSubList();
-		return n.set(index - n.getOffset(), obj);
+		if (!(obj instanceof ManagedObject)){
+			e = new Element(obj);
+			old = n.set(index - n.getOffset(), e);
+		} else {
+			old = n.set(index - n.getOffset(), obj);
+		}
+		return old;
 	}
 	
 	
@@ -576,7 +608,18 @@ implements 	ManagedObject, Serializable {
 	
 	
 	
-	private ListNode search(ManagedObject tn, int currentValue, int destIndex){
+	/**
+	 * Traverses the tree (recursively) in search of the 
+	 * ListNode which contains the index provided. If
+	 * no ListNode can be found, then null is returned.
+	 * @param tn the node from which to start searching.
+	 * @param currentValue the current index value at
+	 * the beginning of the search.
+	 * @param destIndex the index which we want to reach.
+	 * @return
+	 */
+	private ListNode search(
+			ManagedObject tn, int currentValue, int destIndex){
 		if (tn instanceof TreeNode){
 			TreeNode t = (TreeNode)tn;
 			currentValue = t.size();
@@ -585,7 +628,8 @@ implements 	ManagedObject, Serializable {
 				tn = t.next();
 				
 				// If we hit a null, then the index specified was too large
-				// for the collection, so return null.
+				// for the collection, so return null. Alternatively, we
+				// could throw an IllegalArgumentException.
 				if (tn == null){
 					return null;
 				}
@@ -617,7 +661,7 @@ implements 	ManagedObject, Serializable {
 		if (e == null){
 			throw new IllegalArgumentException("Element cannot be null");
 		}
-		TreeNode t = new TreeNode(null, maxChildSize, clusterSize, e);
+		TreeNode t = new TreeNode(null, branchingFactor, clusterSize, e);
 		DataManager dm = AppContext.getDataManager();
 		headTreeNodeRef = dm.createReference(t);
 		ListNode n = (ListNode) t.getChild();
@@ -700,6 +744,16 @@ implements 	ManagedObject, Serializable {
 		///////////////////////////////
 	*/
 	
+	/**
+	 * An object which organizes the {@code ListNode}s
+	 * in a tree structure. Each {@code TreeNode} has
+	 * a reference to either one {@code TreeNode}
+	 * or a {@code ListNode}. The {@code TreeNode} also
+	 * has a reference to its sibling and its parent.<p>
+	 * 
+	 * The {@code TreeNode} is intended to only track
+	 * the size of its children and 
+	 */
 	static class TreeNode
 	implements ManagedObject, Serializable {
 		
@@ -941,7 +995,14 @@ implements 	ManagedObject, Serializable {
 			}
 		}
 		
-		
+		/**
+		 * Determines where to split a list of
+		 * children based on the list size.
+		 * @param numberOfChildren the number of children
+		 * to split
+		 * @return the index corresponding to the location
+		 * where to split the linked list.
+		 */
 		private int calculateSplitSize(int numberOfChildren){
 			return Math.round(numberOfChildren/2);
 		}
@@ -971,7 +1032,7 @@ implements 	ManagedObject, Serializable {
 				generateParentIfNecessary(this);
 				
 				// Perform split by creating and linking new sibling
-				newNode = createSibling(tmp, childrenCount);
+				newNode = createAndLinkSibling(tmp, childrenCount);
 				childrenCount = childrenCount - calculateSplitSize(childrenCount);
 				
 				// Link the new sibling to the tree
@@ -1003,9 +1064,10 @@ implements 	ManagedObject, Serializable {
 		 * @param prev the element previous to the current element
 		 * @param halfway a value representing an index approximately
 		 * half the length of the contents
-		 * @return
+		 * @return the {@TreeNode} that not represents a sibling
+		 * which is connected to the tree
 		 */
-		private TreeNode createSibling(ManagedObject child, int numberOfChildren){
+		private TreeNode createAndLinkSibling(ManagedObject child, int numberOfChildren){
 			ManagedObject prev = null;
 			TreeNode newNode = null;
 			int halfway = calculateSplitSize(numberOfChildren);
@@ -1123,7 +1185,12 @@ implements 	ManagedObject, Serializable {
 	}
 	
 	
-	
+	/**
+	 * A task which iterates through the tree and removes
+	 * all children. This task is instantiated when a
+	 * clear() command is issed from the 
+	 * {@code ScalableList}.
+	 */
 	private static class AsynchronousClearTask
 	implements Serializable, Task, ManagedObject {
 		
@@ -1185,6 +1252,17 @@ implements 	ManagedObject, Serializable {
 		}
 	}
 	
+	
+	/**
+	 * An {@code Offset} object is a simple container
+	 * for the offset of a desired index. An
+	 * {@code Offset} object is attached to a
+	 * {@code SubList} object and is updated whenever
+	 * a {@code get()} operation is called so that
+	 * the index of the item in the {@code SubList}
+	 * maps to the absolute index provided by the
+	 * {@code ScalableList}
+	 */
 	static class Offset
 	implements Serializable, ManagedObject {
 		
@@ -1446,7 +1524,8 @@ implements 	ManagedObject, Serializable {
 	
 	/**
 	 * Node which parents a {@code SubList}. These nodes can be
-	 * considered as the leaf nodes of the tree
+	 * considered as the leaf nodes of the tree and contain 
+	 * references to a portion of the list.
 	 */
 	static class ListNode implements ManagedObject, Serializable {
 		private int count;
@@ -1540,8 +1619,14 @@ implements 	ManagedObject, Serializable {
 			return subListRef.get().get();
 		}
 		
+		/**
+		 * Appends the supplied object to the list
+		 * and performs a split if necessary.
+		 * @param obj the Object to append.
+		 * @return whether the operation was successful;
+		 * true if so, false otherwise.
+		 */
 		public boolean append(Object obj){
-			
 			boolean result = getSubList().append(obj); 
 			if (result){
 				count++;
@@ -1572,11 +1657,30 @@ implements 	ManagedObject, Serializable {
 		}
 
 		
+		/**
+		 * Recursively removes children from the Data Store.
+		 */
 		public void clear(){
 			count = 0;
 			getSubList().clear();
 		}
 		
+		/**
+		 * Removes the object at the specified index of the 
+		 * sublist. The index argument is not an absolute 
+		 * index; it is a relative index which points to a 
+		 * valid index in the list.<p>
+		 * 
+		 * For example, if there are five ListNodes with a 
+		 * cluster size of five, the item with an absolute 
+		 * index of 16 corresponds to an element in the 
+		 * fourth ListNode, with a relative offset of 1.
+		 *  
+		 * @param index the index corresponding to an element
+		 * in the list (not an absolute index with respect
+		 * to the {@code ScalableList} object.
+		 * @return the element that was removed.
+		 */
 		public Object remove(int index){
 			Object obj = getSubList().remove(index);
 			if (obj != null){
@@ -1591,6 +1695,12 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		
+		/**
+		 * Removes the {@code Object} from the {@code SubList}, if it exists.
+		 * @param obj the {@code Object} to remove.
+		 * @return whether the object was removed or not; true if so,
+		 * false otherwise.
+		 */
 		public boolean remove(Object obj){
 			boolean result = getSubList().remove(obj);
 			
@@ -1620,23 +1730,12 @@ implements 	ManagedObject, Serializable {
 			return result;
 		}
 		
-		public boolean remove(ManagedReference<Element> ref){
-			boolean result = getSubList().remove(ref);
-			if (result){
-				count--;
-			}
-			
-			// remove list node if necessary
-			checkRemoveListNode(this);
-			
-			return result;
-		}
-		
 		
 		/**
-		 * If the node is an empty intermediate node, then we
-		 * will remove it from the linked list.
-		 * Update previous to point to next (doubly) and remove
+		 * A method that determines how to remove an
+		 * empty {@code ListNode} from a list of other 
+		 * {@code ListNode}s. Update previous to point 
+		 * to next (doubly) and remove
 		 * this object from Data Store
 		 */
 		private void checkRemoveListNode(ListNode n){
@@ -1673,11 +1772,21 @@ implements 	ManagedObject, Serializable {
 			return parentRef.get();
 		}
 		
+		/**
+		 * Prepends the supplied object to the list.
+		 * This may implicitly cause splitting.
+		 * @param obj the Object to add.
+		 */
 		public void prepend(Object obj){
 			insert(0, obj);
 		}
 		
-		
+		/**
+		 * Splits a linked list of {@code ListNodes} into
+		 * two smaller lists. This is necessary when a
+		 * linked list exceeds the maximum length,
+		 * denoted by the cluster size.
+		 */
 		private void split(){
 			ArrayList<ManagedReference<?>> contents = 
 				getSubList().getElements();
@@ -1763,8 +1872,8 @@ implements 	ManagedObject, Serializable {
 	
 	/**
 	 * This object represents a partition in the list.
-	 * It contains an internal linked-list structure
-	 * to store the elements
+	 * Each of these objects lives as a singleton
+	 * inside a ListNode object.
 	 */
 	static class SubList implements ManagedObject, Serializable {
 		public static final int SIZE_NOT_SET = -1;
@@ -1772,8 +1881,6 @@ implements 	ManagedObject, Serializable {
 		
 		private ArrayList<ManagedReference<?>> contents;
 		
-		private ManagedReference<SubList> nextRef;
-		private ManagedReference<SubList> prevRef;
 		private ManagedReference<Offset> offsetRef;
 		
 		private int size = SIZE_NOT_SET;
@@ -1798,8 +1905,6 @@ implements 	ManagedObject, Serializable {
 			
 			contents = collection;
 			size = contents.size();
-			nextRef = null;
-			prevRef = null;
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
 		}
@@ -1816,8 +1921,6 @@ implements 	ManagedObject, Serializable {
 			
 			contents = new ArrayList<ManagedReference<?>>();
 			size = contents.size();
-			nextRef = null;
-			prevRef = null;
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
 		}
@@ -1835,8 +1938,6 @@ implements 	ManagedObject, Serializable {
 			contents = new ArrayList<ManagedReference<?>>();
 			append(obj);
 			size = contents.size();
-			nextRef = null;
-			prevRef = null;
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
 		}
@@ -1848,8 +1949,6 @@ implements 	ManagedObject, Serializable {
 			contents = new ArrayList<ManagedReference<?>>();
 			append(obj);
 			size = contents.size();
-			nextRef = null;
-			prevRef = null;
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
 		}
@@ -1871,6 +1970,13 @@ implements 	ManagedObject, Serializable {
 			return contents;
 		}
 		
+		/**
+		 * Since the list is a collection of ManagedReferences,
+		 * we are interested in retrieving the value it points
+		 * to.
+		 * @param index
+		 * @return
+		 */
 		public Object get(int index){
 			return contents.get(index).get();
 		}
@@ -1880,21 +1986,14 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		public Object getLast(){
-			return get(contents.size());
+			return get(contents.size() - 1);
 		}
 		
-		public ManagedReference<SubList> getNext(){
-			return nextRef;
-		}
-		
-		public void setNext(SubList listNode){
-			nextRef = AppContext.getDataManager().createReference(listNode);
-		}
-		
-		public void setPrev(SubList listNode){
-			prevRef = AppContext.getDataManager().createReference(listNode);
-		}
-		
+		/**
+		 * Removes all elements in the sublist and
+		 * removes the {@code SubList} object from
+		 * the Data Store.
+		 */
 		public void clear(){
 			DataManager dm = AppContext.getDataManager();
 			Iterator<ManagedReference<?>> iter = contents.iterator();
@@ -1909,11 +2008,35 @@ implements 	ManagedObject, Serializable {
 			dm.removeObject(offsetRef.get());
 		}
 		
+		/**
+		 * Sets the value at the index provided. The
+		 * index is not an absolute index; rather,
+		 * it is relative to the current list. If
+		 * the index does not correspond to a valid
+		 * index in the underlying list, an
+		 * {@code IndexOutOfBoundsException} will be
+		 * thrown.
+		 * @param index the index to add the element
+		 * @param obj the element to be added.
+		 * @return the old element that was replaced.
+		 */
 		public Object set(int index, Object obj){
 			Element e = new Element(obj);
 			return set(index, e);
 		}
 		
+		/**
+		 * Sets the value at the index provided. The
+		 * index is not an absolute index; rather,
+		 * it is relative to the current list. If
+		 * the index does not correspond to a valid
+		 * index in the underlying list, an
+		 * {@code IndexOutOfBoundsException} will be
+		 * thrown.
+		 * @param index the index to add the element
+		 * @param e the element to be added.
+		 * @return the old element that was replaced.
+		 */
 		public Object set(int index, Element e){
 			ManagedReference<Element> ref = AppContext.getDataManager().createReference(e);
 			ManagedReference<?> old = contents.set(index, ref);
@@ -1922,13 +2045,20 @@ implements 	ManagedObject, Serializable {
 			return old.get();
 		}
 		
-		public ManagedReference<SubList> getPrev(){
-			return prevRef;
-		}
-	
-		
+		/**
+		 * Appends the supplied argument to the list. It will
+		 * throw a {@code NullPointerException} if the
+		 * supplied object is null.
+		 * @param obj the element to add to append.
+		 * @return whether the operation was successful; true
+		 * if so, false otherwise.
+		 */
 		public boolean append(Object obj){
 			boolean result = false;
+			if (obj == null){
+				throw new NullPointerException(
+						"The appended object cannot be null");
+			}
 			
 			// If it is not yet a ManagedObject, then
 			// create a new Element to make it a ManagedObject
@@ -1945,7 +2075,15 @@ implements 	ManagedObject, Serializable {
 			return result;
 		}
 
-		
+		/**
+		 * Returns the index of the element inside the
+		 * {@code SubList}. If the element does not
+		 * exist, then -1 is returned.
+		 * @param o the element whose last index is
+		 * to be found.
+		 * @return the index of the element, or -1 if
+		 * it does not exist.
+		 */
 		public int lastIndexOf(Object o){
 			Iterator<ManagedReference<?>> iter = contents.iterator();
 			ManagedReference<?> ref = null;
@@ -1964,12 +2102,16 @@ implements 	ManagedObject, Serializable {
 			}
 			return lastIndex;
 		}
-		
-		public int lastIndexOf(ManagedReference<Element> ref){
-			return contents.lastIndexOf(ref);
-		}
 
 		
+		/**
+		 * Inserts the element into the list at a specified
+		 * location. If the index is not valid, an
+		 * {@code IndexOutOfBoundsException} is thrown.
+		 * @param index the index to add the new element.
+		 * @param obj the object which is to be inserted at
+		 * the specified {@code index}.
+		 */
 		public void insert(int index, Object obj){
 			if (index < 0){
 				throw new IndexOutOfBoundsException("Supplied index cannot be less than 0");
@@ -1986,6 +2128,14 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		
+		/**
+		 * Determines the index of the first occurrence of
+		 * the supplied argument. If the element does not
+		 * exist, then -1 is returned.
+		 * @param o the element whose index is to be searched.
+		 * @return the first index of the supplied element,
+		 * or -1 if it does not exist in the list.
+		 */
 		public int indexOf(Object o){
 			Iterator<ManagedReference<?>> iter = contents.iterator();
 			ManagedReference<?> ref = null;
@@ -2003,11 +2153,15 @@ implements 	ManagedObject, Serializable {
 			}
 			return -1;
 		}
+	
 		
-		public int indexOf(ManagedReference<Element> ref){
-			return contents.indexOf(ref);
-		}
-		
+		/**
+		 * Removes the element at the supplied index. This method
+		 * throws an {@code IndexOutOfBoundsException} if the
+		 * index does not exist in the underlying list.
+		 * @param index the index to remove.
+		 * @return the object removed from the index.
+		 */
 		public Object remove(int index){
 			if (index > contents.size()-1){
 				throw new IndexOutOfBoundsException("The index, "+index+
@@ -2023,16 +2177,13 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		
-		public boolean remove(ManagedReference<Element> ref){
-			boolean success = false;
-			success = contents.remove(ref);
-			if (success && ref.get() instanceof Element){
-				AppContext.getDataManager().removeObject(ref.getForUpdate());
-			}
-			return success;
-		}
-	
-		
+		/**
+		 * Removes the supplied object from the underlying list,
+		 * if it exists. 
+		 * @param obj the element to remove from the list.
+		 * @return whether the operation was successful; true if
+		 * so, false otherwise.
+		 */
 		public boolean remove(Object obj){
 			Iterator<ManagedReference<?>> iter = contents.iterator();
 			ManagedReference<?> current = null;
@@ -2059,6 +2210,11 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		
+		/**
+		 * Removes the last element from the list.
+		 * @return the removed element that had
+		 * existed at the end of the list. 
+		 */
 		public Object removeLast(){
 			return remove(contents.size()-1);
 		}
