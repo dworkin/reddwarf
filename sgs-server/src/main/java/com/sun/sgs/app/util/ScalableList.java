@@ -30,11 +30,13 @@ import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 
 /**
@@ -97,19 +99,21 @@ implements 	ManagedObject, Serializable {
 
 	public static final long serialVersionUID = 1L;
 	
+	private ManagedReference<TreeNode<E>> root;
+	
 	/**
 	 * A reference to the head node of the list.
 	 */
-	private ManagedReference<ManagedReference<ListNode>> headRef;
-	private ManagedReference<ListNode> headRefLink;
-	private ManagedReference<TreeNode> headTreeNodeRef;
+	private ManagedReference<DummyConnector<E>> headRef;
+	private DummyConnector<E> headDummy;
+	private ManagedReference<TreeNode<E>> headTreeNodeRef;
 	/**
 	 * A reference to the tail of the list. This
 	 * makes appending to the list a constant-time
 	 * operation.
 	 */
-	private ManagedReference<ManagedReference<ListNode>> tailRef;
-	private ManagedReference<ListNode> tailRefLink;
+	private ManagedReference<DummyConnector<E>> tailRef;
+	private DummyConnector<E> tailDummy;
 	
 	/**
 	 * The maximum size of the intermediate lists.
@@ -120,8 +124,8 @@ implements 	ManagedObject, Serializable {
 	private int clusterSize = 10;
 	
 	/**
-	 * The maximum number of children contained in a TreeNode;
-	 * this parameter is passed to the TreeNode during
+	 * The maximum number of children contained in a TreeNode<E>;
+	 * this parameter is passed to the TreeNode<E> during
 	 * instantiation.
 	 */
 	private int branchingFactor = 5;
@@ -140,11 +144,12 @@ implements 	ManagedObject, Serializable {
 	 * perform resolution. True if so, and false otherwise. 
 	 */
 	public ScalableList(){
-		headRef = null;
-		tailRef = null;
-		headRefLink = null;
+		headDummy = new DummyConnector<E>();
+		tailDummy = new DummyConnector<E>();
+		root = null;
+		headRef = AppContext.getDataManager().createReference(headDummy);
+		tailRef = AppContext.getDataManager().createReference(tailDummy);
 		headTreeNodeRef = null;
-		tailRefLink = null;
 	}
 	
 	/**
@@ -162,10 +167,12 @@ implements 	ManagedObject, Serializable {
 	 * value must be a positive integer (larger than 0).
 	 */
 	public ScalableList(int branchingFactor, int clusterSize){
-		headRef = null;
-		tailRef = null;
-		headRefLink = null;
-		tailRefLink = null;
+		headDummy = new DummyConnector<E>();
+		tailDummy = new DummyConnector<E>();
+		
+//		headRef = AppContext.getDataManager().createReference(headDummy);
+//		tailRef = AppContext.getDataManager().createReference(tailDummy);
+		root = null;
 		headTreeNodeRef = null;
 		
 		if (clusterSize < 1){
@@ -193,16 +200,17 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		// first item to add into the list
-		if (tailRef == null){
+		if (getTail() == null){
 			return addFirstEntry(e);
 		}
 		// otherwise, add it at the end since no index
 		// and propagate change to parents
-		result = tailRef.get().get().append(e);
+		result = getTail().append(e);
 		
 		// check location of headTreeNodeRef, in case the
-		// append introduced a new TreeNode root. The
-		// headTreeNodeRef should be the root's first child.
+		// append introduced a new TreeNode<E> root during a
+		// split. The headTreeNodeRef should be the root's 
+		// first child.
 		updateTreeNodeRefs();
 		
 		return result;
@@ -218,12 +226,13 @@ implements 	ManagedObject, Serializable {
 	 */
 	public void prepend(E e){
 		// first item to add into the list
-		if (headRef == null){
+		if (headRef == null || getHead() == null || 
+				headRef.get().getRefAsListNode() == null){
 			addFirstEntry(e);
 			return;
 		}
 		// otherwise, add it to the beginning
-		headRef.get().get().prepend(e);
+		getHead().prepend(e);
 	}
 	
 	
@@ -239,17 +248,17 @@ implements 	ManagedObject, Serializable {
 		isValidIndex(index);
 		if (e == null){
 			throw new IllegalArgumentException("Element cannot be null");
-		} else if (headRef == null && index == 0){
+		} else if (getHead() == null && index == 0){
 			addFirstEntry(e);
 			return;
-		} else if (headRef == null){
+		} else if (getHead() == null){
 			throw new IllegalArgumentException("Cannot add to index "+
 					index + " on an empty list");
 		}
 		
 		// otherwise, add it to the specified index.
 		// This requires a search of the list nodes.
-		ListNode n = getNode(index);
+		ListNode<E> n = getNode(index);
 		n.insert(index - n.getSubList().getOffset(), e);
 		
 		updateTreeNodeRefs();
@@ -281,15 +290,15 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		// Schedule asynchronous task here which will delete the list.
-		AppContext.getTaskManager().scheduleTask(new AsynchronousClearTask(headTreeNodeRef));
+		AppContext.getTaskManager().scheduleTask(
+				new AsynchronousClearTask<E>(headTreeNodeRef));
 		
-		// Create a new ListNode and link everything to it.
-		TreeNode t = new TreeNode(null, branchingFactor, clusterSize);
-		ListNode n = (ListNode) t.getChild();
-		headRefLink = AppContext.getDataManager().createReference((ListNode) n);
-		headRef = AppContext.getDataManager().createReference(headRefLink);
-		tailRefLink = AppContext.getDataManager().createReference((ListNode) n);
-		tailRef = AppContext.getDataManager().createReference(tailRefLink);
+		// Create a new ListNode<E> and link everything to it.
+		TreeNode<E> t = new TreeNode<E>(null, branchingFactor, clusterSize);
+		headRef = AppContext.getDataManager().createReference(
+				new DummyConnector<E>());
+		tailRef = AppContext.getDataManager().createReference(
+				new DummyConnector<E>());
 		
 	}
 	
@@ -302,13 +311,13 @@ implements 	ManagedObject, Serializable {
 	 */
 	public int indexOf(Object o){
 		int listIndex = 0;
-		ScalableListNodeIterator iter = 
-			new ScalableListNodeIterator(headTreeNodeRef.get());
-		ListNode n;
+		ScalableListNodeIterator<E> iter = 
+			new ScalableListNodeIterator<E>(headTreeNodeRef.get());
+		ListNode<E> n;
 		int index = -1;
 		
 		while (iter.hasNext()){
-			n = (ListNode) iter.next();
+			n = (ListNode<E>) iter.next();
 			listIndex += n.size();
 			index = n.getSubList().indexOf(o);
 			
@@ -328,9 +337,9 @@ implements 	ManagedObject, Serializable {
 		int listIndex = 0;
 		int absIndex = -1;
 		int index = -1;
-		ScalableListNodeIterator iter = 
-			new ScalableListNodeIterator(headTreeNodeRef.get());
-		ListNode n = null;
+		ScalableListNodeIterator<E> iter = 
+			new ScalableListNodeIterator<E>(headTreeNodeRef.get());
+		ListNode<E> n = null;
 		
 		// For every list node encountered, check for an
 		// instance of the supplied object
@@ -370,14 +379,15 @@ implements 	ManagedObject, Serializable {
 	 */
 	public Object remove(int index){
 		isValidIndex(index);
-		ListNode n = getNode(index);
+		ListNode<E> n = getNode(index);
 		if (n == null){
 			return null;
 		}
 
 		// Performs any relinking in case the removed
-		// ListNode was the head or tail
+		// ListNode<E> was the head or tail
 		Object obj = n.remove(n.getSubList().getOffset());
+		updateTreeNodeRefs();
 		relinkIfNecessary(n);		
 		
 		return obj;
@@ -388,45 +398,84 @@ implements 	ManagedObject, Serializable {
 	 * event that it was removed.
 	 * @param n
 	 */
-	private void relinkIfNecessary(ListNode n){
+	private void relinkIfNecessary(ListNode<E> n){
+		if (n == null || headTreeNodeRef == null){
+			return;
+		}
 		// Store values before they are deleted
-		ListNode next = n.getNext();
-		ListNode prev = n.getPrev();
+		ListNode<E> next = n.getNext();
+		ListNode<E> prev = n.getPrev();
 		
-		// Instantiate a ListNode iterator in the event we
-		// need to locate a cousin ListNode to be the head
+		// Instantiate a ListNode<E> iterator in the event we
+		// need to locate a cousin ListNode<E> to be the head
 		// or tail
-		ScalableListNodeIterator iter = 
-			new ScalableListNodeIterator(headTreeNodeRef.get());
+		ScalableListNodeIterator<E> iter = 
+			new ScalableListNodeIterator<E>(headTreeNodeRef.get());
 		
 		// Check whether we need to update the head or tail.
-		if (n.equals(headRefLink) && n.size() == 0){
-			// Check if we need to search in another TreeNode
+		if (getHead() == null){
+			// Check if we need to search in another TreeNode<E>
 			if (next != null){
-				headRefLink = AppContext.getDataManager()
-					.createReference(next);
+				headDummy.setRef(next);
+			} else if (iter.hasNext()){
+				headDummy.setRef(iter.next());
 			} else {
-				headRefLink = AppContext.getDataManager()
-					.createReference(iter.next());
+				headDummy.setRef(null);
 			}
 		} 
 		// Update the tail 
-		if (n.equals(tailRefLink.get()) && n.size() == 0){
-			// Check if we need to search in another TreeNode
+		if (getTail() == null){
+			// Check if we need to search in another TreeNode<E>
 			if (prev != null){
-				tailRefLink = AppContext.getDataManager()
-					.createReference(prev);
+				tailDummy.setRef(prev);
+			} else if (! iter.hasNext()){
+				tailDummy.setRef(null);
 			} else {
 				// get the last element in the iterator
-				// which represents the last ListNode; hence
+				// which represents the last ListNode<E>; hence
 				// tail.
 				while (iter.hasNext()){
 					prev = iter.next();
 				}
-				tailRefLink = AppContext.getDataManager()
-					.createReference(prev.getPrev());
+				tailDummy.setRef(prev.getPrev());
 			}
 		}
+	}
+	
+	/**
+	 * Retrieves the head {@code ListNode}. In the
+	 * event that one cannot be located, it
+	 * gracefully returns null.
+	 * @return the head {@code ListNode} if it
+	 * exists, or null otherwise.
+	 */
+	private ListNode<E> getHead(){
+		ListNode<E> head;
+		try {
+			head = headDummy.getRefAsListNode();
+		} catch (ObjectNotFoundException onfe){
+			// This is expected if the node has been removed.
+			head = null;
+		}
+		return head;
+	}
+	
+	/**
+	 * Retrieves the tail {@code ListNode}. In the
+	 * event that one cannot be located, it
+	 * gracefully returns null.
+	 * @return the tail {@code ListNode} if it exists,
+	 * or null otherwise.
+	 */
+	private ListNode<E> getTail(){
+		ListNode<E> tail;
+		try {
+			tail = tailDummy.getRefAsListNode();
+		} catch (ObjectNotFoundException onfe){
+			// This is expected if the node has been removed.
+			tail = null;
+		}
+		return tail;
 	}
 	
 	/**
@@ -436,32 +485,26 @@ implements 	ManagedObject, Serializable {
 	 * @param obj the {@code Object} to replace with
 	 * @return the {@code Object} which previously existed in the list
 	 */
-	public Object set(int index, Object obj){
+	public Object set(int index, E obj){
 		Object old = null;
 		if (obj == null){
 			throw new NullPointerException(
 					"Value for set operation cannot be null");
 		}
-		Element e = null;
-		SubList n = getNode(index).getSubList();
-		if (!(obj instanceof ManagedObject)){
-			e = new Element(obj);
-			old = n.set(index - n.getOffset(), e);
-		} else {
-			old = n.set(index - n.getOffset(), obj);
-		}
+		SubList<E> n = getNode(index).getSubList();
+		old = n.set(index - n.getOffset(), obj);
 		return old;
 	}
 	
 	
 	/**
 	 * Removes the last element from the List. If the element was the
-	 * last in the collection, then we leave the ListNode empty in
+	 * last in the collection, then we leave the ListNode<E> empty in
 	 * anticipation of soon writing to it again (appending).
 	 * @return The {@code Object} which was removed.
 	 */
 	public Object removeLast(){
-		ListNode tail = tailRefLink.get(); 
+		ListNode<E> tail = tailDummy.getRefAsListNode(); 
 		Object obj = tail.remove(tail.size()-1);
 	
 		relinkIfNecessary(tail);
@@ -488,11 +531,11 @@ implements 	ManagedObject, Serializable {
 	 * @param index the index of the element to retrieve.
 	 * @return the element at the index.
 	 */
-	public Object get(int index){
+	public E get(int index){
 		
 		// Iterate through using the count. Use a get()
 		// iterator because we are not modifying anything; hence, false.
-		SubList n = getNode(index).getSubList();
+		SubList<E> n = getNode(index).getSubList();
 		if (n == null){
 			return null;
 		}
@@ -504,8 +547,8 @@ implements 	ManagedObject, Serializable {
 	 * reading purposes.
 	 * @return the tail element of the list.
 	 */
-	public Object getLast(){
-		SubList n = tailRefLink.get().getSubList();
+	public E getLast(){
+		SubList<E> n = tailDummy.getRefAsListNode().getSubList();
 		if (n == null){
 			return null;
 		}
@@ -517,8 +560,8 @@ implements 	ManagedObject, Serializable {
 	 * for reading purposes
 	 * @return the head element of the list.
 	 */
-	public Object getFirst(){
-		SubList n = headRefLink.get().getSubList();
+	public E getFirst(){
+		SubList<E> n = headDummy.getRefAsListNode().getSubList();
 		if (n == null){
 			return null;
 		}
@@ -531,7 +574,11 @@ implements 	ManagedObject, Serializable {
 	 * Retrieves the {@code Iterator} for the list.
 	 */
 	public Iterator<E> iterator(){
-		return new ScalableListIterator<E>(headTreeNodeRef.get());
+		if (headTreeNodeRef != null){
+			return new ScalableListIterator<E>(headTreeNodeRef.get());
+		} else {
+			return null;
+		}
 	}
 	
 
@@ -558,12 +605,12 @@ implements 	ManagedObject, Serializable {
 	 * @return whether the element was removed. 
 	 */
 	public boolean remove(Object obj){
-		ScalableListIterator<ListNode> iter = 
-			new ScalableListIterator<ListNode>(headTreeNodeRef.get());
-		ListNode n = null;
+		ScalableListNodeIterator<E> iter = 
+			new ScalableListNodeIterator<E>(headTreeNodeRef.get());
+		ListNode<E> n = null;
 		boolean removed = false;
 		
-		// Find and remove the object in the ListNode that contains it
+		// Find and remove the object in the ListNode<E> that contains it
 		while (iter.hasNext()){
 			n = iter.next();
 			removed = n.remove(obj);
@@ -589,19 +636,19 @@ implements 	ManagedObject, Serializable {
 	
 	
 	/**
-	 * Performs the search for the desired ListNode.
+	 * Performs the search for the desired ListNode<E>.
 	 * This method implicitly updates the offset value
 	 * for the particular node we are finding, meaning
-	 * when we locate the ListNode, the OffsetNode
+	 * when we locate the ListNode<E>, the OffsetNode
 	 * child will be updated to represent the offset
 	 * of the index we are searching for.
 	 * @param index The absolute index in the entire
 	 * list to search for the entry.
-	 * @return The {@code ListNode} which contains the
+	 * @return The {@code ListNode<E>} which contains the
 	 * element at the specified {@code index}.
 	 */
-	private ListNode getNode(int index){
-		// Recursive method to eventually return ListNode
+	private ListNode<E> getNode(int index){
+		// Recursive method to eventually return ListNode<E>
 		// containing the desired index.
 		return search(headTreeNodeRef.get(), 0, index);
 	}
@@ -610,37 +657,40 @@ implements 	ManagedObject, Serializable {
 	
 	/**
 	 * Traverses the tree (recursively) in search of the 
-	 * ListNode which contains the index provided. If
-	 * no ListNode can be found, then null is returned.
+	 * ListNode<E> which contains the index provided. If
+	 * no ListNode<E> can be found, then null is returned.
 	 * @param tn the node from which to start searching.
 	 * @param currentValue the current index value at
 	 * the beginning of the search.
 	 * @param destIndex the index which we want to reach.
 	 * @return
 	 */
-	private ListNode search(
+	private ListNode<E> search(
 			ManagedObject tn, int currentValue, int destIndex){
+		if (tn == null){
+			throw new NullPointerException("Root search node cannot be null");
+		}
+		
 		if (tn instanceof TreeNode){
-			TreeNode t = (TreeNode)tn;
-			currentValue = t.size();
+			TreeNode<E> t = (TreeNode<E>) tn;
 			
-			while (currentValue < destIndex){
-				tn = t.next();
+			// iterate through siblings
+			while ((currentValue += t.size) < destIndex){
+				t = t.next();
 				
-				// If we hit a null, then the index specified was too large
-				// for the collection, so return null. Alternatively, we
-				// could throw an IllegalArgumentException.
-				if (tn == null){
-					return null;
+				// The specified index was too large; hence
+				// throw an IndexOutOfBoundsException
+				if (t == null){
+					throw new IndexOutOfBoundsException("The "+
+							"index " + destIndex + " is out of range.");
 				}
-				currentValue += t.size();
 			}
 			currentValue -= t.size();
 			return search(t.getChild(), currentValue, destIndex);
 			
 			
 		} else if (tn instanceof ListNode){
-			ListNode n = (ListNode)tn;
+			ListNode<E> n = (ListNode<E>)tn;
 			n.getSubList().setOffset(destIndex - currentValue);
 			return n;
 			
@@ -661,51 +711,36 @@ implements 	ManagedObject, Serializable {
 		if (e == null){
 			throw new IllegalArgumentException("Element cannot be null");
 		}
-		TreeNode t = new TreeNode(null, branchingFactor, clusterSize, e);
+		TreeNode<E> t = new TreeNode<E>(null, branchingFactor, clusterSize, e);
 		DataManager dm = AppContext.getDataManager();
+		root = dm.createReference(t);
 		headTreeNodeRef = dm.createReference(t);
-		ListNode n = (ListNode) t.getChild();
-		headRefLink = dm.createReference(n);
-		tailRefLink = dm.createReference(n);
+		ListNode<E> n = (ListNode<E>) t.getChild();
+		headDummy.setRef(n);
+		tailDummy.setRef(n);
 		return true;
 	}
 	
 	/**
-	 * Returns a reference to the head {@code ListNode} of the list, which
-	 * represents a segment of the overall list.
-	 * @return the head node
-	 */
-	protected ManagedReference<ListNode> getHeadRef(){
-		return headRefLink;
-	}
-	
-	/**
-	 * Returns a reference to the tail {@code ListNode} of the list, which
-	 * represents a segment of the overall list.
-	 * @return the tail node
-	 */
-	protected ManagedReference<ListNode> getTailRef(){
-		return tailRefLink;
-	}
-	
-	/**
 	 * Retrieves the size of the list. The size of the
-	 * list is the size of the root {@code TreeNode} of
+	 * list is the size of the root {@code TreeNode<E>} of
 	 * the list because all of its children represent a
 	 * count of their children.
 	 * @return the number of elements of the list.
 	 */
 	public int size(){
 		// This gives us a reference to the one and only
-		// root TreeNode, which parents the entire tree.
+		// root TreeNode<E>, which parents the entire tree.
 		// It should be noted that this object is not the 
 		// same as the headTreeNodeRef, which returns the
 		// first child of the root.
 		int size = 0;
-		TreeNode t = headTreeNodeRef.get();
-		while (t != null){
-			size += t.size();
-			t = t.next();
+		if (headTreeNodeRef != null){
+			TreeNode<E> t = headTreeNodeRef.get();
+			while (t != null){
+				size += t.size();
+				t = t.next();
+			}
 		}
 		return size;
 	}
@@ -714,14 +749,17 @@ implements 	ManagedObject, Serializable {
 	/**
 	 * Given the current head pointer, percolate up
 	 * the tree and find the root.
-	 * @return the root {@code TreeNode} of the tree.
+	 * @return the root {@code TreeNode<E>} of the tree.
 	 */
-	protected void updateTreeNodeRefs(){
-		TreeNode treeHead = headTreeNodeRef.get();
+	private void updateTreeNodeRefs(){
+		TreeNode<E> treeHead = root.get();
+		if (treeHead == null || treeHead.getParent() == null){
+			return;
+		}
 		
 		// Percolate up the tree until we are at the
 		// node whose parent is the root.
-		while (treeHead.getParent().getParent() != null){
+		while (treeHead.getParent() != null){
 			treeHead = treeHead.getParent();
 		}
 		
@@ -730,11 +768,10 @@ implements 	ManagedObject, Serializable {
 		// as the root is not useful for most list
 		// operations.
 		headTreeNodeRef = AppContext.getDataManager()
+			.createReference((TreeNode<E>) treeHead.getChild());
+		root = AppContext.getDataManager()
 			.createReference(treeHead);
-		
 	}
-	
-	
 	
 	
 	
@@ -744,26 +781,75 @@ implements 	ManagedObject, Serializable {
 		///////////////////////////////
 	*/
 	
+	
+	static class DummyConnector<E>
+	implements ManagedObject, Serializable {
+		
+		public static final long serialVersionUID = 3L;
+		
+		private ManagedReference<ManagedObject> ref = null;
+		
+		public DummyConnector(){
+			ref = null;
+		}
+		
+		public DummyConnector(ManagedObject nextRef){
+			if (nextRef != null){
+				ref = AppContext.getDataManager().createReference(nextRef);
+			}
+		}
+		
+		public void setRef(ManagedObject newRef){
+			if (newRef != null){
+				ref = AppContext.getDataManager().createReference(newRef);
+			} else {
+				ref = null;
+			}
+		}
+		
+		public TreeNode<E> getRefAsTreeNode(){
+			if (ref == null){
+				return null;
+			}
+			return (TreeNode<E>) ref.get();
+		}
+		
+		public SubList<E> getRefAsSubList(){
+			if (ref == null){
+				return null;
+			}
+			return (SubList<E>) ref.get();
+		}
+		
+		public ListNode<E> getRefAsListNode(){
+			if (ref == null){
+				return null;
+			}
+			return (ListNode<E>) ref.get();
+		}
+	}
+	
+	
 	/**
-	 * An object which organizes the {@code ListNode}s
-	 * in a tree structure. Each {@code TreeNode} has
-	 * a reference to either one {@code TreeNode}
-	 * or a {@code ListNode}. The {@code TreeNode} also
+	 * An object which organizes the {@code ListNode<E>}s
+	 * in a tree structure. Each {@code TreeNode<E>} has
+	 * a reference to either one {@code TreeNode<E>}
+	 * or a {@code ListNode<E>}. The {@code TreeNode<E>} also
 	 * has a reference to its sibling and its parent.<p>
 	 * 
-	 * The {@code TreeNode} is intended to only track
+	 * The {@code TreeNode<E>} is intended to only track
 	 * the size of its children and 
 	 */
-	static class TreeNode
+	static class TreeNode<E>
 	implements ManagedObject, Serializable {
 		
 		public static final long serialVersionUID = 1L;
 		
-		private ManagedReference<TreeNode> nextRef;
-		private ManagedReference<TreeNode> prevRef;
+		private ManagedReference<TreeNode<E>> nextRef;
+		private ManagedReference<TreeNode<E>> prevRef;
 		private ManagedReference<ManagedObject> childRef;
 		private ManagedReference<ManagedObject> tailRef;
-		private ManagedReference<TreeNode> parentRef;
+		private ManagedReference<TreeNode<E>> parentRef;
 		
 		private int size = 0;
 		private int MAX_NUMBER_CHILDREN = 5;
@@ -774,9 +860,12 @@ implements 	ManagedObject, Serializable {
 		public static final byte INCREMENT_SIZE = 1;
 		public static final byte INCREMENT_NUM_CHILDREN = 2;
 		public static final byte DECREMENT_NUM_CHILDREN = 3;
+		public static final byte DECREMENT_CHILDREN_AND_SIZE = 4;
 		
-		public void setHead(ListNode ref){
-			childRef = AppContext.getDataManager().createReference((ManagedObject) ref);
+		public void setHead(ListNode<E> ref){
+			if (ref != null){
+				childRef = AppContext.getDataManager().createReference((ManagedObject) ref);
+			}
 		}
 		
 		public TreeNode(){
@@ -789,15 +878,15 @@ implements 	ManagedObject, Serializable {
 		
 		/**
 		 * Constructor which is called on a split. This is used to create
-		 * a new sibling and accepts a TreeNode argument which represents
+		 * a new sibling and accepts a TreeNode<E> argument which represents
 		 * the new child it is to possess.
 		 * @param parent
 		 * @param maxNumChildren
 		 * @param clusterSize
 		 * @param child
 		 */
-		private TreeNode(TreeNode parent, int maxNumChildren, 
-				int clusterSize, ListNode child, int numberChildren){
+		private TreeNode(TreeNode<E> parent, int maxNumChildren, 
+				int clusterSize, ListNode<E> child, int numberChildren){
 			if (maxNumChildren < 0){
 				throw new IllegalArgumentException("Maximum children parameter should "+
 						"not be less than 0");
@@ -807,30 +896,35 @@ implements 	ManagedObject, Serializable {
 			this.clusterSize = clusterSize;
 
 			DataManager dm = AppContext.getDataManager();
-			childRef = dm.createReference((ManagedObject) child);
-			parentRef = dm.createReference(parent);
+			if (child != null){
+				childRef = dm.createReference((ManagedObject) child);
+				
+				// The tail element is the last linked node in the list
+				ListNode<E> n = (ListNode<E>) childRef.get();
+				while (n.getNext() != null){
+					n = (ListNode<E>) n.getNext();
+				}
+				tailRef = dm.createReference((ManagedObject) n);
+			}
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 			childrenCount = numberChildren;
 			
-			// The tail element is the last linked node in the list
-			ListNode n = (ListNode) childRef.get();
-			while (n != null){
-				n = (ListNode) n.getNext();
-			}
-			tailRef = dm.createReference((ManagedObject) n);
 		}
 		
 		
 		/**
 		 * Constructor which is called on a split. This is used to create
-		 * a new sibling and accepts a TreeNode argument which represents
+		 * a new sibling and accepts a TreeNode<E> argument which represents
 		 * the new child it is to possess.
 		 * @param parent
 		 * @param maxNumChildren
 		 * @param clusterSize
 		 * @param child
 		 */
-		private TreeNode(TreeNode parent, int maxNumChildren, 
-				int clusterSize, TreeNode child, int numberChildren){
+		private TreeNode(TreeNode<E> parent, int maxNumChildren, 
+				int clusterSize, TreeNode<E> child, int numberChildren){
 			if (maxNumChildren < 0){
 				throw new IllegalArgumentException("Maximum children parameter should "+
 						"not be less than 0");
@@ -840,47 +934,56 @@ implements 	ManagedObject, Serializable {
 			this.clusterSize = clusterSize;
 
 			DataManager dm = AppContext.getDataManager();
-			childRef = dm.createReference((ManagedObject) child);
-			parentRef = dm.createReference(parent);
+			if (child != null){
+				childRef = dm.createReference((ManagedObject) child);
+				
+				// The tail element is the last linked node in the list
+				TreeNode<E> n = (TreeNode<E>) childRef.get();
+				while (n.next() != null){
+					n = (TreeNode<E>) n.next();
+				}
+				tailRef = dm.createReference((ManagedObject) n);
+			}
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 			childrenCount = numberChildren;
 			
-			// The tail element is the last linked node in the list
-			TreeNode n = (TreeNode) childRef.get();
-			while (n != null){
-				n = (TreeNode) n.next();
-			}
-			tailRef = dm.createReference((ManagedObject) n);
 		}
 		
 		/**
-		 * Create a new TreeNode on account of a new leaf ({@code ListNode}) 
+		 * Create a new TreeNode<E> on account of a new leaf ({@code ListNode<E>}) 
 		 * being created.
 		 * @param parent
 		 * @param maxNumChildren
 		 * @param clusterSize
 		 * @param obj
 		 */
-		public TreeNode(TreeNode parent, int maxNumChildren, int clusterSize, Object obj){
+		public TreeNode(TreeNode<E> parent, int maxNumChildren, int clusterSize, E e){
 			if (maxNumChildren < 0){
 				throw new IllegalArgumentException("Maximum children parameter should "+
 						"not be less than 0");
 			}
-			if (obj == null){
+			if (e == null){
 				throw new NullPointerException("Argument suppled to List is null");
 			}
 			MAX_NUMBER_CHILDREN = maxNumChildren;
 			nextRef = null;
 			this.clusterSize = clusterSize;
-			ListNode n = new ListNode(this, clusterSize, obj);
+			ListNode<E> n = new ListNode<E>(this, clusterSize, e);
 			size = n.size();
 			childrenCount = 1;
 			DataManager dm = AppContext.getDataManager();
 			childRef = dm.createReference((ManagedObject) n);
-			parentRef = dm.createReference(parent);
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			} else {
+				parentRef = null;
+			}
 			tailRef = dm.createReference((ManagedObject) n);
 		}
 		
-		public TreeNode(TreeNode parent, int maxNumChildren, int clusterSize){
+		public TreeNode(TreeNode<E> parent, int maxNumChildren, int clusterSize){
 			if (maxNumChildren < 0){
 				throw new IllegalArgumentException("Maximum children parameter should "+
 						"not be less than 0");
@@ -888,37 +991,61 @@ implements 	ManagedObject, Serializable {
 			MAX_NUMBER_CHILDREN = maxNumChildren;
 			nextRef = null;
 			this.clusterSize = clusterSize;
-			ListNode n = new ListNode(this, clusterSize);
+			ListNode<E> n = new ListNode<E>(this, clusterSize);
 			size = n.size();
 			DataManager dm = AppContext.getDataManager();
 			childRef= dm.createReference((ManagedObject) n);
-			parentRef = dm.createReference(parent);
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 			tailRef = dm.createReference((ManagedObject) n);
 		}
 		
-		public TreeNode prev(){
-			return prevRef.get();
+		public TreeNode<E> prev(){
+			if (prevRef != null){
+				return prevRef.get();
+			} else {
+				return null;
+			}
 		}
-		public void setPrev(TreeNode ref){
-			prevRef = AppContext.getDataManager().createReference(ref);
+		public void setPrev(TreeNode<E> ref){
+			if (ref != null){
+				prevRef = AppContext.getDataManager().createReference(ref);
+			}
 		}
-		public TreeNode next(){
-			return nextRef.get();
+		public TreeNode<E> next(){
+			if (nextRef != null){
+				return nextRef.get();
+			} else {
+				return null;
+			}
 		}
 		public ManagedObject getChild(){
-			return childRef.get();
+			if (childRef != null){
+				return childRef.get();
+			} else {
+				return null;
+			}
 		}
 		public void setChild(ManagedObject child){
-			childRef = AppContext.getDataManager().createReference(child);
+			if (child != null){
+				childRef = AppContext.getDataManager().createReference(child);
+			}
 		}
 		public int size(){
 			return size;
 		}
 		public void setTail(ManagedObject ref){
-			tailRef = AppContext.getDataManager().createReference(ref);
+			if (ref != null){
+				tailRef = AppContext.getDataManager().createReference(ref);
+			}
 		}
 		public ManagedObject getTail(){
-			return tailRef.get();
+			if (tailRef != null){
+				return tailRef.get();
+			} else {
+				return null;
+			}
 		}
 		public void increment(){
 			size++;
@@ -935,19 +1062,25 @@ implements 	ManagedObject, Serializable {
 		public int getChildCount(){
 			return childrenCount;
 		}
-		public TreeNode getParent(){
-			return parentRef.get();
+		public TreeNode<E> getParent(){
+			if (parentRef != null){
+				return parentRef.get();
+			} else {
+				return null;
+			}
 		}
-		public void setNext(TreeNode t){
-			nextRef = AppContext.getDataManager().createReference(t);
+		public void setNext(TreeNode<E> t){
+			if (t != null){
+				nextRef = AppContext.getDataManager().createReference(t);
+			}
 		}
 		
 		/**
 		 * Unlinks itself from the tree. This can be considered
-		 * as a TreeNode remove since 
+		 * as a TreeNode<E> remove since 
 		 * @return
 		 */
-		public TreeNode remove(){
+		public TreeNode<E> remove(){
 			
 			// We may have to re-link siblings
 			if (prevRef != null){
@@ -973,7 +1106,7 @@ implements 	ManagedObject, Serializable {
 		 * after every operation, write locks will prevent
 		 * multiple writes to certain parts of the list.
 		 */
-		private void updateCounts(TreeNode t){
+		private void updateCounts(TreeNode<E> t){
 			ManagedObject node = t.getChild();
 			int size = 0;
 			int childrenCount = 0;
@@ -982,15 +1115,15 @@ implements 	ManagedObject, Serializable {
 			if (node instanceof ListNode){
 				while (node != null){
 					childrenCount++;
-					size += ((ListNode) node).size();
-					node = (ManagedObject) ((ListNode) node).getNext();
+					size += ((ListNode<E>) node).size();
+					node = (ManagedObject) ((ListNode<E>) node).getNext();
 				}
 			}
 			else if (node instanceof TreeNode){
 				while (node != null){
 					childrenCount++;
-					size += ((TreeNode) node).size();
-					node = (ManagedObject) ((TreeNode) node).next();
+					size += ((TreeNode<E>) node).size();
+					node = (ManagedObject) ((TreeNode<E>) node).next();
 				}
 			}
 		}
@@ -1009,11 +1142,12 @@ implements 	ManagedObject, Serializable {
 		
 		/**
 		 * This method walks up the tree and performs any
-		 * {@code TreeNode} splits if the children sizes
+		 * {@code TreeNode<E>} splits if the children sizes
 		 * have been exceeded.
 		 */
-		public void performSplitIfNecessary(){
-			TreeNode newNode = null;
+		public boolean performSplitIfNecessary(){
+			boolean generatedNewParent = false;
+			TreeNode<E> newNode = null;
 			ManagedObject tmp = (ManagedObject) this.getChild();
 			
 			// If we are at the root, update it
@@ -1027,9 +1161,9 @@ implements 	ManagedObject, Serializable {
 			}
 			
 			// Check if we need to split, and if so, do it based
-			// on the type of element contained (ListNode or TreeNode)
+			// on the type of element contained (ListNode<E> or TreeNode<E>)
 			if (childrenCount > MAX_NUMBER_CHILDREN){
-				generateParentIfNecessary(this);
+				generatedNewParent = generateParentIfNecessary(this);
 				
 				// Perform split by creating and linking new sibling
 				newNode = createAndLinkSibling(tmp, childrenCount);
@@ -1051,12 +1185,13 @@ implements 	ManagedObject, Serializable {
 					parentRef.get().performSplitIfNecessary();
 				} 
 			}
+			return generatedNewParent;
 		}
 		
 		
 		/**
 		 * Determines the nature of the sibling to be created. The
-		 * Node created will always be a TreeNode, but the type of
+		 * Node created will always be a TreeNode<E>, but the type of
 		 * child depends on whether it parents ListNodes, or other
 		 * TreeNodes.
 		 * @param child the {@code ManagedObject} which needs to
@@ -1064,51 +1199,51 @@ implements 	ManagedObject, Serializable {
 		 * @param prev the element previous to the current element
 		 * @param halfway a value representing an index approximately
 		 * half the length of the contents
-		 * @return the {@TreeNode} that not represents a sibling
+		 * @return the {@TreeNode<E>} that not represents a sibling
 		 * which is connected to the tree
 		 */
-		private TreeNode createAndLinkSibling(ManagedObject child, int numberOfChildren){
+		private TreeNode<E> createAndLinkSibling(ManagedObject child, int numberOfChildren){
 			ManagedObject prev = null;
-			TreeNode newNode = null;
+			TreeNode<E> newNode = null;
 			int halfway = calculateSplitSize(numberOfChildren);
 			
-			// Determine what kind of sibling to make, since a TreeNode's
-			// child can be either a ListNode or a TreeNode
+			// Determine what kind of sibling to make, since a TreeNode<E>'s
+			// child can be either a ListNode<E> or a TreeNode<E>
 			if (child instanceof ListNode){
 				// Get the approximate middle element
 				for (int i=0 ; i<halfway ; i++){
 					prev = child;
-					child = (ManagedObject) ((ListNode)child).getNext();
+					child = (ManagedObject) ((ListNode<E>)child).getNext();
 				}
-				newNode = new TreeNode(this.getParent(), 
+				newNode = new TreeNode<E>(this.getParent(), 
 										MAX_NUMBER_CHILDREN, 
 										clusterSize, 
-										(ListNode) child,
+										(ListNode<E>) child,
 										numberOfChildren - halfway);
 				// Update references
-				((ListNode)prev).setNext(null);
-				((ListNode)child).setPrev(null);
-				((ListNode)child).setParent(newNode);
+				((ListNode<E>)prev).setNext(null);
+				((ListNode<E>)child).setPrev(null);
+				((ListNode<E>)child).setParent(newNode);
 				
 			} else if (child instanceof TreeNode){
 				// Get the approximate middle element
 				for (int i=0 ; i<halfway ; i++){
 					prev = child;
-					child = ((TreeNode)child).next();
+					child = ((TreeNode<E>)child).next();
 				}
-				newNode = new TreeNode( this.getParent(), 
+				newNode = new TreeNode<E>( this.getParent(), 
 										MAX_NUMBER_CHILDREN, 
 										clusterSize, 
-										(TreeNode) child,
+										(TreeNode<E>) child,
 										numberOfChildren - halfway);
 				// Update references
-				((TreeNode)prev).setNext(null);
-				((TreeNode)child).setPrev(null);
-				((TreeNode)child).setParent(newNode);
+				((TreeNode<E>)prev).setNext(null);
+				((TreeNode<E>)child).setPrev(null);
+				((TreeNode<E>)child).setParent(newNode);
 				
 			} else {
 				throw new IllegalStateException("Attempting to split a node that is neither "+
-						"a TreeNode or ListNode");
+						"a TreeNode<E> or ListNode<E>");
 			}
 			this.setTail(prev);			
 			return newNode;
@@ -1121,19 +1256,17 @@ implements 	ManagedObject, Serializable {
 		 * the new parent. The decision to create a new parent depends
 		 * on whether the supplied node is an only-child; only these
 		 * nodes are orphaned while siblings have parents assigned to them.
-		 * @param t the {@code TreeNode} to check whether it requires
+		 * @param t the {@code TreeNode<E>} to check whether it requires
 		 * a parent.
 		 */
-		private boolean generateParentIfNecessary(TreeNode t){
+		private boolean generateParentIfNecessary(TreeNode<E> t){
 			boolean result = false;
 			
 			// If this is the currently existing root, make a new one
 			// and set the supplied node as the child
 			if (t.prev() == null){
-				TreeNode grandparent = new TreeNode(null,  
-													MAX_NUMBER_CHILDREN, 
-													clusterSize, 
-													t);
+				TreeNode<E> grandparent = 
+					new TreeNode<E>(null, MAX_NUMBER_CHILDREN, clusterSize, t, 1);
 				t.setParent(grandparent);
 				
 				// The list's pointer to the parent will be
@@ -1143,8 +1276,10 @@ implements 	ManagedObject, Serializable {
 			return result;
 		}
 		
-		public void setParent(TreeNode parent){
-			parentRef = AppContext.getDataManager().createReference(parent);
+		public void setParent(TreeNode<E> parent){
+			if (parent != null){
+				parentRef = AppContext.getDataManager().createReference(parent);
+			}
 		}
 		
 		/**
@@ -1155,8 +1290,8 @@ implements 	ManagedObject, Serializable {
 			DataManager dm = AppContext.getDataManager();
 			
 			if (getChild() != null && getChild() instanceof TreeNode){
-				TreeNode current = (TreeNode) getChild();
-				TreeNode next = current.next();
+				TreeNode<E> current = (TreeNode<E>) getChild();
+				TreeNode<E> next = current.next();
 				
 				while (current != null){
 					current.clear();
@@ -1166,8 +1301,8 @@ implements 	ManagedObject, Serializable {
 				}
 				
 			} else if (getChild() != null && getChild() instanceof ListNode) {
-				ListNode current = (ListNode) getChild();
-				ListNode next = current.getNext();
+				ListNode<E> current = (ListNode<E>) getChild();
+				ListNode<E> next = current.getNext();
 				
 				while (current != null){
 					current.clear();
@@ -1182,6 +1317,62 @@ implements 	ManagedObject, Serializable {
 			dm.removeObject(this);
 		}
 	
+		
+		/**
+		 * Propagates changes in the form of either an increment
+		 * or decrement to the parents of the tree.
+		 * @param current
+		 * @param mode
+		 */
+		private void propagateChanges( byte mode){
+			// No need to propagate changes if
+			// this is the root node.
+			if (this.getParent() == null){
+				return;
+			}
+			
+			switch (mode){
+			case TreeNode.INCREMENT_SIZE:
+				increment();
+				getParent().propagateChanges(mode);	
+				break;
+			case TreeNode.DECREMENT_SIZE:
+				decrement();
+				if (size() == 0){
+					getParent().propagateChanges(
+							TreeNode.DECREMENT_CHILDREN_AND_SIZE);
+				}
+				getParent().propagateChanges(mode);
+				break;
+			case TreeNode.INCREMENT_NUM_CHILDREN:
+				incrementNumChildren();
+				break;
+			case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
+				decrement();
+				decrementNumChildren();
+				
+				if (size() == 0){
+					// remove this from the tree
+					TreeNode<E> parent = getParent();
+					remove();
+					
+					// since we are removing a TreeNode<E>,
+					// check if parent needs to be removed
+					// as well.
+					parent.propagateChanges(mode);
+				} else {
+					getParent().propagateChanges(TreeNode.DECREMENT_SIZE);
+				}
+				break;
+			default:
+				throw new IllegalArgumentException(
+						"Supplied mode argument is not recognized; "+
+						"expected "+TreeNode.INCREMENT_SIZE+" or "+
+						TreeNode.DECREMENT_SIZE);
+			}
+		}
+		
+		
 	}
 	
 	
@@ -1191,22 +1382,28 @@ implements 	ManagedObject, Serializable {
 	 * clear() command is issed from the 
 	 * {@code ScalableList}.
 	 */
-	private static class AsynchronousClearTask
+	private static class AsynchronousClearTask<E>
 	implements Serializable, Task, ManagedObject {
 		
 		public static final long serialVersionUID = 1L;
 		
-		private ManagedReference<TreeNode> current;
-		private ManagedReference<TreeNode> next;
+		private ManagedReference<TreeNode<E>> current;
+		private ManagedReference<TreeNode<E>> next;
 		
-		public AsynchronousClearTask(ManagedReference<TreeNode> head){
-			current = AppContext.getDataManager().createReference(head.get());
+		public AsynchronousClearTask(ManagedReference<TreeNode<E>> head){
+			if (head != null){
+				current = AppContext.getDataManager().createReference(head.get());
+			} else {
+				current = null;
+			}
 		}
 		
 		public void run(){
 			DataManager dm = AppContext.getDataManager();
-			
-			// for each TreeNode, delete its children and move on
+			if (current == null){
+				return;
+			}
+			// for each TreeNode<E>, delete its children and move on
 			next = dm.createReference(current.get().next());
 			current.get().clear();
 			current = next;
@@ -1232,23 +1429,23 @@ implements 	ManagedObject, Serializable {
 	 * This makes managing sublists less intensive as each
 	 * reference to an underlying entity is a fixed size.
 	 */
-	static class Element
+	static class Element<E>
 	implements Serializable, ManagedObject {
 		
 		public static final long serialVersionUID = 1L;
 		
-		private Object value;
+		private E value;
 		
-		public Element(Object obj){
-			value = obj;
+		public Element(E e){
+			value = e;
 		}
 		
-		public Object getValue(){
+		public E getValue(){
 			return value;
 		}
 		
-		public void setValue(Object obj){
-			value = obj;
+		public void setValue(E e){
+			value = e;
 		}
 	}
 	
@@ -1257,9 +1454,9 @@ implements 	ManagedObject, Serializable {
 	 * An {@code Offset} object is a simple container
 	 * for the offset of a desired index. An
 	 * {@code Offset} object is attached to a
-	 * {@code SubList} object and is updated whenever
+	 * {@code SubList<E>} object and is updated whenever
 	 * a {@code get()} operation is called so that
-	 * the index of the item in the {@code SubList}
+	 * the index of the item in the {@code SubList<E>}
 	 * maps to the absolute index provided by the
 	 * {@code ScalableList}
 	 */
@@ -1281,21 +1478,21 @@ implements 	ManagedObject, Serializable {
 	
 
 	/**
-	 * This iterator walks through the {@code ListNode}s which
-	 * parent the {@code SubList}s. An iterator for this type
+	 * This iterator walks through the {@code ListNode<E>}s which
+	 * parent the {@code SubList<E>}s. An iterator for this type
 	 * of element is necessary to support the other element
 	 * iterator as well as {@code indexOf()} operations.
 	 */
-	static class ScalableListNodeIterator
-	implements Serializable, Iterator<ListNode> {
+	static class ScalableListNodeIterator<E>
+	implements Serializable, Iterator<ListNode<E>> {
 		
-		private TreeNode root;
-		private ListNode current;
-		private TreeNode currentTreeNode;
+		private TreeNode<E> root;
+		private ListNode<E> current;
+		private TreeNode<E> currentTreeNode;
 		
 		public static final long serialVersionUID = 1L;
 		
-		public ScalableListNodeIterator (TreeNode root){
+		public ScalableListNodeIterator (TreeNode<E> root){
 			this.root = root;
 			currentTreeNode = null;
 			current = null;
@@ -1305,48 +1502,51 @@ implements 	ManagedObject, Serializable {
 		 * Constructor to be used for cloning.
 		 * @param iterator
 		 */
-		private ScalableListNodeIterator (ScalableListNodeIterator iterator){
+		private ScalableListNodeIterator (ScalableListNodeIterator<E> iterator){
 			this.root = iterator.getRoot();
 			this.current = iterator.getCurrent();
 			this.currentTreeNode = iterator.getCurrentTreeNode();
 		}
 		
-		public TreeNode getRoot(){
+		public TreeNode<E> getRoot(){
 			return root;
 		}
-		public ListNode getCurrent(){
+		public ListNode<E> getCurrent(){
 			return current;
 		}
-		public TreeNode getCurrentTreeNode(){
+		public TreeNode<E> getCurrentTreeNode(){
 			return currentTreeNode;
 		}
 		
-		public ScalableListNodeIterator clone(ScalableListNodeIterator iterator){
-			return new ScalableListNodeIterator(iterator);
+		public ScalableListNodeIterator<E> clone(ScalableListNodeIterator<E> iterator){
+			return new ScalableListNodeIterator<E>(iterator);
 		}
 		
 		/**
 		 * Two cases to check: the most common case is that the next
-		 * {@code ListNode} is a sibling of the current {@code ListNode}.
+		 * {@code ListNode<E>} is a sibling of the current {@code ListNode<E>}.
 		 * Otherwise, we have to locate a cousin, and return if it
 		 * exists or not.
 		 */
 		public boolean hasNext(){
+			if (current == null){
+				return false;
+			} 
 			if (current.getNext() != null){
 				return true;
 			}
 			// Create a clone of the iterator so that we do not
 			// lose our position.
-			ScalableListNodeIterator clone = clone(this);
+			ScalableListNodeIterator<E> clone = clone(this);
 			return (clone.next() != null);
 		}
 		
 		
 		/**
-		 * Returns the next {@code ListNode} in order
+		 * Returns the next {@code ListNode<E>} in order
 		 * from the list
 		 */
-		public ListNode next(){
+		public ListNode<E> next(){
 			// Check if this is the first element we are returning
 			if (current == null){
 				current = getListNodeChild(root);
@@ -1354,24 +1554,27 @@ implements 	ManagedObject, Serializable {
 				// If there is no problem, link the parent;
 				// Otherwise we will return null
 				if (current != null){
-					currentTreeNode = ((ListNode) current).getParent(); 
+					currentTreeNode = ((ListNode<E>) current).getParent(); 
 				}
 				return current;
 			}
 			
-			// If not first time, we have to search for the next ListNode.
+			// If not first time, we have to search for the next ListNode<E>.
 			// Try getting the next one in the linked list of ListNodes
-			if (((ListNode)current).getNext() != null){
-				current = ((ListNode)current).getNext();
+			if (((ListNode<E>)current).getNext() != null){
+				current = ((ListNode<E>)current).getNext();
 				return current;
 			} 
 			
 			// If there are no more ListNodes in the linked list,
-			// then we need to find the next TreeNode containing
-			// the next ListNode in succession.
+			// then we need to find the next TreeNode<E> containing
+			// the next ListNode<E> in succession.
 			boolean found = false;
-			while (!found || currentTreeNode != null){
+			while (!found){
 				currentTreeNode = getNextTreeNode(currentTreeNode);
+				if (currentTreeNode == null){
+					throw new NoSuchElementException("There is no next element");
+				}
 				current = getListNodeChild(currentTreeNode);
 				if (current != null){
 					found = true;
@@ -1382,33 +1585,33 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		/**
-		 * Given a {@code TreeNode}, retrieve the first ListNode
-		 * @param t The ancestor {@code TreeNode} to look from
-		 * @return the {@code ListNode}, if found, or null otherwise.
+		 * Given a {@code TreeNode<E>}, retrieve the first ListNode<E>
+		 * @param t The ancestor {@code TreeNode<E>} to look from
+		 * @return the {@code ListNode<E>}, if found, or null otherwise.
 		 */
-		private ListNode getListNodeChild(TreeNode t){
+		private ListNode<E> getListNodeChild(TreeNode<E> t){
 			ManagedObject node = t.getChild();
 			
-			// Traverse the children until we find a ListNode,
+			// Traverse the children until we find a ListNode<E>,
 			// or until we hit a null
 			while (node != null && !(node instanceof ListNode)){
-				node = ((TreeNode)node).getChild();
+				node = ((TreeNode<E>)node).getChild();
 			}
-			return (ListNode) node;
+			return (ListNode<E>) node;
 		}
 		
 		
 		/**
-		 * Given a {@code TreeNode}, this method finds the
-		 * next {@code TreeNode} to search for. In other words,
-		 * if there are no TreeNode siblings, then it tries to
+		 * Given a {@code TreeNode<E>}, this method finds the
+		 * next {@code TreeNode<E>} to search for. In other words,
+		 * if there are no TreeNode<E> siblings, then it tries to
 		 * retrieve a sibling of its parent.
 		 * @param t
 		 * @return
 		 */
-		private TreeNode getNextTreeNode(TreeNode t){
+		private TreeNode<E> getNextTreeNode(TreeNode<E> t){
 			// We cannot work with null elements
-			if (t == null){
+			if (t == null || t.getParent() == null){
 				return null;
 			}
 			
@@ -1433,48 +1636,50 @@ implements 	ManagedObject, Serializable {
 	 *	This class represents an iterator of the contents of the
 	 *	list.  
 	 */
-	static class ScalableListIterator<ManagedObject>
-	implements Serializable, Iterator<ManagedObject> {
+	static class ScalableListIterator<E>
+	implements Serializable, Iterator<E> {
 		
-		private ListNode current;
-		private ScalableListNodeIterator listNodeIter;
-		private Iterator<ManagedReference<?>> iter;
+		private ListNode<E> current;
+		private ScalableListNodeIterator<E> listNodeIter;
+		private Iterator<ManagedReference<E>> iter;
 		
 		private long listNodeReferenceValue = -1;
 		
 		public static final long serialVersionUID = 1L;
 		
-		public ScalableListIterator(TreeNode root){
-			listNodeIter = new ScalableListNodeIterator(root);
-			current = (ListNode) listNodeIter.next();
-			iter = ((ListNode)listNodeIter.next()).getSubList().getElements().iterator();
+		public ScalableListIterator(TreeNode<E> root){
+			listNodeIter = new ScalableListNodeIterator<E>(root);
+			
+			// Get the first element
+			current = (ListNode<E>) listNodeIter.next();
+			iter = current.getSubList().getElements().iterator();
 		}
 		
 		/**
 		 * Constructor used for cloning purposes. Cloning is
 		 * used to check for next elements.
 		 */
-		private ScalableListIterator(ScalableListIterator<ManagedObject> iterator){
+		private ScalableListIterator(ScalableListIterator<E> iterator){
 			current = iterator.getCurrent();
 			listNodeIter = iterator.getListNodeIterator();
 			iter = iterator.getIterator();
 		}
-		public ScalableListNodeIterator getListNodeIterator(){
+		public ScalableListNodeIterator<E> getListNodeIterator(){
 			return listNodeIter;
 		}
-		public ListNode getCurrent(){
+		public ListNode<E> getCurrent(){
 			return current;
 		}
-		public Iterator<ManagedReference<?>> getIterator(){
+		public Iterator<ManagedReference<E>> getIterator(){
 			return iter;
 		}
 		
 		/**
 		 * Retrieve the next element in the collection
 		 */
-		public ManagedObject next(){
+		public E next(){
 			
-			// If at the end of the SubList, get the next ListNode
+			// If at the end of the SubList<E>, get the next ListNode<E>
 			// in the ScalableList.
 			while (!iter.hasNext()){
 				
@@ -1483,11 +1688,16 @@ implements 	ManagedObject, Serializable {
 				if (!listNodeIter.hasNext()){
 					return null;
 				}
-				current = (ListNode) listNodeIter.next();
+				current = (ListNode<E>) listNodeIter.next();
 				iter = (current.getSubList().getElements()).iterator();
 			}
 			listNodeReferenceValue = System.nanoTime(); 
-			return (ManagedObject) ((ManagedReference<?>) iter.next()).get();
+			ManagedReference<E> ref = ((ManagedReference<E>) iter.next());
+			if (ref != null){
+				return ref.get();
+			} else {
+				return null;
+			}
 		}
 
 		/**
@@ -1499,15 +1709,15 @@ implements 	ManagedObject, Serializable {
 			}
 			
 			// In case the next element is under a neighboring
-			// ListNode, clone this iterator to check so that we
+			// ListNode<E>, clone this iterator to check so that we
 			// do not lose our place.
-			ScalableListIterator<ManagedObject> clone = clone(this);			
+			ScalableListIterator<E> clone = clone(this);			
 			return (clone.next() != null);
 		}
 		
-		private ScalableListIterator<ManagedObject> clone(
-				ScalableListIterator<ManagedObject> toClone){
-			return new ScalableListIterator<ManagedObject>(toClone);
+		private ScalableListIterator<E> clone(
+				ScalableListIterator<E> toClone){
+			return new ScalableListIterator<E>(toClone);
 		}
 		
 		/**
@@ -1523,100 +1733,121 @@ implements 	ManagedObject, Serializable {
 	
 	
 	/**
-	 * Node which parents a {@code SubList}. These nodes can be
+	 * Node which parents a {@code SubList<E>}. These nodes can be
 	 * considered as the leaf nodes of the tree and contain 
 	 * references to a portion of the list.
 	 */
-	static class ListNode implements ManagedObject, Serializable {
+	static class ListNode<E> implements ManagedObject, Serializable {
 		private int count;
-		private ManagedReference<ManagedReference<SubList>> subListRef;
-		private ManagedReference<SubList> subListRefLink;
-		private ManagedReference<ListNode> nextRef;
-		private ManagedReference<ListNode> prevRef;
-		private ManagedReference<TreeNode> parentRef;
+		private ManagedReference<SubList<E>> subListRef;
+		private ManagedReference<ListNode<E>> nextRef;
+		private ManagedReference<ListNode<E>> prevRef;
+		private ManagedReference<TreeNode<E>> parentRef;
 		
 		public static final long serialVersionUID = 1L;
 		
 		private long dataIntegrityVal;
 		
-		public ListNode(TreeNode parent, int maxSize){
-			SubList sublist = new SubList(maxSize);
+		public ListNode(TreeNode<E> parent, int maxSize){
+			SubList<E> sublist = new SubList<E>(maxSize);
 			count = sublist.size();
 			DataManager dm = AppContext.getDataManager();
-			subListRefLink = dm.createReference(sublist);
-			subListRef = dm.createReference(subListRefLink);
+			subListRef = dm.createReference(sublist);
 			nextRef = null;
 			prevRef = null;
 			dataIntegrityVal = System.nanoTime();
-			parentRef = dm.createReference(parent);
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 		}
 		
-		public ListNode(TreeNode parent, Object obj){
-			SubList sublist = new SubList(obj);
+		public ListNode(TreeNode<E> parent, E e){
+			SubList<E> sublist = new SubList<E>(e);
 			count = sublist.size();
 			DataManager dm = AppContext.getDataManager();
-			subListRefLink = dm.createReference(sublist);
-			subListRef = dm.createReference(subListRefLink);
+			subListRef = dm.createReference(sublist);
 			nextRef = null;
 			prevRef = null;
 			dataIntegrityVal = System.nanoTime();
-			parentRef = dm.createReference(parent);
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 		}
 		
-		public ListNode(TreeNode parent, int maxSize, Object obj){
-			SubList sublist = new SubList(maxSize, obj);
+		public ListNode(TreeNode<E> parent, int maxSize, E e){
+			SubList<E> sublist = new SubList<E>(maxSize, e);
 			count = sublist.size();
 			DataManager dm = AppContext.getDataManager();
-			subListRefLink = dm.createReference(sublist);
-			subListRef = dm.createReference(subListRefLink);
+			subListRef = dm.createReference(sublist);
 			nextRef = null;
 			prevRef = null;
 			dataIntegrityVal = System.nanoTime();
-			parentRef = dm.createReference(parent);
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 		}
 		
-		public ListNode(TreeNode parent, int maxSize, ArrayList<Element> list){
-			SubList sublist = new SubList(maxSize, list);
+		public ListNode(TreeNode<E> parent, int maxSize, ArrayList<ManagedReference<E>> list){
+			SubList<E> sublist = new SubList<E>(maxSize, list);
 			count = sublist.size();
 			DataManager dm = AppContext.getDataManager();
-			subListRefLink = dm.createReference(sublist);
-			subListRef = dm.createReference(subListRefLink);
+			subListRef = dm.createReference(sublist);
 			nextRef = null;
 			prevRef = null;
 			dataIntegrityVal = System.nanoTime();
-			parentRef = dm.createReference(parent);
+			if (parent != null){
+				parentRef = dm.createReference(parent);
+			}
 		}
 		
 		public long getDataIntegrityValue(){
 			return dataIntegrityVal;
 		}
 		
-		public void setNext(ListNode ref){
-			nextRef = AppContext.getDataManager().createReference(ref);
+		public void setNext(ListNode<E> ref){
+			if (ref != null){
+				nextRef = AppContext.getDataManager().createReference(ref);
+			}
 		}
 		
-		public void setParent(TreeNode parent){
-			parentRef = AppContext.getDataManager().createReference(parent);
+		public void setParent(TreeNode<E> parent){
+			if (parent != null){
+				parentRef = AppContext.getDataManager().createReference(parent);
+			}
 		}
 		
-		public ListNode getNext(){
-			return nextRef.get();
+		public ListNode<E> getNext(){
+			if (nextRef != null){
+				return nextRef.get();
+			} else {
+				return null;
+			}
 		}
 		
-		public void setPrev(ListNode ref){
-			prevRef = AppContext.getDataManager().createReference(ref);
+		public void setPrev(ListNode<E> ref){
+			if (ref != null){
+				prevRef = AppContext.getDataManager().createReference(ref);
+			}
 		}
 		
-		public ListNode getPrev(){
-			return prevRef.get();
+		public ListNode<E> getPrev(){
+			if (prevRef != null){
+				return prevRef.get();	
+			} else {
+				return null;
+			}
 		}
 		
 		public int size(){
 			return count;
 		}
 		
-		public SubList getSubList(){
-			return subListRef.get().get();
+		public SubList<E> getSubList(){
+			if (subListRef != null){
+				return subListRef.get();
+			} else {
+				return null;
+			}
 		}
 		
 		/**
@@ -1626,8 +1857,8 @@ implements 	ManagedObject, Serializable {
 		 * @return whether the operation was successful;
 		 * true if so, false otherwise.
 		 */
-		public boolean append(Object obj){
-			boolean result = getSubList().append(obj); 
+		public boolean append(E e){
+			boolean result = getSubList().append(e); 
 			if (result){
 				count++;
 				dataIntegrityVal = System.nanoTime();
@@ -1639,12 +1870,11 @@ implements 	ManagedObject, Serializable {
 			if (count > getSubList().MAX_CHILDREN_APPEND){
 				split();
 			}
-			
 			return result;
 		}
 		
-		public void insert(int index, Object obj){
-			getSubList().insert(index, obj);
+		public void insert(int index, E e){
+			getSubList().insert(index, e);
 			count++;
 			dataIntegrityVal = System.nanoTime();
 			updateParents(this.getParent(), TreeNode.INCREMENT_SIZE);
@@ -1674,7 +1904,7 @@ implements 	ManagedObject, Serializable {
 		 * For example, if there are five ListNodes with a 
 		 * cluster size of five, the item with an absolute 
 		 * index of 16 corresponds to an element in the 
-		 * fourth ListNode, with a relative offset of 1.
+		 * fourth ListNode<E>, with a relative offset of 1.
 		 *  
 		 * @param index the index corresponding to an element
 		 * in the list (not an absolute index with respect
@@ -1696,7 +1926,7 @@ implements 	ManagedObject, Serializable {
 		
 		
 		/**
-		 * Removes the {@code Object} from the {@code SubList}, if it exists.
+		 * Removes the {@code Object} from the {@code SubList<E>}, if it exists.
 		 * @param obj the {@code Object} to remove.
 		 * @return whether the object was removed or not; true if so,
 		 * false otherwise.
@@ -1709,15 +1939,15 @@ implements 	ManagedObject, Serializable {
 			if (result){
 				count--;
 				dataIntegrityVal = System.nanoTime();
-				updateParents(this.getParent(), TreeNode.DECREMENT_SIZE);
+				// remove list node if it is empty
+				checkRemoveListNode(this);
 			}
 			
-			// remove list node if it is empty
-			checkRemoveListNode(this);
+			
 			return result;
 		}
 		
-		public boolean remove(Element e){
+		public boolean remove(Element<E> e){
 			boolean result = getSubList().remove(e);
 			if (result){
 				count--;
@@ -1733,43 +1963,56 @@ implements 	ManagedObject, Serializable {
 		
 		/**
 		 * A method that determines how to remove an
-		 * empty {@code ListNode} from a list of other 
-		 * {@code ListNode}s. Update previous to point 
+		 * empty {@code ListNode<E>} from a list of other 
+		 * {@code ListNode<E>}s. Update previous to point 
 		 * to next (doubly) and remove
 		 * this object from Data Store
 		 */
-		private void checkRemoveListNode(ListNode n){
+		private void checkRemoveListNode(ListNode<E> n){
 			
-			if (n.size() == 0){
-				// interior node; connect prev to next
-				if (this.getNext() != null && this.getPrev() != null){
-					this.getPrev().setNext(this.getNext());
-					this.getNext().setPrev(this.getPrev());
-				}
-				// head node. Update child pointer from parent
-				else if (this.getNext() != null){
-					this.getParent().setChild(this.getNext());
-					this.getNext().setPrev(null);
-				}
-				// tail node
-				else if (this.getPrev() != null){
-					this.getPrev().setNext(null);
-				} 
-				// only child
-				else {
-					this.getParent().setChild(null);
-				}
-				
-				// Walks up the tree to decrement the parent's size
-				updateParents(this.getParent(), TreeNode.DECREMENT_NUM_CHILDREN);
-				
-				// This is an empty node, so remove it from Data Store.
-				AppContext.getDataManager().removeObject(this);
+			// If the size is not zero, then all we
+			// need to do is propagate a decrement
+			if (n.size() != 0){
+				getParent().propagateChanges(TreeNode.DECREMENT_SIZE);
+				return;
 			}
+			
+			// Otherwise, we need to remove the list
+			// node and propagate changes to any
+			// parents. First, we determine the type
+			// of list node: there are four possibilities:
+			// 1) interior node; connect prev to next
+			if (this.getNext() != null && this.getPrev() != null){
+				this.getPrev().setNext(this.getNext());
+				this.getNext().setPrev(this.getPrev());
+			}
+			// 2) head node. Update child pointer from parent
+			else if (this.getNext() != null){
+				this.getParent().setChild(this.getNext());
+				this.getNext().setPrev(null);
+			}
+			// 3) tail node
+			else if (this.getPrev() != null){
+				this.getPrev().setNext(null);
+			} 
+			// 4) only child
+			else {
+				this.getParent().setChild(null);
+			}
+			
+			// Walks up the tree to decrement the parent's size
+			getParent().propagateChanges(TreeNode.DECREMENT_CHILDREN_AND_SIZE);
+			
+			// This is an empty node, so remove it from Data Store.
+			AppContext.getDataManager().removeObject(this);
 		}
 		
-		public TreeNode getParent(){
-			return parentRef.get();
+		public TreeNode<E> getParent(){
+			if (parentRef != null){
+				return parentRef.get();
+			} else {
+				return null;
+			}
 		}
 		
 		/**
@@ -1777,8 +2020,8 @@ implements 	ManagedObject, Serializable {
 		 * This may implicitly cause splitting.
 		 * @param obj the Object to add.
 		 */
-		public void prepend(Object obj){
-			insert(0, obj);
+		public void prepend(E e){
+			insert(0, e);
 		}
 		
 		/**
@@ -1787,11 +2030,11 @@ implements 	ManagedObject, Serializable {
 		 * linked list exceeds the maximum length,
 		 * denoted by the cluster size.
 		 */
-		private void split(){
-			ArrayList<ManagedReference<?>> contents = 
+		private boolean split(){
+			ArrayList<ManagedReference<E>> contents = 
 				getSubList().getElements();
-			AbstractList<ManagedReference<?>> spawned = 
-				new ArrayList<ManagedReference<?>>();
+			ArrayList<ManagedReference<E>> spawned = 
+				new ArrayList<ManagedReference<E>>();
 			
 			// Walks up the tree to increment the new size
 			updateParents(this.getParent(), TreeNode.INCREMENT_NUM_CHILDREN);
@@ -1809,14 +2052,15 @@ implements 	ManagedObject, Serializable {
 			dataIntegrityVal = System.nanoTime();
 			this.count = contents.size();
 			
-			// Create a new ListNode for the moved contents
-			ListNode spawnedNode = new ListNode(getParent(), spawned);
+			// Create a new ListNode<E> for the moved contents
+			ListNode<E> spawnedNode = new ListNode<E>(
+					getParent(), this.getSubList().MAX_CHILDREN, spawned);
 			spawnedNode.setNext(this.getNext());
 			spawnedNode.setPrev(this);
 			this.setNext(spawnedNode);
 			
 			// Check with parent to see if more splitting is necessary
-			getParent().performSplitIfNecessary();
+			return getParent().performSplitIfNecessary();
 		}
 		
 		
@@ -1826,43 +2070,8 @@ implements 	ManagedObject, Serializable {
 		 * @param parent
 		 * @param mode
 		 */
-		private void updateParents(TreeNode parent, byte mode){
-			if (parent == null){
-				return;
-			}
-			
-			switch (mode){
-			case TreeNode.INCREMENT_SIZE:
-				parent.increment();
-				updateParents(parent.getParent(), mode);	
-				break;
-			case TreeNode.DECREMENT_SIZE:
-				parent.decrement();
-				updateParents(parent.getParent(), mode);
-				break;
-			case TreeNode.INCREMENT_NUM_CHILDREN:
-				parent.incrementNumChildren();
-				break;
-				
-			case TreeNode.DECREMENT_NUM_CHILDREN:
-				parent.decrementNumChildren();
-				
-				if (parent.getChildCount() == 0){
-					// remove this from the tree
-					parent = parent.remove();
-					
-					// since we are removing a TreeNode,
-					// check if parent needs to be removed
-					// as well.
-					updateParents(parent.getParent(), mode);
-				}
-				break;
-					
-			default:
-				throw new IllegalArgumentException("Supplied mode argument is not recognized; "+
-						"expected "+TreeNode.INCREMENT_SIZE+" or "+TreeNode.DECREMENT_SIZE);
-			}
-			
+		private void updateParents(TreeNode<E> parent, byte mode){
+			parent.propagateChanges(mode);
 		}
 		
 	}
@@ -1873,13 +2082,13 @@ implements 	ManagedObject, Serializable {
 	/**
 	 * This object represents a partition in the list.
 	 * Each of these objects lives as a singleton
-	 * inside a ListNode object.
+	 * inside a ListNode<E> object.
 	 */
-	static class SubList implements ManagedObject, Serializable {
+	static class SubList<E> implements ManagedObject, Serializable {
 		public static final int SIZE_NOT_SET = -1;
 		public static final int DEFAULT_MAX_CHILDREN = 10;
 		
-		private ArrayList<ManagedReference<?>> contents;
+		private ArrayList<ManagedReference<E>> contents;
 		
 		private ManagedReference<Offset> offsetRef;
 		
@@ -1893,17 +2102,23 @@ implements 	ManagedObject, Serializable {
 			return (maxSize > 0);
 		}
 		
-		public SubList(int maxSize, ArrayList<ManagedReference<?>> collection){
+		public SubList(int maxSize, ArrayList<ManagedReference<E>> collection){
 			if (isLegal(maxSize)){
 				MAX_CHILDREN = maxSize;
 			}
+			contents = new ArrayList<ManagedReference<E>>();
 			// This sets a limit on the number of elements
 			// which can be appended to a node. A value of 2/3 times
 			// the maximum capacity allows for some insertions
 			// without having to split the node.
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
+			ManagedReference<E> tmp = null;
 			
-			contents = collection;
+			for (int i=0 ; i < collection.size() ; i++){
+				tmp = collection.get(i);
+				contents.add(tmp);
+			}
+			
 			size = contents.size();
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
@@ -1919,13 +2134,13 @@ implements 	ManagedObject, Serializable {
 			// without having to split the node.
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
 			
-			contents = new ArrayList<ManagedReference<?>>();
+			contents = new ArrayList<ManagedReference<E>>();
 			size = contents.size();
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
 		}
 		
-		public SubList(int maxSize, Object obj){
+		public SubList(int maxSize, E e){
 			if (isLegal(maxSize)){
 				MAX_CHILDREN = maxSize;
 			}
@@ -1935,19 +2150,19 @@ implements 	ManagedObject, Serializable {
 			// without having to split the node.
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
 			
-			contents = new ArrayList<ManagedReference<?>>();
-			append(obj);
+			contents = new ArrayList<ManagedReference<E>>();
+			append(e);
 			size = contents.size();
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
 		}
 		
-		public SubList(Object obj){
+		public SubList(E e){
 			MAX_CHILDREN = DEFAULT_MAX_CHILDREN;
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
 			
-			contents = new ArrayList<ManagedReference<?>>();
-			append(obj);
+			contents = new ArrayList<ManagedReference<E>>();
+			append(e);
 			size = contents.size();
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
@@ -1959,14 +2174,18 @@ implements 	ManagedObject, Serializable {
 		}
 		
 		public int getOffset(){
-			return offsetRef.get().get();
+			if (offsetRef != null){
+				return offsetRef.get().get();
+			} else {
+				return -1;
+			}
 		}
 		
 		public int size(){
 			return size;
 		}
 		
-		public ArrayList<ManagedReference<?>> getElements(){
+		public ArrayList<ManagedReference<E>> getElements(){
 			return contents;
 		}
 		
@@ -1977,26 +2196,34 @@ implements 	ManagedObject, Serializable {
 		 * @param index
 		 * @return
 		 */
-		public Object get(int index){
-			return contents.get(index).get();
+		public E get(int index){
+			if (contents != null){
+				return contents.get(index).get();
+			} else {
+				return null;
+			}
 		}
 		
-		public Object getFirst(){
+		public E getFirst(){
 			return get(0);
 		}
 		
-		public Object getLast(){
-			return get(contents.size() - 1);
+		public E getLast(){
+			if (contents != null){
+				return get(contents.size() - 1);
+			} else {
+				return null;
+			}
 		}
 		
 		/**
 		 * Removes all elements in the sublist and
-		 * removes the {@code SubList} object from
+		 * removes the {@code SubList<E>} object from
 		 * the Data Store.
 		 */
 		public void clear(){
 			DataManager dm = AppContext.getDataManager();
-			Iterator<ManagedReference<?>> iter = contents.iterator();
+			Iterator<ManagedReference<E>> iter = contents.iterator();
 			
 			// Delete all the elements within the sub list
 			while (iter.hasNext()){
@@ -2005,25 +2232,12 @@ implements 	ManagedObject, Serializable {
 			contents.clear();
 			
 			// Remove the offset reference
-			dm.removeObject(offsetRef.get());
+			if (offsetRef != null){
+				dm.removeObject(offsetRef.get());
+			}
 		}
 		
-		/**
-		 * Sets the value at the index provided. The
-		 * index is not an absolute index; rather,
-		 * it is relative to the current list. If
-		 * the index does not correspond to a valid
-		 * index in the underlying list, an
-		 * {@code IndexOutOfBoundsException} will be
-		 * thrown.
-		 * @param index the index to add the element
-		 * @param obj the element to be added.
-		 * @return the old element that was replaced.
-		 */
-		public Object set(int index, Object obj){
-			Element e = new Element(obj);
-			return set(index, e);
-		}
+
 		
 		/**
 		 * Sets the value at the index provided. The
@@ -2037,12 +2251,21 @@ implements 	ManagedObject, Serializable {
 		 * @param e the element to be added.
 		 * @return the old element that was replaced.
 		 */
-		public Object set(int index, Element e){
-			ManagedReference<Element> ref = AppContext.getDataManager().createReference(e);
-			ManagedReference<?> old = contents.set(index, ref);
-			AppContext.getDataManager().removeObject(old);
-			AppContext.getDataManager().removeObject(old.get());
-			return old.get();
+		public Object set(int index, E e){
+			ManagedReference<E> ref = null;
+		
+			if (e instanceof ManagedObject){
+				ref = AppContext.getDataManager().createReference(e);
+			} else {
+				Element<E> element = new Element<E>(e);
+				ref = AppContext.getDataManager().createReference((E) element);
+			}
+			ManagedReference<E> old = contents.set(index, ref);
+			Object oldObj = old;
+			
+			// Delete from data store
+			AppContext.getDataManager().removeObject((ManagedObject) old.get());
+			return oldObj;
 		}
 		
 		/**
@@ -2053,21 +2276,21 @@ implements 	ManagedObject, Serializable {
 		 * @return whether the operation was successful; true
 		 * if so, false otherwise.
 		 */
-		public boolean append(Object obj){
+		public boolean append(E e){
 			boolean result = false;
-			if (obj == null){
+			if (e == null){
 				throw new NullPointerException(
 						"The appended object cannot be null");
 			}
 			
 			// If it is not yet a ManagedObject, then
 			// create a new Element to make it a ManagedObject
-			ManagedReference<?> ref = null;
-			if (! (obj instanceof ManagedObject)){
-				Element e = new Element(obj);
-				ref = AppContext.getDataManager().createReference(e);
+			ManagedReference<E> ref = null;
+			if (!(e instanceof ManagedObject)){
+				Element<E> element = new Element<E>(e);
+				ref = AppContext.getDataManager().createReference((E) element);
 			} else {
-				ref = AppContext.getDataManager().createReference(obj);
+				ref = AppContext.getDataManager().createReference(e);
 			}
 			result = contents.add(ref);
 			size = contents.size();
@@ -2077,7 +2300,7 @@ implements 	ManagedObject, Serializable {
 
 		/**
 		 * Returns the index of the element inside the
-		 * {@code SubList}. If the element does not
+		 * {@code SubList<E>}. If the element does not
 		 * exist, then -1 is returned.
 		 * @param o the element whose last index is
 		 * to be found.
@@ -2085,7 +2308,7 @@ implements 	ManagedObject, Serializable {
 		 * it does not exist.
 		 */
 		public int lastIndexOf(Object o){
-			Iterator<ManagedReference<?>> iter = contents.iterator();
+			Iterator<ManagedReference<E>> iter = contents.iterator();
 			ManagedReference<?> ref = null;
 			Object obj = null;
 			int index = 0;
@@ -2112,16 +2335,20 @@ implements 	ManagedObject, Serializable {
 		 * @param obj the object which is to be inserted at
 		 * the specified {@code index}.
 		 */
-		public void insert(int index, Object obj){
+		public void insert(int index, E e){
 			if (index < 0){
 				throw new IndexOutOfBoundsException("Supplied index cannot be less than 0");
 			}
-			ManagedReference<Element> ref = null;
-			if (!(ref.get() instanceof ManagedObject)){
-				Element e = new Element(obj);
-				AppContext.getDataManager().createReference(e);
+			if (e == null){
+				throw new IllegalArgumentException("Cannot insert null");
+			}
+			
+			ManagedReference<E> ref = null;
+			if (e instanceof ManagedObject){
+				ref = AppContext.getDataManager().createReference(e);
 			} else {
-				AppContext.getDataManager().createReference(obj);
+				Element<E> element = new Element<E>(e);
+				ref = AppContext.getDataManager().createReference((E) element);
 			}
 			contents.add(index, ref);
 			size = contents.size();
@@ -2137,7 +2364,7 @@ implements 	ManagedObject, Serializable {
 		 * or -1 if it does not exist in the list.
 		 */
 		public int indexOf(Object o){
-			Iterator<ManagedReference<?>> iter = contents.iterator();
+			Iterator<ManagedReference<E>> iter = contents.iterator();
 			ManagedReference<?> ref = null;
 			Object obj = null;
 			int index = 0;
@@ -2169,7 +2396,7 @@ implements 	ManagedObject, Serializable {
 			}
 			
 			ManagedReference<?> removed = contents.remove(index);
-			if (removed.get() instanceof Element){
+			if (removed != null && removed.get() instanceof Element){
 				AppContext.getDataManager().removeObject(removed.getForUpdate());
 			}
 			this.size = contents.size();
@@ -2185,8 +2412,8 @@ implements 	ManagedObject, Serializable {
 		 * so, false otherwise.
 		 */
 		public boolean remove(Object obj){
-			Iterator<ManagedReference<?>> iter = contents.iterator();
-			ManagedReference<?> current = null;
+			Iterator<ManagedReference<E>> iter = contents.iterator();
+			ManagedReference<E> current = null;
 			Object object = null;
 			boolean success = false;
 			
@@ -2219,5 +2446,19 @@ implements 	ManagedObject, Serializable {
 			return remove(contents.size()-1);
 		}
 		
+	}
+	
+	
+	public static void main(String[] args){
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		list.add("A");
+		list.add("B");
+		list.add("C");
+		list.remove(2);
+		//assertEquals(-1, list.indexOf("C"));
+		
+		list.add("C");
+		list.remove("C");
+		//assertEquals(-1, list.indexOf("C"));
 	}
 }
