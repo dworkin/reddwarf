@@ -45,10 +45,10 @@ import com.sun.sgs.profile.ProfileReport;
 
 import com.sun.sgs.service.Transaction;
 
+import java.beans.PropertyChangeEvent;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-
-import java.beans.PropertyChangeEvent;
 
 import java.util.LinkedList;
 import java.util.Properties;
@@ -109,6 +109,9 @@ final class TransactionSchedulerImpl
     // the collector used for profiling data
     private final ProfileCollector profileCollector;
 
+    // the coordinator for all transactional object access
+    private final AccessCoordinatorImpl accessCoordinator;
+
     // the executor service used to manage our threads
     private final ExecutorService executor;
 
@@ -132,6 +135,8 @@ final class TransactionSchedulerImpl
      *                               by the system to manage transactions
      * @param profileCollector the {@code ProfileCollector} used by the
      *                         system to collect profiling data
+     * @param accessCoordinator the {@code AccessCoordinator} used by
+     *                          the system to managed shared data
      *
      * @throws InvocationTargetException if there is a failure initializing
      *                                   the {@code SchedulerQueue}
@@ -139,7 +144,8 @@ final class TransactionSchedulerImpl
      */
     TransactionSchedulerImpl(Properties properties,
                              TransactionCoordinator transactionCoordinator,
-                             ProfileCollector profileCollector)
+                             ProfileCollector profileCollector,
+                             AccessCoordinatorImpl accessCoordinator)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating a Transaction Scheduler");
@@ -150,9 +156,12 @@ final class TransactionSchedulerImpl
             throw new NullPointerException("Coordinator cannot be null");
         if (profileCollector == null)
             throw new NullPointerException("Collector cannot be null");
+	if (accessCoordinator == null)
+	    throw new NullPointerException("AccessCoordinator cannot be null");
 
         this.transactionCoordinator = transactionCoordinator;
         this.profileCollector = profileCollector;
+        this.accessCoordinator = accessCoordinator;
 
         String queueName = properties.getProperty(SCHEDULER_QUEUE_PROPERTY,
                                                   DEFAULT_SCHEDULER_QUEUE);
@@ -524,7 +533,6 @@ final class TransactionSchedulerImpl
                     backingQueue.getReadyCount() + dependencyCount.get();
                 profileCollector.startTask(task.getTask(), task.getOwner(),
                                            task.getStartTime(), waitSize);
-                profileCollector.noteTransactional();
 
                 Transaction transaction = null;
 
@@ -534,8 +542,15 @@ final class TransactionSchedulerImpl
                         transactionCoordinator.createTransaction(unbounded);
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
+                    profileCollector.noteTransactional(transaction.getId());
 
+                    // increment the try count and notify the access
+                    // coordinator of the new transaction
                     task.incrementTryCount();
+                    final int tryCount = task.getTryCount();
+                    accessCoordinator.
+                        notifyNewTransaction(task.getStartTime(), tryCount);
+
                     try {
                         // run the task in the new transactional context
                         task.getTask().run();
@@ -581,7 +596,7 @@ final class TransactionSchedulerImpl
                     throw ie;
                 } catch (Throwable t) {
                     // make sure the transaction was aborted
-                    if (! transaction.isAborted())
+                    if ((transaction != null) && (! transaction.isAborted()))
                         transaction.abort(t);
                     profileCollector.finishTask(task.getTryCount(), t);
                     // some error occurred, so see if we should re-try

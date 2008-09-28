@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>6</version>
+    <version>7</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-parent</artifactId>
   <name>Project Darkstar Server Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.7-SNAPSHOT</version>
+  <version>0.9.8-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <description>

@@ -159,6 +159,9 @@ public final class ContextResolver {
         if (txn == null)
             throw new TransactionNotActiveException("no current transaction");
 
+        if (txn.isAborted()) {
+            throw new TransactionNotActiveException("Transaction is aborted");
+        }
         txn.checkTimeout();
 
         return txn;

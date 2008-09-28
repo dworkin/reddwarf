@@ -219,12 +219,18 @@ class Kernel {
 		txnAwareLogManager.configure(appProperties, proxy);
 	    }
 
+            // create the access coordinator
+            AccessCoordinatorImpl accessCoordinator =
+                new AccessCoordinatorImpl(appProperties, proxy,
+                                          profileCollector);
+
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
             transactionScheduler =
                 new TransactionSchedulerImpl(appProperties,
                                              transactionCoordinator,
-                                             profileCollector);
+                                             profileCollector,
+                                             accessCoordinator);
             taskScheduler =
                 new TaskSchedulerImpl(appProperties, profileCollector);
                         
@@ -233,6 +239,7 @@ class Kernel {
             taskScheduler.setContext(ctx);
 
             // collect the shared system components into a registry
+            systemRegistry.addComponent(accessCoordinator);
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
