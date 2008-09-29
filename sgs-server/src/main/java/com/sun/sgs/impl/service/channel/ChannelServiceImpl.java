@@ -81,7 +81,7 @@ import java.util.logging.Logger;
  * href="../../../app/doc-files/config-properties.html#ChannelService">
  * properties</a>. <p>
  *
- * <p>TODO: add summary comment about how the implementation works.
+ * <p>TBD: add summary comment about how the implementation works.
  */
 public final class ChannelServiceImpl
     extends AbstractService implements ChannelManager
@@ -112,8 +112,8 @@ public final class ChannelServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
-    /** The property name for the maximum number of events to process in a single
-     * transaction.
+    /** The property name for the maximum number of events to process in a
+     * single transaction.
      */
     private static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
@@ -268,22 +268,24 @@ public final class ChannelServiceImpl
 	    /*
 	     * Check service version.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
 			checkServiceVersion(
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
-		    }},  taskOwner);
+		    } },  taskOwner);
 	    
 	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
 	    transactionScheduler.runTask(
-		new AbstractKernelRunnable() {
+		new AbstractKernelRunnable("StoreChannelServerProxy") {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
-			    new ManagedSerializable<ChannelServer>(serverProxy));
-		    }},
+			    new ManagedSerializable<ChannelServer>(
+				serverProxy));
+		    } },
 		taskOwner);
 
 	    /*
@@ -418,10 +420,11 @@ public final class ChannelServiceImpl
 			taskQueue = newTaskQueue;
 		    }
 		}
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
 			ChannelImpl.serviceEventQueue(channelId);
-		    }}, taskOwner);
+		    } }, taskOwner);
 					  
 	    } finally {
 		callFinished();
@@ -456,8 +459,8 @@ public final class ChannelServiceImpl
 			"obtaining members of channel:{0} throws",
 			HexDumper.toHexString(channelId));
 		}
-		Set<BigInteger> newLocalMembers =
-		    Collections.synchronizedSet(getMembersTask.getLocalMembers());
+		Set<BigInteger> newLocalMembers = Collections.synchronizedSet(
+		    getMembersTask.getLocalMembers());
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "newLocalMembers for channel:{0}",
 			       HexDumper.toHexString(channelId));
@@ -489,7 +492,7 @@ public final class ChannelServiceImpl
 			    joiners.add(sessionRefId);
 			}
 		    }
-		    if (! oldLocalMembers.isEmpty()) {
+		    if (!oldLocalMembers.isEmpty()) {
 			leavers = oldLocalMembers;
 		    }
 		}
@@ -630,7 +633,8 @@ public final class ChannelServiceImpl
 		    put(channelId).
 		    flip();
 		    sessionService.sendProtocolMessageNonTransactional(
-		        sessionRefId, msg.asReadOnlyBuffer(), Delivery.RELIABLE);
+		        sessionRefId, msg.asReadOnlyBuffer(),
+			Delivery.RELIABLE);
 	    } finally {
 		callFinished();
 	    }
@@ -833,10 +837,10 @@ public final class ChannelServiceImpl
     {
 	addChannelTask(
 	    channelId,
-	    new AbstractKernelRunnable() {
+	    new AbstractKernelRunnable("RunIoTask") {
 		public void run() {
 		    runIoTask(ioTask, nodeId);
-		}});
+		} });
     }
 
     /**
@@ -896,7 +900,7 @@ public final class ChannelServiceImpl
         public boolean prepare() {
 	    isPrepared = true;
 	    boolean readOnly = internalTaskLists.isEmpty();
-	    if (! readOnly) {
+	    if (!readOnly) {
 		synchronized (contextList) {
 		    contextList.add(this);
 		}
@@ -998,7 +1002,7 @@ public final class ChannelServiceImpl
 		final byte[] sessionIdBytes = sessionRefId.toByteArray();
 		for (final BigInteger channelRefId : channelSet) {
 		    transactionScheduler.scheduleTask(
-			new AbstractKernelRunnable() {
+			new AbstractKernelRunnable("RemoveSessionFromChannel") {
 			    public void run() {
 				ChannelImpl.removeSessionFromChannel(
 				    localNodeId, sessionIdBytes, channelRefId);
@@ -1110,7 +1114,7 @@ public final class ChannelServiceImpl
 		 * Schedule persistent tasks to perform recovery.
 		 */
 		transactionScheduler.runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
 			    /*
 			     * Reassign each failed coordinator to a new node.
@@ -1181,15 +1185,16 @@ public final class ChannelServiceImpl
 		 * locally coordinated channels.
 		 */
 		transactionScheduler.runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable(
+			"ScheduleRemoveFailedSessionsFromLocalChannelsTask")
+		    {
 			public void run() {
 			    taskService.scheduleTask(
 				new ChannelImpl.
 				    RemoveFailedSessionsFromLocalChannelsTask(
 					localNodeId, nodeId));
 			}
-		    },
-		    taskOwner);
+		    }, taskOwner);
 		
 	    } catch (Exception e) {
 		logger.logThrow(
