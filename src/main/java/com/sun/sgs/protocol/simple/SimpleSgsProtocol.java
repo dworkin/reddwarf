@@ -132,6 +132,13 @@ public interface SimpleSgsProtocol {
      * for use in case the client is disconnected and wishes to reconnect to the
      * server with the same identity using a {@link #RECONNECT_REQUEST}. 
      * <p>
+     * The behavior of a server receiving this message from a client that is 
+     * already logged in is determined by the property com.sun.sgs.impl.service.session.allow.new.login.
+     * If the value of this property is false (which is the default value) the
+     * second login request is ignored. If the value is true, the second login
+     * request will cause the currently active login to be replaced by the new
+     * request.
+     * <p>
      * This message should only be received by a client; if received by a server 
      * the client sending the message will be disconnected.
      */
