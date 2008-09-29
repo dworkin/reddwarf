@@ -253,7 +253,7 @@ implements 	ManagedObject, Serializable {
 		// otherwise, add it to the specified index.
 		// This requires a search of the list nodes.
 		ListNode<E> n = getNode(index);
-		n.insert(index - n.getSubList().getOffset(), e);
+		n.insert(n.getSubList().getOffset(), e);
 		
 		updateTreeNodeRefs();
 	}
@@ -478,7 +478,7 @@ implements 	ManagedObject, Serializable {
 					"Value for set operation cannot be null");
 		}
 		SubList<E> n = getNode(index).getSubList();
-		old = n.set(index - n.getOffset(), obj);
+		old = n.set(n.getOffset(), obj);
 		return old;
 	}
 	
@@ -671,7 +671,7 @@ implements 	ManagedObject, Serializable {
 	private ListNode<E> getNode(int index){
 		// Recursive method to eventually return ListNode<E>
 		// containing the desired index.
-		return search(getRoot(), 0, index);
+		return search(getRoot(), 0, index + 1);
 	}
 	
 	
@@ -724,7 +724,7 @@ implements 	ManagedObject, Serializable {
 				}
 			}
 			currentValue -= n.size();
-			n.getSubList().setOffset(destIndex - currentValue);
+			n.getSubList().setOffset(destIndex - currentValue - 1);
 			return n;
 			
 		} else {
@@ -1284,6 +1284,7 @@ implements 	ManagedObject, Serializable {
 				throw new IllegalStateException("Attempting to split a node that is neither "+
 						"a TreeNode<E> or ListNode<E>");
 			}
+			getParent().propagateChanges(getParent(), TreeNode.INCREMENT_NUM_CHILDREN);
 			this.setTail(prev);			
 			return newNode;
 		}
@@ -1531,34 +1532,13 @@ implements 	ManagedObject, Serializable {
 	implements Serializable, Iterator<ListNode<E>> {
 		
 		private ListNode<E> current;
-		private boolean firstTime;
+		private ListNode<E> head;
 		
 		public static final long serialVersionUID = 1L;
 		
 		public ScalableListNodeIterator (ListNode<E> head){
 			current = null;
-			firstTime = true;
-		}
-		
-		/**
-		 * Constructor to be used for cloning.
-		 * @param iterator
-		 */
-		private ScalableListNodeIterator (ScalableListNodeIterator<E> iterator){
-			this.current = iterator.getCurrent();
-			this.firstTime = iterator.isFirstTime();
-		}
-		
-		public ListNode<E> getCurrent(){
-			return current;
-		}
-		
-		public boolean isFirstTime(){
-			return firstTime;
-		}
-		
-		public ScalableListNodeIterator<E> clone(ScalableListNodeIterator<E> iterator){
-			return new ScalableListNodeIterator<E>(iterator);
+			this.head = head;
 		}
 		
 		/**
@@ -1568,8 +1548,23 @@ implements 	ManagedObject, Serializable {
 		 * exists or not.
 		 */
 		public boolean hasNext(){
-			if (current == null || current.getNext() == null){
+			// Check if there was an element to begin with
+			if (current == null && head == null){
 				return false;
+				
+			} else if (head != null){
+				
+				// Return the first element
+				current = head;
+				head = null;
+			} else {
+				
+				// Setup the next element if it exists
+				if (current.getNext() != null){
+					current = current.getNext();
+				} else {
+					return false;
+				}
 			}
 			return true;
 		}
@@ -1583,63 +1578,8 @@ implements 	ManagedObject, Serializable {
 			if (current == null){
 				throw new NoSuchElementException("There is no next element");
 			}
-			
-			// If this is the first access, then simply return
-			// the current (first) ListNode.
-			if (firstTime){
-				firstTime = false;
-				return current;
-			}
 
-			// Otherwise get the next element in sequence.
-			ListNode<E> returnMe = null;
-			returnMe = current.getNext();
-			if (returnMe == null){
-				throw new NoSuchElementException("There is no next element");
-			}
-			return returnMe;
-		}
-		
-		/**
-		 * Given a {@code TreeNode<E>}, retrieve the first ListNode<E>
-		 * @param t The ancestor {@code TreeNode<E>} to look from
-		 * @return the {@code ListNode<E>}, if found, or null otherwise.
-		 */
-		private ListNode<E> getListNodeChild(TreeNode<E> t){
-			ManagedObject node = t.getChild();
-			
-			// Traverse the children until we find a ListNode<E>,
-			// or until we hit a null
-			while (node != null && !(node instanceof ListNode)){
-				node = ((TreeNode<E>)node).getChild();
-			}
-			return (ListNode<E>) node;
-		}
-		
-		
-		/**
-		 * Given a {@code TreeNode<E>}, this method finds the
-		 * next {@code TreeNode<E>} to search for. In other words,
-		 * if there are no TreeNode<E> siblings, then it tries to
-		 * retrieve a sibling of its parent.
-		 * @param t
-		 * @return
-		 */
-		private TreeNode<E> getNextTreeNode(TreeNode<E> t){
-			// We cannot work with null elements
-			if (t == null || t.getParent() == null){
-				return null;
-			}
-			
-			// Get sibling if it exists
-			if (t.next() != null){
-				return t.next();
-			}
-			
-			// Otherwise track down a sibling of the parent.
-			// If there is no sibling, then we are at the root.
-			// Returning root.next() returns null.
-			return t.getParent().next();
+			return current;
 		}
 		
 		public void remove(){
@@ -1655,7 +1595,7 @@ implements 	ManagedObject, Serializable {
 	static class ScalableListIterator<E>
 	implements Serializable, Iterator<E> {
 		
-		private ListNode<E> current;
+		private ListNode<E> currentNode;
 		private ScalableListNodeIterator<E> listNodeIter;
 		private Iterator<ManagedReference<E>> iter;
 		
@@ -1666,47 +1606,36 @@ implements 	ManagedObject, Serializable {
 		public ScalableListIterator(ListNode<E> head){
 			listNodeIter = new ScalableListNodeIterator<E>(head);
 			
-			// Get the first element
-			current = (ListNode<E>) listNodeIter.next();
-			iter = current.getSubList().getElements().iterator();
+			if (listNodeIter == null){
+				currentNode = null;
+				iter = null;
+				return;
+			}
+			
+			// Prepare by getting first ListNode
+			if (listNodeIter.hasNext()){
+				currentNode = (ListNode<E>) listNodeIter.next();
+			} else {
+				currentNode = null;
+			}
+			
+			// Do a last check to make sure we are getting non-null values
+			if (currentNode == null || currentNode.getSubList() == null){
+				iter = null;
+				return;
+			}
+			
+			// Set up the ListIterator, but do not populate
+			// current until hasNext() has been called.
+			iter = currentNode.getSubList().getElements().iterator();
 		}
 		
-		/**
-		 * Constructor used for cloning purposes. Cloning is
-		 * used to check for next elements.
-		 */
-		private ScalableListIterator(ScalableListIterator<E> iterator){
-			current = iterator.getCurrent();
-			listNodeIter = iterator.getListNodeIterator();
-			iter = iterator.getIterator();
-		}
-		public ScalableListNodeIterator<E> getListNodeIterator(){
-			return listNodeIter;
-		}
-		public ListNode<E> getCurrent(){
-			return current;
-		}
-		public Iterator<ManagedReference<E>> getIterator(){
-			return iter;
-		}
 		
 		/**
-		 * Retrieve the next element in the collection
+		 * {@inheritDoc}}
 		 */
 		public E next(){
 			
-			// If at the end of the SubList<E>, get the next ListNode<E>
-			// in the ScalableList.
-			while (!iter.hasNext()){
-				
-				// If there are no more ListNodes to traverse through,
-				// return null. Otherwise, update the references.
-				if (!listNodeIter.hasNext()){
-					return null;
-				}
-				current = (ListNode<E>) listNodeIter.next();
-				iter = (current.getSubList().getElements()).iterator();
-			}
 			listNodeReferenceValue = System.nanoTime(); 
 			ManagedReference<E> ref = ((ManagedReference<E>) iter.next());
 			if (ref != null){
@@ -1717,24 +1646,26 @@ implements 	ManagedObject, Serializable {
 		}
 
 		/**
-		 * Determines if there are subsequent elements in the list.
+		 * {@inheritDoc}
 		 */
 		public boolean hasNext(){
+			// If there is an element in the iterator still,
+			// then simply return true since it will be the
+			// next element to be returned.
 			if (iter.hasNext()){
 				return true;
 			}
 			
-			// In case the next element is under a neighboring
-			// ListNode<E>, clone this iterator to check so that we
-			// do not lose our place.
-			ScalableListIterator<E> clone = clone(this);			
-			return (clone.next() != null);
+			// Otherwise, we need to fetch the next ListNode
+			// and construct a list iterator from that
+			if (listNodeIter.hasNext()){
+				currentNode = listNodeIter.next();
+				iter = currentNode.getSubList().getElements().iterator();
+				return hasNext();
+			}
+			return false;
 		}
 		
-		private ScalableListIterator<E> clone(
-				ScalableListIterator<E> toClone){
-			return new ScalableListIterator<E>(toClone);
-		}
 		
 		/**
 		 * @deprecated This operation is not officially supported.

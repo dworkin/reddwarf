@@ -71,7 +71,7 @@ public class TestScalableList extends Assert {
     private static Properties createProps(String appName) throws Exception {
         Properties props = SgsTestNode.getDefaultProperties(appName, null, 
                                            SgsTestNode.DummyAppListener.class);
-        props.setProperty("com.sun.sgs.txn.timeout", "1000000");
+        props.setProperty("com.sun.sgs.txn.timeout", "10000000");
         return props;
     }
 
@@ -1152,6 +1152,7 @@ public class TestScalableList extends Assert {
 	    }, taskOwner);
     }
     
+   
     /**
      * Tests scalability by assessing the
      * index of values in a large list
@@ -1163,10 +1164,12 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
+	
 			ScalableList<String> list = makeList();
 			assertEquals(2, list.indexOf(2));
 			assertEquals(8, list.indexOf(8));
 			assertEquals(11, list.indexOf(11));
+	
 		}
 	    }, taskOwner);
     }
@@ -1183,6 +1186,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
+		
 			ScalableList<String> list = makeList();
 			list.add("A");
 			assertEquals(12, list.lastIndexOf("A"));
@@ -1190,6 +1194,7 @@ public class TestScalableList extends Assert {
 			list.add("A"); 
 			list.add("A");
 			assertEquals(14, list.lastIndexOf("A"));
+		
 		}
 	    }, taskOwner);
     }
@@ -1229,6 +1234,7 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
+			
 			ScalableList<String> list = makeList();
 			Iterator<String> iter = list.iterator();
 			
@@ -1253,6 +1259,7 @@ public class TestScalableList extends Assert {
 				}
 			}
 			assertEquals(size, list.size());
+
 		}
 	    }, taskOwner);
     }    
