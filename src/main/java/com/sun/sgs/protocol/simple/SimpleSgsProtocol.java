@@ -372,7 +372,9 @@ public interface SimpleSgsProtocol {
      * This message will initiate the channel sending logic on the server, 
      * requesting that the indicated message content be sent to all of the 
      * members of the indicated channel. If the client sending the request
-     * is not a member of the channel, 
+     * is not a member of the channel, the message will be rejected by the server.
+     * The server may also refuse to send the message, or alter the message, 
+     * because of application-specific logic.
      */
     final byte CHANNEL_MESSAGE = 0x52;
 }
