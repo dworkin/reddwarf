@@ -927,6 +927,7 @@ public class TestScalableList extends Assert {
 		    list.add(1, "E");
 		    list.add(1, "D");
 		    list.add(1, "C");
+		    list.add(1, "B");
 		    
 		    assertEquals(12, list.size());
 		}
@@ -1270,7 +1271,7 @@ public class TestScalableList extends Assert {
 		public void run() throws Exception {
 			ScalableList<String> list = makeList();
 			
-			assertEquals(0, list.getFirst());
+			assertEquals("A", list.getFirst());
 		}
 	    }, taskOwner);
     }    
@@ -1346,9 +1347,9 @@ public class TestScalableList extends Assert {
 			
 			try {
 				list.get(2);
-				fail("Expecting IllegalArgumentException for accessing "+
+				fail("Expecting IndexOutOfBoundsException for accessing "+
 						"element outside of range.");
-			} catch (IllegalArgumentException iae ){
+			} catch (IndexOutOfBoundsException e ){
 			}
 			
 		}
@@ -1373,9 +1374,9 @@ public class TestScalableList extends Assert {
 			
 			try {
 				list.get(-1);
-				fail("Expecting IllegalArgumentException for accessing "+
+				fail("Expecting IndexOutOfBoundsException for accessing "+
 						"element outside of range");
-			} catch (IllegalArgumentException iae){
+			} catch (IndexOutOfBoundsException e){
 			}
 			
 		}
