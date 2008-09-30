@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.projectdarkstar.tools.dtc</groupId>
     <artifactId>dtc</artifactId>
-    <version>0.1</version>
+    <version>0.1-SNAPSHOT</version>
   </parent>
 
   <groupId>com.projectdarkstar.tools.dtc</groupId>
