@@ -17,6 +17,7 @@
     <module>dtc-domain</module>
     <module>dtc-api</module>
     <module>dtc-beans</module>
+    <module>dtc-ear</module>
   </modules>
 
   <!-- Require at least Maven version 2.0.8 to build -->
