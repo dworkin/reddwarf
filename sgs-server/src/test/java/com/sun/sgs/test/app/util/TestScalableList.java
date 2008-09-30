@@ -574,7 +574,7 @@ public class TestScalableList extends Assert {
 		    list.add("C");
 		    Object obj = list.remove(1);
 		    
-		    assertEquals("B", obj);
+		    assertEquals("B", obj.toString());
 		}
 	    }, taskOwner);
     }
@@ -713,9 +713,7 @@ public class TestScalableList extends Assert {
 		    list.add("B");
 		    list.add(obj);
 		    
-		    Object o = list.remove(obj);
-		   
-		    assertTrue(obj.equals(o));
+		    assertTrue(list.remove(obj));
 		}
 	    }, taskOwner);
     }
@@ -751,7 +749,7 @@ public class TestScalableList extends Assert {
 		    	
 		    	// Check a random iteration
 		    	if (size == 2){
-		    		assertEquals("C", value);
+		    		assertEquals("B", value);
 		    	}
 		    }
 		    // Iteration amount should equal list size
@@ -1059,7 +1057,8 @@ public class TestScalableList extends Assert {
 		    c.add("G"); 
 		    c.add("H"); 
 		    c.add("I"); 
-		    c.add("J"); 
+		    c.add("J");
+		    c.add("K"); 
 		    
 		    list.addAll(1, c);
 		    
@@ -1107,11 +1106,11 @@ public class TestScalableList extends Assert {
 		public void run() throws Exception {
 			ScalableList<String> list = makeList();
 		    list.remove(5);
-		    assertEquals(6, list.get(5));
+		    assertEquals("G", list.get(5));
 		    list.remove(9);
-		    assertEquals(11, list.get(9));
+		    assertEquals("L", list.get(9));
 		    list.remove(1);
-		    assertEquals(2, list.get(1));
+		    assertEquals("C", list.get(1));
 		}
 	    }, taskOwner);
     }
@@ -1166,9 +1165,9 @@ public class TestScalableList extends Assert {
 		public void run() throws Exception {
 	
 			ScalableList<String> list = makeList();
-			assertEquals(2, list.indexOf(2));
-			assertEquals(8, list.indexOf(8));
-			assertEquals(11, list.indexOf(11));
+			assertEquals(2, list.indexOf("C"));
+			assertEquals(8, list.indexOf("I"));
+			assertEquals(11, list.indexOf("L"));
 	
 		}
 	    }, taskOwner);
@@ -1234,7 +1233,6 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			
 			ScalableList<String> list = makeList();
 			Iterator<String> iter = list.iterator();
 			
@@ -1259,7 +1257,6 @@ public class TestScalableList extends Assert {
 				}
 			}
 			assertEquals(size, list.size());
-
 		}
 	    }, taskOwner);
     }    
@@ -1298,7 +1295,7 @@ public class TestScalableList extends Assert {
 		public void run() throws Exception {
 			ScalableList<String> list = makeList();
 			
-			assertEquals(11, list.getLast());
+			assertEquals("L", list.getLast());
 		}
 	    }, taskOwner);
     }    
@@ -1541,7 +1538,7 @@ public class TestScalableList extends Assert {
 			assertEquals(-1, list.lastIndexOf("C"));
 
 			list.add("C");
-			list.remove("C");
+			list.remove(2);
 			assertEquals(-1, list.lastIndexOf("C"));
 		}
 	    }, taskOwner);

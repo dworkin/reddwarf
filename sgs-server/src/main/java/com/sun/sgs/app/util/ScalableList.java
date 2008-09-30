@@ -32,6 +32,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.util.RobTest.TreeNode;
 
 /**
  *  This class represents an {@code AbstractCollection} which supports 
@@ -196,6 +197,11 @@ implements 	ManagedObject, Serializable {
 		// and propagate change to parents
 		result = getTail().append(e);
 		
+		// update the tail in case it has changed.
+		if (getTail().getNext() != null){
+			setTail(getTail().getNext());
+		}
+		
 		return result;
 	}
 	
@@ -298,16 +304,14 @@ implements 	ManagedObject, Serializable {
 							
 		while (iter.hasNext()){
 			n = (ListNode<E>) iter.next();
-			listIndex += n.size();
 			index = n.getSubList().indexOf(o);
 			
 			if (index != -1){
-				break;
+				return listIndex + index;
 			}
-			
-			
+			listIndex += n.size();
 		}
-		return listIndex + index;
+		return -1;
 	}
 	
 	/**
@@ -328,7 +332,6 @@ implements 	ManagedObject, Serializable {
 		// instance of the supplied object
 		while (iter.hasNext()){
 			n = iter.next();
-			listIndex += n.size();
 			index = n.getSubList().lastIndexOf(e);
 			
 			// Save the most recent occurrence of a matching index
@@ -337,6 +340,7 @@ implements 	ManagedObject, Serializable {
 			if (index != -1){
 				absIndex = listIndex + index;
 			}
+			listIndex += n.size();
 		}
 		return absIndex;
 	}
@@ -467,6 +471,12 @@ implements 	ManagedObject, Serializable {
 		}
 		SubList<E> n = getNode(index).getSubList();
 		old = n.set(n.getOffset(), obj);
+		
+		// If the value is wrapped in an Element,
+		// extract the element.
+		if (old instanceof Element){
+			old = ((Element<E>) old).getValue();
+		}
 		return old;
 	}
 	
@@ -1147,6 +1157,12 @@ implements 	ManagedObject, Serializable {
 			}
 			return parent;
 		}
+		
+		
+		/**
+		 * Sets the next element in the linked list
+		 * @param t the next element to link.
+		 */
 		public void setNext(TreeNode<E> t){
 			if (t != null){
 				nextRef = AppContext.getDataManager().createReference(t);
@@ -1313,8 +1329,15 @@ implements 	ManagedObject, Serializable {
 				throw new IllegalStateException("Attempting to split a node that is neither "+
 						"a TreeNode<E> or ListNode<E>");
 			}
+			this.size -= size;
+			this.setTail(prev);		
+			
+			// Increment the parent's child count. We are
+			// guaranteed to have a parent because we
+			// either updated its size already or created
+			// a new one above.
 			getParent().propagateChanges(getParent(), TreeNode.INCREMENT_NUM_CHILDREN);
-			this.setTail(prev);			
+			
 			return newNode;
 		}
 		
@@ -1404,38 +1427,47 @@ implements 	ManagedObject, Serializable {
 			
 			switch (mode){
 			case TreeNode.INCREMENT_SIZE:
-				current.increment();
-				propagateChanges(current.getParent(), mode);	
+				this.increment();
+				if (getParent() != null){
+					getParent().propagateChanges(getParent(), mode);
+				}
 				break;
 			case TreeNode.DECREMENT_SIZE:
-				current.decrement();
+				this.decrement();
 				if (size() == 0){
-					propagateChanges(current.getParent(),
-							TreeNode.DECREMENT_CHILDREN_AND_SIZE);
-					break;
+					if (getParent() != null){
+						getParent().propagateChanges(getParent(),
+								TreeNode.DECREMENT_CHILDREN_AND_SIZE);
+						break;
+					}
 				}
-				propagateChanges(current.getParent(), 
-						mode);
+				if (getParent() != null){
+					getParent().propagateChanges(getParent(), mode);
+				}
 				break;
 			case TreeNode.INCREMENT_NUM_CHILDREN:
-				current.incrementNumChildren();
+				this.incrementNumChildren();
 				break;
 			case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
-				current.decrement();
-				current.decrementNumChildren();
+				this.decrement();
+				this.decrementNumChildren();
 				
 				if (size() == 0){
 					// remove this from the tree
-					TreeNode<E> parent = current.getParent();
+					TreeNode<E> parent = getParent();
 					remove();
 					
 					// since we are removing a TreeNode<E>,
 					// check if parent needs to be removed
 					// as well.
-					propagateChanges(parent, mode);
+					if (getParent() != null){
+						getParent().propagateChanges(parent, mode);
+					}
 				} else {
-					propagateChanges(
-						current.getParent(), TreeNode.DECREMENT_SIZE);
+					if (getParent() != null){
+						getParent().propagateChanges(
+								getParent(), TreeNode.DECREMENT_SIZE);
+					}
 				}
 				break;
 			default:
@@ -1445,8 +1477,6 @@ implements 	ManagedObject, Serializable {
 						TreeNode.DECREMENT_SIZE);
 			}
 		}
-		
-		
 	}
 	
 	
@@ -2044,10 +2074,10 @@ implements 	ManagedObject, Serializable {
 			if (result){
 				count--;
 				dataIntegrityVal = System.nanoTime();
-				// remove list node if it is empty
-				checkRemoveListNode();
+				updateParents(this.getParent(), TreeNode.DECREMENT_SIZE);
 			}
-			
+			// remove list node if it is empty
+			checkRemoveListNode();
 			
 			return result;
 		}
@@ -2374,11 +2404,16 @@ implements 	ManagedObject, Serializable {
 		 * @return
 		 */
 		public E get(int index){
+			E value = null;
 			if (contents != null){
-				return contents.get(index).get();
-			} else {
-				return null;
-			}
+				value =	contents.get(index).get();
+				
+				// Check if value is enveloped by an Element
+				if (value instanceof Element){
+					return ((Element<E>) value).getValue();
+				}
+			} 
+			return value;
 		}
 		
 		/**
@@ -2439,15 +2474,19 @@ implements 	ManagedObject, Serializable {
 		 */
 		public Object set(int index, E e){
 			ManagedReference<E> ref = null;
+			ManagedReference<E> old = null;
+			Object oldObj = null;
 		
 			if (e instanceof ManagedObject){
 				ref = AppContext.getDataManager().createReference(e);
+				old = contents.set(index, ref);
+				oldObj = ((Element<E>) old.get()).getValue();
 			} else {
 				Element<E> element = new Element<E>(e);
 				ref = AppContext.getDataManager().createReference((E) element);
+				old = contents.set(index, ref);
+				oldObj = old.get();
 			}
-			ManagedReference<E> old = contents.set(index, ref);
-			Object oldObj = old;
 			
 			// Delete from data store
 			AppContext.getDataManager().removeObject((ManagedObject) old.get());
@@ -2500,11 +2539,18 @@ implements 	ManagedObject, Serializable {
 			int index = 0;
 			int lastIndex = -1;
 			
+			// Iterate through all contents, 
+			// checking for equality
 			while (iter.hasNext()){
 				ref = iter.next();
 				obj = ref.get();
 				
-				if (obj.equals(o)){
+				// Retrieve the internal value if 
+				// it is an Element object
+				if (obj instanceof Element){
+					obj = ((Element<E>) obj).getValue();
+				}
+				if (o.equals(obj)){
 					lastIndex = index;
 				}
 				index++;
@@ -2555,11 +2601,18 @@ implements 	ManagedObject, Serializable {
 			Object obj = null;
 			int index = 0;
 			
+			// Iterate through all the list
+			// contents until we find a match
 			while (iter.hasNext()){
 				ref = iter.next();
 				obj = ref.get();
 				
-				if (obj.equals(o)){
+				// Check if we need to extract the
+				// internal value contained in an Element object
+				if (obj instanceof Element){
+					obj = ((Element<E>) obj).getValue();
+				}
+				if (o.equals(obj)){
 					return index;
 				}
 				index++;
@@ -2580,13 +2633,16 @@ implements 	ManagedObject, Serializable {
 				throw new IndexOutOfBoundsException("The index, "+index+
 						", is out of bounds");
 			}
-			
+			Object value = null;
 			ManagedReference<?> removed = contents.remove(index);
 			if (removed != null && removed.get() instanceof Element){
+				value = ((Element<E>) removed.get()).getValue();
 				AppContext.getDataManager().removeObject(removed.getForUpdate());
+			} else {
+				value = removed.get();
 			}
 			this.size = contents.size();
-			return removed;
+			return value;
 		}
 		
 		
@@ -2607,6 +2663,9 @@ implements 	ManagedObject, Serializable {
 			while (iter.hasNext()){
 				current = iter.next();
 				object = current.get();
+				if (object instanceof Element){
+					object = ((Element<E>) object).getValue();
+				}
 				
 				if (obj.equals(object)){
 					// remove the object in the Element wrapper. If
@@ -2619,6 +2678,7 @@ implements 	ManagedObject, Serializable {
 					break;
 				}
 			}
+			this.size = contents.size();
 			return success;
 		}
 		
