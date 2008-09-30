@@ -1406,8 +1406,8 @@ implements 	ManagedObject, Serializable {
 				}
 				
 			}
-			// unlink and self destruct
 			
+			// unlink and self destruct
 			dm.removeObject(this);
 		}
 	
@@ -1656,7 +1656,7 @@ implements 	ManagedObject, Serializable {
 		
 		private ListNode<E> currentNode;
 		private ScalableListNodeIterator<E> listNodeIter;
-		private Iterator<ManagedReference<E>> iter;
+		private Iterator<ManagedReference<ManagedObject>> iter;
 		
 		private long listNodeReferenceValue = -1;
 		
@@ -1860,7 +1860,7 @@ implements 	ManagedObject, Serializable {
 		 * added into the empty list.
 		 */
 		public ListNode(TreeNode<E> parent, int maxSize, 
-				ArrayList<ManagedReference<E>> list){
+				ArrayList<ManagedReference<ManagedObject>> list){
 			SubList<E> sublist = new SubList<E>(maxSize, list);
 			count = sublist.size();
 			DataManager dm = AppContext.getDataManager();
@@ -2186,10 +2186,10 @@ implements 	ManagedObject, Serializable {
 		 * denoted by the cluster size.
 		 */
 		private boolean split(){
-			ArrayList<ManagedReference<E>> contents = 
+			ArrayList<ManagedReference<ManagedObject>> contents = 
 				getSubList().getElements();
-			ArrayList<ManagedReference<E>> spawned = 
-				new ArrayList<ManagedReference<E>>();
+			ArrayList<ManagedReference<ManagedObject>> spawned = 
+				new ArrayList<ManagedReference<ManagedObject>>();
 			
 			// Walks up the tree to increment the new size
 			updateParents(this.getParent(), TreeNode.INCREMENT_NUM_CHILDREN);
@@ -2198,7 +2198,7 @@ implements 	ManagedObject, Serializable {
 			int sublistSize = getSubList().size();
 			int lower = Math.round(sublistSize/2);
 			for (int index = lower;	index < sublistSize ; index++){
-				spawned.add(contents.get(index));
+				spawned.add((ManagedReference<ManagedObject>) contents.get(index));
 			}
 			
 			// remove the relocated nodes from the current list
@@ -2243,7 +2243,7 @@ implements 	ManagedObject, Serializable {
 		public static final int SIZE_NOT_SET = -1;
 		public static final int DEFAULT_MAX_CHILDREN = 10;
 		
-		private ArrayList<ManagedReference<E>> contents;
+		private ArrayList<ManagedReference<ManagedObject>> contents;
 		
 		private ManagedReference<Offset> offsetRef;
 		
@@ -2268,17 +2268,17 @@ implements 	ManagedObject, Serializable {
 		 * @param maxSize the maximum number of elements which can be stored.
 		 * @param collection the elements to add to the empty list.
 		 */
-		public SubList(int maxSize, ArrayList<ManagedReference<E>> collection){
+		public SubList(int maxSize, ArrayList<ManagedReference<ManagedObject>> collection){
 			if (isLegal(maxSize)){
 				MAX_CHILDREN = maxSize;
 			}
-			contents = new ArrayList<ManagedReference<E>>();
+			contents = new ArrayList<ManagedReference<ManagedObject>>();
 			// This sets a limit on the number of elements
 			// which can be appended to a node. A value of 2/3 times
 			// the maximum capacity allows for some insertions
 			// without having to split the node.
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
-			ManagedReference<E> tmp = null;
+			ManagedReference<ManagedObject> tmp = null;
 			
 			for (int i=0 ; i < collection.size() ; i++){
 				tmp = collection.get(i);
@@ -2305,7 +2305,7 @@ implements 	ManagedObject, Serializable {
 			// without having to split the node.
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
 			
-			contents = new ArrayList<ManagedReference<E>>();
+			contents = new ArrayList<ManagedReference<ManagedObject>>();
 			size = contents.size();
 			Offset offset = new Offset();
 			offsetRef = AppContext.getDataManager().createReference(offset);
@@ -2329,7 +2329,7 @@ implements 	ManagedObject, Serializable {
 			// without having to split the node.
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
 			
-			contents = new ArrayList<ManagedReference<E>>();
+			contents = new ArrayList<ManagedReference<ManagedObject>>();
 			append(e);
 			size = contents.size();
 			Offset offset = new Offset();
@@ -2347,7 +2347,7 @@ implements 	ManagedObject, Serializable {
 			MAX_CHILDREN = DEFAULT_MAX_CHILDREN;
 			MAX_CHILDREN_APPEND = Math.round((2 * MAX_CHILDREN)/3);
 			
-			contents = new ArrayList<ManagedReference<E>>();
+			contents = new ArrayList<ManagedReference<ManagedObject>>();
 			append(e);
 			size = contents.size();
 			Offset offset = new Offset();
@@ -2392,7 +2392,7 @@ implements 	ManagedObject, Serializable {
 		 * as an {@code ArrayList}.
 		 * @return the elements contained in the {@code SubList}
 		 */
-		public ArrayList<ManagedReference<E>> getElements(){
+		public ArrayList<ManagedReference<ManagedObject>> getElements(){
 			return contents;
 		}
 		
@@ -2406,11 +2406,11 @@ implements 	ManagedObject, Serializable {
 		public E get(int index){
 			E value = null;
 			if (contents != null){
-				value =	contents.get(index).get();
+				value =	(E) contents.get(index).get();
 				
 				// Check if value is enveloped by an Element
 				if (value instanceof Element){
-					return ((Element<E>) value).getValue();
+					return (E) ((Element<E>) value).getValue();
 				}
 			} 
 			return value;
@@ -2444,7 +2444,7 @@ implements 	ManagedObject, Serializable {
 		 */
 		public void clear(){
 			DataManager dm = AppContext.getDataManager();
-			Iterator<ManagedReference<E>> iter = contents.iterator();
+			Iterator<ManagedReference<ManagedObject>> iter = contents.iterator();
 			
 			// Delete all the elements within the sub list
 			while (iter.hasNext()){
@@ -2473,17 +2473,17 @@ implements 	ManagedObject, Serializable {
 		 * @return the old element that was replaced.
 		 */
 		public Object set(int index, E e){
-			ManagedReference<E> ref = null;
-			ManagedReference<E> old = null;
+			ManagedReference<ManagedObject> ref = null;
+			ManagedReference<ManagedObject> old = null;
 			Object oldObj = null;
 		
 			if (e instanceof ManagedObject){
-				ref = AppContext.getDataManager().createReference(e);
+				ref = AppContext.getDataManager().createReference((ManagedObject) e);
 				old = contents.set(index, ref);
 				oldObj = ((Element<E>) old.get()).getValue();
 			} else {
 				Element<E> element = new Element<E>(e);
-				ref = AppContext.getDataManager().createReference((E) element);
+				ref = AppContext.getDataManager().createReference((ManagedObject) element);
 				old = contents.set(index, ref);
 				oldObj = old.get();
 			}
@@ -2510,13 +2510,8 @@ implements 	ManagedObject, Serializable {
 			
 			// If it is not yet a ManagedObject, then
 			// create a new Element to make it a ManagedObject
-			ManagedReference<E> ref = null;
-			if (!(e instanceof ManagedObject)){
-				Element<E> element = new Element<E>(e);
-				ref = AppContext.getDataManager().createReference((E) element);
-			} else {
-				ref = AppContext.getDataManager().createReference(e);
-			}
+			ManagedReference<ManagedObject> ref = createRefForAdd(e); 
+				
 			result = contents.add(ref);
 			size = contents.size();
 			
@@ -2533,7 +2528,7 @@ implements 	ManagedObject, Serializable {
 		 * it does not exist.
 		 */
 		public int lastIndexOf(Object o){
-			Iterator<ManagedReference<E>> iter = contents.iterator();
+			Iterator<ManagedReference<ManagedObject>> iter = contents.iterator();
 			ManagedReference<?> ref = null;
 			Object obj = null;
 			int index = 0;
@@ -2569,21 +2564,34 @@ implements 	ManagedObject, Serializable {
 		 */
 		public void insert(int index, E e){
 			if (index < 0){
-				throw new IndexOutOfBoundsException("Supplied index cannot be less than 0");
+				throw new IndexOutOfBoundsException(
+						"Supplied index cannot be less than 0");
 			}
 			if (e == null){
-				throw new IllegalArgumentException("Cannot insert null");
+				throw new IllegalArgumentException(
+						"Cannot insert null");
 			}
+			ManagedReference<ManagedObject> ref = createRefForAdd(e);
 			
-			ManagedReference<E> ref = null;
-			if (e instanceof ManagedObject){
-				ref = AppContext.getDataManager().createReference(e);
-			} else {
-				Element<E> element = new Element<E>(e);
-				ref = AppContext.getDataManager().createReference((E) element);
-			}
 			contents.add(index, ref);
 			size = contents.size();
+		}
+		
+		/**
+		 * Sets up the ref {@code ManagedReference} so that it
+		 * contains a serialized {@code ManagedObject}.
+		 * @param e
+		 * @return
+		 */
+		private ManagedReference<ManagedObject> createRefForAdd(E e){
+			ManagedReference<ManagedObject> ref = null;
+			if (e instanceof ManagedObject && e instanceof Serializable){
+				ref = AppContext.getDataManager().createReference((ManagedObject) e);
+			} else {
+				Element<E> element = new Element<E>(e);
+				ref = AppContext.getDataManager().createReference((ManagedObject) element);
+			}
+			return ref;
 		}
 		
 		
@@ -2596,8 +2604,8 @@ implements 	ManagedObject, Serializable {
 		 * or -1 if it does not exist in the list.
 		 */
 		public int indexOf(Object o){
-			Iterator<ManagedReference<E>> iter = contents.iterator();
-			ManagedReference<?> ref = null;
+			Iterator<ManagedReference<ManagedObject>> iter = contents.iterator();
+			ManagedReference<ManagedObject> ref = null;
 			Object obj = null;
 			int index = 0;
 			
@@ -2654,8 +2662,8 @@ implements 	ManagedObject, Serializable {
 		 * so, false otherwise.
 		 */
 		public boolean remove(Object obj){
-			Iterator<ManagedReference<E>> iter = contents.iterator();
-			ManagedReference<E> current = null;
+			Iterator<ManagedReference<ManagedObject>> iter = contents.iterator();
+			ManagedReference<ManagedObject> current = null;
 			Object object = null;
 			boolean success = false;
 			

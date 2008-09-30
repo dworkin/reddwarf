@@ -681,8 +681,8 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Object> list = new ScalableList<Object>(6, 6);
-			Object obj = new Object();
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			String obj = new String("abc");
 			
 		    list.add("A");
 		    list.add("B");
@@ -706,14 +706,15 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(
 	    new AbstractKernelRunnable() {
 		public void run() throws Exception {
-			ScalableList<Object> list = new ScalableList<Object>(6, 6);
-			Object obj = new Object();
+			ScalableList<String> list = new ScalableList<String>(6, 6);
+			String obj = new String("abc");
 			
 		    list.add("A");
 		    list.add("B");
 		    list.add(obj);
 		    
 		    assertTrue(list.remove(obj));
+		    assertEquals(-1, list.indexOf(obj));
 		}
 	    }, taskOwner);
     }
