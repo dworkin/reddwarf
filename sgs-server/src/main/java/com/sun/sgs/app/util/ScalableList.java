@@ -23,6 +23,7 @@ import java.io.Serializable;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -32,7 +33,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.util.RobTest.TreeNode;
 
 /**
  * This class represents an {@code AbstractCollection} which supports a
@@ -71,8 +71,8 @@ import com.sun.sgs.app.util.RobTest.TreeNode;
  * responsible for determining attributes of the list, like size, in roughly
  * O(1) time. As mentioned earlier, performing splits and removing unused nodes
  * can be somewhat expensive, depending on the values set for the
- * {@code branchingFactor} and {@code clusterSize}. However, it is seen that
- * the benefits provided by the partitioning of the list that enable concurrency
+ * {@code branchingFactor} and {@code bucketSize}. However, it is seen that the
+ * benefits provided by the partitioning of the list that enable concurrency
  * outweigh the performance hit for these operations.
  * <p>
  * 
@@ -82,11 +82,14 @@ import com.sun.sgs.app.util.RobTest.TreeNode;
  * destination, they will be involved in the iteration. Therefore, in the event
  * that such a modification takes place, this implementation does not guarantee
  * that the element at the specified index will be the one accessed.
+ * 
+ * @param E
+ *            the type of the elements stored in the {@code ScalableList}
  */
 public class ScalableList<E> extends AbstractCollection<E> implements
 		ManagedObject, Serializable {
 
-	public static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/**
 	 * The top node in the tree
@@ -109,7 +112,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * number of nodes. If it is not explicitly set, it defaults to a value of
 	 * 10.
 	 */
-	private int clusterSize = 10;
+	private int bucketSize = 10;
 
 	/**
 	 * The maximum number of children contained in a TreeNode<E>; this
@@ -119,16 +122,12 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	private int branchingFactor = 5;
 
 	/*
-	 *       IMPLEMENTATION
+	 * IMPLEMENTATION
 	 */
 
 	/**
-	 * Constructor which creates a {@code ScalableList} object with the
-	 * resolution action supplied as a parameter.
-	 * 
-	 * @param resolution
-	 *            Whether the {@code ScalableList} should perform resolution.
-	 *            True if so, and false otherwise.
+	 * Constructor which creates a {@code ScalableList} object with default
+	 * values for the {@code bucketSize} and {@code branchingFactor}.
 	 */
 	public ScalableList() {
 		root = null;
@@ -140,28 +139,29 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 	/**
 	 * Constructor which creates a {@code ScalableList} object with the
-	 * resolution and cluster size supplied as a parameter. The clusterSize can
-	 * be any integer larger than 0, however the {@code branchingFactor} must be
-	 * larger than 1 so that the tree can be meaningful. Otherwise, it would
-	 * only be able to grow to a maximum size of {@code clusterSize} since
-	 * branching could not introduce any additional children.
+	 * {@branchingFactor} and {@code bucketSize} supplied as a parameter. The
+	 * {@code bucketSize} can be any integer larger than 0, however the
+	 * {@code branchingFactor} must be larger than 1 so that the tree can be
+	 * meaningful. Otherwise, it would only be able to grow to a maximum size of
+	 * {@code bucketSize} since branching could not introduce any additional
+	 * children.
 	 * 
 	 * @param branchingFactor
-	 *            The number of children each node should have. A
-	 *            {@code branchingFactor} of 2 means that the list structure
-	 *            incorporates a binary tree.
-	 * @param clusterSize
-	 *            The size of each partitioned list. This value must be a
+	 *            the number of children each node should have. A
+	 *            {@code branchingFactor} of 2 means that the tree structure is
+	 *            binary.
+	 * @param bucketSize
+	 *            the size of each partitioned list. This value must be a
 	 *            positive integer (larger than 0).
 	 */
-	public ScalableList(int branchingFactor, int clusterSize) {
+	public ScalableList(int branchingFactor, int bucketSize) {
 		headRef = AppContext.getDataManager().createReference(
 				new DummyConnector<E>());
 		tailRef = AppContext.getDataManager().createReference(
 				new DummyConnector<E>());
 		root = null;
 
-		if (clusterSize < 1) {
+		if (bucketSize < 1) {
 			throw new IllegalArgumentException("Cluster size must "
 					+ "be an integer larger than 0");
 		}
@@ -169,7 +169,53 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			throw new IllegalArgumentException("Max child size must "
 					+ "be an integer larger than 1");
 		}
-		this.clusterSize = clusterSize;
+		this.bucketSize = bucketSize;
+		this.branchingFactor = branchingFactor;
+	}
+
+	/**
+	 * Constructor which creates a {@code ScalableList} object with the
+	 * {@branchingFactor}, {@code bucketSize}, and a {@code collection}
+	 * supplied as parameters. The {@code bucketSize} can be any integer larger
+	 * than 0, however the {@code branchingFactor} must be larger than 1 so that
+	 * the tree can be meaningful. Otherwise, it would only be able to grow to a
+	 * maximum size of {@code bucketSize} since branching could not introduce
+	 * any additional children. The {@code collection} represents a
+	 * {@code Collection} of elements which will be added to the newly formed
+	 * {@code ScalableList}
+	 * 
+	 * @param branchingFactor
+	 *            the number of children each node should have. A
+	 *            {@code branchingFactor} of 2 means that the tree structure is
+	 *            binary.
+	 * @param bucketSize
+	 *            the size of each partitioned list. This value must be a
+	 *            positive integer (larger than 0).
+	 * @param collection
+	 *            a collection of objects to initially populate the
+	 *            {@code ScalableList}
+	 */
+	public ScalableList(int branchingFactor, int bucketSize,
+			Collection<E> collection) {
+		headRef = AppContext.getDataManager().createReference(
+				new DummyConnector<E>());
+		tailRef = AppContext.getDataManager().createReference(
+				new DummyConnector<E>());
+		root = null;
+
+		// Ensure that the parameters are valid.
+		if (bucketSize < 1) {
+			throw new IllegalArgumentException("Cluster size must "
+					+ "be an integer larger than 0");
+		}
+		if (branchingFactor < 2) {
+			throw new IllegalArgumentException("Max child size must "
+					+ "be an integer larger than 1");
+		}
+		this.bucketSize = bucketSize;
+		this.branchingFactor = branchingFactor;
+
+		this.addAll(collection);
 	}
 
 	/**
@@ -177,11 +223,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * an {@code Object} object.
 	 * 
 	 * @param obj
-	 *            The {@code Object} to be appended to the list.
+	 *            the {@code Object} to be appended to the list
 	 */
 	public boolean add(E e) {
-		boolean result = false;
-
 		if (e == null) {
 			throw new IllegalArgumentException("Element cannot be null");
 		}
@@ -190,34 +234,17 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		if (getTail() == null) {
 			return addFirstEntry(e);
 		}
+
 		// otherwise, add it at the end since no index
 		// and propagate change to parents
-		result = getTail().append(e);
+		boolean result = getTail().append(e);
 
 		// update the tail in case it has changed.
-		if (getTail().getNext() != null) {
-			setTail(getTail().getNext());
+		if (getTail().next() != null) {
+			setTail(getTail().next());
 		}
 
 		return result;
-	}
-
-	/**
-	 * Converts the {@code Object} into an {@code Object} and prepends it to the
-	 * {@code ScalableList}. That is, the {@code Object} is added to the front
-	 * of the list.
-	 * 
-	 * @param obj
-	 *            The {@code Object} to be added to the beginning of the list.
-	 */
-	public void prepend(E e) {
-		// first item to add into the list
-		if (headRef == null || getHead() == null) {
-			addFirstEntry(e);
-			return;
-		}
-		// otherwise, add it to the beginning
-		getHead().prepend(e);
 	}
 
 	/**
@@ -226,12 +253,17 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * {@code IndexOutOfBoundsException} is thrown.
 	 * 
 	 * @param index
-	 *            The location to add the {@code Object}.
+	 *            the location to add the {@code Object}
 	 * @param obj
-	 *            The {@code Object} to add.
+	 *            the {@code Object} to add
+	 * @throws IllegalArgumentException
+	 *             if either the index is out of bounds or if the element is
+	 *             null
 	 */
 	public void add(int index, E e) {
 		isValidIndex(index);
+
+		// Check for the different boundary cases
 		if (e == null) {
 			throw new IllegalArgumentException("Element cannot be null");
 		} else if (getHead() == null && index == 0) {
@@ -253,10 +285,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * specified index.
 	 * 
 	 * @param index
-	 *            The index which to start adding the elements.
+	 *            the index which to start adding the elements
 	 * @param c
-	 *            the collection of elements to add.
-	 * @return True if the operation occurred successfully, and false otherwise.
+	 *            the collection of elements to add
+	 * @return true if the operation occurred successfully, and false otherwise
 	 */
 	public boolean addAll(int index, Collection<E> c) {
 		Iterator<E> iter = c.iterator();
@@ -280,8 +312,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 				new AsynchronousClearTask<E>(root));
 
 		// Create a new ListNode<E> and link everything to it.
-		TreeNode<E> t = new TreeNode<E>(this, null, branchingFactor,
-				clusterSize);
+		TreeNode<E> t = new TreeNode<E>(this, null, branchingFactor, bucketSize);
 		headRef = AppContext.getDataManager().createReference(
 				new DummyConnector<E>());
 		tailRef = AppContext.getDataManager().createReference(
@@ -290,12 +321,39 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	public boolean contains(Object o) {
+		return (indexOf(o) != -1);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public boolean containsAll(Collection<?> c) {
+		Iterator<?> iter = c.iterator();
+		Object object = null;
+
+		// Iterate through all elements in the collection
+		while (iter.hasNext()) {
+			object = iter.next();
+
+			// If there is at least one not found, then
+			// return false.
+			if (indexOf(object) == -1) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Locates the first index where the element is located by traversing the
 	 * list from beginning to end.
 	 * 
 	 * @param o
-	 *            The object to find in the list.
-	 * @return The first index where the element is located, or -1 if not found.
+	 *            the object to find in the list
+	 * @return the first index where the element is located, or -1 if not found
 	 */
 	public int indexOf(Object o) {
 		int listIndex = 0;
@@ -354,6 +412,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * {@code IndexOutOfBoundsException} is thrown.
 	 * 
 	 * @param index
+	 *            the index to check for validity
+	 * @throws {@code IndexOutOfBoundsException}
+	 *             if the index is out of bounds
 	 */
 	private void isValidIndex(int index) {
 		if (index < 0) {
@@ -367,8 +428,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * invalid, then an {@code IndexOutOfBoundsException} is thrown.
 	 * 
 	 * @param index
-	 *            The index of the element to remove.
-	 * @return the removed element previously at the specified index.
+	 *            the index of the element to remove
+	 * @return the removed element previously at the specified index
 	 */
 	public Object remove(int index) {
 		isValidIndex(index);
@@ -390,14 +451,15 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * removed.
 	 * 
 	 * @param n
+	 *            the {@code ListNode} which may have been removed
 	 */
 	private void relinkIfNecessary(ListNode<E> n) {
-		if (n == null || getRoot() == null) {
+		if (n == null) {
 			return;
 		}
 		// Store values before they are deleted
-		ListNode<E> next = n.getNext();
-		ListNode<E> prev = n.getPrev();
+		ListNode<E> next = n.next();
+		ListNode<E> prev = n.prev();
 
 		// Check whether we need to update the head or tail.
 		if (getHead() == null) {
@@ -523,8 +585,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * method.
 	 * 
 	 * @param index
-	 *            the index of the element to retrieve.
-	 * @return the element at the index.
+	 *            the index of the element to retrieve
+	 * @return the element at the index
 	 */
 	public E get(int index) {
 
@@ -586,7 +648,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * 
 	 * @param obj
 	 *            the {@code Object} to check for equality
-	 * @return true if the {@code Object}s are equal; false otherwise.
+	 * @return true if the {@code Object}s are equal; false otherwise
 	 */
 	public boolean equals(Object obj) {
 		if (obj == null || !(obj instanceof ScalableList)) {
@@ -602,8 +664,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * Removes the first encountered element from the list.
 	 * 
 	 * @param obj
-	 *            the element to remove from the list.
-	 * @return whether the element was removed.
+	 *            the element to remove from the list
+	 * @return whether the element was removed
 	 */
 	public boolean remove(Object obj) {
 		ScalableListNodeIterator<E> iter = new ScalableListNodeIterator<E>(
@@ -631,9 +693,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	/**
 	 * Retrieves the root {@code TreeNode} if it exists or null otherwise.
 	 * 
-	 * @return the root node, or null if it does not exist.
+	 * @return the root node, or null if it does not exist
 	 */
-	public TreeNode<E> getRoot() {
+	private TreeNode<E> getRoot() {
 		if (this.root == null) {
 			return null;
 		}
@@ -646,6 +708,27 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		return root;
 	}
 
+	/**
+	 * Obtains the child of the root node, since the root node does not get
+	 * updated unless a split/removal occurs. For most operations, returning the
+	 * child is sufficient.
+	 * 
+	 * @return
+	 */
+	private Node<E> getRootChild() {
+		if (getRoot() == null) {
+			return null;
+		}
+		return getRoot().getChild();
+	}
+
+	/**
+	 * Sets the root element of the underlying tree structure. This is necessary
+	 * during a split or remove.
+	 * 
+	 * @param newRoot
+	 *            the {@code TreeNode} which is to be the new root
+	 */
 	public void setRoot(TreeNode<E> newRoot) {
 		if (root == null) {
 			root = null;
@@ -668,14 +751,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * represent the offset of the index we are searching for.
 	 * 
 	 * @param index
-	 *            The absolute index in the entire list to search for the entry.
-	 * @return The {@code ListNode<E>} which contains the element at the
-	 *         specified {@code index}.
+	 *            the absolute index in the entire list to search for the entry
+	 * @return the {@code ListNode<E>} which contains the element at the
+	 *         specified {@code index}
 	 */
 	private ListNode<E> getNode(int index) {
 		// Recursive method to eventually return ListNode<E>
 		// containing the desired index.
-		return search(getRoot(), 0, index + 1);
+		return search(getRootChild(), 0, index + 1);
 	}
 
 	/**
@@ -683,21 +766,22 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * contains the index provided. If no ListNode<E> can be found, then null
 	 * is returned.
 	 * 
-	 * @param tn
-	 *            the node from which to start searching.
+	 * @param current
+	 *            the node from which to start searching
 	 * @param currentValue
-	 *            the current index value at the beginning of the search.
+	 *            the current index value at the beginning of this current
+	 *            search
 	 * @param destIndex
-	 *            the index which we want to reach.
-	 * @return
+	 *            the absolute index of the desired element
+	 * @return the {@code ListNode} containing the absolute {@code destIndex}
 	 */
-	private ListNode<E> search(ListObject<E> tn, int currentValue, int destIndex) {
-		if (tn == null) {
+	private ListNode<E> search(Node<E> current, int currentValue, int destIndex) {
+		if (current == null) {
 			throw new NullPointerException("Root search node cannot be null");
 		}
 
-		if (tn instanceof TreeNode) {
-			TreeNode<E> t = (TreeNode<E>) tn;
+		if (current instanceof TreeNode) {
+			TreeNode<E> t = (TreeNode<E>) current;
 
 			// iterate through siblings
 			while ((currentValue += t.size) < destIndex) {
@@ -713,11 +797,11 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			currentValue -= t.size();
 			return search(t.getChild(), currentValue, destIndex);
 
-		} else if (tn instanceof ListNode) {
-			ListNode<E> n = (ListNode<E>) tn;
+		} else if (current instanceof ListNode) {
+			ListNode<E> n = (ListNode<E>) current;
 
 			while ((currentValue += n.size()) < destIndex) {
-				n = n.getNext();
+				n = n.next();
 
 				// The specified index was too large; hence
 				// throw an IndexOutOfBoundsException
@@ -741,15 +825,19 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * Adds the object as the first entry of the list when the list is not yet
 	 * populated.
 	 * 
-	 * @param obj
-	 * @return
+	 * @param e
+	 *            the element to add as the first entry into the
+	 *            {@code ScalableList}
+	 * @return whether the operation was successful; true if so, false otherwise
 	 */
 	private boolean addFirstEntry(E e) {
 		if (e == null) {
 			throw new IllegalArgumentException("Element cannot be null");
 		}
 		TreeNode<E> t = new TreeNode<E>(this, null, branchingFactor,
-				clusterSize, e);
+				bucketSize, e);
+
+		// Link the pointers, including the ScalableList head and tail
 		DataManager dm = AppContext.getDataManager();
 		root = dm.createReference(t);
 		ListNode<E> n = (ListNode<E>) t.getChild();
@@ -759,11 +847,13 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	}
 
 	/**
-	 * Retrieves the size of the list. The size of the list is the size of the
-	 * root {@code TreeNode<E>} of the list because all of its children
-	 * represent a count of their children.
+	 * Retrieves the size of the list. The size of the list is obtained by
+	 * performing a traversal of the root's children and adding each of their
+	 * sizes. For very large lists, this process can be somewhat expensive as it
+	 * does not occur in constant-time, but rather in a logarithmic time
+	 * proportional to the {@code branchingFactor}.
 	 * 
-	 * @return the number of elements of the list.
+	 * @return the number of elements in the list
 	 */
 	public int size() {
 		// This gives us a reference to the one and only
@@ -771,35 +861,72 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		// It should be noted that this object is not the
 		// same as the headTreeNodeRef, which returns the
 		// first child of the root.
+		Node<E> current = getRootChild();
 		int size = 0;
-		if (getRoot() != null) {
-			size = getRoot().size();
+
+		// Iterate through the first level of the tree to get
+		// the sizes of each node.
+		while (current != null) {
+			if (current instanceof TreeNode) {
+				size += ((TreeNode<E>) current).size();
+				current = ((TreeNode<E>) current).next();
+			} else {
+				size += ((ListNode<E>) current).size();
+				current = ((ListNode<E>) current).next();
+			}
 		}
 		return size;
 	}
 
 	/*
-	 * //////////////////////////////// INLINE CLASSES
-	 * ///////////////////////////////
+	 * INLINE CLASSES
 	 */
 
+	/**
+	 * The {@code DummyConnector} class is used as a junction point for two
+	 * {@code ManagedReference}s so that changes to the second
+	 * {@code ManagedReference} need not affect the top structure. The class is
+	 * fairly simple, only containing methods which enable the value to be
+	 * easily set and retrieved.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
+	 */
 	static class DummyConnector<E> implements ManagedObject, Serializable {
 
-		public static final long serialVersionUID = 3L;
+		private static final long serialVersionUID = 3L;
 
-		private ManagedReference<ListObject<E>> ref = null;
+		/**
+		 * The pointer to the object.
+		 */
+		private ManagedReference<Node<E>> ref = null;
 
+		/**
+		 * Default no-argument constructor.
+		 */
 		public DummyConnector() {
 			ref = null;
 		}
 
-		public DummyConnector(ListObject<E> nextRef) {
-			if (nextRef != null) {
-				ref = AppContext.getDataManager().createReference(nextRef);
+		/**
+		 * Constructor which accepts the object
+		 * 
+		 * @param reference
+		 *            the element which this object is to point to
+		 */
+		public DummyConnector(Node<E> reference) {
+			if (reference != null) {
+				ref = AppContext.getDataManager().createReference(reference);
 			}
 		}
 
-		public void setRef(ListObject<E> newRef) {
+		/**
+		 * Sets the reference for this object.
+		 * 
+		 * @param newRef
+		 *            the intended new reference
+		 */
+		public void setRef(Node<E> newRef) {
 			if (newRef != null) {
 				ref = AppContext.getDataManager().createReference(newRef);
 			} else {
@@ -807,6 +934,12 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			}
 		}
 
+		/**
+		 * Retrieves the reference as a {@code ListNode}.
+		 * 
+		 * @return the reference as a {@code ListNode}, or null if it does not
+		 *         exist
+		 */
 		public ListNode<E> getRefAsListNode() {
 			if (ref == null) {
 				return null;
@@ -816,17 +949,19 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	}
 
 	/**
-	 * An object which organizes the {@code ListNode<E>}s in a tree structure.
-	 * Each {@code TreeNode<E>} has a reference to either one
+	 * An object which forms a tree above the {@code ListNode<E>} linked list.
+	 * Each {@code TreeNode<E>} has a {@code child} reference to either one
 	 * {@code TreeNode<E>} or a {@code ListNode<E>}. The {@code TreeNode<E>}
 	 * also has a reference to its sibling and its parent.
 	 * <p>
 	 * 
 	 * The {@code TreeNode<E>} is intended to only track the size of its
-	 * children and
+	 * descendant children and the number of children that it owns.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
-	static class TreeNode<E> implements ManagedObject, Serializable,
-			ListObject<E> {
+	static class TreeNode<E> implements ManagedObject, Serializable, Node<E> {
 
 		// Public fields referenced during propagation
 		public static final byte DECREMENT_SIZE = 0;
@@ -835,22 +970,41 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		public static final byte DECREMENT_NUM_CHILDREN = 3;
 		public static final byte DECREMENT_CHILDREN_AND_SIZE = 4;
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 1L;
 
 		// References to neighboring elements
 		private ManagedReference<TreeNode<E>> nextRef;
 		private ManagedReference<TreeNode<E>> prevRef;
-		private ManagedReference<ListObject<E>> childRef;
-		private ManagedReference<ListObject<E>> tailRef;
+		private ManagedReference<Node<E>> childRef;
+		private ManagedReference<Node<E>> tailRef;
 		private ManagedReference<TreeNode<E>> parentRef;
 		private ManagedReference<ScalableList<E>> owner;
 
-		private int MAX_NUMBER_CHILDREN = 5;
-		private int CLUSTER_SIZE = 0;
+		// Propagated values
+		/**
+		 * The maximum number of children this node can contain
+		 */
+		private int BRANCHING_FACTOR = 5;
 
+		/**
+		 * The maximum number of elements which the underlying {@code ListNode}
+		 * can store
+		 */
+		private int BUCKET_SIZE = 0;
+
+		/**
+		 * The number of elements that exist as descendants of this node
+		 */
 		private int size = 0;
+
+		/**
+		 * The number of immediate children
+		 */
 		private int childrenCount = 0;
 
+		/**
+		 * Constructor which does not link any references.
+		 */
 		public TreeNode() {
 			size = 0;
 			nextRef = null;
@@ -860,37 +1014,51 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 		/**
 		 * Constructor which is called on a split. This is used to create a new
-		 * sibling and accepts a TreeNode<E> argument which represents the new
+		 * sibling and accepts a TreeNode argument which represents the new
 		 * child it is to possess.
 		 * 
+		 * @param list
+		 *            the {@code ScalableList} which owns this node
 		 * @param parent
-		 * @param maxNumChildren
-		 * @param clusterSize
+		 *            the intended parent
+		 * @param branchingFactor
+		 *            the maximum number of children
+		 * @param bucketSize
+		 *            the maximum number of elements which can be stored by the
+		 *            underlying {@code ListNode}
 		 * @param child
+		 *            the element to add as a descendant to this node
+		 * @param numberChildren
+		 *            the current number of children
+		 * @param size
+		 *            the current number of descendant elements
 		 */
 		private TreeNode(ScalableList<E> list, TreeNode<E> parent,
-				int maxNumChildren, int clusterSize, ListNode<E> child,
+				int branchingFactor, int bucketSize, ListNode<E> child,
 				int numberChildren, int size) {
-			if (maxNumChildren < 0) {
+
+			if (branchingFactor < 0) {
 				throw new IllegalArgumentException(
 						"Maximum children parameter should "
 								+ "not be less than 0");
 			}
-			MAX_NUMBER_CHILDREN = maxNumChildren;
+			BRANCHING_FACTOR = branchingFactor;
 			nextRef = null;
-			this.CLUSTER_SIZE = clusterSize;
+			this.BUCKET_SIZE = bucketSize;
 
+			// Set up links
 			DataManager dm = AppContext.getDataManager();
 			if (child != null) {
-				childRef = dm.createReference((ListObject<E>) child);
+				childRef = dm.createReference((Node<E>) child);
 
 				// The tail element is the last linked node in the list
 				ListNode<E> n = (ListNode<E>) childRef.get();
-				while (n.getNext() != null) {
-					n = (ListNode<E>) n.getNext();
+				while (n.next() != null) {
+					n = (ListNode<E>) n.next();
 				}
-				tailRef = dm.createReference((ListObject<E>) n);
+				tailRef = dm.createReference((Node<E>) n);
 			}
+
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			}
@@ -901,115 +1069,160 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 		/**
 		 * Constructor which is called on a split. This is used to create a new
-		 * sibling and accepts a TreeNode<E> argument which represents the new
+		 * sibling and accepts a TreeNode argument which represents the new
 		 * child it is to possess.
 		 * 
+		 * @param list
+		 *            a reference to the owning {@code ScalableList}
 		 * @param parent
-		 * @param maxNumChildren
-		 * @param clusterSize
+		 *            the intended parent
+		 * @param branchingFactor
+		 *            the branching factor of the node
+		 * @param bucketSize
+		 *            the maximum size of the underlying {@code ListNode}
 		 * @param child
+		 *            the child to be added underneath the new {@code TreeNode}
+		 * @param numberChildren
+		 *            the total number of children that will exist once the
+		 *            {@code TreeNode} is instantiated. This is based on the
+		 *            nature of the linked list of {@code ListNodes} attached to
+		 *            the {@code child}.
+		 * @param size
+		 *            the total number of elements that will exist under the
+		 *            {@code TreeNode}, based on the elements that already
+		 *            exist among the {@code child} and its siblings.
 		 */
 		private TreeNode(ScalableList<E> list, TreeNode<E> parent,
-				int maxNumChildren, int clusterSize, ListObject<E> child,
+				int branchingFactor, int bucketSize, Node<E> child,
 				int numberChildren, int size) {
-			if (maxNumChildren < 0) {
+
+			if (branchingFactor < 0) {
 				throw new IllegalArgumentException(
 						"Maximum children parameter should "
 								+ "not be less than 0");
 			}
-			MAX_NUMBER_CHILDREN = maxNumChildren;
+			BRANCHING_FACTOR = branchingFactor;
 			nextRef = null;
-			this.CLUSTER_SIZE = clusterSize;
+			this.BUCKET_SIZE = bucketSize;
 
+			// Set up links
 			DataManager dm = AppContext.getDataManager();
 			if (child != null) {
-				childRef = dm.createReference((ListObject<E>) child);
+				childRef = dm.createReference((Node<E>) child);
 
 				// The tail element is the last linked node in the list
 				TreeNode<E> n = (TreeNode<E>) getChild();
 				while (n.next() != null) {
 					n = (TreeNode<E>) n.next();
 				}
-				tailRef = dm.createReference((ListObject<E>) n);
+				tailRef = dm.createReference((Node<E>) n);
 			}
+
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			}
+
 			childrenCount = numberChildren;
 			this.size = size;
 			owner = AppContext.getDataManager().createReference(list);
 		}
 
 		/**
-		 * Create a new TreeNode<E> on account of a new leaf ({@code ListNode<E>})
+		 * Create a new TreeNode on account of a new leaf ({@code ListNode})
 		 * being created.
 		 * 
+		 * @param list
+		 *            the {@code ScalableList} which is the owner of this
+		 *            structure
 		 * @param parent
-		 * @param maxNumChildren
-		 * @param clusterSize
-		 * @param obj
+		 *            the intended parent
+		 * @param branchingFactor
+		 *            the maximum number of children of this node
+		 * @param bucketSize
+		 *            the maximum size of the underlying {@code ListNode}
+		 * @param e
+		 *            an element to add into the empty {@code ListNode}
 		 */
 		public TreeNode(ScalableList<E> list, TreeNode<E> parent,
-				int maxNumChildren, int clusterSize, E e) {
-			if (maxNumChildren < 0) {
+				int branchingFactor, int bucketSize, E e) {
+			if (branchingFactor < 0) {
 				throw new IllegalArgumentException(
 						"Maximum children parameter should "
 								+ "not be less than 0");
 			}
+
 			if (e == null) {
 				throw new NullPointerException(
 						"Argument suppled to List is null");
 			}
-			MAX_NUMBER_CHILDREN = maxNumChildren;
+
+			BRANCHING_FACTOR = branchingFactor;
 			nextRef = null;
-			this.CLUSTER_SIZE = clusterSize;
-			ListNode<E> n = new ListNode<E>(this, clusterSize, e);
+			this.BUCKET_SIZE = bucketSize;
+			ListNode<E> n = new ListNode<E>(this, bucketSize, e);
 			size = n.size();
 			childrenCount = 1;
 			DataManager dm = AppContext.getDataManager();
-			childRef = dm.createReference((ListObject<E>) n);
+			childRef = dm.createReference((Node<E>) n);
+
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			} else {
 				parentRef = null;
 			}
-			tailRef = dm.createReference((ListObject<E>) n);
+
+			tailRef = dm.createReference((Node<E>) n);
 			owner = AppContext.getDataManager().createReference(list);
 		}
 
+		/**
+		 * Constructor which creates a {@code TreeNode} while specifying
+		 * parameters for the node characteristics
+		 * 
+		 * @param list
+		 *            the {@code ScalableList} owner of this structure
+		 * @param parent
+		 *            the intended parent
+		 * @param branchingFactor
+		 *            the maximum number of children
+		 * @param bucketSize
+		 *            the maximum number of elements for the underlying
+		 *            {@code ListNode}
+		 */
 		public TreeNode(ScalableList<E> list, TreeNode<E> parent,
-				int maxNumChildren, int clusterSize) {
-			if (maxNumChildren < 0) {
+				int branchingFactor, int bucketSize) {
+
+			if (branchingFactor < 0) {
 				throw new IllegalArgumentException(
 						"Maximum children parameter should "
 								+ "not be less than 0");
 			}
-			MAX_NUMBER_CHILDREN = maxNumChildren;
+
+			BRANCHING_FACTOR = branchingFactor;
 			nextRef = null;
-			this.CLUSTER_SIZE = clusterSize;
-			ListNode<E> n = new ListNode<E>(this, clusterSize);
+			this.BUCKET_SIZE = bucketSize;
+			ListNode<E> n = new ListNode<E>(this, bucketSize);
 			size = n.size();
 			DataManager dm = AppContext.getDataManager();
-			childRef = dm.createReference((ListObject<E>) n);
+			childRef = dm.createReference((Node<E>) n);
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			}
-			tailRef = dm.createReference((ListObject<E>) n);
+			tailRef = dm.createReference((Node<E>) n);
 			owner = AppContext.getDataManager().createReference(list);
 		}
 
-		public void setHead(ListNode<E> ref) {
-			if (ref != null) {
-				childRef = AppContext.getDataManager().createReference(
-						(ListObject<E>) ref);
-			}
-		}
-
+		/**
+		 * Obtains the previous sibling to the current {@code TreeNode}
+		 * 
+		 * @return the previous sibling, or null if none exist
+		 */
 		public TreeNode<E> prev() {
 			TreeNode<E> prev;
 			if (prevRef == null) {
 				return null;
 			}
+
 			try {
 				prev = prevRef.get();
 			} catch (ObjectNotFoundException onfe) {
@@ -1018,17 +1231,29 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			return prev;
 		}
 
+		/**
+		 * Sets the previous sibling to the parameter provided
+		 * 
+		 * @param ref
+		 *            the intended previous sibling
+		 */
 		public void setPrev(TreeNode<E> ref) {
 			if (ref != null) {
 				prevRef = AppContext.getDataManager().createReference(ref);
 			}
 		}
 
+		/**
+		 * Obtains the next sibling of the current {@code TreeNode}
+		 * 
+		 * @return the next sibling, or null if none exist
+		 */
 		public TreeNode<E> next() {
 			TreeNode<E> next;
 			if (nextRef == null) {
 				return null;
 			}
+
 			try {
 				next = nextRef.get();
 			} catch (ObjectNotFoundException onfe) {
@@ -1037,8 +1262,18 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			return next;
 		}
 
-		public ListObject<E> getChild() {
-			ListObject<E> child;
+		/**
+		 * Obtains the child of the current node. The child represents the head
+		 * of the list of children. The {@code TreeNode} does not have
+		 * references to all the children, so it uses knowledge of the head to
+		 * iterate through them.
+		 * 
+		 * @return the child, which can be either a {@code TreeNode} or
+		 *         {@code ListNode}, depending on the position of the current
+		 *         node in the tree.
+		 */
+		public Node<E> getChild() {
+			Node<E> child;
 			if (childRef == null) {
 				return null;
 			}
@@ -1050,7 +1285,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			return child;
 		}
 
-		public void setChild(ListObject<E> child) {
+		/**
+		 * Sets the child to be the supplied parameter as long as it is not
+		 * null.
+		 * 
+		 * @param child
+		 *            the new child
+		 */
+		public void setChild(Node<E> child) {
 			if (child != null) {
 				childRef = AppContext.getDataManager().createReference(child);
 			}
@@ -1067,8 +1309,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Sets the tail of the list to point to the supplied parameter.
 		 * 
 		 * @param ref
+		 *            the new tail
 		 */
-		public void setTail(ListObject<E> ref) {
+		public void setTail(Node<E> ref) {
 			if (ref != null) {
 				tailRef = AppContext.getDataManager().createReference(ref);
 			}
@@ -1078,10 +1321,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Retrieves the tail element of the list, which is a {@code ListNode}
 		 * element.
 		 * 
-		 * @return the tail element, or null if none exists.
+		 * @return the tail element, or null if none exists
 		 */
-		public ListObject<E> getTail() {
-			ListObject<E> tail;
+		public Node<E> getTail() {
+			Node<E> tail;
 			if (tailRef == null) {
 				return null;
 			}
@@ -1163,10 +1406,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		}
 
 		/**
-		 * Sets the next element in the linked list
+		 * Sets the next element in the linked list.
 		 * 
 		 * @param t
-		 *            the next element to link.
+		 *            the next element to link
 		 */
 		public void setNext(TreeNode<E> t) {
 			if (t != null) {
@@ -1177,7 +1420,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		/**
 		 * Unlinks itself from the tree without performing a recursive deletion.
 		 * 
-		 * @return
+		 * @return itself, after being unlinked
 		 */
 		public TreeNode<E> remove() {
 
@@ -1200,11 +1443,12 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 		/**
 		 * Determines where to split a list of children based on the list size.
+		 * By default, this is set to {@code numberOfChildren}/2.
 		 * 
 		 * @param numberOfChildren
 		 *            the number of children to split
 		 * @return the index corresponding to the location where to split the
-		 *         linked list.
+		 *         linked list
 		 */
 		private int calculateSplitSize(int numberOfChildren) {
 			return Math.round(numberOfChildren / 2);
@@ -1214,15 +1458,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * This method walks up the tree and performs any {@code TreeNode<E>}
 		 * splits if the children sizes have been exceeded.
 		 */
-		public boolean performSplitIfNecessary() {
-			boolean generatedNewParent = false;
+		public void performSplitIfNecessary() {
 			TreeNode<E> newNode = null;
-			ListObject<E> tmp = (ListObject<E>) this.getChild();
+			Node<E> tmp = (Node<E>) this.getChild();
 
 			// Check if we need to split, and if so, do it based
 			// on the type of element contained (ListNode<E> or TreeNode<E>)
-			if (childrenCount > MAX_NUMBER_CHILDREN) {
-				generatedNewParent = generateParentIfNecessary(this);
+			if (childrenCount > BRANCHING_FACTOR) {
+				generateParentIfNecessary(this);
 
 				// Perform split by creating and linking new sibling
 				newNode = createAndLinkSibling(tmp, childrenCount);
@@ -1251,7 +1494,6 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			if (getParent() == null) {
 				owner.get().setRoot(this);
 			}
-			return generatedNewParent;
 		}
 
 		/**
@@ -1261,18 +1503,15 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * 
 		 * @param child
 		 *            the {@code ManagedObject} which needs to be split and
-		 *            placed under a new parent.
-		 * @param prev
-		 *            the element previous to the current element
-		 * @param halfway
-		 *            a value representing an index approximately half the
-		 *            length of the contents
+		 *            placed under a new parent
+		 * @param numberOfChildren
+		 *            the number of children which the new sibling will parent
 		 * @return the {@TreeNode<E>} that not represents a sibling which is
 		 *         connected to the tree
 		 */
-		private TreeNode<E> createAndLinkSibling(ListObject<E> child,
+		private TreeNode<E> createAndLinkSibling(Node<E> child,
 				int numberOfChildren) {
-			ListObject<E> prev = null;
+			Node<E> prev = null;
 			TreeNode<E> newNode = null;
 			int halfway = calculateSplitSize(numberOfChildren);
 			int size = this.size;
@@ -1286,19 +1525,20 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 				// Get the approximate middle element
 				for (int i = 0; i < halfway; i++) {
 					listNodePrev = listNodeChild;
-					listNodeChild = listNodeChild.getNext();
+					listNodeChild = listNodeChild.next();
 					size -= listNodePrev.size();
 				}
 
+				// Create the new sibling
 				newNode = new TreeNode<E>(owner.get(), this.getParent(),
-						MAX_NUMBER_CHILDREN, CLUSTER_SIZE, listNodeChild,
+						BRANCHING_FACTOR, BUCKET_SIZE, listNodeChild,
 						numberOfChildren - halfway, size);
 
 				// Update parent references to new node for
 				// all subsequent nodes
 				listNodeChild.setParent(newNode);
-				while (listNodeChild.getNext() != null) {
-					listNodeChild = listNodeChild.getNext();
+				while (listNodeChild.next() != null) {
+					listNodeChild = listNodeChild.next();
 					listNodeChild.setParent(newNode);
 				}
 
@@ -1312,8 +1552,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 					treeNodeChild = treeNodeChild.next();
 					size -= treeNodePrev.size();
 				}
+
+				// Create the new sibling
 				newNode = new TreeNode<E>(owner.get(), this.getParent(),
-						MAX_NUMBER_CHILDREN, CLUSTER_SIZE, treeNodeChild,
+						BRANCHING_FACTOR, BUCKET_SIZE, treeNodeChild,
 						numberOfChildren - halfway, size);
 
 				// Update parent references to new node
@@ -1326,7 +1568,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			} else {
 				throw new IllegalStateException(
 						"Attempting to split a node that is neither "
-								+ "a TreeNode<E> or ListNode<E>");
+								+ "a TreeNode nor a ListNode");
 			}
 			this.size -= size;
 			this.setTail(prev);
@@ -1335,8 +1577,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			// guaranteed to have a parent because we
 			// either updated its size already or created
 			// a new one above.
-			getParent().propagateChanges(getParent(),
-					TreeNode.INCREMENT_NUM_CHILDREN);
+			getParent().propagateChanges(TreeNode.INCREMENT_NUM_CHILDREN);
 
 			return newNode;
 		}
@@ -1350,16 +1591,18 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * 
 		 * @param t
 		 *            the {@code TreeNode<E>} to check whether it requires a
-		 *            parent.
+		 *            parent
 		 */
 		private boolean generateParentIfNecessary(TreeNode<E> t) {
 			boolean result = false;
 
 			// If this is the currently existing root, make a new one
 			// and set the supplied node as the child
-			if (t.prev() == null) {
+			if (t.getParent() == null) {
 				TreeNode<E> grandparent = new TreeNode<E>(owner.get(), null,
-						MAX_NUMBER_CHILDREN, CLUSTER_SIZE, t, 1, t.size());
+						BRANCHING_FACTOR, BUCKET_SIZE, t, 1, t.size());
+
+				// Link the node to its new parent
 				t.setParent(grandparent);
 
 				// The list's pointer to the parent will be
@@ -1369,6 +1612,12 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			return result;
 		}
 
+		/**
+		 * Sets the parent for the node.
+		 * 
+		 * @param parent
+		 *            the intended parent
+		 */
 		public void setParent(TreeNode<E> parent) {
 			if (parent != null) {
 				parentRef = AppContext.getDataManager().createReference(parent);
@@ -1376,16 +1625,18 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		}
 
 		/**
-		 * Removes itself from the data store and recursively removes its
+		 * Removes itself from the Data Store and recursively removes its
 		 * children.
 		 */
 		public void clear() {
 			DataManager dm = AppContext.getDataManager();
 
+			// Determine what kind of child it is: TreeNode or ListNode
 			if (getChild() != null && getChild() instanceof TreeNode) {
 				TreeNode<E> current = (TreeNode<E>) getChild();
 				TreeNode<E> next = current.next();
 
+				// For each of its children, call the clear() method
 				while (current != null) {
 					current.clear();
 					dm.removeObject(current);
@@ -1395,18 +1646,19 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 			} else if (getChild() != null && getChild() instanceof ListNode) {
 				ListNode<E> current = (ListNode<E>) getChild();
-				ListNode<E> next = current.getNext();
+				ListNode<E> next = current.next();
 
+				// For each node, call the clear() method
 				while (current != null) {
 					current.clear();
 					dm.removeObject(current);
 					current = next;
-					next = next.getNext();
+					next = next.next();
 				}
 
 			}
 
-			// unlink and self destruct
+			// unlink and self-destruct
 			dm.removeObject(this);
 		}
 
@@ -1414,61 +1666,81 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Propagates changes in the form of either an increment or decrement to
 		 * the parents of the tree.
 		 * 
-		 * @param current
 		 * @param mode
+		 *            the type of propagation which is to occur, specified by
+		 *            static {@code TreeNode} fields
+		 * @throws IllegalArgumentException
+		 *             when the mode is not recognized
 		 */
-		public void propagateChanges(TreeNode<E> current, byte mode) {
-			// No need to propagate changes if
-			// this is the root node.
-			if (current == null) {
+		public void propagateChanges(byte mode) {
+
+			// No need to make any updates if this is
+			// the root node.
+			if (this.equals(this.owner.get().getRoot())) {
 				return;
 			}
 
+			// Otherwise, make the change, depending on the mode
 			switch (mode) {
+				// Increment the size
 				case TreeNode.INCREMENT_SIZE:
 					this.increment();
 					if (getParent() != null) {
-						getParent().propagateChanges(getParent(), mode);
+						getParent().propagateChanges(mode);
 					}
 					break;
+
+				// Decrements the size and prepares for removal
+				// if necessary
 				case TreeNode.DECREMENT_SIZE:
 					this.decrement();
 					if (size() == 0) {
 						if (getParent() != null) {
-							getParent().propagateChanges(getParent(),
+							getParent().propagateChanges(
 									TreeNode.DECREMENT_CHILDREN_AND_SIZE);
 							break;
 						}
 					}
 					if (getParent() != null) {
-						getParent().propagateChanges(getParent(), mode);
+						getParent().propagateChanges(mode);
 					}
 					break;
+
+				// Increments the number of children. This does not
+				// need to propagate; split() performs the
+				// propagation while this method is called to
+				// update the parent nodes in the process.
 				case TreeNode.INCREMENT_NUM_CHILDREN:
 					this.incrementNumChildren();
 					break;
+
+				// Decrements the child size. If the node is
+				// empty, then it removes itself and
+				// propagates further.
 				case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
 					this.decrement();
 					this.decrementNumChildren();
 
+					// remove this from the tree if empty; otherwise
+					// propagate decrementing of the size
 					if (size() == 0) {
-						// remove this from the tree
-						TreeNode<E> parent = getParent();
 						remove();
 
 						// since we are removing a TreeNode<E>,
 						// check if parent needs to be removed
 						// as well.
 						if (getParent() != null) {
-							getParent().propagateChanges(parent, mode);
+							getParent().propagateChanges(mode);
 						}
 					} else {
 						if (getParent() != null) {
-							getParent().propagateChanges(getParent(),
+							getParent().propagateChanges(
 									TreeNode.DECREMENT_SIZE);
 						}
 					}
 					break;
+
+				// If the mode was not recognized, throw an exception
 				default:
 					throw new IllegalArgumentException(
 							"Supplied mode argument is not recognized; "
@@ -1479,27 +1751,48 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	}
 
 	/**
-	 * A task which iterates through the tree and removes all children. This
-	 * task is instantiated when a clear() command is issed from the
-	 * {@code ScalableList}.
+	 * An asynchronous task which iterates through the tree and removes all
+	 * children. This task is instantiated when a clear() command is issued from
+	 * the {@code ScalableList}. The success of this operation is dependent on
+	 * implemented {@code clear()} methods on each of the underlying components.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
 	private static class AsynchronousClearTask<E> implements Serializable,
 			Task, ManagedObject {
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 4L;
 
+		/**
+		 * A reference to the current {@code TreeNode} whose children are being
+		 * deleted
+		 */
 		private ManagedReference<TreeNode<E>> current;
+
+		/**
+		 * A reference to the next sibling element
+		 */
 		private ManagedReference<TreeNode<E>> next;
 
-		public AsynchronousClearTask(ManagedReference<TreeNode<E>> head) {
-			if (head != null) {
+		/**
+		 * Constructor for the asynchronous task
+		 * 
+		 * @param root
+		 *            the root node of the entire tree structure
+		 */
+		public AsynchronousClearTask(ManagedReference<TreeNode<E>> root) {
+			if (root != null) {
 				current = AppContext.getDataManager().createReference(
-						head.get());
+						root.get());
 			} else {
 				current = null;
 			}
 		}
 
+		/**
+		 * The entry point of the task.
+		 */
 		public void run() {
 			DataManager dm = AppContext.getDataManager();
 			if (current == null) {
@@ -1528,21 +1821,47 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * using a ManagedReference, rather than the actual object itself. This
 	 * makes managing sublists less intensive as each reference to an underlying
 	 * entity is a fixed size.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
 	static class Element<E> implements Serializable, ManagedObject {
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 5L;
 
+		/**
+		 * The stored value which is not a {@code ManagedObject}. If it were a
+		 * {@code ManagedObject}, then it would not need to be enveloped by an
+		 * {@code Element} wrapper.
+		 */
 		private E value;
 
+		/**
+		 * Constructor for creating an {@code Element}.
+		 * 
+		 * @param e
+		 *            the element to store within the {@code Element}
+		 *            {@code ManagedObject}
+		 */
 		public Element(E e) {
 			value = e;
 		}
 
+		/**
+		 * Retrieves the element.
+		 * 
+		 * @return the element stored by this object
+		 */
 		public E getValue() {
 			return value;
 		}
 
+		/**
+		 * Sets the value of the element
+		 * 
+		 * @param e
+		 *            the new value to set
+		 */
 		public void setValue(E e) {
 			value = e;
 		}
@@ -1555,17 +1874,37 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * operation is called so that the index of the item in the
 	 * {@code SubList<E>} maps to the absolute index provided by the
 	 * {@code ScalableList}
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
 	static class Offset implements Serializable, ManagedObject {
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 6L;
 
+		/**
+		 * The value representing the relative offset for the {@code SubList}
+		 * object. When an absolute index value is searched for, the offset is
+		 * the difference between the absolute index and the starting index of
+		 * the element's containing {@code ListNode}.
+		 */
 		private int offset = -1;
 
+		/**
+		 * Sets the offset to the supplied value.
+		 * 
+		 * @param offset
+		 *            the new offset
+		 */
 		public void set(int offset) {
 			this.offset = offset;
 		}
 
+		/**
+		 * Retrieves the stored offset
+		 * 
+		 * @return the current offset
+		 */
 		public int get() {
 			return offset;
 		}
@@ -1573,18 +1912,35 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 	/**
 	 * This iterator walks through the {@code ListNode<E>}s which parent the
-	 * {@code SubList<E>}s. An iterator for this type of element is necessary
-	 * to support the other element iterator as well as {@code indexOf()}
+	 * {@code SubList}s. An iterator for this type of element is necessary to
+	 * support the other element iterator as well as {@code indexOf()}
 	 * operations.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
 	static class ScalableListNodeIterator<E> implements Serializable,
 			Iterator<ListNode<E>> {
 
+		/**
+		 * The current position of the iterator
+		 */
 		private ListNode<E> current;
+
+		/**
+		 * The head of the iterator which represents the starting location of
+		 * the iteration process
+		 */
 		private ListNode<E> head;
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 7L;
 
+		/**
+		 * Constructor to create a new iterator.
+		 * 
+		 * @param head
+		 *            the head {@code ListNode} from which to begin iterating
+		 */
 		public ScalableListNodeIterator(ListNode<E> head) {
 			current = null;
 			this.head = head;
@@ -1609,8 +1965,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			} else {
 
 				// Setup the next element if it exists
-				if (current.getNext() != null) {
-					current = current.getNext();
+				if (current.next() != null) {
+					current = current.next();
 				} else {
 					return false;
 				}
@@ -1620,6 +1976,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 		/**
 		 * Returns the next {@code ListNode<E>} in order from the list
+		 * 
+		 * @return the next {@code ListNode}
+		 * @throws NoSuchElementException
+		 *             if there exists no next sibling
 		 */
 		public ListNode<E> next() {
 			if (current == null) {
@@ -1629,6 +1989,12 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			return current;
 		}
 
+		/**
+		 * {@inheritDoc}
+		 * 
+		 * @deprecated this operation is not supported. Removal of elements
+		 *             should be performed using the {@code ScalableList} API.
+		 */
 		public void remove() {
 			throw new UnsupportedOperationException(
 					"This method is not supported");
@@ -1637,23 +2003,42 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 	/**
 	 * This class represents an iterator of the contents of the list.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
 	static class ScalableListIterator<E> implements Serializable, Iterator<E> {
 
+		/**
+		 * The current {@code ListNode} of the iterative process
+		 */
 		private ListNode<E> currentNode;
+
+		/**
+		 * The iterator responsible for iterating through the {@code ListNodes}
+		 */
 		private ScalableListNodeIterator<E> listNodeIter;
+
+		/**
+		 * The iterator responsible for iterating through the stored elements of
+		 * the {@code ScalableList}
+		 */
 		private Iterator<ManagedReference<ManagedObject>> iter;
 
+		/**
+		 * The value for the current {@code ListNode} to determine if any
+		 * changes have taken place since the last time it was accessed
+		 */
 		private long listNodeReferenceValue = -1;
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 8L;
 
 		/**
 		 * Constructor used to create a {@code ScalableListIterator} for the
 		 * underlying elements in the {@code ScalableList}.
 		 * 
 		 * @param head
-		 *            the head {@code ListNode} of the collection.
+		 *            the head {@code ListNode} of the collection
 		 */
 		public ScalableListIterator(ListNode<E> head) {
 			listNodeIter = new ScalableListNodeIterator<E>(head);
@@ -1669,6 +2054,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			// Prepare by getting first ListNode
 			if (listNodeIter.hasNext()) {
 				currentNode = (ListNode<E>) listNodeIter.next();
+				listNodeReferenceValue = currentNode.getDataIntegrityValue();
 			} else {
 				currentNode = null;
 			}
@@ -1685,11 +2071,22 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		}
 
 		/**
-		 * {@inheritDoc}}
+		 * {@inheritDoc}
+		 * 
+		 * @throws ConcurrentModificationException
+		 *             if the {@code ListNode} that the iterator is pointing to
+		 *             has been modified to (addition or removal) by someone
+		 *             else.
 		 */
 		public E next() {
 
-			listNodeReferenceValue = System.nanoTime();
+			// Check the integrity of the ListNode to see if
+			// any changes were made since we last operated.
+			// Throw a ConcurrentModificationException if so.
+			if (currentNode.getDataIntegrityValue() != listNodeReferenceValue) {
+				throw new ConcurrentModificationException(
+						"The ListNode has been modified.");
+			}
 
 			// Retrieve the value from the list
 			ManagedReference<E> ref = ((ManagedReference<E>) iter.next());
@@ -1711,10 +2108,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * {@inheritDoc}
 		 */
 		public boolean hasNext() {
+
 			// If there is an element in the iterator still,
 			// then simply return true since it will be the
 			// next element to be returned.
 			if (iter.hasNext()) {
+				// Check the current integrity ListNode value
+				listNodeReferenceValue = currentNode.getDataIntegrityValue();
+
 				return true;
 			}
 
@@ -1730,7 +2131,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 		/**
 		 * @deprecated This operation is not officially supported. Removal of
-		 *             nodes is achieved by the ScalableList API.
+		 *             nodes is achieved by the {@code ScalableList} API.
 		 */
 		public void remove() {
 			throw new UnsupportedOperationException(
@@ -1743,9 +2144,13 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * as the leaf nodes of the tree and contain references to a portion of the
 	 * list. A {@code ListNode}'s parent is always a {@code TreeNode} since
 	 * they are the deepest organizational element of the {@code ScalableList}.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
-	static class ListNode<E> implements ManagedObject, Serializable,
-			ListObject<E> {
+	static class ListNode<E> implements ManagedObject, Serializable, Node<E> {
+
+		private static final int DATA_INTEGRITY_STARTING_VALUE = Integer.MIN_VALUE;
 
 		// References to neighbors
 		private ManagedReference<SubList<E>> subListRef;
@@ -1753,11 +2158,17 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		private ManagedReference<ListNode<E>> prevRef;
 		private ManagedReference<TreeNode<E>> parentRef;
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 9L;
 
-		private long dataIntegrityVal;
+		/**
+		 * A value which increments when changes are made to the node. This is
+		 * used by iterators to deal with concurrent modifications
+		 */
+		private int dataIntegrityVal;
 
-		// The number of elements contained in the SubList.
+		/**
+		 * The number of elements contained in the SubList.
+		 */
 		private int count;
 
 		/**
@@ -1768,7 +2179,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * @param parent
 		 *            the intended parent
 		 * @param maxSize
-		 *            the maximum number of elements that can be stored.
+		 *            the maximum number of elements that can be stored
 		 */
 		public ListNode(TreeNode<E> parent, int maxSize) {
 			SubList<E> sublist = new SubList<E>(maxSize);
@@ -1777,7 +2188,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			subListRef = dm.createReference(sublist);
 			nextRef = null;
 			prevRef = null;
-			dataIntegrityVal = System.nanoTime();
+			dataIntegrityVal = DATA_INTEGRITY_STARTING_VALUE;
+
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			}
@@ -1789,10 +2201,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * splitting.
 		 * 
 		 * @param parent
-		 *            the intended parent.
+		 *            the intended parent
 		 * @param e
 		 *            an element which is to be stored as the first item in the
-		 *            list.
+		 *            list
 		 */
 		public ListNode(TreeNode<E> parent, E e) {
 			SubList<E> sublist = new SubList<E>(e);
@@ -1803,33 +2215,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			nextRef = null;
 			prevRef = null;
 
-			dataIntegrityVal = System.nanoTime();
-			if (parent != null) {
-				parentRef = dm.createReference(parent);
-			}
-		}
-
-		/**
-		 * Constructor which uses knowledge of a parent and maximum list size. A
-		 * {@code ListNode} that exceeds {@code maxSize} will be subject to
-		 * splitting.
-		 * 
-		 * @param parent
-		 *            the intended parent.
-		 * @param maxSize
-		 *            the maximum number of elements that can be stored.
-		 * @param e
-		 *            an element which is to be stored as the first item in the
-		 *            list.
-		 */
-		public ListNode(TreeNode<E> parent, int maxSize, E e) {
-			SubList<E> sublist = new SubList<E>(maxSize, e);
-			count = sublist.size();
-			DataManager dm = AppContext.getDataManager();
-			subListRef = dm.createReference(sublist);
-			nextRef = null;
-			prevRef = null;
-			dataIntegrityVal = System.nanoTime();
+			dataIntegrityVal = DATA_INTEGRITY_STARTING_VALUE;
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			}
@@ -1843,9 +2229,36 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * @param parent
 		 *            the intended parent
 		 * @param maxSize
-		 *            the maximum number of elements that can be stored.
+		 *            the maximum number of elements that can be stored
+		 * @param e
+		 *            an element which is to be stored as the first item in the
+		 *            list
+		 */
+		public ListNode(TreeNode<E> parent, int maxSize, E e) {
+			SubList<E> sublist = new SubList<E>(maxSize, e);
+			count = sublist.size();
+			DataManager dm = AppContext.getDataManager();
+			subListRef = dm.createReference(sublist);
+			nextRef = null;
+			prevRef = null;
+			dataIntegrityVal = DATA_INTEGRITY_STARTING_VALUE;
+
+			if (parent != null) {
+				parentRef = dm.createReference(parent);
+			}
+		}
+
+		/**
+		 * Constructor which uses knowledge of a parent and maximum list size. A
+		 * {@code ListNode} that exceeds {@code maxSize} will be subject to
+		 * splitting.
+		 * 
+		 * @param parent
+		 *            the intended parent
+		 * @param maxSize
+		 *            the maximum number of elements that can be stored
 		 * @param list
-		 *            a list of items which are to be added into the empty list.
+		 *            a list of items which are to be added into the empty list
 		 */
 		public ListNode(TreeNode<E> parent, int maxSize,
 				ArrayList<ManagedReference<ManagedObject>> list) {
@@ -1855,13 +2268,19 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			subListRef = dm.createReference(sublist);
 			nextRef = null;
 			prevRef = null;
-			dataIntegrityVal = System.nanoTime();
+			dataIntegrityVal = DATA_INTEGRITY_STARTING_VALUE;
+
 			if (parent != null) {
 				parentRef = dm.createReference(parent);
 			}
 		}
 
-		public long getDataIntegrityValue() {
+		/**
+		 * Returns the data integrity value of the {@code ListNode}
+		 * 
+		 * @return the current data integrity value
+		 */
+		public int getDataIntegrityValue() {
 			return dataIntegrityVal;
 		}
 
@@ -1870,7 +2289,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * supplied parameter.
 		 * 
 		 * @param ref
-		 *            the next item in the {@code ListNode} linked list.
+		 *            the next item in the {@code ListNode} linked list
 		 */
 		public void setNext(ListNode<E> ref) {
 			if (ref != null) {
@@ -1882,7 +2301,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Sets the parent of the node.
 		 * 
 		 * @param parent
-		 *            the indended parent of the {@code ListNode}.
+		 *            the intended parent of the {@code ListNode}
 		 */
 		public void setParent(TreeNode<E> parent) {
 			if (parent != null) {
@@ -1895,9 +2314,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * already at the tail.
 		 * 
 		 * @return the next {@code ListNode} in the linked list, or null if at
-		 *         the tail.
+		 *         the tail
 		 */
-		public ListNode<E> getNext() {
+		public ListNode<E> next() {
 			ListNode<E> next;
 			if (nextRef == null) {
 				return null;
@@ -1915,7 +2334,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * the supplied parameter.
 		 * 
 		 * @param ref
-		 *            the indended previous element.
+		 *            the intended previous element
 		 */
 		public void setPrev(ListNode<E> ref) {
 			if (ref != null) {
@@ -1927,9 +2346,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Retrieves the previous element in the {@code ListNode} linked list,
 		 * or null if at the head.
 		 * 
-		 * @return the previous element in the list, or null if at the head.
+		 * @return the previous element in the list, or null if at the head
 		 */
-		public ListNode<E> getPrev() {
+		public ListNode<E> prev() {
 			ListNode<E> prev;
 			if (prevRef == null) {
 				return null;
@@ -1954,7 +2373,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * elements in the collection.
 		 * 
 		 * @return the {@code SubList} containing list elements, or null if one
-		 *         has not yet been instantiated.
+		 *         has not yet been instantiated
 		 */
 		public SubList<E> getSubList() {
 			SubList<E> list;
@@ -1974,15 +2393,15 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * necessary.
 		 * 
 		 * @param obj
-		 *            the Object to append.
+		 *            the Object to append
 		 * @return whether the operation was successful; true if so, false
-		 *         otherwise.
+		 *         otherwise
 		 */
 		public boolean append(E e) {
 			boolean result = getSubList().append(e);
 			if (result) {
 				count++;
-				dataIntegrityVal = System.nanoTime();
+				dataIntegrityVal++;
 				updateParents(this.getParent(), TreeNode.INCREMENT_SIZE);
 			}
 
@@ -2000,14 +2419,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * 
 		 * @param index
 		 *            the index to insert the value, relative to the current
-		 *            {@code SubList}.
+		 *            {@code SubList}
 		 * @param e
-		 *            the value ti insert.
+		 *            the value to insert
 		 */
 		public void insert(int index, E e) {
 			getSubList().insert(index, e);
 			count++;
-			dataIntegrityVal = System.nanoTime();
+			dataIntegrityVal++;
 			updateParents(this.getParent(), TreeNode.INCREMENT_SIZE);
 
 			// check if we need to split; i.e. if we have exceeded
@@ -2023,6 +2442,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		public void clear() {
 			count = 0;
 			getSubList().clear();
+			AppContext.getDataManager().removeObject(this);
 		}
 
 		/**
@@ -2038,14 +2458,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * @param index
 		 *            the index corresponding to an element in the list (not an
 		 *            absolute index with respect to the {@code ScalableList}
-		 *            object.
-		 * @return the element that was removed.
+		 *            object
+		 * @return the element that was removed
 		 */
 		public Object remove(int index) {
 			Object obj = getSubList().remove(index);
 			if (obj != null) {
 				count--;
-				dataIntegrityVal = System.nanoTime();
+				dataIntegrityVal++;
 				updateParents(this.getParent(), TreeNode.DECREMENT_SIZE);
 			}
 
@@ -2059,9 +2479,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * exists.
 		 * 
 		 * @param obj
-		 *            the {@code Object} to remove.
+		 *            the {@code Object} to remove
 		 * @return whether the object was removed or not; true if so, false
-		 *         otherwise.
+		 *         otherwise
 		 */
 		public boolean remove(Object obj) {
 			boolean result = getSubList().remove(obj);
@@ -2070,7 +2490,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			// count information accordingly
 			if (result) {
 				count--;
-				dataIntegrityVal = System.nanoTime();
+				dataIntegrityVal++;
 				updateParents(this.getParent(), TreeNode.DECREMENT_SIZE);
 			}
 			// remove list node if it is empty
@@ -2084,15 +2504,15 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * exists.
 		 * 
 		 * @param e
-		 *            the {@code Element} to remove.
+		 *            the {@code Element} to remove
 		 * @return whether the object was removed or not; true if so, false
-		 *         otherwise.
+		 *         otherwise
 		 */
 		public boolean remove(Element<E> e) {
 			boolean result = getSubList().remove(e);
 			if (result) {
 				count--;
-				dataIntegrityVal = System.nanoTime();
+				dataIntegrityVal++;
 			}
 
 			// remove list node if necessary
@@ -2120,18 +2540,18 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			// First, we determine the type
 			// of list node: there are four possibilities:
 			// 1) interior node; connect prev to next
-			if (this.getNext() != null && this.getPrev() != null) {
-				this.getPrev().setNext(this.getNext());
-				this.getNext().setPrev(this.getPrev());
+			if (this.next() != null && this.prev() != null) {
+				this.prev().setNext(this.next());
+				this.next().setPrev(this.prev());
 			}
 			// 2) head node. Update child pointer from parent
-			else if (this.getNext() != null) {
-				this.getParent().setChild((ListObject<E>) this.getNext());
-				this.getNext().setPrev(null);
+			else if (this.next() != null) {
+				this.getParent().setChild((Node<E>) this.next());
+				this.next().setPrev(null);
 			}
 			// 3) tail node
-			else if (this.getPrev() != null) {
-				this.getPrev().setNext(null);
+			else if (this.prev() != null) {
+				this.prev().setNext(null);
 			}
 			// 4) only child
 			else {
@@ -2143,7 +2563,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			// then we need to give it a substitute
 			if (this.getParent().size() > 0
 					&& this.getParent().getChild().equals(this)) {
-				this.getParent().setChild((ListObject<E>) this.getNext());
+				this.getParent().setChild((Node<E>) this.next());
 			}
 
 			// This is an empty node, so remove it from Data Store.
@@ -2152,17 +2572,20 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 
 		/**
 		 * Retrieves the parent of the {@code ListNode}
+		 * 
+		 * @return the parent
+		 * @throws
 		 */
 		public TreeNode<E> getParent() {
 			TreeNode<E> parent;
 			if (parentRef == null) {
 				return null;
 			}
-			try {
-				parent = parentRef.get();
-			} catch (ObjectNotFoundException onfe) {
-				parent = null;
-			}
+
+			// By definition, there should always be a parent
+			// to a list node. Throw an ObjectNotFoundException
+			// if this call goes bad.
+			parent = parentRef.get();
 			return parent;
 		}
 
@@ -2170,8 +2593,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Prepends the supplied object to the list. This may implicitly cause
 		 * splitting.
 		 * 
-		 * @param obj
-		 *            the Object to add.
+		 * @param e
+		 *            the element to add to the collection
 		 */
 		public void prepend(E e) {
 			insert(0, e);
@@ -2182,7 +2605,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * This is necessary when a linked list exceeds the maximum length,
 		 * denoted by the cluster size.
 		 */
-		private boolean split() {
+		private void split() {
 			ArrayList<ManagedReference<ManagedObject>> contents = getSubList()
 					.getElements();
 			ArrayList<ManagedReference<ManagedObject>> spawned = new ArrayList<ManagedReference<ManagedObject>>();
@@ -2201,18 +2624,18 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			// remove the relocated nodes from the current list
 			// and mark that the list has changed
 			contents.removeAll(spawned);
-			dataIntegrityVal = System.nanoTime();
+			dataIntegrityVal++;
 			this.count = contents.size();
 
 			// Create a new ListNode<E> for the moved contents
 			ListNode<E> spawnedNode = new ListNode<E>(getParent(), this
 					.getSubList().MAX_CHILDREN, spawned);
-			spawnedNode.setNext(this.getNext());
+			spawnedNode.setNext(this.next());
 			spawnedNode.setPrev(this);
 			this.setNext(spawnedNode);
 
 			// Check with parent to see if more splitting is necessary
-			return getParent().performSplitIfNecessary();
+			getParent().performSplitIfNecessary();
 		}
 
 		/**
@@ -2220,10 +2643,13 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * the parents of the tree.
 		 * 
 		 * @param parent
+		 *            the parent of the current node
 		 * @param mode
+		 *            the type of update to perform, specified by the static
+		 *            final {@code TreeNode} fields.
 		 */
 		private void updateParents(TreeNode<E> parent, byte mode) {
-			parent.propagateChanges(parent, mode);
+			parent.propagateChanges(mode);
 		}
 
 	}
@@ -2231,20 +2657,49 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	/**
 	 * This object represents a partition in the list. Each of these objects
 	 * lives as a singleton inside a ListNode<E> object.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
 	static class SubList<E> implements ManagedObject, Serializable {
+
+		// Default values
 		public static final int SIZE_NOT_SET = -1;
 		public static final int DEFAULT_MAX_CHILDREN = 10;
 
+		/**
+		 * A reference to the list of elements.
+		 */
 		private ArrayList<ManagedReference<ManagedObject>> contents;
 
+		/**
+		 * A reference to the object which contains the offset during list
+		 * manipulation operations.
+		 */
 		private ManagedReference<Offset> offsetRef;
 
+		/**
+		 * The size of the list of elements
+		 */
 		private int size = SIZE_NOT_SET;
+
+		/**
+		 * The maximum number of children which can be contained, previously
+		 * addressed as the {@code bucketSize}
+		 */
 		public int MAX_CHILDREN = DEFAULT_MAX_CHILDREN;
+
+		/**
+		 * A value corresponding to the maximum size of the list during an
+		 * append operation. This value ensures that if the list is constantly
+		 * being appended to, that the nodes are left partially empty so that
+		 * inserts do not immediately cause splitting. As an implementation
+		 * decision, the {@code MAX_CHILDREN_APPEND} value is calculated as
+		 * {@code Math.round(MAX_CHILDREN * 2 / 3)}.
+		 */
 		public int MAX_CHILDREN_APPEND;
 
-		public static final long serialVersionUID = 1L;
+		private static final long serialVersionUID = 10L;
 
 		/**
 		 * Performs a quick check to see if the argument is a legal parameter;
@@ -2258,15 +2713,16 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Constructor which creates a {@code SubList}.
 		 * 
 		 * @param maxSize
-		 *            the maximum number of elements which can be stored.
+		 *            the maximum number of elements which can be stored
 		 * @param collection
-		 *            the elements to add to the empty list.
+		 *            the elements to add to the empty list
 		 */
 		public SubList(int maxSize,
 				ArrayList<ManagedReference<ManagedObject>> collection) {
 			if (isLegal(maxSize)) {
 				MAX_CHILDREN = maxSize;
 			}
+
 			contents = new ArrayList<ManagedReference<ManagedObject>>();
 			// This sets a limit on the number of elements
 			// which can be appended to a node. A value of 2/3 times
@@ -2289,12 +2745,13 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Constructor which creates a {@code SubList}
 		 * 
 		 * @param maxSize
-		 *            the maximum number of elements which can be stored.
+		 *            the maximum number of elements which can be stored
 		 */
 		public SubList(int maxSize) {
 			if (isLegal(maxSize)) {
 				MAX_CHILDREN = maxSize;
 			}
+
 			// This sets a limit on the number of elements
 			// which can be appended to a node. A value of 2/3 times
 			// the maximum capacity allows for some insertions
@@ -2311,9 +2768,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Constructor to create a {@code SubList}
 		 * 
 		 * @param maxSize
-		 *            the maximum number of elements which can be stored.
+		 *            the maximum number of elements which can be stored
 		 * @param e
-		 *            an element to add to the empty list, at the first index.
+		 *            an element to add to the empty list, at the first index
 		 */
 		public SubList(int maxSize, E e) {
 			if (isLegal(maxSize)) {
@@ -2338,7 +2795,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * parameter, refer to one of the other constructors.
 		 * 
 		 * @param e
-		 *            an element to add into the empty list.
+		 *            an element to add into the empty list
 		 */
 		public SubList(E e) {
 			MAX_CHILDREN = DEFAULT_MAX_CHILDREN;
@@ -2357,6 +2814,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * when it exits the search loop and is ready to retrieve it.
 		 * 
 		 * @param offset
+		 *            the offset of a specified element
 		 */
 		public void setOffset(int offset) {
 			offsetRef.getForUpdate().set(offset);
@@ -2365,7 +2823,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		/**
 		 * Retrieves the offset previously supplied when searching.
 		 * 
-		 * @return
+		 * @return the offset of an element that will soon be retrieved
 		 */
 		public int getOffset() {
 			if (offsetRef != null) {
@@ -2378,7 +2836,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		/**
 		 * Returns the size of the collection.
 		 * 
-		 * @return the size of the collection.
+		 * @return the size
 		 */
 		public int size() {
 			return size;
@@ -2399,7 +2857,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * interested in retrieving the value it points to.
 		 * 
 		 * @param index
-		 * @return
+		 * @return the element, if it exists, or null otherwise
 		 */
 		public E get(int index) {
 			E value = null;
@@ -2417,7 +2875,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		/**
 		 * Retrieves the first (head) stored element in the {@code SubList}
 		 * 
-		 * @return the first element.
+		 * @return the first element
 		 */
 		public E getFirst() {
 			return get(0);
@@ -2466,14 +2924,18 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * @param index
 		 *            the index to add the element
 		 * @param e
-		 *            the element to be added.
-		 * @return the old element that was replaced.
+		 *            the element to be added
+		 * @return the old element that was replaced
+		 * @throws IndexOutOfBoundsException
+		 *             if the index is outside the range of the underlying list
 		 */
 		public Object set(int index, E e) {
 			ManagedReference<ManagedObject> ref = null;
 			ManagedReference<ManagedObject> old = null;
 			Object oldObj = null;
 
+			// Wrap the element as an Element if is not already
+			// a ManagedObject
 			if (e instanceof ManagedObject) {
 				ref = AppContext.getDataManager().createReference(
 						(ManagedObject) e);
@@ -2487,7 +2949,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 				oldObj = old.get();
 			}
 
-			// Delete from data store
+			// Delete the old value from data store
 			AppContext.getDataManager().removeObject((ManagedObject) old.get());
 			return oldObj;
 		}
@@ -2496,10 +2958,10 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Appends the supplied argument to the list. It will throw a
 		 * {@code NullPointerException} if the supplied object is null.
 		 * 
-		 * @param obj
-		 *            the element to add to append.
+		 * @param e
+		 *            the element to add to append
 		 * @return whether the operation was successful; true if so, false
-		 *         otherwise.
+		 *         otherwise
 		 */
 		public boolean append(E e) {
 			boolean result = false;
@@ -2523,8 +2985,8 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * the element does not exist, then -1 is returned.
 		 * 
 		 * @param o
-		 *            the element whose last index is to be found.
-		 * @return the index of the element, or -1 if it does not exist.
+		 *            the element whose last index is to be found
+		 * @return the index of the element, or -1 if it does not exist
 		 */
 		public int lastIndexOf(Object o) {
 			Iterator<ManagedReference<ManagedObject>> iter = contents
@@ -2559,9 +3021,12 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * 
 		 * @param index
 		 *            the index to add the new element.
-		 * @param obj
+		 * @param e
 		 *            the object which is to be inserted at the specified
-		 *            {@code index}.
+		 *            {@code index}
+		 * @throws IndexOutOfBoundsException
+		 *             if the supplied index is outside of the range of the
+		 *             underlying list
 		 */
 		public void insert(int index, E e) {
 			if (index < 0) {
@@ -2582,10 +3047,14 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * serialized {@code ManagedObject}.
 		 * 
 		 * @param e
-		 * @return
+		 *            the element to potentially wrap in an {@code Element}
+		 * @return a reference to the wrapped element, ready to be stored into a
+		 *         {@code SubList}
 		 */
 		private ManagedReference<ManagedObject> createRefForAdd(E e) {
 			ManagedReference<ManagedObject> ref = null;
+
+			// Determine if we need to wrap the parameter or not.
 			if (e instanceof ManagedObject && e instanceof Serializable) {
 				ref = AppContext.getDataManager().createReference(
 						(ManagedObject) e);
@@ -2602,9 +3071,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * argument. If the element does not exist, then -1 is returned.
 		 * 
 		 * @param o
-		 *            the element whose index is to be searched.
+		 *            the element whose index is to be searched
 		 * @return the first index of the supplied element, or -1 if it does not
-		 *         exist in the list.
+		 *         exist in the list
 		 */
 		public int indexOf(Object o) {
 			Iterator<ManagedReference<ManagedObject>> iter = contents
@@ -2638,8 +3107,11 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * underlying list.
 		 * 
 		 * @param index
-		 *            the index to remove.
-		 * @return the object removed from the index.
+		 *            the index to remove
+		 * @return the object removed from the index
+		 * @throws IndexOutOfBoundsException
+		 *             if the index is outside of the range of the underlying
+		 *             list
 		 */
 		public Object remove(int index) {
 			if (index > contents.size() - 1) {
@@ -2648,6 +3120,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 			}
 			Object value = null;
 			ManagedReference<?> removed = contents.remove(index);
+
+			// Determine how to extract the element, based on whether it
+			// is an instance of Element or not
 			if (removed != null && removed.get() instanceof Element) {
 				value = ((Element<E>) removed.get()).getValue();
 				AppContext.getDataManager()
@@ -2663,9 +3138,9 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		 * Removes the supplied object from the underlying list, if it exists.
 		 * 
 		 * @param obj
-		 *            the element to remove from the list.
+		 *            the element to remove from the list
 		 * @return whether the operation was successful; true if so, false
-		 *         otherwise.
+		 *         otherwise
 		 */
 		public boolean remove(Object obj) {
 			Iterator<ManagedReference<ManagedObject>> iter = contents
@@ -2700,7 +3175,7 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 		/**
 		 * Removes the last element from the list.
 		 * 
-		 * @return the removed element that had existed at the end of the list.
+		 * @return the removed element that had existed at the end of the list
 		 */
 		public Object removeLast() {
 			return remove(contents.size() - 1);
@@ -2713,8 +3188,11 @@ public class ScalableList<E> extends AbstractCollection<E> implements
 	 * {@code TreeNode} as elements within a {@code ScalableList}. This
 	 * interface avoids cast warnings when the identity of a given element is
 	 * not immediately known.
+	 * 
+	 * @param <E>
+	 *            the type of element stored in the {@code ScalableList}
 	 */
-	static interface ListObject<E> {
+	static interface Node<E> {
 
 		/**
 		 * Retrieves the node's parent.

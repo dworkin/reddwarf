@@ -208,7 +208,7 @@ public class TestScalableList extends Assert {
 			public void run() throws Exception {
 				ScalableList<String> list = new ScalableList<String>(6, 6);
 				list.add("A");
-				list.prepend("B");
+				list.add(0, "B");
 
 				assertEquals(2, list.size());
 				assertEquals("B", list.get(0));
@@ -226,7 +226,7 @@ public class TestScalableList extends Assert {
 		txnScheduler.runTask(new AbstractKernelRunnable() {
 			public void run() throws Exception {
 				ScalableList<String> list = new ScalableList<String>(6, 6);
-				list.prepend("A");
+				list.add(0, "A");
 
 				assertEquals(1, list.size());
 			}
@@ -848,7 +848,7 @@ public class TestScalableList extends Assert {
 			public void run() throws Exception {
 				ScalableList<String> list = new ScalableList<String>(3, 3);
 				list.add("L");
-				list.prepend("A");
+				list.add(0, "A");
 				list.add(1, "K");
 				list.add(1, "J");
 				list.add(1, "I");
@@ -936,17 +936,17 @@ public class TestScalableList extends Assert {
 			public void run() throws Exception {
 				ScalableList<String> list = new ScalableList<String>(3, 3);
 				list.add("L");
-				list.prepend("K");
-				list.prepend("J");
-				list.prepend("I");
-				list.prepend("H");
-				list.prepend("G");
-				list.prepend("F");
-				list.prepend("E");
-				list.prepend("D");
-				list.prepend("C");
-				list.prepend("B");
-				list.prepend("A");
+				list.add(0, "K");
+				list.add(0, "J");
+				list.add(0, "I");
+				list.add(0, "H");
+				list.add(0, "G");
+				list.add(0, "F");
+				list.add(0, "E");
+				list.add(0, "D");
+				list.add(0, "C");
+				list.add(0, "B");
+				list.add(0, "A");
 
 				assertEquals("A", list.get(0));
 				assertEquals("D", list.get(3));
@@ -1048,22 +1048,22 @@ public class TestScalableList extends Assert {
 		txnScheduler.runTask(new AbstractKernelRunnable() {
 			public void run() throws Exception {
 				ScalableList<String> list = new ScalableList<String>(3, 3);
-				list.prepend("L");
-				list.prepend("K");
-				list.prepend("J");
-				list.prepend("I");
-				list.prepend("H");
-				list.prepend("G");
+				list.add(0, "L");
+				list.add(0, "K");
+				list.add(0, "J");
+				list.add(0, "I");
+				list.add(0, "H");
+				list.add(0, "G");
 
 				assertEquals(6, list.size());
 				assertEquals("H", list.get(1));
 
-				list.prepend("F");
-				list.prepend("E");
-				list.prepend("D");
-				list.prepend("C");
-				list.prepend("B");
-				list.prepend("A");
+				list.add(0, "F");
+				list.add(0, "E");
+				list.add(0, "D");
+				list.add(0, "C");
+				list.add(0, "B");
+				list.add(0, "A");
 
 				assertEquals(12, list.size());
 				assertEquals("B", list.get(1));
