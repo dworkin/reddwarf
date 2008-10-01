@@ -154,7 +154,7 @@ class ClientSessionHandler {
 	}
 
 	/*
-	 * TODO: It might be a good idea to implement high- and low-water marks
+	 * TBD: It might be a good idea to implement high- and low-water marks
 	 * for the buffers, so they don't go into hysteresis when they get
 	 * full. -JM
 	 */
@@ -211,6 +211,16 @@ class ClientSessionHandler {
 	    }
 	    messageQueue.clear();
 	}
+    }
+
+    /**
+     * Returns {@code true} if the login for this session has been handled,
+     * otherwise returns {@code false}.
+     *
+     * @return	{@code true} if the login for this session has been handled
+     */
+    boolean loginHandled() {
+	return getCurrentState() != State.CONNECTED;
     }
 
     /**
@@ -320,14 +330,15 @@ class ClientSessionHandler {
 	    scheduleTask(new AbstractKernelRunnable() {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
-		    }});
-
-	    deactivateIdentity(identity);
+		    } });
+	    if (sessionService.removeUserLogin(identity, this)) {
+		deactivateIdentity(identity);
+	    }
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
-		assert closeConnection == false;
+		assert !closeConnection;
 	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
 		// Bypass sendProtocolMessage method which prevents sending
 		// messages to disconnecting sessions.
@@ -349,7 +360,7 @@ class ClientSessionHandler {
 		public void run() {
 		    ClientSessionImpl sessionImpl = 
 			ClientSessionImpl.getSession(dataService, sessionRefId);
-		    sessionImpl. notifyListenerAndRemoveSession(
+		    sessionImpl.notifyListenerAndRemoveSession(
 			dataService, graceful, true);
 		}
 	    });
@@ -376,13 +387,14 @@ class ClientSessionHandler {
 	final boolean graceful, final boolean closeConnection)
     {
         synchronized (lock) {
-            if (state != State.DISCONNECTED)
+            if (state != State.DISCONNECTED) {
                 state = State.DISCONNECTING;
+	    }
         }
 	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	    public void run() {
 		handleDisconnect(graceful, closeConnection);
-	    }});
+	    } });
     }
 
     /**
@@ -408,7 +420,7 @@ class ClientSessionHandler {
      */
     void shutdown() {
 	synchronized (lock) {
-	    if (shutdown == true) {
+	    if (shutdown) {
 		return;
 	    }
 	    shutdown = true;
@@ -543,7 +555,7 @@ class ClientSessionHandler {
                 processQueue();
             } catch (ExecutionException e) {
                 /*
-		 * TODO: If we're expecting the session to close, don't
+		 * TBD: If we're expecting the session to close, don't
                  * complain.
 		 */
                 if (logger.isLoggable(Level.FINE)) {
@@ -599,8 +611,9 @@ class ClientSessionHandler {
         @Override
         void read() {
             synchronized (readLock) {
-                if (isReading)
+                if (isReading) {
                     throw new ReadPendingException();
+		}
                 isReading = true;
             }
             sessionConnection.read(this);
@@ -634,7 +647,7 @@ class ClientSessionHandler {
             } catch (Exception e) {
 
                 /*
-		 * TODO: If we're expecting the channel to close, don't
+		 * TBD: If we're expecting the channel to close, don't
                  * complain.
 		 */
 
@@ -662,7 +675,7 @@ class ClientSessionHandler {
 	    
 	    switch (opcode) {
 		
-	    case SimpleSgsProtocol.LOGIN_REQUEST: {
+	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
 	        byte version = msg.getByte();
 	        if (version != SimpleSgsProtocol.VERSION) {
@@ -683,10 +696,9 @@ class ClientSessionHandler {
 		read();
 
 		break;
-	    }
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		if (! loggedIn) {
+		if (!loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
 			"session message received before login completed:{0}",
@@ -702,13 +714,15 @@ class ClientSessionHandler {
 				dataService, sessionRefId);
 			if (sessionImpl != null) {
 			    if (isConnected()) {
-				sessionImpl.getClientSessionListener(dataService).
-				    receivedMessage(clientMessage.asReadOnlyBuffer());
+				sessionImpl.
+				    getClientSessionListener(dataService).
+				        receivedMessage(clientMessage.
+						            asReadOnlyBuffer());
 			    }
 			} else {
 			    scheduleHandleDisconnect(false, true);
 			}
-		    }}, identity);
+		    } }, identity);
 
 		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
@@ -716,7 +730,7 @@ class ClientSessionHandler {
 		break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-		if (! loggedIn) {
+		if (!loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
 			"channel message received before login completed:{0}",
@@ -743,7 +757,7 @@ class ClientSessionHandler {
 			} else {
 			    scheduleHandleDisconnect(false, true);
 			}
-		    }}, identity);
+		    } }, identity);
 
 		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
@@ -837,8 +851,15 @@ class ClientSessionHandler {
 		 * "addHandler", and schedule a task to perform client
 		 * login (call the AppListener.loggedIn method).
 		 */
-		taskQueue = sessionService.createTaskQueue();
+		if (!sessionService.validateUserLogin(
+			authenticatedIdentity, ClientSessionHandler.this))
+		{
+		    // This login request is not allowed to proceed.
+		    sendLoginFailureAndDisconnect();
+		    return;
+		}
 		identity = authenticatedIdentity;
+		taskQueue = sessionService.createTaskQueue();
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();
 		try {
@@ -874,7 +895,7 @@ class ClientSessionHandler {
 			sendLoginProtocolMessage(
  			    loginRedirectMessage, Delivery.RELIABLE, false);
 			handleDisconnect(false, false);
-		    }});
+		    } });
 	    }
 	}
 
@@ -890,7 +911,7 @@ class ClientSessionHandler {
 		    sendLoginProtocolMessage(
  			loginFailureMessage, Delivery.RELIABLE, false);
 		    handleDisconnect(false, false);
-		}});
+		} });
 	}
     }
 
@@ -1081,7 +1102,7 @@ class ClientSessionHandler {
 			    // whether or not this session is connected at
 			    // the time of notification.
 			    thisIdentity.notifyLoggedIn();
-			}});
+			} });
 		
 	    } else {
 		if (ex == null) {
@@ -1089,7 +1110,7 @@ class ClientSessionHandler {
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
-		} else if (! isRetryableException(ex)) {
+		} else if (!isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +
