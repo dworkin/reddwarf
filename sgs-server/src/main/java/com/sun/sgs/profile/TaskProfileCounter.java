@@ -19,32 +19,14 @@
 
 package com.sun.sgs.profile;
 
+
 /**
- * This interface represents a single operation that can be reported as
- * happening during the life of a task running through the scheduler.
+ * Interface that represents a counter used in profiling tasks run through
+ * the scheduler. All counters have a name associated with them, and start
+ * at zero. Counters can only be incremented.  These counters are 
+ * task-local, in that each counter is set to zero for each task where
+ * that counter is modified.
  */
-public interface ProfileOperation {
+public interface TaskProfileCounter extends ProfileCounter {
 
-    /**
-     * Returns the name of this operation.
-     *
-     * @return the name
-     */
-    String getOperationName();
-
-    /**
-     * Tells this operation to report that it is happening. This may be
-     * called any number of times during a single task.
-     *
-     * @throws IllegalStateException if this is called outside the scope
-     *                               of a task run through the scheduler
-     */
-    void report();
-
-    /**
-     * Gets aggregate number of times this operation has been reported.
-     * 
-     * @return the current count of operation reports
-     */
-    long getCount();
 }

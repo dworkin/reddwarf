@@ -19,8 +19,10 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
@@ -58,7 +60,11 @@ public final class TransactionCoordinatorImpl
     /** The next transaction ID. */
     private AtomicLong nextTid = new AtomicLong(1);
 
-    /** The optional collector for reporting participant details. */
+    /** The collector handle for reporting participant details. */
+    private final ProfileCollectorHandle collectorHandle;
+    /** The collector to decide if we want to collect participant details for
+     *  a particular transaction.
+     */
     private final ProfileCollector collector;
 
     /** The value for bounded timeout. */
@@ -89,9 +95,10 @@ public final class TransactionCoordinatorImpl
 	 */
 	TransactionHandleImpl(long tid, long timeout,
                               boolean disablePrepareAndCommitOpt,
-			      ProfileCollector collector) {
+			      ProfileCollectorHandle collectorHandle) {
 	    txn = new TransactionImpl(tid, timeout, 
-                                      disablePrepareAndCommitOpt, collector);
+                                      disablePrepareAndCommitOpt, 
+                                      collectorHandle);
 	}
 
 	public String toString() {
@@ -114,20 +121,30 @@ public final class TransactionCoordinatorImpl
      * properties.
      *
      * @param	properties the properties for configuring this service
-     * @param	collector the <code>ProfileCollector</code> used to report
-     *       	participant detail
+     * @param   collector the {@code ProfileCollector} used to decide if we
+     *           want to collect participant data for a particular transaction,
+     *           based on the current default collection level
+     * @param	collectorHandle the {@code ProfileCollectorHandle} used to 
+     *          report participant detail
      * @throws	IllegalArgumentException if the bounded or
      *		unbounded timeout properties are less than {@code 1}
      */
     public TransactionCoordinatorImpl(Properties properties,
-				      ProfileCollector collector) {
+                                      ProfileCollector collector,
+				      ProfileCollectorHandle collectorHandle) 
+    {
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
 	}
         if (collector == null) {
 	    throw new NullPointerException("Collector must not be null");
 	}
-	this.collector = collector;
+        if (collectorHandle == null) {
+	    throw new NullPointerException("CollectorHandle must not be null");
+	}
+	
+        this.collector = collector;
+        this.collectorHandle = collectorHandle;
 
 	PropertiesWrapper props = new PropertiesWrapper(properties);
 	this.boundedTimeout =
@@ -147,16 +164,21 @@ public final class TransactionCoordinatorImpl
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction(boolean unbounded) {
+        boolean collectData = 
+            collector.getDefaultProfileLevel().ordinal() >= 
+                ProfileLevel.MEDIUM.ordinal();
 	if (unbounded) {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     unboundedTimeout, 
                                              disablePrepareAndCommitOpt,
-                                             collector);
+                                             collectData ? 
+                                                 collectorHandle : null);
 	} else {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     boundedTimeout, 
                                              disablePrepareAndCommitOpt,
-                                             collector);
+                                             collectData ? 
+                                                 collectorHandle : null);
 	}
     }
 }

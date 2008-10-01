@@ -22,11 +22,10 @@ package com.sun.sgs.impl.service.transaction;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -95,8 +94,11 @@ final class TransactionImpl implements Transaction {
      */
     private Throwable abortCause = null;
 
-    /** The optional collector used to report participant detail. */
-    private final ProfileCollector collector;
+    /** 
+     * The collector handle used to report participant detail, or null
+     * if no participant details are to be gathered. 
+     */
+    private final ProfileCollectorHandle collector;
 
     /** Collected profiling data on each participant, created only if
      *  global profiling is set to MEDIUM at the start of the transaction.
@@ -108,7 +110,7 @@ final class TransactionImpl implements Transaction {
      * prepare and commit optimization flag, and collector.
      */
     TransactionImpl(long tid, long timeout, boolean usePrepareAndCommitOpt,
-                    ProfileCollector collector) 
+                    ProfileCollectorHandle collector) 
     {
 	this.tid = tid;
 	this.timeout = timeout;
@@ -117,8 +119,7 @@ final class TransactionImpl implements Transaction {
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
 	state = State.ACTIVE;
-	if (collector.getDefaultProfileLevel().ordinal() >= 
-                ProfileLevel.MEDIUM.ordinal()) {
+        if (collector != null) {
 	    detailMap = new HashMap<String, ProfileParticipantDetailImpl>();
 	} else {
 	    detailMap = null;

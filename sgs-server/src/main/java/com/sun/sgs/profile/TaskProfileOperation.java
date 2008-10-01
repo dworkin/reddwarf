@@ -21,19 +21,9 @@ package com.sun.sgs.profile;
 
 
 /**
- * A registration interface where profile producers register
- * and get {@code ProfileConsumer}s used to consume profiling data.
+ * This interface represents a single operation that can be reported as
+ * happening during the life of a task running through the scheduler.
  */
-public interface ProfileRegistrar {
-
-    /**
-     * Registers the given unique name as a profile producer.
-     *
-     * @param name the unique name of the profile producer
-     *
-     * @return a {@code ProfileConsumer} that will consume profiling
-     *         data from the provided named producer
-     */
-    ProfileConsumer registerProfileProducer(String name);
+public interface TaskProfileOperation extends ProfileOperation {
 
 }

@@ -21,11 +21,8 @@ package com.sun.sgs.test.impl.profile;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileRegistrar;
+import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.UtilReflection;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
 import java.util.Properties;
@@ -37,11 +34,6 @@ public class TestProfileCollectorImpl extends TestCase {
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
     private ProfileCollector profileCollector;
-    
-    private Field profileCollectorField = 
-            UtilReflection.getField(
-                com.sun.sgs.impl.profile.ProfileRegistrarImpl.class, 
-                "profileCollector");
     
     /** Constructs a test instance. */
     public TestProfileCollectorImpl(String name) throws Exception {
@@ -92,10 +84,9 @@ public class TestProfileCollectorImpl extends TestCase {
     
     /** Returns the profile collector for a given node */
     private ProfileCollector getCollector(SgsTestNode node) throws Exception {
-        ProfileRegistrar registrar = 
-            node.getSystemRegistry().getComponent(
-                com.sun.sgs.profile.ProfileRegistrar.class);
-        return (ProfileCollector) profileCollectorField.get(registrar);
+        ProfileService service = 
+            node.getProxy().getService(ProfileService.class);
+        return service.getProfileCollector();
     }
         ////////     The tests     /////////
     public void testDefaultKernel() {

@@ -19,32 +19,16 @@
 
 package com.sun.sgs.profile;
 
+
 /**
- * This interface represents a single operation that can be reported as
- * happening during the life of a task running through the scheduler.
+ * A profile sample is a list of data points that are accumulated
+ * during the lifetime of a task.  A profile sample may be for either
+ * a single task or span multiple tasks.  A profile sample allows for
+ * different aggregations on data at a later time.
+ *
+ * @see ProfileCounter
+ * @see ProfileOperation
  */
-public interface ProfileOperation {
+public interface TaskProfileSample {
 
-    /**
-     * Returns the name of this operation.
-     *
-     * @return the name
-     */
-    String getOperationName();
-
-    /**
-     * Tells this operation to report that it is happening. This may be
-     * called any number of times during a single task.
-     *
-     * @throws IllegalStateException if this is called outside the scope
-     *                               of a task run through the scheduler
-     */
-    void report();
-
-    /**
-     * Gets aggregate number of times this operation has been reported.
-     * 
-     * @return the current count of operation reports
-     */
-    long getCount();
 }

@@ -26,6 +26,8 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.kernel.schedule.SchedulerQueue;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
@@ -107,7 +109,7 @@ final class TransactionSchedulerImpl
     private final SchedulerQueue backingQueue;
 
     // the collector used for profiling data
-    private final ProfileCollector profileCollector;
+    private final ProfileCollectorHandle profileCollector;
 
     // the coordinator for all transactional object access
     private final AccessCoordinatorImpl accessCoordinator;
@@ -144,7 +146,7 @@ final class TransactionSchedulerImpl
      */
     TransactionSchedulerImpl(Properties properties,
                              TransactionCoordinator transactionCoordinator,
-                             ProfileCollector profileCollector,
+                             ProfileCollectorHandle profileCollector,
                              AccessCoordinatorImpl accessCoordinator)
         throws Exception
     {

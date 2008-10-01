@@ -23,6 +23,8 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
@@ -30,8 +32,6 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
-
-import com.sun.sgs.profile.ProfileCollector;
 
 import java.util.LinkedList;
 import java.util.Properties;
@@ -81,7 +81,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
     private final ScheduledExecutorService executor;
 
     // the collector used for profiling data
-    private final ProfileCollector profileCollector;
+    private final ProfileCollectorHandle profileCollector;
 
     // the number of tasks waiting to run
     private final AtomicInteger waitingSize = new AtomicInteger(0);
@@ -102,13 +102,16 @@ final class TaskSchedulerImpl implements TaskScheduler {
      * @throws Exception if there is any failure creating the scheduler
      */
     TaskSchedulerImpl(Properties properties,
-                      ProfileCollector profileCollector) throws Exception {
+                      ProfileCollectorHandle profileCollector) throws Exception 
+    {
         logger.log(Level.CONFIG, "Creating a Task Scheduler");
 
-        if (properties == null)
+        if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
-        if (profileCollector == null)
+        }
+        if (profileCollector == null) {
             throw new NullPointerException("Collector cannot be null");
+        }
 
         this.profileCollector = profileCollector;
 

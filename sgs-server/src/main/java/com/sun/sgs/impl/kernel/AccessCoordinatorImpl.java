@@ -26,7 +26,8 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
-import com.sun.sgs.profile.ProfileCollector;
+
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
@@ -102,7 +103,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
     // system components
     private final TransactionProxy txnProxy;
-    private final ProfileCollector profileCollector;
+    private final ProfileCollectorHandle profileCollector;
  
     /**
      * Creates an instance of {@code AccessCoordinatorImpl}.
@@ -111,7 +112,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      *                                  is not a valid number greater than 0
      */
     AccessCoordinatorImpl(Properties properties, TransactionProxy txnProxy,
-                          ProfileCollector profileCollector) {
+                          ProfileCollectorHandle profileCollector) {
         if (properties == null)
             throw new NullPointerException("Properties cannot be null");
         if (txnProxy == null)

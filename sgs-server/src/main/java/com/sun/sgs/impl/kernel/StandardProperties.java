@@ -38,8 +38,11 @@ package com.sun.sgs.impl.kernel;
  * A deprecated property is <code>CONFIG_FILE</code>, which, if present,
  * will be combined with the application property file.
  */
-public class StandardProperties {
+public final class StandardProperties {
 
+    /** This class should not be instantiated. */
+    private StandardProperties() { }
+    
     // the root of all the properties
     private static final String NS = "com.sun.sgs.";
     
@@ -83,6 +86,12 @@ public class StandardProperties {
      */
     public static final String DATA_MANAGER = NS + "dataManager";
 
+    /**
+     * An optional key specifying a specific class to use for the
+     * <code>ProfileService</code>.
+     */
+    public static final String PROFILE_SERVICE = NS + "profileService";
+    
     /**
      * An optional key specifying a specific class to use for the
      * <code>NodeMappingService</code>.
@@ -160,6 +169,8 @@ public class StandardProperties {
      * ordering represents the order in which the services are configured.
      */
     public enum StandardService {
+        /** Enumeration for the Profile Service . */
+        ProfileService,
         /** Enumeration for the Data Service. */
         DataService,
         /** Enumeration for the Watchdog Service. */
@@ -197,11 +208,12 @@ public class StandardProperties {
      * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE} whose value
      *      is {@value #APP_LISTENER_NONE} to indicate that no application code
      *      will run on the server node
-     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to indicate
-     *      the set of services to run on the server node
+     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to 
+     *      indicate the set of services to run on the server node
      * <li> {@value #SERVER_START} set to {@code true} to indicate that the
      *       services' servers should be started
-     * <li> {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
+     * <li> 
+     *   {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
      *   set to {@code com.sun.sgs.impl.service.data.store.net.DataStoreClient}
      *   to indicate the multi-node data service should be used
      *

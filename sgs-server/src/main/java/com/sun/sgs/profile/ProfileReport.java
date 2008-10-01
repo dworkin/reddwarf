@@ -126,20 +126,6 @@ public interface ProfileReport {
     List<ProfileOperation> getReportedOperations();
 
     /**
-     * Returns the updated values of the aggregate counters that were
-     * updated during the running of the task. If no aggregate
-     * counters were updated, an empty <code>Map</code> is
-     * returned. The <code>Map</code> is a mapping from counter name
-     * to counter value. Note that the reported values are the values
-     * observed during the running of the task, not the value (which
-     * may have changed) at the time this report is provided to any
-     * listeners.
-     *
-     * @return a <code>Map</code> from counter name to observed value
-     */
-    Map<String, Long> getUpdatedAggregateCounters();
-
-    /**
      * Returns the values of the task-local counters that were updated
      * during the running of the task. If no task-local counters were
      * updated, then an empty {@code Map} is returned. The
@@ -149,21 +135,6 @@ public interface ProfileReport {
      * @return a <code>Map</code> from counter name to observed value
      */
     Map<String, Long> getUpdatedTaskCounters();
-
-    /**
-     * Returns a mapping for each sample that records for the lifetime
-     * of the application that was updated, to the entire list of
-     * samples for that name. If no lifetime samples were updated,
-     * then an empty <code>Map</code> is returned. The
-     * <code>Map</code> is a mapping from sample name to an
-     * oldest-first list of sample values.  The list of samples
-     * includes all samples collected during the lifetime of the
-     * application.
-     *
-     * @return a <code>Map</code> from sample name to a list of values
-     *         added during the task  
-     */
-    Map<String, List<Long>> getUpdatedAggregateSamples();
 
     /**
      * Returns the list of values for the task-local samples that were

@@ -22,6 +22,7 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.impl.service.profile.ProfileServiceImpl;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -266,7 +267,8 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props), DummyProfileCoordinator.getRegistrar());
+	    new DataStoreImpl(props), 
+            new ProfileServiceImpl(DummyProfileCoordinator.getCollector()));
         DummyProfileCoordinator.startProfiling();
 	return store;
     }

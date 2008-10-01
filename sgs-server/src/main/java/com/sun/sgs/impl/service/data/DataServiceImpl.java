@@ -49,8 +49,8 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -428,11 +428,13 @@ public final class DataServiceImpl implements DataService {
 		baseStore = new DataStoreClient(properties);
 	    }
             storeToShutdown = baseStore;
-            ProfileRegistrar registrar = 
-		systemRegistry.getComponent(ProfileRegistrar.class);
-	    store = new DataStoreProfileProducer(baseStore, registrar);
+            
+            ProfileService profileService = 
+                    txnProxy.getService(ProfileService.class);
+	    store = new DataStoreProfileProducer(baseStore, profileService);
             ProfileConsumer consumer =
-                registrar.registerProfileProducer(getClass().getName());
+                profileService.getProfileCollector().
+                    registerProfileProducer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);
