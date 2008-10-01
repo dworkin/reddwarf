@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.data.store.net;
 
+import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
@@ -123,6 +125,7 @@ public interface DataStoreServer extends Remote {
      * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
+     * @throws	IOException if a network problem occurs
      */
     void setObjects(long tid, long[] oids, byte[][] dataArray)
 	throws IOException;
@@ -313,7 +316,6 @@ public interface DataStoreServer extends Remote {
      * @return	{@code true} if this participant is read-only, otherwise
      *		{@code false}
      * @throws	IllegalArgumentException if {@code tid} is negative
-     * @throws	Exception if there are any failures in preparing
      * @throws	IllegalStateException if the transaction has been prepared,
      *		committed, or aborted, or if the transaction is not known
      * @throws	IOException if a network problem occurs

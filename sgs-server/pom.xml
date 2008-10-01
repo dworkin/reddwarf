@@ -228,10 +228,12 @@
 	<configuration>
 	  <effort>Max</effort>
 	  <excludeFilterFile>
-	    src/main/etc/findbugs-exclude.xml
+	    ${basedir}/src/main/etc/findbugs-exclude.xml
 	  </excludeFilterFile>
 	  <threshold>Low</threshold>
 	  <xmlOutput>true</xmlOutput>
+	  <findbugsXmlOutput>true</findbugsXmlOutput>
+	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
 	</configuration>
       </plugin>
 

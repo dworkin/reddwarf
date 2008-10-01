@@ -19,25 +19,26 @@
 
 package com.sun.sgs.test.util;
 
-import org.junit.internal.runners.InitializationError; 
-import org.junit.internal.runners.TestClassRunner;
-
 import org.junit.runner.Description;
+
+import org.junit.runners.model.InitializationError;
 
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 
+import org.junit.runners.BlockJUnit4ClassRunner;
 
 /**
  * This is a custom implementation of JUunit4's <code>TestClassRunner</code>
  * that adds support for reporting the name of each test when it starts.
  */
-public class NameRunner extends TestClassRunner {
+public class NameRunner extends BlockJUnit4ClassRunner {
 
     private static String testName;
 
     public NameRunner(Class<?> c) throws InitializationError, Exception {
         super(c);
+        filter(new NamedTestFilter());
     }
 
     public void run(RunNotifier runNotifier) {

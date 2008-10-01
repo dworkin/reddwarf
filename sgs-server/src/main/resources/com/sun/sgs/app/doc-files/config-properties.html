@@ -287,11 +287,20 @@ These properties control the implementation of the
 <code>ClientSessionService</code>.
 <dl>
 
+<dt>com.sun.sgs.impl.service.session.allow.new.login
+<span class="default">false</span>
+<dd>Whether to permit or deny a new login request for a user that is
+already logged in.  If the property is <code>false</code>, a new
+user with the same identity as an existing user is not permitted
+to log in.  If the property is <code>true</code>, the user's existing
+session is disconnected, and the new login is allowed to proceed.
+		
 <dt>com.sun.sgs.impl.service.session.disconnect.delay
 <span class="default">1000</span>
 <dd>The time, in milliseconds, in which a disconnecting client is allowed to close a
 connection before it is closed by the server. The delay must be greater than or
 equal to <code>200</code> milliseconds.
+	
 </dl>
 
 <a name="System"></a>

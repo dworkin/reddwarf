@@ -42,7 +42,7 @@ public class ClientSessionWrapper
     implements ClientSession, Serializable, ManagedObjectRemoval
 {
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
     /** The reference to the client session that this instance wraps. */
     private final ManagedReference<ClientSessionImpl> sessionRef;
@@ -100,7 +100,8 @@ public class ClientSessionWrapper
 	if (object == this) {
 	    return true;
 	} else if (object instanceof ClientSessionWrapper) {
-	    return sessionRef.equals(((ClientSessionWrapper) object).sessionRef);
+	    return sessionRef.equals(
+		       ((ClientSessionWrapper) object).sessionRef);
 	} else {
 	    return false;
 	}

@@ -25,6 +25,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
+import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.math.BigInteger;
@@ -83,6 +84,9 @@ final class Context extends TransactionContext {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /** The proxy for notifying of object accesses. */
+    final AccessReporter<BigInteger> oidAccesses;
+
     /**
      * A map that records all managed objects that are currently having
      * ManagedObjectRemoval.removingObject called on them, to detect recursion,
@@ -97,16 +101,18 @@ final class Context extends TransactionContext {
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
-	    ClassesTable classesTable)
+	    ClassesTable classesTable,
+	    AccessReporter<BigInteger> oidAccesses)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
-	    classesTable != null;
+	    classesTable != null && oidAccesses != null;
 	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	this.oidAccesses = oidAccesses;
 	classSerial = classesTable.createClassSerialization(this.txn);
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
@@ -123,7 +129,7 @@ final class Context extends TransactionContext {
     final class TxnTrampoline implements Transaction {
 
 	/** The original transaction. */
-	private final Transaction originalTxn;
+	final Transaction originalTxn;
 
 	/** Whether this transaction is inactive. */
 	private boolean inactive;

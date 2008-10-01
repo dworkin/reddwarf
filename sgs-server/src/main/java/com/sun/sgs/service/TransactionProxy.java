@@ -22,6 +22,7 @@ package com.sun.sgs.service;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
+import java.util.MissingResourceException;
 
 
 /**
@@ -43,7 +44,7 @@ public interface TransactionProxy {
      * @throws TransactionTimeoutException if the current transaction has
      *                                     timed out
      */
-    public Transaction getCurrentTransaction();
+    Transaction getCurrentTransaction();
 
     /**
      * Returns the owner of the task that is executing the current
@@ -51,7 +52,7 @@ public interface TransactionProxy {
      *
      * @return the current transaction owner's <code>Identity</code>
      */
-    public Identity getCurrentOwner();
+    Identity getCurrentOwner();
 
     /**
      * Returns a <code>Service</code>, based on the given type, that is
