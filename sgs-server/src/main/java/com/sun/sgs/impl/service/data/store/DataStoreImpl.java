@@ -997,13 +997,15 @@ public class DataStoreImpl
 	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	/*
-	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
-	 * without reading or writing, so get the object and ask for a write
-	 * lock.  -tjb@sun.com (10/06/2006)
-	 */
 	try {
-	    getObjectInternal(txn, oid, true);
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    boolean found = oidsDb.markForUpdate(
+		txnInfo.dbTxn, DataEncoding.encodeLong(oid));
+	    /* XXX: Clarify about placeholders.  -tjb@sun.com (10/01/2008) */
+	    if (!found) {
+		throw new ObjectNotFoundException("Object not found: " + oid);
+	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
