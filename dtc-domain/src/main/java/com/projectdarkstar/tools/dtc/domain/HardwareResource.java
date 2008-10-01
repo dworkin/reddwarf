@@ -19,7 +19,7 @@
 
 package com.projectdarkstar.tools.dtc.domain;
 
-import java.sql.Date;
+import java.util.Date;
 import java.util.List;
 import java.util.ArrayList;
 import java.io.Serializable;
@@ -92,7 +92,7 @@ public class HardwareResource implements Serializable
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    public void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     /**
      * Returns the hostname of the resource

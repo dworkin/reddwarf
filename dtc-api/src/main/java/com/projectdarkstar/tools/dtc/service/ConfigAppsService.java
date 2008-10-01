@@ -39,7 +39,14 @@ public interface ConfigAppsService
 {
     /**
      * Add a ServerApp object based on the given serverApp to persistent
-     * storage.
+     * storage.  If the given serverApp's pkgLibrary field is set, 
+     * this method will create a new PkgLibrary if it does not already
+     * exist in the database.  Otherwise, it will set the pkgLibrary
+     * reference to the PkgLibrary in the database with the already 
+     * existing id.  Additionally, this method will <em>always</em>
+     * create a ServerApp object that contains an empty list of
+     * configs.  The configs attribute of the given serverApp will
+     * be ignored if it has any objects in it.
      * 
      * @param serverApp the serverApp to add
      * @return id of the newly created ServerApp object

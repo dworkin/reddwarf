@@ -87,7 +87,7 @@ public class PkgLibrary implements Serializable
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    public void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false, unique = true)
     public String getName() { return name; }

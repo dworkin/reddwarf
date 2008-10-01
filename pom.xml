@@ -120,6 +120,12 @@
 	<version>${junit.version}</version>
 	<scope>test</scope>
       </dependency>
+      <dependency>
+	<groupId>com.bm</groupId>
+	<artifactId>ejb3unit</artifactId>
+	<version>${ejb3unit.version}</version>
+	<scope>test</scope>
+      </dependency>
       
       <dependency>
 	<groupId>org.apache.geronimo.specs</groupId>
@@ -155,13 +161,20 @@
       <url>http://download.java.net/maven/2/</url>
       <layout>default</layout>
     </repository>
+    <repository>
+      <id>ejb3unit.repository</id>
+      <name>EJB3Unit Repository</name>
+      <url>http://ejb3unit.sourceforge.net/maven2</url>
+      <layout>default</layout>
+    </repository>
   </repositories>
 
 
 
 
   <properties>
-    <junit.version>4.2</junit.version>
+    <junit.version>4.5</junit.version>
+    <ejb3unit.version>2.0.0-RC-1</ejb3unit.version>
     <geronimo-jpa_3.0_spec.version>1.1.1</geronimo-jpa_3.0_spec.version>
     <geronimo-ejb_3.0_spec.version>1.0.1</geronimo-ejb_3.0_spec.version>
     <commons-beanutils-core.version>1.7.0</commons-beanutils-core.version>

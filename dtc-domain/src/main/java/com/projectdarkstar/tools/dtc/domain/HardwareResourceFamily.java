@@ -89,7 +89,7 @@ public class HardwareResourceFamily implements Serializable
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    public void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Column(name = "name", nullable = false)
     public String getName() { return name; }

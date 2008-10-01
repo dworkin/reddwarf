@@ -71,7 +71,7 @@ public class LogFile implements Serializable
     @Version
     @Column(name = "versionNumber")
     public Long getVersionNumber() { return versionNumber; }
-    protected void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    public void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
     @Lob
     @Basic(fetch = FetchType.LAZY)

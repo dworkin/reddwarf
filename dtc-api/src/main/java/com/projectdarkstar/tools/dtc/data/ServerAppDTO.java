@@ -45,7 +45,8 @@ public class ServerAppDTO extends AbstractDTO
                         String name,
                         String description,
                         String className,
-                        String classPath)
+                        String classPath,
+                        PkgLibraryDTO requiredPkg)
     {
         this.setId(id);
         this.setVersionNumber(versionNumber);
@@ -54,9 +55,9 @@ public class ServerAppDTO extends AbstractDTO
         this.setDescription(description);
         this.setClassName(className);
         this.setClassPath(classPath);
+        this.setRequiredPkg(requiredPkg);
         
         this.setConfigs(new ArrayList<ServerAppConfigDTO>());
-        this.setRequiredPkg(null);
     }
     
     /**
