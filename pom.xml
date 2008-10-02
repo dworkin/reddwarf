@@ -75,7 +75,7 @@
   </repositories>
 
   <properties>
-    <sgs.version>0.9.6.1</sgs.version>
+    <sgs.version>0.9.6.2</sgs.version>
     <sgs-shared.version>1.0</sgs-shared.version>
   </properties>
 
