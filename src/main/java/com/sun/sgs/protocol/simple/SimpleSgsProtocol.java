@@ -42,15 +42,16 @@ package com.sun.sgs.protocol.simple;
  * <li> optional content, depending on the operation code.
  * </ul>
  * <p>
- * A {@code ByteArray} is encoded in a context dependent fashion. If the ByteArray
- * is the only content, or if the ByteArray is the last piece of content (that is,
- * if the length of the ByteArray can be determined by the payload length and
- * the length of what has come before), the ByteArray is encoded as
+ * A {@code ByteArray} is encoded in a context dependent fashion. If the
+ * ByteArray is the only content, or if the ByteArray is the last piece of
+ * content (that is, if the length of the ByteArray can be determined by the
+ * payload length and the length of what has come before), the ByteArray is
+ * encoded as
  * <ul>
  * <li> (byte[]) the bytes in the array
  * </ul>
- * If there is other content that follows the ByteArray, then the ByteArray 
- * is encoded as
+ * If there is other content that follows the ByteArray, then the ByteArray is
+ * encoded as
  * <ul>
  * <li> (unsigned short) number of bytes in the array
  * <li> (byte[]) content
@@ -59,23 +60,29 @@ package com.sun.sgs.protocol.simple;
  * A {@code String} is encoded as follows:
  * <ul>
  * <li> (unsigned short) number of bytes of modified UTF-8 encoded String
- * <li> (byte[]) String encoded in modified UTF-8 as described
- * in {@link java.io.DataInput}
+ * <li> (byte[]) String encoded in modified UTF-8 as described in
+ * {@link java.io.DataInput}
  * </ul>
  * Note that these encodings only apply to those data items that are specified
- * explicitly in the protocol. Application data, passed as a ByteArray, may 
- * contain any information, but will need to be parsed (and, if necessary, 
- * converted to and from a network representation) by the application or 
- * client.
- * <p>
+ * explicitly in the protocol. Application data, passed as a ByteArray, may
+ * contain any information, but will need to be parsed (and, if necessary,
+ * converted to and from a network representation) by the application or client.
+ * <br>
  * The total length of a message must not be greater than 65535 bytes; given the
- * header information this means that the payload of a message cannot be 
- * greater than 65532 bytes. If a message larger than this must be sent, it is
- * the responsibility of the sender to break the message into pieces and
- * of the receiver to re-assemble those pieces.
+ * header information this means that the payload of a message cannot be greater
+ * than 65532 bytes. If a message larger than this must be sent, it is the
+ * responsibility of the sender to break the message into pieces and of the
+ * receiver to re-assemble those pieces. 
+ * <br>
+ * If a server receives a message with an Opcode other than those defined here,
+ * or with an Opcode that defines a message that should only be sent to a
+ * client, or the message is malformed in other ways, the server will disconnect
+ * the client session. Additionally, if a server receives a message from a
+ * client that is not logged in and that message is not a {@link #LOGIN_REQUEST}
+ * the message will be ignored.
  */
 public interface SimpleSgsProtocol {
-    
+
     /**
      * The maximum length of a protocol message:
      * {@value #MAX_MESSAGE_LENGTH} bytes.
@@ -92,143 +99,146 @@ public interface SimpleSgsProtocol {
     final byte VERSION = 0x04;
 
     /**
-     * Login request from a client to a server. This message should only be 
-     * received by a server; if received by a client it should be ignored.
-     * <br>
-     * Opcode: {@code 0x10}
-     * <br>
+     * Login request from a client to a server. This message should only be sent
+     * to a server; if received by a client it should be ignored. <br>
+     * Opcode: {@code 0x10} <br>
      * Payload:
      * <ul>
-     * <li>(byte)   protocol version
+     * <li>(byte) protocol version
      * <li>(String) name
      * <li>(String) password
      * </ul>
-     * The protocol version will be checked by the server to insure that the
-     * client and server are using the same protocol; if the two do not match
-     * the server will disconnect from the client. Since the protocols being used
-     * are not the same, no other communication between the client and the 
-     * server can be guaranteed to be understood.
+     * The {@code protocol version} will be checked by the server to insure that
+     * the client and server are using the same protocol or versions of the
+     * protocol that are compatible. If the server determines that the protocol
+     * version used by the sender and the protocol version or versions required
+     * by the server are not compatible, the server will disconnect from the
+     * client. In cases where the protocols being used are not compatible, no
+     * other communication between the client and the server is guaranteed to be
+     * understood.
      * <p>
-     * The name and password strings will be passed to the server's authentication
-     * mechanism. The result of attempting to login will be the sending of
-     * either a {@link #LOGIN_SUCCESS}, {@link #LOGIN_FAILURE}, or 
-     * {@link #LOGIN_REDIRECT} message from the server to the client.
+     * The {@code name} and {@code password} strings are passed to the server's
+     * authentication mechanism. After the server processes the login requres,
+     * the server sends one of the following acknowledgments:
+     * <ul>
+     * <li> {@link #LOGIN_SUCCESS}, if user authentication succeeds and
+     * invoking the 'loggedIn' method on the application's 'AppListener' with
+     * the user's ClientSession returns a non-null, serializable
+     * ClientSessionListener;
+     * <li>{@link #LOGIN_REDIRECT}, if user authentication succeeds, but the
+     * server requests that the client redirect the login request to another
+     * node; or
+     * <li>{@link #LOGIN_FAILURE}, if user authentication fails, or if the
+     * user is already logged in and the server is configured to reject new
+     * logins for the same user, or if invoking the 'loggedIn' method on the
+     * application's 'AppListener' with the user's ClientSession returns a null,
+     * or non-serializable ClientSessionListener or the method does not complete
+     * successfully
+     * </ul>
+     * to the client.
      * <p>
-     * Sending a login request on a session that is currently logged in will 
-     * result in 
+     * If a client is currently logged in, the result of receiving a
+     * LOGIN_REQUEST is determined by the value of the property
+     * com.sun.sgs.impl.service.session.allow.new.login. If the value of this
+     * property is {@code false}, the server discards the request. If the value
+     * of the property is {@code true}, the current login from the client is
+     * terminated, and a new login is initiated using the information passed in
+     * the new request.
      */
     final byte LOGIN_REQUEST = 0x10;
 
     /**
-     * Login success.  Server response to a client's {@link #LOGIN_REQUEST}. 
+     * Login success. Server response to a client's {@link #LOGIN_REQUEST}.
      * <br>
-     * Opcode: {@code 0x11}
-     * <br>
+     * Opcode: {@code 0x11} <br>
      * Payload:
      * <ul>
      * <li> (ByteArray) reconnectionKey
      * </ul>
-     * The reconnectionKey is an opaque reference that can be held by the client
-     * for use in case the client is disconnected and wishes to reconnect to the
-     * server with the same identity using a {@link #RECONNECT_REQUEST}. 
-     * <br>
-     * The behavior of a server receiving this message from a client that is 
-     * already logged in is determined by the property com.sun.sgs.impl.service.session.allow.new.login.
-     * If the value of this property is false (which is the default value) the
-     * second login request is ignored. If the value is true, the second login
-     * request will cause the currently active login to be replaced by the new
-     * request.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
+     * The {@code reconnectionKey} is an opaque reference that can be held by
+     * the client for use in case the client is disconnected and wishes to
+     * reconnect to the server with the same identity using a
+     * {@link #RECONNECT_REQUEST}.
      */
     final byte LOGIN_SUCCESS = 0x11;
 
     /**
-     * Login failure.  Server response to a client's {@link #LOGIN_REQUEST}.
+     * Login failure. Server response to a client's {@link #LOGIN_REQUEST}.
      * <br>
-     * Opcode: {@code 0x12}
-     * <br>
+     * Opcode: {@code 0x12} <br>
      * Payload:
      * <ul>
      * <li> (String) reason
      * </ul>
-     * This message indicates a failure of the login process initiated by a 
-     * {@link #LOGIN_REQUEST}. The reason for the failure is encoded in the returned
-     * string; the interpretation of the reason is application specific.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
+     * This message indicates that the server rejects the {@link #LOGIN_REQUEST}
+     * for some reason, including
+     * <ul>
+     * <li> user authentication failure,
+     * <li> failure during application processing of the client session, or
+     * <li> a user with the same identity is already logged in, and the server
+     * is configured to reject new logins for clients who are currently logged
+     * in
+     * </ul>
+     * 
      */
     final byte LOGIN_FAILURE = 0x12;
 
     /**
-     * Login redirect.  Server response to a client's {@link #LOGIN_REQUEST}.
+     * Login redirect. Server response to a client's {@link #LOGIN_REQUEST}.
      * <br>
-     * Opcode: {@code 0x13}
-     * <br>
+     * Opcode: {@code 0x13} <br>
      * Payload:
      * <ul>
      * <li> (String) hostname
      * <li> (int) port
      * </ul>
-     * This message indicates a redirection from the 
-     * machine to which the {@link #LOGIN_REQUEST} was sent to another machine.
-     * The client receiving this request should shut down the connection to the
-     * original machine and establish a connection to the redirection machine, 
-     * indicated by the hostname and port in the payload. The client should 
-     * then attempt to log in to the machine to which it has been redirected
-     * by sending a {@link #LOGIN_REQUEST} to that machine.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
+     * This message indicates a redirection from the node to which the
+     * {@link #LOGIN_REQUEST} was sent to another node. The client receiving
+     * this request should shut down the connection to the original node and
+     * establish a connection to the node indicated by the {@code hostname} and
+     * {@code port} in the payload. The client should then attempt to log in to
+     * the node to which it has been redirected by sending a
+     * {@link #LOGIN_REQUEST} to that node.
      */
     final byte LOGIN_REDIRECT = 0x13;
 
     /**
-     * Reconnection request.  Client requesting reconnect to a server.
-     * <br>
-     * Opcode: {@code 0x20}
-     * <br>
+     * Reconnection request. Client requesting reconnect to a server. <br>
+     * Opcode: {@code 0x20} <br>
      * Payload:
      * <ul>
-     * <li> (byte)      protocol version
+     * <li> (byte) protocol version
      * <li> (ByteArray) reconnectionKey
      * </ul>
-     * This message requests that the client be reconnected to an existing 
-     * login session with the server. The reconnectionKey must be the same that
-     * was sent to the client by the server as part of the {@link #LOGIN_SUCCESS}
-     * for the session to which reconnection is requested. Support for this message,
-     * and the length of time after a disconnect that a server will allow 
-     * reconnect, may vary from server to server. If the message is received by
-     * the server when the server state indicates that the client is currently 
-     * logged in with a valid session, the server will respond with a {@link 
-     * #RECONNECT_SUCCESS} message, and will continue with the current client
-     * session.
-     * <br>
+     * This message requests that the client be reconnected to an existing
+     * client session with the server. The {@code reconnectionKey} must match
+     * the one that the client received in the previous {@link #LOGIN_SUCCESS}
+     * or {@link #RECONNECT_SUCCESS} message (if reconnection was performed
+     * subsequent to login). If reconnection is successful, the server
+     * acknowledges the request with a {@link #RECONNECT_SUCCESS} message
+     * containing a new {@code reconnectionKey}. If reconnection is not
+     * successful, a {@link #RECONNECT_FAILURE} message is sent to the client.
+     * If the client receives a RECONNECT_FAILURE message, the client should
+     * disconnect from the server. <br>
      * <b>Note: this message is not currently supported by the Project Darkstar
      * Server</b>
      */
+    
     final byte RECONNECT_REQUEST = 0x20;
 
     /**
-     * Reconnect success.  Server response to a client's
-     * {@link #RECONNECT_REQUEST}.
-     * <br>
-     * Opcode: {@code 0x21}
-     * <br>
+     * Reconnect success. Server response to a client's
+     * {@link #RECONNECT_REQUEST}. <br>
+     * Opcode: {@code 0x21} <br>
      * Payload:
      * <ul>
      * <li> (ByteArray) reconnectionKey
      * </ul>
-     * Indicates that a {@link #RECONNECT_REQUEST} has been successful. The 
-     * message will include a reconnect key that can be used in subsequent 
-     * reconnect requests from the client. Reciept of this message indicates that
-     * the client session has been re-established in the state it was in when the
-     * client was disconnected from the server.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
+     * Indicates that a {@link #RECONNECT_REQUEST} has been successful. The
+     * message will include a {@code reconnectionKey} that can be used in
+     * subsequent reconnect requests from the client. Reciept of this message
+     * indicates that the client session has been re-established in the state it
+     * was in when the client was disconnected from the server. 
      * <br>
      * <b>Note: this message is not currently supported by the Project Darkstar
      * Server</b>
@@ -236,24 +246,21 @@ public interface SimpleSgsProtocol {
     final byte RECONNECT_SUCCESS = 0x21;
 
     /**
-     * Reconnect failure.  Server response to a client's
-     * {@link #RECONNECT_REQUEST}.
+     * Reconnect failure. Server response to a client's
+     * {@link #RECONNECT_REQUEST}. 
      * <br>
-     * Opcode: {@code 0x22}
+     * Opcode: {@code 0x22} 
      * <br>
      * Payload:
      * <ul>
      * <li> (String) reason
      * </ul>
      * This response indicates that a reconnect request could not be honored by
-     * the server. This could have been because of an invalid reconnect key, or 
-     * because too much time had elapsed between the client disconnection and 
-     * the reconnect request (which, in turn, caused the server to discard
-     * the client state). The string returned details the reason for the
-     * denial of reconnection.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
+     * the server. This could have been because of an invalid reconnect key, or
+     * because too much time had elapsed between the session disconnection and
+     * the reconnect request (which, in turn, may have caused the server to
+     * discard the session state). The string returned details the reason for
+     * the denial of reconnection. 
      * <br>
      * <b>Note: this message is not currently supported by the Project Darkstar
      * Server</b>
@@ -261,12 +268,11 @@ public interface SimpleSgsProtocol {
     final byte RECONNECT_FAILURE = 0x22;
 
     /**
-     * Session message.  May be sent by the client or the server.
-     * Maximum length is {@value #MAX_PAYLOAD_LENGTH} bytes.
-     * Larger messages require fragmentation and reassembly above
-     * this protocol layer.
+     * Session message. May be sent by the client or the server. Maximum length
+     * is {@value #MAX_PAYLOAD_LENGTH} bytes. Larger messages require
+     * fragmentation and reassembly above this protocol layer. 
      * <br>
-     * Opcode: {@code 0x30}
+     * Opcode: {@code 0x30} 
      * <br>
      * Payload:
      * <ul>
@@ -274,27 +280,23 @@ public interface SimpleSgsProtocol {
      * </ul>
      * This message allows information to be sent between the client and the
      * server. The content of the message is application dependent, and the
-     * mechanisms for constructing and parsing these messages is an application-level
-     * task. 
-     * <br>
-     * If this message is sent by a client to a server and the client is not
-     * currently logged in to the server, the message will be ignored. 
+     * mechanisms for constructing and parsing these messages is an
+     * application-level task. 
      */
     final byte SESSION_MESSAGE = 0x30;
 
-
     /**
-     * Logout request from a client to a server.
+     * Logout request from a client to a server. 
      * <br>
-     * Opcode: {@code 0x40}
+     * Opcode: {@code 0x40} 
      * <br>
-     * No payload.
+     * No payload. 
      * <br>
-     * This message will cause the client to be logged out of the server, and
-     * the connection to be closed. Membership in any channels by the client will 
-     * be dropped. Any message (other than {@link #LOGIN_REQUEST} sent by the
-     * client after sending this message will be ignored, and any message will 
-     * need to be sent on a new connection to the server.
+     * This message will cause the client to be logged out of the server,. The
+     * server will remove all of the client's channel memberships. Any message
+     * (other than {@link #LOGIN_REQUEST} sent by the client after sending this
+     * message will be ignored, and any message will need to be sent on a new
+     * connection to the server.
      */
     final byte LOGOUT_REQUEST = 0x40;
 
@@ -304,18 +306,14 @@ public interface SimpleSgsProtocol {
      * Opcode: {@code 0x41}
      * <br>
      * No payload.
-      * <br>
+     * <br>
      * This message is sent from the server to the client to indicate that a
      * {@link #LOGOUT_REQUEST} has been received and that the client has been
      * logged out of the current session. On receipt of this message, the client
      * should shut down any networking resources that are used to communicate
      * with the server.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
-    */
+     */
     final byte LOGOUT_SUCCESS = 0x41;
-
 
     /**
      * Channel join.  Server notifying a client that it has joined a channel.
@@ -329,39 +327,34 @@ public interface SimpleSgsProtocol {
      * </ul>
      * This message is sent from the server to the client to indicate that the 
      * client has been added to the channel identified by the name and channel ID
-     * contained in the message. The client should establish a way of receiving 
-     * messages that will be sent on the channel.
-     * <br>
-     * This message should only be received by a client; if received by a server 
-     * the client sending the message will be disconnected.
+     * contained in the message. 
      */
     final byte CHANNEL_JOIN = 0x50;
 
     /**
-     * Channel leave.  Server notifying a client that the client has left a channel.
+     * Channel leave. Server notifying a client that the client has left a
+     * channel. 
      * <br>
-     * Opcode: {@code 0x51}
+     * Opcode: {@code 0x51} 
      * <br>
      * Payload:
      * <ul>
      * <li> (ByteArray) channel ID
      * </ul>
-     * This message is sent from the server to the client indicating to the client
-     * that it has been removed from the channel with the indicated channel ID.
-     * The client can no longer send messages on the channel, and any objects
-     * that are currently listening for messages on the channel can be removed.
+     * This message is sent from the server indicating to the client that the
+     * client has been removed from the channel with the indicated channel ID.
+     * The client can no longer send messages on the channel.
      */
     final byte CHANNEL_LEAVE = 0x51;
-    
+
     /**
-     * Channel message.  May be sent by the client or the server.
-     * Maximum length is {@value #MAX_PAYLOAD_LENGTH} bytes minus the channel ID
-     * size plus two bytes (the size of the unsigned short indicating the 
-     * channel Id size).
-     * Larger messages require fragmentation and reassembly above
-     * this protocol layer.
+     * Channel message. May be sent by the client or the server. Maximum length
+     * is {@value #MAX_PAYLOAD_LENGTH} bytes minus the sum of the channel ID
+     * size and two bytes (the size of the unsigned short indicating the channel
+     * Id size). Larger messages require fragmentation and reassembly above this
+     * protocol layer. 
      * <br>
-     * Opcode: {@code 0x52}
+     * Opcode: {@code 0x52} 
      * <br>
      * Payload:
      * <ul>
@@ -369,12 +362,11 @@ public interface SimpleSgsProtocol {
      * <li> (ByteArray) channel ID
      * <li> (ByteArray) message
      * </ul>
-     * This message will initiate the channel sending logic on the server, 
-     * requesting that the indicated message content be sent to all of the 
-     * members of the indicated channel. If the client sending the request
-     * is not a member of the channel, the message will be rejected by the server.
-     * The server may also refuse to send the message, or alter the message, 
-     * because of application-specific logic.
+     * This message requests that the specified message be sent to all members
+     * of the specified channel. If the client sending the request is not a
+     * member of the channel, the message will be rejected by the server. The
+     * server may also refuse to send the message, or alter the message, because
+     * of application-specific logic.
      */
     final byte CHANNEL_MESSAGE = 0x52;
 }
