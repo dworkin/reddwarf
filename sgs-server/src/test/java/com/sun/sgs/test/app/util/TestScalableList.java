@@ -22,6 +22,7 @@ package com.sun.sgs.test.app.util;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 
@@ -158,8 +159,7 @@ public class TestScalableList extends Assert {
 	}
 
 	/*
-	 * /////////////////////////////////////////////////// NON-EXCEPTIONAL
-	 * (NORMAL) USE CASES ///////////////////////////////////////////////////
+	 * /////////////  NON-EXCEPTIONAL (NORMAL) USE CASES /////////////////
 	 */
 
 	/**
@@ -376,7 +376,7 @@ public class TestScalableList extends Assert {
 				list.add("B");
 				list.add("C");
 
-				assertEquals("A", list.getFirst());
+				assertEquals("A", list.get(0));
 			}
 		}, taskOwner);
 	}
@@ -395,28 +395,11 @@ public class TestScalableList extends Assert {
 				list.add("B");
 				list.add("C");
 
-				assertEquals("C", list.getLast());
+				assertEquals("C", list.get(2));
 			}
 		}, taskOwner);
 	}
 
-	/**
-	 * Tests whether the first and last element in the list are the same when
-	 * the list size is unity.
-	 * 
-	 * @throws Exception
-	 */
-	@Test
-	public void testGetFirstAndLastElementWithOneEntry() throws Exception {
-		txnScheduler.runTask(new AbstractKernelRunnable() {
-			public void run() throws Exception {
-				ScalableList<String> list = new ScalableList<String>(6, 6);
-				list.add("only child");
-
-				assertEquals(list.getFirst(), list.getLast());
-			}
-		}, taskOwner);
-	}
 
 	/**
 	 * Tests the accuracy of retrieving a value from the middle of the list.
@@ -554,7 +537,7 @@ public class TestScalableList extends Assert {
 				list.add("B");
 				list.add("C");
 
-				list.removeFirst();
+				list.remove(0);
 
 				assertEquals(2, list.size());
 			}
@@ -574,7 +557,7 @@ public class TestScalableList extends Assert {
 				list.add("A");
 				list.add("B");
 				list.add("C");
-				Object obj = list.removeFirst();
+				Object obj = list.remove(0);
 
 				assertEquals("A", obj);
 			}
@@ -595,7 +578,7 @@ public class TestScalableList extends Assert {
 				list.add("A");
 				list.add("B");
 				list.add("C");
-				list.removeLast();
+				list.remove(2);
 
 				assertEquals(2, list.size());
 			}
@@ -616,7 +599,7 @@ public class TestScalableList extends Assert {
 				list.add("A");
 				list.add("B");
 				list.add("C");
-				Object obj = list.removeLast();
+				Object obj = list.remove(2);
 
 				assertEquals("C", obj);
 			}
@@ -723,9 +706,9 @@ public class TestScalableList extends Assert {
 				list.add("B");
 				list.add("C");
 
-				list.removeFirst();
-				list.removeFirst();
-				list.removeFirst();
+				list.remove(0);
+				list.remove(0);
+				list.remove(0);
 
 				assertTrue(list.isEmpty());
 			}
@@ -798,6 +781,186 @@ public class TestScalableList extends Assert {
 		}, taskOwner);
 	}
 
+	
+	
+	/**
+	 * Tests adding an item to an empty list.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testContainsWithSingleElement() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+
+				assertTrue(list.contains("A"));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests the contains() method
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testContainsWithPopulatedList() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+				assertTrue(list.add("B"));
+				assertTrue(list.add("C"));
+
+				assertTrue(list.contains("A"));
+				assertTrue(list.contains("B"));
+				assertTrue(list.contains("C"));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests whether items can be found in a list.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testContainsAllWithPopulatedList() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+				assertTrue(list.add("B"));
+				assertTrue(list.add("C"));
+
+				Collection<String> c = new ArrayList<String>();
+				c.add("B");
+				c.add("C");
+				
+				assertTrue(list.containsAll(c));
+				assertEquals(3, list.size());
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests whether a collection of items can be retained
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testRetainAll() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+				assertTrue(list.add("B"));
+				assertTrue(list.add("C"));
+				assertTrue(list.add("D"));
+
+				Collection<String> c = new ArrayList<String>();
+				c.add("A");
+				c.add("B");
+				
+				assertTrue(list.retainAll(c));
+				assertEquals(2, list.size());
+				assertEquals("A", list.get(0));
+				assertEquals("B", list.get(1));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests retrieving a sublist from two arbitrary indices
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testSubList() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+				assertTrue(list.add("B"));
+				assertTrue(list.add("C"));
+				assertTrue(list.add("D"));
+				
+				List<String> newList = list.subList(1, 2);
+				
+				assertEquals(2, newList.size());
+				assertEquals("B", newList.get(0));
+				assertEquals("C", newList.get(1));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests retrieving an array of the contents
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testToArray() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+				assertTrue(list.add("B"));
+				assertTrue(list.add("C"));
+				assertTrue(list.add("D"));
+				
+				Object[] array = list.toArray();
+				
+				assertEquals(4, list.size());
+				assertEquals(4, array.length);
+				assertEquals("A", array[0]);
+				assertEquals("B", array[1]);
+				assertEquals("C", array[2]);
+				assertEquals("D", array[3]);
+			}
+		}, taskOwner);
+	}
+	
+	
+	
+	/**
+	 * Tests retrieving an array of the contents by
+	 * providing it an array parameter
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testToArrayGivenParam() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = new ScalableList<String>(6, 6);
+				assertTrue(list.add("A"));
+				assertTrue(list.add("B"));
+				assertTrue(list.add("C"));
+				assertTrue(list.add("D"));
+				
+				Object[] container = new Object[77];
+				Object[] array = list.toArray(container);
+				
+				assertEquals(4, list.size());
+				assertEquals(77, array.length);
+				assertEquals("A", array[0]);
+				assertEquals("B", array[1]);
+				assertEquals("C", array[2]);
+				assertEquals("D", array[3]);
+			}
+		}, taskOwner);
+	}
+	
+	
+	
 	/*
 	 * ////////////////////////////////////////////////////////////// SCALABLE
 	 * USE CASES (INVOLVING SPLITTING AND DELETING)
@@ -1183,7 +1346,7 @@ public class TestScalableList extends Assert {
 			public void run() throws Exception {
 				ScalableList<String> list = makeList();
 
-				assertEquals("A", list.getFirst());
+				assertEquals("A", list.get(0));
 			}
 		}, taskOwner);
 	}
@@ -1199,10 +1362,142 @@ public class TestScalableList extends Assert {
 			public void run() throws Exception {
 				ScalableList<String> list = makeList();
 
-				assertEquals("L", list.getLast());
+				assertEquals("L", list.get(11));
 			}
 		}, taskOwner);
 	}
+	
+	
+	
+	
+	
+
+
+	
+
+	
+	
+	/**
+	 * Tests whether items can be found in a list.
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testScalableContainsAllWithPopulatedList() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = makeList();
+
+				Collection<String> c = new ArrayList<String>();
+				c.add("B");
+				c.add("D");
+				c.add("I");
+				
+				assertTrue(list.containsAll(c));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests whether a collection of items can be retained
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testScalableRetainAll() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = makeList();
+				
+				Collection<String> c = new ArrayList<String>();
+				c.add("A");
+				c.add("D");
+				c.add("G");
+				
+				assertTrue(list.retainAll(c));
+				assertEquals(3, list.size());
+				assertEquals("A", list.get(0));
+				assertEquals("D", list.get(1));
+				assertEquals("G", list.get(2));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests retrieving a sublist from two arbitrary indices
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testScalableSubList() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = makeList();
+				
+				List<String> newList = list.subList(3, 7);
+				
+				assertEquals(5, newList.size());
+				assertEquals("D", newList.get(0));
+				assertEquals("H", newList.get(4));
+			}
+		}, taskOwner);
+	}
+	
+	
+	/**
+	 * Tests retrieving an array of the contents
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testScalableToArray() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = makeList();
+				
+				Object[] array = list.toArray();
+				
+				assertEquals(12, list.size());
+				assertEquals(12, array.length);
+				assertEquals("A", array[0]);
+				assertEquals("D", array[3]);
+				assertEquals("G", array[6]);
+			}
+		}, taskOwner);
+	}
+	
+	
+	
+	/**
+	 * Tests retrieving an array of the contents by
+	 * providing it an array parameter
+	 * 
+	 * @throws Exception
+	 */
+	@Test
+	public void testScalableToArrayGivenParam() throws Exception {
+		txnScheduler.runTask(new AbstractKernelRunnable() {
+			public void run() throws Exception {
+				ScalableList<String> list = makeList();
+				
+				Object[] container = new Object[77];
+				Object[] array = list.toArray(container);
+				
+				assertEquals(12, list.size());
+				assertEquals(77, array.length);
+				assertEquals("A", array[0]);
+				assertEquals("D", array[3]);
+				assertEquals("G", array[6]);
+			}
+		}, taskOwner);
+	}
+	
+	
+	
+	
+	
 
 	/*
 	 * //////////////////////////////////////////////////////////////
@@ -1375,7 +1670,7 @@ public class TestScalableList extends Assert {
 				assertFalse(list.isEmpty());
 
 				list.add("B");
-				list.removeFirst();
+				list.remove(0);
 				assertFalse(list.isEmpty());
 			}
 		}, taskOwner);
