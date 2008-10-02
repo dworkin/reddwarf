@@ -27,17 +27,11 @@ import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.service.ProfileService;
 
 /**
- * Class DataStoreStats
+ * Implementation of JMX MBean for the data store.
  * 
  */
 
 public class DataStoreStats implements DataStoreStatsMXBean {  
-
-    /* -- Profile operations for the DataStore API -- */
-   
-    // JANE: much of this code could be automatically generated, I'd think,
-    // especially for the operations.  Seems like a netbeans plug-in sort
-    // of thing to do.
 
     /* -- Profile operations for the DataStore API -- */
 
@@ -86,7 +80,12 @@ public class DataStoreStats implements DataStoreStatsMXBean {
      */
     final ProfileSample writtenBytesSample;
     
-    public DataStoreStats(ProfileService profileService){
+    /**
+     * Create a data store statistics object.
+     * @param profileService the profile service used to create profiling
+     *     objects and register the MBean with JMX
+     */
+    public DataStoreStats(ProfileService profileService) {
         // NOTE
         // Set up profiling stuff.  Can this be done statically?
         // What if I have a new ProfileStats (probably a bad name) object
@@ -102,21 +101,28 @@ public class DataStoreStats implements DataStoreStatsMXBean {
                 registerProfileProducer(DataStore.class.getName());
         ProfileLevel level = ProfileLevel.MAX;
         
-	createObjectOp = consumer.registerOperation("createObject", level);
-	markForUpdateOp = consumer.registerOperation("markForUpdate", level);
-	getObjectOp = consumer.registerOperation("getObject", level);
+	createObjectOp = 
+            consumer.registerOperation("createObject", true, level);
+	markForUpdateOp = 
+            consumer.registerOperation("markForUpdate", true, level);
+	getObjectOp = consumer.registerOperation("getObject", true, level);
 	getObjectForUpdateOp =
-	    consumer.registerOperation("getObjectForUpdate", level);
-	setObjectOp = consumer.registerOperation("setObject", level);
-	setObjectsOp = consumer.registerOperation("setObjects", level);
-	removeObjectOp = consumer.registerOperation("removeObject", level);
-	getBindingOp = consumer.registerOperation("getBinding", level);
-	setBindingOp = consumer.registerOperation("setBinding", level);
-	removeBindingOp = consumer.registerOperation("removeBinding", level);
-	nextBoundNameOp = consumer.registerOperation("nextBoundName", level);
-	getClassIdOp = consumer.registerOperation("getClassId", level);
-	getClassInfoOp = consumer.registerOperation("getClassInfo", level);
-	nextObjectIdOp = consumer.registerOperation("nextObjectIdOp", level);
+	    consumer.registerOperation("getObjectForUpdate", true, level);
+	setObjectOp = consumer.registerOperation("setObject", true, level);
+	setObjectsOp = consumer.registerOperation("setObjects", true, level);
+	removeObjectOp = 
+            consumer.registerOperation("removeObject", true, level);
+	getBindingOp = consumer.registerOperation("getBinding", true, level);
+	setBindingOp = consumer.registerOperation("setBinding", true, level);
+	removeBindingOp = 
+            consumer.registerOperation("removeBinding", true, level);
+	nextBoundNameOp = 
+            consumer.registerOperation("nextBoundName", true, level);
+	getClassIdOp = consumer.registerOperation("getClassId", true, level);
+	getClassInfoOp = 
+            consumer.registerOperation("getClassInfo", true, level);
+	nextObjectIdOp =
+            consumer.registerOperation("nextObjectIdOp", true, level);
 	readBytesCounter = consumer.registerCounter("readBytes", true, level);
 	readObjectsCounter =
 	    consumer.registerCounter("readObjects", true, level);
@@ -140,92 +146,92 @@ public class DataStoreStats implements DataStoreStatsMXBean {
     // versions, to reduce synch?  But register one big JMX bean w/ platform.
     // Use Atomic...
     
-    @Override
+    /** {@inheritDoc} */
     public long getGetBindingCount() {
         return getBindingOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getClassIdCount() {
         return getClassIdOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getClassInfoCount() {
         return getClassInfoOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getCreateObjectCount() {
         return createObjectOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getMarkForUpdateCount() {
         return markForUpdateOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getNextObjectIdCount() {
         return nextObjectIdOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getObjectCount() {
         return getObjectOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getObjectForUpdateCount() {
         return getObjectForUpdateOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getReadBytesCount() {
         return readBytesCounter.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getReadObjectsCount() {
         return readObjectsCounter.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getWrittenBytesCount() {
         return writtenBytesCounter.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getWrittenObjectsCount() {
         return writtenObjectsCounter.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getRemoveBindingCount() {
         return removeBindingOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getNextBoundNameCount() {
         return nextBoundNameOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getRemoveObjectCount() {
         return removeObjectOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getSetBindingCount() {
         return setBindingOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getSetObjectCount() {
         return setObjectOp.getCount();
     }
 
-    @Override
+    /** {@inheritDoc} */
     public long getSetObjectsCount() {
         return setObjectsOp.getCount();
     }

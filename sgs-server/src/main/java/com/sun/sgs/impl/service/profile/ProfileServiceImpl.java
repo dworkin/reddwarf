@@ -25,16 +25,17 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.TransactionProxy;
 import java.lang.management.ManagementFactory;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.InstanceNotFoundException;
 import javax.management.JMException;
 import javax.management.MBeanRegistrationException;
 import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
 /**
@@ -50,7 +51,7 @@ public class ProfileServiceImpl implements ProfileService {
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
     
     private ProfileCollector collector;
-    private Set<ObjectName> registeredMBeans;
+    private ConcurrentMap<String, Object> registeredMBeans;
     private boolean shutdown = false;
     
     /**
@@ -70,8 +71,7 @@ public class ProfileServiceImpl implements ProfileService {
         logger.log(Level.CONFIG, 
                  "Creating ProfileServiceImpl properties:{0}", properties);
         collector = systemRegistry.getComponent(ProfileCollector.class);
-        registeredMBeans = 
-                Collections.synchronizedSet(new HashSet<ObjectName>());
+        finishConstruction();
     }
     
     /** 
@@ -82,10 +82,25 @@ public class ProfileServiceImpl implements ProfileService {
         logger.log(Level.CONFIG, 
                  "Creating ProfileServiceImpl for testing");
         this.collector = collector;
-        registeredMBeans = 
-                Collections.synchronizedSet(new HashSet<ObjectName>());
+        finishConstruction();
     }
     
+    private void finishConstruction() {
+        registeredMBeans = new ConcurrentHashMap<String, Object>();
+        
+        // Create the task aggregator, add it as a listener, and register
+        // it as an MBean.  We do this here so we can gather task data for
+        // all services that are started after us.
+        TaskAggregate taskAgg = new TaskAggregate();
+        collector.addListener(taskAgg, true);
+        try {
+            registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
+    }
     /* -- implement ProfileService -- */
     /** {@inheritDoc} */
     public ProfileCollector getProfileCollector() {
@@ -101,18 +116,23 @@ public class ProfileServiceImpl implements ProfileService {
         
         try {
             ObjectName name = new ObjectName(mBeanName);
-            platServer.registerMBean(
+            platServer.registerMBean(mBean, name);
 //                new StandardMBean(stats, DataStoreStatsMXBean.class) { },
                     // Still not clear why I'd use an anon class here
                     // Can provide descriptors for my attributes: how?
-                mBean, name);
-            registeredMBeans.add(name);
+                
+            registeredMBeans.putIfAbsent(mBeanName, mBean);
             logger.log(Level.CONFIG, "Registered MBean {0}", name);
         } catch (JMException ex) {
             logger.logThrow(Level.CONFIG, ex, 
                             "Could not register MBean {0}", mBeanName);
             throw ex;
         }
+    }
+
+    /** {@inheritDoc} */
+    public Object getRegisteredMBean(String mBeanName) {
+        return registeredMBeans.get(mBeanName);
     }
 
     /* -- implement Service -- */
@@ -133,10 +153,13 @@ public class ProfileServiceImpl implements ProfileService {
         }
         // attempt to unregister all our registered MBeans
         MBeanServer platServer = ManagementFactory.getPlatformMBeanServer();
-        Set<ObjectName> setCopy = new HashSet<ObjectName>(registeredMBeans);
-        for (ObjectName name : setCopy) {
+        Set<String> keys = registeredMBeans.keySet();
+        for (String name : keys) {
             try {
-                platServer.unregisterMBean(name);
+                platServer.unregisterMBean(new ObjectName(name));
+            } catch (MalformedObjectNameException ex) {
+                logger.logThrow(Level.WARNING, ex, 
+                                "Could not unregister MBean {0}", name);
             } catch (InstanceNotFoundException ex) {
                 logger.logThrow(Level.WARNING, ex, 
                                 "Could not unregister MBean {0}", name);

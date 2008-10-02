@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package com.sun.sgs.impl.kernel;
+package com.sun.sgs.impl.service.profile;
 
 import com.sun.sgs.management.TaskAggregateMXBean;
 import com.sun.sgs.profile.ProfileListener;
@@ -31,7 +31,7 @@ import javax.management.NotificationBroadcasterSupport;
  * The central location to aggregate information on tasks run through the
  * system.
  */
-public class TaskAggregate extends NotificationBroadcasterSupport
+class TaskAggregate extends NotificationBroadcasterSupport
         implements TaskAggregateMXBean, ProfileListener 
 {
     private AtomicLong numTasks = new AtomicLong();
@@ -107,7 +107,8 @@ public class TaskAggregate extends NotificationBroadcasterSupport
             long newRunningTime = profileReport.getRunningTime();
             double newLagTime = profileReport.getActualStartTime() -
                     profileReport.getScheduledStartTime();
-//            System.out.println("JANE running " + newRunningTime + " lag " + newLagTime);
+//            System.out.println("JANE running " + newRunningTime + 
+//                                  " lag " + newLagTime);
             if (newRunningTime > maxRuntime.longValue()) {
                 maxRuntime.set(newRunningTime);
             }

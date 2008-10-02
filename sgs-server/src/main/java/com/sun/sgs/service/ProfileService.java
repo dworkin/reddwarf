@@ -43,8 +43,18 @@ public interface ProfileService extends Service {
      * @param mBean the MBean or MXBean to be registered
      * @param mBeanName the name under which it should be registered
      * 
-     * @throws javax.management.JMException if there were any problems reported
+     * @throws JMException if there were any problems reported
      *    by the JMX system during registration
      */
-    void registerMBean(Object mBean, String mBeanName) throws JMException;  
+    void registerMBean(Object mBean, String mBeanName) throws JMException;
+    
+    /**
+     * Return the object registered under the given name, or {@code null}
+     * if no object has been registered with that name.
+     * 
+     * @param mBeanName the name the object was registered under
+     * @return the object passed into {@link #registerMBean(Object, String)
+     *         registerMBean} with the given {@code mBeanName}
+     */
+    Object getRegisteredMBean(String mBeanName);
 }

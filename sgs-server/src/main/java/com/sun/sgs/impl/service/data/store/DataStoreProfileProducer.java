@@ -86,43 +86,6 @@ public class DataStoreProfileProducer
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
-        // Register beans with Platform MBeanServer
-//        MBeanServer platServer = ManagementFactory.getPlatformMBeanServer();
-////            final StandardMBean mbean = new StandardMBean(thing, ThingMBean.class) { };
-//        // Use anon class for StandardMBean to avoid class loader confusion:
-//        // see http://blogs.sun.com/jmxetc/entry/javax_management_standardmbean_when_and
-////        platServer.registerMBean(
-////                new StandardMBean(config, ConfigManagerMBean.class) { },
-////                new ObjectName(ConfigManagerMBean.CONFIG_MBEAN_NAME));
-////        platServer.registerMBean(new PropertyManager(appProperties), 
-////                new ObjectName(PropertyManager.PROPERTY_MANAGER_MBEAN_NAME));
-////        final NotificationEmitter emitter = 
-////                new NotificationBroadcasterSupport(taskAgg.getNotificationInfo());
-////        platServer.
-////            registerMBean(
-////               new StandardEmitterMBean(taskAgg, TaskAggregateMBean.class, emitter),
-////               new ObjectName(TaskAggregateMBean.TASK_AGGREGATE_MBEAN_NAME));
-//        
-//        // If we find an exception when registering the MBean, just log it
-//        // and continue on.
-//        try {
-//            platServer.registerMBean(
-////                new StandardMBean(stats, DataStoreStatsMXBean.class) { },
-//                    // Still not clear why I'd use an anon class here
-//                    // Can provide descriptors for my attributes: how?
-//                stats,
-//                new ObjectName(
-//                        DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME));
-//        } catch (InstanceAlreadyExistsException e) {
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-//        } catch (MBeanRegistrationException e) {
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-//        } catch (NotCompliantMBeanException e) {
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-//        } catch (MalformedObjectNameException e) {
-//            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-//        }
-        
     }
 
     /* -- Implement DataStore -- */

@@ -46,6 +46,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.management.DataServiceMXBean;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
@@ -59,6 +60,7 @@ import java.math.BigInteger;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Provides an implementation of <code>DataService</code> based on {@link
@@ -142,7 +144,7 @@ import java.util.logging.Logger;
  * com.sun.sgs.impl.service.data.DataServiceImpl.abort}, to make it easier to
  * debug concurrency conflicts by just logging aborts.
  */
-public final class DataServiceImpl implements DataService {
+public final class DataServiceImpl implements DataService, DataServiceMXBean {
 
     /** The name of this class. */
     private static final String CLASSNAME = 
@@ -237,6 +239,8 @@ public final class DataServiceImpl implements DataService {
     private boolean detectModifications;
 
     /** Our profiling operations. */
+    // Note that right now, there is only one, so this class simply
+    // implements the MBean interface
     private final ProfileOperation createReferenceOp;
     
     /**
@@ -436,7 +440,16 @@ public final class DataServiceImpl implements DataService {
                 profileService.getProfileCollector().
                     registerProfileProducer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
-		"createReference", ProfileLevel.MAX);
+		"createReference", true, ProfileLevel.MAX);
+
+            // and register our MBean
+            try {
+                profileService.registerMBean(this, 
+                    DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -702,6 +715,12 @@ public final class DataServiceImpl implements DataService {
 		Level.FINEST, e, "nextObjectId objectId:{0} throws", objectId);
 	    throw e;
 	}
+    }
+
+    /* -- Implement DataServiceMXBean -- */
+    /** {@inheritDoc} */
+    public long getCreateReferenceCount() {
+        return createReferenceOp.getCount();
     }
 
     /* -- Generic binding methods -- */

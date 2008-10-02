@@ -53,7 +53,6 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
 
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 
@@ -69,7 +68,6 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.LogManager;
-import javax.management.JMException;
 
 /**
  * This is the core class for the server. It is the first class that is
@@ -259,12 +257,6 @@ class Kernel {
             // system registry, as some listeners use those components.
             loadProfileListeners(profileCollector);
 
-            // create the task aggregator, and add a listener.  We do
-            // this before the services are created so we can record any
-            // tasks created during service start-up.
-            TaskAggregate taskAgg = new TaskAggregate();
-            profileCollector.addListener(taskAgg, true);
-            
             if (logger.isLoggable(Level.INFO)) {
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
                         Version.getVersion());
@@ -273,15 +265,6 @@ class Kernel {
             // the core system is ready, so start up the application
             createAndStartApplication();
 
-            // We'll use the profile service to register an MBean
-            ProfileService profileService = 
-                    proxy.getService(ProfileService.class);
-            try {
-                profileService.registerMBean(taskAgg, 
-                    TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
-            } catch (JMException e) {
-                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-            }
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, e, "Failed on Kernel boot");

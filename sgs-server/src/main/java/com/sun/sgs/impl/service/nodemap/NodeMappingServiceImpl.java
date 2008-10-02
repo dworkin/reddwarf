@@ -33,10 +33,12 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskReservation;
+import com.sun.sgs.management.NodeMappingServiceMXBean;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -56,6 +58,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Maps Identities to Nodes.
@@ -375,6 +378,9 @@ public class NodeMappingServiceImpl
     private final List<TaskReservation> pendingNotifications =
                 new ArrayList<TaskReservation>();
     
+    /** Our service statistics */
+    private final NodeMappingServiceStats serviceStats;
+    
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -491,6 +497,20 @@ public class NodeMappingServiceImpl
                        ", clientPort:" + clientPort + 
                        ", fullStack:" + fullStack + "]";
             
+            // create our profiling info
+            ProfileService profileService =
+                txnProxy.getService(ProfileService.class);
+            serviceStats = 
+                new NodeMappingServiceStats(profileService, fullName);
+
+            // and register our MBean
+            try {
+                profileService.registerMBean(serviceStats, 
+                    NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");
@@ -580,6 +600,8 @@ public class NodeMappingServiceImpl
             throw new NullPointerException("null identity");
         }
         
+        serviceStats.assignNodeOp.report();
+        
         // We could check here to see if there's already a mapping, 
         // saving a remote call.  However, it makes the logic here
         // more complicated, and it means we duplicate some of the
@@ -619,6 +641,8 @@ public class NodeMappingServiceImpl
             throw new NullPointerException("null identity");
         }       
 
+        serviceStats.setStatusOp.report();
+        
         SetStatusTask stask = 
                 new SetStatusTask(identity, service.getName(), active);
         try {
@@ -698,6 +722,9 @@ public class NodeMappingServiceImpl
         if (id == null) {
             throw new NullPointerException("null identity");
         }
+        
+        serviceStats.getNodeOp.report();
+        
         Context context = contextFactory.joinTransaction();
         Node node = context.get(id);
         logger.log(Level.FINEST, "getNode id:{0} returns {1}", id, node);
@@ -709,6 +736,8 @@ public class NodeMappingServiceImpl
         throws UnknownNodeException 
     {
         checkState();
+        serviceStats.getIdentitiesOp.report();
+        
         // Verify that the nodeId is valid.
         Node node = watchdogService.getNode(nodeId);
         if (node == null) {
@@ -757,6 +786,7 @@ public class NodeMappingServiceImpl
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
+        serviceStats.addNodeMappingListenerOp.report();
         nodeChangeListeners.add(listener);
         logger.log(Level.FINEST, "addNodeMappingListener successful");
     }

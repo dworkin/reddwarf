@@ -91,13 +91,17 @@ class ProfileConsumerImpl implements ProfileConsumer {
      *
      * @throws IllegalStateException if no more operations can be registered
      */
-    public ProfileOperation registerOperation(String name, 
+    public ProfileOperation registerOperation(String name, boolean taskLocal,
                                               ProfileLevel minLevel) 
     {
 	ProfileOperation op = ops.get(name);
 
 	if (op == null) {
-	    op = new ProfileOperationImpl(name, minLevel);
+            if (taskLocal) {
+                op = new ProfileOperationImpl(name, minLevel);
+            } else {
+                op = new AggregateProfileOperationImpl(name, minLevel);
+            }
 	    ops.putIfAbsent(name, op);
 	    op = ops.get(name);
 	}

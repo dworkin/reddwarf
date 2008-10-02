@@ -61,12 +61,15 @@ public interface ProfileConsumer {
      * <code>ProfileOperation</code>.  
      *
      * @param name the name of the operation
+     * @param taskLocal {@code true} if this operation is called in the
+     *        context of a task, {@code false} otherwise
      * @param minLevel the minimum level of profiling that must be set to report
      *              this operation
      *
      * @return an instance of <code>ProfileOperation</code>
      */
-    ProfileOperation registerOperation(String name, ProfileLevel minLevel);
+    ProfileOperation registerOperation(String name, boolean taskLocal, 
+                                       ProfileLevel minLevel);
 
     /**
      * Registers the named counter with this consumer, such that the
