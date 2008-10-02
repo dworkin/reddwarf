@@ -287,6 +287,7 @@ final class ManagedReferenceImpl<T>
 
     @SuppressWarnings("fallthrough")
     void markForUpdate() {
+	boolean optimisticWriteLocks = context.optimisticWriteLocks();
 	switch (state) {
 	case EMPTY:
 	    /*
@@ -294,17 +295,22 @@ final class ManagedReferenceImpl<T>
 	     * will be modified, so fetch the object now.
 	     */
 	    object = deserialize(
-		context.store.getObject(context.txn, oid, true));
+		context.store.getObject(
+		    context.txn, oid, !optimisticWriteLocks));
 	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
 	case MAYBE_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
+	    if (!optimisticWriteLocks) {
+		context.store.markForUpdate(context.txn, oid);
+	    }
 	    unmodifiedBytes = null;
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
+	    if (!optimisticWriteLocks) {
+		context.store.markForUpdate(context.txn, oid);
+	    }
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -397,6 +403,7 @@ final class ManagedReferenceImpl<T>
     /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public T getForUpdate() {
+	boolean optimisticWriteLocks = context.optimisticWriteLocks();
 	RuntimeException exception;
 	try {
 	    DataServiceImpl.checkContext(context);
@@ -405,17 +412,22 @@ final class ManagedReferenceImpl<T>
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
-		    context.store.getObject(context.txn, oid, true));
+		    context.store.getObject(
+			context.txn, oid, !optimisticWriteLocks));
 		context.refs.registerObject(this);
 		state = State.MODIFIED;
 		break;
 	    case MAYBE_MODIFIED:
-		context.store.markForUpdate(context.txn, oid);
+		if (!optimisticWriteLocks) {
+		    context.store.markForUpdate(context.txn, oid);
+		}
 		unmodifiedBytes = null;
 		state = State.MODIFIED;
 		break;
 	    case NOT_MODIFIED:
-		context.store.markForUpdate(context.txn, oid);
+		if (!optimisticWriteLocks) {
+		    context.store.markForUpdate(context.txn, oid);
+		}
 		state = State.MODIFIED;
 		break;
 	    case FLUSHED:

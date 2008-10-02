@@ -165,6 +165,62 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
+    public void testReadIdsForUpdate() throws Exception {
+	byte[] data = new byte[itemSize];
+	data[0] = 1;
+	store = getDataStore();
+	DummyTransaction txn = new DummyTransaction(1000);
+	long[] ids = new long[items];
+	for (int i = 0; i < items; i++) {
+	    ids[i] = store.createObject(txn);
+	    store.setObject(txn, ids[i], data);
+	}
+	txn.commit();
+	for (int r = 0; r < repeat; r++) {
+	    long start = System.currentTimeMillis();
+	    for (int c = 0; c < count; c++) {
+		txn = new DummyTransaction(1000);
+		for (int i = 0; i < items; i++) {
+		    store.getObject(txn, ids[i], true);
+		}
+		txn.commit();
+	    }
+	    long stop = System.currentTimeMillis();
+	    System.err.println(
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
+	}
+    }
+
+
+    public void testMarkIdsForUpdate() throws Exception {
+	byte[] data = new byte[itemSize];
+	data[0] = 1;
+	store = getDataStore();
+	DummyTransaction txn = new DummyTransaction(1000);
+	long[] ids = new long[items];
+	for (int i = 0; i < items; i++) {
+	    ids[i] = store.createObject(txn);
+	    store.setObject(txn, ids[i], data);
+	}
+	txn.commit();
+	for (int r = 0; r < repeat; r++) {
+	    long start = System.currentTimeMillis();
+	    for (int c = 0; c < count; c++) {
+		txn = new DummyTransaction(1000);
+		for (int i = 0; i < items; i++) {
+		    store.getObject(txn, ids[i], false);
+		    store.markForUpdate(txn, ids[i]);
+		}
+		txn.commit();
+	    }
+	    long stop = System.currentTimeMillis();
+	    System.err.println(
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
+	}
+    }
+
     public void testWriteIds() throws Exception {
 	testWriteIdsInternal(false);
     }	
