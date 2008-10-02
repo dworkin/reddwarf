@@ -55,14 +55,13 @@ public interface DataStore {
 
     /**
      * Notifies the <code>DataStore</code> that an object is going to be
-     * modified.  The implementation can use this information to obtain an
-     * exclusive lock on the object in order avoid contention when the object
-     * is modified.
+     * modified.  This method does not check that the object exists.  The
+     * implementation can use this information to obtain an exclusive lock on
+     * the object in order avoid contention when the object is modified.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
      * @throws	IllegalArgumentException if <code>oid</code> is negative
-     * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -125,10 +124,10 @@ public interface DataStore {
     void setObjects(Transaction txn, long[] oids, byte[][] dataArray);
 
     /**
-     * Removes the object with the specified object ID.  The implementation
-     * will make an effort to flag subsequent references to the removed object
-     * by throwing {@link ObjectNotFoundException}, although this behavior is
-     * not guaranteed.
+     * Removes the object with the specified object ID.  This method does not
+     * check for placeholders.  The implementation will make an effort to flag
+     * subsequent references to the removed object by throwing {@link
+     * ObjectNotFoundException}, although this behavior is not guaranteed.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID

@@ -49,14 +49,13 @@ public interface DbDatabase {
      *
      * @param	txn the transaction for this operation
      * @param	key the key
-     * @return	whether the key was found
      * @throws	IllegalArgumentException if {@code txn} was not created by the
      *		associated environment
      * @throws	TransactionAbortedException if the transaction should be
      *		aborted due to timeout or conflict
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
-    boolean markForUpdate(DbTransaction txn, byte[] key);
+    void markForUpdate(DbTransaction txn, byte[] key);
 
     /**
      * Sets the value associated with a key in this database, regardless of

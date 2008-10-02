@@ -105,18 +105,14 @@ public class BdbDatabase implements DbDatabase {
     }
 
     /** {@inheritDoc} */
-    public boolean markForUpdate(DbTransaction txn, byte[] key) {
+    public void markForUpdate(DbTransaction txn, byte[] key) {
 	try {
 	    DatabaseEntry valueEntry = new DatabaseEntry();
 	    valueEntry.setPartial(0, 0, true);
 	    OperationStatus status = db.get(
 		BdbTransaction.getBdbTxn(txn), new DatabaseEntry(key),
 		valueEntry, LockMode.RMW);
-	    if (status == SUCCESS) {
-		return true;
-	    } else if (status == NOTFOUND) {
-		return false;
-	    } else {
+	    if (status != SUCCESS && status != NOTFOUND) {
 		throw new DbDatabaseException("Operation failed: " + status);
 	    }
 	} catch (DatabaseException e) {

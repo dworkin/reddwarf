@@ -342,12 +342,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testMarkForUpdateNotFound() throws Exception {
-	try {
-	    store.markForUpdate(txn, id);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    System.err.println(e);
-	}
+	store.markForUpdate(txn, id);
     }
 
     /* -- Unusual states -- */
@@ -394,7 +389,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testMarkForUpdatePlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
+	if (!isLocalDataStore()) {
 	    return;
 	}
 	createPlaceholder(txn, id);
@@ -403,12 +398,7 @@ public class TestDataStoreImpl extends TestCase {
 		txn.commit();
 		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
-	    try {
-		store.markForUpdate(txn, id);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
+	    store.markForUpdate(txn, id);
 	}
 	store.setObject(txn, id, new byte[0]);
 	txn.commit();
@@ -516,7 +506,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testGetObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
+	if (!isLocalDataStore()) {
 	    return;
 	}
 	createPlaceholder(txn, id);
@@ -633,7 +623,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testSetObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
+	if (!isLocalDataStore()) {
 	    return;
 	}
 	for (int i = 0; i < 2; i++) {
@@ -784,7 +774,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testSetObjectsPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
+	if (!isLocalDataStore()) {
 	    return;
 	}
 	for (int i = 0; i < 2; i++) {
@@ -887,21 +877,16 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testRemoveObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
+	if (!isLocalDataStore()) {
 	    return;
 	}
-	createPlaceholder(txn, id);
 	for (int i = 0; i < 2; i++) {
+	    createPlaceholder(txn, id);
 	    if (i == 1) {
 		txn.commit();
 		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
-	    try {
-		store.removeObject(txn, id);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
+	    store.removeObject(txn, id);
 	}
 	store.setObject(txn, id, new byte[0]);
 	txn.commit();
@@ -2371,6 +2356,22 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    /**
+     * Checks if we're running against a local data store, which is required
+     * to create placeholders or call raw methods.
+     */
+    private static boolean isLocalDataStore() {
+	DataStore internalStore =
+	    ((DataStoreProfileProducer) store).getDataStore();
+	return internalStore instanceof DataStoreImpl;
+    }
+
+    /** Returns the underlying local data store. */
+    private static DataStoreImpl getLocalDataStore() {
+	return (DataStoreImpl)
+	    ((DataStoreProfileProducer) store).getDataStore();
+    }
+
     /** Creates a placeholder at the specified object ID. */
     private static void createPlaceholder(Transaction txn, long oid) {
 	setObjectRaw(txn, oid, new byte[] { PLACEHOLDER_OBJ_VALUE });
@@ -2381,7 +2382,7 @@ public class TestDataStoreImpl extends TestCase {
 	Transaction txn, long oid, byte[] data)
     {
 	try {
-	    setObjectRaw.invoke((DataStoreImpl) store, txn, oid, data);
+	    setObjectRaw.invoke(getLocalDataStore(), txn, oid, data);
 	} catch (Exception e) {
 	    throw new RuntimeException(e.getMessage(), e);
 	}
@@ -2391,7 +2392,7 @@ public class TestDataStoreImpl extends TestCase {
     private static byte[] getObjectRaw(Transaction txn, long oid) {
 	try {
 	    return (byte[]) getObjectRaw.invoke(
-		(DataStoreImpl) store, txn, oid);
+		getLocalDataStore(), txn, oid);
 	} catch (Exception e) {
 	    throw new RuntimeException(e.getMessage(), e);
 	}
@@ -2401,7 +2402,7 @@ public class TestDataStoreImpl extends TestCase {
     private static long nextObjectIdRaw(Transaction txn, long oid) {
 	try {
 	    return (Long) nextObjectIdRaw.invoke(
-		(DataStoreImpl) store, txn, oid);
+		getLocalDataStore(), txn, oid);
 	} catch (Exception e) {
 	    throw new RuntimeException(e.getMessage(), e);
 	}
