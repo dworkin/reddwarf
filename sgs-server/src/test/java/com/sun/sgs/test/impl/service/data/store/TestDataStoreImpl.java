@@ -1997,7 +1997,7 @@ public class TestDataStoreImpl extends TestCase {
 	 * shutting the data store down, and we can only do that with a local
 	 * one.  -tjb@sun.com (07/16/2008)
 	 */
-	if (!(store instanceof DataStoreImpl)) {
+	if (!isLocalDataStore()) {
 	    return;
 	}
 	/* Create objects but don't create data */

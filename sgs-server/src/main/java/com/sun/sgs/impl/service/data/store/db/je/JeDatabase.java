@@ -117,6 +117,7 @@ public class JeDatabase implements DbDatabase {
     public void markForUpdate(DbTransaction txn, byte[] key) {
 	try {
 	    DatabaseEntry valueEntry = new DatabaseEntry();
+	    /* Ignore value by truncating to zero bytes */
 	    valueEntry.setPartial(0, 0, true);
 	    OperationStatus status = db.get(
 		JeTransaction.getJeTxn(txn), new DatabaseEntry(key),
