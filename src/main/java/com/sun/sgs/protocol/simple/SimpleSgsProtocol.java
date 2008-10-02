@@ -326,8 +326,8 @@ public interface SimpleSgsProtocol {
      * <li> (ByteArray) channel ID
      * </ul>
      * This message is sent from the server to the client to indicate that the 
-     * client has been added to the channel identified by the name and channel ID
-     * contained in the message. 
+     * client has been added to the channel identified by the {@code channel 
+     * name} and {@code channel ID} contained in the message. 
      */
     final byte CHANNEL_JOIN = 0x50;
 
@@ -342,17 +342,17 @@ public interface SimpleSgsProtocol {
      * <li> (ByteArray) channel ID
      * </ul>
      * This message is sent from the server indicating to the client that the
-     * client has been removed from the channel with the indicated channel ID.
-     * The client can no longer send messages on the channel.
+     * client has been removed from the channel with the indicated {@code 
+     * channel ID}. The client can no longer send messages on the channel.
      */
     final byte CHANNEL_LEAVE = 0x51;
 
     /**
      * Channel message. May be sent by the client or the server. Maximum length
-     * is {@value #MAX_PAYLOAD_LENGTH} bytes minus the sum of the channel ID
-     * size and two bytes (the size of the unsigned short indicating the channel
-     * Id size). Larger messages require fragmentation and reassembly above this
-     * protocol layer. 
+     * is {@value #MAX_PAYLOAD_LENGTH} bytes minus the sum of the {@code 
+     * channel ID} size and two bytes (the size of the unsigned short indicating 
+     * the {@code channel Id} size). Larger messages require fragmentation and 
+     * reassembly above this protocol layer. 
      * <br>
      * Opcode: {@code 0x52} 
      * <br>
