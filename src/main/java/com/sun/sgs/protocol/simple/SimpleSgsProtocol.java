@@ -74,7 +74,7 @@ package com.sun.sgs.protocol.simple;
  * responsibility of the sender to break the message into pieces and of the
  * receiver to re-assemble those pieces. 
  * <br>
- * If a server receives a message with an Opcode other than those defined here,
+ * If a server receives a message with an {@code Opcode} other than those defined here,
  * or with an Opcode that defines a message that should only be sent to a
  * client, or the message is malformed in other ways, the server will disconnect
  * the client session. Additionally, if a server receives a message from a
@@ -112,38 +112,43 @@ public interface SimpleSgsProtocol {
      * the client and server are using the same protocol or versions of the
      * protocol that are compatible. If the server determines that the protocol
      * version used by the sender and the protocol version or versions required
-     * by the server are not compatible, the server will disconnect from the
-     * client. In cases where the protocols being used are not compatible, no
-     * other communication between the client and the server is guaranteed to be
+     * by the server are not compatible, the server will disconnect the client.
+     * In cases where the protocols being used are not compatible, no other
+     * communication between the client and the server is guaranteed to be
      * understood.
      * <p>
      * The {@code name} and {@code password} strings are passed to the server's
-     * authentication mechanism. After the server processes the login requres,
-     * the server sends one of the following acknowledgments:
+     * authentication mechanism. After the server processes the login request,
+     * the server sends one of the following acknowledgments to the client:
      * <ul>
      * <li> {@link #LOGIN_SUCCESS}, if user authentication succeeds and
-     * invoking the 'loggedIn' method on the application's 'AppListener' with
-     * the user's ClientSession returns a non-null, serializable
-     * ClientSessionListener;
+     * invoking the {@code loggedIn}' method on the application's
+     * {@code AppListener} with the user's {@code ClientSession} returns a
+     * non-null, serializable {@code ClientSessionListener};
      * <li>{@link #LOGIN_REDIRECT}, if user authentication succeeds, but the
      * server requests that the client redirect the login request to another
      * node; or
      * <li>{@link #LOGIN_FAILURE}, if user authentication fails, or if the
      * user is already logged in and the server is configured to reject new
-     * logins for the same user, or if invoking the 'loggedIn' method on the
-     * application's 'AppListener' with the user's ClientSession returns a null,
-     * or non-serializable ClientSessionListener or the method does not complete
-     * successfully
+     * logins for the same user, or if invoking the {@code loggedIn} method on
+     * the application's {@code AppListener} with the user's
+     * {@code ClientSession} returns a null, or non-serializable
+     * {@code ClientSessionListener} or the method does not complete
+     * successfully.
      * </ul>
-     * to the client.
      * <p>
      * If a client is currently logged in, the result of receiving a
-     * LOGIN_REQUEST is determined by the value of the property
-     * com.sun.sgs.impl.service.session.allow.new.login. If the value of this
-     * property is {@code false}, the server discards the request. If the value
-     * of the property is {@code true}, the current login from the client is
-     * terminated, and a new login is initiated using the information passed in
-     * the new request.
+     * LOGIN_REQUEST is not defined by the protocol, but is an
+     * implementation-dependent detail of the server. 
+     * <br>
+     * <i>In the current Project Darkstar Server implementation, the behavior of
+     * the server receiving such a {@code LOGIN_REQUEST} is determined by the
+     * value of the property
+     * {@code com.sun.sgs.impl.service.session.allow.new.login}. If the value
+     * of this property is {@code false}, the server response with a
+     * {@link #LOGIN_FAILURE}. If the value of the property is {@code true},
+     * the current login from the client is terminated, and a new login is
+     * initiated using the information passed in the new request.</i>
      */
     final byte LOGIN_REQUEST = 0x10;
 
@@ -171,7 +176,7 @@ public interface SimpleSgsProtocol {
      * <li> (String) reason
      * </ul>
      * This message indicates that the server rejects the {@link #LOGIN_REQUEST}
-     * for some reason, including
+     * for some reason, for example
      * <ul>
      * <li> user authentication failure,
      * <li> failure during application processing of the client session, or
@@ -218,12 +223,12 @@ public interface SimpleSgsProtocol {
      * acknowledges the request with a {@link #RECONNECT_SUCCESS} message
      * containing a new {@code reconnectionKey}. If reconnection is not
      * successful, a {@link #RECONNECT_FAILURE} message is sent to the client.
-     * If the client receives a RECONNECT_FAILURE message, the client should
-     * disconnect from the server. <br>
-     * <b>Note: this message is not currently supported by the Project Darkstar
-     * Server</b>
+     * If the client receives a {@code RECONNECT_FAILURE} message, the client
+     * should disconnect from the server. <br>
+     * <i>Note: this message is not currently supported by the Project Darkstar
+     * Server</i>
      */
-    
+
     final byte RECONNECT_REQUEST = 0x20;
 
     /**
@@ -235,13 +240,13 @@ public interface SimpleSgsProtocol {
      * <li> (ByteArray) reconnectionKey
      * </ul>
      * Indicates that a {@link #RECONNECT_REQUEST} has been successful. The
-     * message will include a {@code reconnectionKey} that can be used in
+     * message will include a {@code reconnectionKey} that can be used in a
      * subsequent reconnect requests from the client. Reciept of this message
      * indicates that the client session has been re-established in the state it
      * was in when the client was disconnected from the server. 
      * <br>
-     * <b>Note: this message is not currently supported by the Project Darkstar
-     * Server</b>
+     * <i>Note: this message is not currently supported by the Project Darkstar
+     * Server</i>
      */
     final byte RECONNECT_SUCCESS = 0x21;
 
@@ -262,8 +267,8 @@ public interface SimpleSgsProtocol {
      * discard the session state). The string returned details the reason for
      * the denial of reconnection. 
      * <br>
-     * <b>Note: this message is not currently supported by the Project Darkstar
-     * Server</b>
+     * <i>Note: this message is not currently supported by the Project Darkstar
+     * Server</i>
      */
     final byte RECONNECT_FAILURE = 0x22;
 
@@ -292,9 +297,9 @@ public interface SimpleSgsProtocol {
      * <br>
      * No payload. 
      * <br>
-     * This message will cause the client to be logged out of the server,. The
+     * This message will cause the client to be logged out of the server. The
      * server will remove all of the client's channel memberships. Any message
-     * (other than {@link #LOGIN_REQUEST} sent by the client after sending this
+     * (other than {@link #LOGIN_REQUEST}) sent by the client after sending this
      * message will be ignored, and any message will need to be sent on a new
      * connection to the server.
      */
