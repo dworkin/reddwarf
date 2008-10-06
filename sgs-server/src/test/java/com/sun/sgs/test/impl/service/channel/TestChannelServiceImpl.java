@@ -42,7 +42,6 @@ import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.io.Connection;
@@ -52,6 +51,7 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -283,7 +283,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)
 			dataService.getServiceBinding(VERSION_KEY);
@@ -298,7 +298,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
 		    dataService.setServiceBinding(VERSION_KEY, version);
@@ -318,7 +318,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
@@ -335,7 +335,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
@@ -354,7 +354,7 @@ public class TestChannelServiceImpl extends TestCase {
     // -- Test createChannel --
 
     public void testCreateChannelNullName() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channelService.createChannel(
@@ -367,7 +367,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testCreateChannelNullListener() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channelService.createChannel(
@@ -380,7 +380,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testCreateChannelNonSerializableListener() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channelService.createChannel(
@@ -405,7 +405,7 @@ public class TestChannelServiceImpl extends TestCase {
     // -- Test Channel serialization --
 
     public void testChannelWriteReadObject() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() throws Exception {
 		Channel savedChannel =
 		    channelService.createChannel("x", null, Delivery.RELIABLE);
@@ -443,7 +443,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetNameMismatchedTxn() throws Exception {
 	final Channel channel = createChannel();
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channel.getName();
@@ -456,7 +456,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetName() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		String name = "foo";
 		Channel channel = channelService.createChannel(
@@ -469,7 +469,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetNameClosedChannel() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		String name = "foo";
 		Channel channel = channelService.createChannel(
@@ -500,7 +500,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelGetDeliveryMismatchedTxn() throws Exception {
 	// TBD: should the implementation work this way?
 	final Channel channel = createChannel();
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channel.getDeliveryRequirement();
@@ -513,7 +513,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetDelivery() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
 		    Channel channel = channelService.createChannel(
@@ -529,7 +529,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetDeliveryClosedChannel() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		for (Delivery delivery : Delivery.values()) {
 		    Channel channel = channelService.createChannel(
@@ -561,7 +561,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelHasSessionsMismatchedTxn() throws Exception {
 	final Channel channel = createChannel();
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channel.hasSessions();
@@ -574,7 +574,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelHasSessionsNoSessionsJoined() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		String name = "foo";
 		Channel channel = channelService.createChannel(
@@ -593,7 +593,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers("foo", someUsers);
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = channelService.getChannel(channelName);
 		    if (! channel.hasSessions()) {
@@ -607,7 +607,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testChannelHasSessionsClosedChannel() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		String name = "foo";
 		Channel channel = channelService.createChannel(
@@ -638,7 +638,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelGetSessionsMismatchedTxn() throws Exception {
 	final Channel channel = createChannel();
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
 		    channel.getSessions();
@@ -651,7 +651,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetSessionsNoSessionsJoined() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		String name = "foo";
 		Channel channel = channelService.createChannel(
@@ -670,7 +670,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(someUsers);
 	try {
 	    joinUsers("foo", someUsers);
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = channelService.getChannel(channelName);
 		    Set<String> users = new HashSet<String>(someUsers);
@@ -695,7 +695,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelGetSessionsClosedChannel() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		String name = "foo";
 		Channel channel = channelService.createChannel(
@@ -731,7 +731,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelJoinClosedChannel() throws Exception {
 	final DummyClient client = newClient();
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Channel channel =
 			channelService.createChannel(
@@ -754,7 +754,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelJoinNullClientSession() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel("x", null, Delivery.RELIABLE);
@@ -809,7 +809,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final Channel channel = createChannel(channelName);
 	final DummyClient client = newClient();
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
 			channel.leave(client.getSession());
@@ -834,7 +834,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(users);
 
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    ClientSession session =
@@ -857,7 +857,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelLeaveNullClientSession() throws Exception {
 	
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel("x", null, Delivery.RELIABLE);
@@ -877,7 +877,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ClientGroup group = new ClientGroup(someUsers);
 	
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 	
@@ -901,7 +901,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    Thread.sleep(100);
 	    
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 	
@@ -942,7 +942,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	    for (final String user : someUsers) {
 		
-		txnScheduler.runTask(new AbstractKernelRunnable() {
+		txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			Channel channel = getChannel(channelName);
 			ClientSession session = getSession(user);
@@ -951,7 +951,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 		Thread.sleep(100);
 		
-		txnScheduler.runTask(new AbstractKernelRunnable() {
+		txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			Channel channel = getChannel(channelName);
 			ClientSession session = getSession(user);
@@ -963,7 +963,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    Thread.sleep(1000);
 	    assertEquals(count, getObjectCount());
 	    
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 
@@ -996,7 +996,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelLeaveAllClosedChannel() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel("x", null, Delivery.RELIABLE);
@@ -1012,7 +1012,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelLeaveAllNoSessionsJoined() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel =
 		    channelService.createChannel("x", null, Delivery.RELIABLE);
@@ -1032,7 +1032,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
 
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    channel.leaveAll();
@@ -1041,7 +1041,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    
 	    Thread.sleep(100);
 	    
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(channelName);
 		    int numJoinedSessions = getSessions(channel).size();
@@ -1074,7 +1074,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendAllClosedChannel() throws Exception {
 	final String channelName = "test";
 	createChannel(channelName);
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		dataService.removeObject(channel);
@@ -1410,7 +1410,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	// Create a channel with a ValidatingChannelListener and join the
 	// client to the channel.
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		ChannelListener listener =
 		    new ValidatingChannelListener();
@@ -1430,7 +1430,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	// Validate that the session passed to the handleChannelMessage
 	// method was a wrapped ClientSession.
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		ValidatingChannelListener listener = (ValidatingChannelListener)
 		    dataService.getBinding(listenerName);
@@ -1454,7 +1454,7 @@ public class TestChannelServiceImpl extends TestCase {
 	int numIterations = 100;
 	long startTime = System.currentTimeMillis();
 	for (int i = 0; i < numIterations; i++) {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = channelService.getChannel(channelName);
 		    DataManager dataManager = AppContext.getDataManager();
@@ -1486,14 +1486,14 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName = "closeTest";
 	createChannel(channelName);
 	printServiceBindings();
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		dataService.removeObject(channel);
 	    }
 	}, taskOwner);
 	Thread.sleep(100);
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		if (getChannel(channelName) != null) {
@@ -1582,7 +1582,7 @@ public class TestChannelServiceImpl extends TestCase {
 	System.err.println("beforeCount: " + beforeCount);
 	// Add some obsolete channel sets
 
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() throws Exception {
 
 		ClientSession session =
@@ -1691,7 +1691,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void checkMembership(final String name, final boolean isMember)
 	    throws Exception
 	{
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Channel channel = getChannel(name);
 		    Set<ClientSession> sessions = getSessions(channel);
@@ -1750,7 +1750,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     private void printServiceBindings() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		System.err.println("Service bindings----------");
 		Iterator<String> iter =
@@ -1791,7 +1791,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     // Runs the given transactional task using the task scheduler on the
     // specified host.
-    private void runTransactionalTask(AbstractKernelRunnable task, String host)
+    private void runTransactionalTask(TestAbstractKernelRunnable task, String host)
 	throws Exception
     {
 	SgsTestNode node =
@@ -1806,7 +1806,7 @@ public class TestChannelServiceImpl extends TestCase {
 	nodeTxnScheduler.runTask(task, nodeTaskOwner);
     }
 
-    private static class CreateChannelTask extends AbstractKernelRunnable {
+    private static class CreateChannelTask extends TestAbstractKernelRunnable {
 	private final String name;
 	private final ChannelListener listener;
 	private final String host;
@@ -1859,7 +1859,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName, final List<String> users)
 	throws Exception
     {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		for (String user : users) {
@@ -1889,7 +1889,7 @@ public class TestChannelServiceImpl extends TestCase {
 	final String channelName, final List<String> users)
 	throws Exception
     {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
 		Set<ClientSession> sessions = getSessions(channel);
@@ -1933,7 +1933,7 @@ public class TestChannelServiceImpl extends TestCase {
 				   HexDumper.format(buf.getBuffer()));
 
 		txnScheduler.runTask(
-		    new AbstractKernelRunnable() {
+		    new TestAbstractKernelRunnable() {
 			public void run() {
 			    Channel channel = getChannel(channelName);
 			    channel.send(null, ByteBuffer.wrap(buf.getBuffer()));
@@ -2704,7 +2704,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    private class GetSessionTask extends AbstractKernelRunnable {
+    private class GetSessionTask extends TestAbstractKernelRunnable {
 
 	private final String name;
 	private ClientSession session;
@@ -2728,7 +2728,7 @@ public class TestChannelServiceImpl extends TestCase {
 	return task.count;
     }
     
-    private class GetObjectCountTask extends AbstractKernelRunnable {
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
 
 	volatile int count = 0;
 	
@@ -2772,7 +2772,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     private class GetChannelServiceBindingCountTask
-	extends AbstractKernelRunnable
+	extends TestAbstractKernelRunnable
     {
 	volatile int count = 0;
 	
@@ -2793,7 +2793,7 @@ public class TestChannelServiceImpl extends TestCase {
     
     private void closeChannel(final String name) throws Exception {
 
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = channelService.getChannel(name);
 		dataService.removeObject(channel);

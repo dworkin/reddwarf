@@ -750,6 +750,7 @@ public final class ChannelServiceImpl
 	 * Constructs an instance with the given {@code nodeId}.
 	 */
 	GetLocalMembersTask(BigInteger channelRefId) {
+	    super(null);
 	    this.channelRefId = channelRefId;
 	}
 
@@ -1254,6 +1255,7 @@ public final class ChannelServiceImpl
 
 	/** Constructs an instance with the specified {@code nodeId}. */
 	GetChannelServerTask(long nodeId) {
+	    super(null);
 	    this.nodeId = nodeId;
 	}
 

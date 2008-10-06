@@ -24,10 +24,10 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -154,14 +154,14 @@ public class TestDataServicePerformance extends TestCase {
         TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
         Identity taskOwner = serverNode.getProxy().getCurrentOwner();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("counters", new Counters(items));
                 }}, taskOwner);
         for (int r = 0; r < repeat; r++) {
             long start = System.currentTimeMillis();
             for (int c = 0; c < count; c++) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             Counters counters =
                                 (Counters) service.getBinding("counters");
@@ -204,14 +204,14 @@ public class TestDataServicePerformance extends TestCase {
         TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
         Identity taskOwner = serverNode.getProxy().getCurrentOwner();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("counters", new Counters(items));
                 }}, taskOwner);
         for (int r = 0; r < repeat; r++) {
             long start = System.currentTimeMillis();
             for (int c = 0; c < count; c++) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             Counters counters =
                                 (Counters) service.getBinding("counters");

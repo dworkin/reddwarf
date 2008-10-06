@@ -159,7 +159,7 @@ class ClientSessionHandler {
 	 * full. -JM
 	 */
 
-	enqueueReadResume();
+	scheduleReadOnReadHandler();
     }
 
     /* -- Instance methods -- */
@@ -327,7 +327,7 @@ class ClientSessionHandler {
 	    // also happen even though 'notifyLoggedIn' was not invoked.
 	    // Are these behaviors okay?  -- ann (3/19/07)
 	    final Identity thisIdentity = identity;
-	    scheduleTask(new AbstractKernelRunnable("NotifyLogggedOut") {
+	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
 		    } });
@@ -926,20 +926,31 @@ class ClientSessionHandler {
     }
 
     /**
-     * Schedule a task to resume reading.  Use this method to delay reading
+     * Schedules a task to resume reading.  Use this method to delay reading
      * until a task resulting from an earlier read request has been completed.
      */
     void enqueueReadResume() {
-        scheduleNonTransactionalTask(
-	  new AbstractKernelRunnable("ResumeReadOnReadHandler") {
-            public void run() {
-                logger.log(Level.FINER, "resuming reads session:{0}", this);
-                if (isConnected()) {
-                    readHandler.read();
-                }
-            } });
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("ScheduleReadOnReadHandler") {
+		public void run() {
+		    scheduleReadOnReadHandler();
+		} }, identity);
     }
 
+    /**
+     * Schedules an asynchronous task to resume reading.
+     */
+    private void scheduleReadOnReadHandler() {
+	scheduleNonTransactionalTask(
+	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
+		public void run() {
+		    logger.log(Level.FINER, "resuming reads session:{0}", this);
+		    if (isConnected()) {
+			readHandler.read();
+		    }
+		} });
+    }
+    
     /* -- other private methods and classes -- */
 
     /**
@@ -1009,6 +1020,7 @@ class ClientSessionHandler {
 	private volatile Node node = null;
 
 	GetNodeTask(Identity authenticatedIdentity) {
+	    super(null);
 	    this.authenticatedIdentity = authenticatedIdentity;
 	}
 
@@ -1026,7 +1038,13 @@ class ClientSessionHandler {
      * Constructs the ClientSession.
      */
     private class CreateClientSessionTask extends AbstractKernelRunnable {
-	
+
+	/** Constructs and instance. */
+	CreateClientSessionTask() {
+	    super(null);
+	}
+
+	/** {@inheritDoc} */
 	public void run() {
 	    ClientSessionImpl sessionImpl =
 		new ClientSessionImpl(sessionService, identity);
@@ -1039,7 +1057,12 @@ class ClientSessionHandler {
      * {@code AppListener} that this session has logged in.
      */
     private class LoginTask extends AbstractKernelRunnable {
-
+	
+	/** Constructs an instance. */
+	LoginTask() {
+	    super(null);
+	}
+	
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}
 	 * callback, which returns a client session listener.  If the

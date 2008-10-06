@@ -1381,6 +1381,11 @@ public final class ClientSessionServiceImpl
     private class MonitorDisconnectingSessionsTask
 	extends AbstractKernelRunnable
     {
+	/** Constructs and instance. */
+	MonitorDisconnectingSessionsTask() {
+	    super(null);
+	}
+	
 	/** {@inheritDoc} */
 	public void run() {
 	    long now = System.currentTimeMillis();

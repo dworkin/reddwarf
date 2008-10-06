@@ -31,13 +31,6 @@ public abstract class AbstractKernelRunnable implements KernelRunnable {
     private final String name;
 
     /**
-     * Constructs an instance.
-     */
-    public AbstractKernelRunnable() {
-	this(null);
-    }
-
-    /**
      * Constructs an instance with the specified {@code name}.  If the
      * {@code name} is non-{@code null}, then it is included in the
      * {@code toString} method to identify the instance.
