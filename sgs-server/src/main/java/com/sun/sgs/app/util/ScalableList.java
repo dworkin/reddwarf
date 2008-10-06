@@ -166,6 +166,27 @@ public class ScalableList<E> extends AbstractList<E> implements
      */
     private int branchingFactor = 5;
 
+    /**
+     * Represents the number of elements removed from an
+     * {@code AsynchronousClearTask}. This variable is primarily for testing
+     * purposes.
+     */
+    protected int removedElements = 0;
+
+    /**
+     * Represents the number of elements removed from an
+     * {@code AsynchronousClearTask}. This variable is primarily for testing
+     * purposes.
+     */
+    protected int removedListNodes = 0;
+
+    /**
+     * Represents the number of elements removed from an
+     * {@code AsynchronousClearTask}. This variable is primarily for testing
+     * purposes.
+     */
+    protected int removedTreeNodes = 0;
+
     /*
      * IMPLEMENTATION
      */
@@ -364,11 +385,13 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    return;
 	}
 
+	AsynchronousClearTask<E> clearTask = new AsynchronousClearTask<E>(
+		getHead());
+
 	// Otherwise, schedule asynchronous task here
 	// which will delete the list and replace it
 	// with an empty instance.
-	AppContext.getTaskManager().scheduleTask(
-		new AsynchronousClearTask<E>(getHead()));
+	AppContext.getTaskManager().scheduleTask(clearTask);
 
 	// Create a new ListNode<E> and link everything to it.
 	TreeNode<E> t = new TreeNode<E>(this, null, branchingFactor,
@@ -379,6 +402,10 @@ public class ScalableList<E> extends AbstractList<E> implements
 		new DummyConnector<E>(t.getChild()));
 	setRoot(t);
 
+	// Collect removal information for testing purposes
+	removedElements = clearTask.removedElements;
+	removedListNodes = clearTask.removedListNodes;
+	removedTreeNodes = clearTask.removedTreeNodes;
     }
 
     /**
@@ -657,8 +684,7 @@ public class ScalableList<E> extends AbstractList<E> implements
     public Object[] toArray() {
 	List<E> list = subList(0, size() - 1);
 	return list.toArray();
-	
-	
+
     }
 
     /**
@@ -1839,6 +1865,24 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private ArrayList<TreeNode<E>> queue;
 
 	/**
+	 * Counter which holds onto the number of removed {@code TreeNode}s.
+	 * Thia variable is for testing purposes.
+	 */
+	private int removedElements;
+
+	/**
+	 * Counter which holds onto the number of removed {@code ListNode}s.
+	 * This variable is for testing purposes.
+	 */
+	private int removedListNodes;
+
+	/**
+	 * Counter which holds onto the number of removed {@code TreeNode}s.
+	 * Thia variable is for testing purposes.
+	 */
+	private int removedTreeNodes;
+
+	/**
 	 * Constructor for the asynchronous task
 	 * 
 	 * @param root
@@ -1851,6 +1895,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 		current = null;
 	    }
 	    queue = new ArrayList<TreeNode<E>>();
+	    removedTreeNodes = 0;
+	    removedListNodes = 0;
+	    removedElements = 0;
 	}
 
 	/**
@@ -1928,8 +1975,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	    ListNode<E> currentListNode = uncheckedCast(current.get());
 	    TreeNode<E> parent = null;
+	    ListNode<E> old = null;
 	    int count = 0;
 	    E entry = null;
+
+	    // Add the parent to the queue if it doesn't
+	    // already exist
+	    parent = currentListNode.getParent();
+	    enqueueIfNecessary(parent);
 
 	    // remove elements; delete the ones that
 	    // are Element<E> objects
@@ -1940,11 +1993,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    return false;
 		}
 
-		// Add the parent to the queue if it doesn't
-		// already exist
-		parent = currentListNode.getParent();
-		enqueueIfNecessary(parent);
-
 		// Repeatedly remove the head element in the
 		// ListNode as long as one exists.
 		if (currentListNode.size() > 0) {
@@ -1952,6 +2000,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 			    .markForUpdate(currentListNode);
 		    entry = currentListNode.remove(0);
 		    count++;
+		    removedElements++;
 
 		    // If the entry was an Element object, delete it
 		    // since the user did not have it persist
@@ -1959,11 +2008,20 @@ public class ScalableList<E> extends AbstractList<E> implements
 			AppContext.getDataManager().removeObject(entry);
 		    }
 		} else {
-		    // Remove SubList element attached
-		    // to this ListNode ManagedObject
+		    // Remove SubList attached to this ListNode ManagedObject.
+		    // We don't need to remove the ListNode as the remove()
+		    // method above already takes care of it.
 		    AppContext.getDataManager().removeObject(
 			    currentListNode.getSubList());
 		    currentListNode = currentListNode.next();
+		    removedListNodes++;
+
+		    // Add the parent to the queue if it doesn't
+		    // already exist
+		    if (currentListNode != null) {
+			parent = currentListNode.getParent();
+			enqueueIfNecessary(parent);
+		    }
 		}
 	    }
 
@@ -2013,6 +2071,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		// remove node
 		AppContext.getDataManager().markForUpdate(currentTreeNode);
 		AppContext.getDataManager().removeObject(currentTreeNode);
+		removedTreeNodes++;
 
 		// pop the queue to remove the next TreeNode, or if none,
 		// then we are done.
@@ -2030,6 +2089,33 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    (Node<E>) currentTreeNode);
 
 	    return true;
+	}
+
+	/**
+	 * Returns the number of removed elements from the operation
+	 * 
+	 * @return number of removed elements
+	 */
+	public int getNumberOfRemovedElements() {
+	    return removedElements;
+	}
+
+	/**
+	 * Returns the number of removed {@code ListNode}s from the operation
+	 * 
+	 * @return number of removed {@code ListNodes}
+	 */
+	public int getNumberOfRemovedListNodes() {
+	    return removedListNodes;
+	}
+
+	/**
+	 * Returns the number of removed {@code TreeNode}s from the operation
+	 * 
+	 * @return number of removed {@code TreeNodes}
+	 */
+	public int getNumberOfRemovedTreeNodes() {
+	    return removedTreeNodes;
 	}
     }
 
@@ -2819,8 +2905,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * denoted by the cluster size.
 	 */
 	private void split() {
-	    ArrayList<ManagedReference<ManagedObject>> contents = 
-		getSubList().getElements();
+	    ArrayList<ManagedReference<ManagedObject>> contents = getSubList()
+		    .getElements();
 	    ArrayList<ManagedReference<ManagedObject>> spawned = 
 		new ArrayList<ManagedReference<ManagedObject>>();
 

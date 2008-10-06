@@ -971,11 +971,33 @@ public class TestScalableList extends Assert {
 		ScalableList<String> list = makeList();
 
 		list.clear();
-
 		assertTrue(list.isEmpty());
+		assertEquals(0, list.size());
 	    }
 	}, taskOwner);
     }
+    
+    
+    /**
+     * Tests the clearing mechanism using the {@code AsynchronousClearTask}
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testConsecutiveClears() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = makeList();
+
+		list.clear();
+		list.clear();
+		list.clear();
+		assertTrue(list.isEmpty());
+		assertEquals(0, list.size());
+	    }
+	}, taskOwner);
+    }
+    
     
     /**
      * Tests the clearing mechanism using the {@code AsynchronousClearTask}
@@ -1005,6 +1027,74 @@ public class TestScalableList extends Assert {
 	}, taskOwner);
     }
 
+    
+    /**
+     * Tests the clearing mechanism using the {@code AsynchronousClearTask}
+     * by creating a class that extends the {@code ScalableList} class.
+     * At the moment, this would require some sort of callback mechanism
+     * to validate the correct values.
+     * @throws Exception
+     */
+/*
+    @Test
+    public void testClearsUsingInheritence() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		
+		//Extend the class to get access to test fields
+		class ScalableListChild<String> extends ScalableList<String> {
+		    public ScalableListChild(){
+			super();
+		    }
+		    
+		    public int getRemovedElements(){
+			return this.removedElements;
+		    }
+		    public int getRemovedListNodes(){
+			return this.removedListNodes;
+		    }
+		    public int getRemovedTreeNodes(){
+			return this.removedTreeNodes;
+		    }
+		}
+		
+		// Create a new instance and populate it
+		ScalableListChild<String> sample = 
+		    new ScalableListChild<String>();
+		sample.add("A");
+		sample.add("B");
+		sample.add("C");
+		sample.add("D");
+		sample.add("E");
+		sample.add("F");
+		sample.add("G");
+		sample.add("H");
+		sample.add("I");
+		sample.add("J");
+		sample.add("K");
+		sample.add("L");
+		sample.add("M");
+		
+		sample.clear();
+		
+		// sleep to allow the task to finish
+		try {
+		    Thread.sleep(15000);
+		} catch (InterruptedException ie){
+		    // do nothing.
+		}
+		
+		// check that the values match. These are
+		// hardcoded based on what they should be
+		// given a no-argument constructor.
+		assertEquals(13, sample.getRemovedElements());
+		assertEquals(2, sample.getRemovedListNodes());
+		assertEquals(1, sample.getRemovedTreeNodes());
+	    }
+	}, taskOwner);
+    }
+*/   
+    
     /**
      * Tests scalability by appending elements exceeding the cluster size
      * 
