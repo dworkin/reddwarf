@@ -198,7 +198,7 @@ public class TestDataServicePerformance extends TestCase {
                             Counters counters =
                                 (Counters) service.getBinding("counters");
                             for (int i = 0; i < items; i++) {
-                                counters.get(i);
+                                counters.getForUpdate(i);
                             }
                         }}, taskOwner);
             }
@@ -331,7 +331,6 @@ public class TestDataServicePerformance extends TestCase {
 	Counter get(int i) {
 	    return counters.get(i).get();
 	}
-
 	Counter getForUpdate(int i) {
 	    return counters.get(i).getForUpdate();
 	}

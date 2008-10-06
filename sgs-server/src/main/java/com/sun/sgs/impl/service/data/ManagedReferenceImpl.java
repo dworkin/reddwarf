@@ -287,7 +287,6 @@ final class ManagedReferenceImpl<T>
 
     @SuppressWarnings("fallthrough")
     void markForUpdate() {
-	boolean optimisticWriteLocks = context.optimisticWriteLocks();
 	switch (state) {
 	case EMPTY:
 	    /*
@@ -296,19 +295,19 @@ final class ManagedReferenceImpl<T>
 	     */
 	    object = deserialize(
 		context.store.getObject(
-		    context.txn, oid, !optimisticWriteLocks));
+		    context.txn, oid, !context.optimisticWriteLocks()));
 	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
 	case MAYBE_MODIFIED:
-	    if (!optimisticWriteLocks) {
+	    if (!context.optimisticWriteLocks()) {
 		context.store.markForUpdate(context.txn, oid);
 	    }
 	    unmodifiedBytes = null;
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
-	    if (!optimisticWriteLocks) {
+	    if (!context.optimisticWriteLocks()) {
 		context.store.markForUpdate(context.txn, oid);
 	    }
 	    state = State.MODIFIED;
@@ -403,7 +402,6 @@ final class ManagedReferenceImpl<T>
     /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public T getForUpdate() {
-	boolean optimisticWriteLocks = context.optimisticWriteLocks();
 	RuntimeException exception;
 	try {
 	    DataServiceImpl.checkContext(context);
@@ -413,19 +411,19 @@ final class ManagedReferenceImpl<T>
 	    case EMPTY:
 		object = deserialize(
 		    context.store.getObject(
-			context.txn, oid, !optimisticWriteLocks));
+			context.txn, oid, !context.optimisticWriteLocks()));
 		context.refs.registerObject(this);
 		state = State.MODIFIED;
 		break;
 	    case MAYBE_MODIFIED:
-		if (!optimisticWriteLocks) {
+		if (!context.optimisticWriteLocks()) {
 		    context.store.markForUpdate(context.txn, oid);
 		}
 		unmodifiedBytes = null;
 		state = State.MODIFIED;
 		break;
 	    case NOT_MODIFIED:
-		if (!optimisticWriteLocks) {
+		if (!context.optimisticWriteLocks()) {
 		    context.store.markForUpdate(context.txn, oid);
 		}
 		state = State.MODIFIED;

@@ -111,8 +111,12 @@ import java.util.logging.Logger;
  *	<i>Default:</i> <code>false</code>
  *
  * <dd style="padding-top: .5em">Whether to wait until commit time to obtain
- *	write locks.  By default, write locks are acquired as soon as the
- *	service knows that an object is being modified. <p>
+ *	write locks.  If <code>false</code>, which is the default, the service
+ *	acquires write locks as soon as it knows that an object is being
+ *	modified.  If <code>true</code>, the service delays obtaining write
+ *	locks until commit time, which may improve performance in some cases,
+ *	typically when there is low contention.  Note that setting this flag to
+ *	<code>true</code> does not delay write locks when removing objects.<p>
  *
  * </dl> <p>
  *
@@ -582,9 +586,9 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
-		/* Mark that this object has been write locked */
-		oidAccesses.reportObjectAccess(
-		    ref.getId(), AccessType.WRITE, object);
+		// mark that this object has been write locked
+		oidAccesses.reportObjectAccess(ref.getId(), AccessType.WRITE,
+					       object);
 
 		ref.markForUpdate();
 	    }
