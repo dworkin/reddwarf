@@ -598,7 +598,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * {@inheritDoc}
      */
     public Iterator<E> descendingIterator() {
-	return new BidirectionalDequeIterator(this, true);
+	return new BidirectionalDequeIterator<E>(this, true);
     }
 
     /**
@@ -711,7 +711,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * {@inheritDoc}
      */
     public Iterator<E> iterator() {
-	return new BidirectionalDequeIterator(this, false);
+	return new BidirectionalDequeIterator<E>(this, false);
     }
 
     /**
@@ -1274,7 +1274,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	    if (o == null)
 		return false;
 	    else if (o instanceof Element) {
-		Element<E> e = (Element)o;
+                Element<E> e = uncheckedCast(o);
 		E v1 = e.getValue();
 		E v2 = getValue();
 		return (v1 == v2 || (v1 != null && v1.equals(v2))) &&
@@ -1413,6 +1413,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 	 *
 	 * @param s {@inheritDoc}
 	 */
+        @SuppressWarnings("unchecked")
 	private void readObject(ObjectInputStream s)
 	    throws IOException, ClassNotFoundException {
 	    
@@ -1423,7 +1424,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 		valueRef = uncheckedCast(s.readObject());
 	    }
 	    else {
-		value = (E)(s.readObject());
+                // note that this is the line with the unchecked cast
+                value = (E)(s.readObject());
 	    }
 	}
     }

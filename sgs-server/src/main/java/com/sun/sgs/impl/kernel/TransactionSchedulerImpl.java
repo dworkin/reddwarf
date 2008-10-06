@@ -533,6 +533,7 @@ final class TransactionSchedulerImpl
                     backingQueue.getReadyCount() + dependencyCount.get();
                 profileCollector.startTask(task.getTask(), task.getOwner(),
                                            task.getStartTime(), waitSize);
+                task.incrementTryCount();
 
                 Transaction transaction = null;
 
@@ -542,16 +543,14 @@ final class TransactionSchedulerImpl
                         transactionCoordinator.createTransaction(unbounded);
                     transaction = handle.getTransaction();
                     ContextResolver.setCurrentTransaction(transaction);
-                    profileCollector.noteTransactional(transaction.getId());
-
-                    // increment the try count and notify the access
-                    // coordinator of the new transaction
-                    task.incrementTryCount();
-                    final int tryCount = task.getTryCount();
-                    accessCoordinator.
-                        notifyNewTransaction(task.getStartTime(), tryCount);
-
+                    
                     try {
+                        // notify the profiler and access coordinator
+                        profileCollector.noteTransactional(transaction.getId());
+                        accessCoordinator.
+                            notifyNewTransaction(task.getStartTime(),
+                                                 task.getTryCount());
+
                         // run the task in the new transactional context
                         task.getTask().run();
                     } finally {

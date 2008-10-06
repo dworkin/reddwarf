@@ -282,7 +282,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // input to decide how to resolve conflict
         Transaction txn = txnProxy.getCurrentTransaction();
         txn.join(this);
-        txnMap.put(txn, new AccessedObjectsDetailImpl());
+        txnMap.put(txn, new AccessedObjectsDetailImpl(txn));
     }
 
     // NOTE: there will be another version of the notifyNewTransaction
@@ -296,7 +296,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     /** Private implementation of {@code AccessedObjectsDetail}. */
     private class AccessedObjectsDetailImpl implements AccessedObjectsDetail {
         // the id of the transaction for this detail
-        private final byte [] txnId = txnProxy.getCurrentTransaction().getId();
+        private final byte [] txnId;
 
 	/**
 	 * The ordered set of accesses for all sources, which includes
@@ -329,6 +329,11 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         // information about why the transaction failed, if it failed
 	private ConflictType conflictType = ConflictType.NONE;
         private byte [] idOfConflictingTxn = null;
+
+        /** Creates an instance for the given transaction. */
+        AccessedObjectsDetailImpl(Transaction txn) {
+            this.txnId = txn.getId();
+        }
 
         /** Implement AccessObjectsDetail. */
 	
