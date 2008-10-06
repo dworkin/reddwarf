@@ -73,13 +73,6 @@ package com.sun.sgs.protocol.simple;
  * than 65532 bytes. If a message larger than this must be sent, it is the
  * responsibility of the sender to break the message into pieces and of the
  * receiver to re-assemble those pieces. 
- * <br>
- * If a server receives a message with an {@code Opcode} other than those defined here,
- * or with an Opcode that defines a message that should only be sent to a
- * client, or the message is malformed in other ways, the server will disconnect
- * the client session. Additionally, if a server receives a message from a
- * client that is not logged in and that message is not a {@link #LOGIN_REQUEST}
- * the message will be ignored.
  */
 public interface SimpleSgsProtocol {
 
@@ -140,15 +133,6 @@ public interface SimpleSgsProtocol {
      * If a client is currently logged in, the result of receiving a
      * LOGIN_REQUEST is not defined by the protocol, but is an
      * implementation-dependent detail of the server. 
-     * <br>
-     * <i>In the current Project Darkstar Server implementation, the behavior of
-     * the server receiving such a {@code LOGIN_REQUEST} is determined by the
-     * value of the property
-     * {@code com.sun.sgs.impl.service.session.allow.new.login}. If the value
-     * of this property is {@code false}, the server response with a
-     * {@link #LOGIN_FAILURE}. If the value of the property is {@code true},
-     * the current login from the client is terminated, and a new login is
-     * initiated using the information passed in the new request.</i>
      */
     final byte LOGIN_REQUEST = 0x10;
 
@@ -225,8 +209,6 @@ public interface SimpleSgsProtocol {
      * successful, a {@link #RECONNECT_FAILURE} message is sent to the client.
      * If the client receives a {@code RECONNECT_FAILURE} message, the client
      * should disconnect from the server. <br>
-     * <i>Note: this message is not currently supported by the Project Darkstar
-     * Server</i>
      */
 
     final byte RECONNECT_REQUEST = 0x20;
@@ -244,9 +226,6 @@ public interface SimpleSgsProtocol {
      * subsequent reconnect requests from the client. Reciept of this message
      * indicates that the client session has been re-established in the state it
      * was in when the client was disconnected from the server. 
-     * <br>
-     * <i>Note: this message is not currently supported by the Project Darkstar
-     * Server</i>
      */
     final byte RECONNECT_SUCCESS = 0x21;
 
@@ -266,9 +245,6 @@ public interface SimpleSgsProtocol {
      * the reconnect request (which, in turn, may have caused the server to
      * discard the session state). The string returned details the reason for
      * the denial of reconnection. 
-     * <br>
-     * <i>Note: this message is not currently supported by the Project Darkstar
-     * Server</i>
      */
     final byte RECONNECT_FAILURE = 0x22;
 
