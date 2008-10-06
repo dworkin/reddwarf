@@ -167,6 +167,7 @@
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$2"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
@@ -296,6 +297,13 @@
   <Match>
     <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$FlushContextsThread"/>
     <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- OK to ignore exception in ClientSessionWrapper.toString method. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
+    <Method name="toString"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
 
   <!-- Package com.sun.sgs.impl.service.watchdog -->

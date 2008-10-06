@@ -982,17 +982,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns {@code true} if the node with the associated {@code nodeId}
-     * is alive, otherwise returns {@code false}.
-     *
-     * This method must be called from outside a transaction or an
-     * {@code IllegalStateException} will be thrown.
-     */
-    private static boolean isAlive(long nodeId) {
-	return ChannelServiceImpl.getChannelService().isAlive(nodeId);
-    }
-
-    /**
      * Returns the channel server for the specified {@code nodeId}.
      */
     private static ChannelServer getChannelServer(long nodeId) {
