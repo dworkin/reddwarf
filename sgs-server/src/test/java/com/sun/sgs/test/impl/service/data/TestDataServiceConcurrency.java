@@ -23,10 +23,10 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.DummyManagedObject;
 import java.util.Properties;
 import java.util.Random;
@@ -184,7 +184,7 @@ public class TestDataServiceConcurrency extends TestCase {
             final AtomicInteger i = new AtomicInteger(0);
 	    final int start = t * perThread;
             while (i.get() < perThread) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             int ival = i.get();
                             while (ival < perThread) {
@@ -302,7 +302,7 @@ public class TestDataServiceConcurrency extends TestCase {
             final AtomicInteger i = new AtomicInteger(0);
             try {
                 while (i.get() < operations) {
-                    txnScheduler.runTask(new AbstractKernelRunnable() {
+                    txnScheduler.runTask(new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
                                 while (i.get() < operations) {
                                     if (i.get() % 1000 == 0 &&

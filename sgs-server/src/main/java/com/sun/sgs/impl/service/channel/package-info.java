@@ -17,28 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** Provides an implementation of {@link com.sun.sgs.app.ChannelManager}. */
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.ChannelListener;
-import com.sun.sgs.app.Delivery;
-
-/**
- * Represents an ordered unreliable channel.  This is currently a
- * placeholder that will eventually handle message delivery details in the
- * subclass instead of handling them in the {@code ChannelImpl} superclass.
- */
-class OrderedUnreliableChannelImpl extends ChannelImpl {
-    
-    /** The serialVersionUID for this class. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Constructs an instance with the specified {@code delivery}
-     * requirement and write capacity.
-     */
-    OrderedUnreliableChannelImpl(String name, ChannelListener listener,
-				 Delivery delivery, int writeBufferCapacity)
-    {
-	super(name, listener, delivery, writeBufferCapacity);
-    }
-}

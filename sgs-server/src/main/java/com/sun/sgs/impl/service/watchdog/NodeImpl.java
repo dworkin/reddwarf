@@ -278,11 +278,13 @@ class NodeImpl
      */
     synchronized void setFailed(DataService dataService, NodeImpl backup) {
 	NodeImpl nodeImpl = getForUpdate(dataService);
-	this.isAlive = nodeImpl.isAlive = false;
-	this.backupId = nodeImpl.backupId =
+	this.isAlive = false;
+	nodeImpl.isAlive = false;
+	this.backupId = 
 	    (backup != null) ?
 	    backup.getId() :
 	    INVALID_ID;
+	nodeImpl.backupId = this.backupId;
 	this.primaryIds.clear();
 	nodeImpl.primaryIds.clear();
     }

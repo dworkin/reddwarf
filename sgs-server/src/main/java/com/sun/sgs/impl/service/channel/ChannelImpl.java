@@ -365,13 +365,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    final ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    channelService.getTaskService().scheduleNonDurableTask(
-	        new AbstractKernelRunnable() {
+	        new AbstractKernelRunnable("SendServiceEventQueue") {
 		  public void run() {
 		      channelService.runIoTask(
  			new IoRunnable() {
 			  public void run() throws IOException {
 			      coordinator.serviceEventQueue(channelId);
-			  }}, coord);
+			  } }, coord);
 		  }
 		}, false);
 	}
@@ -854,7 +854,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		new IoRunnable() {
 		    public void run() throws IOException {
 			server.leave(channelId, sessionIdBytes);
-		    }},
+		    } },
 		nodeId);
 	}
 	return true;
@@ -1421,7 +1421,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				if (server != null) {
 				    server.refresh(channelName, channelIdBytes);
 				}
-			    }},
+			    } },
 			nodeId);
 		}
 		dataService.markForUpdate(this);
@@ -1549,7 +1549,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		new IoRunnable() {
 		    public void run() throws IOException {
 			server.join(channelName, channelIdBytes, sessionId);
-		    }},
+		    } },
 		nodeId);
 	}
 
@@ -1632,7 +1632,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    if (server != null) {
 				server.leaveAll(channelIdBytes);
 			    }
-			}},
+			} },
 		    nodeId);
 	    }
 	}
@@ -1706,7 +1706,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    if (server != null) {
 				server.send(channelIdBytes, message);
 			    }
-			}},
+			} },
 		    nodeId);
 	    }
 
@@ -1768,16 +1768,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    if (server != null) {
 				server.close(channelIdBytes);
 			    }
-			}},
+			} },
 		    nodeId);
 	    }
 	    
 	    channelService.addChannelTask(
 		channelRefId,
-		new AbstractKernelRunnable() {
+		new AbstractKernelRunnable("NotifyChannelClosed") {
 		    public void run() {
 			channelService.closedChannel(channelRefId);
-		    }});
+		    } });
 	}
 
 	/** {@inheritDoc} */
@@ -1874,7 +1874,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	implements Task, Serializable
     {
 	/** The serialVersionUID for this class. */
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/** The node ID of the failed node. */
 	private final long nodeId;
@@ -2073,7 +2073,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private static class ChannelSet extends ClientSessionInfo {
 	
-	private final static long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
 	/** The set of channel IDs that the client session is a member of. */
 	private final Set<BigInteger> set = new HashSet<BigInteger>();
@@ -2147,7 +2147,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    for (String sessionKey :
 		     BoundNamesUtil.getServiceBoundNamesIterable(
 			dataService,
-			channel.getSessionNodePrefix(channel.channelId, nodeId)))
+			channel.getSessionNodePrefix(
+			    channel.channelId, nodeId)))
 	    {
 		BigInteger sessionRefId =
 		    getLastComponentAsBigInteger(sessionKey);

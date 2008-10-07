@@ -25,7 +25,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.LocalNodePolicy;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -38,6 +37,7 @@ import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -249,7 +249,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)
 			serverNode.getDataService()
@@ -265,7 +265,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
 		    serverNode.getDataService()
@@ -279,7 +279,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
@@ -296,7 +296,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
@@ -328,7 +328,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
             nodemap.assignNode(NodeMappingService.class, id);
             
             txnScheduler.runTask(
-                new AbstractKernelRunnable() {
+                new TestAbstractKernelRunnable() {
                     public void run() throws Exception {
                         nodeMappingService.getNode(id);
                     }
@@ -378,7 +378,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
        
         // Now expect to be able to find the identity
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id);
                     // Make sure we got a notification
@@ -454,7 +454,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         for (int j = 0; j < MAX; j++) {
             final Identity id = ids[j];
             txnScheduler.runTask(
-                new AbstractKernelRunnable() {
+                new TestAbstractKernelRunnable() {
                     public void run() throws Exception {
                         nodeMappingService.getNode(id);
                     }
@@ -488,7 +488,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         // Gather up the nodes
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Iterator<Node> iter = watchdog.getNodes();
                     while (iter.hasNext()) {
@@ -501,7 +501,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // For each node, gather up the identities
         for (final Node node : nodes) {
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Iterator<Identity> idIter = 
                         nodeMappingService.getIdentities(node.getId());
@@ -577,7 +577,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     
     public void testAssignNodeInTransaction() throws Exception {
         // TODO should API specify a transaction exception will be thrown?
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 nodeMappingService.assignNode(NodeMappingService.class, new IdentityImpl("first"));
             }
@@ -588,7 +588,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testGetNodeNullIdentity() throws Exception {
         try {
             txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
+                    new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             nodeMappingService.getNode(null);
                         }
@@ -602,7 +602,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testGetNodeBadIdentity() throws Exception {
         try {
             txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
+                    new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             nodeMappingService.getNode(new IdentityImpl("first"));
                         }
@@ -618,7 +618,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         nodeMappingService.assignNode(NodeMappingService.class, id);
         try {
             txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
+                    new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             nodeMappingService.getNode(id);
                         }
@@ -655,7 +655,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     public void testGetIdentitiesBadNode() throws Exception {
         try {
             txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
+                    new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             nodeMappingService.getIdentities(999L);
                         }
@@ -671,7 +671,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         nodeMappingService.assignNode(NodeMappingService.class, id1);
 
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id1);
 		    Set<Identity> foundSet = new HashSet<Identity>();
@@ -692,7 +692,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         final long nodeId = additionalNodes[NUM_NODES - 1].getNodeId();
 
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Iterator<Identity> ids = 
                         nodeMappingService.getIdentities(nodeId);
@@ -738,7 +738,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         for (final Node node : nodeset) {
             final Set s = nodemap.get(node);
             
-            txnScheduler.runTask(new AbstractKernelRunnable(){
+            txnScheduler.runTask(new TestAbstractKernelRunnable(){
                 public void run() throws Exception {
 		    Set<Identity> foundSet = new HashSet<Identity>();
                     Iterator<Identity> idIter = 
@@ -972,7 +972,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         Object oldServer = swapToEvilServer(nodeMappingService);
         
-        txnScheduler.runTask(new AbstractKernelRunnable(){
+        txnScheduler.runTask(new TestAbstractKernelRunnable(){
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id1);
 		    Set<Identity> foundSet = new HashSet<Identity>();
@@ -998,7 +998,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         // Identity should now be gone... this is a hole in the
         // implementation, currently.  It won't be removed.  
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     Node node = nodeMappingService.getNode(id);
@@ -1042,7 +1042,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     
     /** Use the invariant checking method */
     private void verifyMapCorrect(final Identity id) throws Exception {  
-        txnScheduler.runTask( new AbstractKernelRunnable() {
+        txnScheduler.runTask( new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 boolean valid = 
                     (Boolean) assertValidMethod.invoke(nodeMappingService, id);
@@ -1054,7 +1054,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** 
      * Simple task to call getNode and return an id 
      */
-    private class GetNodeTask extends AbstractKernelRunnable {
+    private class GetNodeTask extends TestAbstractKernelRunnable {
         /** The identity */
         private Identity id;
         /** The node the identity is assigned to */
