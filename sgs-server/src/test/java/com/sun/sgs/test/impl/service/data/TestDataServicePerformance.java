@@ -186,14 +186,14 @@ public class TestDataServicePerformance extends TestCase {
         TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
         Identity taskOwner = serverNode.getProxy().getCurrentOwner();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("counters", new Counters(items));
                 }}, taskOwner);
         for (int r = 0; r < repeat; r++) {
             long start = System.currentTimeMillis();
             for (int c = 0; c < count; c++) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             Counters counters =
                                 (Counters) service.getBinding("counters");
@@ -217,14 +217,14 @@ public class TestDataServicePerformance extends TestCase {
         TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
         Identity taskOwner = serverNode.getProxy().getCurrentOwner();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("counters", new Counters(items));
                 }}, taskOwner);
         for (int r = 0; r < repeat; r++) {
             long start = System.currentTimeMillis();
             for (int c = 0; c < count; c++) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             Counters counters =
                                 (Counters) service.getBinding("counters");
