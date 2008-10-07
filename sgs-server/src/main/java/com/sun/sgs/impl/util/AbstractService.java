@@ -630,6 +630,7 @@ public abstract class AbstractService implements Service {
 
 	/** Constructs an instance with the specified {@code nodeId}. */
 	CheckNodeStatusTask(long nodeId) {
+	    super(null);
 	    this.nodeId = nodeId;
 	}
 

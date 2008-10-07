@@ -39,7 +39,6 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.io.Connector;
@@ -50,6 +49,7 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -316,7 +316,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)
 			dataService.getServiceBinding(VERSION_KEY);
@@ -331,7 +331,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
     
     public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
 		    dataService.setServiceBinding(VERSION_KEY, version);
@@ -343,7 +343,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
@@ -361,7 +361,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
@@ -651,7 +651,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    checkBindings(0);
 	    // check that client session was removed after disconnected callback
 	    // returned 
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
 		    try {
 			dataService.getBinding(name);
@@ -780,7 +780,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -809,7 +809,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -838,7 +838,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort()).login();
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			ClientSession session = (ClientSession)
 			    dataService.getBinding(name);
@@ -873,7 +873,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    private class GetClientSessionTask extends AbstractKernelRunnable {
+    private class GetClientSessionTask extends TestAbstractKernelRunnable {
 	private final String name;
 	volatile ClientSession session;
 
@@ -910,7 +910,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    TransactionScheduler txnScheduler =
 		serverNode.getSystemRegistry().
 		    getComponent(TransactionScheduler.class);
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		@SuppressWarnings("unchecked")
 		public void run() {
 		    for (SgsTestNode node : nodes) {
@@ -939,7 +939,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			    getComponent(TransactionScheduler.class);
 		    Identity identity = node.getProxy().getCurrentOwner();
 		    localTxnScheduler.scheduleTask(
-		    	  new AbstractKernelRunnable() {
+		    	  new TestAbstractKernelRunnable() {
 			    public void run() {
 				DataManager dataManager =
 				    AppContext.getDataManager();
@@ -960,7 +960,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			identity);
 		}
 	    }
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    AppContext.getDataManager().
 			setBinding(counterName, new Counter());
@@ -997,7 +997,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
 	    txnScheduler.runTask(
-		new AbstractKernelRunnable() {
+		new TestAbstractKernelRunnable() {
 		    int tryCount = 0;
 		    public void run() {
 			Set<ClientSession> sessions =
@@ -1047,7 +1047,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final ByteBuffer msg = ByteBuffer.allocate(0);
 	long startTime = System.currentTimeMillis();
 	for (int i = 0; i < numIterations; i++) {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    DataManager dataManager = AppContext.getDataManager();
 		    ClientSession session = (ClientSession)
@@ -1121,7 +1121,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         return task.getKeys();
     }
 
-    private class GetKeysTask extends AbstractKernelRunnable {
+    private class GetKeysTask extends TestAbstractKernelRunnable {
         private List<String> keys = new ArrayList<String>();
         private final String prefix;
         GetKeysTask(String prefix) {

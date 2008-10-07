@@ -46,7 +46,7 @@ class ChannelWrapper
     implements Channel, Serializable, ManagedObjectRemoval
 {
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
     /** The reference to the channel that this instance wraps. */
     private final ManagedReference<ChannelImpl> channelRef;
@@ -169,7 +169,8 @@ class ChannelWrapper
 	} catch (ObjectNotFoundException e) {
 	}
 	return getClass().getName() + "[" +
-	    (channelImpl == null ? "(not found)" : channelImpl.toString()) + "]";
+	    (channelImpl == null ? "(not found)" : channelImpl.toString()) +
+	    "]";
     }
     /* -- Other methods -- */
 

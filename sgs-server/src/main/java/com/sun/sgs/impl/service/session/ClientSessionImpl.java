@@ -414,7 +414,9 @@ public class ClientSessionImpl
 			"for session:{1} throws",
 			listener, this);
 		    sessionService.scheduleTask(
-			new AbstractKernelRunnable() {
+			new AbstractKernelRunnable(
+			    "NotifyListenerAndRemoveSession")
+			{
 			    public void run() {
 				ClientSessionImpl sessionImpl =
 				    ClientSessionImpl.getSession(
@@ -648,7 +650,7 @@ public class ClientSessionImpl
 		return;
 	    }
 	    sessionService.scheduleNonTransactionalTask(
-	        new AbstractKernelRunnable() {
+	        new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
 			sessionService.runIoTask(
 			    new IoRunnable() {
