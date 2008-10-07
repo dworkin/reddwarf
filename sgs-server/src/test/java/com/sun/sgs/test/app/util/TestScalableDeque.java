@@ -27,12 +27,12 @@ import com.sun.sgs.app.util.ScalableDeque;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -112,7 +112,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testNoArgConstructor() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableDeque<Integer> deque = new ScalableDeque<Integer>();
 		}
@@ -122,7 +122,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testOneArgConstructorTrue() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    new ScalableDeque<Integer>(true);
 		}
@@ -131,7 +131,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testOneArgConstructorFalse() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    new ScalableDeque<Integer>(false);
 		}
@@ -143,7 +143,7 @@ public class TestScalableDeque extends Assert {
 	final Deque<Integer> control = new ArrayDeque<Integer>();
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    for (int i = 0; i < 32; i++) {
 			control.offer(i);
@@ -158,7 +158,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testNullCopyConstructor() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    try {
 			new ScalableDeque<Integer>(null);
@@ -176,7 +176,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testSizeOnEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -188,7 +188,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testSizeOnNonEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -201,7 +201,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testSizeOnDequeAfterRemoval() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -215,7 +215,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testSizeAfterClear() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -229,7 +229,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testSizeWithMultipleSameElements() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -246,7 +246,7 @@ public class TestScalableDeque extends Assert {
      */
     @Test public void testIsEmptyTrue() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -258,7 +258,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIsEmptyFalse() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -271,7 +271,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIsEmptyAfterClear() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -285,7 +285,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIsEmptyAfterRemoval() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -302,7 +302,7 @@ public class TestScalableDeque extends Assert {
      */
     @Test public void testClear() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -318,7 +318,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testClearOnEmptyMap() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -333,7 +333,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleClears() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -350,7 +350,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testClearThenAdd() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -371,7 +371,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testContains() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -384,7 +384,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testContainsOnEmptyMap() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -396,7 +396,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testContainsWithMultipleElements() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -412,7 +412,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testContainsWithMultipleSameElements() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -431,7 +431,7 @@ public class TestScalableDeque extends Assert {
      */
     @Test public void testAdd() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -445,7 +445,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleAdds() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -461,7 +461,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testAddAll() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -483,7 +483,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testAddFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -496,7 +496,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleAddFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -510,7 +510,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testAddLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -523,7 +523,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleAddLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -536,7 +536,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testOffer() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -550,7 +550,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleOffers() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -566,7 +566,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testOfferFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -579,7 +579,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleOfferFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -593,7 +593,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testOfferLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -606,7 +606,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testMultipleOfferLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -620,7 +620,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testAddLastNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -636,7 +636,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testAddFirstNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();		    
@@ -655,7 +655,7 @@ public class TestScalableDeque extends Assert {
      */
     @Test public void testElement() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -667,7 +667,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testElementOnEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -686,7 +686,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testPeek() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -698,7 +698,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testPeekOnEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -709,7 +709,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testPeekFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -722,7 +722,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testPeekLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -735,7 +735,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testGetFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -748,7 +748,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testGetLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -761,7 +761,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testGetFirstOnEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -777,7 +777,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testGetLastOnEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -798,7 +798,7 @@ public class TestScalableDeque extends Assert {
      */
     @Test public void testRemove() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -810,7 +810,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveFirst() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -822,7 +822,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveFirstWithMultipleElements() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -835,7 +835,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveLast() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -847,7 +847,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveLastWithMultipleElements() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -860,7 +860,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveFirstOccurrence() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -875,7 +875,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveFirstOccurrenceNotPresent() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -892,7 +892,7 @@ public class TestScalableDeque extends Assert {
 	throws Exception {
 	
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -932,7 +932,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveLastOccurrence() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -949,7 +949,7 @@ public class TestScalableDeque extends Assert {
 	throws Exception {
 	
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -989,7 +989,7 @@ public class TestScalableDeque extends Assert {
     
     @Test public void testRemoveLastOccurrenceNotPresent() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1004,7 +1004,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveAllOccurrences() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1021,7 +1021,7 @@ public class TestScalableDeque extends Assert {
 	throws Exception {
 	
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1038,7 +1038,7 @@ public class TestScalableDeque extends Assert {
     
     @Test public void testRemoveAllOccurrencesWhenOccurrenceNotPresent() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1053,7 +1053,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveAll() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1072,7 +1072,7 @@ public class TestScalableDeque extends Assert {
 	throws Exception {
 	
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1093,7 +1093,7 @@ public class TestScalableDeque extends Assert {
 	throws Exception {
 	
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1114,7 +1114,7 @@ public class TestScalableDeque extends Assert {
     
     @Test public void testRemoveAllWhenOccurrenceNotPresent() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1131,7 +1131,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1147,7 +1147,7 @@ public class TestScalableDeque extends Assert {
     
     @Test public void testRemoveFirstOccurrenceNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1163,7 +1163,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveLastOccurrenceNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1179,7 +1179,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveAllOccurrencesNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1195,7 +1195,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testRemoveAllNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1214,7 +1214,7 @@ public class TestScalableDeque extends Assert {
      */
     @Test public void testPush() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1226,7 +1226,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testPop() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1238,7 +1238,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testPopOnEmptyDeque() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1258,7 +1258,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIterator() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1276,7 +1276,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIteratorHasNext() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1289,7 +1289,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIteratorRemoval() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1313,7 +1313,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIteratorRemovalTwice() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1336,7 +1336,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIteratorRemovalBeforeNext() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1357,7 +1357,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testIteratorNextNotPresent() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1376,7 +1376,7 @@ public class TestScalableDeque extends Assert {
 
     @Test public void testDescendingIterator() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1403,7 +1403,7 @@ public class TestScalableDeque extends Assert {
 	final String name = "test-deque";
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1414,7 +1414,7 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    ScalableDeque<Integer> d = 
@@ -1436,7 +1436,7 @@ public class TestScalableDeque extends Assert {
 	final String name = "test-iterator";
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1447,7 +1447,7 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
@@ -1470,7 +1470,7 @@ public class TestScalableDeque extends Assert {
 
 	// create the deque
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1483,7 +1483,7 @@ public class TestScalableDeque extends Assert {
 
 	// remove some elements while the iterator is serialized
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
@@ -1497,7 +1497,7 @@ public class TestScalableDeque extends Assert {
 
 	// load the iterator back
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
@@ -1525,7 +1525,7 @@ public class TestScalableDeque extends Assert {
 
 	// create the deque
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(true);
@@ -1539,7 +1539,7 @@ public class TestScalableDeque extends Assert {
 	// remove the iterator's first 5 elements while the
 	// iterator is serialized
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
@@ -1553,7 +1553,7 @@ public class TestScalableDeque extends Assert {
 
 	// load the iterator back
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
@@ -1581,7 +1581,7 @@ public class TestScalableDeque extends Assert {
 
 	// create the deque
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1595,7 +1595,7 @@ public class TestScalableDeque extends Assert {
 	// remove the iterator's first 5 elements while the
 	// iterator is serialized
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
@@ -1609,7 +1609,7 @@ public class TestScalableDeque extends Assert {
 
 	// load the iterator back
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 
@@ -1639,7 +1639,7 @@ public class TestScalableDeque extends Assert {
 
 	// create the deque
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
@@ -1656,7 +1656,7 @@ public class TestScalableDeque extends Assert {
 	// remove the iterator's first 5 elements while the
 	// iterator is serialized
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    ScalableDeque<Integer> d = 
@@ -1671,7 +1671,7 @@ public class TestScalableDeque extends Assert {
 
 	// load the iterator back
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    
 		    Iterator<Integer> it = 

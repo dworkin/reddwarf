@@ -21,8 +21,6 @@ package com.sun.sgs.test.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
-
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
@@ -33,6 +31,7 @@ import com.sun.sgs.test.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
 
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
 import java.util.Properties;
 
@@ -57,7 +56,7 @@ public class TestTaskSchedulerImpl {
 
     // an empty task that does nothing
     private static final KernelRunnable testTask =
-        new AbstractKernelRunnable() {
+        new TestAbstractKernelRunnable() {
             public void run() throws Exception {}
         };
 
@@ -431,7 +430,7 @@ public class TestTaskSchedulerImpl {
      * Utility classes.
      */
 
-    private class IncrementRunner extends AbstractKernelRunnable {
+    private class IncrementRunner extends TestAbstractKernelRunnable {
         public void run() {
             taskCount++;
         }

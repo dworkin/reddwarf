@@ -408,7 +408,8 @@ public class NodeMappingServiceImpl
             /*
 	     * Check service version.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
 			checkServiceVersion(
 			    NodeMapUtil.VERSION_KEY, 
@@ -660,6 +661,7 @@ public class NodeMappingServiceImpl
         private boolean canRemove = false;
 
         SetStatusTask(Identity id, String serviceName, boolean active) {
+	    super(null);
             this.active = active;
             idKey = NodeMapUtil.getIdentityKey(id);
             removeKey = NodeMapUtil.getPartialStatusKey(id);
@@ -843,6 +845,7 @@ public class NodeMappingServiceImpl
         final Identity id;
         final Node newNode;
         MapRemoveTask(NodeMappingListener listener, Identity id, Node newNode) {
+	    super(null);
             this.listener = listener;
             this.id = id;
             this.newNode = newNode;
@@ -862,6 +865,7 @@ public class NodeMappingServiceImpl
         final Identity id;
         final Node oldNode;
         MapAddTask(NodeMappingListener listener, Identity id, Node oldNode) {
+	    super(null);
             this.listener = listener;
             this.id = id;
             this.oldNode = oldNode;

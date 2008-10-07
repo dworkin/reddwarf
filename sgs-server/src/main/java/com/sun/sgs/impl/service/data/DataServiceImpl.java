@@ -467,7 +467,7 @@ public final class DataServiceImpl implements DataService {
 		state = State.RUNNING;
 	    }
 	    systemRegistry.getComponent(TransactionScheduler.class).runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("BindDataServiceHeader") {
 			public void run() {
 			    DataServiceHeader header;
 			    try {
