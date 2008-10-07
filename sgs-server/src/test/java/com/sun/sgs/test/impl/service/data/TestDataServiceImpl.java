@@ -3727,11 +3727,12 @@ public class TestDataServiceImpl{
                     throw new RuntimeException("just kill it");             
                 }
 
-                firstTry = false;
                 dummy = (DummyManagedObject) service.getBinding("dummy");
 
                 // First step is done, let the other task proceed
                 flag1.release();
+                firstTry = false;
+
                 // We can only hope the second task gets a chance
                 Thread.sleep(runNumber * 500);
                 System.err.println(runNumber + " task 1 ("
@@ -3773,13 +3774,13 @@ public class TestDataServiceImpl{
                 if (!firstTry) {
                     throw new RuntimeException("just kill it");
                 }
-                firstTry = false;
                 flag1.acquire();
                 service.getBinding("dummy2");
                 // Let the other task proceed
                 flag2.release();
                 System.err.println(runNumber + " task 2 ("
                                  + txn + "): released flag");
+                firstTry = false;
                 try {
                     ((DummyManagedObject)
                          service.getBinding("dummy")).setValue(runNumber);
