@@ -67,12 +67,18 @@ package com.sun.sgs.protocol.simple;
  * explicitly in the protocol. Application data, passed as a ByteArray, may
  * contain any information, but will need to be parsed (and, if necessary,
  * converted to and from a network representation) by the application or client.
- * <br>
+ * <p>
  * The total length of a message must not be greater than 65535 bytes; given the
  * header information this means that the payload of a message cannot be greater
  * than 65532 bytes. If a message larger than this must be sent, it is the
  * responsibility of the sender to break the message into pieces and of the
  * receiver to re-assemble those pieces. 
+ * <p>
+ * Behavior not specified in this document is left as an implementation 
+ * decision for the particular client and server. Information on the
+ * implementation characteristics of the Project Darkstar server can be found
+ * in the <a href="../../../../../overview-summary.html"> overview</a> for the 
+ * implementation.
  */
 public interface SimpleSgsProtocol {
 
@@ -224,8 +230,7 @@ public interface SimpleSgsProtocol {
      * Indicates that a {@link #RECONNECT_REQUEST} has been successful. The
      * message will include a {@code reconnectionKey} that can be used in a
      * subsequent reconnect requests from the client. Reciept of this message
-     * indicates that the client session has been re-established in the state it
-     * was in when the client was disconnected from the server. 
+     * indicates that the client session has been re-established. 
      */
     final byte RECONNECT_SUCCESS = 0x21;
 
@@ -240,9 +245,9 @@ public interface SimpleSgsProtocol {
      * <li> (String) reason
      * </ul>
      * This response indicates that a reconnect request could not be honored by
-     * the server. This could have been because of an invalid reconnect key, or
-     * because too much time had elapsed between the session disconnection and
-     * the reconnect request (which, in turn, may have caused the server to
+     * the server. This could be because of an invalid reconnect key, or
+     * because too much time has elapsed between the session disconnection and
+     * the reconnect request (which, in turn, may cause the server to
      * discard the session state). The string returned details the reason for
      * the denial of reconnection. 
      */
