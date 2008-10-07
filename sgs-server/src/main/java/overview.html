@@ -13,13 +13,12 @@ current implementation of the Project Darkstar Server.
 
 <h4>Additional Protocol Semantics</h4>
 
-In addition to the semantics for protocol messages specified in <a 
-href="com/sun/sgs/protocol/simple/SimpleSgsProtocol.h"> the protocol specification</a>,
-the current implementation of the Project Darkstar Server provides the following
-semantics for messages:
+In addition to the semantics for protocol messages given in {@link 
+com.sun.sgs.protocol.simple.SimpleSgsProtocol}, the current implementation of 
+the Project Darkstar Server provides the following semantics for messages:
 <ul>
-    <li> If a Project Darkstar server receives a message with an <code>Opcode</code>
-    other than those specified in the protocol specification, or with an 
+    <li> If a Project Darkstar server receives a message with an <code>Opcode
+    </code> other than those specified in the protocol specification, or with an 
     <code>Opcode</code> that defines a message that should only be sent to 
     a client, or the message is malformed in other ways, the server will 
     disconnect the client session that was the origin of the message;</li>
@@ -38,11 +37,11 @@ semantics for messages:
 </ul>
 
 At this time, the Project Darkstar Server does not implement a response to the 
-<code>RECONNECT_REQUEST Opcode</code>, and will treat such a request as an
-unknown <code>Opcode</code> and will disconnect any client sending such a 
-request. Similarly, the current implementation of the Project Darkstar server
-will not send messages beginning with the <code>RECONNECT_SUCCESS</code> or 
-<code>RECONNECT_FALURE</code> <code>Opcodes</code>.
+<code>RECONNECT_REQUEST Opcode</code>. The current implementation treats such a 
+request as an unknown <code>Opcode</code> and will disconnect any client sending 
+such a  request. Similarly, the current implementation of the Project Darkstar 
+server will not send messages beginning with the <code>RECONNECT_SUCCESS</code> 
+or <code>RECONNECT_FALURE Opcodes</code>.
 
 
 <h4>Modifications and updates to managed objects</h4>
