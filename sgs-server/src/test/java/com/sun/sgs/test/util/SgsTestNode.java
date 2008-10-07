@@ -254,8 +254,8 @@ public class SgsTestNode {
         channelService = getService(ChannelServiceImpl.class);
 
 	if (sessionService != null) {
-	    appPort =
-		((ClientSessionServiceImpl) sessionService).getListenPort();
+	    appPort = -1;
+//		((ClientSessionServiceImpl) sessionService).getListenPort();
 	}
     }
 
