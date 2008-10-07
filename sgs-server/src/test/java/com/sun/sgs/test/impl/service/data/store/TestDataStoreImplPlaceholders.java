@@ -51,7 +51,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
     /** Directory used for database shared across multiple tests. */
     private static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
-	"TestDataStoreImpl.db";
+	"TestDataStoreImplPlaceholders.db";
 
     /** The DataStoreImpl.setObjectRaw(Transaction,long,byte[]) method. */
     private static final Method setObjectRaw =
