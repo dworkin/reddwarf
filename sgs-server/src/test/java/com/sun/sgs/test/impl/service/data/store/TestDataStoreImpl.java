@@ -342,12 +342,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testMarkForUpdateNotFound() throws Exception {
-	try {
-	    store.markForUpdate(txn, id);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    System.err.println(e);
-	}
+	store.markForUpdate(txn, id);
     }
 
     /* -- Unusual states -- */
@@ -513,34 +508,6 @@ public class TestDataStoreImpl extends TestCase {
 	    assertSameBytes(value, store.getObject(txn, id, false));
 	    assertSameBytes(value2, store.getObject(txn, id2, false));
 	}
-    }
-
-    public void testGetObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	createPlaceholder(txn, id);
-	for (int i = 0; i < 2; i++) {
-	    if (i == 1) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    try {
-		store.getObject(txn, id, false);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
-	    try {
-		store.getObject(txn, id, true);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
-	}
-	store.setObject(txn, id, new byte[0]);
-	txn.commit();
-	txn = null;
     }
 
     /* -- Test setObject -- */
@@ -2368,42 +2335,6 @@ public class TestDataStoreImpl extends TestCase {
 	if (!Arrays.equals(x, y)) {
 	    fail("Expected " + Arrays.toString(x) + ", got " +
 		 Arrays.toString(y));
-	}
-    }
-
-    /** Creates a placeholder at the specified object ID. */
-    private static void createPlaceholder(Transaction txn, long oid) {
-	setObjectRaw(txn, oid, new byte[] { PLACEHOLDER_OBJ_VALUE });
-    }
-
-    /** Calls DataStoreImpl.setObjectRaw. */
-    private static void setObjectRaw(
-	Transaction txn, long oid, byte[] data)
-    {
-	try {
-	    setObjectRaw.invoke((DataStoreImpl) store, txn, oid, data);
-	} catch (Exception e) {
-	    throw new RuntimeException(e.getMessage(), e);
-	}
-    }
-
-    /** Calls DataStoreImpl.getObjectRaw. */
-    private static byte[] getObjectRaw(Transaction txn, long oid) {
-	try {
-	    return (byte[]) getObjectRaw.invoke(
-		(DataStoreImpl) store, txn, oid);
-	} catch (Exception e) {
-	    throw new RuntimeException(e.getMessage(), e);
-	}
-    }
-	
-    /** Calls DataStoreImpl.nextObjectIdRaw. */
-    private static long nextObjectIdRaw(Transaction txn, long oid) {
-	try {
-	    return (Long) nextObjectIdRaw.invoke(
-		(DataStoreImpl) store, txn, oid);
-	} catch (Exception e) {
-	    throw new RuntimeException(e.getMessage(), e);
 	}
     }
 }
