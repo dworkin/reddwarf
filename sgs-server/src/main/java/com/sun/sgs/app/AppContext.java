@@ -19,7 +19,8 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.impl.kernel.ContextResolver;
+import java.util.Map;
+import java.util.HashMap;
 
 
 /**
@@ -28,10 +29,22 @@ import com.sun.sgs.impl.kernel.ContextResolver;
  */
 public final class AppContext {
     
+    // the current locator for this context
     private static ManagerLocator managerLocator;
+    
+    // directly cache the DataManager since it is used frequently
     private static DataManager dataManager;
+    
+    // directly cache the TaskManager since it is used frequently
     private static TaskManager taskManager;
+    
+    // directly cache the ChannelManager since it is used frequently
     private static ChannelManager channelManager;
+    
+    // cache the remaining managers in a map
+    private static volatile Map<Class<?>, Object> managerMap =
+            new HashMap<Class<?>, Object>();
+    
     
     /** This class should not be instantiated. */
     private AppContext() { }
@@ -100,6 +113,10 @@ public final class AppContext {
      * Returns a manager of the specified type for use by the current
      * application.  The object returned is not serializable, and should not be
      * stored as part of a managed object.
+     * 
+     * Note that for any calls with the same type argument, this method will
+     * always return the same object in between calls to
+     * {@link #setManagerLocator setManagerLocator}.
      *
      * @param	<T> the type of the manager
      * @param	type a class representing the type of the manager
@@ -108,8 +125,14 @@ public final class AppContext {
      *		specified type
      */
     public static <T> T getManager(Class<T> type) {
-        //FIXME: This should do some thread safe caching ...
-        return managerLocator.getManager(type);    
+        if(!managerMap.containsKey(type)) {
+            synchronized(AppContext.class) {
+                if(!managerMap.containsKey(type))
+                    managerMap.put(type, managerLocator.getManager(type));
+            }
+        }
+
+        return (T)managerMap.get(type);
     }
     
     /**
@@ -148,10 +171,14 @@ public final class AppContext {
                                           "setManagerLocator not allowed");
         }
         
+        // set the locator and cache the standard managers
         AppContext.managerLocator = managerLocator;
         dataManager = managerLocator.getManager(DataManager.class);
         channelManager = managerLocator.getManager(ChannelManager.class);
         taskManager = managerLocator.getManager(TaskManager.class);
+        
+        // reset the cache for the other managers
+        managerMap = new HashMap<Class<?>, Object>();
     }
 
 }

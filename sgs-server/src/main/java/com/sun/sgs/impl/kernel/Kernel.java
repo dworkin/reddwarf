@@ -21,6 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ManagerLocator;
+import com.sun.sgs.app.AppContext;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
@@ -136,6 +138,9 @@ class Kernel {
 
     // the application that is running in this kernel
     private KernelContext application;
+    
+    // the default manager locator for the application
+    private final ManagerLocator managerLocator = new ManagerLocatorImpl();
 
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
@@ -362,6 +367,9 @@ class Kernel {
                                 "services that application is ready", appName);
             throw e;
         }
+        
+        // tell the AppContext how to find the managers
+        AppContext.setManagerLocator(managerLocator);
     }
 
     /**

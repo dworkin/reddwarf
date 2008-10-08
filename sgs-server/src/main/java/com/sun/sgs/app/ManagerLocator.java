@@ -20,7 +20,12 @@
 package com.sun.sgs.app;
 
 /**
- *
+ * Defines the boundary API for accessing managers for use by the current
+ * application.  Any implementation of the Project Darkstar API should
+ * provide a single implementation of this interface that is to be
+ * used by the {@link AppContext} to locate managers in the system.
+ * 
+ * @see AppContext#setManagerLocator AppContext.setManagerLocator
  */
 public interface ManagerLocator {
     /**
