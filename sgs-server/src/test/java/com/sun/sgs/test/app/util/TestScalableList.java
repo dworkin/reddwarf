@@ -1704,8 +1704,8 @@ public class TestScalableList extends Assert {
 
 		try {
 		    list.add(null);
-		    fail("Expecting IllegalArgumentException");
-		} catch (IllegalArgumentException iae) {
+		    fail("Expecting NullPointerException");
+		} catch (NullPointerException npe) {
 		}
 	    }
 	}, taskOwner);
@@ -1730,8 +1730,8 @@ public class TestScalableList extends Assert {
 
 		try {
 		    list.addAll(c);
-		    fail("Expecting IllegalArgumentException");
-		} catch (IllegalArgumentException iae) {
+		    fail("Expecting NullPointerException");
+		} catch (NullPointerException npe) {
 		}
 
 	    }
@@ -1758,8 +1758,8 @@ public class TestScalableList extends Assert {
 
 		try {
 		    list.addAll(1, c);
-		    fail("Expecting IllegalArgumentException");
-		} catch (IllegalArgumentException iae) {
+		    fail("Expecting NullPointerException");
+		} catch (NullPointerException npe) {
 		}
 
 	    }
