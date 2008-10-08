@@ -214,7 +214,7 @@ public interface SimpleSgsProtocol {
      * containing a new {@code reconnectionKey}. If reconnection is not
      * successful, a {@link #RECONNECT_FAILURE} message is sent to the client.
      * If the client receives a {@code RECONNECT_FAILURE} message, the client
-     * should disconnect from the server. <br>
+     * should disconnect from the server.
      */
 
     final byte RECONNECT_REQUEST = 0x20;
