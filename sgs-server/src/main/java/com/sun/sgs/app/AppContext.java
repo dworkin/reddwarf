@@ -124,6 +124,7 @@ public final class AppContext {
      * @throws	ManagerNotFoundException if no manager is found for the
      *		specified type
      */
+    @SuppressWarnings("unchecked")
     public static <T> T getManager(Class<T> type) {
         if(!managerMap.containsKey(type)) {
             synchronized(AppContext.class) {

@@ -357,6 +357,9 @@ class Kernel {
         transactionScheduler.setContext(application);
         taskScheduler.setContext(application);
         ContextResolver.setTaskState(application, owner);
+        
+        // tell the AppContext how to find the managers
+        AppContext.setManagerLocator(managerLocator);
 
         // notify all of the services that the application state is ready
         try {
@@ -367,9 +370,6 @@ class Kernel {
                                 "services that application is ready", appName);
             throw e;
         }
-        
-        // tell the AppContext how to find the managers
-        AppContext.setManagerLocator(managerLocator);
     }
 
     /**
