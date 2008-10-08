@@ -126,6 +126,11 @@ public final class AppContext {
      */
     @SuppressWarnings("unchecked")
     public static <T> T getManager(Class<T> type) {
+        if(managerMap == null)
+            throw new ManagerNotFoundException("manager of type "+
+                                               type.getName()+
+                                               " cannot be located");
+        
         if(!managerMap.containsKey(type)) {
             synchronized(AppContext.class) {
                 if(!managerMap.containsKey(type))
@@ -166,8 +171,8 @@ public final class AppContext {
         if(managerLocator == null)
             throw new NullPointerException("managerLocator cannot be null");
         if(AppContext.managerLocator != null &&
-                !System.getProperty("com.sun.sgs.app.AppContext.resetAllowed").
-                equals("true")) {
+                !"true".equals(
+                System.getProperty("com.sun.sgs.app.AppContext.resetAllowed"))) {
             throw new AppContextException("multiple invocations of "+
                                           "setManagerLocator not allowed");
         }
