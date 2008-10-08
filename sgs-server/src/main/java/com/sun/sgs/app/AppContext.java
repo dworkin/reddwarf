@@ -148,7 +148,7 @@ public final class AppContext {
      * Invoking this method will immediately retrieve and cache values for
      * the {@code DataManager}, {@code TaskManager}, and {@code ChannelManager}
      * from the given {@code ManagerLocator}.  If one of these cannot be
-     * located, a {@link ManagerNotFoundException} will be thrown. <p>
+     * located, it will be set to null. <p>
      * 
      * In most situations, this method
      * should only be called once throughout the life of the application.
@@ -179,9 +179,23 @@ public final class AppContext {
         
         // set the locator and cache the standard managers
         AppContext.managerLocator = managerLocator;
-        dataManager = managerLocator.getManager(DataManager.class);
-        channelManager = managerLocator.getManager(ChannelManager.class);
-        taskManager = managerLocator.getManager(TaskManager.class);
+        try {
+            dataManager = managerLocator.getManager(DataManager.class);
+        } catch(ManagerNotFoundException m) {
+            dataManager = null;
+        }
+        
+        try {
+            channelManager = managerLocator.getManager(ChannelManager.class);
+        } catch(ManagerNotFoundException m) {
+            channelManager = null;
+        }
+        
+        try {
+            taskManager = managerLocator.getManager(TaskManager.class);
+        } catch(ManagerNotFoundException m) {
+            taskManager = null;
+        }
         
         // reset the cache for the other managers
         managerMap = new HashMap<Class<?>, Object>();
