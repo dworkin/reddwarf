@@ -23,10 +23,9 @@ import java.util.List;
 
 /**
  * A profile sample is a list of data points that are accumulated
- * during the lifetime of the system.
+ * during the lifetime of the system. Some simple statistics are
+ * gathered about each sample.
  *
- * @see ProfileCounter
- * @see ProfileOperation
  */
 public interface ProfileSample {
 
@@ -39,6 +38,7 @@ public interface ProfileSample {
 
     /**
      * Adds a new sample to the end of the current list of samples.
+     * If no more samples can be added, the earliest sample is dropped.
      *
      * @param value the amount to increment the counter
      */
@@ -55,4 +55,25 @@ public interface ProfileSample {
      * Clear the accumulated samples.
      */
     void clearSamples();
+    
+    /**
+     * Returns the exponentaially smoothed average of the samples.
+     * 
+     * @return the average of the samples
+     */
+    double getAverage();
+    
+    /**
+     * Gets the maximum sample value.
+     * 
+     * @return the maximum sample
+     */
+    long getMaxSample();
+    
+    /**
+     * Gets the minimum sample value.
+     * 
+     * @return the minimum sample
+     */
+    long getMinSample();
 }

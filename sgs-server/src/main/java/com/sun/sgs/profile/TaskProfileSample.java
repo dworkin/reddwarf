@@ -19,15 +19,13 @@
 
 package com.sun.sgs.profile;
 
-
 /**
- * A profile sample is a list of data points that are accumulated
- * during the lifetime of a task.  A profile sample may be for either
- * a single task or span multiple tasks.  A profile sample allows for
- * different aggregations on data at a later time.
- *
- * @see ProfileCounter
- * @see ProfileOperation
+ * A sample which also provides information into {@link ProfileReport}s.
+ * <p>
+ * If data is added to the sample during a given task, the {@code ProfileReport}
+ * for that task will include the changes made, and exclude changes made while
+ * running other tasks.
+ * 
  */
 public interface TaskProfileSample {
 

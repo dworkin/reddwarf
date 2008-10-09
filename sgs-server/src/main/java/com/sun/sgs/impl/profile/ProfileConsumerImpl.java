@@ -98,7 +98,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
 
 	if (op == null) {
             if (taskLocal) {
-                op = new ProfileOperationImpl(name, minLevel);
+                op = new TaskProfileOperationImpl(name, minLevel);
             } else {
                 op = new AggregateProfileOperationImpl(name, minLevel);
             }
@@ -205,10 +205,10 @@ class ProfileConsumerImpl implements ProfileConsumer {
         }
     }
 
-    private class ProfileOperationImpl
+    private class TaskProfileOperationImpl
         extends AggregateProfileOperationImpl implements TaskProfileOperation
     {
-        ProfileOperationImpl(String opName, ProfileLevel minLevel) {
+        TaskProfileOperationImpl(String opName, ProfileLevel minLevel) {
             super(opName, minLevel);
         }
         /**
@@ -291,8 +291,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             if (minLevel.ordinal() > profileLevel.ordinal()) {
                 return;
             }
-            // JANE ! Alert - only want to do this for tasks that succeed?
-            // I don't think so.. .we want to know all the counts, right?
+            
             super.incrementCount();
             
             try {
@@ -334,6 +333,18 @@ class ProfileConsumerImpl implements ProfileConsumer {
         private final LinkedList<Long> samples = new LinkedList<Long>();
 	private final long maxSamples;
         
+        /** 
+         * Smoothing factor for exponential smoothing, between 0 and 1.
+         * A value closer to one provides less smoothing of the data, and
+         * more weight to recent data;  a value closer to zero provides more
+         * smoothing but is less responsive to recent changes.
+         */
+        private float smoothingFactor = (float) 0.9;
+        private long minSampleValue = Long.MAX_VALUE;
+        private long maxSampleValue = Long.MIN_VALUE;
+        private final ExponentialAverage avgSampleValue = 
+                new ExponentialAverage();
+        
         AggregateProfileSample(String name, long maxSamples, 
                                ProfileLevel minLevel)
         {
@@ -341,10 +352,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
             this.maxSamples = maxSamples;
             this.minLevel = minLevel;
         }
+        
+        /** {@inheritDoc} */
         public String getSampleName() {
             return name;
         }
-         public void addSample(long value) {
+        /** {@inheritDoc} */
+        public synchronized void addSample(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
             if (minLevel.ordinal() > profileLevel.ordinal()) {
@@ -355,13 +369,72 @@ class ProfileConsumerImpl implements ProfileConsumer {
 		samples.removeFirst(); // remove oldest
             }
 	    samples.add(value);
+            
+            // Update the statistics
+            if (value > maxSampleValue) {
+                maxSampleValue = value;
+            } 
+            if (value < minSampleValue) {
+                minSampleValue = value;
+            }
+            avgSampleValue.update(value);
          }
-         public List<Long> getSamples() {
+        /** {@inheritDoc} */
+         public synchronized List<Long> getSamples() {
              return new LinkedList<Long>(samples);
          }
-         public void clearSamples() {
+         /** {@inheritDoc} */
+         public synchronized void clearSamples() {
              samples.clear();
+             avgSampleValue.clear();
+             maxSampleValue = Long.MIN_VALUE;
+             minSampleValue = Long.MAX_VALUE;
          }
+
+        /** {@inheritDoc} */
+        public synchronized double getAverage() {
+            return avgSampleValue.avg;
+        }
+
+        /** {@inheritDoc} */
+        public synchronized long getMaxSample() {
+            return maxSampleValue;
+        }
+
+        /** {@inheritDoc} */
+        public synchronized long getMinSample() {
+            return minSampleValue;
+        }
+         
+        private class ExponentialAverage {
+
+            private double last;
+            double avg;
+
+            void update(long sample) {
+                // calculate the exponential smoothed data:
+                // current avg = 
+                //   (smoothingFactor * current sample) 
+                // + ((1 - smoothingFactor) * last avg)
+                // This is the same as:
+                // current avg =
+                //    (smoothingFactor * current sample)
+                //  + (last avg)
+                //  - (smoothingFactor * last avg)
+                // Which simplifies to:
+                // current avg =
+                //   (current sample - lastAvg) * smoothingFactor + lastAvg
+
+                avg = (sample - last) * smoothingFactor + last;
+                last = avg;
+//                System.out.println("avg: " + avg);
+            }
+            
+            void clear() {
+                last = 0;
+                avg = 0;
+            }
+        }
     }
     
     /** The task-local implementation of {@code ProfileSample} */

@@ -19,13 +19,12 @@
 
 package com.sun.sgs.profile;
 
-
 /**
- * Interface that represents a counter used in profiling tasks run through
- * the scheduler. All counters have a name associated with them, and start
- * at zero. Counters can only be incremented.  These counters are 
- * task-local, in that each counter is set to zero for each task where
- * that counter is modified.
+ * A counter which also provides information into {@link ProfileReport}s.
+ * <p>
+ * If the counter is modified during a given task, the {@code ProfileReport}
+ * for that task will include the modification, and exclude changes made while
+ * running other tasks.
  */
 public interface TaskProfileCounter extends ProfileCounter {
 

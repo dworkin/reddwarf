@@ -21,8 +21,10 @@ package com.sun.sgs.profile;
 
 
 /**
- * This interface represents a single operation that can be reported as
- * happening during the life of a task running through the scheduler.
+ * An operation which also provides information into {@link ProfileReport}s.
+ * <p>
+ * If operation occurs during a given task, the {@code ProfileReport}
+ * for that task will include the operation.
  */
 public interface TaskProfileOperation extends ProfileOperation {
 

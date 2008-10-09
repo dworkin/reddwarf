@@ -20,8 +20,8 @@
 package com.sun.sgs.profile;
 
 /**
- * This interface represents a single operation that can be reported as
- * happening during the life of a task running through the scheduler.
+ * This interface represents an operation that has occurred.  The total
+ * number of operations is maintained.
  */
 public interface ProfileOperation {
 
