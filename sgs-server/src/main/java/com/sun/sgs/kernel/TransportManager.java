@@ -29,14 +29,15 @@ import java.util.Properties;
 public interface TransportManager {
 
     /**
-     * Start a new transport. An instance of {@code transportClassName}
-     * is constructed with {@code properties} and
-     * {@code handler} as arguments.
+     * Start a new transport.
      * The transport name must resolve to a class that implements
-     * {@link Transport}. The newly created transport is returned. Each call
-     * to {@code startTransport} will result in the creation of a new instance.
+     * {@link Transport}. The class should be public, not abstract, and should
+     * provide a public constructor with a {@link Properties} and
+     * {@link ConnectionHandler} parameter. The newly created transport is
+     * returned and each call will return a new instance.
      * 
-     * @param transportClassName class name of the transport
+     * @param transportClassName name of the class that implements
+     * {@link Transport}
      * @param properties properties passed to the transport's constructor
      * @param handler handler passed to the transport's constructor
      * @return the transport object

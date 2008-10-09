@@ -52,7 +52,7 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.transport.udp.listen.address
+ *	{@value #LISTEN_HOST_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> Listen on all network interfaces
  *
@@ -60,7 +60,7 @@ import java.util.logging.Logger;
  *      will listen on.<p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.app.port
+ *	{@value #LISTEN_PORT_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> Required property<br>
  *
@@ -81,12 +81,12 @@ public class UDP implements Transport {
      * This is the host interface we are listening on. Default is listen
      * on all interfaces.
      */
-    private static final String LISTEN_HOST_PROPERTY =
+    public static final String LISTEN_HOST_PROPERTY =
         PKG_NAME + ".listen.address";
     
     /** The name of the server port property. */
-    private static final String LISTEN_PORT_PROPERTY = com.sun.sgs.impl.kernel.StandardProperties.APP_PORT;
-//	PKG_NAME + ".listen.port";
+    public static final String LISTEN_PORT_PROPERTY =
+	PKG_NAME + ".listen.port";
 
     /** The async channel group for this service. */
     private final AsynchronousChannelGroup asyncChannelGroup;

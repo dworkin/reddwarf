@@ -399,9 +399,13 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             StandardProperties.APP_NAME, appName,
-            StandardProperties.APP_PORT, Integer.toString(getNextAppPort()),
+            StandardProperties.APP_NODE, Integer.toString(getNextAppPort()),
             StandardProperties.SERVER_START, startServer,
             StandardProperties.SERVER_HOST, "localhost",
+            "com.sun.sgs.impl.service.session.transport",
+                "com.sun.sgs.impl.transport.tcp.TCP",
+            "com.sun.sgs.impl.transport.tcp.listen.port",
+                String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.port", 

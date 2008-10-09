@@ -66,10 +66,11 @@ public class StandardProperties {
     public static final String APP_LISTENER_NONE = "NONE";
 
     /**
-     * A key specifying the listening port for the application.  Required
-     * unless a null <code>AppListener</code> is specified.
+     * Application node instance. The default value is 0. If more than one
+     * app node is started on the same host, this propery must be set
+     * and specify a unique value for each node on that host.
      */
-    public static final String APP_PORT = NS + "app.port";
+    public static final String APP_NODE = NS + "app.node";
 
     /**
      * An optional key specifying a specific class to use for the

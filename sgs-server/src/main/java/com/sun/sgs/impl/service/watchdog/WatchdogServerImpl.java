@@ -152,7 +152,7 @@ public final class WatchdogServerImpl
     private static final int DEFAULT_ID_BLOCK_SIZE = 256;
     
     /** The server port. */
-    private final int port;
+    private final int serverPort;
 
     /** The renew interval. */
     final long renewInterval;
@@ -194,11 +194,6 @@ public final class WatchdogServerImpl
     /** The set of alive nodes, sorted by renew expiration time. */
     final SortedSet<NodeImpl> expirationSet =
 	Collections.synchronizedSortedSet(new TreeSet<NodeImpl>());
-
-    /** The map of alive node ports, keyed by host name. */
-    /** TBD:  use a ConcurrentHashMap, to improve system start up time? */
-    private final HashMap<String, Set<Long>> aliveNodeHostPortMap =
-         new HashMap<String, Set<Long>>();
     
     /** The set of failed nodes that are currently recovering. */
     private final ConcurrentMap<Long, NodeImpl> recoveringNodes =
@@ -220,7 +215,8 @@ public final class WatchdogServerImpl
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
      * @param	host the local host name
-     * @param   port the port
+     * @param   instance the application node instance or -1 if this is not
+     * an application node
      * @param	client the local watchdog client
      * @param   fullStack {@code true} if this server is running on a full
      *            stack
@@ -231,7 +227,7 @@ public final class WatchdogServerImpl
 			      ComponentRegistry systemRegistry,
 			      TransactionProxy txnProxy,
                               String host, 
-                              int port,
+                              int instance,
                               WatchdogClient client,
                               boolean fullStack)
 	throws Exception
@@ -243,7 +239,7 @@ public final class WatchdogServerImpl
 	
 	isFullStack = fullStack;
 	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ":" + port +
+	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ", " + instance +
 		       "]: detected " +
 		       (isFullStack ? "full stack" : "server stack"));
 	}
@@ -268,7 +264,7 @@ public final class WatchdogServerImpl
 		RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL,
 		RENEW_INTERVAL_LOWER_BOUND, RENEW_INTERVAL_UPPER_BOUND);
 	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ":" + port +
+	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ", " + instance +
 		       "]: renewInterval:" + renewInterval);
 	}
 
@@ -291,13 +287,13 @@ public final class WatchdogServerImpl
 	}
  
         // register our local id
-        long[] values = registerNode(host, port, client);
+        long[] values = registerNode(host, instance, -1, client);
         localNodeId = values[0];
         
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
-	this.port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
+	serverPort = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
-	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
+	    logger.log(Level.INFO, "Server is using port {0,number,#}", serverPort);
 	}
 	
 	checkExpirationThread.start();
@@ -377,16 +373,16 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public long[] registerNode(final String host, 
-                               final int port, 
+                               final int instance,
+                               final int port,
                                WatchdogClient client)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
 
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST,
-	               "registering node for host:{1} port:{2}",
-	               host, port);
+	    logger.log(Level.FINEST, "registering node {0} on host:{0}",
+                       instance, host);
 	}
 
 	try {
@@ -403,29 +399,22 @@ public final class WatchdogServerImpl
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "Failed to obtain node ID for {0}:{1}, throws",
-		    host, port);
+		    "Failed to obtain node ID for node {0} on {1}, throws",
+		    instance, host);
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, host, port, client);
-	    assert ! aliveNodes.containsKey(nodeId);
-	          
-            synchronized (aliveNodeHostPortMap) {
-                Set<Long> ports = null;
-                if (aliveNodeHostPortMap.containsKey(host)) {
-                    ports = aliveNodeHostPortMap.get(host);
-                } else {
-                    // New node, need to set up a new ports set.
-                    ports = new HashSet<Long>();
-                }
-                boolean added = ports.add(Long.valueOf(port));
-                if (!added) {
+	    final NodeImpl node = new NodeImpl(nodeId, host, instance, port, client);
+            
+            synchronized (aliveNodes) {
+                assert ! aliveNodes.containsKey(nodeId);
+
+                if (aliveNodes.containsValue(node))
                     throw new IllegalArgumentException(
-                                "configuration error: a node at " +
-                                host + ":" + port + " already exists");
-                }
-                aliveNodeHostPortMap.put(host, ports);
+                                    "configuration error: node " + instance +
+                                    " on host " + host +
+                                    " already exists");
+                aliveNodes.put(nodeId, node);
             }
             
 	    // Persist node
@@ -435,15 +424,14 @@ public final class WatchdogServerImpl
 			node.putNode(dataService);
 		    }}, taskOwner);
 	    } catch (Exception e) {
-                removeHostPortMapEntry(node);
+                aliveNodes.remove(nodeId);
 		throw new NodeRegistrationFailedException(
 		    "registration failed: " + nodeId, e);
 	    }
 	    
 	    // Put node in set, sorted by expiration.
 	    node.setExpiration(calculateExpiration());
-	    aliveNodes.put(nodeId, node);
-
+	    
 	    // TBD: use a ConcurrentSkipListSet?
 	    expirationSet.add(node);
 
@@ -521,7 +509,7 @@ public final class WatchdogServerImpl
      * @return	the port
      */
     public int getPort() {
-	return port;
+	return serverPort;
     }
     
     /**
@@ -529,27 +517,6 @@ public final class WatchdogServerImpl
      */
     private long calculateExpiration() {
 	return System.currentTimeMillis() + renewInterval;
-    }
-
-    /**
-     * Removes an entry in the host port map;  called when a node
-     * is found to have failed.
-     */
-    private void removeHostPortMapEntry(NodeImpl node) {
-        synchronized (aliveNodeHostPortMap) {
-            String host = node.getHostName();
-            Set<Long> ports = 
-                aliveNodeHostPortMap.get(host);
-            if (ports == null) {
-                logger.log(Level.WARNING, "Unexpected null ports value");
-                return;
-            }
-            ports.remove(Long.valueOf(node.getPort()));
-            if (ports.isEmpty()) {
-                // No more ports in use on this host
-                aliveNodeHostPortMap.remove(host);
-            }
-        }       
     }
     
     /**
@@ -599,7 +566,6 @@ public final class WatchdogServerImpl
 		     */
 		    for (NodeImpl node: expiredNodes) {
 			aliveNodes.remove(node.getId());
-                        removeHostPortMapEntry(node);
 		    }
                     
 		    /*
@@ -841,6 +807,7 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
+        int[] instances = new int[size];
         int[] ports = new int[size];
 	boolean[] status = new boolean[size];
 	long[] backups = new long[size];
@@ -850,6 +817,7 @@ public final class WatchdogServerImpl
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
+            instances[i] = changedNode.getInstance();
             ports[i] = changedNode.getPort();
 	    status[i] = changedNode.isAlive();
 	    backups[i] = changedNode.getBackupId();
@@ -865,7 +833,7 @@ public final class WatchdogServerImpl
 			Level.FINEST,
 			"notifying client:{0} of status change", notifyNode);
 		}
-		client.nodeStatusChanges(ids, hosts, ports, status, backups);
+		client.nodeStatusChanges(ids, hosts, instances, ports, status, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the

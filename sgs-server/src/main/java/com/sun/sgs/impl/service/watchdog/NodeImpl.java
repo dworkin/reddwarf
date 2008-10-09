@@ -61,6 +61,9 @@ class NodeImpl
     /** The host name, or {@code null}. */
     private final String host;
     
+    /** The node instance. */
+    private final int instance;
+    
     /** The port, or {@code null}. */
     private final int port;
 
@@ -94,8 +97,8 @@ class NodeImpl
      * @param   port     a port
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, int port, WatchdogClient client) {
-        this (nodeId, hostName, port, client, true, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int instance, int port, WatchdogClient client) {
+        this (nodeId, hostName, instance, port, client, true, INVALID_ID);
     }
 
     /**
@@ -109,8 +112,8 @@ class NodeImpl
      * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, int port, boolean isAlive) {
-	this(nodeId, hostName, port, null, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int instance, int port, boolean isAlive) {
+	this(nodeId, hostName, instance, port, null, isAlive, INVALID_ID);
     }
 	
     /**
@@ -126,10 +129,10 @@ class NodeImpl
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, int port, 
+    NodeImpl(long nodeId, String hostName, int instance, int port, 
              boolean isAlive, long backupId) 
     {
-        this(nodeId, hostName, port, null, isAlive, backupId);
+        this(nodeId, hostName, instance, port, null, isAlive, backupId);
     }
     
     /**
@@ -145,12 +148,13 @@ class NodeImpl
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    private NodeImpl(long nodeId, String hostName, int port, 
+    private NodeImpl(long nodeId, String hostName, int instance, int port, 
                      WatchdogClient client, boolean isAlive, long backupId) 
     {
         this.id = nodeId;
 
 	this.host = hostName;
+        this.instance = instance;
         this.port = port;
         this.client = client;
         this.isAlive = isAlive;
@@ -167,6 +171,10 @@ class NodeImpl
     /** {@inheritDoc} */
     public String getHostName() {
 	return host;
+    }
+    
+    public int getInstance() {
+        return instance;
     }
     
     /** {@inheritDoc} */
@@ -204,7 +212,7 @@ class NodeImpl
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
 	    return id == node.id && compareStrings(host, node.host) == 0 &&
-                     port == node.port;
+                     instance == node.instance;
 	}
 	return false;
     }
@@ -219,7 +227,7 @@ class NodeImpl
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
 	    (backupId == INVALID_ID ? "(none)" : backupId) + 
-            "]@" + host + ":" + port;
+            "]@" + host + " instance " + instance;
     }
 
     /* -- package access methods -- */

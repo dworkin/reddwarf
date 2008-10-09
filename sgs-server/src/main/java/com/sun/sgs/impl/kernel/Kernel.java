@@ -758,18 +758,6 @@ class Kernel {
                        StandardProperties.APP_LISTENER +
                        "for application: " + appName);
         }
-        
-        if (!StandardProperties.APP_LISTENER_NONE.equals(
-		appProperties.getProperty(StandardProperties.APP_LISTENER)) &&
-	    appProperties.getProperty(StandardProperties.APP_PORT) == null)
-	{
-            logger.log(Level.SEVERE, "Missing required property " +
-                       StandardProperties.APP_PORT + " for application: " +
-                       appName);
-            throw new IllegalArgumentException("Missing required property " +
-                       StandardProperties.APP_PORT + " for application: " +
-                       appName);
-        }
     }
     
     /**
