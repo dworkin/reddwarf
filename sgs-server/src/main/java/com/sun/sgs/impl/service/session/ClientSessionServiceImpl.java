@@ -311,19 +311,15 @@ public final class ClientSessionServiceImpl
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
-
             readBufferSize = wrappedProps.getIntProperty(
                 READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-
 	    disconnectDelay = wrappedProps.getLongProperty(
 		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
 		200, Long.MAX_VALUE);
-
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
@@ -366,7 +362,8 @@ public final class ClientSessionServiceImpl
 		new ClientSessionServiceRecoveryListener());
 	    int acceptorBacklog = wrappedProps.getIntProperty(
 	                ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
 			checkServiceVersion(
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
@@ -375,7 +372,8 @@ public final class ClientSessionServiceImpl
 	    /*
 	     * Store the ClientSessionServer proxy in the data store.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("StoreClientSessionServiceProxy") {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getClientSessionServerKey(localNodeId),
@@ -1134,7 +1132,8 @@ public final class ClientSessionServiceImpl
 			taskQueue = newTaskQueue;
 		    }
 		}
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
 			ClientSessionImpl.serviceEventQueue(sessionId);
 		    } }, taskOwner);
@@ -1382,6 +1381,11 @@ public final class ClientSessionServiceImpl
     private class MonitorDisconnectingSessionsTask
 	extends AbstractKernelRunnable
     {
+	/** Constructs and instance. */
+	MonitorDisconnectingSessionsTask() {
+	    super(null);
+	}
+	
 	/** {@inheritDoc} */
 	public void run() {
 	    long now = System.currentTimeMillis();
@@ -1420,7 +1424,7 @@ public final class ClientSessionServiceImpl
 		 * Schedule persistent tasks to perform recovery.
 		 */
 		transactionScheduler.runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
 			    /*
 			     * For each session on the failed node, notify

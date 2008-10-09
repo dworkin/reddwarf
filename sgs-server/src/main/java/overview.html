@@ -11,6 +11,39 @@ See <a href="com/sun/sgs/app/doc-files/config-properties.html">this
 document</a> for a list of configuration properties supported by the
 current implementation of the Project Darkstar Server.
 
+<h4>Additional Protocol Semantics</h4>
+
+In addition to the semantics for protocol messages given in {@link 
+com.sun.sgs.protocol.simple.SimpleSgsProtocol}, the current implementation of 
+the Project Darkstar Server provides the following semantics for messages:
+<ul>
+    <li> If a Project Darkstar server receives a message with an <code>Opcode
+    </code> other than those specified in the protocol specification, or with an 
+    <code>Opcode</code> that defines a message that should only be sent to 
+    a client, or the message is malformed in other ways, the server will 
+    disconnect the client session that was the origin of the message;</li>
+    <li> If the server receives a message from a client that is not currently
+    logged in, and the message is not a <code>LOGIN_REQUEST</code>, the message
+    will be ignored;</li>
+    <li>If the server receives a <code>LOGIN_REQUEST</code> that specifies the 
+    same identity as an existing user, the behavior of the server is 
+    determined by the value of the 
+    <code>com.sun.sgs.impl.service.session.allow.new.login</code> property. If
+    the value of that property is <code>false</code> (the default value) the 
+    new login is not permitted and the server responds with a 
+    <code>LOGIN_FAILURE</code>. If the  value of the property is 
+    <code>true</code>, the user's existing session is disconnected, and a new 
+    login is allowed to proceed.</li>
+</ul>
+
+At this time, the Project Darkstar Server does not implement a response to the 
+<code>RECONNECT_REQUEST Opcode</code>. The current implementation treats such a 
+request as an unknown <code>Opcode</code> and will disconnect any client sending 
+such a  request. Similarly, the current implementation of the Project Darkstar 
+server will not send messages beginning with the <code>RECONNECT_SUCCESS</code> 
+or <code>RECONNECT_FALURE Opcodes</code>.
+
+
 <h4>Modifications and updates to managed objects</h4>
 
 You can using logging to obtain information about instances of {@link

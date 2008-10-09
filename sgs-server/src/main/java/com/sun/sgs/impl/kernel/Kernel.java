@@ -833,6 +833,7 @@ class Kernel {
 
         /** Creates an instance of <code>AppStartupRunner</code>. */
         AppStartupRunner(Properties properties) {
+	    super(null);
             this.properties = properties;
         }
 

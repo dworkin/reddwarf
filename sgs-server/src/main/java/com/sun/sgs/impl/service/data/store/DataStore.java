@@ -57,12 +57,11 @@ public interface DataStore {
      * Notifies the <code>DataStore</code> that an object is going to be
      * modified.  The implementation can use this information to obtain an
      * exclusive lock on the object in order avoid contention when the object
-     * is modified.
+     * is modified.  This method does nothing if the object does not exist.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
      * @throws	IllegalArgumentException if <code>oid</code> is negative
-     * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -128,7 +127,9 @@ public interface DataStore {
      * Removes the object with the specified object ID.  The implementation
      * will make an effort to flag subsequent references to the removed object
      * by throwing {@link ObjectNotFoundException}, although this behavior is
-     * not guaranteed.
+     * not guaranteed.  The implementation is not required to check that the
+     * object is an externally visible object rather than one used internally
+     * by the implementation.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID

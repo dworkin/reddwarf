@@ -114,6 +114,23 @@ public class JeDatabase implements DbDatabase {
     }
 
     /** {@inheritDoc} */
+    public void markForUpdate(DbTransaction txn, byte[] key) {
+	try {
+	    DatabaseEntry valueEntry = new DatabaseEntry();
+	    /* Ignore value by truncating to zero bytes */
+	    valueEntry.setPartial(0, 0, true);
+	    OperationStatus status = db.get(
+		JeTransaction.getJeTxn(txn), new DatabaseEntry(key),
+		valueEntry, LockMode.RMW);
+	    if (status != SUCCESS && status != NOTFOUND) {
+		throw new DbDatabaseException("Operation failed: " + status);
+	    }
+	} catch (DatabaseException e) {
+	    throw JeEnvironment.convertException(e, true);
+	}
+    }
+
+    /** {@inheritDoc} */
     public void put(DbTransaction txn, byte[] key, byte[] value) {
 	try {
 	    OperationStatus status = db.put(
