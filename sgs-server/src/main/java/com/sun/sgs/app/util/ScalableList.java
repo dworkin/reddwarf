@@ -2178,7 +2178,8 @@ public class ScalableList<E> extends AbstractList<E> implements
      */
     static class ListNode<E> implements ManagedObject, Serializable, Node<E> {
 
-	private static final int DATA_INTEGRITY_STARTING_VALUE = Integer.MIN_VALUE;
+	private static final int DATA_INTEGRITY_STARTING_VALUE = 
+	    Integer.MIN_VALUE;
 
 	// References to neighbors
 	private ManagedReference<SubList<E>> subListRef;
@@ -2606,7 +2607,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private void split() {
 	    ArrayList<ManagedReference<ManagedObject>> contents = getSubList()
 		    .getElements();
-	    ArrayList<ManagedReference<ManagedObject>> spawned = new ArrayList<ManagedReference<ManagedObject>>();
+	    ArrayList<ManagedReference<ManagedObject>> spawned = 
+		new ArrayList<ManagedReference<ManagedObject>>();
 
 	    // move last half of list into a new child
 	    int sublistSize = getSubList().size();
