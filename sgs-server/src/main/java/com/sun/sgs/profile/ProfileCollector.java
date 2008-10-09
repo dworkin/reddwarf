@@ -19,6 +19,7 @@
 
 package com.sun.sgs.profile;
 
+import com.sun.sgs.app.NameExistsException;
 import java.util.List;
 import java.util.Map;
 
@@ -136,30 +137,33 @@ public interface ProfileCollector {
     void removeListener(ProfileListener listener);
     
     /**
-     * Registers the given unique name as a profile producer.
+     * Creates a {@code ProfileConsumer} with the given name.
      *
-     * @param name the unique name of the profile producer
+     * @param name the unique name of the profile consumer
      *
-     * @return a {@code ProfileConsumer} that will consume profiling
-     *         data from the provided named producer
+     * @return a {@code ProfileConsumer} with the given name
+     * 
+     * @throws NameExistsException if the name is already in use
+     * <p><b> Actually, implementation doesn't throw this, as the tests 
+     * really want to be able to create multiple instances of each service </b>
      */
-    // JANE poorly named?
-    ProfileConsumer registerProfileProducer(String name);
+    ProfileConsumer createConsumer(String name);
 
     /**
-     * Returns a read-only map of {@code ProfileConsumer} names to the 
-     * {@code ProfileConsumer}s which have been registered through a call to 
-     * {@link #registerProfileProducer}.
-     * 
-     * @return the map of names to consumers
-     */
-    Map<String, ProfileConsumer> getConsumers();
-    
-    /**
-     * Returns the named {@code ProfileConsumer}.
+     * Returns the named {@code ProfileConsumer}, or {@code null} if no
+     * consumers have that name.
      * 
      * @param name the name of the consumer
      * @return the named consumer
      */
     ProfileConsumer getConsumer(String name);
+    
+    /**
+     * Returns a read-only map of {@code ProfileConsumer} names to the 
+     * {@code ProfileConsumer}s which have been created through a call to 
+     * {@link #createConsumer}.
+     * 
+     * @return the map of names to consumers
+     */
+    Map<String, ProfileConsumer> getConsumers();
 }

@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.profile;
 
+// import com.sun.sgs.app.NameExistsException;
+
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
@@ -160,12 +162,24 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         defaultProfileLevel = level;
     }
     
-    /** {@inheritDoc} */
-    public Map<String, ProfileConsumer> getConsumers() {
-        // Create a copy of the map to get the type correct.
-        ConcurrentHashMap<String, ProfileConsumer> retMap = 
-                new ConcurrentHashMap<String, ProfileConsumer>(consumers);
-        return Collections.unmodifiableMap(retMap);
+   /** {@inheritDoc} */
+    public ProfileConsumer createConsumer(String name) {
+        if (name == null) {
+            throw new NullPointerException("Name cannot be null");
+        }
+        
+        ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
+
+        /*  commented out code:  our tests, particularly constructor tests,
+            cannot deal with this
+        ProfileConsumerImpl oldpc = consumers.putIfAbsent(name, pc);
+        if (oldpc != null) {
+            throw 
+               new NameExistsException("The consumer has already been created");
+        }
+         */
+        consumers.put(name, pc);
+        return pc;
     }
     
     /** {@inheritDoc} */
@@ -174,13 +188,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
     
     /** {@inheritDoc} */
-    public ProfileConsumer registerProfileProducer(String name) {
-        if (name == null) {
-            throw new NullPointerException("Name cannot be null");
-        }
-        ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
-        consumers.put(pc.getName(), pc);
-        return pc;
+    public Map<String, ProfileConsumer> getConsumers() {
+        // Create a copy of the map to get the type correct.
+        ConcurrentHashMap<String, ProfileConsumer> retMap = 
+                new ConcurrentHashMap<String, ProfileConsumer>(consumers);
+        return Collections.unmodifiableMap(retMap);
     }
     
     /** {@inheritDoc} */

@@ -23,19 +23,12 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 
 /**
- * This is the main aggregation point for profiling data. Implementations of
- * this interface are used to collect data from arbitrary sources (typically
- * <code>ProfileConsumer</code>s or the scheduler itself) and keep
- * track of which tasks are generating which data.
- * <p>
- * This interface allows instances of <code>ProfileListener</code>
- * to register as listeners for reported data. All reporting to these
- * listeners is done synchronously, such that listeners do not need to worry
- * about being called concurrently. Listeners should be efficient in handling
- * reports, since they may be blocking all other listeners.
+ * The object which manages how {@link ProfileCollector}s keep track
+ * of which tasks are generating which data.
  */
 public interface ProfileCollectorHandle {
 
@@ -86,6 +79,7 @@ public interface ProfileCollectorHandle {
      * <code>noteTransactional</code> must first have been called in
      * the context of the current thread.
      *
+     * <p><b> Note sure this belongs in this interface </b>
      * @param participantDetail the detail associated with the participant
      *
      * @throws IllegalStateException if no transactional task is bound to
@@ -97,6 +91,7 @@ public interface ProfileCollectorHandle {
      * Sets the detail for all objects accessed during the task as
      * reported to the <code>AccessCoordinator</code>.
      * 
+     * <p><b> Note sure this belongs in this interface </b>
      * @param detail all detail of the accessed objects
      *
      * @throws IllegalStateException if no transactional task is bound to

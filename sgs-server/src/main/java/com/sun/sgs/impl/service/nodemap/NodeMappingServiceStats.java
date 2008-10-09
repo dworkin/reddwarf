@@ -39,7 +39,7 @@ public class NodeMappingServiceStats implements NodeMappingServiceMXBean {
     
     NodeMappingServiceStats(ProfileService profileService, String name) {
         ProfileConsumer consumer =
-            profileService.getProfileCollector().registerProfileProducer(name);
+            profileService.getProfileCollector().createConsumer(name);
 
         ProfileLevel level = ProfileLevel.MAX;
         addNodeMappingListenerOp =

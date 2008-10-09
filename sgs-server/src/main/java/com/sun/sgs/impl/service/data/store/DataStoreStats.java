@@ -98,7 +98,7 @@ public class DataStoreStats implements DataStoreStatsMXBean {
         // hard to see the advantage of that.
         ProfileConsumer consumer =
 	    profileService.getProfileCollector().
-                registerProfileProducer(DataStore.class.getName());
+                createConsumer(DataStore.class.getName());
         ProfileLevel level = ProfileLevel.MAX;
         
 	createObjectOp = 
