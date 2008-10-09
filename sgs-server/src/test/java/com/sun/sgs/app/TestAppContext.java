@@ -88,11 +88,11 @@ public class TestAppContext {
         taskManager = EasyMock.createNiceMock(TaskManager.class);
         arbitraryManager = new Object();
         
-        EasyMock.expect(managerLocator.getManager(DataManager.class)).
+        EasyMock.expect(managerLocator.getDataManager()).
                 andReturn(dataManager);
-        EasyMock.expect(managerLocator.getManager(ChannelManager.class)).
+        EasyMock.expect(managerLocator.getChannelManager()).
                 andReturn(channelManager);
-        EasyMock.expect(managerLocator.getManager(TaskManager.class)).
+        EasyMock.expect(managerLocator.getTaskManager()).
                 andReturn(taskManager);
         EasyMock.expect(managerLocator.getManager(Object.class)).
                 andReturn(arbitraryManager);
@@ -108,11 +108,11 @@ public class TestAppContext {
         
         EasyMock.reset(managerLocator);
         
-        EasyMock.expect(managerLocator.getManager(DataManager.class)).
+        EasyMock.expect(managerLocator.getDataManager()).
                 andReturn(dataManager).andReturn(null);
-        EasyMock.expect(managerLocator.getManager(ChannelManager.class)).
+        EasyMock.expect(managerLocator.getChannelManager()).
                 andReturn(channelManager).andReturn(null);
-        EasyMock.expect(managerLocator.getManager(TaskManager.class)).
+        EasyMock.expect(managerLocator.getTaskManager()).
                 andReturn(taskManager).andReturn(null);
         EasyMock.expect(managerLocator.getManager(Object.class)).
                 andReturn(arbitraryManager).andReturn(null);
@@ -124,11 +124,11 @@ public class TestAppContext {
         
         ManagerNotFoundException m = new ManagerNotFoundException("not found");
         
-        EasyMock.expect(managerLocator.getManager(DataManager.class)).
+        EasyMock.expect(managerLocator.getDataManager()).
                 andThrow(m);
-        EasyMock.expect(managerLocator.getManager(ChannelManager.class)).
+        EasyMock.expect(managerLocator.getChannelManager()).
                 andThrow(m);
-        EasyMock.expect(managerLocator.getManager(TaskManager.class)).
+        EasyMock.expect(managerLocator.getTaskManager()).
                 andThrow(m);
         EasyMock.expect(managerLocator.getManager(Object.class)).
                 andThrow(m);
@@ -200,7 +200,7 @@ public class TestAppContext {
         DataManager d2 = AppContext.getDataManager();
         
         Assert.assertSame(d1, dataManager);
-        Assert.assertSame(d2, dataManager);
+        Assert.assertNull(d2);
     }
     
     @Test
@@ -212,7 +212,7 @@ public class TestAppContext {
         ChannelManager c2 = AppContext.getChannelManager();
         
         Assert.assertSame(c1, channelManager);
-        Assert.assertSame(c2, channelManager);
+        Assert.assertNull(c2);
     }
     
     @Test
@@ -224,7 +224,7 @@ public class TestAppContext {
         TaskManager t2 = AppContext.getTaskManager();
         
         Assert.assertSame(t1, taskManager);
-        Assert.assertSame(t2, taskManager);
+        Assert.assertNull(t2);
     }
     
     @Test
@@ -236,7 +236,7 @@ public class TestAppContext {
         Object o2 = AppContext.getManager(Object.class);
         
         Assert.assertSame(o1, arbitraryManager);
-        Assert.assertSame(o2, arbitraryManager);
+        Assert.assertNull(o2);
     }
     
     @Test(expected=AppContextException.class)

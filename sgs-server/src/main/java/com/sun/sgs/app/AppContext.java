@@ -19,10 +19,6 @@
 
 package com.sun.sgs.app;
 
-import java.util.Map;
-import java.util.HashMap;
-
-
 /**
  * Provides access to facilities available in the current application context.
  * This class should not be instantiated.
@@ -39,91 +35,61 @@ public final class AppContext {
     // the current locator for this context
     private static ManagerLocator managerLocator;
     
-    // directly cache the DataManager since it is used frequently
-    private static DataManager dataManager;
-    
-    // directly cache the TaskManager since it is used frequently
-    private static TaskManager taskManager;
-    
-    // directly cache the ChannelManager since it is used frequently
-    private static ChannelManager channelManager;
-    
-    // cache the remaining managers in a map
-    private static volatile Map<Class<?>, Object> managerMap =
-            new HashMap<Class<?>, Object>();
-    
-    
     /** This class should not be instantiated. */
     private AppContext() { }
 
     /**
      * Returns the {@code ChannelManager} for use by the current
      * application.  The object returned is not serializable, and should not be
-     * stored as part of a managed object. <p>
-     * 
-     * Note that this method will
-     * always return the same object in between calls to
-     * {@link #setManagerLocator setManagerLocator}.
+     * stored as part of a managed object.
      *
      * @return	the {@code ChannelManager} for the current application
      * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
      *          be located
      */
     public static ChannelManager getChannelManager() {
-        if(channelManager == null)
-            throw new ManagerNotFoundException("ChannelManager cannot be located");
-
-        return channelManager;
+        if(managerLocator == null)
+            throw new ManagerNotFoundException("AppContext not initialized");
+        
+        return managerLocator.getChannelManager();
     }
 
     /**
      * Returns the {@code DataManager} for use by the current application.
      * The object returned is not serializable, and should not be stored as
-     * part of a managed object. <p>
-     * 
-     * Note that this method will
-     * always return the same object in between calls to
-     * {@link #setManagerLocator setManagerLocator}.
+     * part of a managed object.
      *
      * @return	the {@code DataManager} for the current application
      * @throws	ManagerNotFoundException if the {@code DataManager} cannot
      *          be located
      */
     public static DataManager getDataManager() {
-        if(dataManager == null)
-            throw new ManagerNotFoundException("DataManager cannot be located");
-
-        return dataManager;
+        if(managerLocator == null)
+            throw new ManagerNotFoundException("AppContext not initialized");
+        
+        return managerLocator.getDataManager();
     }
 
     /**
      * Returns the {@code TaskManager} for use by the current application.
      * The object returned is not serializable, and should not be stored as
-     * part of a managed object. <p>
-     * 
-     * Note that this method will
-     * always return the same object in between calls to
-     * {@link #setManagerLocator setManagerLocator}.
+     * part of a managed object.
      *
      * @return	the {@code TaskManager} for the current application
      * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
      *          be located
      */
     public static TaskManager getTaskManager() {
-        if(taskManager == null)
-            throw new ManagerNotFoundException("TaskManager cannot be located");
-
-        return taskManager;
+        if(managerLocator == null)
+            throw new ManagerNotFoundException("AppContext not initialized");
+        
+        return managerLocator.getTaskManager();
     }
 
     /**
      * Returns a manager of the specified type for use by the current
      * application.  The object returned is not serializable, and should not be
-     * stored as part of a managed object. <p>
-     * 
-     * Note that for any calls with the same type argument, this method will
-     * always return the same object in between calls to
-     * {@link #setManagerLocator setManagerLocator}.
+     * stored as part of a managed object.
      *
      * @param	<T> the type of the manager
      * @param	type a class representing the type of the manager
@@ -131,31 +97,16 @@ public final class AppContext {
      * @throws	ManagerNotFoundException if no manager is found for the
      *		specified type
      */
-    @SuppressWarnings("unchecked")
     public static <T> T getManager(Class<T> type) {
-        if(managerMap == null)
-            throw new ManagerNotFoundException("manager of type "+
-                                               type.getName()+
-                                               " cannot be located");
+        if(managerLocator == null)
+            throw new ManagerNotFoundException("AppContext not initialized");
         
-        if(!managerMap.containsKey(type)) {
-            synchronized(AppContext.class) {
-                if(!managerMap.containsKey(type))
-                    managerMap.put(type, managerLocator.getManager(type));
-            }
-        }
-
-        return (T)managerMap.get(type);
+        return managerLocator.getManager(type);
     }
     
     /**
      * Sets the {@code ManagerLocator} which is used to retrieve
      * managers for the application.  <p>
-     * 
-     * Invoking this method will immediately retrieve and cache values for
-     * the {@code DataManager}, {@code TaskManager}, and {@code ChannelManager}
-     * from the given {@code ManagerLocator}.  If one of these cannot be
-     * located, it will be set to null. <p>
      * 
      * In most situations, this method
      * should only be called once throughout the life of the application.
@@ -177,32 +128,11 @@ public final class AppContext {
             throw new NullPointerException("managerLocator cannot be null");
         if(AppContext.managerLocator != null &&
                 !"true".equals(System.getProperty(RESET_ALLOWED_PROP))) {
-            throw new AppContextException("multiple invocations of "+
+            throw new AppContextException("multiple invocations of " +
                                           "setManagerLocator not allowed");
         }
         
-        // set the locator and cache the standard managers
         AppContext.managerLocator = managerLocator;
-        try {
-            dataManager = managerLocator.getManager(DataManager.class);
-        } catch(ManagerNotFoundException m) {
-            dataManager = null;
-        }
-        
-        try {
-            channelManager = managerLocator.getManager(ChannelManager.class);
-        } catch(ManagerNotFoundException m) {
-            channelManager = null;
-        }
-        
-        try {
-            taskManager = managerLocator.getManager(TaskManager.class);
-        } catch(ManagerNotFoundException m) {
-            taskManager = null;
-        }
-        
-        // reset the cache for the other managers
-        managerMap = new HashMap<Class<?>, Object>();
     }
 
 }

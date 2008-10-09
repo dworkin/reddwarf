@@ -28,6 +28,40 @@ package com.sun.sgs.app;
  * @see AppContext#setManagerLocator AppContext.setManagerLocator
  */
 public interface ManagerLocator {
+    
+    /**
+     * Returns the {@code ChannelManager} for use by the current
+     * application.  The object returned is not serializable, and should not be
+     * stored as part of a managed object.
+     *
+     * @return	the {@code ChannelManager} for the current application
+     * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
+     *          be located
+     */
+    public ChannelManager getChannelManager();
+
+    /**
+     * Returns the {@code DataManager} for use by the current application.
+     * The object returned is not serializable, and should not be stored as
+     * part of a managed object.
+     *
+     * @return	the {@code DataManager} for the current application
+     * @throws	ManagerNotFoundException if the {@code DataManager} cannot
+     *          be located
+     */
+    public DataManager getDataManager();
+
+    /**
+     * Returns the {@code TaskManager} for use by the current application.
+     * The object returned is not serializable, and should not be stored as
+     * part of a managed object.
+     *
+     * @return	the {@code TaskManager} for the current application
+     * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
+     *          be located
+     */
+    public TaskManager getTaskManager();
+    
     /**
      * Returns a manager of the specified type for use by the current
      * application.  The object returned is not serializable, and should not be
