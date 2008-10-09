@@ -45,8 +45,8 @@ public class TransportManagerImpl implements TransportManager {
     
     /** {@inheritDoc} */
     @Override
-    public Transport startTransport(Properties properties,
-                                    String transportClassName,
+    public Transport startTransport(String transportClassName,
+                                    Properties properties,
                                     ConnectionHandler handler)
         throws Exception
     {
@@ -64,7 +64,7 @@ public class TransportManagerImpl implements TransportManager {
         Class<?> transportClass = Class.forName(transportClassName);
     
         if (!Transport.class.isAssignableFrom(transportClass))
-            throw new Exception(transportClassName +
+            throw new IllegalArgumentException(transportClassName +
                                 " class does not implement Transport interface");
         
         Constructor<?> [] constructors = transportClass.getConstructors();

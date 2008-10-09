@@ -19,16 +19,22 @@
 
 package com.sun.sgs.transport;
 
+import com.sun.sgs.kernel.TransportManager;
+
 /**
- * IO transport.
+ * I/O transport. A tranport object handles incoming connection request for
+ * a specific transport type.
  * 
+ * @see ConnectionHandler
+ * @see TransportManager
  */
 public interface Transport {
     
     /**
      * Shutdown the transport. The actions of this method are implementation
-     * dependent, but typlicaly involve closing open network connections,
-     * releasing system resources, etc..
+     * dependent, but typically involve closing open network connections,
+     * releasing system resources, etc.. All shutdown activity is
+     * synchronous with this call.
      */
     void shutdown();
 }

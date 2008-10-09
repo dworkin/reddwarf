@@ -29,16 +29,24 @@ import java.util.Properties;
 public interface TransportManager {
 
     /**
-     * Start a new transport.
+     * Start a new transport. An instance of {@code transportClassName}
+     * is constructed with {@code properties} and
+     * {@code handler} as arguments.
+     * The transport name must resolve to a class that implements
+     * {@link Transport}. The newly created transport is returned. Each call
+     * to {@code startTransport} will result in the creation of a new instance.
      * 
-     * @param properties
-     * @param transportClassName
-     * @param handler
+     * @param transportClassName class name of the transport
+     * @param properties properties passed to the transport's constructor
+     * @param handler handler passed to the transport's constructor
      * @return the transport object
-     * @throws java.lang.Exception
+     * @throws IllegalArgumentException if any argument is {@code null} or if
+     * the class specified by {@code transportClassName} does not implement
+     * {@link Transport}
+     * @throws Exception thrown from the transport's constructor
      */
-    Transport startTransport(Properties properties,
-                             String transportClassName,
+    Transport startTransport(String transportClassName,
+                             Properties properties,
                              ConnectionHandler handler) throws Exception;
 
 }

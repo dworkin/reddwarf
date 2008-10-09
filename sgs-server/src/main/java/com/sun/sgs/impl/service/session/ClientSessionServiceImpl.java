@@ -214,7 +214,7 @@ public final class ClientSessionServiceImpl
     private final Properties transportProperties;
     
     /** Transport class. */
-    private final String transportName;
+    private final String transportClassName;
     
     /** Transport object. */
     private Transport transport = null;
@@ -282,9 +282,9 @@ public final class ClientSessionServiceImpl
 	try {
             // For now, system properties == transport properties
             transportProperties = properties;
-            transportName = wrappedProps.getProperty(TRANSPORT_PROPERTY);
+            transportClassName = wrappedProps.getProperty(TRANSPORT_PROPERTY);
             
-            if (transportName == null)
+            if (transportClassName == null)
                 throw new Exception("transport must be specified");
 
 	    /*
@@ -404,8 +404,8 @@ public final class ClientSessionServiceImpl
     public void doReady() {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
         try {
-            transport = transportMgr.startTransport(transportProperties,
-                                                    transportName,
+            transport = transportMgr.startTransport(transportClassName,
+                                                    transportProperties,
                                                     this);
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);

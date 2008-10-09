@@ -22,14 +22,22 @@ package com.sun.sgs.transport;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 
 /**
- * Interface implemented by objects implementing a connection handler.
+ * Interface implemented by objects implementing a connection handler. A
+ * connection handler is passed to a {@link Transport} when it is created.
+ * When a new connection is received by the transport,
+ * {@link #newConnection newConnection} is invoked with the new I/O channel
+ * for that connection.
+ * 
+ * @see Transport
  */
 public interface ConnectionHandler {
     
     /**
-     * Notify the handler that a new connetion has been initiated.
+     * Notify the handler that a new connection has been initiated. If an
+     * exception is thrown the connection will be refused.
      * 
      * @param channel on which the new connection can communicate.
+     * @throws Exception if the handler rejects the connection.
      */
-    void newConnection(AsynchronousByteChannel channel);
+    void newConnection(AsynchronousByteChannel channel) throws Exception;
 }
