@@ -118,6 +118,22 @@ public class TestAppContext {
                 andReturn(arbitraryManager).andReturn(null);
         EasyMock.replay(managerLocator);
     }
+    
+    private void initEmptyAppContext() {
+        managerLocator = EasyMock.createMock(ManagerLocator.class);
+        
+        ManagerNotFoundException m = new ManagerNotFoundException("not found");
+        
+        EasyMock.expect(managerLocator.getManager(DataManager.class)).
+                andThrow(m);
+        EasyMock.expect(managerLocator.getManager(ChannelManager.class)).
+                andThrow(m);
+        EasyMock.expect(managerLocator.getManager(TaskManager.class)).
+                andThrow(m);
+        EasyMock.expect(managerLocator.getManager(Object.class)).
+                andThrow(m);
+        EasyMock.replay(managerLocator);
+    }
 
     @Test(expected=ManagerNotFoundException.class)
     public void testGetDataManagerBeforeInit() {
@@ -247,6 +263,36 @@ public class TestAppContext {
         
         AppContext.setManagerLocator(m1);
         AppContext.setManagerLocator(m2);
+    }
+    
+    @Test
+    public void testEmptyManagerLocator() {
+        initEmptyAppContext();
+        AppContext.setManagerLocator(managerLocator);
+    }
+    
+    @Test(expected=ManagerNotFoundException.class)
+    public void testGetDataManagerWithEmptyManagerLocator() {
+        initEmptyAppContext();
+        AppContext.setManagerLocator(managerLocator);
+        
+        AppContext.getDataManager();
+    }
+    
+    @Test(expected=ManagerNotFoundException.class)
+    public void testGetTaskManagerWithEmptyManagerLocator() {
+        initEmptyAppContext();
+        AppContext.setManagerLocator(managerLocator);
+        
+        AppContext.getTaskManager();
+    }
+    
+    @Test(expected=ManagerNotFoundException.class)
+    public void testGetChannelManagerWithEmptyManagerLocator() {
+        initEmptyAppContext();
+        AppContext.setManagerLocator(managerLocator);
+        
+        AppContext.getChannelManager();
     }
     
 }

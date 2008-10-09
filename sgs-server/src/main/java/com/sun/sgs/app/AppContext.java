@@ -112,7 +112,7 @@ public final class AppContext {
     /**
      * Returns a manager of the specified type for use by the current
      * application.  The object returned is not serializable, and should not be
-     * stored as part of a managed object.
+     * stored as part of a managed object. <p>
      * 
      * Note that for any calls with the same type argument, this method will
      * always return the same object in between calls to
@@ -163,8 +163,6 @@ public final class AppContext {
      *         once <em>and</em> the
      *         {@code com.sun.sgs.app.AppContext.resetAllowed} property is
      *         not set to {@code true}.
-     * @throws ManagerNotFoundException if one of the standard managers
-     *         cannot be located with the {@code ManagerLocator}
      */
     public static synchronized void 
             setManagerLocator(ManagerLocator managerLocator) {
