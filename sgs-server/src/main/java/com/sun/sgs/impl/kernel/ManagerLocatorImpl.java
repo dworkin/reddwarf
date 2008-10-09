@@ -19,7 +19,10 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagerLocator;
+import com.sun.sgs.app.TaskManager;
 
 /**
  * Package-private implementation of {@code ManagerLocator} that is
@@ -29,6 +32,18 @@ import com.sun.sgs.app.ManagerLocator;
  * @see com.sun.sgs.app.AppContext#setManagerLocator AppContext.setManagerLocator
  */
 class ManagerLocatorImpl implements ManagerLocator {
+
+    public ChannelManager getChannelManager() {
+        return ContextResolver.getChannelManager();
+    }
+
+    public DataManager getDataManager() {
+        return ContextResolver.getDataManager();
+    }
+
+    public TaskManager getTaskManager() {
+        return ContextResolver.getTaskManager();
+    }
 
     public <T> T getManager(Class<T> type) {
         return ContextResolver.getManager(type);
