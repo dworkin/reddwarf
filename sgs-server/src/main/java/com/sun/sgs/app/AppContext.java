@@ -29,6 +29,13 @@ import java.util.HashMap;
  */
 public final class AppContext {
     
+    /**
+     * If this system property is set to "true", multiple invocations of
+     * {@link AppContext#setManagerLocator setManagerLocator} are allowed.
+     */
+    public static final String RESET_ALLOWED_PROP = 
+            "com.sun.sgs.app.AppContext.resetAllowed";
+    
     // the current locator for this context
     private static ManagerLocator managerLocator;
     
@@ -169,8 +176,7 @@ public final class AppContext {
         if(managerLocator == null)
             throw new NullPointerException("managerLocator cannot be null");
         if(AppContext.managerLocator != null &&
-                !"true".equals(
-                System.getProperty("com.sun.sgs.app.AppContext.resetAllowed"))) {
+                !"true".equals(System.getProperty(RESET_ALLOWED_PROP))) {
             throw new AppContextException("multiple invocations of "+
                                           "setManagerLocator not allowed");
         }
