@@ -33,7 +33,7 @@ public final class AppContext {
             "com.sun.sgs.app.AppContext.resetAllowed";
     
     // the current locator for this context
-    private static ManagerLocator managerLocator;
+    private static volatile ManagerLocator managerLocator;
     
     /** This class should not be instantiated. */
     private AppContext() { }
