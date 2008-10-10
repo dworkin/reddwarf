@@ -277,10 +277,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	this.addAll(collection);
     }
 
-    ScalableList<E> getScalableList() {
-	return this;
-    }
-
     /**
      * Retrieves the {@code branchingFactor} for the list.
      * 
@@ -1342,24 +1338,32 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	/**
 	 * Unlinks itself from the tree without performing a recursive
-	 * deletion.
-	 * 
-	 * @return itself, after being unlinked
+	 * deletion. This method re-links references that are dangling as a
+	 * result of this node's removal.
 	 */
-	public TreeNode<E> remove() {
+	private TreeNode<E> prune() {
 
-	    // We may have to re-link siblings
+	    // Decide how to perform re-linking of the nodes,
 	    if (prevRef != null) {
 		if (nextRef != null) {
-		    this.prev().setNext(this.next());
-		    this.next().setPrev(this.prev());
+		    prevRef.getForUpdate().setNext(this.next());
+		    nextRef.getForUpdate().setPrev(this.prev());
 		} else {
 		    // relink tail
-		    this.prev().setNext(null);
+		    prevRef.getForUpdate().setNext(null);
 		}
 	    } else if (nextRef != null) {
 		// relink head
-		this.next().setPrev(null);
+		nextRef.getForUpdate().setPrev(null);
+	    } else {
+		// its an only child; join the parent to the child
+		// if a parent exists.
+		if (parentRef != null && childRef != null) {
+		    Node<E> child = childRef.getForUpdate();
+		    TreeNode<E> parent = parentRef.getForUpdate();
+		    parent.setChild(child, child.size());
+		    child.setParent(parent);
+		}
 	    }
 	    AppContext.getDataManager().removeObject(this);
 	    return this;
@@ -1381,31 +1385,36 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * This method walks up the tree and performs any {@code TreeNode<E>}
 	 * splits if the children sizes have been exceeded.
 	 */
-	public boolean performSplitIfNecessary() {
-	    TreeNode<E> newNode = null;
-	    Node<E> tmp = (Node<E>) this.getChild();
-
+	private boolean performSplitIfNecessary() {
 	    // Check if we need to split
 	    if (childrenCount > branchingFactor) {
-		AppContext.getDataManager().markForUpdate(this);
-		generateParentIfNecessary();
-
-		// Perform split by creating and linking new sibling
-		newNode = createAndLinkSibling(tmp, childrenCount);
-		childrenCount =
-			childrenCount - calculateSplitSize(childrenCount);
-
-		// Link the new sibling to the tree
-		newNode.setPrev(this);
-		newNode.setNext(this.next());
-		this.setNext(newNode);
-		if (newNode.next() != null) {
-		    newNode.next().setPrev(newNode);
-		}
-
+		split();
 		return true;
 	    }
 	    return false;
+	}
+
+	/**
+	 * Splits the children into two roughly equal groups, and generates a
+	 * sibling to parent one of the groups.
+	 */
+	private void split() {
+	    TreeNode<E> newNode = null;
+	    Node<E> tmp = (Node<E>) this.getChild();
+	    AppContext.getDataManager().markForUpdate(this);
+	    generateParentIfNecessary();
+
+	    // Perform split by creating and linking new sibling
+	    newNode = createAndLinkSibling(tmp, childrenCount);
+	    childrenCount = childrenCount - calculateSplitSize(childrenCount);
+
+	    // Link the new sibling to the tree
+	    newNode.setPrev(this);
+	    newNode.setNext(this.next());
+	    this.setNext(newNode);
+	    if (newNode.next() != null) {
+		newNode.next().setPrev(newNode);
+	    }
 	}
 
 	/**
@@ -1505,6 +1514,12 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @throws IllegalArgumentException when the mode is not recognized
 	 */
 	public void propagateChanges(byte mode) {
+	    // If we are at the root, then check if the root needs to be
+	    // split or pruned.
+	    if (this.equals(owner.get().getRoot())) {
+		updateRootIfNecessary(mode);
+		return;
+	    }
 
 	    // Depending on the mode, perform the appropriate updates
 	    switch (mode) {
@@ -1526,34 +1541,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 		// This case checks if subsequent splits are
 		// necessary.
 		case TreeNode.INCREMENT_CHILDREN_AND_SIZE:
-		    this.increment();
-		    this.incrementNumChildren();
-
-		    // if another split did not take place,
-		    // then just propagate the increment.
-		    // Otherwise, increment and check if
-		    // the parent needs to split
-		    if (!performSplitIfNecessary()) {
-			mode = TreeNode.INCREMENT_SIZE;
-		    }
+		    mode = incrementChildrenAndSize();
 		    break;
 
 		// Decrements the child size. If the node is
 		// empty, then it removes itself. Both cases
 		// propagate to parent
 		case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
-		    this.decrement();
-		    this.decrementNumChildren();
-
-		    // remove this from the tree if empty, and
-		    // decrement parent's number of children and
-		    // size; otherwise, only propagate size
-		    // decrementing
-		    if (size() == 0) {
-			remove();
-		    } else {
-			mode = TreeNode.DECREMENT_SIZE;
-		    }
+		    mode = decrementChildrenAndSize();
 		    break;
 
 		// If the mode was not recognized, throw an exception
@@ -1567,10 +1562,127 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // Recursively call the method on our parent as long as
 	    // a parent exists and its not the root
 	    TreeNode<E> parent = getParent();
-	    if (parent != null && !parent.equals(owner.get().getRoot())) {
+	    if (parent != null) {
 		parent.propagateChanges(mode);
 	    } else {
 		owner.getForUpdate().setRoot(this);
+	    }
+	}
+
+	/**
+	 * Increments the number of children and size, and determines whether
+	 * the parent should do both or just perform an increment of the size.
+	 * 
+	 * @return the operation corresponding to the next recursive operation
+	 * to perform. The byte can be looked-up in the {@code TreeNode}
+	 * static fields.
+	 */
+	private byte incrementChildrenAndSize() {
+	    this.increment();
+	    this.incrementNumChildren();
+
+	    // if another split did not take place,
+	    // then just propagate the increment.
+	    // Otherwise, increment and check if
+	    // the parent needs to split
+	    if (!performSplitIfNecessary()) {
+		return TreeNode.INCREMENT_SIZE;
+	    }
+	    return TreeNode.INCREMENT_CHILDREN_AND_SIZE;
+	}
+
+	/**
+	 * Decrements the number of children and size, and determines whether
+	 * the parent should do both or just decrement the size.
+	 * 
+	 * @return the operation corresponding to the next recursive operation
+	 * to perform. The byte can be looked-up in the {@code TreeNode}
+	 * static fields.
+	 */
+	private byte decrementChildrenAndSize() {
+	    this.decrement();
+	    this.decrementNumChildren();
+
+	    // prune child if there is only one and its not a ListNode.
+	    // Otherwise if there are no children, remove this from
+	    // the tree and decrement parent's number of children and
+	    // size. Otherwise, only propagate decrementing
+	    if (childrenCount == 1 && (getChild() instanceof ListNode)) {
+		TreeNode<E> child = uncheckedCast(getChild());
+		child.prune();
+	    } else if (size() == 0) {
+		prune();
+	    } else {
+		return TreeNode.DECREMENT_SIZE;
+	    }
+	    return TreeNode.DECREMENT_CHILDREN_AND_SIZE;
+	}
+
+	/**
+	 * In the event that a removal leaves the root with only one child,
+	 * that one child is to be the new root. This avoids having a long
+	 * chain of parents and children, which harm the searching performance
+	 * of the ScalableList.
+	 */
+	private void pruneRoot() {
+	    assert !(getChild() instanceof ListNode);
+	    TreeNode<E> newRoot = uncheckedCast(getChild());
+	    AppContext.getDataManager().removeObject(this);
+
+	    owner.getForUpdate().setRoot(newRoot);
+	}
+
+	/**
+	 * This method retrieves the number of children by iterating through
+	 * them one by one. This method is used when the current node is the
+	 * root, since the field {@code childrenCount} does not get updated.
+	 * 
+	 * @return the number of children
+	 */
+	private int getNumberOfChildrenUsingIteration() {
+	    int total = 0;
+	    Node<E> child = getChild();
+	    while (child != null) {
+		total++;
+		child = child.next();
+	    }
+	    return total;
+	}
+
+	/**
+	 * Determines what kind of action is to be performed at the root. The
+	 * root is a special case because it doesn't get changed unless it is
+	 * absolutely necessary to prune it or to provide it with a new parent
+	 * (a new root).
+	 * 
+	 * @param mode
+	 */
+	private void updateRootIfNecessary(byte mode) {
+	    int numberOfRootChildren = getNumberOfChildrenUsingIteration();
+
+	    // Determine what changes are necessary
+	    switch (mode) {
+
+		// If the root has too many children, split it.
+		case TreeNode.INCREMENT_CHILDREN_AND_SIZE:
+		    if (numberOfRootChildren > branchingFactor) {
+			size = owner.get().size() + 1;
+			split();
+		    }
+		    break;
+
+		// If the root has only one child, and the child is
+		// not a ListNode, prune it.
+		case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
+		    if (numberOfRootChildren == 1 &&
+			    !(getChild() instanceof ListNode)) {
+			pruneRoot();
+		    }
+
+		    // Otherwise we don't recognize the operation, so just
+		    // exit.
+		default:
+		    break;
 	    }
 	}
 
@@ -2044,7 +2156,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * The iterator responsible for iterating through the stored elements
 	 * of the {@code ScalableList}
 	 */
-	private Iterator<ManagedReference<ManagedObject>> iter;
+	private transient Iterator<ManagedReference<ManagedObject>> iter;
 
 	/**
 	 * The value for the current {@code ListNode} to determine if any
@@ -2571,9 +2683,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * Splits a linked list of {@code ListNodes} into two smaller lists.
-	 * This is necessary when a linked list exceeds the maximum length,
-	 * denoted by the cluster size.
+	 * Splits the children into two roughly equal groups, and generates a
+	 * sibling to parent one of the groups.
 	 */
 	private void split() {
 	    ArrayList<ManagedReference<ManagedObject>> contents =

@@ -58,10 +58,12 @@ public class TestScalableList extends Assert {
 
     @BeforeClass
     public static void setUpClass() throws Exception {
-	serverNode = new SgsTestNode("TestScalableList", null,
-		createProps("TestScalableList"));
-	txnScheduler = serverNode.getSystemRegistry().getComponent(
-		TransactionScheduler.class);
+	serverNode =
+		new SgsTestNode("TestScalableList", null,
+			createProps("TestScalableList"));
+	txnScheduler =
+		serverNode.getSystemRegistry().getComponent(
+			TransactionScheduler.class);
 	taskOwner = serverNode.getProxy().getCurrentOwner();
 	dataService = serverNode.getDataService();
     }
@@ -72,8 +74,9 @@ public class TestScalableList extends Assert {
     }
 
     private static Properties createProps(String appName) throws Exception {
-	Properties props = SgsTestNode.getDefaultProperties(appName, null,
-		SgsTestNode.DummyAppListener.class);
+	Properties props =
+		SgsTestNode.getDefaultProperties(appName, null,
+			SgsTestNode.DummyAppListener.class);
 	props.setProperty("com.sun.sgs.txn.timeout", "10000000");
 	return props;
     }
@@ -125,29 +128,29 @@ public class TestScalableList extends Assert {
 		try {
 		    list = new ScalableList<String>(2, 1);
 		} catch (Exception e) {
-		    fail("Did not expect exception: "
-			    + e.getLocalizedMessage());
+		    fail("Did not expect exception: " +
+			    e.getLocalizedMessage());
 		}
 
 		try {
 		    list = new ScalableList<String>(99, 99);
 		} catch (Exception e) {
-		    fail("Did not expect exception: "
-			    + e.getLocalizedMessage());
+		    fail("Did not expect exception: " +
+			    e.getLocalizedMessage());
 		}
 
 		try {
 		    list = new ScalableList<String>(2, 999);
 		} catch (Exception e) {
-		    fail("Did not expect exception: "
-			    + e.getLocalizedMessage());
+		    fail("Did not expect exception: " +
+			    e.getLocalizedMessage());
 		}
 
 		try {
 		    list = new ScalableList<String>(999, 2);
 		} catch (Exception e) {
-		    fail("Did not expect exception: "
-			    + e.getLocalizedMessage());
+		    fail("Did not expect exception: " +
+			    e.getLocalizedMessage());
 		}
 
 		try {
@@ -156,8 +159,8 @@ public class TestScalableList extends Assert {
 		    int rand2 = random.nextInt(999) + 1;
 		    list = new ScalableList<String>(rand1, rand2);
 		} catch (Exception e) {
-		    fail("Did not expect exception: "
-			    + e.getLocalizedMessage());
+		    fail("Did not expect exception: " +
+			    e.getLocalizedMessage());
 		}
 	    }
 	}, taskOwner);
@@ -314,10 +317,10 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
 		ScalableList<String> list = new ScalableList<String>(8, 8);
-		ManagedReference<ScalableList<String>> list1Ref = dataService
-			.createReference(list);
-		ManagedReference<ScalableList<String>> list2Ref = dataService
-			.createReference(list);
+		ManagedReference<ScalableList<String>> list1Ref =
+			dataService.createReference(list);
+		ManagedReference<ScalableList<String>> list2Ref =
+			dataService.createReference(list);
 
 		assertTrue(list1Ref.get().equals(list2Ref.get()));
 	    }
@@ -976,8 +979,7 @@ public class TestScalableList extends Assert {
 	    }
 	}, taskOwner);
     }
-    
-    
+
     /**
      * Tests the clearing mechanism using the {@code AsynchronousClearTask}
      * 
@@ -997,8 +999,7 @@ public class TestScalableList extends Assert {
 	    }
 	}, taskOwner);
     }
-    
-    
+
     /**
      * Tests the clearing mechanism using the {@code AsynchronousClearTask}
      * 
@@ -1012,7 +1013,7 @@ public class TestScalableList extends Assert {
 
 		list.clear();
 		assertTrue(list.isEmpty());
-		
+
 		list.add("A");
 		list.add("B");
 		list.add("C");
@@ -1027,74 +1028,36 @@ public class TestScalableList extends Assert {
 	}, taskOwner);
     }
 
-    
     /**
-     * Tests the clearing mechanism using the {@code AsynchronousClearTask}
-     * by creating a class that extends the {@code ScalableList} class.
-     * At the moment, this would require some sort of callback mechanism
-     * to validate the correct values.
+     * Tests the clearing mechanism using the {@code AsynchronousClearTask} by
+     * creating a class that extends the {@code ScalableList} class. At the
+     * moment, this would require some sort of callback mechanism to validate
+     * the correct values.
+     * 
      * @throws Exception
      */
-/*
-    @Test
-    public void testClearsUsingInheritence() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
-	    public void run() throws Exception {
-		
-		//Extend the class to get access to test fields
-		class ScalableListChild<String> extends ScalableList<String> {
-		    public ScalableListChild(){
-			super();
-		    }
-		    
-		    public int getRemovedElements(){
-			return this.removedElements;
-		    }
-		    public int getRemovedListNodes(){
-			return this.removedListNodes;
-		    }
-		    public int getRemovedTreeNodes(){
-			return this.removedTreeNodes;
-		    }
-		}
-		
-		// Create a new instance and populate it
-		ScalableListChild<String> sample = 
-		    new ScalableListChild<String>();
-		sample.add("A");
-		sample.add("B");
-		sample.add("C");
-		sample.add("D");
-		sample.add("E");
-		sample.add("F");
-		sample.add("G");
-		sample.add("H");
-		sample.add("I");
-		sample.add("J");
-		sample.add("K");
-		sample.add("L");
-		sample.add("M");
-		
-		sample.clear();
-		
-		// sleep to allow the task to finish
-		try {
-		    Thread.sleep(15000);
-		} catch (InterruptedException ie){
-		    // do nothing.
-		}
-		
-		// check that the values match. These are
-		// hardcoded based on what they should be
-		// given a no-argument constructor.
-		assertEquals(13, sample.getRemovedElements());
-		assertEquals(2, sample.getRemovedListNodes());
-		assertEquals(1, sample.getRemovedTreeNodes());
-	    }
-	}, taskOwner);
-    }
-*/   
-    
+    /*
+     * @Test public void testClearsUsingInheritence() throws Exception {
+     * txnScheduler.runTask(new AbstractKernelRunnable() { public void run()
+     * throws Exception { //Extend the class to get access to test fields
+     * class ScalableListChild<String> extends ScalableList<String> { public
+     * ScalableListChild(){ super(); } public int getRemovedElements(){ return
+     * this.removedElements; } public int getRemovedListNodes(){ return
+     * this.removedListNodes; } public int getRemovedTreeNodes(){ return
+     * this.removedTreeNodes; } } // Create a new instance and populate it
+     * ScalableListChild<String> sample = new ScalableListChild<String>();
+     * sample.add("A"); sample.add("B"); sample.add("C"); sample.add("D");
+     * sample.add("E"); sample.add("F"); sample.add("G"); sample.add("H");
+     * sample.add("I"); sample.add("J"); sample.add("K"); sample.add("L");
+     * sample.add("M"); sample.clear(); // sleep to allow the task to finish
+     * try { Thread.sleep(15000); } catch (InterruptedException ie){ // do
+     * nothing. } // check that the values match. These are // hardcoded based
+     * on what they should be // given a no-argument constructor.
+     * assertEquals(13, sample.getRemovedElements()); assertEquals(2,
+     * sample.getRemovedListNodes()); assertEquals(1,
+     * sample.getRemovedTreeNodes()); } }, taskOwner); }
+     */
+
     /**
      * Tests scalability by appending elements exceeding the cluster size
      * 
@@ -1607,6 +1570,127 @@ public class TestScalableList extends Assert {
 		assertEquals("G", array[6]);
 	    }
 	}, taskOwner);
+    }
+
+    /**
+     * Tests arbitrary operations in sequence
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testScalableArbitraryOperations() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 3);
+
+		assertTrue(list.isEmpty());
+		list.add("A");
+		list.add("B");
+		assertNotNull(list.remove(0));
+		assertEquals(1, list.size());
+		assertEquals(-1, list.indexOf("A"));
+		assertEquals(0, list.indexOf("B"));
+
+		list.add("C");
+		list.add(1, "D");
+		list.add(1, "E");
+		list.add(1, "F");
+		list.add(1, "G");
+		list.add(1, "H");
+		assertEquals(7, list.size());
+		assertNotNull(list.remove(4));
+		assertNotNull(list.remove(4));
+		assertEquals(5, list.size());
+		assertEquals("C", list.get(4));
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests random operations in sequence
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testScalableRandomOperations() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 3);
+		ArrayList<String> shadow = new ArrayList<String>();
+		Random random = new Random(System.currentTimeMillis());
+		int operation;
+		String value;
+
+		// perform random operations
+		for (int i = 0; i < 20; i++) {
+		    operation = random.nextInt(5);
+		    value = Integer.toString(random.nextInt(999));
+		    performRandomOperation(list, operation, value);
+		    performRandomOperation(shadow, operation, value);
+		}
+
+		// Check that the list and shadow list match
+		int size = shadow.size();
+		assertEquals(size, list.size());
+		for (int i = 0; i < size; i++) {
+		    assertEquals("iteration #" + i + ": ", shadow.get(i),
+			    list.get(i));
+		}
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Performs random operations based on the value provided,
+     * 
+     * @param list the list to modify
+     * @param operation the type of operation
+     * @param value the value to add, if necessary
+     */
+    private void performRandomOperation(List<String> list, int operation,
+	    String value) {
+	switch (operation) {
+	    case 0:
+		// append to the list
+		list.add(value);
+		break;
+	    case 1:
+		// remove the head
+		if (list.size() > 0) {
+		    list.remove(0);
+		}
+		break;
+	    case 2:
+		// add to the head
+		list.add(0, value);
+		break;
+	    case 3:
+		// remove from the tail
+		if (list.size() < 1) {
+		    break;
+		}
+		list.remove(list.size() - 1);
+		break;
+	    case 4:
+		// add halfway
+		int halfway;
+		if (list.size() <= 1) {
+		    halfway = 0;
+		} else {
+		    halfway = (list.size() - 1) / 2;
+		}
+		list.add(halfway, value);
+		break;
+	    case 5:
+		// remove halfway
+		if (list.size() < 1) {
+		    break;
+		} else {
+		    halfway = (list.size() - 1) / 2;
+		}
+		list.remove(halfway);
+		break;
+	}
     }
 
     /*
