@@ -19,16 +19,31 @@
 
 package com.sun.sgs.transport;
 
-import com.sun.sgs.kernel.TransportManager;
+import com.sun.sgs.transport.TransportFactory;
 
 /**
  * I/O transport. A tranport object handles incoming connection request for
  * a specific transport type.
  * 
  * @see ConnectionHandler
- * @see TransportManager
+ * @see TransportFactory
  */
 public interface Transport {
+    
+    /**
+     * Returns the descriptor for this transport. Multiple calls to this
+     * method may return the same object.
+     * 
+     * @return the descriptor for this transport
+     */
+    TransportDescriptor descriptor();
+    
+//    /**
+//     * Start the transport. If {@code start} has been call, subsequent
+//     * calls will have no affect. If {@link #shutdown} has been called this
+//     * method will throw an {@code IllegalStateException}.
+//     */
+//    void start();
     
     /**
      * Shutdown the transport. The actions of this method are implementation

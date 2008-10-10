@@ -17,16 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.transport;
 
-import com.sun.sgs.transport.ConnectionHandler;
-import com.sun.sgs.transport.Transport;
 import java.util.Properties;
 
 /**
  * A transport manager.
  */
-public interface TransportManager {
+public interface TransportFactory {
 
     /**
      * Start a new transport.

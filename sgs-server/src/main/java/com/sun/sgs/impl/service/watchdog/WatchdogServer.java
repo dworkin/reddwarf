@@ -50,7 +50,6 @@ public interface WatchdogServer extends Remote {
      *
      * @param	host  a host name
      * @param   instance the node instance on the host
-     * @param   port a port number
      * @param	client a watchdog client
      *
      * @return 	an array containing two {@code long} values consisting of
@@ -61,7 +60,7 @@ public interface WatchdogServer extends Remote {
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long[] registerNode(String host, int instance, int port, WatchdogClient client)
+    long[] registerNode(String host, int instance, WatchdogClient client)
 	throws NodeRegistrationFailedException, IOException;
 
     /**

@@ -42,7 +42,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.kernel.TransportManager;
+import com.sun.sgs.transport.TransportFactory;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -57,6 +57,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
+import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -82,8 +83,8 @@ import java.util.logging.Logger;
  * The {@link #ClientSessionServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> and <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transport">
- * <code>com.sun.sgs.impl.service.session.transport</code></a> configuration properties and supports
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transports">
+ * <code>com.sun.sgs.impl.service.session.transports</code></a> configuration properties and supports
  * these public configuration <a
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
@@ -112,9 +113,9 @@ public final class ClientSessionServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
     
-    /** The transport to use for incomming client connections. */
-    private static final String TRANSPORT_PROPERTY =
-        PKG_NAME + ".transport";
+    /** The transport(s) to use for incomming client connections. */
+    private static final String TRANSPORT_LIST_PROPERTY =
+        PKG_NAME + ".transports";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -207,17 +208,17 @@ public final class ClientSessionServiceImpl
     /** The identity manager. */
     final IdentityCoordinator identityManager;
     
-    /** Transport manager */
-    private final TransportManager transportMgr;
+    /** Transport factory */
+    private final TransportFactory transportFactory;
     
     /** Transport specific properties. */
     private final Properties transportProperties;
     
-    /** Transport class. */
-    private final String transportClassName;
+    /** Transport class name(s). */
+    private final String transportList;
     
-    /** Transport object. */
-    private Transport transport = null;
+    /** Transport object(s). */
+    private final List<Transport> transports = new ArrayList<Transport>();
 
     /** The exporter for the ClientSessionServer. */
     private final Exporter<ClientSessionServer> exporter;
@@ -282,10 +283,10 @@ public final class ClientSessionServiceImpl
 	try {
             // For now, system properties == transport properties
             transportProperties = properties;
-            transportClassName = wrappedProps.getProperty(TRANSPORT_PROPERTY);
+            transportList = wrappedProps.getProperty(TRANSPORT_LIST_PROPERTY);
             
-            if (transportClassName == null)
-                throw new Exception("transport must be specified");
+            if (transportList == null)
+                throw new Exception("at least one transport must be specified");
 
 	    /*
 	     * Get the property for controlling session event processing
@@ -339,7 +340,7 @@ public final class ClientSessionServiceImpl
 	     */
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
-            transportMgr = systemRegistry.getComponent(TransportManager.class);
+            transportFactory = systemRegistry.getComponent(TransportFactory.class);
 	    flushContextsThread.start();
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
@@ -404,9 +405,24 @@ public final class ClientSessionServiceImpl
     public void doReady() {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
         try {
-            transport = transportMgr.startTransport(transportClassName,
-                                                    transportProperties,
-                                                    this);
+            for (String transportClassName : transportList.split(":")) {
+                transports.add(transportFactory.startTransport(transportClassName,
+                                                               transportProperties,
+                                                               this));
+            }
+            final TransportDescriptor[] descriptors =
+                                    new TransportDescriptor[transports.size()];
+            int i = 0;
+            for (Transport transport : transports)
+                descriptors[i++] = transport.descriptor();
+
+            transactionScheduler.runTask(new AbstractKernelRunnable() {
+		    public void run() {
+                        Node node = watchdogService.getNodeForUpdate(localNodeId);
+                        assert node != null;
+                        node.setClientListener(descriptors);
+                    } },
+                    taskOwner);
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }
@@ -415,9 +431,8 @@ public final class ClientSessionServiceImpl
     /** {@inheritDoc} */
     @Override
     public void doShutdown() {
-        if (transport != null) {
+        for (Transport transport : transports)
             transport.shutdown();
-        }
 
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
@@ -440,8 +455,7 @@ public final class ClientSessionServiceImpl
 	    } finally {
 		monitorDisconnectingSessionsTaskHandle = null;
 	    }
-	}
-	    
+	}    
 	disconnectingHandlersMap.clear();
 
 	synchronized (flushContextsLock) {
@@ -598,14 +612,16 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     @Override
-    public void newConnection(AsynchronousByteChannel channel) {
+    public void newConnection(AsynchronousByteChannel channel,
+                              TransportDescriptor desc) {
         logger.log(Level.FINER, "new connection on {0}", channel);
 
         /* The handler will call addHandler if login succeeds */
         new ClientSessionHandler(this,
                                  dataService,
                                  new AsynchronousMessageChannel(channel,
-                                                                readBufferSize));
+                                                                readBufferSize),
+                                 desc);
     }
 
     /* -- Implement TransactionContextFactory -- */

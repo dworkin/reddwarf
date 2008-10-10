@@ -347,8 +347,9 @@ public final class WatchdogServiceImpl
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values = serverProxy.registerNode(clientHost, appNode, 
-                                                         -1, clientProxy);
+                long[] values = serverProxy.registerNode(clientHost,
+                                                         appNode, 
+                                                         clientProxy);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
                     throw new IllegalArgumentException(
@@ -463,6 +464,16 @@ public final class WatchdogServiceImpl
 	return NodeImpl.getNode(dataService, nodeId);
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public Node getNodeForUpdate(long nodeId) {
+	checkState();
+	if (nodeId < 0) {
+	    throw new IllegalArgumentException("invalid nodeId: " + nodeId);
+	}
+	return NodeImpl.getNodeForUpdate(dataService, nodeId);
+    }
+    
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
 	checkState();
@@ -613,7 +624,7 @@ public final class WatchdogServiceImpl
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, appNode, -1, false);
+	    Node node = new NodeImpl(localNodeId, localHost, appNode, false);
 	    notifyNodeListeners(node);
 	}
     }
@@ -702,9 +713,12 @@ public final class WatchdogServiceImpl
     private final class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
-	public void nodeStatusChanges(
- 	    long[] ids, String hosts[], int instances[], int[] ports, 
-            boolean[] status, long[] backups)
+        @Override
+	public void nodeStatusChanges(long[] ids,
+                                      String hosts[],
+                                      int instances[], 
+                                      boolean[] status,
+                                      long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
 		status.length != backups.length)
@@ -717,7 +731,7 @@ public final class WatchdogServiceImpl
 		    continue;
 		}
 		Node node =
-		    new NodeImpl(ids[i], hosts[i], instances[i], ports[i], 
+		    new NodeImpl(ids[i], hosts[i], instances[i], 
                                  status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (status[i] == false && backups[i] == localNodeId) {

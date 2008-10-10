@@ -19,9 +19,11 @@
 
 package com.sun.sgs.impl.transport.udp;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.nio.AttachedFuture;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.transport.TransportDescriptorImpl;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
@@ -30,6 +32,7 @@ import com.sun.sgs.nio.channels.AsynchronousDatagramChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -76,6 +79,19 @@ public class UDP implements Transport {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
+    private final TransportDescriptor descriptor;
+    
+    private static class UDPDescriptor extends TransportDescriptorImpl {
+        private static final long serialVersionUID = 1L;
+
+        UDPDescriptor(String hostName, int listeningPort) {
+             super("UDP",
+                   new Delivery[] {Delivery.UNRELIABLE},
+                   hostName,
+                   listeningPort);
+        }
+    }
+    
     /**
      * The server listen address property.
      * This is the host interface we are listening on. Default is listen
@@ -120,15 +136,15 @@ public class UDP implements Transport {
 	
 	try {
 	    int port = wrappedProps.getRequiredIntProperty(LISTEN_PORT_PROPERTY,
-                                                       1, 65535);
-	    /*
-	     * Listen for incoming client connections. If no host address
-             * is supplied, default to listen on all interfaces.
-	     */
-            String hostAddress = properties.getProperty(LISTEN_HOST_PROPERTY);
+                                                           1, 65535);
+            
+	    // Listen for incoming client connections. If no host address
+            // is supplied, default to listen on all interfaces.
+	    //
+            String host = properties.getProperty(LISTEN_HOST_PROPERTY);
             InetSocketAddress listenAddress =
-                hostAddress == null ? new InetSocketAddress(port) :
-                                      new InetSocketAddress(hostAddress, port);
+                        host == null ? new InetSocketAddress(port) :
+                                       new InetSocketAddress(host, port);
             AsynchronousChannelProvider provider =
                 // TODO fetch from config
                 AsynchronousChannelProvider.provider();
@@ -157,19 +173,15 @@ public class UDP implements Transport {
                 }
 		throw e;
 	    }
-
+            descriptor = new UDPDescriptor(host, port);
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to create transport");
+		logger.logThrow(Level.CONFIG, e, "Failed to create transport");
 	    }
 	    shutdown();
 	    throw e;
 	}
-    
         receive(new AcceptorListener());
-
         try {
             if (logger.isLoggable(Level.CONFIG)) {
                 logger.log(
@@ -294,7 +306,8 @@ public class UDP implements Transport {
             logger.log(Level.FINEST, "Completed connection ");
             try {
                 handler.newConnection(new ChannelWrapper(newChannel,
-                                                         firstMessage));
+                                                         firstMessage),
+                                      descriptor);
 
             } catch (CancellationException e) {               
                 logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
@@ -413,5 +426,10 @@ public class UDP implements Transport {
         {
             return size;
         }
+    }
+
+    @Override
+    public TransportDescriptor descriptor() {
+        return descriptor;
     }
 }

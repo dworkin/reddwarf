@@ -25,6 +25,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -64,8 +65,8 @@ class NodeImpl
     /** The node instance. */
     private final int instance;
     
-    /** The port, or {@code null}. */
-    private final int port;
+    /** The client listeners set, or {@code null} if not an application node. */
+    private TransportDescriptor[] clientListeners = null;
 
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
@@ -97,8 +98,8 @@ class NodeImpl
      * @param   port     a port
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, int instance, int port, WatchdogClient client) {
-        this (nodeId, hostName, instance, port, client, true, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int instance, WatchdogClient client) {
+        this (nodeId, hostName, instance, client, true, INVALID_ID);
     }
 
     /**
@@ -112,8 +113,8 @@ class NodeImpl
      * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, int instance, int port, boolean isAlive) {
-	this(nodeId, hostName, instance, port, null, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int instance, boolean isAlive) {
+	this(nodeId, hostName, instance, null, isAlive, INVALID_ID);
     }
 	
     /**
@@ -129,10 +130,10 @@ class NodeImpl
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, int instance, int port, 
+    NodeImpl(long nodeId, String hostName, int instance, 
              boolean isAlive, long backupId) 
     {
-        this(nodeId, hostName, instance, port, null, isAlive, backupId);
+        this(nodeId, hostName, instance, null, isAlive, backupId);
     }
     
     /**
@@ -142,20 +143,17 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
      * @param	client   a watchdog client
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    private NodeImpl(long nodeId, String hostName, int instance, int port, 
+    private NodeImpl(long nodeId, String hostName, int instance, 
                      WatchdogClient client, boolean isAlive, long backupId) 
     {
         this.id = nodeId;
-
 	this.host = hostName;
         this.instance = instance;
-        this.port = port;
         this.client = client;
         this.isAlive = isAlive;
         this.backupId = backupId;
@@ -173,13 +171,20 @@ class NodeImpl
 	return host;
     }
     
-    public int getInstance() {
+    int getInstance() {
         return instance;
     }
     
     /** {@inheritDoc} */
-    public int getPort() {
-        return port;
+    @Override
+    public TransportDescriptor[] getClientListeners() {
+        return clientListeners;
+    }
+    
+    /** {@inheritDoc} */
+    @Override
+    public void setClientListener(TransportDescriptor[] descriptors) {
+        clientListeners = descriptors;
     }
 
     /** {@inheritDoc} */
@@ -353,12 +358,10 @@ class NodeImpl
      *		current transaction
      */
      private NodeImpl getForUpdate(DataService dataService) {
-	NodeImpl nodeImpl = getNode(dataService, id);
+	NodeImpl nodeImpl = getNodeForUpdate(dataService, id);
 	if (nodeImpl == null) {
 	    throw new ObjectNotFoundException("node is removed");
 	}
-	// update non-final fields before
-	dataService.markForUpdate(nodeImpl);
 	return nodeImpl;
     }
 
@@ -402,6 +405,30 @@ class NodeImpl
 	NodeImpl node = null;
 	try {
 	    node = (NodeImpl) dataService.getServiceBinding(key);
+	} catch (NameNotBoundException e) {
+	}
+	return node;
+    }
+    
+    /**
+     * Returns the {@code Node} instance for the given {@code nodeId},
+     * retrieved from the specified {@code dataService} for update.
+     * This method returns {@code null} if the node isn't bound in the data
+     * service .  This method must only be called within a transaction.
+     *
+     * @param	dataService a data service
+     * @param	nodeId a node ID
+     * @return	the node for the given {@code nodeId}, or {@code null}
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    static NodeImpl getNodeForUpdate(DataService dataService, long nodeId) {
+	String key = getNodeKey(nodeId);
+	NodeImpl node = null;
+	try {
+	    node = (NodeImpl) dataService.getServiceBinding(key);
+            	// update non-final fields before
+	    dataService.markForUpdate(node);
 	} catch (NameNotBoundException e) {
 	}
 	return node;

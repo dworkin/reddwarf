@@ -27,6 +27,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.RecoveryListener;
 
+import com.sun.sgs.transport.TransportDescriptor;
 import java.util.Iterator;
 import java.util.Properties;
 
@@ -116,6 +117,11 @@ public class DummyWatchdogService implements WatchdogService {
         return node;
     }
 
+    @Override
+    public Node getNodeForUpdate(long nodeId) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+        
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
         listeners.add(listener);
@@ -155,6 +161,15 @@ public class DummyWatchdogService implements WatchdogService {
         public boolean isAlive() {
             return isLocalNodeAlive();
         }
-    }
 
+        @Override
+        public TransportDescriptor[] getClientListeners() {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+
+        @Override
+        public void setClientListener(TransportDescriptor[] descriptors) {
+            throw new UnsupportedOperationException("Not supported yet.");
+        }
+    }
 }

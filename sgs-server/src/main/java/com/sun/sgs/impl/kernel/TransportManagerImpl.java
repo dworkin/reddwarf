@@ -22,7 +22,7 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
-import com.sun.sgs.kernel.TransportManager;
+import com.sun.sgs.transport.TransportFactory;
 import java.lang.reflect.Constructor;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -31,7 +31,7 @@ import java.util.logging.Logger;
 /**
  * Implementation of a transport manager.
  */
-public class TransportManagerImpl implements TransportManager {
+public class TransportManagerImpl implements TransportFactory {
 
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(TransportManagerImpl.class.getName()));

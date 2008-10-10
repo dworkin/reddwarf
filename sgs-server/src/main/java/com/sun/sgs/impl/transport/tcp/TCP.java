@@ -19,8 +19,10 @@
 
 package com.sun.sgs.impl.transport.tcp;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.transport.TransportDescriptorImpl;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
@@ -29,6 +31,7 @@ import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -83,6 +86,26 @@ public class TCP implements Transport {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
     
+    private final TCPDescriptor descriptor;
+    
+    private static class TCPDescriptor extends TransportDescriptorImpl {
+        private static final long serialVersionUID = 1L;
+
+        TCPDescriptor(String hostName, int listeningPort) {
+            super("TCP", Delivery.values(), hostName, listeningPort);
+        }
+
+        @Override
+        public boolean canSupport(Delivery required) {
+            return true; // optimization, TCP supports all
+        }
+
+        @Override
+        public boolean isCompatibleWith(TransportDescriptor descriptor) {
+            return getType().equals(descriptor.getType());
+        }
+    }
+    
     /**
      * The server listen address property.
      * This is the host interface we are listening on. Default is listen
@@ -102,6 +125,8 @@ public class TCP implements Transport {
     /** The default acceptor backlog (&lt;= 0 means default). */
     private static final int DEFAULT_ACCEPTOR_BACKLOG = 0;
 
+    private int acceptorBacklog;
+    
     /** The async channel group for this service. */
     private AsynchronousChannelGroup asyncChannelGroup;
 
@@ -131,23 +156,30 @@ public class TCP implements Transport {
 	           "Creating TCP transport with properties:{0}",
 	           properties);
         
+        this.handler = handler;
+
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        int acceptorBacklog = wrappedProps.getIntProperty(
+        acceptorBacklog = wrappedProps.getIntProperty(
                     ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
-
+        
         String host = properties.getProperty(LISTEN_HOST_PROPERTY);
         int port = wrappedProps.getRequiredIntProperty(LISTEN_PORT_PROPERTY,
                                                        1, 65535);
-        
-        this.handler = handler;
+        descriptor = new TCPDescriptor(host, port);
+        start();
+    }
+   
+    private void start() {
         try {
              // Listen for incoming client connections. If no host address
              // is supplied, default to listen on all interfaces.
              //
             InetSocketAddress listenAddress =
-                            host == null ? new InetSocketAddress(port) :
-                                           new InetSocketAddress(host, port);
+                        descriptor.getHostName() == null ?
+                                new InetSocketAddress(descriptor.getListeningPort()) :
+                                new InetSocketAddress(descriptor.getHostName(),
+                                                      descriptor.getListeningPort());
             
             AsynchronousChannelProvider provider =
                 AsynchronousChannelProvider.provider();
@@ -161,7 +193,7 @@ public class TCP implements Transport {
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(
 			Level.CONFIG, "bound to port:{0,number,#}",
-			port);
+			descriptor.getListeningPort());
 		}
 	    } catch (Exception e) {
 		logger.logThrow(Level.WARNING, e,
@@ -182,9 +214,8 @@ public class TCP implements Transport {
 		    "Failed to create TCP transport");
 	    }
 	    shutdown();
-	    throw e;
+	    throw new RuntimeException(e);
 	}
-   
         acceptFuture = acceptor.accept(new AcceptorListener());
         try {
             if (logger.isLoggable(Level.CONFIG)) {
@@ -196,7 +227,7 @@ public class TCP implements Transport {
             throw new RuntimeException(ioe.getMessage(), ioe);
         }
     }
-    
+  
     /** {@inheritDoc} */
     @Override
     public void shutdown() {
@@ -255,7 +286,7 @@ public class TCP implements Transport {
                     AsynchronousSocketChannel newChannel = result.getNow();
                     logger.log(Level.FINER, "Accepted {0}", newChannel);
 
-                    handler.newConnection(newChannel);
+                    handler.newConnection(newChannel, descriptor);
 
                     // Resume accepting connections
                     acceptFuture = acceptor.accept(this);
@@ -273,12 +304,16 @@ public class TCP implements Transport {
                 } catch (IOException ioe) {
                     // ignore
                 }
-
                 logger.logThrow(
 		    Level.SEVERE, e, "acceptor error on {0}", addr);
 
                 // TBD: take other actions, such as restarting acceptor?
             }
 	}
+    }
+    
+    @Override
+    public TransportDescriptor descriptor() {
+        return descriptor;
     }
 }

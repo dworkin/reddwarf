@@ -37,7 +37,9 @@ public interface ConnectionHandler {
      * exception is thrown the connection will be refused.
      * 
      * @param channel on which the new connection can communicate.
+     * @param descriptor for the transport on which the connection was made
      * @throws Exception if the handler rejects the connection.
      */
-    void newConnection(AsynchronousByteChannel channel) throws Exception;
+    void newConnection(AsynchronousByteChannel channel,
+                       TransportDescriptor descriptor) throws Exception;
 }

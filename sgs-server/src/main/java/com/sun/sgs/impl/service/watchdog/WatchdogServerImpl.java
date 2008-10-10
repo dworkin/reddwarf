@@ -27,12 +27,10 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
@@ -287,7 +285,7 @@ public final class WatchdogServerImpl
 	}
  
         // register our local id
-        long[] values = registerNode(host, instance, -1, client);
+        long[] values = registerNode(host, instance, client);
         localNodeId = values[0];
         
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
@@ -374,7 +372,6 @@ public final class WatchdogServerImpl
      */
     public long[] registerNode(final String host, 
                                final int instance,
-                               final int port,
                                WatchdogClient client)
 	throws NodeRegistrationFailedException
     {
@@ -404,7 +401,7 @@ public final class WatchdogServerImpl
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, host, instance, port, client);
+	    final NodeImpl node = new NodeImpl(nodeId, host, instance, client);
             
             synchronized (aliveNodes) {
                 assert ! aliveNodes.containsKey(nodeId);
@@ -808,7 +805,6 @@ public final class WatchdogServerImpl
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
         int[] instances = new int[size];
-        int[] ports = new int[size];
 	boolean[] status = new boolean[size];
 	long[] backups = new long[size];
 
@@ -818,7 +814,6 @@ public final class WatchdogServerImpl
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
             instances[i] = changedNode.getInstance();
-            ports[i] = changedNode.getPort();
 	    status[i] = changedNode.isAlive();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
@@ -833,7 +828,7 @@ public final class WatchdogServerImpl
 			Level.FINEST,
 			"notifying client:{0} of status change", notifyNode);
 		}
-		client.nodeStatusChanges(ids, hosts, instances, ports, status, backups);
+		client.nodeStatusChanges(ids, hosts, instances, status, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the

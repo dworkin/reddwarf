@@ -39,6 +39,7 @@ import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -89,6 +90,13 @@ class ClientSessionHandler {
     /** The I/O channel for sending messages to the client. */
     private final AsynchronousMessageChannel sessionConnection;
 
+    /**
+     * The descriptor of the underlying transport for this session. If the
+     * client is to be re-directed, they must be re-directed onto a transport
+     * compatable with this one.
+     */
+    private final TransportDescriptor transportDesc;
+    
     /** The completion handler for reading from the I/O channel. */
     private volatile ReadHandler readHandler = new ConnectedReadHandler();
 
@@ -134,7 +142,8 @@ class ClientSessionHandler {
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
 			 DataService dataService,
-			 AsynchronousMessageChannel sessionConnection)
+			 AsynchronousMessageChannel sessionConnection,
+                         TransportDescriptor transportDesc)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
@@ -142,10 +151,13 @@ class ClientSessionHandler {
 	    throw new NullPointerException("null dataService");
 	} else if (sessionConnection == null) {
 	    throw new NullPointerException("null sessionConnection");
-	}
+	} else if (transportDesc == null) {
+            throw new NullPointerException("null transportDesc");
+        }
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.sessionConnection = sessionConnection;
+        this.transportDesc = transportDesc;
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -171,7 +183,6 @@ class ClientSessionHandler {
      * @return	{@code true} if this handler is connected
      */
     boolean isConnected() {
-
 	State currentState = getCurrentState();
 	return
 	    currentState == State.CONNECTED ||
@@ -886,8 +897,24 @@ class ClientSessionHandler {
 			"from nodeId:{1} to node:{2}",
 			name, sessionService.getLocalNodeId(), node);
 		}
+                TransportDescriptor[] descriptors = node.getClientListeners();
+                TransportDescriptor newListener = null;
+                for (TransportDescriptor descriptor : descriptors) {
+                    if (descriptor.isCompatibleWith(transportDesc)) {
+                        newListener = descriptor;
+                        break;
+                    }
+                }
+                if (newListener == null) {
+                    logger.log(Level.SEVERE,
+                               "redirect node {0} does not support a compatable transport" +
+                               node);
+                    sendLoginFailureAndDisconnect();
+                    return;
+                }
 		final byte[] loginRedirectMessage =
-		    getLoginRedirectMessage(node.getHostName(), node.getPort());
+		    getLoginRedirectMessage(newListener.getHostName(),
+                                            newListener.getListeningPort());
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
 		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
