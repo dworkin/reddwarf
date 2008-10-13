@@ -894,9 +894,8 @@ public class TestScalableList extends Assert {
 
 		List<String> newList = list.subList(1, 2);
 
-		assertEquals(2, newList.size());
+		assertEquals(1, newList.size());
 		assertEquals("B", newList.get(0));
-		assertEquals("C", newList.get(1));
 	    }
 	}, taskOwner);
     }
@@ -1027,36 +1026,6 @@ public class TestScalableList extends Assert {
 	    }
 	}, taskOwner);
     }
-
-    /**
-     * Tests the clearing mechanism using the {@code AsynchronousClearTask} by
-     * creating a class that extends the {@code ScalableList} class. At the
-     * moment, this would require some sort of callback mechanism to validate
-     * the correct values.
-     * 
-     * @throws Exception
-     */
-    /*
-     * @Test public void testClearsUsingInheritence() throws Exception {
-     * txnScheduler.runTask(new AbstractKernelRunnable() { public void run()
-     * throws Exception { //Extend the class to get access to test fields
-     * class ScalableListChild<String> extends ScalableList<String> { public
-     * ScalableListChild(){ super(); } public int getRemovedElements(){ return
-     * this.removedElements; } public int getRemovedListNodes(){ return
-     * this.removedListNodes; } public int getRemovedTreeNodes(){ return
-     * this.removedTreeNodes; } } // Create a new instance and populate it
-     * ScalableListChild<String> sample = new ScalableListChild<String>();
-     * sample.add("A"); sample.add("B"); sample.add("C"); sample.add("D");
-     * sample.add("E"); sample.add("F"); sample.add("G"); sample.add("H");
-     * sample.add("I"); sample.add("J"); sample.add("K"); sample.add("L");
-     * sample.add("M"); sample.clear(); // sleep to allow the task to finish
-     * try { Thread.sleep(15000); } catch (InterruptedException ie){ // do
-     * nothing. } // check that the values match. These are // hardcoded based
-     * on what they should be // given a no-argument constructor.
-     * assertEquals(13, sample.getRemovedElements()); assertEquals(2,
-     * sample.getRemovedListNodes()); assertEquals(1,
-     * sample.getRemovedTreeNodes()); } }, taskOwner); }
-     */
 
     /**
      * Tests scalability by appending elements exceeding the cluster size
@@ -1519,9 +1488,9 @@ public class TestScalableList extends Assert {
 
 		List<String> newList = list.subList(3, 7);
 
-		assertEquals(5, newList.size());
+		assertEquals(4, newList.size());
 		assertEquals("D", newList.get(0));
-		assertEquals("H", newList.get(4));
+		assertEquals("G", newList.get(3));
 	    }
 	}, taskOwner);
     }
@@ -1691,6 +1660,22 @@ public class TestScalableList extends Assert {
 		list.remove(halfway);
 		break;
 	}
+    }
+
+    /**
+     * Tests retrieving an empty sublist
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testGetEmptySublist() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = makeList();
+
+		assertEquals(0, list.subList(2, 2).size());
+	    }
+	}, taskOwner);
     }
 
     /*
@@ -1915,6 +1900,47 @@ public class TestScalableList extends Assert {
 		list.add("C");
 		list.remove(2);
 		assertEquals(-1, list.lastIndexOf("C"));
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests expected exceptions from the {@code subList()} operation
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testSubListExceptions() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 3);
+		list.add("A");
+		list.add("B");
+		list.add("C");
+
+		try {
+		    list.subList(1, 3);
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException e) {
+		}
+
+		try {
+		    list.subList(-1, 1);
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException e) {
+		}
+
+		try {
+		    list.subList(-1, 3);
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException e) {
+		}
+
+		try {
+		    list.subList(2, 1);
+		    fail("Expecting IllegalArgumentException");
+		} catch (IllegalArgumentException iae) {
+		}
 	    }
 	}, taskOwner);
     }

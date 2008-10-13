@@ -278,6 +278,45 @@ public class ScalableList<E> extends AbstractList<E> implements
     }
 
     /**
+     * Creates a new {@code ScalableList} instance used for creating a sub
+     * list of the supplied {@code Collection}.
+     * 
+     * @param collection the contents from which to obtain the sub list
+     * @param branchingFactor the branching factor
+     * @param bucketSize the bucket size
+     * @param from the starting index (inclusive)
+     * @param to the ending index (exclusive)
+     */
+    private ScalableList(List<E> list, int branchingFactor, int bucketSize,
+	    int from, int to) {
+
+	isLegal(branchingFactor, bucketSize);
+	isValidRange(from, to, list.size());
+
+	TreeNode<E> t = new TreeNode<E>(this, null);
+	headRef =
+		AppContext.getDataManager().createReference(
+			new DummyConnector<E>(t.getChild()));
+	tailRef =
+		AppContext.getDataManager().createReference(
+			new DummyConnector<E>(t.getChild()));
+	setRoot(t);
+
+	this.bucketSize = bucketSize;
+	this.branchingFactor = branchingFactor;
+
+	// Only add elements if from != to. Otherwise, we construct
+	// an empty list, as defined by the List.subList() definition
+	if (from != to) {
+	    // Add all elements between "from" (inclusive)
+	    // and "to" (exclusive)
+	    for (int i = from; i < to; i++) {
+		add(list.get(i));
+	    }
+	}
+    }
+
+    /**
      * Retrieves the {@code branchingFactor} for the list.
      * 
      * @return the {@code branchingFactor}
@@ -314,12 +353,12 @@ public class ScalableList<E> extends AbstractList<E> implements
     }
 
     /**
-     * Appends the specified element to the end of this list (optional
-     * operation). Lists that support this operation may place limitations on
-     * what elements may be added to this list. In particular, some lists will
-     * refuse to add null elements, and others will impose restrictions on the
-     * type of elements that may be added. List classes should clearly specify
-     * in their documentation any restrictions on what elements may be added.
+     * Appends the specified element to the end of this list. Lists that
+     * support this operation may place limitations on what elements may be
+     * added to this list. In particular, some lists will refuse to add null
+     * elements, and others will impose restrictions on the type of elements
+     * that may be added. List classes should clearly specify in their
+     * documentation any restrictions on what elements may be added.
      * 
      * @param e element to add
      * @throws NullPointerException if the element is null
@@ -330,13 +369,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    throw new NullPointerException("Element cannot be null");
 	}
 
-	// first item to add into the list
-	if (size() == 0) {
-	    return getTail().append(e);
-	}
-
-	// otherwise, add it at the end since no index
-	// and propagate change to parents
+	// add it at the end and propagate change to parents
 	boolean result = getTail().append(e);
 
 	// update the tail in case it has changed.
@@ -349,10 +382,9 @@ public class ScalableList<E> extends AbstractList<E> implements
     }
 
     /**
-     * Inserts the specified element at the specified position in this list
-     * (optional operation). Shifts the element currently at that position (if
-     * any) and any subsequent elements to the right (adds one to their
-     * indices).
+     * Inserts the specified element at the specified position in this list.
+     * Shifts the element currently at that position (if any) and any
+     * subsequent elements to the right (adds one to their indices).
      * 
      * @param index the index
      * @param e the element to add
@@ -361,7 +393,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * list's head cannot be obtained
      */
     public void add(int index, E e) {
-	isValidIndex(index);
+	isNotNegative(index);
 
 	// Check for the different boundary cases
 	if (e == null) {
@@ -438,11 +470,10 @@ public class ScalableList<E> extends AbstractList<E> implements
      */
     public boolean containsAll(Collection<?> c) {
 	Iterator<?> iter = c.iterator();
-	Object object = null;
 
 	// Iterate through all elements in the collection
 	while (iter.hasNext()) {
-	    object = iter.next();
+	    Object object = iter.next();
 
 	    // If there is at least one not found, then
 	    // return false.
@@ -467,12 +498,10 @@ public class ScalableList<E> extends AbstractList<E> implements
 	int listIndex = 0;
 	ScalableListNodeIterator<E> iter =
 		new ScalableListNodeIterator<E>(getHead());
-	ListNode<E> n;
-	int index;
 
 	while (iter.hasNext()) {
-	    n = (ListNode<E>) iter.next();
-	    index = n.getSubList().indexOf(o);
+	    ListNode<E> n = (ListNode<E>) iter.next();
+	    int index = n.getSubList().indexOf(o);
 
 	    if (index != -1) {
 		return listIndex + index;
@@ -495,16 +524,14 @@ public class ScalableList<E> extends AbstractList<E> implements
     public int lastIndexOf(Object obj) {
 	int listIndex = 0;
 	int absIndex = -1;
-	int index;
 	ScalableListNodeIterator<E> iter =
 		new ScalableListNodeIterator<E>(getHead());
-	ListNode<E> n = null;
 
 	// For every list node encountered, check for an
 	// instance of the supplied object
 	while (iter.hasNext()) {
-	    n = iter.next();
-	    index = n.getSubList().lastIndexOf(obj);
+	    ListNode<E> n = iter.next();
+	    int index = n.getSubList().lastIndexOf(obj);
 
 	    // Save the most recent occurrence of a matching index
 	    // but keep searching in case we find another in another
@@ -518,37 +545,29 @@ public class ScalableList<E> extends AbstractList<E> implements
     }
 
     /**
-     * Determines if the provided index is valid; that is, whether it is a
-     * natural number (not negative). If the index is negative, then an
-     * {@code IndexOutOfBoundsException} is thrown.
+     * Determines if the provided index is positive (not negative). If the
+     * index is negative, then an {@code IndexOutOfBoundsException} is thrown.
      * 
      * @param index the index to check for validity
      * @throws IndexOutOfBoundsException if the index is negative
      */
-    private void isValidIndex(int index) {
-	// set the upper bound for the index
-	int upperIndex = size() - 1;
-	if (upperIndex < 0) {
-	    upperIndex = 0;
-	}
-
-	if (index < 0 || index > upperIndex) {
+    private void isNotNegative(int index) {
+	if (index < 0) {
 	    throw new IndexOutOfBoundsException("Index " + index +
-		    " is out of bounds");
+		    " cannot be negative");
 	}
     }
 
     /**
-     * Removes the element at the specified position in this list (optional
-     * operation). Shifts any subsequent elements to the left (subtracts one
-     * from their indices). Returns the element that was removed from the
-     * list.
+     * Removes the element at the specified position in this list. Shifts any
+     * subsequent elements to the left (subtracts one from their indices).
+     * Returns the element that was removed from the list.
      * 
      * @param index the index of the element to be removed
      * @return the element previously at the specified position
      */
     public E remove(int index) {
-	isValidIndex(index);
+	isNotNegative(index);
 	SearchResult<E> sr = getNode(index);
 	ListNode<E> n = sr.getListNode();
 	if (n == null) {
@@ -573,7 +592,6 @@ public class ScalableList<E> extends AbstractList<E> implements
     public boolean retainAll(Collection<?> c) {
 	Iterator<E> iter = new ScalableListIterator<E>(getHead());
 	ArrayList<E> newList = new ArrayList<E>();
-	E e = null;
 
 	// For each element in the overall list,
 	// if it is contained in the supplied
@@ -582,7 +600,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	// will add everything from this into
 	// an emptied list (this).
 	while (iter.hasNext()) {
-	    e = iter.next();
+	    E e = iter.next();
 
 	    // Add the node to the new collection
 	    if (c.contains(e)) {
@@ -707,34 +725,39 @@ public class ScalableList<E> extends AbstractList<E> implements
      * that change the size of this list, or otherwise perturb it in such a
      * fashion that iterations in progress may yield incorrect results.)
      * 
-     * @param fromIndex low endpoint (inclusive) of the subList
-     * @param toIndex high endpoint (exclusive) of the subList
+     * @param fromIndex - low endpoint (inclusive) of the subList
+     * @param toIndex - high endpoint (exclusive) of the subList
      * @return a view of the specified range within this list
-     * @throws IndexOutOfBoundsException if either of the indices are seen to
-     * be less than 0, or if the range is out of bounds
-     * @throws IllegalArgumentException if the {@code toIndex} is less than
-     * the {@code fromIndex}
+     * @throws IndexOutOfBoundsException if the indices are outside of the
+     * range of the collection
+     * @throws IllegalArgumentException if the indices do not correspond to a
+     * valid range
      */
     public List<E> subList(int fromIndex, int toIndex) {
-	// Check for illegal values
-	int maxIndex = size() - 1;
-	if (fromIndex < 0 || toIndex < 0 || fromIndex > maxIndex ||
-		toIndex > maxIndex) {
-	    throw new IndexOutOfBoundsException("The indices " + fromIndex +
-		    " and/or " + toIndex + " are invalid");
-	} else if (toIndex < fromIndex) {
-	    throw new IllegalArgumentException("The toIndex (" + toIndex +
-		    ") cannot be less than the fromIndex (" + fromIndex + ")");
-	}
 
 	// for each element between the indices (inclusive),
 	// add to the new list
-	List<E> sublist = new ArrayList<E>();
-	for (int i = fromIndex; i <= toIndex; i++) {
-	    sublist.add(get(i));
-	}
+	return new ScalableList<E>(this, branchingFactor, bucketSize,
+		fromIndex, toIndex);
+    }
 
-	return sublist;
+    /**
+     * Check if the supplied range is valid.
+     * 
+     * @throws IndexOutOfBoundsException if the range is invalid
+     * @param from the starting index
+     * @param to the ending index
+     * @param size the size of the collection
+     */
+    private void isValidRange(int from, int to, int size) {
+	int maxIndex = size - 1;
+	if (from < 0 || to < 0 || from > maxIndex || to > maxIndex) {
+	    throw new IndexOutOfBoundsException("The indices " + from +
+		    " and/or " + to + " are invalid");
+	} else if (to < from) {
+	    throw new IllegalArgumentException("The toIndex (" + to +
+		    ") cannot be less than the fromIndex (" + from + ")");
+	}
     }
 
     /**
@@ -793,54 +816,10 @@ public class ScalableList<E> extends AbstractList<E> implements
     }
 
     /**
-     * Compares the specified object with this list for equality. Returns true
-     * if and only if the specified object is also a list, both lists have the
-     * same size, and all corresponding pairs of elements in the two lists are
-     * equal. (Two elements e1 and e2 are equal if (e1==null ? e2==null :
-     * e1.equals(e2)).) In other words, two lists are defined to be equal if
-     * they contain the same elements in the same order. This definition
-     * ensures that the equals method works properly across different
-     * implementations of the List interface.
-     * 
-     * @param obj the object for which to check equality
-     * @return true if the specified object is equal to this list.
-     */
-    public boolean equals(Object obj) {
-	if (obj == null || !(obj instanceof ScalableList)) {
-	    return false;
-	}
-
-	ScalableList<E> list = uncheckedCast(obj);
-	return AppContext.getDataManager().createReference(this).equals(
-		AppContext.getDataManager().createReference(list));
-    }
-
-    /**
-     * Returns the hash code value for this list. The hash code of a list is
-     * defined to be the result of the following calculation: hashCode = 1;
-     * Iterator i = list.iterator(); while (i.hasNext()) { Object obj =
-     * i.next(); hashCode = 31*hashCode + (obj==null ? 0 : obj.hashCode()); }
-     * <p>
-     * This ensures that list1.equals(list2) implies that
-     * list1.hashCode()==list2.hashCode() for any two lists, list1 and list2,
-     * as required by the general contract of Object.hashCode.
-     * <p>
-     * The {@code equals()} method requires that this method is defined.
-     * 
-     * @return the {@code hashCode} for this {@code Object}
-     */
-    public int hashCode() {
-
-	// Checkstyle complains if this method does not exist
-	return super.hashCode();
-    }
-
-    /**
-     * Removes the first occurrence in this list of the specified element
-     * (optional operation). If this list does not contain the element, it is
-     * unchanged. More formally, removes the element with the lowest index i
-     * such that (o==null ? get(i)==null : o.equals(get(i))) (if such an
-     * element exists).
+     * Removes the first occurrence in this list of the specified element. If
+     * this list does not contain the element, it is unchanged. More formally,
+     * removes the element with the lowest index i such that (o==null ?
+     * get(i)==null : o.equals(get(i))) (if such an element exists).
      * 
      * @param obj element to be removed from the list, if present
      * @return the element previously at the specified position
@@ -848,12 +827,11 @@ public class ScalableList<E> extends AbstractList<E> implements
     public boolean remove(Object obj) {
 	ScalableListNodeIterator<E> iter =
 		new ScalableListNodeIterator<E>(getHead());
-	ListNode<E> n = null;
 	boolean removed = false;
 
 	// Find and remove the object in the ListNode<E> that contains it
 	while (iter.hasNext()) {
-	    n = iter.next();
+	    ListNode<E> n = iter.next();
 	    removed = n.remove(obj);
 	    if (removed) {
 
@@ -1052,7 +1030,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private ManagedReference<TreeNode<E>> prevRef;
 	private ManagedReference<Node<E>> childRef;
 	private ManagedReference<TreeNode<E>> parentRef;
-	private ManagedReference<ScalableList<E>> owner;
+	private final ManagedReference<ScalableList<E>> owner;
 
 	/**
 	 * The maximum number of children this node can contain
@@ -1191,17 +1169,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@inheritDoc}
 	 */
 	public TreeNode<E> next() {
-	    TreeNode<E> next;
-	    if (nextRef == null) {
-		return null;
-	    }
-
-	    try {
-		next = nextRef.get();
-	    } catch (ObjectNotFoundException onfe) {
-		next = null;
-	    }
-	    return next;
+	    return nextRef.get();
 	}
 
 	/**
@@ -1514,6 +1482,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @throws IllegalArgumentException when the mode is not recognized
 	 */
 	public void propagateChanges(byte mode) {
+	    AppContext.getDataManager().markForUpdate(this);
+	    
 	    // If we are at the root, then check if the root needs to be
 	    // split or pruned.
 	    if (this.equals(owner.get().getRoot())) {
@@ -1625,8 +1595,13 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * of the ScalableList.
 	 */
 	private void pruneRoot() {
+	    // Ensure that the child is not a ListNode and that this
+	    // instance is the root
 	    assert !(getChild() instanceof ListNode);
+	    assert (owner.get().getRoot().equals(this));
+
 	    TreeNode<E> newRoot = uncheckedCast(getChild());
+	    AppContext.getDataManager().markForUpdate(this);
 	    AppContext.getDataManager().removeObject(this);
 
 	    owner.getForUpdate().setRoot(newRoot);
@@ -1741,24 +1716,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private ArrayList<TreeNode<E>> queue;
 
 	/**
-	 * Counter which holds onto the number of removed {@code TreeNode}s.
-	 * Thia variable is for testing purposes.
-	 */
-	private int removedElements;
-
-	/**
-	 * Counter which holds onto the number of removed {@code ListNode}s.
-	 * This variable is for testing purposes.
-	 */
-	private int removedListNodes;
-
-	/**
-	 * Counter which holds onto the number of removed {@code TreeNode}s.
-	 * Thia variable is for testing purposes.
-	 */
-	private int removedTreeNodes;
-
-	/**
 	 * Constructor for the asynchronous task
 	 * 
 	 * @param root the root node of the entire tree structure
@@ -1770,9 +1727,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		current = null;
 	    }
 	    queue = new ArrayList<TreeNode<E>>();
-	    removedTreeNodes = 0;
-	    removedListNodes = 0;
-	    removedElements = 0;
 	}
 
 	/**
@@ -1780,10 +1734,10 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public void run() {
 	    // Perform some work and check if we need to reschedule
+	    AppContext.getDataManager().markForUpdate(this);
+	    
 	    if (doWork()) {
-		AppContext.getDataManager().markForUpdate(this);
 		AppContext.getTaskManager().scheduleTask(this);
-
 	    } else {
 		AppContext.getDataManager().removeObject(this);
 		Runnable r = noteDoneRemoving;
@@ -1791,7 +1745,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    r.run();
 		}
 	    }
-
 	}
 
 	/**
@@ -1875,11 +1828,11 @@ public class ScalableList<E> extends AbstractList<E> implements
 			    .markForUpdate(currentListNode);
 		    entry = currentListNode.remove(0);
 		    count++;
-		    removedElements++;
 
 		    // If the entry was an Element object, delete it
 		    // since the user did not have it persist
 		    if (entry instanceof Element) {
+			AppContext.getDataManager().markForUpdate(entry);
 			AppContext.getDataManager().removeObject(entry);
 		    }
 		} else {
@@ -1889,7 +1842,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    AppContext.getDataManager().removeObject(
 			    currentListNode.getSubList());
 		    currentListNode = currentListNode.next();
-		    removedListNodes++;
 
 		    // Add the parent to the queue if it doesn't
 		    // already exist
@@ -1928,17 +1880,15 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * complete
 	 */
 	private boolean removeSomeTreeNodes() {
-	    TreeNode<E> currentTreeNode = null;
+	    TreeNode<E> currentTreeNode = uncheckedCast(current.getForUpdate());
 	    int count = 0;
 
 	    // Remove as many nodes as the maximum number of
 	    // operations allows
 	    while (count < MAX_OPERATIONS) {
-		if (current == null) {
+		if (currentTreeNode == null) {
 		    return false;
 		}
-
-		currentTreeNode = uncheckedCast(current.get());
 
 		// Add parent to the queue if it doesn't already exist
 		enqueueIfNecessary(currentTreeNode.getParent());
@@ -1946,7 +1896,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		// remove node
 		AppContext.getDataManager().markForUpdate(currentTreeNode);
 		AppContext.getDataManager().removeObject(currentTreeNode);
-		removedTreeNodes++;
 
 		// pop the queue to remove the next TreeNode, or if none,
 		// then we are done.
@@ -1967,32 +1916,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    return true;
 	}
 
-	/**
-	 * Returns the number of removed elements from the operation
-	 * 
-	 * @return number of removed elements
-	 */
-	public int getNumberOfRemovedElements() {
-	    return removedElements;
-	}
-
-	/**
-	 * Returns the number of removed {@code ListNode}s from the operation
-	 * 
-	 * @return number of removed {@code ListNodes}
-	 */
-	public int getNumberOfRemovedListNodes() {
-	    return removedListNodes;
-	}
-
-	/**
-	 * Returns the number of removed {@code TreeNode}s from the operation
-	 * 
-	 * @return number of removed {@code TreeNodes}
-	 */
-	public int getNumberOfRemovedTreeNodes() {
-	    return removedTreeNodes;
-	}
     }
 
     /**
@@ -2622,6 +2545,13 @@ public class ScalableList<E> extends AbstractList<E> implements
 		return;
 	    }
 
+	    // If this is an only child and its size is 0,
+	    // we will keep it so that we can make future
+	    // appends rather than creating a new ListNode.
+	    if (this.next() == null && this.prev() == null) {
+		return;
+	    }
+
 	    // Otherwise, we need to remove the list
 	    // node and relink accordingly.
 	    // First, we determine the type
@@ -2629,17 +2559,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // 1) interior node; connect prev to next
 	    // 2) head node. Update child pointer from parent
 	    // 3) tail node
-	    // 4) only child
 	    if (this.next() != null && this.prev() != null) {
 		this.prev().setNext(this.next());
 		this.next().setPrev(this.prev());
 	    } else if (this.next() != null) {
 		this.getParent().setChild(this.next(), this.size());
 		this.next().setPrev(null);
-	    } else if (this.prev() != null) {
-		this.prev().setNext(null);
 	    } else {
-		this.getParent().setChild(null, this.size());
+		this.prev().setNext(null);
 	    }
 
 	    // If we are removing the child of the
@@ -3017,16 +2944,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    assert (o != null);
 	    Iterator<ManagedReference<ManagedObject>> iter =
 		    contents.iterator();
-	    ManagedReference<?> ref = null;
-	    Object obj = null;
 	    int index = 0;
 	    int lastIndex = -1;
 
 	    // Iterate through all contents,
 	    // checking for equality
 	    while (iter.hasNext()) {
-		ref = iter.next();
-		obj = ref.get();
+		ManagedReference<?> ref = iter.next();
+		Object obj = ref.get();
 
 		// Retrieve the internal value if
 		// it is an Element object
@@ -3102,15 +3027,13 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    assert (o != null);
 	    Iterator<ManagedReference<ManagedObject>> iter =
 		    contents.iterator();
-	    ManagedReference<ManagedObject> ref = null;
-	    Object obj = null;
 	    int index = 0;
 
 	    // Iterate through all the list
 	    // contents until we find a match
 	    while (iter.hasNext()) {
-		ref = iter.next();
-		obj = ref.get();
+		ManagedReference<ManagedObject> ref = iter.next();
+		Object obj = ref.get();
 
 		// Check if we need to extract the
 		// internal value contained in an Element object
@@ -3168,14 +3091,12 @@ public class ScalableList<E> extends AbstractList<E> implements
 	public boolean remove(Object obj) {
 	    Iterator<ManagedReference<ManagedObject>> iter =
 		    contents.iterator();
-	    ManagedReference<ManagedObject> current = null;
-	    Object object = null;
 	    boolean success = false;
 
 	    // go through all the elements in this collection (a sublist)
 	    while (iter.hasNext()) {
-		current = iter.next();
-		object = current.get();
+		ManagedReference<ManagedObject> current = iter.next();
+		Object object = current.get();
 
 		// if it is an Element, then extract its value
 		if (object instanceof Element) {
