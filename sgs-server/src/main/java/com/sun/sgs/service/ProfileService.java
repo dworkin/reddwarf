@@ -44,7 +44,8 @@ public interface ProfileService extends Service {
      * @param mBeanName the name under which it should be registered
      * 
      * @throws JMException if there were any problems reported
-     *    by the JMX system during registration
+     *    by the JMX system during registration, including if an object
+     *    has already been registered with the mBeanName
      */
     void registerMBean(Object mBean, String mBeanName) throws JMException;
     
