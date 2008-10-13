@@ -117,6 +117,10 @@ public final class ClientSessionServiceImpl
     private static final String TRANSPORT_LIST_PROPERTY =
         PKG_NAME + ".transports";
     
+    /** The transport properties base */
+    private static final String TRANSPORT_PROPERTIES_BASE =
+        PKG_NAME + ".transport.properties.";
+    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
@@ -157,6 +161,9 @@ public final class ClientSessionServiceImpl
      */
     private static final long DEFAULT_DISCONNECT_DELAY = 1000;
 
+    /** Properties. */
+    private final PropertiesWrapper wrappedProps;
+    
     /** The read buffer size for new connections. */
     private final int readBufferSize;
 
@@ -210,9 +217,7 @@ public final class ClientSessionServiceImpl
     
     /** Transport factory */
     private final TransportFactory transportFactory;
-    
-    /** Transport specific properties. */
-    private final Properties transportProperties;
+   
     
     /** Transport class name(s). */
     private final String transportList;
@@ -278,11 +283,9 @@ public final class ClientSessionServiceImpl
 	logger.log(Level.CONFIG,
 		   "Creating ClientSessionServiceImpl properties:{0}",
 		   properties);
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-            // For now, system properties == transport properties
-            transportProperties = properties;
             transportList = wrappedProps.getProperty(TRANSPORT_LIST_PROPERTY);
             
             if (transportList == null)
@@ -405,14 +408,16 @@ public final class ClientSessionServiceImpl
     public void doReady() {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
         try {
+            int i = 0;
             for (String transportClassName : transportList.split(":")) {
-                transports.add(transportFactory.startTransport(transportClassName,
-                                                               transportProperties,
-                                                               this));
+                transports.add(
+                        transportFactory.startTransport(transportClassName,
+                                                        wrappedProps.getEmbeddedProperties(TRANSPORT_PROPERTIES_BASE + i++),
+                                                        this));
             }
             final TransportDescriptor[] descriptors =
                                     new TransportDescriptor[transports.size()];
-            int i = 0;
+            i = 0;
             for (Transport transport : transports)
                 descriptors[i++] = transport.descriptor();
 
