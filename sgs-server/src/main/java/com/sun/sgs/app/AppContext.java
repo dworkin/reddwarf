@@ -25,13 +25,6 @@ package com.sun.sgs.app;
  */
 public final class AppContext {
     
-    /**
-     * If this system property is set to "true", multiple invocations of
-     * {@link AppContext#setManagerLocator setManagerLocator} are allowed.
-     */
-    public static final String RESET_ALLOWED_PROP = 
-            "com.sun.sgs.app.AppContext.resetAllowed";
-    
     // the current locator for this context
     private static volatile ManagerLocator managerLocator;
     
@@ -109,28 +102,18 @@ public final class AppContext {
      * managers for the application.  <p>
      * 
      * In most situations, this method
-     * should only be called once throughout the life of the application.
-     * By default, if this method is called a second time, it will
-     * throw a {@link AppContextException}.  However, if the
-     * {@code com.sun.sgs.app.AppContext.resetAllowed} system property is
-     * set to {@code true}, calling this method multiple times is allowed.
+     * should only be called once upon bootup of a Project Darkstar
+     * container.  Typically, an application should never have a reason
+     * to call this method, and doing so could cause unexpected
+     * results.
      * 
      * @param managerLocator the {@code ManagerLocator} that the 
      *        {@code AppContext} should use to retrieve managers
-     * @throws AppContextException if this method has already been called
-     *         once <em>and</em> the
-     *         {@code com.sun.sgs.app.AppContext.resetAllowed} property is
-     *         not set to {@code true}.
      */
     public static synchronized void 
             setManagerLocator(ManagerLocator managerLocator) {
         if(managerLocator == null)
             throw new NullPointerException("managerLocator cannot be null");
-        if(AppContext.managerLocator != null &&
-                !"true".equals(System.getProperty(RESET_ALLOWED_PROP))) {
-            throw new AppContextException("multiple invocations of " +
-                                          "setManagerLocator not allowed");
-        }
         
         AppContext.managerLocator = managerLocator;
     }

@@ -41,22 +41,6 @@ public class TestAppContext {
     private TaskManager taskManager;
     private Object arbitraryManager;
     
-    //system property
-    private String saved;
-    
-    @Before
-    public void saveCurrentProperty() {
-        saved = System.getProperty("com.sun.sgs.app.AppContext.resetAllowed");
-    }
-    
-    @After
-    public void resetOriginalProperty() {
-        if(saved == null)
-            System.clearProperty("com.sun.sgs.app.AppContext.resetAllowed");
-        else
-            System.setProperty("com.sun.sgs.app.AppContext.resetAllowed", saved);
-    }
-    
     /**
      * Resets the private static state of the AppContext to 
      * its original state using Reflection.  This is not ideal as it requires 
@@ -237,18 +221,6 @@ public class TestAppContext {
         
         Assert.assertSame(o1, arbitraryManager);
         Assert.assertNull(o2);
-    }
-    
-    @Test(expected=AppContextException.class)
-    public void testInvalidResetManagerLocator() {
-        initStableAppContext();
-        ManagerLocator m1 = managerLocator;
-        
-        initStableAppContext();
-        ManagerLocator m2 = managerLocator;
-        
-        AppContext.setManagerLocator(m1);
-        AppContext.setManagerLocator(m2);
     }
     
     @Test

@@ -18,7 +18,6 @@
  */
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
@@ -217,10 +216,6 @@ public class SgsTestNode {
                 boolean clean) 
         throws Exception
     {
-        //we need to enable multiple invocations of setManagerLocator
-        //in the AppContext
-        System.setProperty(AppContext.RESET_ALLOWED_PROP, "true");
-        
         this.appName = appName;
 	this.serverNode = serverNode;
 	
