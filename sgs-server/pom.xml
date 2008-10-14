@@ -44,7 +44,6 @@
     <dependency>
       <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
       <artifactId>je</artifactId>
-      <scope>provided</scope>
     </dependency>
   </dependencies>
 
