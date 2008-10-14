@@ -319,6 +319,21 @@ public class ScalableList<E> extends AbstractList<E> implements
     }
 
     /**
+     * Creates a reference to the supplied argument if it is not {@code null}.
+     * 
+     * @param <T> the type of the object
+     * @param t the object to reference
+     * @return a {@code ManagedReference} of the object, or {@code null} if
+     * the argument is null.
+     */
+    static <T> ManagedReference<T> createReferenceIfNecessary(T t) {
+	if (t == null) {
+	    return null;
+	}
+	return AppContext.getDataManager().createReference(t);
+    }
+
+    /**
      * Retrieves the {@code branchingFactor} for the list.
      * 
      * @return the {@code branchingFactor}
@@ -858,11 +873,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      */
     void setRoot(TreeNode<E> newRoot) {
 	AppContext.getDataManager().markForUpdate(this);
-	if (newRoot == null) {
-	    root = null;
-	} else {
-	    root = AppContext.getDataManager().createReference(newRoot);
-	}
+	root = createReferenceIfNecessary(newRoot);
     }
 
     /**
@@ -962,11 +973,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	void setRef(Node<E> newRef) {
 	    AppContext.getDataManager().markForUpdate(this);
-	    if (newRef != null) {
-		ref = AppContext.getDataManager().createReference(newRef);
-	    } else {
-		ref = null;
-	    }
+	    ref = createReferenceIfNecessary(newRef);
 	}
 
 	/**
@@ -1063,9 +1070,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    childRef = dm.createReference(child);
 
 	    // this might be the root so parent could be null
-	    if (parent != null) {
-		parentRef = dm.createReference(parent);
-	    }
+	    parentRef = ScalableList.createReferenceIfNecessary(parent);
 
 	    childrenCount = numberChildren;
 	    this.size = size;
@@ -1080,24 +1085,20 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param parent the intended parent
 	 * @param e an element to add into the empty {@code ListNode}
 	 */
-	public TreeNode(ScalableList<E> list, TreeNode<E> parent, E e) {
+	TreeNode(ScalableList<E> list, TreeNode<E> parent, E e) {
 	    assert (e != null);
 
 	    owner = AppContext.getDataManager().createReference(list);
 	    this.branchingFactor = owner.get().getBranchingFactor();
 	    nextRef = null;
 	    this.bucketSize = owner.get().getBucketSize();
+
 	    ListNode<E> n = new ListNode<E>(this, bucketSize, e);
 	    size = n.size();
 	    childrenCount = 1;
 	    DataManager dm = AppContext.getDataManager();
 	    childRef = dm.createReference((Node<E>) n);
-
-	    if (parent != null) {
-		parentRef = dm.createReference(parent);
-	    } else {
-		parentRef = null;
-	    }
+	    parentRef = ScalableList.createReferenceIfNecessary(parent);
 	}
 
 	/**
@@ -1107,18 +1108,17 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param list the {@code ScalableList} owner of this structure
 	 * @param parent the intended parent {@code ListNode}
 	 */
-	public TreeNode(ScalableList<E> list, TreeNode<E> parent) {
+	TreeNode(ScalableList<E> list, TreeNode<E> parent) {
 	    owner = AppContext.getDataManager().createReference(list);
 	    this.branchingFactor = owner.get().getBranchingFactor();
 	    nextRef = null;
 	    this.bucketSize = owner.get().getBucketSize();
+
 	    ListNode<E> n = new ListNode<E>(this, bucketSize);
 	    size = n.size();
 	    DataManager dm = AppContext.getDataManager();
 	    childRef = dm.createReference((Node<E>) n);
-	    if (parent != null) {
-		parentRef = dm.createReference(parent);
-	    }
+	    parentRef = ScalableList.createReferenceIfNecessary(parent);
 	}
 
 	/**
@@ -1137,11 +1137,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	public void setPrev(Node<E> ref) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    TreeNode<E> t = uncheckedCast(ref);
-	    if (ref != null) {
-		prevRef = AppContext.getDataManager().createReference(t);
-	    } else {
-		prevRef = null;
-	    }
+	    prevRef = ScalableList.createReferenceIfNecessary(t);
 	}
 
 	/**
@@ -1165,7 +1161,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * the tree.
 	 * @throws ObjectNotFoundException if the reference does not exist
 	 */
-	public Node<E> getChild() {
+	Node<E> getChild() {
 	    if (childRef == null) {
 		return null;
 	    }
@@ -1179,14 +1175,10 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * 
 	 * @param child the new child
 	 */
-	public void setChild(Node<E> child, int size) {
+	void setChild(Node<E> child, int size) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    this.size = size;
-	    if (child != null) {
-		childRef = AppContext.getDataManager().createReference(child);
-	    } else {
-		childRef = null;
-	    }
+	    childRef = ScalableList.createReferenceIfNecessary(child);
 	}
 
 	/**
@@ -1230,7 +1222,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * 
 	 * @return the number of immediate children
 	 */
-	public int getChildCount() {
+	int getChildCount() {
 	    return childrenCount;
 	}
 
@@ -1250,11 +1242,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	public void setNext(Node<E> ref) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    TreeNode<E> t = uncheckedCast(ref);
-	    if (t != null) {
-		nextRef = AppContext.getDataManager().createReference(t);
-	    } else {
-		nextRef = null;
-	    }
+	    nextRef = ScalableList.createReferenceIfNecessary(t);
 	}
 
 	/**
@@ -1421,12 +1409,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public void setParent(TreeNode<E> parent) {
 	    AppContext.getDataManager().markForUpdate(this);
-	    if (parent != null) {
-		parentRef =
-			AppContext.getDataManager().createReference(parent);
-	    } else {
-		parentRef = null;
-	    }
+	    parentRef = ScalableList.createReferenceIfNecessary(parent);
 	}
 
 	/**
@@ -2231,11 +2214,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	public void setNext(Node<E> ref) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    ListNode<E> node = uncheckedCast(ref);
-	    if (ref != null) {
-		nextRef = AppContext.getDataManager().createReference(node);
-	    } else {
-		nextRef = null;
-	    }
+	    nextRef = ScalableList.createReferenceIfNecessary(node);
 	}
 
 	/**
@@ -2243,12 +2222,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public void setParent(TreeNode<E> parent) {
 	    AppContext.getDataManager().markForUpdate(this);
-	    if (parent != null) {
-		parentRef =
-			AppContext.getDataManager().createReference(parent);
-	    } else {
-		parentRef = null;
-	    }
+	    parentRef = ScalableList.createReferenceIfNecessary(parent);
 	}
 
 	/**
@@ -2267,11 +2241,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	public void setPrev(Node<E> ref) {
 	    AppContext.getDataManager().markForUpdate(this);
 	    ListNode<E> n = uncheckedCast(ref);
-	    if (ref != null) {
-		prevRef = AppContext.getDataManager().createReference(n);
-	    } else {
-		prevRef = null;
-	    }
+	    prevRef = ScalableList.createReferenceIfNecessary(n);
 	}
 
 	/**
