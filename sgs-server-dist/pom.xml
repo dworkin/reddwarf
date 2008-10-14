@@ -26,10 +26,7 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
-    </dependency>
+
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-javadoc</artifactId>
@@ -39,18 +36,6 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-tutorial-server-dist</artifactId>
       <type>zip</type>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.mina</groupId>
-      <artifactId>mina-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-jdk14</artifactId>
     </dependency>
 
     <dependency>
