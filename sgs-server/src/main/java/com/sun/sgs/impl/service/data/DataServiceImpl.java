@@ -48,6 +48,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
@@ -454,8 +455,9 @@ public final class DataServiceImpl implements DataService {
 	    store = new DataStoreProfileProducer(baseStore, registrar);
             ProfileConsumer consumer =
                 registrar.registerProfileProducer(getClass().getName());
-            createReferenceOp = consumer.registerOperation(
-		"createReference", ProfileLevel.MAX);
+            createReferenceOp = consumer.createOperation(
+		"createReference", ProfileDataType.TASK_AGGREGATE,
+                ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {

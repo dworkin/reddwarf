@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,29 +20,20 @@
 package com.sun.sgs.profile;
 
 /**
- * A counter used in profiling. All counters have a name associated with them,
- * and start at zero. Counters can only be incremented. 
+ * A profile counter which is initially {@code 0}, and increments until it
+ * is explicitly cleared.
  */
-public interface ProfileCounter {
+public interface AggregateProfileCounter extends ProfileCounter {
 
     /**
-     * Returns the name of this counter.
-     *
-     * @return the counter's name
-     */
-    String getName();
-
-    /**
-     * Increments the counter by <code>1</code>.
-     */
-    void incrementCount();
-
-    /**
-     * Increments the counter by the given non-negative value.
-     *
-     * @param value the amount to increment the counter
+     * Gets the current counter value.
      * 
-     * @throws IllegalArgumentException if {@code value} is negative
+     * @return the current count value
      */
-    void incrementCount(long value);
+    long getCount();
+    
+    /**
+     * Clear the counter, resetting it to {@code 0}.
+     */
+    void clearCounter();
 }

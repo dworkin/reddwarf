@@ -45,6 +45,7 @@ import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
 
 import com.sun.sgs.profile.ProfileRegistrar;
@@ -321,16 +322,17 @@ public class TaskServiceImpl
             registrar.registerProfileProducer(getName());
 
         ProfileLevel level = ProfileLevel.MAX;
+        ProfileDataType type = ProfileDataType.TASK_AGGREGATE;
         scheduleNDTaskOp =
-            consumer.registerOperation("scheduleNonDurableTask", level);
+            consumer.createOperation("scheduleNonDurableTask", type, level);
         scheduleNDTaskDelayedOp =
-            consumer.registerOperation("scheduleNonDurableTaskDelayed", 
-                                       level);
-        scheduleTaskOp = consumer.registerOperation("scheduleTask", level);
+            consumer.createOperation("scheduleNonDurableTaskDelayed", 
+                                     type, level);
+        scheduleTaskOp = consumer.createOperation("scheduleTask", type, level);
         scheduleTaskDelayedOp =
-            consumer.registerOperation("scheduleDelayedTask", level);
+            consumer.createOperation("scheduleDelayedTask", type, level);
         scheduleTaskPeriodicOp =
-            consumer.registerOperation("schedulePeriodicTask", level);
+            consumer.createOperation("schedulePeriodicTask", type, level);
 
         // finally, create a timer for delaying the status votes and get
         // the delay used in submitting status votes

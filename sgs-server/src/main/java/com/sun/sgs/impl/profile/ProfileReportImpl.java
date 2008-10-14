@@ -76,7 +76,6 @@ class ProfileReportImpl implements ProfileReport {
     Set<ProfileParticipantDetail> participants;
 
     // counters that are updated through methods on this class
-    Map<String, Long> aggCounters;
     Map<String, Long> taskCounters;
 
     // a list of operations performed, which is updated through
@@ -85,7 +84,6 @@ class ProfileReportImpl implements ProfileReport {
 
     // samples that are aggregated through methods on this class
     Map<String, List<Long>> localSamples;
-    Map<String, List<Long>> aggregateSamples;
 
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
@@ -108,24 +106,8 @@ class ProfileReportImpl implements ProfileReport {
 
 	ops = new ArrayList<ProfileOperation>();
 	participants = new HashSet<ProfileParticipantDetail>();
-	aggCounters = null;
 	taskCounters = null;
 	localSamples = null;
-	aggregateSamples = null;
-    }
-
-    /**
-     * Package-private method used to update aggregate counters that were
-     * changed during this task.
-     *
-     * @param counter the name of the counter
-     * @param value the new value of this counter
-     */
-    void updateAggregateCounter(String counter, long value) {
-        if (aggCounters == null) {
-            aggCounters = new HashMap<String, Long>();
-        }
-        aggCounters.put(counter, value);
     }
 
     /**
@@ -172,28 +154,6 @@ class ProfileReportImpl implements ProfileReport {
 	    }
         }
 	samples.add(value);
-    }
-
-    /**
-     * Package-private method used to add to an aggregate sample. If
-     * this sample hasn't had a value reported yet for this task, then
-     * a new list is made and the the provided value is added to it.
-     *
-     * @param sampleName the name of the sample
-     * @param samples the list of all samples for this name
-     */
-    void registerAggregateSamples(String sampleName, List<Long> samples) {
-	// NOTE: we make the list unmodifiable so that the user cannot
-	// alter any of the samples.  This is important since the same
-	// list is used for the lifetime of the application.
-        if (aggregateSamples == null) {
-            aggregateSamples = new HashMap<String, List<Long>>();
-	    aggregateSamples.put(sampleName, 
-				Collections.unmodifiableList(samples));
-        } else if (!aggregateSamples.containsKey(sampleName)) {
-	    aggregateSamples.put(sampleName, 
-				 Collections.unmodifiableList(samples));
-        }
     }
 
     /**
@@ -276,22 +236,8 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public Map<String, Long> getUpdatedAggregateCounters() {
-        return (aggCounters == null) ? EMPTY_COUNTER_MAP : aggCounters;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public Map<String, Long> getUpdatedTaskCounters() {
         return (taskCounters == null) ? EMPTY_COUNTER_MAP : taskCounters;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public Map<String, List<Long>> getUpdatedAggregateSamples() {
-	return (aggregateSamples == null) ? EMPTY_SAMPLE_MAP : aggregateSamples;
     }
 
     /**
