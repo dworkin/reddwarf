@@ -1197,46 +1197,32 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * A convenience method to increment the size of the {@code TreeNode}.
-	 * Note that this differs from the children count; the latter of which
-	 * is a quantity representing the number of children.
+	 * Recursively increments the node's size until reaching the root. The
+	 * root is not updated to enable some degree of concurrency.
 	 */
-	public void increment() {
+	void increment() {
+	    if (getParent() == null) {
+		return;
+	    }
+	    AppContext.getDataManager().markForUpdate(this);
 	    size++;
+	    getParent().increment();
 	}
 
 	/**
-	 * A convenience method to decrement the size of the {@code TreeNode}.
-	 * Note that this differs from the children count; the latter of which
-	 * is a quantity representing the number of children that are either
-	 * {@code ListNode}s or {@code TreeNode}s.
+	 * Recursively decrements the node's size until reaching the root. The
+	 * root is not updated to enable some degree of concurrency.
 	 */
-	public void decrement() {
-	    size--;
-	}
-
-	/**
-	 * A convenience method which increments the number of children
-	 * existing under a {@code TreeNode}. Note that this value is
-	 * different from the size; the latter of which represents the total
-	 * number of elements contained beneath this parent. In other words,
-	 * all elements that are neither {@code ListNode}s or
-	 * {@code TreeNode}s.
-	 */
-	public void incrementNumChildren() {
-	    childrenCount++;
-	}
-
-	/**
-	 * A convenience method which decrements the number of children
-	 * existing under a {@code TreeNode}. Note that this value is
-	 * different from the size; the latter of which represents the total
-	 * number of elements contained beneath this parent. In other words,
-	 * all elements that are neither {@code ListNode}s or
-	 * {@code TreeNode}s.
-	 */
-	public void decrementNumChildren() {
-	    childrenCount--;
+	void decrement() {
+	    if (getParent() == null) {
+		return;
+	    }
+	    AppContext.getDataManager().markForUpdate(this);
+	    if (--size == 0) {
+		getParent().decrementChildrenAndSize();
+	    } else {
+		getParent().decrement();
+	    }
 	}
 
 	/**
@@ -1337,6 +1323,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    TreeNode<E> newNode = null;
 	    Node<E> tmp = (Node<E>) this.getChild();
 	    AppContext.getDataManager().markForUpdate(this);
+
+	    // Updates the reference of the new root, if created
 	    generateParentIfNecessary();
 
 	    // Perform split by creating and linking new sibling
@@ -1401,8 +1389,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // guaranteed to have a parent because we
 	    // either updated its size already or created
 	    // a new one above.
-	    getParent()
-		    .propagateChanges(TreeNode.INCREMENT_CHILDREN_AND_SIZE);
+	    getParent().incrementChildrenAndSize();
 
 	    return newNode;
 	}
@@ -1423,6 +1410,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 		// Link the node to its new parent
 		setParent(grandparent);
+		owner.getForUpdate().setRoot(grandparent);
 	    }
 	}
 
@@ -1442,105 +1430,53 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * Propagates changes to the parents of the tree. Changes can include
-	 * incrementing/decrementing the size and/or incrementing/decrementing
-	 * the number of children.
-	 * 
-	 * @param mode the type of propagation which is to occur, specified by
-	 * static {@code TreeNode} fields
-	 * @throws IllegalArgumentException when the mode is not recognized
-	 */
-	public void propagateChanges(byte mode) {
-	    AppContext.getDataManager().markForUpdate(this);
-
-	    // If we are at the root, then check if the root needs to be
-	    // split or pruned.
-	    if (getParent() == null) {
-		updateRootIfNecessary(mode);
-		return;
-	    }
-
-	    // Depending on the mode, perform the appropriate updates
-	    switch (mode) {
-		// Increment the size and propagates this to parent
-		case TreeNode.INCREMENT_SIZE:
-		    this.increment();
-		    break;
-
-		// Decrements the size and prepares for removal
-		// if necessary; both cases propagate to parent
-		case TreeNode.DECREMENT_SIZE:
-		    this.decrement();
-		    if (size() == 0) {
-			mode = TreeNode.DECREMENT_CHILDREN_AND_SIZE;
-		    }
-		    break;
-
-		// Increments the number of children and size.
-		// This case checks if subsequent splits are
-		// necessary.
-		case TreeNode.INCREMENT_CHILDREN_AND_SIZE:
-		    mode = incrementChildrenAndSize();
-		    break;
-
-		// Decrements the child size. If the node is
-		// empty, then it removes itself. Both cases
-		// propagate to parent
-		case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
-		    mode = decrementChildrenAndSize();
-		    break;
-
-		// If the mode was not recognized, throw an exception
-		default:
-		    throw new IllegalArgumentException(
-			    "Supplied mode argument is not recognized; " +
-				    "expected " + TreeNode.INCREMENT_SIZE +
-				    " or " + TreeNode.DECREMENT_SIZE);
-	    }
-
-	    // Recursively call the method on our parent as long as
-	    // a parent exists and its not the root
-	    TreeNode<E> parent = getParent();
-	    if (parent != null) {
-		parent.propagateChanges(mode);
-	    } else {
-		owner.getForUpdate().setRoot(this);
-	    }
-	}
-
-	/**
 	 * Increments the number of children and size, and determines whether
-	 * the parent should do both or just perform an increment of the size.
+	 * the parent should do both, or just perform an increment of the
+	 * size.
 	 * 
 	 * @return the operation corresponding to the next recursive operation
 	 * to perform. The byte can be looked-up in the {@code TreeNode}
 	 * static fields.
 	 */
-	private byte incrementChildrenAndSize() {
-	    this.increment();
-	    this.incrementNumChildren();
+	void incrementChildrenAndSize() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    size++;
+	    childrenCount++;
+
+	    TreeNode<E> parent = getParent();
+	    if (parent == null) {
+		updateRootIfNecessary(TreeNode.INCREMENT_CHILDREN_AND_SIZE);
+		return;
+	    }
 
 	    // if another split did not take place,
 	    // then just propagate the increment.
 	    // Otherwise, increment and check if
 	    // the parent needs to split
 	    if (!performSplitIfNecessary()) {
-		return TreeNode.INCREMENT_SIZE;
+		parent.increment();
 	    }
-	    return TreeNode.INCREMENT_CHILDREN_AND_SIZE;
+	    parent.incrementChildrenAndSize();
 	}
 
 	/**
 	 * Decrements the number of children and size, and determines whether
-	 * the parent should do both or just decrement the size.
+	 * the parent should do both again, or just decrement the size.
 	 * 
 	 * @return the operation corresponding to the next recursive operation
 	 * to perform. The byte can be looked-up in the {@code TreeNode}
 	 * static fields.
 	 */
-	private byte decrementChildrenAndSize() {
-	    this.decrement();
-	    this.decrementNumChildren();
+	void decrementChildrenAndSize() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    size--;
+	    childrenCount--;
+
+	    TreeNode<E> parent = getParent();
+	    if (parent == null) {
+		updateRootIfNecessary(TreeNode.DECREMENT_CHILDREN_AND_SIZE);
+		return;
+	    }
 
 	    // prune child if there is only one and its not a ListNode.
 	    // Otherwise if there are no children, remove this from
@@ -1551,10 +1487,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 		child.prune();
 	    } else if (size() == 0) {
 		prune();
-	    } else {
-		return TreeNode.DECREMENT_SIZE;
 	    }
-	    return TreeNode.DECREMENT_CHILDREN_AND_SIZE;
+	    parent.decrement();
 	}
 
 	/**
@@ -2553,7 +2487,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    for (int index = lower; index < sublistSize; index++) {
 		ManagedReference<ManagedObject> temp = contents.get(index);
 		spawned.add(temp);
-		// contents.remove(temp);
 	    }
 
 	    // remove the relocated nodes from the current list
@@ -2604,11 +2537,27 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param parent the parent of the current node
 	 * @param mode the type of update to perform, specified by the static
 	 * final {@code TreeNode} fields.
+	 * @throws IllegalArgumentException if the mode is not recognized
 	 */
 	private void updateParents(TreeNode<E> parent, byte mode) {
-	    parent.propagateChanges(mode);
+	    switch (mode) {
+		case TreeNode.INCREMENT_SIZE:
+		    parent.increment();
+		    break;
+		case TreeNode.INCREMENT_CHILDREN_AND_SIZE:
+		    parent.incrementChildrenAndSize();
+		    break;
+		case TreeNode.DECREMENT_SIZE:
+		    parent.decrement();
+		    break;
+		case TreeNode.DECREMENT_CHILDREN_AND_SIZE:
+		    parent.decrementChildrenAndSize();
+		    break;
+		default:
+		    throw new IllegalArgumentException(
+			    "Unsupported mode of propagation");
+	    }
 	}
-
     }
 
     /**
