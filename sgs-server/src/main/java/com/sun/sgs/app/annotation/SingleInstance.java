@@ -26,10 +26,13 @@ import java.lang.annotation.ElementType;
 
 /**
  * A class annotated with the <code>SingleInstance</code> annotation tells
- * the Project Darkstar container that instances only a single instance
+ * the Project Darkstar container that only a single instance
  * should be used when injecting objects of its type into other objects.
  * In other words, every time an object of its type is injected into
- * another object by the container, the same object is injected.
+ * another object by the container, the same object is injected. <p>
+ * 
+ * The <code>SingleInstance</code> annotation can only be used on classes
+ * that implement {@link com.sun.sgs.app.ManagedObject ManagedObject}.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)

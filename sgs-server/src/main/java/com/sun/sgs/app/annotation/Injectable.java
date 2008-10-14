@@ -27,7 +27,10 @@ import java.lang.annotation.ElementType;
 /**
  * A class annotated with the <code>Injectable</code> annotation tells
  * the Project Darkstar container that instances of it are candidates for
- * being injected into other objects.
+ * being injected into other objects. <p>
+ * 
+ * The <code>Injectable</code> annotation can only be used on classes
+ * that implement {@link com.sun.sgs.app.ManagedObject ManagedObject}.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
