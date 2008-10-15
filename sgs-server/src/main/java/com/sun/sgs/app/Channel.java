@@ -140,6 +140,8 @@ public interface Channel extends ManagedObject {
      * @throws IllegalStateException if this channel is closed
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
+     * @throws UnsupportedOperationException if the session does not support
+     *         the channel's delivery requirement
      * @throws TransactionException if the operation failed because of
      *	       a problem with the current transaction
      */
@@ -155,6 +157,8 @@ public interface Channel extends ManagedObject {
      * @throws IllegalStateException if this channel is closed
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
+     * @throws UnsupportedOperationException if at least one of the sessions
+     *         does not support the channel's delivery requirement
      * @throws TransactionException if the operation failed because of
      *	       a problem with the current transaction
      */

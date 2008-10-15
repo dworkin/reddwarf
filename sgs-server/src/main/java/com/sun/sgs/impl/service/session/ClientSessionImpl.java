@@ -41,6 +41,7 @@ import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
+import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -93,6 +94,9 @@ public class ClientSessionImpl
 
     /** The identity for this session. */
     private final Identity identity;
+    
+    /** The underlying transport for this session. */
+    private final TransportDescriptor transportDesc;
 
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
@@ -125,7 +129,8 @@ public class ClientSessionImpl
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
-		      Identity identity)
+		      Identity identity,
+                      TransportDescriptor transportDesc)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
@@ -135,6 +140,7 @@ public class ClientSessionImpl
 	}
 	this.sessionService = sessionService;
 	this.identity = identity;
+        this.transportDesc = transportDesc;
 	this.nodeId = sessionService.getLocalNodeId();
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
@@ -325,6 +331,10 @@ public class ClientSessionImpl
 	return wrappedSessionRef.get();
     }
 
+    public boolean canSupport(Delivery required) {
+        return transportDesc.canSupport(required);
+    }
+    
     /**
      * Invokes the {@code disconnected} callback on this session's {@code
      * ClientSessionListener} (if present and {@code notify} is

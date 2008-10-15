@@ -145,6 +145,9 @@ public class UDP implements Transport {
             InetSocketAddress listenAddress =
                         host == null ? new InetSocketAddress(port) :
                                        new InetSocketAddress(host, port);
+            
+            descriptor = new UDPDescriptor(listenAddress.getHostName(),
+                                           listenAddress.getPort());
             AsynchronousChannelProvider provider =
                 // TODO fetch from config
                 AsynchronousChannelProvider.provider();
@@ -173,7 +176,6 @@ public class UDP implements Transport {
                 }
 		throw e;
 	    }
-            descriptor = new UDPDescriptor(host, port);
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(Level.CONFIG, e, "Failed to create transport");

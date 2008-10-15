@@ -40,6 +40,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.BindException;
+import java.rmi.server.ExportException;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 import java.util.ArrayList;
@@ -124,7 +125,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
         serviceProps.setProperty(StandardProperties.APP_NODE, 
-                Integer.toString(SgsTestNode.getNextAppPort()));
+                Integer.toString(SgsTestNode.getNextUniquePort()));
         renewTime = Integer.valueOf(
             serviceProps.getProperty(
                 "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
@@ -239,26 +240,13 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
-    public void testConstructorNoAppPort() throws Exception {
-        WatchdogServiceImpl watchdog = null;
-	Properties properties = createProperties(
-            StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", "0");
-	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
     public void testConstructorAppButNoServerHost() throws Exception {
         // Server start is false but we didn't specify a server host
         int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             StandardProperties.APP_NODE, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
         try {
@@ -419,7 +407,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             StandardProperties.APP_NODE, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
@@ -466,7 +454,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             StandardProperties.APP_NODE, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
@@ -535,7 +523,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             StandardProperties.APP_NODE, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+                Integer.toString(SgsTestNode.getNextUniquePort()),
 	    "com.sun.sgs.impl.service.nodemap.client.port",
 	        String.valueOf(SgsTestNode.getNextUniquePort()),
 	    "com.sun.sgs.impl.service.watchdog.client.port",
@@ -828,7 +816,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	try {
 	    for (int i = 0; i < 5; i++) {
                 props.put(StandardProperties.APP_NODE,
-                          Integer.toString(SgsTestNode.getNextAppPort()));
+                          Integer.toString(SgsTestNode.getNextUniquePort()));
 		WatchdogServiceImpl watchdog =
 		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		DummyNodeListener listener = new DummyNodeListener();
@@ -1134,7 +1122,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         SgsTestNode node = null;
         try {
             node = new SgsTestNode(serverNode, null, props);
-            fail("Expected IllegalArgumentException");
+            fail("Expected ExportException");
         } catch (InvocationTargetException e) {
             System.err.println(e);
             Throwable target = e.getTargetException();
@@ -1145,8 +1133,8 @@ public class TestWatchdogServiceImpl extends TestCase {
                 System.err.println("unwrapping target exception");
                 target = ((InvocationTargetException) target).getTargetException();
             }
-            if (!(target instanceof IllegalArgumentException)) {
-                fail("Expected IllegalArgumentException");
+            if (!(target instanceof ExportException)) {
+                fail("Expected ExportException, got " + target);
             }
         } finally {
             if (node != null) {
@@ -1168,17 +1156,18 @@ public class TestWatchdogServiceImpl extends TestCase {
             // server.  We expect to see a socket BindException rather
             // than an IllegalArgumentException.
  	    Properties props1 = getPropsForApplication(appName + "1");
- 	    props1.setProperty(StandardProperties.APP_NODE,
- 			       props.getProperty(StandardProperties.APP_NODE));
+ 	    props1.setProperty("com.sun.sgs.impl.service.session.transport.properties.0",
+ 			       props.getProperty("com.sun.sgs.impl.service.session.transport.properties.0"));
 	    node1 = new SgsTestNode(appName, null, props1, true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {
             System.err.println(e);
             Throwable target = e.getTargetException();
             // We wrap our exceptions a bit in the kernel....
-            while (target instanceof InvocationTargetException) {
+            while ((target instanceof InvocationTargetException) ||
+                   (target instanceof RuntimeException)) {
                 System.err.println("unwrapping target exception");
-                target = ((InvocationTargetException) target).getTargetException();
+                target = target.getCause();
             }
             if (!(target instanceof BindException)) {
                 fail("Expected BindException, got " + target);
@@ -1283,7 +1272,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
             StandardProperties.APP_NODE, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port",

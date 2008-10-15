@@ -119,7 +119,7 @@ public class DummyWatchdogService implements WatchdogService {
 
     @Override
     public Node getNodeForUpdate(long nodeId) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return getNode(nodeId);
     }
         
     /** {@inheritDoc} */

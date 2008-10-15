@@ -289,7 +289,8 @@ public final class ClientSessionServiceImpl
             transportList = wrappedProps.getProperty(TRANSPORT_LIST_PROPERTY);
             
             if (transportList == null)
-                throw new Exception("at least one transport must be specified");
+                throw new IllegalArgumentException(
+                        "at least one transport must be specified");
 
 	    /*
 	     * Get the property for controlling session event processing

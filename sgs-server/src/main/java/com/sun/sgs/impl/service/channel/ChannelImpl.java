@@ -259,7 +259,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
 	     */
-	    addEvent(new JoinEvent(unwrapSession(session)));
+	    addEvent(new JoinEvent(checkDeliveryRequirement(session)));
 
 	    logger.log(Level.FINEST, "join session:{0} returns", session);
 
@@ -289,7 +289,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * each session.
 	     */
 	    for (ClientSession session : sessions) {
-		addEvent(new JoinEvent(unwrapSession(session)));
+		addEvent(new JoinEvent(checkDeliveryRequirement(session)));
 	    }
 	    logger.log(Level.FINEST, "join sessions:{0} returns", sessions);
 
@@ -297,6 +297,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.logThrow(Level.FINEST, e, "join throws");
 	    throw e;
 	}
+    }
+    
+    /**
+     * Unwrap the client session and check to make sure it supports the
+     * delivery requirement of this channel.
+     * @param session
+     * @return the unwrapped client session
+     */
+    private ClientSessionImpl checkDeliveryRequirement(ClientSession session) {
+        ClientSessionImpl sessionImpl = unwrapSession(session);
+            
+        if (!sessionImpl.canSupport(delivery))
+            throw new UnsupportedOperationException("Session does not support" +
+                                                    " delivery requirement");
+        return sessionImpl;
     }
 
     /**
@@ -310,7 +325,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * {@code leave} methods in order to access the underlying {@code
      * ClientSession} so that the correct client session ID can be obtained.
      */
-    private ClientSession unwrapSession(ClientSession session) {
+    private ClientSessionImpl unwrapSession(ClientSession session) {
 	assert session instanceof ClientSessionWrapper;
 	return ((ClientSessionWrapper) session).getClientSession();
     }

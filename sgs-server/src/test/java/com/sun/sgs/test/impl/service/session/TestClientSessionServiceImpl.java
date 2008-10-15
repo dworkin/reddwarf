@@ -129,9 +129,10 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-//	    StandardProperties.APP_NODE, "20000",
-            "com.sun.sgs.impl.service.session.transport", "com.sun.sgs.impl.transport.tcp.TCP",
-            "com.sun.sgs.impl.transport.tcp.listen.port", "20000");
+            "com.sun.sgs.impl.service.session.transports",
+                "com.sun.sgs.impl.transport.tcp.TCP",
+            "com.sun.sgs.impl.service.session.transport.properties.0",
+                "com.sun.sgs.impl.transport.tcp.listen.port:20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
@@ -306,7 +307,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Properties props =
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
-		    StandardProperties.APP_NODE, "20000",
 		    "com.sun.sgs.impl.service.session.disconnect.delay", "199");
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),

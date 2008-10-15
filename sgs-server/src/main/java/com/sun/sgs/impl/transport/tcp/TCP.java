@@ -166,21 +166,18 @@ public class TCP implements Transport {
         String host = properties.getProperty(LISTEN_HOST_PROPERTY);
         int port = wrappedProps.getRequiredIntProperty(LISTEN_PORT_PROPERTY,
                                                        1, 65535);
-        descriptor = new TCPDescriptor(host, port);
-        start();
-    }
-   
-    private void start() {
+
         try {
              // Listen for incoming client connections. If no host address
              // is supplied, default to listen on all interfaces.
              //
             InetSocketAddress listenAddress =
-                        descriptor.getHostName() == null ?
-                                new InetSocketAddress(descriptor.getListeningPort()) :
-                                new InetSocketAddress(descriptor.getHostName(),
-                                                      descriptor.getListeningPort());
+                        host == null ?
+                                new InetSocketAddress(port) :
+                                new InetSocketAddress(host, port);
             
+            descriptor = new TCPDescriptor(listenAddress.getHostName(),
+                                           listenAddress.getPort());
             AsynchronousChannelProvider provider =
                 AsynchronousChannelProvider.provider();
             asyncChannelGroup =

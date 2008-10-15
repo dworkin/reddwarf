@@ -1046,7 +1046,9 @@ class ClientSessionHandler {
 	
 	public void run() {
 	    ClientSessionImpl sessionImpl =
-		new ClientSessionImpl(sessionService, identity);
+                    new ClientSessionImpl(sessionService,
+                                          identity,
+                                          transportDesc);
 	    sessionRefId = sessionImpl.getId();
 	}
     }
