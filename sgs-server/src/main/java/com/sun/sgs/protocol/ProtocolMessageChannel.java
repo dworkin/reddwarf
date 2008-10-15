@@ -25,16 +25,10 @@ import java.nio.channels.Channel;
 
 /**
  * A channel for sending protocol messages to a client.  A {@code
- * ProtocolMessageChannel} should have a constructor that takes the
- * following arguments:
- * <ul>
- * <li>{@link java.util.Properties}</li>
- * <li>{@link com.sun.sgs.kernel.ComponentRegistry}</li>
- * <li>{@link com.sun.sgs.nio.channels.AsynchronousByteChannel}</li>
- * <li>{@link ProtocolMessageHandler}
- * </ul>
+ * ProtocolMessageChannel} is created by tge {@link
+ * ProtocolFactory#newChannel ProtocolFactory.newChannel} method.
  *
- * Note: If the protocol specification (implemented by a given {@code
+ * <p>Note: If the protocol specification (implemented by a given {@code
  * ProtocolMessageChannel}) requires that a login acknowledgment be
  * delivered to the client before any other protocol messages, the protocol
  * message channel must implement this requirement.  It is possible that a
@@ -45,7 +39,7 @@ import java.nio.channels.Channel;
  * <p>TBD: should reconnection be handled a this layer or transparently by
  * the transport layer?   Perhaps the {@code AsynchronousByteChannel}
  * managed by the transport layer could handle the reconnection under the
- * covers.
+ * covers?
  */
 public interface ProtocolMessageChannel extends Channel {
 
