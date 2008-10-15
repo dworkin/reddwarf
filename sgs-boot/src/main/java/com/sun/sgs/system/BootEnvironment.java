@@ -19,6 +19,8 @@
 
 package com.sun.sgs.system;
 
+import java.io.File;
+
 /**
  * Defines environment variables used by the bootstrapper
  * to locate and configure the necessary environment pieces
@@ -74,9 +76,12 @@ public class BootEnvironment {
     public static final String JAVA_OPTS = "JAVA_OPTS";
     
     
-    public static final String DEFAULT_SGS_DEPLOY = "deploy/";
-    public static final String DEFAULT_SGS_PROPERTIES = "conf/sgs-server.properties";
-    public static final String DEFAULT_SGS_LOGGING = "conf/sgs-logging.properties";
+    public static final String DEFAULT_SGS_DEPLOY = 
+            "${SGS_HOME}" + File.separator + "deploy" + File.separator;
+    public static final String DEFAULT_SGS_PROPERTIES = 
+            "${SGS_HOME}" + File.separator + "conf" + File.separator + "sgs-server.properties";
+    public static final String DEFAULT_SGS_LOGGING = 
+            "${SGS_HOME}" + File.separator + "conf" + File.separator + "sgs-logging.properties";
     
     
     public static final String DEFAULT_BDB_ROOT = "lib/bdb-natives/";

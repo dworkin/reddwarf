@@ -32,7 +32,7 @@ public class Boot {
 
     public static void main(String[] args) {
         //load properties from configuration file
-        Properties properties = new Properties();
+        Properties properties = new SubstitutionProperties();
         try {
             URL sgs_boot = ClassLoader.getSystemClassLoader().
                     getResource(BootEnvironment.SGS_BOOT);
