@@ -27,7 +27,9 @@ package com.sun.sgs.profile;
 public interface ProfileRegistrar {
 
     /**
-     * Registers the given unique name as a profile producer.
+     * Registers the given unique name as a profile producer.  If the
+     * name has already been registered, the existing {@code ProfileConsumer}
+     * for that name is returned.
      *
      * @param name the unique name of the profile producer
      *
