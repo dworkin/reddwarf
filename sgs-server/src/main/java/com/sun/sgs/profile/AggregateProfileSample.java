@@ -39,7 +39,7 @@ public interface AggregateProfileSample extends ProfileSample {
     void clearSamples();
     
     /**
-     * Returns the exponentaially smoothed average of the samples.
+     * Returns the average of the samples.
      * 
      * @return the average of the samples
      */

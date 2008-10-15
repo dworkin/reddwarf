@@ -91,27 +91,51 @@ class ProfileConsumerImpl implements ProfileConsumer {
     }
 
     /** {@inheritDoc} */
-    public ProfileOperation createOperation(String name, ProfileDataType type,
-                                              ProfileLevel minLevel) 
+    public synchronized ProfileOperation createOperation(String name, 
+            ProfileDataType type, ProfileLevel minLevel) 
     {
 	ProfileOperation op = ops.get(name);
-
+        
 	if (op == null) {
             switch (type) {
                 case TASK:
-                    op = new TaskProfileOperationImpl(name, minLevel);
+                    op = new TaskProfileOperationImpl(name, type, minLevel);
                     break;
                 case AGGREGATE:
-                    op = new AggregateProfileOperationImpl(name, minLevel);
+                    op = new AggregateProfileOperationImpl(name, type, 
+                                                           minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
-                    op = new AggregateTaskProfileOperationImpl(name, minLevel);
+                    op = new AggregateTaskProfileOperationImpl(name, type, 
+                                                               minLevel);
                     break;
             }
-	    ops.putIfAbsent(name, op);
-	    op = ops.get(name);
-	}
+	    ops.put(name, op);
+	} else {
+            // Check minLevel and type
+            if (op instanceof AbstractProfileData) {
+                AbstractProfileData oldData = (AbstractProfileData) op;
+                ProfileLevel oldLevel = oldData.getMinLevel();
+                if (oldLevel != minLevel) {
+                    throw new IllegalArgumentException(
+                            "Operation with name " + name + 
+                            " already created, but with level " +  oldLevel);
+                }
+                
+                ProfileDataType oldType = oldData.getType();
+                if (oldType != type) {
+                    throw new  IllegalArgumentException(
+                            "Operation with name " + name + 
+                            " already created, but with type " +  oldType);
+                }
+            } else {
+                // Can't happen in this implementation
+                throw new IllegalArgumentException(
+                        "Operation with name " + name + 
+                        " already created with an unknown type");
+            }   
+        }
 
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, 
@@ -121,24 +145,49 @@ class ProfileConsumerImpl implements ProfileConsumer {
     }
 
     /** {@inheritDoc} */
-    public ProfileCounter createCounter(String name, ProfileDataType type,
-                                        ProfileLevel minLevel) 
+    public synchronized ProfileCounter createCounter(String name, 
+            ProfileDataType type, ProfileLevel minLevel) 
     {
         if (counters.containsKey(name)) {
-            return counters.get(name);
+            ProfileCounter oldCounter = counters.get(name);
+            // Check minLevel and type
+            if (oldCounter instanceof AbstractProfileData) {
+                AbstractProfileData oldData = (AbstractProfileData) oldCounter;
+                ProfileLevel oldLevel = oldData.getMinLevel();
+                if (oldLevel != minLevel) {
+                    throw new IllegalArgumentException(
+                            "Counter with name " + name + 
+                            " already created, but with level " +  oldLevel);
+                }
+                
+                ProfileDataType oldType = oldData.getType();
+                if (oldType != type) {
+                    throw new  IllegalArgumentException(
+                            "Counter with name " + name + 
+                            " already created, but with type " +  oldType);
+                }
+            } else {
+                // Can't happen in this implementation
+                throw new IllegalArgumentException(
+                        "Counter with name " + name + 
+                        " already created with an unknown type");
+            }   
+            return oldCounter;
         } else {
             ProfileCounter counter;
             switch (type) {
                 case TASK:
-                    counter = new TaskProfileCounterImpl(name, minLevel);
+                    counter = new TaskProfileCounterImpl(name, type, minLevel);
                     break;
                 case AGGREGATE:
-                    counter = new AggregateProfileCounterImpl(name, minLevel);
+                    counter = new AggregateProfileCounterImpl(name, type, 
+                                                              minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
                     counter = 
-                            new AggregateTaskProfileCounterImpl(name, minLevel);
+                            new AggregateTaskProfileCounterImpl(name, type, 
+                                                                minLevel);
                     break;
             }
             
@@ -150,28 +199,51 @@ class ProfileConsumerImpl implements ProfileConsumer {
     /**
      * {@inheritDoc}
      */
-    public ProfileSample createSample(String name, ProfileDataType type,
-				      long maxSamples, ProfileLevel minLevel) 
+    public synchronized ProfileSample createSample(String name, 
+            ProfileDataType type, long maxSamples, ProfileLevel minLevel) 
     {
         // REMINDER: this assume maxSamples isn't necessary when
 	// deciding whether a sample source is already present.
         if (samples.containsKey(name)) {
+            ProfileSample oldSample = samples.get(name);
+            // Check minLevel and type
+            if (oldSample instanceof AbstractProfileData) {
+                AbstractProfileData oldData = (AbstractProfileData) oldSample;
+                ProfileLevel oldLevel = oldData.getMinLevel();
+                if (oldLevel != minLevel) {
+                    throw new IllegalArgumentException(
+                            "Sample with name " + name + 
+                            " already created, but with level " +  oldLevel);
+                }
+                
+                ProfileDataType oldType = oldData.getType();
+                if (oldType != type) {
+                    throw new  IllegalArgumentException(
+                            "Sample with name " + name + 
+                            " already created, but with type " +  oldType);
+                }
+            } else {
+                // Can't happen in this implementation
+                throw new IllegalArgumentException(
+                        "Sample with name " + name + 
+                        " already created with an unknown type");
+            }   
             return samples.get(name);
         } else {
             ProfileSample sample;
             switch (type) {
                 case TASK:
-                    sample = new TaskProfileSampleImpl(name, minLevel);
+                    sample = new TaskProfileSampleImpl(name, type, minLevel);
                     break;
                 case AGGREGATE:
-                    sample =  new AggregateProfileSampleImpl(name, 
+                    sample =  new AggregateProfileSampleImpl(name, type,
                                                              maxSamples, 
                                                              minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
                     sample = 
-                            new AggregateTaskProfileSampleImpl(name, 
+                            new AggregateTaskProfileSampleImpl(name, type,
                                                                maxSamples, 
                                                                minLevel);
                     break;
@@ -198,8 +270,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
     private abstract class AbstractProfileData {
         protected final String name;
         protected final ProfileLevel minLevel;
-        AbstractProfileData(String name, ProfileLevel minLevel) {
+        /* Type used for error checking in factory method */
+        private final ProfileDataType type;
+        AbstractProfileData(String name, ProfileDataType type, 
+                            ProfileLevel minLevel) 
+        {
             this.name = name;
+            this.type = type;
             this.minLevel = minLevel;
         }
 
@@ -209,6 +286,14 @@ class ProfileConsumerImpl implements ProfileConsumer {
 
         public String toString() {
             return name;
+        }
+        
+        ProfileLevel getMinLevel() {
+            return minLevel;
+        }
+        
+        ProfileDataType getType() {
+            return type;
         }
     }
     /**
@@ -220,8 +305,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements AggregateProfileOperation 
     {
         protected final AtomicLong count = new AtomicLong();
-        AggregateProfileOperationImpl(String opName, ProfileLevel minLevel) {
-            super(opName, minLevel);
+        AggregateProfileOperationImpl(String opName, ProfileDataType type,
+                                      ProfileLevel minLevel) {
+            super(opName, type, minLevel);
         }
 
         /** {@inheritDoc} */
@@ -249,8 +335,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             extends AbstractProfileData
             implements TaskProfileOperation
     {
-        TaskProfileOperationImpl(String opName, ProfileLevel minLevel) {
-            super(opName, minLevel);
+        TaskProfileOperationImpl(String opName, ProfileDataType type, 
+                                 ProfileLevel minLevel) {
+            super(opName, type, minLevel);
         }
         
         /** {@inheritDoc} */
@@ -277,10 +364,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements TaskProfileOperation
     {
         private final TaskProfileOperationImpl taskOperation;
-        AggregateTaskProfileOperationImpl(String opName, ProfileLevel minLevel) 
+        AggregateTaskProfileOperationImpl(String opName, ProfileDataType type, 
+                                          ProfileLevel minLevel) 
         {
-            super(opName, minLevel);
-            taskOperation = new TaskProfileOperationImpl(opName, minLevel);
+            super(opName, type, minLevel);
+            taskOperation = 
+                    new TaskProfileOperationImpl(opName, type, minLevel);
         }
         
         /** {@inheritDoc} */
@@ -299,8 +388,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements AggregateProfileCounter
     {
         private final AtomicLong count = new AtomicLong();
-        AggregateProfileCounterImpl(String name, ProfileLevel minLevel) {
-            super(name, minLevel);
+        AggregateProfileCounterImpl(String name, ProfileDataType type,
+                                    ProfileLevel minLevel) {
+            super(name, type, minLevel);
         }
         /** {@inheritDoc} */
         public void incrementCount() {
@@ -327,7 +417,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
         }
 
         /** {@inheritDoc} */
-        public void clearCounter() {
+        public void clearCount() {
             count.set(0);
         }
 
@@ -346,8 +436,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             extends AbstractProfileData 
             implements TaskProfileCounter
     {
-        TaskProfileCounterImpl(String name, ProfileLevel minLevel) {
-            super(name, minLevel);
+        TaskProfileCounterImpl(String name, ProfileDataType type, 
+                               ProfileLevel minLevel) {
+            super(name, type, minLevel);
         }
         public void incrementCount() {
             // If the minimum level we want to profile at is greater than
@@ -393,10 +484,11 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements TaskProfileCounter 
     {
         private final TaskProfileCounterImpl taskCounter;
-        AggregateTaskProfileCounterImpl(String opName, ProfileLevel minLevel) 
+        AggregateTaskProfileCounterImpl(String opName, ProfileDataType type,
+                                        ProfileLevel minLevel) 
         {
-            super(opName, minLevel);
-            taskCounter = new TaskProfileCounterImpl(opName, minLevel);
+            super(opName, type, minLevel);
+            taskCounter = new TaskProfileCounterImpl(opName, type, minLevel);
         }
         
         /** {@inheritDoc} */
@@ -417,8 +509,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             extends AbstractProfileData 
             implements TaskProfileSample
     {
-	TaskProfileSampleImpl(String name, ProfileLevel minLevel) {
-            super(name, minLevel);
+	TaskProfileSampleImpl(String name, ProfileDataType type, 
+                              ProfileLevel minLevel) {
+            super(name, type, minLevel);
         }
         public void addSample(long value) {
             // If the minimum level we want to profile at is greater than
@@ -460,10 +553,10 @@ class ProfileConsumerImpl implements ProfileConsumer {
         private final ExponentialAverage avgSampleValue = 
                 new ExponentialAverage();
         
-	AggregateProfileSampleImpl(String name, long maxSamples, 
-                                   ProfileLevel minLevel) 
+	AggregateProfileSampleImpl(String name, ProfileDataType type,
+                                   long maxSamples, ProfileLevel minLevel) 
         {
-            super(name, minLevel);
+            super(name, type, minLevel);
 	    this.maxSamples = maxSamples;
         }
 
@@ -552,11 +645,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements TaskProfileSample
     {
         private final TaskProfileSample taskSample;
-        AggregateTaskProfileSampleImpl(String name, long maxSamples, 
+        AggregateTaskProfileSampleImpl(String name, ProfileDataType type,
+                                       long maxSamples, 
                                        ProfileLevel minLevel) 
         {
-            super(name, maxSamples, minLevel);
-            taskSample = new TaskProfileSampleImpl(name, minLevel);
+            super(name, type, maxSamples, minLevel);
+            taskSample = new TaskProfileSampleImpl(name, type, minLevel);
         }
         
         /** {@inheritDoc} */

@@ -35,7 +35,7 @@ public interface ProfileSample {
     /**
      * Adds a new sample to the end of the current list of samples.
      *
-     * @param value the amount to increment the counter
+     * @param value the data sample to be added
      */
     void addSample(long value);
 }

@@ -86,9 +86,9 @@ public interface ProfileConsumer {
     }
     
     /**
-     * Creates the named operation in this consumer.  If an operation with
-     * this name has already been created by this consumer, it is returned, 
-     * regardless of the supplied {@code type} and {@code minLevel}. 
+     * Creates the named operation in this consumer.  If an operation has
+     * already been created by this consumer with the same {@code name},
+     * {@code type} and {@code minLevel}, it is returned.
      *
      * @param name the name of the operation
      * @param type the type of operation to create
@@ -96,15 +96,19 @@ public interface ProfileConsumer {
      *              this operation
      *
      * @return a {@code ProfileOperation} to note operations
+     * 
+     * @throws IllegalArgumentException if an operation has already been
+     *         created with this {@code name} but a different {@code type}
+     *         or {@code minLevel}
      */
     ProfileOperation createOperation(String name,  
                                      ProfileDataType type,
                                      ProfileLevel minLevel);
 
     /**
-     * Creates the named counter in this consumer.  If an operation with
-     * this name has already been created by this consumer, it is returned,
-     * regardless of the supplied {@code type} and {@code minLevel}.
+     * Creates the named counter in this consumer.  If a counter has
+     * already been created by this consumer with the same {@code name},
+     * {@code type} and {@code minLevel}, it is returned.
      *
      * @param name the name of the counter
      * @param type the type of operation to create
@@ -112,16 +116,19 @@ public interface ProfileConsumer {
      *              this counter
      *
      * @return a {@code ProfileCounter}
+     * 
+     * @throws IllegalArgumentException if a counter has already been
+     *         created with this {@code name} but a different {@code type}
+     *         or {@code minLevel}
      */
     ProfileCounter createCounter(String name, 
                                  ProfileDataType type,
                                  ProfileLevel minLevel);
 
     /**
-     * Creates the named sample collection in this consumer.  If a
-     * {@code ProfileSample} with this name has already been created by this
-     * consumer, it is returned, regardless of the supplied {@code type} and 
-     * {@code minLevel}.
+     * Creates the named sample collection in this consumer.  If a sample has
+     * already been created by this consumer with the same {@code name},
+     * {@code type} and {@code minLevel}, it is returned.
      * <p>
      *  A negative value for {@code maxSamples} indicates an infinite
      *  number of samples.  Note that for non-task-local sample
@@ -137,6 +144,10 @@ public interface ProfileConsumer {
      *              this sample  
      *
      * @return a {@code ProfileSample} that collects {@code long} data
+     * 
+     * @throws IllegalArgumentException if a sample collection  has already been
+     *         created with this {@code name} but a different {@code type}
+     *         or {@code minLevel}
      */
     ProfileSample createSample(String name, 
                                ProfileDataType type,

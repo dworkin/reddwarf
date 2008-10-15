@@ -35,5 +35,5 @@ public interface AggregateProfileCounter extends ProfileCounter {
     /**
      * Clear the counter, resetting it to {@code 0}.
      */
-    void clearCounter();
+    void clearCount();
 }
