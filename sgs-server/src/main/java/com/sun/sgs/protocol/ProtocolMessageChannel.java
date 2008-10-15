@@ -25,7 +25,7 @@ import java.nio.channels.Channel;
 
 /**
  * A channel for sending protocol messages to a client.  A {@code
- * ProtocolMessageChannel} is created by tge {@link
+ * ProtocolMessageChannel} is created by the {@link
  * ProtocolFactory#newChannel ProtocolFactory.newChannel} method.
  *
  * <p>Note: If the protocol specification (implemented by a given {@code
