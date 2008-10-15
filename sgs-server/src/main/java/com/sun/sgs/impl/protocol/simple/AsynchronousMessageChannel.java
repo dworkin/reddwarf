@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.session;
+package com.sun.sgs.impl.protocol.simple;
 
 import com.sun.sgs.impl.nio.DelegatingCompletionHandler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;

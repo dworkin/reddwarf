@@ -173,6 +173,8 @@ public class ClientSessionImpl
      */
     public ClientSession send(ByteBuffer message) {
 	try {
+	    // TBD: the max payload is protocol dependent, so how do we
+	    // obtain it here?
             if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
@@ -187,11 +189,9 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
-            buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
-               .put(message)
-               .flip();
-	    addEvent(new SendEvent(buf.array()));
+	    byte[] msgBytes = new byte[message.remaining()];
+	    message.get(msgBytes);
+	    addEvent(new SendEvent(msgBytes));
 
 	    return getWrappedClientSession();
 
@@ -727,8 +727,8 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.sendProtocolMessage(
-		sessionImpl, ByteBuffer.wrap(message), Delivery.RELIABLE);
+	    sessionImpl.sessionService.
+		addSessionMessage(sessionImpl, message);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -754,7 +754,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.disconnect(sessionImpl);
+	    sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

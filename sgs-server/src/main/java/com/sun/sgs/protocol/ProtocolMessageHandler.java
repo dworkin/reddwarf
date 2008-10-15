@@ -34,29 +34,27 @@ import java.nio.ByteBuffer;
  *
  * <p>TBD: should reconnection be handled a this layer or transparently by
  * the transport layer?
+ *
+ * <p>TBD: should a future be returned by the handler's methods instead of
+ * supplied to them?
  */
 public interface ProtocolMessageHandler {
 
     /**
-     * Processes a login request with the specified protocol {@code
-     * version}, {@code name}, and {@code password}.
+     * Processes a login request with the specified {@code name}, and {@code
+     * password}.
      *
      * <p>When this handler has completed processing the login request, it
      * must invoke the given {@code future}'s {@link CompletionFuture#done
      * done} method to notify the caller that the request has been
      * processed.
      *
-     * <p>TBD: Does protocol version belong at this layer?  Seems like it
-     * should be handled by the {@code ProtocolMessageChannel}.
-     *
-     * @param	version a protocol version
      * @param	name a user name
      * @param	password a password
      * @param	future a future to be notified when the request has been
      *		processed, or {@code null}
      */
-    void loginRequest(int version,  String name, String password,
-		      CompletionFuture future);
+    void loginRequest(String name, String password, CompletionFuture future);
 
     /**
      * Processes a message sent by the associated client.
@@ -103,10 +101,10 @@ public interface ProtocolMessageHandler {
     void logoutRequest(CompletionFuture future);
 
     /**
-     * Notifies this handler that the associated client is disconnected.
+     * Processes disconnection request.
      *
      * @param	future a future to be notified when the request has been
      *		processed, or {@code null}
      */
-    void disconnected(CompletionFuture future);
+    void disconnect(CompletionFuture future);
 }
