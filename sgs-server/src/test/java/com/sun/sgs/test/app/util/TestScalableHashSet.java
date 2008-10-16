@@ -25,12 +25,12 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ScalableHashSet;
 import com.sun.sgs.auth.Identity;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.HashSet;
@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import junit.framework.JUnit4TestAdapter;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -78,7 +77,7 @@ public class TestScalableHashSet extends Assert {
     /** Per-test setup */
     @Before public void setUp() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    set = new ScalableHashSet<Object>();
 		    one = new Int(1);
@@ -98,7 +97,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testConstructorNoArg() throws Exception {
 	txnScheduler.runTask(
-            new TestTask(new AbstractKernelRunnable() {
+            new TestTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     assertTrue(set.isEmpty());
                 }
@@ -109,7 +108,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testConstructorOneArg() throws Exception {
 	txnScheduler.runTask(
-            new TestTask(new AbstractKernelRunnable() {
+            new TestTask(new TestAbstractKernelRunnable() {
                 public void run() {
 		    try {
 			new ScalableHashSet(-1);
@@ -130,7 +129,7 @@ public class TestScalableHashSet extends Assert {
     @Test public void testCopyConstructor() throws Exception {
 	final Set<Integer> anotherSet = new HashSet<Integer>();
 	txnScheduler.runTask(
-            new TestTask(new AbstractKernelRunnable() {
+            new TestTask(new TestAbstractKernelRunnable() {
                 public void run() {
 		    try {
 			new ScalableHashSet<Object>(null);
@@ -145,7 +144,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-            new TestTask(new AbstractKernelRunnable() {
+            new TestTask(new TestAbstractKernelRunnable() {
                 public void run() {
 		    assertEquals(anotherSet, set);
 		}
@@ -154,13 +153,13 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testCopyConstructorObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    try {
@@ -171,7 +170,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    try {
 			new ScalableHashSet<Object>(set);
@@ -186,7 +185,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testAdd() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertTrue(set.add(1));
 		    assertFalse(set.add(1));
@@ -197,7 +196,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertTrue(set.contains(1));
 		    assertTrue(set.contains(null));
@@ -208,7 +207,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testAddObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    one = new Int(1);
@@ -217,7 +216,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertTrue(set.add(new Int(1)));
 		}
@@ -228,7 +227,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testClear() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(1);
 		    set.add(null);
@@ -239,7 +238,7 @@ public class TestScalableHashSet extends Assert {
 	    }), taskOwner);
 	DoneRemoving.await(1);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.clear();
 		    assertTrue(set.isEmpty());
@@ -250,13 +249,13 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testClearObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    DoneRemoving.init();
@@ -268,13 +267,13 @@ public class TestScalableHashSet extends Assert {
 	    }), taskOwner);
 	DoneRemoving.await(1);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.clear();
 		    assertTrue(set.isEmpty());
@@ -287,7 +286,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testContains() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.contains(1));
 		    assertFalse(set.contains(null));
@@ -302,20 +301,20 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testContainsObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    assertFalse(set.contains(one));
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.contains(one));
 		}
@@ -326,7 +325,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testIsEmpty() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertTrue(set.isEmpty());
 		    set.add(null);
@@ -343,20 +342,20 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testIsEmptyObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    assertFalse(set.isEmpty());
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.isEmpty());
 		}
@@ -368,7 +367,7 @@ public class TestScalableHashSet extends Assert {
     @SuppressWarnings("unchecked")
     @Test public void testIterator() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(null);
 		    set.add(1);
@@ -379,7 +378,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
@@ -398,7 +397,7 @@ public class TestScalableHashSet extends Assert {
     @SuppressWarnings("unchecked")
     @Test public void testIteratorCollectionNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		    Iterator<Object> iter = set.iterator();
@@ -407,7 +406,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    DoneRemoving.init();
 		    dataService.removeObject(set);
@@ -415,7 +414,7 @@ public class TestScalableHashSet extends Assert {
 	    }), taskOwner);
 	DoneRemoving.await(1);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
@@ -448,7 +447,7 @@ public class TestScalableHashSet extends Assert {
     @SuppressWarnings("unchecked")
     @Test public void testIteratorObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		    set.add(new Int(2));
@@ -458,13 +457,13 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
@@ -486,7 +485,7 @@ public class TestScalableHashSet extends Assert {
     @SuppressWarnings("unchecked")
     @Test public void testIteratorRemove() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Iterator<Object> iter = set.iterator();
 		    try {
@@ -507,7 +506,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    ManagedSerializable<Iterator<Object>> msIter =
 			uncheckedCast(dataService.getBinding("iter"));
@@ -527,7 +526,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Iterator<Object> iter = set.iterator();
 		    int count = 0;
@@ -544,7 +543,7 @@ public class TestScalableHashSet extends Assert {
     @Test public void testIteratorRetainAcrossTransactions() throws Exception {
 	final AtomicReference<Iterator<Object>> iterRef = new AtomicReference();
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		    Iterator<Object> iter = set.iterator();
@@ -554,7 +553,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Iterator<Object> iter = iterRef.get();
 		    try {
@@ -580,7 +579,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testRemove() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.remove(1));
 		    assertFalse(set.remove(null));
@@ -603,7 +602,7 @@ public class TestScalableHashSet extends Assert {
 	// store the set in the db
 
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.remove(1));
 		    assertFalse(set.remove(null));
@@ -617,7 +616,7 @@ public class TestScalableHashSet extends Assert {
 	// handling of the Marker flag.
 
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 
 		    ScalableHashSet deserialized = 
@@ -636,13 +635,13 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testRemoveObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    one = new Int(1);
@@ -650,7 +649,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.remove(one));
 		}
@@ -661,7 +660,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testSize() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertEquals(0, set.size());
 		    set.add(1);
@@ -680,20 +679,20 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testSizeObjectNotFound() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    assertEquals(1, set.size());
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertEquals(1, set.size());
 		}
@@ -704,7 +703,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testEquals() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Set<Object> control = new HashSet<Object>();
 		    assertTrue(set.equals(control));
@@ -724,14 +723,14 @@ public class TestScalableHashSet extends Assert {
 	final Set<Object> empty = new HashSet<Object>();
 	final Set<Object> containsOne = new HashSet<Object>();
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    containsOne.add(one);
 		    set.add(one);
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(one);
 		    assertFalse(set.equals(empty));
@@ -739,7 +738,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertFalse(set.equals(empty));
 		    assertFalse(set.equals(containsOne));
@@ -751,7 +750,7 @@ public class TestScalableHashSet extends Assert {
  
     @Test public void testRemoveAll() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    try {
 			set.removeAll(null);
@@ -778,7 +777,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testAddAll() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    try {
 			set.addAll(null);
@@ -805,7 +804,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testContainsAll() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    try {
 			set.containsAll(null);
@@ -831,7 +830,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testRetainAll() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    try {
 			set.retainAll(null);
@@ -855,7 +854,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testToArray() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertEquals(0, set.toArray().length);
 		    set.add(1);
@@ -873,7 +872,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testToString() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    assertEquals("[]", set.toString());
 		    set.add(1);
@@ -886,7 +885,7 @@ public class TestScalableHashSet extends Assert {
 
     @Test public void testRemoveObjectSet() throws Exception {
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    DoneRemoving.init();
 		    dataService.removeObject(set);
@@ -896,7 +895,7 @@ public class TestScalableHashSet extends Assert {
 	DoneRemoving.await(1);
 	int count = getObjectCount();
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    set = new ScalableHashSet<Object>();
 		    for (int i = 0; i < 50; i++) {
@@ -905,7 +904,7 @@ public class TestScalableHashSet extends Assert {
 		}
 	    }), taskOwner);
 	txnScheduler.runTask(
-	    new TestTask(new AbstractKernelRunnable() {
+	    new TestTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    dataService.removeObject(set);
 		    set = null;
@@ -953,9 +952,9 @@ public class TestScalableHashSet extends Assert {
 	}
     }
 
-    private class TestTask extends AbstractKernelRunnable {
-        private final AbstractKernelRunnable r;
-        TestTask(AbstractKernelRunnable r) { this.r = r; }
+    private class TestTask extends TestAbstractKernelRunnable {
+        private final TestAbstractKernelRunnable r;
+        TestTask(TestAbstractKernelRunnable r) { this.r = r; }
         public void run() throws Exception {
             startTransaction();
             r.run();
@@ -989,7 +988,7 @@ public class TestScalableHashSet extends Assert {
 	final AtomicBoolean done = new AtomicBoolean(false);
 	while (!done.get()) {
 	    txnScheduler.runTask(
-		new TestTask(new AbstractKernelRunnable() {
+		new TestTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			BigInteger last = lastRef.get();
 			int count;
@@ -1023,12 +1022,5 @@ public class TestScalableHashSet extends Assert {
 		System.err.println(id + ": " + e);
 	    }
 	}
-    }
-
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestScalableHashSet.class);
     }
 }

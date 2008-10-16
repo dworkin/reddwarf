@@ -251,11 +251,12 @@ public final class WatchdogServerImpl
 	/*
 	 * Check service version.
 	 */
-	transactionScheduler.runTask(new AbstractKernelRunnable() {
+	transactionScheduler.runTask(
+	    new AbstractKernelRunnable("CheckServiceVersion") {
 		public void run() {
 		    checkServiceVersion(
 			VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
-		}},  taskOwner);
+		} },  taskOwner);
 	
 	int requestedPort = wrappedProps.getIntProperty(
  	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
@@ -306,6 +307,13 @@ public final class WatchdogServerImpl
     /** Calls NodeImpl.markAllNodesFailed. */
     private class FailedNodesRunnable extends AbstractKernelRunnable {
 	Collection<NodeImpl> nodes;
+
+	/** Constructs an instance. */
+	FailedNodesRunnable() {
+	    super(null);
+	}
+
+	/** {@inheritDoc} */
 	public void run() {
 	    nodes = NodeImpl.markAllNodesFailed(dataService);
 	}
@@ -324,7 +332,7 @@ public final class WatchdogServerImpl
     
     /** {@inheritDoc} */
     protected void doReady() {
-        assert(!notifyClientsThread.isAlive());
+        assert !notifyClientsThread.isAlive();
         // Don't notify clients until other services have had a chance
         // to register themselves with the watchdog.
         notifyClientsThread.start();      
@@ -352,12 +360,13 @@ public final class WatchdogServerImpl
 	// of failure.
 	final Collection<NodeImpl> failedNodes = aliveNodes.values();
 	try {
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+	      new AbstractKernelRunnable("MarkAllNodesFailed") {
 		public void run() {
 		    for (NodeImpl node : failedNodes) {
 			node.setFailed(dataService, null);
 		    }
-		}}, taskOwner);
+		} }, taskOwner);
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.WARNING, e,
@@ -409,7 +418,7 @@ public final class WatchdogServerImpl
 		    "Exception occurred while obtaining node ID", e);
 	    }
 	    final NodeImpl node = new NodeImpl(nodeId, host, port, client);
-	    assert ! aliveNodes.containsKey(nodeId);
+	    assert !aliveNodes.containsKey(nodeId);
 	          
             synchronized (aliveNodeHostPortMap) {
                 Set<Long> ports = null;
@@ -430,10 +439,11 @@ public final class WatchdogServerImpl
             
 	    // Persist node
 	    try {
-		transactionScheduler.runTask(new AbstractKernelRunnable() {
+		transactionScheduler.runTask(
+		  new AbstractKernelRunnable("StoreNewNode") {
 		    public void run() {
 			node.putNode(dataService);
-		    }}, taskOwner);
+		    } }, taskOwner);
 	    } catch (Exception e) {
                 removeHostPortMapEntry(node);
 		throw new NodeRegistrationFailedException(
@@ -469,7 +479,7 @@ public final class WatchdogServerImpl
 
 	try {
 	    NodeImpl node = aliveNodes.get(nodeId);
-	    if (node == null || ! node.isAlive() || node.isExpired()) {
+	    if (node == null || !node.isAlive() || node.isExpired()) {
 		return false;
 	    }
 
@@ -497,10 +507,11 @@ public final class WatchdogServerImpl
 		// TBD: should the node be removed if the current
 		// backup ID for the node with the given node ID
 		// is not the given backup ID?
-		transactionScheduler.runTask(new AbstractKernelRunnable() {
+		transactionScheduler.runTask(
+		  new AbstractKernelRunnable("RemoveRecoveredNode") {
 		    public void run() {
 			NodeImpl.removeNode(dataService,  nodeId);
-		    }}, taskOwner);
+		    } }, taskOwner);
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
@@ -574,14 +585,14 @@ public final class WatchdogServerImpl
 
 	    Collection<NodeImpl> expiredNodes = new ArrayList<NodeImpl>();
 	    
-	    while (! shuttingDown()) {
+	    while (!shuttingDown()) {
 		/*
 		 * Determine which nodes have failed because they
 		 * haven't renewed before their expiration time.
 		 */
 		long now = System.currentTimeMillis();
 		synchronized (expirationSet) {
-		    while (! expirationSet.isEmpty()) {
+		    while (!expirationSet.isEmpty()) {
 			NodeImpl node = expirationSet.first();
 			if (node.getExpiration() > now) {
 			    break;
@@ -591,13 +602,13 @@ public final class WatchdogServerImpl
 		    }
 		}
 		
-		if (! expiredNodes.isEmpty()) {
+		if (!expiredNodes.isEmpty()) {
 		    /*
 		     * Remove failed nodes from map of "alive" nodes so
 		     * that a failed node won't be assigned as a backup.
                      * Also, clean up the host port map entry.
 		     */
-		    for (NodeImpl node: expiredNodes) {
+		    for (NodeImpl node : expiredNodes) {
 			aliveNodes.remove(node.getId());
                         removeHostPortMapEntry(node);
 		    }
@@ -623,9 +634,9 @@ public final class WatchdogServerImpl
 		 * node doesn't have a backup, assign it a backup if
 		 * an "alive" node is available to serve as one.
 		 */
-		if (! recoveringNodes.isEmpty()) {
+		if (!recoveringNodes.isEmpty()) {
 		    for (NodeImpl recoveringNode : recoveringNodes.values()) {
-			if (! recoveringNode.hasBackup()) {
+			if (!recoveringNode.hasBackup()) {
 			    NodeImpl backup = chooseBackup(recoveringNode);
 			    if (backup != null) {
 				assignBackup(recoveringNode, backup);
@@ -641,7 +652,7 @@ public final class WatchdogServerImpl
 		/*
 		 * Notify thread to send out node status change notifications.
 		 */
-		if (! statusChangedNodes.isEmpty()) {
+		if (!statusChangedNodes.isEmpty()) {
 		    synchronized (notifyClientsLock) {
 			notifyClientsLock.notifyAll();
 		    }
@@ -759,13 +770,14 @@ public final class WatchdogServerImpl
 	 */
 	private void assignBackup(final NodeImpl node, final NodeImpl backup) {
 	    try {
-		transactionScheduler.runTask(new AbstractKernelRunnable() {
+		transactionScheduler.runTask(
+		    new AbstractKernelRunnable("SetNodeFailed") {
 			public void run() {
 			    node.setFailed(dataService, backup);
 			    if (backup != null) {
 				backup.addPrimary(dataService, node.getId());
 			    }
-			}}, taskOwner);
+			} }, taskOwner);
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.SEVERE, e,

@@ -48,7 +48,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /*
- * TODO: Modify implementation to not accept calls before service is ready.
+ * TBD: Modify implementation to not accept calls before service is ready.
  * The server should not service incoming remote calls (registerNode, etc.)
  * until it receives the 'ready' invocation (or finishes construction
  * successfully).  Some of the fields used in registerNode aren't initialized
@@ -296,7 +296,7 @@ public final class WatchdogServiceImpl
             // -1 as a placeholder for the port number.
             if (isFullStack || 
                 (StandardService.ClientSessionService.ordinal() <=
-                    finalStandardService.ordinal()) ) {
+                    finalStandardService.ordinal())) {
                 appPort = wrappedProps.getRequiredIntProperty(
                     StandardProperties.APP_PORT, 1, 65535);
             } else {
@@ -306,11 +306,12 @@ public final class WatchdogServiceImpl
 	    /*
 	     * Check service version.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
 			checkServiceVersion(
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
-		    }},  taskOwner);
+		    } },  taskOwner);
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
@@ -361,7 +362,8 @@ public final class WatchdogServiceImpl
             
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, port:{1} localNodeId:{2}",
+			   "node registered, host:{0}, port:{1} " +
+			   "localNodeId:{2}",
 			   clientHost, appPort, localNodeId);
 	    }
 	    
@@ -427,11 +429,11 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
 	checkState();
-	if (getIsAlive() == false) {
+	if (!getIsAlive()) {
 	    return false;
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
-	    if (node == null || node.isAlive() == false) {
+	    if (node == null || !node.isAlive()) {
 		setFailedThenNotify(true);
 		return false;
 	    } else {
@@ -531,7 +533,7 @@ public final class WatchdogServiceImpl
 
 		boolean renewed = false;
 		try {
-		    if (! serverProxy.renewNode(localNodeId)) {
+		    if (!serverProxy.renewNode(localNodeId)) {
 			setFailedThenNotify(true);
 			break;
 		    }
@@ -605,7 +607,7 @@ public final class WatchdogServiceImpl
      */
     private void setFailedThenNotify(boolean notify) {
 	synchronized (lock) {
-	    if (! isAlive) {
+	    if (!isAlive) {
 		return;
 	    }
 	    isAlive = false;
@@ -634,9 +636,9 @@ public final class WatchdogServiceImpl
 	for (NodeListener listener : nodeListeners.keySet()) {
 	    final NodeListener nodeListener = listener;
 	    taskScheduler.scheduleTask(
-		new AbstractKernelRunnable() {
+		new AbstractKernelRunnable("NotifyNodeListeners") {
 		    public void run() {
-			if (! shuttingDown() &&
+			if (!shuttingDown() &&
                             isLocalNodeAliveNonTransactional()) 
 			{
 			    if (node.isAlive()) {
@@ -674,10 +676,10 @@ public final class WatchdogServiceImpl
 		new RecoveryCompleteFutureImpl(node, listener);
 	    futureQueue.add(future);
 	    taskScheduler.scheduleTask(
-		new AbstractKernelRunnable() {
+		new AbstractKernelRunnable("NotifyRecoveryListeners") {
 		    public void run() {
 			try {
-			    if (! shuttingDown() &&
+			    if (!shuttingDown() &&
 				isLocalNodeAliveNonTransactional())
 			    {
 				recoveryListener.recover(node, future);
@@ -702,7 +704,7 @@ public final class WatchdogServiceImpl
 
 	/** {@inheritDoc} */
 	public void nodeStatusChanges(
- 	    long[] ids, String hosts[], int[] ports, 
+ 	    long[] ids, String[] hosts, int[] ports, 
             boolean[] status, long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
@@ -719,7 +721,7 @@ public final class WatchdogServiceImpl
 		    new NodeImpl(ids[i], hosts[i], ports[i], 
                                  status[i], backups[i]);
 		notifyNodeListeners(node);
-		if (status[i] == false && backups[i] == localNodeId) {
+		if (!status[i] && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }
@@ -772,7 +774,8 @@ public final class WatchdogServiceImpl
 		if (recoveryFutures.remove(node) != null) {
 		    try {
 			if (isLocalNodeAliveNonTransactional()) {
-			    serverProxy.recoveredNode(node.getId(), localNodeId);
+			    serverProxy.recoveredNode(
+				node.getId(), localNodeId);
 			}
 		    } catch (Exception e) {
 			logger.logThrow(
@@ -785,7 +788,7 @@ public final class WatchdogServiceImpl
 	}
 
 	/** {@inheritDoc} */
-	synchronized public boolean isDone() {
+	public synchronized boolean isDone() {
 	    return isDone;
 	}
     }

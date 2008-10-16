@@ -154,12 +154,12 @@ class ClientSessionHandler {
 	}
 
 	/*
-	 * TODO: It might be a good idea to implement high- and low-water marks
+	 * TBD: It might be a good idea to implement high- and low-water marks
 	 * for the buffers, so they don't go into hysteresis when they get
 	 * full. -JM
 	 */
 
-        readHandler.read();
+	scheduleReadOnReadHandler();
     }
 
     /* -- Instance methods -- */
@@ -211,6 +211,16 @@ class ClientSessionHandler {
 	    }
 	    messageQueue.clear();
 	}
+    }
+
+    /**
+     * Returns {@code true} if the login for this session has been handled,
+     * otherwise returns {@code false}.
+     *
+     * @return	{@code true} if the login for this session has been handled
+     */
+    boolean loginHandled() {
+	return getCurrentState() != State.CONNECTED;
     }
 
     /**
@@ -317,17 +327,18 @@ class ClientSessionHandler {
 	    // also happen even though 'notifyLoggedIn' was not invoked.
 	    // Are these behaviors okay?  -- ann (3/19/07)
 	    final Identity thisIdentity = identity;
-	    scheduleTask(new AbstractKernelRunnable() {
+	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
-		    }});
-
-	    deactivateIdentity(identity);
+		    } });
+	    if (sessionService.removeUserLogin(identity, this)) {
+		deactivateIdentity(identity);
+	    }
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
-		assert closeConnection == false;
+		assert !closeConnection;
 	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
 		// Bypass sendProtocolMessage method which prevents sending
 		// messages to disconnecting sessions.
@@ -345,11 +356,12 @@ class ClientSessionHandler {
         writeHandler = new ClosedWriteHandler();
 
 	if (sessionRefId != null) {
-	    scheduleTask(new AbstractKernelRunnable() {
-		public void run() {
+	    scheduleTask(
+	      new AbstractKernelRunnable("NotifyListenerAndRemoveSession") {
+	        public void run() {
 		    ClientSessionImpl sessionImpl = 
 			ClientSessionImpl.getSession(dataService, sessionRefId);
-		    sessionImpl. notifyListenerAndRemoveSession(
+		    sessionImpl.notifyListenerAndRemoveSession(
 			dataService, graceful, true);
 		}
 	    });
@@ -376,13 +388,15 @@ class ClientSessionHandler {
 	final boolean graceful, final boolean closeConnection)
     {
         synchronized (lock) {
-            if (state != State.DISCONNECTED)
+            if (state != State.DISCONNECTED) {
                 state = State.DISCONNECTING;
+	    }
         }
-	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+	scheduleNonTransactionalTask(
+	  new AbstractKernelRunnable("HandleDisconnect") {
 	    public void run() {
 		handleDisconnect(graceful, closeConnection);
-	    }});
+	    } });
     }
 
     /**
@@ -408,7 +422,7 @@ class ClientSessionHandler {
      */
     void shutdown() {
 	synchronized (lock) {
-	    if (shutdown == true) {
+	    if (shutdown) {
 		return;
 	    }
 	    shutdown = true;
@@ -543,7 +557,7 @@ class ClientSessionHandler {
                 processQueue();
             } catch (ExecutionException e) {
                 /*
-		 * TODO: If we're expecting the session to close, don't
+		 * TBD: If we're expecting the session to close, don't
                  * complain.
 		 */
                 if (logger.isLoggable(Level.FINE)) {
@@ -599,8 +613,9 @@ class ClientSessionHandler {
         @Override
         void read() {
             synchronized (readLock) {
-                if (isReading)
+                if (isReading) {
                     throw new ReadPendingException();
+		}
                 isReading = true;
             }
             sessionConnection.read(this);
@@ -634,7 +649,7 @@ class ClientSessionHandler {
             } catch (Exception e) {
 
                 /*
-		 * TODO: If we're expecting the channel to close, don't
+		 * TBD: If we're expecting the channel to close, don't
                  * complain.
 		 */
 
@@ -662,7 +677,7 @@ class ClientSessionHandler {
 	    
 	    switch (opcode) {
 		
-	    case SimpleSgsProtocol.LOGIN_REQUEST: {
+	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
 	        byte version = msg.getByte();
 	        if (version != SimpleSgsProtocol.VERSION) {
@@ -675,18 +690,21 @@ class ClientSessionHandler {
 	            break;
 	        }
 
-		String name = msg.getString();
-		String password = msg.getString();
-		handleLoginRequest(name, password);
+		final String name = msg.getString();
+		final String password = msg.getString();
+		scheduleNonTransactionalTask(
+		    new AbstractKernelRunnable("HandleLoginRequest") {
+			public void run() {
+			    handleLoginRequest(name, password);
+			} });
 
                 // Resume reading immediately
 		read();
 
 		break;
-	    }
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		if (! loggedIn) {
+		if (!loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
 			"session message received before login completed:{0}",
@@ -695,20 +713,23 @@ class ClientSessionHandler {
 		}
 		final ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("NotifyListenerMessageReceived") {
 		    public void run() {
 			ClientSessionImpl sessionImpl =
 			    ClientSessionImpl.getSession(
 				dataService, sessionRefId);
 			if (sessionImpl != null) {
 			    if (isConnected()) {
-				sessionImpl.getClientSessionListener(dataService).
-				    receivedMessage(clientMessage.asReadOnlyBuffer());
+				sessionImpl.
+				    getClientSessionListener(dataService).
+				        receivedMessage(clientMessage.
+						            asReadOnlyBuffer());
 			    }
 			} else {
 			    scheduleHandleDisconnect(false, true);
 			}
-		    }}, identity);
+		    } }, identity);
 
 		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
@@ -716,7 +737,7 @@ class ClientSessionHandler {
 		break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-		if (! loggedIn) {
+		if (!loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
 			"channel message received before login completed:{0}",
@@ -727,7 +748,8 @@ class ClientSessionHandler {
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
 		final ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("HandleChannelMessage") {
 		    public void run() {
 			ClientSessionImpl sessionImpl =
 			    ClientSessionImpl.getSession(
@@ -743,7 +765,7 @@ class ClientSessionHandler {
 			} else {
 			    scheduleHandleDisconnect(false, true);
 			}
-		    }}, identity);
+		    } }, identity);
 
 		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
@@ -837,8 +859,15 @@ class ClientSessionHandler {
 		 * "addHandler", and schedule a task to perform client
 		 * login (call the AppListener.loggedIn method).
 		 */
-		taskQueue = sessionService.createTaskQueue();
+		if (!sessionService.validateUserLogin(
+			authenticatedIdentity, ClientSessionHandler.this))
+		{
+		    // This login request is not allowed to proceed.
+		    sendLoginFailureAndDisconnect();
+		    return;
+		}
 		identity = authenticatedIdentity;
+		taskQueue = sessionService.createTaskQueue();
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();
 		try {
@@ -869,12 +898,13 @@ class ClientSessionHandler {
 		    getLoginRedirectMessage(node.getHostName(), node.getPort());
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
-		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+		scheduleNonTransactionalTask(
+		  new AbstractKernelRunnable("SendLoginRedirectMessage") {
 		    public void run() {
 			sendLoginProtocolMessage(
  			    loginRedirectMessage, Delivery.RELIABLE, false);
 			handleDisconnect(false, false);
-		    }});
+		    } });
 	    }
 	}
 
@@ -885,30 +915,42 @@ class ClientSessionHandler {
 	private void sendLoginFailureAndDisconnect() {
 	    // TBD: identity may be null. Fix to pass a non-null identity
 	    // when scheduling the task.
-	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+	    scheduleNonTransactionalTask(
+	      new AbstractKernelRunnable("SendLoginFailureMessage") {
 		public void run() {
 		    sendLoginProtocolMessage(
  			loginFailureMessage, Delivery.RELIABLE, false);
 		    handleDisconnect(false, false);
-		}});
+		} });
 	}
     }
 
     /**
-     * Schedule a task to resume reading.  Use this method to delay reading
+     * Schedules a task to resume reading.  Use this method to delay reading
      * until a task resulting from an earlier read request has been completed.
      */
     void enqueueReadResume() {
-        taskQueue.addTask(new AbstractKernelRunnable() {
-            public void run() {
-                logger.log(Level.FINER, "resuming reads session:{0}", this);
-                if (isConnected()) {
-                    readHandler.read();
-                }
-            }
-	}, identity);
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("ScheduleReadOnReadHandler") {
+		public void run() {
+		    scheduleReadOnReadHandler();
+		} }, identity);
     }
 
+    /**
+     * Schedules an asynchronous task to resume reading.
+     */
+    private void scheduleReadOnReadHandler() {
+	scheduleNonTransactionalTask(
+	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
+		public void run() {
+		    logger.log(Level.FINER, "resuming reads session:{0}", this);
+		    if (isConnected()) {
+			readHandler.read();
+		    }
+		} });
+    }
+    
     /* -- other private methods and classes -- */
 
     /**
@@ -978,6 +1020,7 @@ class ClientSessionHandler {
 	private volatile Node node = null;
 
 	GetNodeTask(Identity authenticatedIdentity) {
+	    super(null);
 	    this.authenticatedIdentity = authenticatedIdentity;
 	}
 
@@ -995,7 +1038,13 @@ class ClientSessionHandler {
      * Constructs the ClientSession.
      */
     private class CreateClientSessionTask extends AbstractKernelRunnable {
-	
+
+	/** Constructs and instance. */
+	CreateClientSessionTask() {
+	    super(null);
+	}
+
+	/** {@inheritDoc} */
 	public void run() {
 	    ClientSessionImpl sessionImpl =
 		new ClientSessionImpl(sessionService, identity);
@@ -1008,7 +1057,12 @@ class ClientSessionHandler {
      * {@code AppListener} that this session has logged in.
      */
     private class LoginTask extends AbstractKernelRunnable {
-
+	
+	/** Constructs an instance. */
+	LoginTask() {
+	    super(null);
+	}
+	
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}
 	 * callback, which returns a client session listener.  If the
@@ -1071,7 +1125,7 @@ class ClientSessionHandler {
 		
 		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("NotifyLoggedIn") {
 			public void run() {
 			    logger.log(
 			        Level.FINE,
@@ -1081,7 +1135,7 @@ class ClientSessionHandler {
 			    // whether or not this session is connected at
 			    // the time of notification.
 			    thisIdentity.notifyLoggedIn();
-			}});
+			} });
 		
 	    } else {
 		if (ex == null) {
@@ -1089,7 +1143,7 @@ class ClientSessionHandler {
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
-		} else if (! isRetryableException(ex)) {
+		} else if (!isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +

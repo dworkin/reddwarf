@@ -32,8 +32,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
-
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 
@@ -47,6 +45,7 @@ import com.sun.sgs.test.impl.service.task.TestTaskServiceImpl.Counter;
 import com.sun.sgs.test.impl.service.task.TestTaskServiceImpl.ManagedHandle;
 
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.UtilProperties;
 
 import java.io.File;
@@ -130,7 +129,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     dataServiceZero.setBinding("counter", new Counter());
                 }
@@ -152,7 +151,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         long expectedNode = additionalNodes[0].getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskServiceZero.scheduleTask(new TestTask());
@@ -170,7 +169,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         long expectedNode = additionalNodes[0].getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskServiceZero.scheduleTask(new TestTask(), 100L);
@@ -188,7 +187,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskServiceZero.scheduleTask(new TestTask(), 100L);
@@ -209,7 +208,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         long expectedNode = serverNode.getNodeId();
         DummyNodeMappingService.assignIdentity(getClass(), id, expectedNode);
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskServiceZero.schedulePeriodicTask(new TestTask(), 0L,
@@ -234,7 +233,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskServiceZero.schedulePeriodicTask(new TestTask(), 100L,
@@ -256,7 +255,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         DummyNodeMappingService.assignIdentity(getClass(), id,
                                                serverNode.getNodeId());
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     PeriodicTaskHandle h =
@@ -268,7 +267,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
         try {
             txnSchedulerOne.runTask(
-                new AbstractKernelRunnable() {
+                new TestAbstractKernelRunnable() {
                     public void run() {
                         ((ManagedHandle)
                              dataServiceOne.getBinding("handle")).cancel();
@@ -289,7 +288,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
                                                serverNode.getNodeId());
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     taskServiceZero.scheduleTask(new TestTask(), 300L);
@@ -303,7 +302,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         assertEquals(DummyNodeMappingService.getActiveCount(id), 1);
 
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     for (int i = 0; i < 5; i++)
@@ -388,7 +387,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         throws Exception
     {
         txnSchedulerZero.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() {
                     assertCounterClear(message);
                 }

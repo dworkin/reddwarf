@@ -239,7 +239,8 @@ public final class NodeMappingServerImpl
         /*
          * Check service version.
          */
-        transactionScheduler.runTask(new AbstractKernelRunnable() {
+        transactionScheduler.runTask(
+	    new AbstractKernelRunnable("CheckServiceVersion") {
                 public void run() {
                     checkServiceVersion(
                         NodeMapUtil.VERSION_KEY, 
@@ -384,6 +385,7 @@ public final class NodeMappingServerImpl
         /** return value, node assignment */
         private Node node;
         CheckTask(Identity id, String serviceName) {
+	    super(null);
             idkey = NodeMapUtil.getIdentityKey(id);
             this.serviceName = serviceName;
             this.id = id;
@@ -527,6 +529,7 @@ public final class NodeMappingServerImpl
         private Node node;
         
         RemoveTask(Identity id) {
+	    super(null);
             this.id = id;
             idkey = NodeMapUtil.getIdentityKey(id);
             statuskey = NodeMapUtil.getPartialStatusKey(id);
@@ -726,7 +729,7 @@ public final class NodeMappingServerImpl
         final IdentityMO newidmo = new IdentityMO(id, newNodeId);
         
         try {
-            runTransactionally(new AbstractKernelRunnable() {
+            runTransactionally(new AbstractKernelRunnable("MoveIdentity") {
                 public void run() {                   
                     // First, we clean up any old mappings.
                     if (oldNode != null) {
@@ -810,6 +813,7 @@ public final class NodeMappingServerImpl
         private final long nodeId;
                             
         GetNodeTask(long nodeId) {
+	    super(null);
             this.nodeId = nodeId; 
         }               
                     
@@ -919,6 +923,7 @@ public final class NodeMappingServerImpl
         GetIdOnNodeTask(DataService dataService, 
                         String nodekey, LoggerWrapper logger) 
         {
+	    super(null);
             this.dataService = dataService;
             this.nodekey = nodekey;
             this.logger = logger;
@@ -1017,6 +1022,7 @@ public final class NodeMappingServerImpl
          * @param idkey Identitifier key
          */
         GetIdTask(DataService dataService, String idkey) {
+	    super(null);
             this.dataService = dataService;
             this.idkey = idkey;
         }
@@ -1074,6 +1080,7 @@ public final class NodeMappingServerImpl
         private Set<String> foundKeys = new HashSet<String>();
 
         AssertTask(Identity id, DataService dataService) {
+	    super(null);
             this.id = id;
             this.dataService = dataService;
             idkey = NodeMapUtil.getIdentityKey(id);

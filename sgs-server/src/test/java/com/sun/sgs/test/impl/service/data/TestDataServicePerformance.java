@@ -20,14 +20,15 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -154,19 +155,84 @@ public class TestDataServicePerformance extends TestCase {
         TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
         Identity taskOwner = serverNode.getProxy().getCurrentOwner();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("counters", new Counters(items));
                 }}, taskOwner);
         for (int r = 0; r < repeat; r++) {
             long start = System.currentTimeMillis();
             for (int c = 0; c < count; c++) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             Counters counters =
                                 (Counters) service.getBinding("counters");
                             for (int i = 0; i < items; i++) {
                                 counters.get(i);
+                            }
+                        }}, taskOwner);
+            }
+            long stop = System.currentTimeMillis();
+            System.err.println(
+                "Time: " + (stop - start) / (float) count +
+                " ms per transaction");
+        }
+    }
+
+    public void testReadForUpdate() throws Exception {
+	Properties props = getNodeProps();
+	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+	serverNode = new SgsTestNode("TestDataServicePerformance", null, props);
+	final DataService service = serverNode.getDataService();
+        TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        Identity taskOwner = serverNode.getProxy().getCurrentOwner();
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() {
+                    service.setBinding("counters", new Counters(items));
+                }}, taskOwner);
+        for (int r = 0; r < repeat; r++) {
+            long start = System.currentTimeMillis();
+            for (int c = 0; c < count; c++) {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                        public void run() throws Exception {
+                            Counters counters =
+                                (Counters) service.getBinding("counters");
+                            for (int i = 0; i < items; i++) {
+                                counters.getForUpdate(i);
+                            }
+                        }}, taskOwner);
+            }
+            long stop = System.currentTimeMillis();
+            System.err.println(
+                "Time: " + (stop - start) / (float) count +
+                " ms per transaction");
+        }
+    }
+
+    public void testMarkForUpdate() throws Exception {
+	Properties props = getNodeProps();
+	props.setProperty("com.sun.sgs.txn.timeout", "10000");
+	serverNode = new SgsTestNode("TestDataServicePerformance", null, props);
+	final DataService service = serverNode.getDataService();
+        TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
+            getComponent(TransactionScheduler.class);
+        Identity taskOwner = serverNode.getProxy().getCurrentOwner();
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() {
+                    service.setBinding("counters", new Counters(items));
+                }}, taskOwner);
+        for (int r = 0; r < repeat; r++) {
+            long start = System.currentTimeMillis();
+            for (int c = 0; c < count; c++) {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                        public void run() throws Exception {
+                            Counters counters =
+                                (Counters) service.getBinding("counters");
+			    DataManager dataManager =
+				AppContext.getDataManager();
+                            for (int i = 0; i < items; i++) {
+                                Counter counter = counters.get(i);
+				dataManager.markForUpdate(counter);
                             }
                         }}, taskOwner);
             }
@@ -204,14 +270,14 @@ public class TestDataServicePerformance extends TestCase {
         TransactionScheduler txnScheduler = serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);
         Identity taskOwner = serverNode.getProxy().getCurrentOwner();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("counters", new Counters(items));
                 }}, taskOwner);
         for (int r = 0; r < repeat; r++) {
             long start = System.currentTimeMillis();
             for (int c = 0; c < count; c++) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             Counters counters =
                                 (Counters) service.getBinding("counters");
@@ -264,6 +330,9 @@ public class TestDataServicePerformance extends TestCase {
 	}
 	Counter get(int i) {
 	    return counters.get(i).get();
+	}
+	Counter getForUpdate(int i) {
+	    return counters.get(i).getForUpdate();
 	}
     }
 
