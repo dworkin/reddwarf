@@ -20,6 +20,7 @@
 package com.sun.sgs.system;
 
 import java.net.URL;
+import java.io.File;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,17 +35,17 @@ public class Boot {
         //load properties from configuration file
         Properties properties = new SubstitutionProperties();
         try {
-            URL sgs_boot = ClassLoader.getSystemClassLoader().
+            URL sgsBoot = ClassLoader.getSystemClassLoader().
                     getResource(BootEnvironment.SGS_BOOT);
-            properties.load(sgs_boot.openStream());
+            properties.load(sgsBoot.openStream());
         } catch(Exception e) {
             logger.log(Level.SEVERE, "Unable to load initial configuration", e);
             System.exit(1);
         }
         
         //determine SGS_HOME
-        String sgs_home = properties.getProperty(BootEnvironment.SGS_HOME);
-        if(sgs_home == null) {
+        String sgsHome = properties.getProperty(BootEnvironment.SGS_HOME);
+        if(sgsHome == null) {
             URL jarLocation = Boot.class.getProtectionDomain().getCodeSource().getLocation();
             String jarPath = jarLocation.getPath();
             int jarFileIndex = jarPath.indexOf(BootEnvironment.SGS_JAR);
@@ -53,11 +54,11 @@ public class Boot {
                 System.exit(1);
             }
             else {
-                sgs_home = jarPath.substring(0, jarFileIndex - 1);
-                properties.setProperty(BootEnvironment.SGS_HOME, sgs_home);
+                sgsHome = jarPath.substring(0, jarFileIndex - 1);
+                properties.setProperty(BootEnvironment.SGS_HOME, sgsHome);
             }
         }
-        logger.log(Level.CONFIG, "SGS_HOME set to "+sgs_home);
+        logger.log(Level.CONFIG, "SGS_HOME set to "+sgsHome);
         
         //load defaults for any missing properties
         if(properties.getProperty(BootEnvironment.SGS_DEPLOY) == null) {
@@ -106,7 +107,60 @@ public class Boot {
         }
         
         
-        System.out.println(properties);
+        String classpath = bootClassPath(properties);
+        System.out.println(classpath);
+    }
+    
+    /**
+     * Constructs a classpath to be used when running the Project Darkstar
+     * kernel.  The classpath consists of any jar files that live directly
+     * in subdirectories of the $SGS_HOME directory from the environment
+     * (with the exception of the $SGS_HOME/sgs-server directory).
+     * It also contains any jar files in the $SGS_HOME/sgs-server/lib
+     * directory.
+     * 
+     * @param env environment with SGS_HOME set
+     * @return classpath to use to run the kernel
+     */
+    private static String bootClassPath(Properties env) {
+        //determine SGS_HOME
+        String sgsHome = env.getProperty(BootEnvironment.SGS_HOME);
+        if(sgsHome == null)
+            return "";
+        
+        //locate SGS_HOME directory
+        File sgsHomeDir = new File(sgsHome);
+        if(!sgsHomeDir.isDirectory())
+            return "";
+        
+        //build classpath from SGS_HOME subdirectories
+        StringBuffer buf = new StringBuffer();
+        for(File f : sgsHomeDir.listFiles()) {
+            if(f.isDirectory() && !f.getName().equals("sgs-server")) {
+                for(File jar : f.listFiles()) {
+                    if(jar.getName().endsWith(".jar")) {
+                        if(buf.length() != 0)
+                            buf.append(File.pathSeparator + jar.getAbsolutePath());
+                        else
+                            buf.append(jar.getAbsolutePath());
+                    }
+                }
+            }
+        }
+        
+        //add jars from SGS_HOME/sgs-server
+        File sgsLibDir = new File(sgsHome + File.separator + 
+                                  "sgs-server" + File.separator + "lib");
+        for (File sgsJar : sgsLibDir.listFiles()) {
+            if(sgsJar.isFile() && sgsJar.getName().endsWith(".jar")) {
+                if(buf.length() != 0)
+                    buf.append(File.pathSeparator + sgsJar.getAbsolutePath());
+                else
+                    buf.append(sgsJar.getAbsolutePath());
+            }
+        }
+        
+        return buf.toString();
     }
     
 }
