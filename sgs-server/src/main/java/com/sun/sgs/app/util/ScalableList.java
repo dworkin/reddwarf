@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
 import com.sun.sgs.app.AppContext;
@@ -557,6 +558,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * 
      * @param index the index of the element to be removed
      * @return the element previously at the specified position
+     * @throws IndexOutOfBoundsException if the index is out of bounds
      */
     public E remove(int index) {
 	isNotNegative(index);
@@ -579,7 +581,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * @return {@code true} if this list changed as a result of the call
      */
     public boolean retainAll(Collection<?> c) {
-	Iterator<E> iter = new ScalableListIterator<E>(getHead());
+	Iterator<E> iter = new ScalableIterator<E>(this);
 	ArrayList<E> newList = new ArrayList<E>();
 
 	// For each element in the overall list,
@@ -661,7 +663,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * @return the head {@code ListNode} if it exists
      * @throws ObjectNotFoundException if no reference exists
      */
-    private ListNode<E> getHead() {
+    ListNode<E> getHead() {
 	return headRef.get().getRefAsListNode();
     }
 
@@ -671,7 +673,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * @return the tail {@code ListNode} if it exists
      * @throws ObjectNotFoundException if there is no reference
      */
-    private ListNode<E> getTail() {
+    ListNode<E> getTail() {
 	return tailRef.get().getRefAsListNode();
     }
 
@@ -811,8 +813,27 @@ public class ScalableList<E> extends AbstractList<E> implements
      * @return an {@code Iterator} over the elements in the list
      */
     public Iterator<E> iterator() {
-	ListNode<E> ln = getHead();
-	return new ScalableListIterator<E>(ln);
+	return new ScalableIterator<E>(this);
+    }
+
+    /**
+     * Returns a {@code ListIterator} over the elements in this list in proper
+     * sequence.
+     * 
+     * @return a {@code ListIterator} over the elements in the list
+     */
+    public ListIterator<E> listIterator() {
+	return new ScalableListIterator<E>(this);
+    }
+
+    /**
+     * Returns a {@code ListIterator} over the elements in this list, starting
+     * from the element at the given index.
+     * 
+     * @return a {@code ListIterator} over the elements in the list
+     */
+    public ListIterator<E> listIterator(int index) {
+	return new ScalableListIterator<E>(this, getNode(index));
     }
 
     /**
@@ -895,6 +916,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * entry
      * @return the {@code SearchResult} which contains the element at the
      * specified {@code index}
+     * @throws IndexOutOfBoundsException if the index is out of bounds
      */
     private SearchResult<E> getNode(int index) {
 	// Recursive method to eventually return ListNode<E>
@@ -1882,6 +1904,12 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	private ListNode<E> next;
 
+	/**
+	 * The previous position of the iterator. This is initialized as the
+	 * head element provided in the constructor
+	 */
+	private ListNode<E> prev;
+
 	private static final long serialVersionUID = 7L;
 
 	/**
@@ -1890,6 +1918,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param head the head {@code ListNode} from which to begin iterating
 	 */
 	ScalableListNodeIterator(ListNode<E> head) {
+	    prev = null;
 	    current = null;
 	    next = head;
 	}
@@ -1916,6 +1945,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		throw new NoSuchElementException("There is no next element");
 	    }
 
+	    prev = current;
 	    current = next;
 	    if (next != null) {
 		next = next.next();
@@ -1924,8 +1954,39 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * @deprecated this operation is not supported. Removal of elements
-	 * should be performed using the {@code ScalableList} API.
+	 * Determines if there is a next element to iterate over; that is, if
+	 * the next {@code ListNode} is not null.
+	 * 
+	 * @return {@code true} if the next element is not null, and
+	 * {@code false} otherwise
+	 */
+	public boolean hasPrev() {
+	    return (prev != null);
+	}
+
+	/**
+	 * Returns the previous {@code ListNode<E>} in order from the list
+	 * 
+	 * @return the previous {@code ListNode}
+	 * @throws NoSuchElementException if there exists no previous sibling
+	 */
+	public ListNode<E> prev() {
+	    if (current == null && prev == null) {
+		throw new NoSuchElementException("There is no prev element");
+	    }
+
+	    next = current;
+	    current = prev;
+	    if (prev != null) {
+		prev = prev.prev();
+	    }
+	    return current;
+	}
+
+	/**
+	 * @deprecated this operation is not supported because the
+	 * {@code ScalableList} only removes elements explicitly, not
+	 * {@code ListNodes}.
 	 * @throws UnsupportedOperationException the operation is not
 	 * supported
 	 */
@@ -1940,32 +2001,51 @@ public class ScalableList<E> extends AbstractList<E> implements
      * 
      * @param <E> the type of element stored in the {@code ScalableList}
      */
-    static class ScalableListIterator<E> implements Serializable, Iterator<E> {
+    static class ScalableIterator<E> implements Serializable, Iterator<E> {
+
+	/**
+	 * A reference to the {@code ScalableList} which this iterator is
+	 * referring to
+	 */
+	final ScalableList<E> owner;
 
 	/**
 	 * The current {@code ListNode} of the iterative process
 	 */
-	private ListNode<E> currentNode;
+	protected ListNode<E> currentNode;
 
 	/**
-	 * The iterator responsible for iterating through the
-	 * {@code ListNodes}
+	 * The index of the current element being examined
 	 */
-	private ScalableListNodeIterator<E> listNodeIter;
+	protected int currentElementIndex;
 
 	/**
-	 * The iterator responsible for iterating through the stored elements
-	 * of the {@code ScalableList}
+	 * Flag which only lets one removal happen per call to {@code next()}
 	 */
-	private transient Iterator<ManagedReference<ManagedObject>> iter;
+	protected boolean wasNextCalled;
 
 	/**
 	 * The value for the current {@code ListNode} to determine if any
 	 * changes have taken place since the last time it was accessed
 	 */
-	private long listNodeReferenceValue = -1;
+	protected long listNodeReferenceValue = -1;
 
 	private static final long serialVersionUID = 8L;
+
+	/**
+	 * Performs a check to see that the index for {@code next()} is still
+	 * within range of the sub list.
+	 * 
+	 * @param <E> the type of element stored
+	 * @param offset the offset
+	 * @param currentListNode the current {@code ListNode} being examined
+	 * @return {@code true} if the offset exists in the sub list and
+	 * {@code false} otherwise
+	 */
+	static <E> boolean isNextWithinRange(int offset,
+		ListNode<E> currentListNode) {
+	    return (offset + 1 < currentListNode.size());
+	}
 
 	/**
 	 * Constructor used to create a {@code ScalableListIterator} for the
@@ -1973,29 +2053,20 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * 
 	 * @param head the head {@code ListNode} of the collection
 	 */
-	ScalableListIterator(ListNode<E> head) {
-	    listNodeIter = new ScalableListNodeIterator<E>(head);
+	ScalableIterator(ScalableList<E> list) {
+	    owner = list;
+	    currentNode = list.getHead();
+	    currentElementIndex = -1;
+	    listNodeReferenceValue = currentNode.getDataIntegrityValue();
+	    wasNextCalled = false;
+	}
 
-	    // Prepare by getting first ListNode
-	    if (listNodeIter.hasNext()) {
-		currentNode = listNodeIter.next();
-		listNodeReferenceValue = currentNode.getDataIntegrityValue();
-	    } else {
-		currentNode = null;
-	    }
-
-	    // Do a last check to make sure we are getting non-null values.
-	    // If the value is null, then return an empty iterator.
-	    if (currentNode == null || currentNode.getSubList() == null) {
-		iter =
-			(new ArrayList<ManagedReference<ManagedObject>>())
-				.iterator();
-		return;
-	    }
-
-	    // Set up the ListIterator, but do not populate
-	    // current until hasNext() has been called.
-	    iter = currentNode.getSubList().getElements().iterator();
+	ScalableIterator(ScalableList<E> list, ListNode<E> startingNode) {
+	    owner = list;
+	    currentNode = startingNode;
+	    currentElementIndex = -1;
+	    listNodeReferenceValue = currentNode.getDataIntegrityValue();
+	    wasNextCalled = false;
 	}
 
 	/**
@@ -2008,19 +2079,29 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @return the next element
 	 */
 	public E next() {
+	    ArrayList<ManagedReference<ManagedObject>> elements =
+		    currentNode.getSubList().getElements();
 
 	    // Check the integrity of the ListNode to see if
 	    // any changes were made since we last operated.
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
 
-	    // Retrieve the value from the list; we may have to load
+	    // Retrieve the next value from the list; we may have to load
 	    // up a new ListNode
-	    if (!iter.hasNext() && loadNextListNode()) {
-		next();
+	    if (!isNextWithinRange(currentElementIndex, currentNode)) {
+		if (loadNextListNode()) {
+		    next();
+		} else {
+		    throw new NoSuchElementException(
+			    "There is no next element");
+		}
 	    }
 
-	    ManagedReference<E> ref = uncheckedCast(iter.next());
+	    ManagedReference<E> ref =
+		    uncheckedCast(elements.get(++currentElementIndex));
+	    wasNextCalled = true;
+
 	    Object obj = ref.get();
 
 	    // In case we wrapped the item with an
@@ -2040,9 +2121,10 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@code false} otherwise
 	 */
 	private boolean loadNextListNode() {
-	    if (listNodeIter.hasNext()) {
-		currentNode = listNodeIter.next();
-		iter = currentNode.getSubList().getElements().iterator();
+	    if (currentNode.next() != null) {
+		currentNode = currentNode.next();
+		listNodeReferenceValue = currentNode.getDataIntegrityValue();
+		currentElementIndex = -1;
 		return true;
 	    }
 	    return false;
@@ -2055,7 +2137,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @throws ConcurrentModificationException if the data integrity value
 	 * has changed
 	 */
-	private void checkDataIntegrity() {
+	void checkDataIntegrity() {
 	    if (currentNode.getDataIntegrityValue() != listNodeReferenceValue) {
 		throw new ConcurrentModificationException(
 			"The ListNode has been modified.");
@@ -2076,7 +2158,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // If there is an element in the iterator still,
 	    // then simply return true since it will be the
 	    // next element to be returned.
-	    if (iter.hasNext()) {
+	    if (isNextWithinRange(currentElementIndex, currentNode)) {
 		checkDataIntegrity();
 		return true;
 	    }
@@ -2091,15 +2173,330 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * @deprecated This operation is not officially supported. Removal of
-	 * nodes is achieved by the {@code ScalableList} API.
-	 * @throws UnsupportedOperationException the operation is not
-	 * supported
+	 * Removes from the underlying collection the last element returned by
+	 * the iterator. This can only be called once per call to {@code next}.
+	 * 
+	 * @throws IndexOutOfBoundsException if the index is out of bounds
 	 */
 	public void remove() {
-	    throw new UnsupportedOperationException(
-		    "Removal of nodes is achieved "
-			    + "through the ScalableList API");
+	    if (wasNextCalled) {
+		owner.remove(currentElementIndex);
+		listNodeReferenceValue = currentNode.getDataIntegrityValue();
+		wasNextCalled = false;
+	    }
+	}
+    }
+
+    /**
+     * A class which implements a {@code ListIterator} for the
+     * {@code ScalableList} data structure. This iterator allows
+     * bi-directional traversal and other operations native to the
+     * {@code ListIterator} interface.
+     * 
+     * @param <E> the type of element
+     */
+    static class ScalableListIterator<E> extends ScalableIterator<E>
+	    implements ListIterator<E> {
+
+	private static final long serialVersionUID = 9L;
+
+	/**
+	 * Flag which checks whether {@code previous()} was called
+	 */
+	boolean wasPrevCalled;
+
+	/**
+	 * Constructor which starts the iterations at the specified
+	 * {@code ListNode}.
+	 * 
+	 * @param listNode the starting {@code ListNode}
+	 */
+	ScalableListIterator(ScalableList<E> list) {
+	    super(list);
+	    wasPrevCalled = false;
+	}
+
+	/**
+	 * Constructor which creates a {@code ScalableListIterator} given the
+	 * list and a {@code searchResult} denoting the starting point.
+	 * 
+	 * @param list
+	 * @param searchResult
+	 */
+	ScalableListIterator(ScalableList<E> list,
+		SearchResult<E> searchResult) {
+	    super(list, searchResult.node);
+	    wasPrevCalled = false;
+	    currentElementIndex = searchResult.offset - 1;
+	}
+
+	/**
+	 * Performs a check to see that the index for {@code prev()} is still
+	 * within range of the sub list.
+	 * 
+	 * @param <E> the type of element stored
+	 * @param offset the offset
+	 * @param currentListNode the current {@code ListNode} being examined
+	 * @return {@code true} if the offset exists in the sub list and
+	 * {@code false} otherwise
+	 */
+	static <E> boolean isPrevWithinRange(int offset,
+		ListNode<E> currentListNode) {
+	    return (offset - 1 >= 0);
+	}
+
+	/**
+	 * Retrieves the index of the current element by walking up the tree
+	 * to the root and aggregating the counts of each {@code ListNode} and
+	 * {@code TreeNode}. This operation is slightly expensive because of
+	 * the required percolation up the tree.
+	 * 
+	 * @return the absolute index of the current element being examined
+	 */
+	private int getCurrentIndex() {
+	    return getAbsoluteIndex(currentNode, 0) + currentElementIndex;
+	}
+
+	/**
+	 * Walks along the {@code ListNode} linked list and collects the node
+	 * sizes until reaching the first child of the parent. If we did not
+	 * check for this, then we would instead iterate to the head
+	 * {@code ListNode}, which would be a performance hit.
+	 * <p>
+	 * This method recursively calls the {@code TreeNode} implementation
+	 * of this method and returns the total absolute index
+	 * 
+	 * @param listNode the current node to examine
+	 * @param size the current size
+	 * @return the absolute index of all elements prior to the
+	 * {@code listNode}
+	 */
+	int getAbsoluteIndex(ListNode<E> listNode, int size) {
+	    TreeNode<E> parent = listNode.getParent();
+
+	    // Iterate through siblings until we reach the parent's
+	    // first child.
+	    while (listNode.prev() != null &&
+		    !parent.getChild().equals(listNode)) {
+		listNode = listNode.prev();
+		size += listNode.size();
+	    }
+	    return getAbsoluteIndex(parent, size);
+	}
+
+	/**
+	 * Walks up the tree and collects the sizes to produce an absolute
+	 * index.
+	 * 
+	 * @return the absolute index of the given node
+	 */
+	int getAbsoluteIndex(TreeNode<E> node, int size) {
+	    TreeNode<E> parent = node.getParent();
+
+	    // We reached the root; return the size we have.
+	    if (parent == null) {
+		return size;
+	    }
+
+	    // Iterate through siblings
+	    while (node.prev() != null) {
+		node = node.prev();
+		size += node.size();
+	    }
+	    return getAbsoluteIndex(parent, size);
+	}
+
+	/**
+	 * Get the previous {@code ListNode} for the
+	 * {@code ScalableListNodeIterator}. This sets the
+	 * {@code currentElementIndex} to be the size, so that future checks
+	 * for the previous element point to an existing element located at
+	 * index {@code currentNode.size() - 1}.
+	 * 
+	 * @return {@code true} if there was a previous {@code ListNode}, and
+	 * {@code false} otherwise
+	 */
+	private boolean loadPrevListNode() {
+	    if (currentNode.prev() != null) {
+		currentNode = currentNode.prev();
+		currentElementIndex = currentNode.size();
+		listNodeReferenceValue = currentNode.getDataIntegrityValue();
+		return true;
+	    }
+	    return false;
+	}
+
+	/**
+	 * Returns the index of the element that would be returned by a
+	 * subsequent call to <tt>next</tt>. (Returns list size if the list
+	 * iterator is at the end of the list.)
+	 * 
+	 * @return the index of the element that would be returned by a
+	 * subsequent call to <tt>next</tt>, or list size if list iterator
+	 * is at end of list.
+	 */
+	public int nextIndex() {
+	    return getCurrentIndex() + 1;
+	}
+
+	/**
+	 * Returns the index of the element that would be returned by a
+	 * subsequent call to <tt>previous</tt>. (Returns -1 if the list
+	 * iterator is at the beginning of the list.)
+	 * 
+	 * @return the index of the element that would be returned by a
+	 * subsequent call to <tt>previous</tt>, or -1 if list iterator is
+	 * at beginning of list.
+	 */
+	public int previousIndex() {
+	    return getCurrentIndex() - 1;
+	}
+
+	/**
+	 * Returns <tt>true</tt> if this list iterator has more elements
+	 * when traversing the list in the reverse direction. (In other words,
+	 * returns <tt>true</tt> if <tt>previous</tt> would return an
+	 * element rather than throwing an exception.)
+	 * 
+	 * @return <tt>true</tt> if the list iterator has more elements when
+	 * traversing the list in the reverse direction.
+	 */
+	public boolean hasPrevious() {
+
+	    // If the future index will be equal to or larger than 0,
+	    // then another element exists
+	    if (isPrevWithinRange(currentElementIndex, currentNode)) {
+		checkDataIntegrity();
+		return true;
+	    }
+
+	    // Otherwise, try loading the next ListNode
+	    if (loadPrevListNode()) {
+		// Store the new integrity ListNode value
+		listNodeReferenceValue = currentNode.getDataIntegrityValue();
+		return hasPrevious();
+	    }
+	    return false;
+
+	}
+
+	/**
+	 * Returns the previous element in the list. This method may be called
+	 * repeatedly to iterate through the list backwards, or intermixed
+	 * with calls to <tt>next</tt> to go back and forth. (Note that
+	 * alternating calls to <tt>next</tt> and <tt>previous</tt> will
+	 * return the same element repeatedly.)
+	 * 
+	 * @return the previous element in the list.
+	 * @exception NoSuchElementException if the iteration has no previous
+	 * element.
+	 */
+	public E previous() {
+	    // Check the integrity of the ListNode to see if
+	    // any changes were made since we last operated.
+	    // Throw a ConcurrentModificationException if so.
+	    checkDataIntegrity();
+
+	    // Retrieve the value from the list; we may have to load
+	    // up a new ListNode
+	    if (!isPrevWithinRange(currentElementIndex, currentNode)) {
+		if (loadPrevListNode()) {
+		    previous();
+		} else {
+		    throw new NoSuchElementException(
+			    "The previous element does not exist");
+		}
+	    }
+
+	    // Check if next was just called; if so, we get the current
+	    // element,
+	    // otherwise we get the previous element
+	    if (wasNextCalled) {
+		wasNextCalled = false;
+	    } else {
+		currentElementIndex--;
+	    }
+
+	    ManagedReference<E> ref =
+		    uncheckedCast(currentNode.getSubList().getElements().get(
+			    currentElementIndex));
+	    wasPrevCalled = true;
+
+	    Object obj = ref.get();
+
+	    // In case we wrapped the item with an
+	    // Element object, fetch the value.
+	    if (obj instanceof Element) {
+		Element<E> tmp = uncheckedCast(obj);
+		return tmp.getValue();
+	    }
+	    return ref.get();
+	}
+
+	/**
+	 * Overrides the method to check whether {@code} previous() was
+	 * called; if so, it returns the same element. Otherwise, it obtains
+	 * the next element.
+	 * 
+	 * @return the next element
+	 */
+	public E next() {
+	    if (wasPrevCalled) {
+		wasPrevCalled = false;
+
+		ManagedReference<E> ref =
+			uncheckedCast(currentNode.getSubList().getElements()
+				.get(currentElementIndex));
+		wasNextCalled = true;
+
+		Object obj = ref.get();
+
+		// In case we wrapped the item with an
+		// Element object, fetch the value.
+		if (obj instanceof Element) {
+		    Element<E> tmp = uncheckedCast(obj);
+		    return tmp.getValue();
+		}
+		return ref.get();
+
+	    } else {
+		return super.next();
+	    }
+	}
+
+	/**
+	 * Replaces the last element returned by <tt>next</tt> or
+	 * <tt>previous</tt> with the specified element (optional
+	 * operation). This process will automatically remove the old element
+	 * from the data manager if it was not a {@code ManagedObject}.
+	 * 
+	 * @param e the element with which to replace the last element
+	 * returned by <tt>next</tt> or <tt>previous</tt>.
+	 */
+	public void set(E o) {
+	    owner.set(currentElementIndex, o);
+	}
+
+	/**
+	 * Inserts the specified element into the list. The element is
+	 * inserted immediately before the next element that would be returned
+	 * by <tt>next</tt>, if any, and after the next element that would
+	 * be returned by <tt>previous</tt>, if any. (If the list contains
+	 * no elements, the new element becomes the sole element on the list.)
+	 * The new element is inserted before the implicit cursor: a
+	 * subsequent call to <tt>next</tt> would be unaffected, and a
+	 * subsequent call to <tt>previous</tt> would return the new
+	 * element. (This call increases by one the value that would be
+	 * returned by a call to <tt>nextIndex</tt> or
+	 * <tt>previousIndex</tt>.)
+	 * 
+	 * @param e the element to insert.
+	 * @exception IndexOutOfBoundsException if the index which the element
+	 * is to be added is out of bounds
+	 */
+	public void add(E o) {
+	    owner.add(currentElementIndex++, o);
+	    listNodeReferenceValue = currentNode.getDataIntegrityValue();
 	}
     }
 
@@ -2576,6 +2973,27 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public static int calculateMaxAppendSize(int maxChildren) {
 	    return maxChildren * 2 / 3;
+	}
+
+	/**
+	 * Returns the value of the underlying element, depending on whether
+	 * it is a {@code ManagedObject} or {@code Element}
+	 * 
+	 * @param <E> the type of object
+	 * @param ref the {@code ManagedReference} retrieved from the list
+	 * @return the value of the reference
+	 */
+	@SuppressWarnings("unchecked")
+	static <E> E getValue(ManagedReference<ManagedObject> ref) {
+	    ManagedObject obj = ref.get();
+
+	    // In case we wrapped the item with an
+	    // Element object, fetch the value.
+	    if (obj instanceof Element) {
+		Element<E> tmp = uncheckedCast(obj);
+		return tmp.getValue();
+	    }
+	    return (E) obj;
 	}
 
 	/**

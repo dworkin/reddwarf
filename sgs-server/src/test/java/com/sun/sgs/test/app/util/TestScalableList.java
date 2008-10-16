@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Properties;
 import java.util.Random;
 
@@ -32,6 +33,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ScalableList;
 import com.sun.sgs.auth.Identity;
@@ -90,6 +92,7 @@ public class TestScalableList extends Assert {
     public void testConstructorWithIllegalArgs() throws Exception {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
+		ScalableList<String> list = null;
 		try {
 		    new ScalableList<String>(-1, -1);
 		    fail("Expected IllegalArgumentException");
@@ -111,6 +114,7 @@ public class TestScalableList extends Assert {
 		    fail("Expected IllegalArgumentException");
 		} catch (IllegalArgumentException iae) {
 		}
+		
 	    }
 	}, taskOwner);
     }
@@ -124,7 +128,7 @@ public class TestScalableList extends Assert {
     public void testConstructorWithLegalArgs() throws Exception {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
-		ScalableList<String> list;
+		ScalableList<String> list = null;
 		try {
 		    list = new ScalableList<String>(2, 1);
 		} catch (Exception e) {
@@ -162,6 +166,12 @@ public class TestScalableList extends Assert {
 		    fail("Did not expect exception: " +
 			    e.getLocalizedMessage());
 		}
+
+		if (list != null) {
+		    list.clear();
+		}
+
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -183,6 +193,7 @@ public class TestScalableList extends Assert {
 		assertTrue(list.add("A"));
 
 		assertEquals(1, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -201,6 +212,7 @@ public class TestScalableList extends Assert {
 		assertTrue(list.add("B"));
 
 		assertEquals(2, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -220,6 +232,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(2, list.size());
 		assertEquals("B", list.get(0));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -237,6 +250,7 @@ public class TestScalableList extends Assert {
 		list.add(0, "A");
 
 		assertEquals(1, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -257,6 +271,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(3, list.size());
 		assertEquals("Z", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -278,6 +293,8 @@ public class TestScalableList extends Assert {
 
 		assertTrue(list.addAll(c));
 		assertEquals(3, list.size());
+		
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -302,6 +319,7 @@ public class TestScalableList extends Assert {
 
 		assertTrue(list.addAll(c));
 		assertEquals(5, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -323,6 +341,7 @@ public class TestScalableList extends Assert {
 			dataService.createReference(list);
 
 		assertTrue(list1Ref.get().equals(list2Ref.get()));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -350,6 +369,8 @@ public class TestScalableList extends Assert {
 		assertEquals(5, list.size());
 		// get the middle element
 		assertEquals("D", list.get(2));
+		
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -368,6 +389,7 @@ public class TestScalableList extends Assert {
 		list.add("A");
 
 		assertEquals("A", list.get(0));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -385,6 +407,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		assertEquals("A", list.get(0));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -404,6 +427,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		assertEquals("C", list.get(2));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -423,6 +447,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		assertEquals("B", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -443,6 +468,8 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		assertEquals("C", list.get(2));
+		
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -463,6 +490,7 @@ public class TestScalableList extends Assert {
 		list.remove(0);
 		assertEquals(2, list.size());
 		assertEquals("B", list.get(0));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -485,6 +513,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(2, list.size());
 		assertEquals("C", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -506,6 +535,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(2, list.size());
 		assertEquals("B", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -526,6 +556,7 @@ public class TestScalableList extends Assert {
 		Object obj = list.remove(1);
 
 		assertEquals("B", obj.toString());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -547,6 +578,7 @@ public class TestScalableList extends Assert {
 		list.remove(0);
 
 		assertEquals(2, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -567,6 +599,7 @@ public class TestScalableList extends Assert {
 		Object obj = list.remove(0);
 
 		assertEquals("A", obj);
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -588,6 +621,7 @@ public class TestScalableList extends Assert {
 		list.remove(2);
 
 		assertEquals(2, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -609,6 +643,7 @@ public class TestScalableList extends Assert {
 		Object obj = list.remove(2);
 
 		assertEquals("C", obj);
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -632,6 +667,7 @@ public class TestScalableList extends Assert {
 		list.remove(obj);
 
 		assertEquals(2, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -655,6 +691,7 @@ public class TestScalableList extends Assert {
 
 		assertTrue(list.remove(obj));
 		assertEquals(-1, list.indexOf(obj));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -692,6 +729,7 @@ public class TestScalableList extends Assert {
 		}
 		// Iteration amount should equal list size
 		assertEquals(size, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -718,6 +756,7 @@ public class TestScalableList extends Assert {
 		list.remove(0);
 
 		assertTrue(list.isEmpty());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -738,6 +777,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		assertEquals(1, list.indexOf("B"));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -762,6 +802,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(3, list.lastIndexOf(s2));
 		assertEquals(2, list.lastIndexOf(s1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -784,6 +825,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(3, list.size());
 		assertEquals("Z", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -801,6 +843,7 @@ public class TestScalableList extends Assert {
 		assertTrue(list.add("A"));
 
 		assertTrue(list.contains("A"));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -822,6 +865,8 @@ public class TestScalableList extends Assert {
 		assertTrue(list.contains("A"));
 		assertTrue(list.contains("B"));
 		assertTrue(list.contains("C"));
+		
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -846,6 +891,7 @@ public class TestScalableList extends Assert {
 
 		assertTrue(list.containsAll(c));
 		assertEquals(3, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -873,6 +919,7 @@ public class TestScalableList extends Assert {
 		assertEquals(2, list.size());
 		assertEquals("A", list.get(0));
 		assertEquals("B", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -896,6 +943,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(1, newList.size());
 		assertEquals("B", newList.get(0));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -923,6 +971,7 @@ public class TestScalableList extends Assert {
 		assertEquals("B", array[1]);
 		assertEquals("C", array[2]);
 		assertEquals("D", array[3]);
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -952,6 +1001,176 @@ public class TestScalableList extends Assert {
 		assertEquals("B", array[1]);
 		assertEquals("C", array[2]);
 		assertEquals("D", array[3]);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests retrieving an array of the contents by providing it an array
+     * parameter
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testIteratorRemove() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+
+		Iterator<String> iter = list.iterator();
+		assertTrue(iter.hasNext());
+
+		// This should not do anything because next() has
+		// not yet been called
+		iter.remove();
+		assertEquals(4, list.size());
+		Random random = new Random();
+		int randomIndex = random.nextInt(list.size() - 1);
+		String verify = list.get(randomIndex);
+		int i = 0;
+
+		while (iter.hasNext()) {
+		    iter.next();
+
+		    // perform one removal
+		    if (i == randomIndex) {
+			iter.remove();
+		    }
+		    i++;
+		}
+		assertEquals(3, list.size());
+		assertEquals(false, list.contains(verify));
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests the iterator's ability to add an element to the list.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testListIteratorAdd() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+
+		ListIterator<String> iter = list.listIterator();
+		assertTrue(iter.hasNext());
+		int count = 0;
+		String valueToAddAndCheck = "E";
+
+		while (iter.hasNext()) {
+		    iter.next();
+		    if (count == 2) {
+			iter.add(valueToAddAndCheck);
+		    }
+		    count++;
+		}
+		assertEquals(5, list.size());
+		assertEquals(true, list.contains(valueToAddAndCheck));
+		assertEquals(2, list.indexOf(valueToAddAndCheck));
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests the {@code ListIterator}'s ability to fetch next and previous an
+     * element to the list.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testListIteratorNextAndPrev() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		ArrayList<String> shadow = new ArrayList<String>();
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+		shadow.add("A");
+		shadow.add("B");
+		shadow.add("C");
+		shadow.add("D");
+
+		ListIterator<String> iter = list.listIterator();
+		ListIterator<String> shadowIter = shadow.listIterator();
+		assertEquals(shadowIter.hasNext(), iter.hasNext());
+		int count = 0;
+
+		// test next()
+		while (shadowIter.hasNext()) {
+		    assertEquals("next index: " + Integer.toString(count++),
+			    shadowIter.next(), iter.next());
+
+		}
+		assertEquals(shadowIter.hasNext(), iter.hasNext());
+
+		// test previous()
+		while (shadowIter.hasPrevious()) {
+		    assertEquals("prev index: " + Integer.toString(count--),
+			    shadowIter.previous(), iter.previous());
+		}
+		assertEquals(shadowIter.hasPrevious(), iter.hasPrevious());
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests the {@code ListIterator}'s ability to fetch next and previous an
+     * element to the list.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testListIteratorSet() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		ArrayList<String> shadow = new ArrayList<String>();
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+		shadow.add("A");
+		shadow.add("B");
+		shadow.add("C");
+		shadow.add("D");
+
+		ListIterator<String> iter = list.listIterator();
+		ListIterator<String> shadowIter = shadow.listIterator();
+		assertEquals(shadowIter.hasNext(), iter.hasNext());
+		Random random = new Random();
+		String newValue;
+		int count = 0;
+
+		// test set()
+		while (shadowIter.hasNext()) {
+		    shadowIter.next();
+		    iter.next();
+		    newValue = Integer.toString(random.nextInt(100));
+		    shadowIter.set(newValue);
+		    iter.set(newValue);
+
+		    assertEquals(shadow.get(count), list.get(count));
+		    count++;
+		}
+		assertEquals(shadow.size(), list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -975,6 +1194,7 @@ public class TestScalableList extends Assert {
 		list.clear();
 		assertTrue(list.isEmpty());
 		assertEquals(0, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -995,6 +1215,7 @@ public class TestScalableList extends Assert {
 		list.clear();
 		assertTrue(list.isEmpty());
 		assertEquals(0, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1023,6 +1244,7 @@ public class TestScalableList extends Assert {
 		assertEquals(-1, list.indexOf("B"));
 		assertEquals(-1, list.indexOf("C"));
 		assertEquals(-1, list.indexOf("D"));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1055,6 +1277,7 @@ public class TestScalableList extends Assert {
 		list.add("F");
 
 		assertEquals(12, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1087,6 +1310,7 @@ public class TestScalableList extends Assert {
 		list.add(1, "B");
 
 		assertEquals(12, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1108,6 +1332,7 @@ public class TestScalableList extends Assert {
 		assertEquals("G", list.get(6));
 		assertEquals("J", list.get(9));
 		assertEquals("L", list.get(11));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1143,6 +1368,7 @@ public class TestScalableList extends Assert {
 		assertEquals("G", list.get(6));
 		assertEquals("J", list.get(9));
 		assertEquals("L", list.get(11));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1176,6 +1402,7 @@ public class TestScalableList extends Assert {
 		assertEquals("G", list.get(6));
 		assertEquals("J", list.get(9));
 		assertEquals("L", list.get(11));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1213,6 +1440,7 @@ public class TestScalableList extends Assert {
 		assertEquals("G", list.get(6));
 		assertEquals("J", list.get(9));
 		assertEquals("L", list.get(11));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1257,6 +1485,7 @@ public class TestScalableList extends Assert {
 		assertEquals("L", list.get(9));
 		list.remove(1);
 		assertEquals("C", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1291,6 +1520,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(12, list.size());
 		assertEquals("B", list.get(1));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1309,7 +1539,7 @@ public class TestScalableList extends Assert {
 		assertEquals(2, list.indexOf("C"));
 		assertEquals(8, list.indexOf("I"));
 		assertEquals(11, list.indexOf("L"));
-
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1332,7 +1562,7 @@ public class TestScalableList extends Assert {
 		list.add("A");
 		list.add("A");
 		assertEquals(14, list.lastIndexOf("A"));
-
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1355,6 +1585,7 @@ public class TestScalableList extends Assert {
 		assertEquals("ZZ", list.get(8));
 		assertEquals("L", list.set(11, "ZZZ"));
 		assertEquals("ZZZ", list.get(11));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1376,9 +1607,9 @@ public class TestScalableList extends Assert {
 
 		// Go through all the elements
 		int size = 0;
-		String value = null;
+
 		while (iter.hasNext()) {
-		    value = iter.next();
+		    iter.next();
 		    size++;
 
 		    // Randomly check values during the iterations
@@ -1393,6 +1624,7 @@ public class TestScalableList extends Assert {
 		    }
 		}
 		assertEquals(size, list.size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1409,6 +1641,7 @@ public class TestScalableList extends Assert {
 		ScalableList<String> list = makeList();
 
 		assertEquals("A", list.get(0));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1425,6 +1658,7 @@ public class TestScalableList extends Assert {
 		ScalableList<String> list = makeList();
 
 		assertEquals("L", list.get(11));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1446,6 +1680,7 @@ public class TestScalableList extends Assert {
 		c.add("I");
 
 		assertTrue(list.containsAll(c));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1471,6 +1706,7 @@ public class TestScalableList extends Assert {
 		assertEquals("A", list.get(0));
 		assertEquals("D", list.get(1));
 		assertEquals("G", list.get(2));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1491,6 +1727,7 @@ public class TestScalableList extends Assert {
 		assertEquals(4, newList.size());
 		assertEquals("D", newList.get(0));
 		assertEquals("G", newList.get(3));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1513,6 +1750,7 @@ public class TestScalableList extends Assert {
 		assertEquals("A", array[0]);
 		assertEquals("D", array[3]);
 		assertEquals("G", array[6]);
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1537,6 +1775,7 @@ public class TestScalableList extends Assert {
 		assertEquals("A", array[0]);
 		assertEquals("D", array[3]);
 		assertEquals("G", array[6]);
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1571,6 +1810,7 @@ public class TestScalableList extends Assert {
 		assertNotNull(list.remove(4));
 		assertEquals(5, list.size());
 		assertEquals("C", list.get(4));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1605,6 +1845,7 @@ public class TestScalableList extends Assert {
 		    assertEquals("iteration #" + i + ": ", shadow.get(i),
 			    list.get(i));
 		}
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1674,6 +1915,7 @@ public class TestScalableList extends Assert {
 		ScalableList<String> list = makeList();
 
 		assertEquals(0, list.subList(2, 2).size());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1704,6 +1946,7 @@ public class TestScalableList extends Assert {
 			    + "an invalid index");
 		} catch (IndexOutOfBoundsException e) {
 		}
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1728,7 +1971,7 @@ public class TestScalableList extends Assert {
 			    + "element outside of range.");
 		} catch (IndexOutOfBoundsException e) {
 		}
-
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1753,7 +1996,7 @@ public class TestScalableList extends Assert {
 			    + "element outside of range");
 		} catch (IndexOutOfBoundsException e) {
 		}
-
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1776,6 +2019,7 @@ public class TestScalableList extends Assert {
 		    fail("Expecting NullPointerException");
 		} catch (NullPointerException npe) {
 		}
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1802,6 +2046,8 @@ public class TestScalableList extends Assert {
 		    fail("Expecting NullPointerException");
 		} catch (NullPointerException npe) {
 		}
+		
+		AppContext.getDataManager().removeObject(list);
 
 	    }
 	}, taskOwner);
@@ -1830,7 +2076,7 @@ public class TestScalableList extends Assert {
 		    fail("Expecting NullPointerException");
 		} catch (NullPointerException npe) {
 		}
-
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1851,6 +2097,7 @@ public class TestScalableList extends Assert {
 		list.add("B");
 		list.remove(0);
 		assertFalse(list.isEmpty());
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1876,6 +2123,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 		list.remove("C");
 		assertEquals(-1, list.indexOf("C"));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1900,6 +2148,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 		list.remove(2);
 		assertEquals(-1, list.lastIndexOf("C"));
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -1941,6 +2190,7 @@ public class TestScalableList extends Assert {
 		    fail("Expecting IllegalArgumentException");
 		} catch (IllegalArgumentException iae) {
 		}
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
