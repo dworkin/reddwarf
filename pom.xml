@@ -23,6 +23,7 @@
   </description>
 
   <modules>
+    <module>sgs-boot</module>
     <module>sgs-server</module>
     <module>sgs-server-api</module>
     <module>sgs-server-dist</module>
