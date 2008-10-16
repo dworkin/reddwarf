@@ -25,9 +25,12 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.profile.ProfileReport;
+import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -35,11 +38,17 @@ import com.sun.sgs.test.util.UtilReflection;
 import java.beans.PropertyChangeEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Exchanger;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.*;
@@ -70,7 +79,12 @@ public class TestProfileCollectorImpl {
     /** Test setup. */
     @Before
     public void setUp() throws Exception {
-        setUp(null);
+        // Start a partial stack.  We actually don't need any services for
+        // these tests, but we cannot start up additional nodes if we don't
+        // have at least the core services started.
+        Properties p = SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+        p.setProperty("com.sun.sgs.finalService", "NodeMappingService");
+        setUp(p);
     }
 
     protected void setUp(Properties props) throws Exception {
@@ -82,7 +96,8 @@ public class TestProfileCollectorImpl {
     }
   
     /** Shut down the nodes. */
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes) {
                 if (node != null) {
@@ -255,17 +270,27 @@ public class TestProfileCollectorImpl {
     
     @Test
     public void testAddListenerCalled() throws Exception {
-        TestListener test = new TestListener();
+        final Semaphore flag = new Semaphore(1);
+        
+        TestListener test = new TestListener(
+            new Runnable() {
+                public void run() {
+                    flag.release();
+                }
+        });
         profileCollector.addListener(test, true);
+        
+        flag.acquire();
         // Run a task, to be sure our listener gets called at least once
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 // empty task
-		public void run() { }
+		public void run() { 
+                }
             }, taskOwner);
             
         // Calling reports is asynchronous
-        Thread.sleep(100);
+        flag.tryAcquire(100, TimeUnit.MILLISECONDS);
         assertTrue(test.reportCalls > 0);
     }
     
@@ -323,11 +348,1022 @@ public class TestProfileCollectorImpl {
         assertEquals(initialSize  + 1, profileCollector.getListeners().size());
     }
     
+    /* -- Consumer tests -- */
+    @Test
+    public void testConsumerName() {
+        final String name = "consumer1";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons = registrar.registerProfileProducer(name);
+        assertEquals(name, cons.getName());
+    }
     
+    @Test
+    public void testConsumerSetLevel() {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        assertEquals(profileCollector.getDefaultProfileLevel(), 
+                     cons1.getProfileLevel());
+        
+        cons1.setProfileLevel(ProfileLevel.MIN);
+        assertEquals(ProfileLevel.MIN, cons1.getProfileLevel());
+        cons1.setProfileLevel(ProfileLevel.MEDIUM);
+        assertEquals(ProfileLevel.MEDIUM, cons1.getProfileLevel());
+        cons1.setProfileLevel(ProfileLevel.MAX);
+        assertEquals(ProfileLevel.MAX, cons1.getProfileLevel());
+    }
+    
+    @Test
+    public void testConsumerSetCollectorLevel() {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileLevel cons1Level = cons1.getProfileLevel();
+        assertEquals(profileCollector.getDefaultProfileLevel(), cons1Level);
+
+        // Change default level from what the kernel set, make sure it
+        // affects later consumers.
+        profileCollector.setDefaultProfileLevel(ProfileLevel.MIN);
+        ProfileConsumer cons2 = registrar.registerProfileProducer("c2");
+        assertEquals(profileCollector.getDefaultProfileLevel(), 
+                     cons2.getProfileLevel());
+        // and make sure other consumers aren't affected
+        assertEquals(cons1Level, cons1.getProfileLevel());
+    }
+    
+    /* -- Counter tests -- */
+    @Test
+    public void testCounterName() {
+        final String name = "counter";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCounter counter1 = 
+                cons1.registerCounter(name, true, ProfileLevel.MAX);
+        assertEquals(name, counter1.getCounterName());
+    }
+    
+    @Test
+    public void testCounterTwice() {
+        final String name = "counter";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCounter counter1 = 
+                cons1.registerCounter(name, true, ProfileLevel.MAX);
+
+        // Try creating with same name and parameters
+        ProfileCounter counter2 =
+                cons1.registerCounter(name, true, ProfileLevel.MAX);
+        assertSame(counter1, counter2);
+        
+        // Try creating with same name and different parameters
+        // Note we expect this behavior to change with upcoming API changes
+        ProfileCounter op3 =
+                cons1.registerCounter(name, false, ProfileLevel.MAX);
+        assertSame(counter1, op3);
+        
+        // Try creating with a different name
+        ProfileCounter counter4 =
+                cons1.registerCounter("somethingelse", true, ProfileLevel.MAX);
+        assertNotSame(counter1, counter4);
+    }
+    
+    @Test
+    public void testCounterType() {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCounter counter = 
+                cons1.registerCounter("counter", true, ProfileLevel.MIN);
+        
+        assertTrue(counter.isTaskLocal());
+        
+        ProfileCounter counter1 = 
+                cons1.registerCounter("other", false, ProfileLevel.MIN);
+        assertFalse(counter1.isTaskLocal());
+    }
+    
+    // NOTE not bothering to write tests for aggregate types now, as
+    // aggregation within profile reports will be going away soon
+    
+    @Test
+    public void testCounter() throws Exception {
+        final String name = "counter";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        // Register a counter to be noted at all profiling levels
+        final ProfileCounter counter = 
+                cons1.registerCounter(name, true, ProfileLevel.MIN);
+        // An operation that is sent when the counter is updated, which is
+        // used as a flag in the listener.  This isn't ideal, because the
+        // test is relying on functionality within the class it's testing,
+        // but we cannot control when the listener will be called.
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new TestCounterReport(name, expectUpdate, errorExchanger, 1));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the counter incremented in the listener
+                    expectUpdate.report();
+                    counter.incrementCount();
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+
+    @Test
+    public void testCounterLevel() throws Exception {
+        final String name = "MyCounter";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        // Register a counter to be updated only at the max level
+        final ProfileCounter counter = 
+                cons1.registerCounter(name, true, ProfileLevel.MAX);
+        
+        // An operation that is sent when the counter is updated, which is
+        // used as a flag in the listener.  This isn't ideal, because the
+        // test is relying on functionality within the class it's testing,
+        // but we cannot control when the listener will be called.
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener( 
+            new TestCounterReport(name, expectUpdate, errorExchanger, 1));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // The default profile level is MIN so we don't expect
+                    // to see the counter incremented.
+                    counter.incrementCount();
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        cons1.setProfileLevel(ProfileLevel.MAX);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    // Because we bumped the consumer's profile level,
+                    // we expect the counter
+                    expectUpdate.report();
+                    counter.incrementCount();
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+    
+    @Test
+    public void testCounterIncrement() throws Exception {
+        final String name = "counter";
+        final int incValue = 5;
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        // Register a counter to be noted at all profiling levels
+        final ProfileCounter counter = 
+                cons1.registerCounter(name, true, ProfileLevel.MIN);
+        // An operation that is sent when the counter is updated, which is
+        // used as a flag in the listener.  This isn't ideal, because the
+        // test is relying on functionality within the class it's testing,
+        // but we cannot control when the listener will be called.
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new TestCounterReport(name, expectUpdate, 
+                                  errorExchanger, incValue));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the counter incremented in the listener
+                    expectUpdate.report();
+                    counter.incrementCount(incValue);
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+    
+    @Test
+    public void testCounterMultiple() throws Exception {
+        final String name = "counterforstuff";
+        final int incValue = 5;
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        // Register a counter to be noted at all profiling levels
+        final ProfileCounter counter = 
+                cons1.registerCounter(name, true, ProfileLevel.MIN);
+        // An operation that is sent when the counter is updated, which is
+        // used as a flag in the listener.  This isn't ideal, because the
+        // test is relying on functionality within the class it's testing,
+        // but we cannot control when the listener will be called.
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new TestCounterReport(name, expectUpdate, 
+                                  errorExchanger, incValue));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the counter incremented by 5 total
+                    expectUpdate.report();
+                    counter.incrementCount(2);
+                    counter.incrementCount(3);
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+    
+    /**
+     * Helper class for counter tests.  This runnable is run during
+     * the profile listener's report method.  It checks for a known
+     * operation to know if a counter should have been incremented,
+     * otherwise the counter should not be in the profile report.
+     * Synchronization with the test case is performed through an
+     * Exchanger. If an AssertionError is thrown, it is assumed to 
+     * have come from the JUnit framework and is passed back to the 
+     * test thread so it can be reported there.  Otherwise, JUnit
+     * does not note that the test has failed.
+     * <p>
+     * Note that this class assumes the counter will only be updated once.
+     */
+    private static class TestCounterReport implements Runnable {
+        final String name;
+        final ProfileOperation expectUpdate;
+        final Exchanger<AssertionError> errorExchanger;
+        final int incrementValue;
+        
+        public TestCounterReport(String name,
+                                 ProfileOperation expectUpdate, 
+                                 Exchanger<AssertionError> errorExchanger,
+                                 int incrementValue)
+        {
+            this.name = name;
+            this.expectUpdate = expectUpdate;
+            this.errorExchanger = errorExchanger;
+            this.incrementValue = incrementValue;
+        }
+        
+        public void run() {
+            AssertionError error = null;
+            ProfileReport report = TestListener.report;
+            boolean update = 
+                report.getReportedOperations().contains(expectUpdate);
+            // Check to see if we expected the counter value to be
+            // updated in this listener call.
+            if (update) {    
+                try {
+                    // Find the counter, make sure it was incremented
+                    long value = 
+                        report.getUpdatedTaskCounters().get(name);
+                    System.err.println("got counter value of " + value);
+                    assertEquals(incrementValue, value);
+                } catch (AssertionError e) {
+                    error = e;
+                }
+            } else {
+                try {
+                    long value =
+                        report.getUpdatedTaskCounters().get("counter");
+                    System.err.println("got counter value of " + value);
+                    fail("Expected NullPointerExcpetion");
+                } catch (NullPointerException e) {
+                    System.err.println("Caught expected NPE");
+                } catch (AssertionError e) {
+                    error = e;
+                }
+            }
+            // Signal that we're done, and return the exception
+            try { 
+                errorExchanger.exchange(error);
+            } catch (InterruptedException ignored) {
+                // do nothing
+            }
+        }
+    }
+    
+    
+        
+    /* -- Operation tests -- */
+    @Test
+    public void testOperationName() {
+        final String name = "myOperation";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileOperation op1 = 
+                cons1.registerOperation(name, ProfileLevel.MAX);
+        assertEquals(name, op1.getOperationName());
+    }
+    
+    @Test
+    public void testOperationTwice() {
+        final String name = "myOperation";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileOperation op1 = 
+                cons1.registerOperation(name, ProfileLevel.MAX);
+
+        // Try creating with same name and parameters
+        ProfileOperation op2 =
+                cons1.registerOperation(name, ProfileLevel.MAX);
+        assertSame(op1, op2);
+        
+        // Try creating with same name and different parameters
+        // Note we expect this behavior to change with upcoming API changes
+        ProfileOperation op3 =
+                cons1.registerOperation(name, ProfileLevel.MIN);
+        assertSame(op1, op3);
+        
+        // Try creating with a different name
+        ProfileOperation op4 =
+                cons1.registerOperation("somethingelse", ProfileLevel.MAX);
+        assertNotSame(op1, op4);
+    }
+    
+    // NOTE will need type tests soon, right now there is only one type
+    // of operation
+    @Ignore
+    public void testOperationType() {
+        
+    }
+    
+    @Test
+    public void testOperation() throws Exception {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        final ProfileOperation op =
+                cons1.registerOperation("something", ProfileLevel.MIN);
+        final BooleanWrapper boolWrap = new BooleanWrapper();
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new TestOperationReport(op, boolWrap, errorExchanger));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the operation in the profile report
+                    boolWrap.value = true;
+                    op.report();
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    boolWrap.value = false;
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+
+    @Test
+    public void testOperationMediumLevel() throws Exception {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        final ProfileOperation op =
+                cons1.registerOperation("something", ProfileLevel.MEDIUM);
+        final BooleanWrapper boolWrap = new BooleanWrapper();
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new TestOperationReport(op, boolWrap, errorExchanger));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We do not expect to see this reported.
+                    boolWrap.value = false;
+                    op.report();
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        cons1.setProfileLevel(ProfileLevel.MEDIUM);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    boolWrap.value = true;
+                    op.report();
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+        
+        cons1.setProfileLevel(ProfileLevel.MAX);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    boolWrap.value = true;
+                    op.report();
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+    
+    @Test
+    public void testOperationMaxLevel() throws Exception {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        final ProfileOperation op =
+                cons1.registerOperation("something", ProfileLevel.MAX);
+        final BooleanWrapper boolWrap = new BooleanWrapper();
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new TestOperationReport(op, boolWrap, errorExchanger));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We do not expect to see this reported.
+                    boolWrap.value = false;
+                    op.report();
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        cons1.setProfileLevel(ProfileLevel.MEDIUM);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    // No report expected:  the level is still too low
+                    boolWrap.value = false;
+                    op.report();
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+        
+        cons1.setProfileLevel(ProfileLevel.MAX);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    boolWrap.value = true;
+                    op.report();
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+       
+    @Test
+    public void testOperationMultiple() throws Exception {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        final ProfileOperation op =
+                cons1.registerOperation("something", ProfileLevel.MIN);
+        final ProfileOperation op1 =
+                cons1.registerOperation("else", ProfileLevel.MIN);
+        final BooleanWrapper boolWrap = new BooleanWrapper();
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        TestListener test = new TestListener(
+            new Runnable() {
+                public void run() {
+                    AssertionError error = null;
+                    if (boolWrap.value) {
+                        try {
+                            List<ProfileOperation> ops =
+                                TestListener.report.getReportedOperations();
+                            for (ProfileOperation po : ops) {
+                                System.err.println(po);
+                            }
+                            int opIndex1 = ops.indexOf(op);
+                            int opIndex2 = ops.lastIndexOf(op);
+                            int op1Index1 = ops.indexOf(op1);
+                            int op1Index2 = ops.lastIndexOf(op1);
+
+                            // We expect to see op twice, and op1 once
+                            assertTrue(opIndex1 != -1);
+                            assertTrue(opIndex2 != -1);
+                            assertTrue(op1Index1 != -1);
+                            assertTrue(op1Index2 == -1);
+
+                            // We expect the op ordering to be maintained
+                            assertTrue(opIndex1 < op1Index1);
+                            assertTrue(op1Index1 < opIndex2);
+                        } catch (AssertionError e) {
+                            error = e;
+                        }
+                    }
+
+                    // Signal that we're done, and return the exception
+                    try { 
+                        errorExchanger.exchange(error);
+                    } catch (InterruptedException ignored) {
+                        // do nothing
+                    }
+                }
+        });
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the operation in the profile report
+                    boolWrap.value = true;
+                    op.report();
+                    op1.report();
+                    op.report();
+                }
+            }, taskOwner);
+    }
+    
+    /**
+     * Helper class for testing operations in ProfileReports
+     */
+    private static class TestOperationReport implements Runnable {
+        final ProfileOperation operation;
+        final BooleanWrapper expectOperation;
+        final Exchanger<AssertionError> errorExchanger;
+        
+        public TestOperationReport(ProfileOperation operation,
+                                   BooleanWrapper expectOperation,
+                                   Exchanger<AssertionError> errorExchanger) 
+        {
+            this.operation = operation;
+            this.expectOperation = expectOperation;
+            this.errorExchanger = errorExchanger;
+        }
+        
+        public void run() {
+            AssertionError error = null;
+            boolean update = 
+                TestListener.report.getReportedOperations().contains(operation);
+            try {
+                assertEquals(expectOperation.value, update);
+            } catch (AssertionError e) {
+                error = e;
+            }
+            
+            // Signal that we're done, and return the exception
+            try { 
+                errorExchanger.exchange(error);
+            } catch (InterruptedException ignored) {
+                // do nothing
+            }
+        }
+    }
+    /* Helper class for operation tests.  This is not optimal: bad timing
+     * could let another task run and invalidate the test.
+     */
+    private static class BooleanWrapper {
+        boolean value;
+    }
+     
+    /* -- Sample tests -- */
+    @Test
+    public void testSampleName() {
+        final String name = "SomeSamples";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileSample sample1 = 
+                cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
+        assertEquals(name, sample1.getSampleName());
+    }
+    
+    @Test
+    public void testSampleTwice() {
+        final String name = "mySamples";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileSample s1 = 
+                cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
+
+        // Try creating with same name and parameters
+        ProfileSample s2 =
+                cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
+        assertSame(s1, s2);
+        
+        // Try creating with same name and different parameters
+        // Note we expect this behavior to change with upcoming API changes
+        ProfileSample s3 =
+                cons1.registerSampleSource(name, false, -1, ProfileLevel.MIN);
+        assertSame(s1, s3);     
+        ProfileSample s4 =
+                cons1.registerSampleSource(name, true, 25, ProfileLevel.MIN);
+        assertSame(s1, s4);
+        
+        // Try creating with a different name
+        ProfileSample s5 =
+            cons1.registerSampleSource("somethingelse", 
+                                        true, -1, ProfileLevel.MAX);
+        assertNotSame(s1, s5);
+    }
+    
+
+    @Test
+    public void testSampleType() {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileSample s1 = 
+            cons1.registerSampleSource("samples", true, -1, ProfileLevel.MAX);
+        
+        assertTrue(s1.isTaskLocal());
+        
+        ProfileSample s2 = 
+            cons1.registerSampleSource("other", false, -1, ProfileLevel.MAX);
+        assertFalse(s2.isTaskLocal());
+    }
+     
+    // NOTE not bothering to write tests for aggregate types now, as
+    // aggregation within profile reports will be going away soon
+    
+    @Test
+    public void testSample() throws Exception {
+        final String name = "sample";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        // Register a counter to be noted at all profiling levels
+        final ProfileSample sample = 
+            cons1.registerSampleSource(name, true, -1, ProfileLevel.MIN);
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        final List<Long> testValues = new ArrayList<Long>();
+        testValues.add(1L);
+        testValues.add(5L);
+        testValues.add(-22L);
+        TestListener test = new TestListener(
+            new TestSampleReport(name, expectUpdate, 
+                                 errorExchanger, testValues));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the test values in listener
+                    expectUpdate.report();
+                    for (Long v : testValues) {
+                        sample.addSample(v);
+                    }
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+
+    @Test
+    public void testSampleLevel() throws Exception {
+        final String name = "MySamples";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("cons1");
+        final ProfileSample sample = 
+            cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
+        
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        final List<Long> testValues = new ArrayList<Long>();
+        testValues.add(101L);
+        testValues.add(-22L);
+        TestListener test = new TestListener(
+            new TestSampleReport(name, expectUpdate, 
+                                 errorExchanger, testValues));
+        profileCollector.addListener(test, true);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // The default profile level is MIN so we don't expect
+                    // to see the samples.
+                    for (Long v : testValues) {
+                        sample.addSample(v);
+                    }
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        cons1.setProfileLevel(ProfileLevel.MAX);
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    // Because we bumped the consumer's profile level,
+                    // we expect the counter
+                    expectUpdate.report();
+                    for (Long v : testValues) {
+                        sample.addSample(v);
+                    }
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+    }
+    
+    @Test
+    public void testSampleLevelChange() throws Exception {
+        final String name = "samples";
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        final ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        final ProfileSample sample = 
+            cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
+        
+        final ProfileOperation expectUpdate =
+                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        final List<Long> testValues = new ArrayList<Long>();
+        testValues.add(101L);
+        testValues.add(-22L);
+        TestListener test = new TestListener(
+            new TestSampleReport(name, expectUpdate, 
+                                 errorExchanger, testValues));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // The default profile level is MIN so we don't expect
+                    // to see the samples.
+                    for (Long v : testValues) {
+                        sample.addSample(v);
+                    }
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() {
+                    // We don't expect to see this sample in the report;
+                    // the level was still too low.
+                    sample.addSample(999L);
+                    cons1.setProfileLevel(ProfileLevel.MAX);
+                    for (Long v : testValues) {
+                        expectUpdate.report();
+                        sample.addSample(v);
+                    }
+                    cons1.setProfileLevel(ProfileLevel.MIN);
+                    // Should not see this one, either
+                    sample.addSample(-22L);
+                }
+            }, taskOwner);
+            
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            System.err.println(error);
+            fail("Got an exception: " + error);
+        }
+    }
+    
+    // NOTE: no test for maxSamples argument into consumer when creating
+    // samples, as this is only used for the aggregate sample case (tasks
+    // always saw all the samples)
+    
+    /**
+     * Helper class for sample tests.  This runnable is run during
+     * the profile listener's report method.  It checks for a known
+     * operation to know if a sample should have been added,
+     * otherwise the sample should not be in the profile report.
+     * Synchronization with the test case is performed through an
+     * Exchanger. If an AssertionError is thrown, it is assumed to 
+     * have come from the JUnit framework and is passed back to the 
+     * test thread so it can be reported there.  Otherwise, JUnit
+     * does not note that the test has failed.
+     * <p>
+     * Note that this class assumes the sample will only be updated once.
+     */
+    private static class TestSampleReport implements Runnable {
+        final String name;
+        final ProfileOperation expectUpdate;
+        final Exchanger<AssertionError> errorExchanger;
+        final List<Long> expectedValues;
+        
+        public TestSampleReport(String sampleName,
+                                ProfileOperation expectUpdate,
+                                Exchanger<AssertionError> errorExchanger,
+                                List<Long> expectedValues)
+        {
+            this.name = sampleName;
+            this.expectUpdate = expectUpdate;
+            this.errorExchanger = errorExchanger;
+            this.expectedValues = expectedValues;
+        }
+        
+        public void run() {
+            AssertionError error = null;
+            ProfileReport report = TestListener.report;
+            boolean update = 
+                report.getReportedOperations().contains(expectUpdate);
+            List<Long> values = report.getUpdatedTaskSamples().get(name);
+            
+            try {
+                if (update) {
+                    assertEquals(expectedValues.size(), values.size());
+                    for (int i = 0; i < expectedValues.size(); i++) {
+                        Long found = values.get(i);
+                        System.err.println("found value: " + found);
+                        assertEquals(expectedValues.get(i), found);
+                    }
+                } else {
+                    assertNull(values);
+                }
+            } catch (AssertionError e) {
+                    error = e;
+            }
+
+            // Signal that we're done, and return the exception
+            try { 
+                errorExchanger.exchange(error);
+            } catch (InterruptedException ignored) {
+                // do nothing
+            }
+        }
+    }
+    
+    
+    /** A simple profile listener that notes calls to the public APIs */
     private static class TestListener implements ProfileListener {
         int propertyChangeCalls = 0;
         int reportCalls = 0;
         int shutdownCalls = 0;
+        final Runnable doReport;
+        // Make the profile report available to the doReport runnable.
+        static ProfileReport report;
+        
+        TestListener() {
+            this.doReport = null;
+        }
+        TestListener(Runnable doReport) {
+            this.doReport = doReport;
+        }
         
         @Override
         public void propertyChange(PropertyChangeEvent event) {
@@ -337,12 +1373,15 @@ public class TestProfileCollectorImpl {
         @Override
         public void report(ProfileReport profileReport) {
             reportCalls++;
+            if (doReport != null) {
+                TestListener.report = profileReport;
+                doReport.run();
+            }
         }
 
         @Override
         public void shutdown() {
             shutdownCalls++;
         }
-        
     }
 }
