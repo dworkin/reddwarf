@@ -42,13 +42,22 @@ public class Boot {
             System.exit(1);
         }
         
-        //ensure that SGS_HOME is set
+        //determine SGS_HOME
         String sgs_home = properties.getProperty(BootEnvironment.SGS_HOME);
         if(sgs_home == null) {
-            logger.log(Level.SEVERE, BootEnvironment.SGS_HOME +
-                       " is not specified.");
-            System.exit(1);
+            URL jarLocation = Boot.class.getProtectionDomain().getCodeSource().getLocation();
+            String jarPath = jarLocation.getPath();
+            int jarFileIndex = jarPath.indexOf(BootEnvironment.SGS_JAR);
+            if(jarFileIndex == -1) {
+                logger.log(Level.SEVERE, "Unable to determine SGS_HOME");
+                System.exit(1);
+            }
+            else {
+                sgs_home = jarPath.substring(0, jarFileIndex - 1);
+                properties.setProperty(BootEnvironment.SGS_HOME, sgs_home);
+            }
         }
+        logger.log(Level.CONFIG, "SGS_HOME set to "+sgs_home);
         
         //load defaults for any missing properties
         if(properties.getProperty(BootEnvironment.SGS_DEPLOY) == null) {
@@ -97,7 +106,7 @@ public class Boot {
         }
         
         
-        System.out.print(properties);
+        System.out.println(properties);
     }
     
 }

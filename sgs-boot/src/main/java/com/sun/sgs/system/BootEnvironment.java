@@ -29,6 +29,11 @@ import java.io.File;
 public class BootEnvironment {
     
     /**
+     * Default location of the bootstrapper jar relative to the SGS_HOME
+     */
+    public static final String SGS_JAR = "sgs-server/bin/sgs-boot.jar";
+    
+    /**
      * Name of the properties file to locate and retrieve properties
      * for the environment
      */
@@ -77,27 +82,31 @@ public class BootEnvironment {
     
     
     public static final String DEFAULT_SGS_DEPLOY = 
-            "${SGS_HOME}" + File.separator + "deploy" + File.separator;
+            "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
+            "deploy";
     public static final String DEFAULT_SGS_PROPERTIES = 
-            "${SGS_HOME}" + File.separator + "conf" + File.separator + "sgs-server.properties";
+            "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
+            "conf" + File.separator + "sgs-server.properties";
     public static final String DEFAULT_SGS_LOGGING = 
-            "${SGS_HOME}" + File.separator + "conf" + File.separator + "sgs-logging.properties";
+            "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
+            "conf" + File.separator + "sgs-logging.properties";
     
     
-    public static final String DEFAULT_BDB_ROOT = "lib/bdb-natives/";
+    public static final String DEFAULT_BDB_ROOT = 
+            "${SGS_HOME}" + File.separator + "bdb";
     public static final String DEFAULT_BDB_LINUX_X86 = 
-            DEFAULT_BDB_ROOT + "linux-x86/";
+            DEFAULT_BDB_ROOT + File.separator + "linux-x86";
     public static final String DEFAULT_BDB_LINUX_X86_64 = 
-            DEFAULT_BDB_ROOT + "linux-x86_64/";
+            DEFAULT_BDB_ROOT + File.separator + "linux-x86_64";
     public static final String DEFAULT_BDB_MACOSX_X86 =
-            DEFAULT_BDB_ROOT + "macosx-x86/";
+            DEFAULT_BDB_ROOT + File.separator + "macosx-x86";
     public static final String DEFAULT_BDB_MACOSX_PPC = 
-            DEFAULT_BDB_ROOT + "macosx-ppc/";
+            DEFAULT_BDB_ROOT + File.separator + "macosx-ppc";
     public static final String DEFAULT_BDB_SOLARIS_SPARC = 
-            DEFAULT_BDB_ROOT + "solaris-sparc/";
+            DEFAULT_BDB_ROOT + File.separator + "solaris-sparc";
     public static final String DEFAULT_BDB_SOLARIS_X86 = 
-            DEFAULT_BDB_ROOT + "solaris-x86/";
+            DEFAULT_BDB_ROOT + File.separator + "solaris-x86";
     public static final String DEFAULT_BDB_WIN32_X86 = 
-            DEFAULT_BDB_ROOT + "win32-x86/";
+            DEFAULT_BDB_ROOT + File.separator + "win32-x86";
     
 }
