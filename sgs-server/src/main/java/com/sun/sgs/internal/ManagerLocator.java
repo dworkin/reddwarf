@@ -43,7 +43,7 @@ public interface ManagerLocator {
      * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
      *          be located
      */
-    public ChannelManager getChannelManager();
+    ChannelManager getChannelManager();
 
     /**
      * Returns the {@code DataManager} for use by the current application.
@@ -54,7 +54,7 @@ public interface ManagerLocator {
      * @throws	ManagerNotFoundException if the {@code DataManager} cannot
      *          be located
      */
-    public DataManager getDataManager();
+    DataManager getDataManager();
 
     /**
      * Returns the {@code TaskManager} for use by the current application.
@@ -65,7 +65,7 @@ public interface ManagerLocator {
      * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
      *          be located
      */
-    public TaskManager getTaskManager();
+    TaskManager getTaskManager();
     
     /**
      * Returns a manager of the specified type for use by the current
@@ -78,5 +78,5 @@ public interface ManagerLocator {
      * @throws	ManagerNotFoundException if no manager is found for the
      *		specified type
      */
-    public <T> T getManager(Class<T> type);
+    <T> T getManager(Class<T> type);
 }

@@ -25,7 +25,7 @@ package com.sun.sgs.internal;
  * through the {@link com.sun.sgs.app.AppContext AppContext}.  This class
  * should not be instantiated.
  */
-public class InternalContext {
+public final class InternalContext {
     
     // the current locator for this context
     private static volatile ManagerLocator managerLocator;
