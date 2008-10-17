@@ -27,9 +27,9 @@ import com.sun.sgs.internal.ManagerLocator;
 /**
  * Package-private implementation of {@code ManagerLocator} that is
  * to be used as the default locator for the
- * {@link com.sun.sgs.app.AppContext AppContext}.
+ * {@link com.sun.sgs.internal.InternalContext InternalContext}.
  * 
- * @see com.sun.sgs.app.AppContext#setManagerLocator AppContext.setManagerLocator
+ * @see com.sun.sgs.internal.InternalContext#setManagerLocator InternalContext.setManagerLocator
  */
 class ManagerLocatorImpl implements ManagerLocator {
 

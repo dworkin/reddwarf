@@ -25,13 +25,13 @@ package com.sun.sgs.internal;
  * through the {@link com.sun.sgs.app.AppContext AppContext}.  This class
  * should not be instantiated.
  */
-public class ImplContext {
+public class InternalContext {
     
     // the current locator for this context
     private static volatile ManagerLocator managerLocator;
     
     /** This class should not be instantiated. */
-    private ImplContext() { }
+    private InternalContext() { }
     
     /**
      * Returns the {@code ManagerLocator} for use by the current
@@ -64,10 +64,10 @@ public class ImplContext {
      * results.
      * 
      * @param managerLocator the {@code ManagerLocator} that the 
-     *        {@code AppContext} should use to retrieve managers
+     *        {@code InternalContext} should use to retrieve managers
      */
     public static synchronized void 
             setManagerLocator(ManagerLocator managerLocator) {
-        ImplContext.managerLocator = managerLocator;
+        InternalContext.managerLocator = managerLocator;
     }
 }

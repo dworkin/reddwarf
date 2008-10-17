@@ -19,10 +19,12 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.internal.ImplContext;
+import com.sun.sgs.internal.InternalContext;
 
 /**
  * Provides access to facilities available in the current application context.
+ * The {@code AppContext} uses the {@link InternalContext} to retrieve
+ * managers via its {@link com.sun.sgs.internal.ManagerLocator ManagerLocator}.
  * This class should not be instantiated.
  */
 public final class AppContext {
@@ -38,12 +40,11 @@ public final class AppContext {
      * @return	the {@code ChannelManager} for the current application
      * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
      *          be located
-     * @throws  IllegalStateException if the <code>AppContext</code> has not
-     *          been initialized via 
-     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
+     * @throws  IllegalStateException if the {@code InternalContext} has not
+     *          been initialized with a {@code ManagerLocator}
      */
     public static ChannelManager getChannelManager() {
-        return ImplContext.getManagerLocator().getChannelManager();
+        return InternalContext.getManagerLocator().getChannelManager();
     }
 
     /**
@@ -54,12 +55,11 @@ public final class AppContext {
      * @return	the {@code DataManager} for the current application
      * @throws	ManagerNotFoundException if the {@code DataManager} cannot
      *          be located
-     * @throws  IllegalStateException if the <code>AppContext</code> has not
-     *          been initialized via 
-     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
+     * @throws  IllegalStateException if the {@code InternalContext} has not
+     *          been initialized with a {@code ManagerLocator}
      */
     public static DataManager getDataManager() {
-        return ImplContext.getManagerLocator().getDataManager();
+        return InternalContext.getManagerLocator().getDataManager();
     }
 
     /**
@@ -70,12 +70,11 @@ public final class AppContext {
      * @return	the {@code TaskManager} for the current application
      * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
      *          be located
-     * @throws  IllegalStateException if the <code>AppContext</code> has not
-     *          been initialized via 
-     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
+     * @throws  IllegalStateException if the {@code InternalContext} has not
+     *          been initialized with a {@code ManagerLocator}
      */
     public static TaskManager getTaskManager() {
-        return ImplContext.getManagerLocator().getTaskManager();
+        return InternalContext.getManagerLocator().getTaskManager();
     }
 
     /**
@@ -88,12 +87,11 @@ public final class AppContext {
      * @return	the manager of the specified type for the current application
      * @throws	ManagerNotFoundException if no manager is found for the
      *		specified type
-     * @throws  IllegalStateException if the <code>AppContext</code> has not
-     *          been initialized via 
-     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
+     * @throws  IllegalStateException if the {@code InternalContext} has not
+     *          been initialized with a {@code ManagerLocator}
      */
     public static <T> T getManager(Class<T> type) {
-        return ImplContext.getManagerLocator().getManager(type);
+        return InternalContext.getManagerLocator().getManager(type);
     }
 
 }

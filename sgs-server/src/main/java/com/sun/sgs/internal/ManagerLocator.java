@@ -27,10 +27,10 @@ import com.sun.sgs.app.TaskManager;
  * Defines the boundary API for accessing managers for use by the current
  * application.  Any implementation of the Project Darkstar API should
  * provide a single implementation of this interface that is to be
- * used by the {@link AppContext} to locate managers in the system.
+ * used by the {@link InternalContext} to locate managers in the system.
  * 
  * @see com.sun.sgs.app.AppContext AppContext
- * @see ImplContext#setManagerLocator ImplContext.setManagerLocator
+ * @see InternalContext#setManagerLocator InternalContext.setManagerLocator
  */
 public interface ManagerLocator {
     
