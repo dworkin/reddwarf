@@ -40,9 +40,9 @@ public class InternalContext {
      * from the Project Darkstar stack.  Generally, it should not need to be 
      * called by an application.
      *
-     * @return	the {@code ChannelManager} for the current application
-     * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
-     *          be located
+     * @return	the {@code ManagerLocator} for the current application
+     * @throws	IllegalStateException if the {@code ManagerLocator}
+     *          is null
      */
     public static ManagerLocator getManagerLocator() {
         if (managerLocator == null) {
