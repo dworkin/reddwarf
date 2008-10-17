@@ -22,12 +22,16 @@ package com.sun.sgs.app.impl;
 /**
  * Provides a pluggable mechanism for replacing the {@link ManagerLocator}
  * used by the application to get Managers from the Project Darkstar stack
- * through the {@link com.sun.sgs.app.AppContext AppContext}.
+ * through the {@link com.sun.sgs.app.AppContext AppContext}.  This class
+ * should not be instantiated.
  */
 public class ImplContext {
     
     // the current locator for this context
     private static volatile ManagerLocator managerLocator;
+    
+    /** This class should not be instantiated. */
+    private ImplContext() { }
     
     /**
      * Returns the {@code ManagerLocator} for use by the current
