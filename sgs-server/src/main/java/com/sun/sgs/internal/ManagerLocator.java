@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.app.impl;
+package com.sun.sgs.internal;
 
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;

@@ -19,8 +19,8 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.app.impl.ImplContext;
-import com.sun.sgs.app.impl.ManagerLocator;
+import com.sun.sgs.internal.ImplContext;
+import com.sun.sgs.internal.ManagerLocator;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;

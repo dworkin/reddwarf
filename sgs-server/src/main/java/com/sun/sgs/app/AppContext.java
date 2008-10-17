@@ -19,7 +19,7 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.app.impl.ImplContext;
+import com.sun.sgs.internal.ImplContext;
 
 /**
  * Provides access to facilities available in the current application context.

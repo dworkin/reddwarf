@@ -21,4 +21,4 @@
  * Provides implementation hooks for a Project Darkstar Server to configure
  * the underlying behavior of the system.
  */
-package com.sun.sgs.app.impl;
+package com.sun.sgs.internal;

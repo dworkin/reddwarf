@@ -22,7 +22,7 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
-import com.sun.sgs.app.impl.ManagerLocator;
+import com.sun.sgs.internal.ManagerLocator;
 
 /**
  * Package-private implementation of {@code ManagerLocator} that is

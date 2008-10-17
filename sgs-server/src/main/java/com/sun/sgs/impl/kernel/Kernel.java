@@ -21,8 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.impl.ManagerLocator;
-import com.sun.sgs.app.impl.ImplContext;
+import com.sun.sgs.internal.ManagerLocator;
+import com.sun.sgs.internal.ImplContext;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
