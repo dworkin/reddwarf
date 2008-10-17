@@ -21,8 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ManagerLocator;
-import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.impl.ManagerLocator;
+import com.sun.sgs.app.impl.ImplContext;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
@@ -359,7 +359,7 @@ class Kernel {
         ContextResolver.setTaskState(application, owner);
         
         // tell the AppContext how to find the managers
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
 
         // notify all of the services that the application state is ready
         try {

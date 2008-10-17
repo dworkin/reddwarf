@@ -19,11 +19,13 @@
 
 package com.sun.sgs.app;
 
+import com.sun.sgs.app.impl.ImplContext;
+import com.sun.sgs.app.impl.ManagerLocator;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 import org.junit.Test;
-import org.junit.Before;
 import org.junit.After;
 import org.junit.Assert;
 
@@ -119,22 +121,22 @@ public class TestAppContext {
         EasyMock.replay(managerLocator);
     }
 
-    @Test(expected=ManagerNotFoundException.class)
+    @Test(expected=IllegalStateException.class)
     public void testGetDataManagerBeforeInit() {
         AppContext.getDataManager();
     }
     
-    @Test(expected=ManagerNotFoundException.class)
+    @Test(expected=IllegalStateException.class)
     public void testGetTaskManagerBeforeInit() {
         AppContext.getTaskManager();
     }
     
-    @Test(expected=ManagerNotFoundException.class)
+    @Test(expected=IllegalStateException.class)
     public void testGetChannelManagerBeforeInit() {
         AppContext.getChannelManager();
     }
     
-    @Test(expected=ManagerNotFoundException.class)
+    @Test(expected=IllegalStateException.class)
     public void testGetArbitraryManagerBeforeInit() {
         AppContext.getManager(Object.class);
     }
@@ -142,7 +144,7 @@ public class TestAppContext {
     @Test
     public void testGetDataManagerAfterInit() {
         initStableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         DataManager d = AppContext.getDataManager();
         
         Assert.assertSame(d, dataManager);
@@ -151,7 +153,7 @@ public class TestAppContext {
     @Test
     public void testGetTaskManagerAfterInit() {
         initStableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         TaskManager t = AppContext.getTaskManager();
         
         Assert.assertSame(t, taskManager);
@@ -160,7 +162,7 @@ public class TestAppContext {
     @Test
     public void testGetChannelManagerAfterInit() {
         initStableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         ChannelManager c = AppContext.getChannelManager();
         
         Assert.assertSame(c, channelManager);
@@ -169,7 +171,7 @@ public class TestAppContext {
     @Test
     public void testGetArbitraryManagerAfterInit() {
         initStableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         Object o = AppContext.getManager(Object.class);
         
         Assert.assertSame(o, arbitraryManager);
@@ -178,7 +180,7 @@ public class TestAppContext {
     @Test
     public void testGetDataManagerWithUnstableManagerLocator() {
         initUnstableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         DataManager d1 = AppContext.getDataManager();
         DataManager d2 = AppContext.getDataManager();
@@ -190,7 +192,7 @@ public class TestAppContext {
     @Test
     public void testGetChannelManagerWithUnstableManagerLocator() {
         initUnstableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         ChannelManager c1 = AppContext.getChannelManager();
         ChannelManager c2 = AppContext.getChannelManager();
@@ -202,7 +204,7 @@ public class TestAppContext {
     @Test
     public void testGetTaskManagerWithUnstableManagerLocator() {
         initUnstableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         TaskManager t1 = AppContext.getTaskManager();
         TaskManager t2 = AppContext.getTaskManager();
@@ -214,7 +216,7 @@ public class TestAppContext {
     @Test
     public void testGetArbitraryManagerWithUnstableManagerLocator() {
         initUnstableAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         Object o1 = AppContext.getManager(Object.class);
         Object o2 = AppContext.getManager(Object.class);
@@ -233,20 +235,20 @@ public class TestAppContext {
         initStableAppContext();
         ManagerLocator m2 = managerLocator;
         
-        AppContext.setManagerLocator(m1);
-        AppContext.setManagerLocator(m2);
+        ImplContext.setManagerLocator(m1);
+        ImplContext.setManagerLocator(m2);
     }
     
     @Test
     public void testEmptyManagerLocator() {
         initEmptyAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
     }
     
     @Test(expected=ManagerNotFoundException.class)
     public void testGetDataManagerWithEmptyManagerLocator() {
         initEmptyAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         AppContext.getDataManager();
     }
@@ -254,7 +256,7 @@ public class TestAppContext {
     @Test(expected=ManagerNotFoundException.class)
     public void testGetTaskManagerWithEmptyManagerLocator() {
         initEmptyAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         AppContext.getTaskManager();
     }
@@ -262,7 +264,7 @@ public class TestAppContext {
     @Test(expected=ManagerNotFoundException.class)
     public void testGetChannelManagerWithEmptyManagerLocator() {
         initEmptyAppContext();
-        AppContext.setManagerLocator(managerLocator);
+        ImplContext.setManagerLocator(managerLocator);
         
         AppContext.getChannelManager();
     }

@@ -17,7 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.app;
+package com.sun.sgs.app.impl;
+
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.TaskManager;
 
 /**
  * Defines the boundary API for accessing managers for use by the current
@@ -25,7 +29,8 @@ package com.sun.sgs.app;
  * provide a single implementation of this interface that is to be
  * used by the {@link AppContext} to locate managers in the system.
  * 
- * @see AppContext#setManagerLocator AppContext.setManagerLocator
+ * @see com.sun.sgs.app.AppContext AppContext
+ * @see ImplContext#setManagerLocator ImplContext.setManagerLocator
  */
 public interface ManagerLocator {
     

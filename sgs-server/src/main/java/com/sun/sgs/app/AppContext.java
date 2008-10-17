@@ -19,14 +19,13 @@
 
 package com.sun.sgs.app;
 
+import com.sun.sgs.app.impl.ImplContext;
+
 /**
  * Provides access to facilities available in the current application context.
  * This class should not be instantiated.
  */
 public final class AppContext {
-    
-    // the current locator for this context
-    private static volatile ManagerLocator managerLocator;
     
     /** This class should not be instantiated. */
     private AppContext() { }
@@ -39,12 +38,12 @@ public final class AppContext {
      * @return	the {@code ChannelManager} for the current application
      * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
      *          be located
+     * @throws  IllegalStateException if the <code>AppContext</code> has not
+     *          been initialized via 
+     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
      */
     public static ChannelManager getChannelManager() {
-        if(managerLocator == null)
-            throw new ManagerNotFoundException("AppContext not initialized");
-        
-        return managerLocator.getChannelManager();
+        return ImplContext.getManagerLocator().getChannelManager();
     }
 
     /**
@@ -55,12 +54,12 @@ public final class AppContext {
      * @return	the {@code DataManager} for the current application
      * @throws	ManagerNotFoundException if the {@code DataManager} cannot
      *          be located
+     * @throws  IllegalStateException if the <code>AppContext</code> has not
+     *          been initialized via 
+     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
      */
     public static DataManager getDataManager() {
-        if(managerLocator == null)
-            throw new ManagerNotFoundException("AppContext not initialized");
-        
-        return managerLocator.getDataManager();
+        return ImplContext.getManagerLocator().getDataManager();
     }
 
     /**
@@ -71,12 +70,12 @@ public final class AppContext {
      * @return	the {@code TaskManager} for the current application
      * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
      *          be located
+     * @throws  IllegalStateException if the <code>AppContext</code> has not
+     *          been initialized via 
+     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
      */
     public static TaskManager getTaskManager() {
-        if(managerLocator == null)
-            throw new ManagerNotFoundException("AppContext not initialized");
-        
-        return managerLocator.getTaskManager();
+        return ImplContext.getManagerLocator().getTaskManager();
     }
 
     /**
@@ -89,33 +88,12 @@ public final class AppContext {
      * @return	the manager of the specified type for the current application
      * @throws	ManagerNotFoundException if no manager is found for the
      *		specified type
+     * @throws  IllegalStateException if the <code>AppContext</code> has not
+     *          been initialized via 
+     *          {@link ImplContext#setManagerLocator ImplContext.setManagerLocator}
      */
     public static <T> T getManager(Class<T> type) {
-        if(managerLocator == null)
-            throw new ManagerNotFoundException("AppContext not initialized");
-        
-        return managerLocator.getManager(type);
-    }
-    
-    /**
-     * Sets the {@code ManagerLocator} which is used to retrieve
-     * managers for the application.  <p>
-     * 
-     * In most situations, this method
-     * should only be called once upon bootup of a Project Darkstar
-     * container.  Typically, an application should never have a reason
-     * to call this method, and doing so could cause unexpected
-     * results.
-     * 
-     * @param managerLocator the {@code ManagerLocator} that the 
-     *        {@code AppContext} should use to retrieve managers
-     */
-    public static synchronized void 
-            setManagerLocator(ManagerLocator managerLocator) {
-        if(managerLocator == null)
-            throw new NullPointerException("managerLocator cannot be null");
-        
-        AppContext.managerLocator = managerLocator;
+        return ImplContext.getManagerLocator().getManager(type);
     }
 
 }
