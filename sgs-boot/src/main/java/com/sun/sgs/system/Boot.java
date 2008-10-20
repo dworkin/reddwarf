@@ -38,11 +38,20 @@ public class Boot {
     private static final Logger logger = Logger.getLogger(Boot.class.getName());
 
     public static void main(String[] args) {
+        if(args.length > 1) {
+            logger.log(Level.SEVERE, "Invalid number of arguments");
+            System.exit(1);
+        }
+        
         //load properties from configuration file
         Properties properties = new SubstitutionProperties();
         try {
-            URL sgsBoot = ClassLoader.getSystemClassLoader().
-                    getResource(BootEnvironment.SGS_BOOT);
+            URL sgsBoot = null;
+            if(args.length == 0)
+                sgsBoot = ClassLoader.getSystemClassLoader().
+                        getResource(BootEnvironment.SGS_BOOT);
+            else
+                sgsBoot = new File(args[0]).toURI().toURL();
             properties.load(sgsBoot.openStream());
         } catch(Exception e) {
             logger.log(Level.SEVERE, "Unable to load initial configuration", e);
