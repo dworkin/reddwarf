@@ -32,12 +32,10 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -139,8 +137,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     private static final int TXN_ALLOCATION_BLOCK_SIZE = 100;
 
     /**
-     * The name of the undocumented property that controls whether to replace
-     * Java(TM) RMI with an experimental, socket-based facility.
+     * Whether to replace Java(TM) RMI with an experimental, socket-based
+     * facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	PACKAGE + ".no.rmi");
@@ -389,8 +387,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	final SortedMap<Long, Txn> table =
-	    Collections.synchronizedSortedMap(new TreeMap<Long, Txn>());
+	final NavigableMap<Long, Txn> table =
+	    new ConcurrentSkipListMap<Long, Txn>();
 
 	/** Creates an instance. */
 	TxnTable() { }
@@ -455,15 +453,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    result.add(txn);
 		}
 		/* Search for the next entry */
-		Long startingId = Long.valueOf(nextId + 1);
-		nextId = null;
-		synchronized (table) {
-		    Iterator<Long> iter =
-			table.tailMap(startingId).keySet().iterator();
-		    if (iter.hasNext()) {
-			nextId = iter.next();
-		    }
-		}
+		nextId = table.higherKey(nextId);
 	    }
 	    return result;
 	}
