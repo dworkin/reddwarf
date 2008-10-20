@@ -31,6 +31,7 @@ import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
+import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -51,7 +52,15 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 
 @RunWith(NameRunner.class)
 public class TestProfileCollectorImpl {
@@ -134,8 +143,7 @@ public class TestProfileCollectorImpl {
     
     /** Returns the profile registrar for a given node */
     private ProfileRegistrar getRegistrar(SgsTestNode node) {
-        return  node.getSystemRegistry().getComponent(
-                            com.sun.sgs.profile.ProfileRegistrar.class);
+        return  node.getSystemRegistry().getComponent(ProfileRegistrar.class);
     }
     
     
@@ -250,6 +258,13 @@ public class TestProfileCollectorImpl {
         assertSame(pc2, pc1);
     }
     
+    @Test(expected=UnsupportedOperationException.class)
+    public void testGetConsumersReadOnly() {
+        Map<String, ProfileConsumer> consumerMap =
+                profileCollector.getConsumers();
+        consumerMap.put("Foo", null);
+    }
+    
     /* -- Listener tests -- */
     @Test
     public void testNoListener() {
@@ -267,6 +282,14 @@ public class TestProfileCollectorImpl {
         assertEquals(2, listeners.size());
         assertTrue(listeners.contains(test));
     }
+    
+    @Test(expected=UnsupportedOperationException.class)
+    public void testGetListenersReadOnly() {
+        List<ProfileListener> listeners = 
+                profileCollector.getListeners();
+        listeners.add(null);
+    }
+    
     
     @Test
     public void testAddListenerCalled() throws Exception {
@@ -346,6 +369,17 @@ public class TestProfileCollectorImpl {
         profileCollector.removeListener(test);
         assertEquals(0, test.shutdownCalls);
         assertEquals(initialSize  + 1, profileCollector.getListeners().size());
+    }
+    
+    @Test(expected=NullPointerException.class)
+    public void testListenerNullRemove() {
+        profileCollector.removeListener(null);
+    }
+    
+    @Test
+    public void testListenerRemoveNotAdded() {
+        TestListener test = new TestListener();
+        profileCollector.removeListener(test);
     }
     
     /* -- Consumer tests -- */
@@ -450,12 +484,6 @@ public class TestProfileCollectorImpl {
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.registerCounter(name, true, ProfileLevel.MIN);
-        // An operation that is sent when the counter is updated, which is
-        // used as a flag in the listener.  This isn't ideal, because the
-        // test is relying on functionality within the class it's testing,
-        // but we cannot control when the listener will be called.
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -464,22 +492,28 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("owner");
         TestListener test = new TestListener(
-            new TestCounterReport(name, expectUpdate, errorExchanger, 1));
+            new TestCounterReport(name, positiveOwner, errorExchanger, 1));
         profileCollector.addListener(test, true);
 
+        // We run with the myOwner because we expect to see the
+        // value in the test report.
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() { 
-                    // We expect to see the counter incremented in the listener
-                    expectUpdate.report();
                     counter.incrementCount();
                 }
-            }, taskOwner);
+            }, positiveOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
+            // Print the original stack trace, plus fail directly, so we
+            // can get stack traces for both threads.
+            error.printStackTrace(System.err);
             fail("Got an exception: " + error);
         }
 
@@ -491,6 +525,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
+            error.printStackTrace(System.err);
             fail("Got an exception: " + error);
         }
     }
@@ -504,13 +539,6 @@ public class TestProfileCollectorImpl {
         final ProfileCounter counter = 
                 cons1.registerCounter(name, true, ProfileLevel.MAX);
         
-        // An operation that is sent when the counter is updated, which is
-        // used as a flag in the listener.  This isn't ideal, because the
-        // test is relying on functionality within the class it's testing,
-        // but we cannot control when the listener will be called.
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
-        
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
         // Use an exchanger to synchronize between the threads and communicate
@@ -518,8 +546,11 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("counterlevel");
         TestListener test = new TestListener( 
-            new TestCounterReport(name, expectUpdate, errorExchanger, 1));
+            new TestCounterReport(name, positiveOwner, errorExchanger, 1));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -543,10 +574,9 @@ public class TestProfileCollectorImpl {
 		public void run() {
                     // Because we bumped the consumer's profile level,
                     // we expect the counter
-                    expectUpdate.report();
                     counter.incrementCount();
                 }
-            }, taskOwner);
+            }, positiveOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -563,13 +593,7 @@ public class TestProfileCollectorImpl {
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.registerCounter(name, true, ProfileLevel.MIN);
-        // An operation that is sent when the counter is updated, which is
-        // used as a flag in the listener.  This isn't ideal, because the
-        // test is relying on functionality within the class it's testing,
-        // but we cannot control when the listener will be called.
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
-        
+
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
         // Use an exchanger to synchronize between the threads and communicate
@@ -577,19 +601,20 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("counterinc");
         TestListener test = new TestListener(
-            new TestCounterReport(name, expectUpdate, 
+            new TestCounterReport(name, positiveOwner, 
                                   errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() { 
-                    // We expect to see the counter incremented in the listener
-                    expectUpdate.report();
                     counter.incrementCount(incValue);
                 }
-            }, taskOwner);
+            }, positiveOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
@@ -607,12 +632,6 @@ public class TestProfileCollectorImpl {
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.registerCounter(name, true, ProfileLevel.MIN);
-        // An operation that is sent when the counter is updated, which is
-        // used as a flag in the listener.  This isn't ideal, because the
-        // test is relying on functionality within the class it's testing,
-        // but we cannot control when the listener will be called.
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -621,8 +640,11 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("countermult");
         TestListener test = new TestListener(
-            new TestCounterReport(name, expectUpdate, 
+            new TestCounterReport(name, positiveOwner, 
                                   errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
@@ -630,11 +652,10 @@ public class TestProfileCollectorImpl {
             new TestAbstractKernelRunnable() {
 		public void run() { 
                     // We expect to see the counter incremented by 5 total
-                    expectUpdate.report();
                     counter.incrementCount(2);
                     counter.incrementCount(3);
                 }
-            }, taskOwner);
+            }, positiveOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
@@ -642,76 +663,6 @@ public class TestProfileCollectorImpl {
             fail("Got an exception: " + error);
         }
     }
-    
-    /**
-     * Helper class for counter tests.  This runnable is run during
-     * the profile listener's report method.  It checks for a known
-     * operation to know if a counter should have been incremented,
-     * otherwise the counter should not be in the profile report.
-     * Synchronization with the test case is performed through an
-     * Exchanger. If an AssertionError is thrown, it is assumed to 
-     * have come from the JUnit framework and is passed back to the 
-     * test thread so it can be reported there.  Otherwise, JUnit
-     * does not note that the test has failed.
-     * <p>
-     * Note that this class assumes the counter will only be updated once.
-     */
-    private static class TestCounterReport implements Runnable {
-        final String name;
-        final ProfileOperation expectUpdate;
-        final Exchanger<AssertionError> errorExchanger;
-        final int incrementValue;
-        
-        public TestCounterReport(String name,
-                                 ProfileOperation expectUpdate, 
-                                 Exchanger<AssertionError> errorExchanger,
-                                 int incrementValue)
-        {
-            this.name = name;
-            this.expectUpdate = expectUpdate;
-            this.errorExchanger = errorExchanger;
-            this.incrementValue = incrementValue;
-        }
-        
-        public void run() {
-            AssertionError error = null;
-            ProfileReport report = TestListener.report;
-            boolean update = 
-                report.getReportedOperations().contains(expectUpdate);
-            // Check to see if we expected the counter value to be
-            // updated in this listener call.
-            if (update) {    
-                try {
-                    // Find the counter, make sure it was incremented
-                    long value = 
-                        report.getUpdatedTaskCounters().get(name);
-                    System.err.println("got counter value of " + value);
-                    assertEquals(incrementValue, value);
-                } catch (AssertionError e) {
-                    error = e;
-                }
-            } else {
-                try {
-                    long value =
-                        report.getUpdatedTaskCounters().get("counter");
-                    System.err.println("got counter value of " + value);
-                    fail("Expected NullPointerExcpetion");
-                } catch (NullPointerException e) {
-                    System.err.println("Caught expected NPE");
-                } catch (AssertionError e) {
-                    error = e;
-                }
-            }
-            // Signal that we're done, and return the exception
-            try { 
-                errorExchanger.exchange(error);
-            } catch (InterruptedException ignored) {
-                // do nothing
-            }
-        }
-    }
-    
-    
         
     /* -- Operation tests -- */
     @Test
@@ -762,7 +713,6 @@ public class TestProfileCollectorImpl {
         ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
         final ProfileOperation op =
                 cons1.registerOperation("something", ProfileLevel.MIN);
-        final BooleanWrapper boolWrap = new BooleanWrapper();
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -771,34 +721,36 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("opowner");
         TestListener test = new TestListener(
-            new TestOperationReport(op, boolWrap, errorExchanger));
+            new TestOperationReport(op, positiveOwner, errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() { 
-                    // We expect to see the operation in the profile report
-                    boolWrap.value = true;
                     op.report();
                 }
-            }, taskOwner);
+            }, positiveOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
+            error.printStackTrace(System.err);
             fail("Got an exception: " + error);
         }
 
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() {
-                    boolWrap.value = false;
                 }
             }, taskOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
+            error.printStackTrace(System.err);
             fail("Got an exception: " + error);
         }
     }
@@ -809,7 +761,6 @@ public class TestProfileCollectorImpl {
         ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
         final ProfileOperation op =
                 cons1.registerOperation("something", ProfileLevel.MEDIUM);
-        final BooleanWrapper boolWrap = new BooleanWrapper();
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -818,15 +769,17 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("opmed");
         TestListener test = new TestListener(
-            new TestOperationReport(op, boolWrap, errorExchanger));
+            new TestOperationReport(op, positiveOwner, errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() { 
                     // We do not expect to see this reported.
-                    boolWrap.value = false;
                     op.report();
                 }
             }, taskOwner);
@@ -841,24 +794,58 @@ public class TestProfileCollectorImpl {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() {
-                    boolWrap.value = true;
                     op.report();
                 }
-            }, taskOwner);
+            }, positiveOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
             fail("Got an exception: " + error);
         }
+    }
+    
+    @Test
+    public void testOperationMediumToMaxLevel() throws Exception {
+        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        final ProfileOperation op =
+                cons1.registerOperation("something", ProfileLevel.MEDIUM);
         
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("opmedtomax");
+        TestListener test = new TestListener(
+            new TestOperationReport(op, positiveOwner, errorExchanger));
+        profileCollector.addListener(test, true);
+
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We do not expect to see this reported.
+                    op.report();
+                }
+            }, taskOwner);
+
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            fail("Got an exception: " + error);
+        }
+
         cons1.setProfileLevel(ProfileLevel.MAX);
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() {
-                    boolWrap.value = true;
                     op.report();
                 }
-            }, taskOwner);
+            }, positiveOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -872,7 +859,6 @@ public class TestProfileCollectorImpl {
         ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
         final ProfileOperation op =
                 cons1.registerOperation("something", ProfileLevel.MAX);
-        final BooleanWrapper boolWrap = new BooleanWrapper();
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -881,15 +867,17 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("opmax");
         TestListener test = new TestListener(
-            new TestOperationReport(op, boolWrap, errorExchanger));
+            new TestOperationReport(op, positiveOwner, errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() { 
                     // We do not expect to see this reported.
-                    boolWrap.value = false;
                     op.report();
                 }
             }, taskOwner);
@@ -905,7 +893,6 @@ public class TestProfileCollectorImpl {
             new TestAbstractKernelRunnable() {
 		public void run() {
                     // No report expected:  the level is still too low
-                    boolWrap.value = false;
                     op.report();
                 }
             }, taskOwner);
@@ -919,10 +906,9 @@ public class TestProfileCollectorImpl {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() {
-                    boolWrap.value = true;
                     op.report();
                 }
-            }, taskOwner);
+            }, positiveOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -938,7 +924,6 @@ public class TestProfileCollectorImpl {
                 cons1.registerOperation("something", ProfileLevel.MIN);
         final ProfileOperation op1 =
                 cons1.registerOperation("else", ProfileLevel.MIN);
-        final BooleanWrapper boolWrap = new BooleanWrapper();
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -947,11 +932,13 @@ public class TestProfileCollectorImpl {
         final Exchanger<AssertionError> errorExchanger = 
                 new Exchanger<AssertionError>();
 
+        final Identity myOwner = new DummyIdentity("me");
         TestListener test = new TestListener(
             new Runnable() {
                 public void run() {
                     AssertionError error = null;
-                    if (boolWrap.value) {
+                    ProfileReport report = TestListener.report;
+                    if (report.getTaskOwner().equals(myOwner)) {
                         try {
                             List<ProfileOperation> ops =
                                 TestListener.report.getReportedOperations();
@@ -991,54 +978,11 @@ public class TestProfileCollectorImpl {
             new TestAbstractKernelRunnable() {
 		public void run() { 
                     // We expect to see the operation in the profile report
-                    boolWrap.value = true;
                     op.report();
                     op1.report();
                     op.report();
                 }
-            }, taskOwner);
-    }
-    
-    /**
-     * Helper class for testing operations in ProfileReports
-     */
-    private static class TestOperationReport implements Runnable {
-        final ProfileOperation operation;
-        final BooleanWrapper expectOperation;
-        final Exchanger<AssertionError> errorExchanger;
-        
-        public TestOperationReport(ProfileOperation operation,
-                                   BooleanWrapper expectOperation,
-                                   Exchanger<AssertionError> errorExchanger) 
-        {
-            this.operation = operation;
-            this.expectOperation = expectOperation;
-            this.errorExchanger = errorExchanger;
-        }
-        
-        public void run() {
-            AssertionError error = null;
-            boolean update = 
-                TestListener.report.getReportedOperations().contains(operation);
-            try {
-                assertEquals(expectOperation.value, update);
-            } catch (AssertionError e) {
-                error = e;
-            }
-            
-            // Signal that we're done, and return the exception
-            try { 
-                errorExchanger.exchange(error);
-            } catch (InterruptedException ignored) {
-                // do nothing
-            }
-        }
-    }
-    /* Helper class for operation tests.  This is not optimal: bad timing
-     * could let another task run and invalidate the test.
-     */
-    private static class BooleanWrapper {
-        boolean value;
+            }, myOwner);
     }
      
     /* -- Sample tests -- */
@@ -1107,9 +1051,7 @@ public class TestProfileCollectorImpl {
         // Register a counter to be noted at all profiling levels
         final ProfileSample sample = 
             cons1.registerSampleSource(name, true, -1, ProfileLevel.MIN);
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
-        
+
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
         // Use an exchanger to synchronize between the threads and communicate
@@ -1121,8 +1063,11 @@ public class TestProfileCollectorImpl {
         testValues.add(1L);
         testValues.add(5L);
         testValues.add(-22L);
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("sampleowner");
         TestListener test = new TestListener(
-            new TestSampleReport(name, expectUpdate, 
+            new TestSampleReport(name, positiveOwner, 
                                  errorExchanger, testValues));
         profileCollector.addListener(test, true);
 
@@ -1130,16 +1075,16 @@ public class TestProfileCollectorImpl {
             new TestAbstractKernelRunnable() {
 		public void run() { 
                     // We expect to see the test values in listener
-                    expectUpdate.report();
                     for (Long v : testValues) {
                         sample.addSample(v);
                     }
                 }
-            }, taskOwner);
+            }, positiveOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
+            error.printStackTrace(System.err);
             fail("Got an exception: " + error);
         }
 
@@ -1151,6 +1096,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
+            error.printStackTrace(System.err);
             fail("Got an exception: " + error);
         }
     }
@@ -1163,9 +1109,6 @@ public class TestProfileCollectorImpl {
         final ProfileSample sample = 
             cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
         
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
-        
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
         // Use an exchanger to synchronize between the threads and communicate
@@ -1176,8 +1119,11 @@ public class TestProfileCollectorImpl {
         final List<Long> testValues = new ArrayList<Long>();
         testValues.add(101L);
         testValues.add(-22L);
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("samplelevel");
         TestListener test = new TestListener(
-            new TestSampleReport(name, expectUpdate, 
+            new TestSampleReport(name, positiveOwner, 
                                  errorExchanger, testValues));
         profileCollector.addListener(test, true);
         txnScheduler.runTask(
@@ -1202,13 +1148,12 @@ public class TestProfileCollectorImpl {
             new TestAbstractKernelRunnable() {
 		public void run() {
                     // Because we bumped the consumer's profile level,
-                    // we expect the counter
-                    expectUpdate.report();
+                    // we expect the samples to appear
                     for (Long v : testValues) {
                         sample.addSample(v);
                     }
                 }
-            }, taskOwner);
+            }, positiveOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -1223,10 +1168,7 @@ public class TestProfileCollectorImpl {
         final ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
         final ProfileSample sample = 
             cons1.registerSampleSource(name, true, -1, ProfileLevel.MAX);
-        
-        final ProfileOperation expectUpdate =
-                cons1.registerOperation("expectUpdate", ProfileLevel.MIN);
-        
+
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
         // Use an exchanger to synchronize between the threads and communicate
@@ -1237,8 +1179,11 @@ public class TestProfileCollectorImpl {
         final List<Long> testValues = new ArrayList<Long>();
         testValues.add(101L);
         testValues.add(-22L);
+        // The owner for our positive test.  The listener uses this owner
+        // to find the ProfileReport for the task in this test.
+        final Identity positiveOwner = new DummyIdentity("samplechange");
         TestListener test = new TestListener(
-            new TestSampleReport(name, expectUpdate, 
+            new TestSampleReport(name, positiveOwner, 
                                  errorExchanger, testValues));
         profileCollector.addListener(test, true);
 
@@ -1267,14 +1212,13 @@ public class TestProfileCollectorImpl {
                     sample.addSample(999L);
                     cons1.setProfileLevel(ProfileLevel.MAX);
                     for (Long v : testValues) {
-                        expectUpdate.report();
                         sample.addSample(v);
                     }
                     cons1.setProfileLevel(ProfileLevel.MIN);
                     // Should not see this one, either
                     sample.addSample(-22L);
                 }
-            }, taskOwner);
+            }, positiveOwner);
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -1287,68 +1231,9 @@ public class TestProfileCollectorImpl {
     // samples, as this is only used for the aggregate sample case (tasks
     // always saw all the samples)
     
-    /**
-     * Helper class for sample tests.  This runnable is run during
-     * the profile listener's report method.  It checks for a known
-     * operation to know if a sample should have been added,
-     * otherwise the sample should not be in the profile report.
-     * Synchronization with the test case is performed through an
-     * Exchanger. If an AssertionError is thrown, it is assumed to 
-     * have come from the JUnit framework and is passed back to the 
-     * test thread so it can be reported there.  Otherwise, JUnit
-     * does not note that the test has failed.
-     * <p>
-     * Note that this class assumes the sample will only be updated once.
-     */
-    private static class TestSampleReport implements Runnable {
-        final String name;
-        final ProfileOperation expectUpdate;
-        final Exchanger<AssertionError> errorExchanger;
-        final List<Long> expectedValues;
-        
-        public TestSampleReport(String sampleName,
-                                ProfileOperation expectUpdate,
-                                Exchanger<AssertionError> errorExchanger,
-                                List<Long> expectedValues)
-        {
-            this.name = sampleName;
-            this.expectUpdate = expectUpdate;
-            this.errorExchanger = errorExchanger;
-            this.expectedValues = expectedValues;
-        }
-        
-        public void run() {
-            AssertionError error = null;
-            ProfileReport report = TestListener.report;
-            boolean update = 
-                report.getReportedOperations().contains(expectUpdate);
-            List<Long> values = report.getUpdatedTaskSamples().get(name);
-            
-            try {
-                if (update) {
-                    assertEquals(expectedValues.size(), values.size());
-                    for (int i = 0; i < expectedValues.size(); i++) {
-                        Long found = values.get(i);
-                        System.err.println("found value: " + found);
-                        assertEquals(expectedValues.get(i), found);
-                    }
-                } else {
-                    assertNull(values);
-                }
-            } catch (AssertionError e) {
-                    error = e;
-            }
+    
+    /* -- HELPER CLASSES -- */
 
-            // Signal that we're done, and return the exception
-            try { 
-                errorExchanger.exchange(error);
-            } catch (InterruptedException ignored) {
-                // do nothing
-            }
-        }
-    }
-    
-    
     /** A simple profile listener that notes calls to the public APIs */
     private static class TestListener implements ProfileListener {
         int propertyChangeCalls = 0;
@@ -1382,6 +1267,171 @@ public class TestProfileCollectorImpl {
         @Override
         public void shutdown() {
             shutdownCalls++;
+        }
+    }
+    
+    /**
+     * Helper class for counter tests.  This runnable is run during
+     * the profile listener's report method.  It checks for a known
+     * operation to know if a counter should have been incremented,
+     * otherwise the counter should not be in the profile report.
+     * Synchronization with the test case is performed through an
+     * Exchanger. If an AssertionError is thrown, it is assumed to 
+     * have come from the JUnit framework and is passed back to the 
+     * test thread so it can be reported there.  Otherwise, JUnit
+     * does not note that the test has failed.
+     * <p>
+     * Note that this class assumes the counter will only be updated once.
+     */
+    private static class TestCounterReport implements Runnable {
+        final String name;
+        final Identity positiveOwner;
+        final Exchanger<AssertionError> errorExchanger;
+        final int incrementValue;
+        
+        public TestCounterReport(String name,
+                                 Identity positiveOwner, 
+                                 Exchanger<AssertionError> errorExchanger,
+                                 int incrementValue)
+        {
+            this.name = name;
+            this.positiveOwner = positiveOwner;
+            this.errorExchanger = errorExchanger;
+            this.incrementValue = incrementValue;
+        }
+        
+        public void run() {
+            AssertionError error = null;
+            ProfileReport report = TestListener.report;
+
+            // Check to see if we expected the counter value to be
+            // updated in this report.
+            boolean update = report.getTaskOwner().equals(positiveOwner);
+            if (update) {    
+                try {
+                    // Find the counter, make sure it was incremented
+                    Long value = 
+                        report.getUpdatedTaskCounters().get(name);
+                    System.err.println("got counter value of " + value);
+                    assertEquals(incrementValue, value.intValue());
+                } catch (AssertionError e) {
+                    error = e;
+                }
+            } else {
+                try {
+                    Long value =
+                        report.getUpdatedTaskCounters().get(name);
+                    assertNull("expected no value", value);
+                } catch (AssertionError e) {
+                    error = e;
+                }
+            }
+            // Signal that we're done, and return the exception
+            try { 
+                errorExchanger.exchange(error);
+            } catch (InterruptedException ignored) {
+                // do nothing
+            }
+        }
+    }
+    
+    /**
+     * Helper class for testing operations in ProfileReports
+     */
+    private static class TestOperationReport implements Runnable {
+        final ProfileOperation operation;
+        final Identity positiveOwner;
+        final Exchanger<AssertionError> errorExchanger;
+        
+        public TestOperationReport(ProfileOperation operation,
+                                   Identity positiveOwner,
+                                   Exchanger<AssertionError> errorExchanger) 
+        {
+            this.operation = operation;
+            this.positiveOwner = positiveOwner;
+            this.errorExchanger = errorExchanger;
+        }
+        
+        public void run() {
+            AssertionError error = null;
+            ProfileReport report = TestListener.report;
+            // Check to see if we expected the operation to be in this report.
+            boolean update = report.getTaskOwner().equals(positiveOwner);
+            boolean found = report.getReportedOperations().contains(operation);
+            try {
+                assertEquals(update, found);
+            } catch (AssertionError e) {
+                error = e;
+            }
+            
+            // Signal that we're done, and return the exception
+            try { 
+                errorExchanger.exchange(error);
+            } catch (InterruptedException ignored) {
+                // do nothing
+            }
+        }
+    }
+    
+    /**
+     * Helper class for sample tests.  This runnable is run during
+     * the profile listener's report method.  It checks for a known
+     * operation to know if a sample should have been added,
+     * otherwise the sample should not be in the profile report.
+     * Synchronization with the test case is performed through an
+     * Exchanger. If an AssertionError is thrown, it is assumed to 
+     * have come from the JUnit framework and is passed back to the 
+     * test thread so it can be reported there.  Otherwise, JUnit
+     * does not note that the test has failed.
+     * <p>
+     * Note that this class assumes the sample will only be updated once.
+     */
+    private static class TestSampleReport implements Runnable {
+        final String name;
+        final Identity positiveOwner;
+        final Exchanger<AssertionError> errorExchanger;
+        final List<Long> expectedValues;
+        
+        public TestSampleReport(String sampleName,
+                                Identity positiveIdentity,
+                                Exchanger<AssertionError> errorExchanger,
+                                List<Long> expectedValues)
+        {
+            this.name = sampleName;
+            this.positiveOwner = positiveIdentity;
+            this.errorExchanger = errorExchanger;
+            this.expectedValues = expectedValues;
+        }
+        
+        public void run() {
+            AssertionError error = null;
+            ProfileReport report = TestListener.report;
+            // Check to see if we expected the sample values to be
+            // updated in this report.
+            boolean update = report.getTaskOwner().equals(positiveOwner);
+            List<Long> values = report.getUpdatedTaskSamples().get(name);
+            
+            try {
+                if (update) {
+                    assertEquals(expectedValues.size(), values.size());
+                    for (int i = 0; i < expectedValues.size(); i++) {
+                        Long found = values.get(i);
+                        System.err.println("found value: " + found);
+                        assertEquals(expectedValues.get(i), found);
+                    }
+                } else {
+                    assertNull(values);
+                }
+            } catch (AssertionError e) {
+                    error = e;
+            }
+
+            // Signal that we're done, and return the exception
+            try { 
+                errorExchanger.exchange(error);
+            } catch (InterruptedException ignored) {
+                // do nothing
+            }
         }
     }
 }
