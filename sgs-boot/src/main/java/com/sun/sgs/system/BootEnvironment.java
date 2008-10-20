@@ -65,6 +65,11 @@ public class BootEnvironment {
     public static final String SGS_LOGGING = "SGS_LOGGING";
     
     /**
+     * The name of the log file to send output to.
+     */
+    public static final String SGS_LOGFILE = "SGS_LOGFILE";
+    
+    /**
      * The location of the Berkeley DB natives to include as part
      * of the java.library.path
      */
@@ -108,5 +113,8 @@ public class BootEnvironment {
             DEFAULT_BDB_ROOT + File.separator + "solaris-x86";
     public static final String DEFAULT_BDB_WIN32_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "win32-x86";
+    
+    
+    public static final String KERNEL_CLASS = "com.sun.sgs.impl.kernel.Kernel";
     
 }

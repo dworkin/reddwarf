@@ -21,15 +21,21 @@ package com.sun.sgs.system;
 
 import java.net.URL;
 import java.io.File;
+import java.io.PrintStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.List;
+import java.util.Arrays;
 
 /**
  * Bootstraps and launches a Project Darkstar server
  */
 public class Boot {
-    private static Logger logger = Logger.getLogger(Boot.class.getName());
+    private static final Logger logger = Logger.getLogger(Boot.class.getName());
 
     public static void main(String[] args) {
         //load properties from configuration file
@@ -69,7 +75,7 @@ public class Boot {
             properties.setProperty(BootEnvironment.SGS_LOGGING,
                                    BootEnvironment.DEFAULT_SGS_LOGGING);
         }
-        if(properties.getProperty(BootEnvironment.SGS_LOGGING) == null) {
+        if(properties.getProperty(BootEnvironment.SGS_PROPERTIES) == null) {
             properties.setProperty(BootEnvironment.SGS_PROPERTIES,
                                    BootEnvironment.DEFAULT_SGS_PROPERTIES);
         }
@@ -106,9 +112,66 @@ public class Boot {
             properties.setProperty(BootEnvironment.BDB_NATIVES, bdb);
         }
         
+        //get the java executable
+        String javaCmd = "java";
+        String javaHome = properties.getProperty(BootEnvironment.JAVA_HOME);
+        if(javaHome != null)
+            javaCmd = javaHome + File.separator + "jre" + 
+                    File.separator + "bin" + File.separator + javaCmd;
         
+        //get the java options
+        String javaOpts = properties.getProperty(BootEnvironment.JAVA_OPTS, "");
+        
+        //build the classpath
         String classpath = bootClassPath(properties);
-        System.out.println(classpath);
+
+        //build the full execute path
+        String execute = javaCmd + 
+                " -cp " + classpath +
+                " -Djava.util.logging.config.file=" + properties.getProperty(BootEnvironment.SGS_LOGGING) +
+                " -Djava.library.path=" + properties.getProperty(BootEnvironment.BDB_NATIVES) +
+                " " + javaOpts +
+                " " + BootEnvironment.KERNEL_CLASS;
+        List<String> executeCmd = Arrays.asList(execute.split("\\s+"));
+        
+        //build the process
+        ProcessBuilder pb = new ProcessBuilder(executeCmd);
+        pb.environment().put(BootEnvironment.SGS_HOME, 
+                             properties.getProperty(BootEnvironment.SGS_HOME));
+        pb.environment().put(BootEnvironment.SGS_DEPLOY, 
+                             properties.getProperty(BootEnvironment.SGS_DEPLOY));
+        pb.environment().put(BootEnvironment.SGS_PROPERTIES,
+                             properties.getProperty(BootEnvironment.SGS_PROPERTIES));
+        pb.directory(new File(properties.getProperty(BootEnvironment.SGS_HOME)));
+        pb.redirectErrorStream(true);
+        
+        //get the output stream
+        PrintStream output = System.out;
+        String logFile = properties.getProperty(BootEnvironment.SGS_LOGFILE);
+        if(logFile != null) {
+            try {
+                output = new PrintStream(new FileOutputStream(logFile), true);
+                logger.log(Level.INFO, "Redirecting log output to: "+logFile);
+            } catch(FileNotFoundException e) {
+                logger.log(Level.SEVERE, "Unable to open log file", e);
+                System.exit(1);
+            }
+        }
+
+        //run the process
+        try {
+            Process p = pb.start();
+            Thread t = new Thread(new ProcessOutputReader(p, output));
+            t.start();
+            t.join();
+            p.waitFor();
+        } catch(IOException e) {
+            logger.log(Level.SEVERE, "Unable to start process", e);
+            System.exit(1);
+        } catch(InterruptedException i) {
+            logger.log(Level.WARNING, "Thread interrupted", i);
+        }
+
     }
     
     /**
