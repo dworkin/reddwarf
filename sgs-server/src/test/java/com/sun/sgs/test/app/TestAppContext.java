@@ -106,22 +106,22 @@ public class TestAppContext {
         InternalContext.getManagerLocator();
     }
 
-    @Test(expected=IllegalStateException.class)
+    @Test(expected=ManagerNotFoundException.class)
     public void testGetDataManagerBeforeInit() {
         AppContext.getDataManager();
     }
     
-    @Test(expected=IllegalStateException.class)
+    @Test(expected=ManagerNotFoundException.class)
     public void testGetTaskManagerBeforeInit() {
         AppContext.getTaskManager();
     }
     
-    @Test(expected=IllegalStateException.class)
+    @Test(expected=ManagerNotFoundException.class)
     public void testGetChannelManagerBeforeInit() {
         AppContext.getChannelManager();
     }
     
-    @Test(expected=IllegalStateException.class)
+    @Test(expected=ManagerNotFoundException.class)
     public void testGetArbitraryManagerBeforeInit() {
         AppContext.getManager(Object.class);
     }
@@ -236,7 +236,6 @@ public class TestAppContext {
     
     @Test(expected=IllegalStateException.class)
     public void testSetNullManagerLocator() {
-        initEmptyAppContext();
         InternalContext.setManagerLocator(null);
         
         InternalContext.getManagerLocator();

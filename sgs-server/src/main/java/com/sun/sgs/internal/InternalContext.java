@@ -42,13 +42,14 @@ public final class InternalContext {
      *
      * @return	the {@code ManagerLocator} for the current application
      * @throws	IllegalStateException if the {@code ManagerLocator}
-     *          is null
+     *          is set to null
      */
     public static ManagerLocator getManagerLocator() {
-        if (managerLocator == null) {
+        ManagerLocator locator = managerLocator;
+        if (locator == null) {
             throw new IllegalStateException("ManagerLocator is not set");
         }
-        return managerLocator;
+        return locator;
     }
     
     /**
@@ -61,7 +62,10 @@ public final class InternalContext {
      * of the Project Darkstar stack for testing purposes.
      * Typically, an application should never have a reason
      * to call this method, and doing so could cause unexpected
-     * results.
+     * results. <p>
+     * 
+     * It is valid to set the {@code ManagerLocator} to null.
+     * Doing so will reset the {@code InternalContext} to its original state.
      * 
      * @param managerLocator the {@code ManagerLocator} that the 
      *        {@code InternalContext} should use to retrieve managers

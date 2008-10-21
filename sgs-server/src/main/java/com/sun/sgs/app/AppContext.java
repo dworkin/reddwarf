@@ -40,11 +40,14 @@ public final class AppContext {
      * @return	the {@code ChannelManager} for the current application
      * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
      *          be located
-     * @throws  IllegalStateException if the {@code InternalContext} has not
-     *          been initialized with a {@code ManagerLocator}
      */
     public static ChannelManager getChannelManager() {
-        return InternalContext.getManagerLocator().getChannelManager();
+        try {
+            return InternalContext.getManagerLocator().getChannelManager();
+        } catch(IllegalStateException ise) {
+            throw new ManagerNotFoundException("ManagerLocator is " +
+                                               "unavailable", ise);
+        }
     }
 
     /**
@@ -55,11 +58,14 @@ public final class AppContext {
      * @return	the {@code DataManager} for the current application
      * @throws	ManagerNotFoundException if the {@code DataManager} cannot
      *          be located
-     * @throws  IllegalStateException if the {@code InternalContext} has not
-     *          been initialized with a {@code ManagerLocator}
      */
     public static DataManager getDataManager() {
-        return InternalContext.getManagerLocator().getDataManager();
+        try {
+            return InternalContext.getManagerLocator().getDataManager();
+        } catch(IllegalStateException ise) {
+            throw new ManagerNotFoundException("ManagerLocator is " +
+                                               "unavailable", ise);
+        }
     }
 
     /**
@@ -70,11 +76,14 @@ public final class AppContext {
      * @return	the {@code TaskManager} for the current application
      * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
      *          be located
-     * @throws  IllegalStateException if the {@code InternalContext} has not
-     *          been initialized with a {@code ManagerLocator}
      */
     public static TaskManager getTaskManager() {
-        return InternalContext.getManagerLocator().getTaskManager();
+        try {
+            return InternalContext.getManagerLocator().getTaskManager();
+        } catch(IllegalStateException ise) {
+            throw new ManagerNotFoundException("ManagerLocator is " +
+                                               "unavailable", ise);
+        }
     }
 
     /**
@@ -87,11 +96,14 @@ public final class AppContext {
      * @return	the manager of the specified type for the current application
      * @throws	ManagerNotFoundException if no manager is found for the
      *		specified type
-     * @throws  IllegalStateException if the {@code InternalContext} has not
-     *          been initialized with a {@code ManagerLocator}
      */
     public static <T> T getManager(Class<T> type) {
-        return InternalContext.getManagerLocator().getManager(type);
+        try {
+            return InternalContext.getManagerLocator().getManager(type);
+        } catch(IllegalStateException ise) {
+            throw new ManagerNotFoundException("ManagerLocator is " +
+                                               "unavailable", ise);
+        }
     }
 
 }
