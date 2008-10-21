@@ -171,9 +171,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     ProfileConsumer registerProfileProducer(String name) {
         if (name == null)
             throw new NullPointerException("Name cannot be null");
-        ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
-        consumers.put(pc.getName(), pc);
-        return pc;
+        consumers.putIfAbsent(name, new ProfileConsumerImpl(this, name));
+        return consumers.get(name);
     }
     
     /** {@inheritDoc} */
