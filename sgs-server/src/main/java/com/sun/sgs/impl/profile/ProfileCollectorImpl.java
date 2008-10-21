@@ -154,9 +154,29 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
     /** {@inheritDoc} */
     public void setDefaultProfileLevel(ProfileLevel level) {
-        if (level == null)
+        if (level == null) {
             throw new NullPointerException("Profile level cannot be null");
+        }
         defaultProfileLevel = level;
+    }
+    
+    /** {@inheritDoc} */
+    public ProfileConsumer getConsumer(String name) {
+        if (name == null) {
+            throw new NullPointerException("Name cannot be null");
+        }
+        
+        ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
+
+        ProfileConsumerImpl oldpc = consumers.putIfAbsent(name, pc);
+        if (oldpc != null) {
+            logger.log(Level.INFO, 
+                   "Found consumer {0} already created", name);
+            return oldpc;
+        } else {
+            logger.log(Level.INFO, "Created consumer for {0}", name);
+            return pc;
+        }
     }
     
     /** {@inheritDoc} */
@@ -167,18 +187,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         return Collections.unmodifiableMap(retMap);
     }
     
-    /** Called by the profile registrar */
-    ProfileConsumer registerProfileProducer(String name) {
-        if (name == null)
-            throw new NullPointerException("Name cannot be null");
-        consumers.putIfAbsent(name, new ProfileConsumerImpl(this, name));
-        return consumers.get(name);
-    }
-    
     /** {@inheritDoc} */
     public void addListener(ProfileListener listener, boolean canRemove) {
-        if (listener == null)
+        if (listener == null) {
             throw new NullPointerException("Cannot add a null listener");
+        }
         listeners.put(listener, canRemove);
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
@@ -199,8 +212,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     public void addListener(String listenerClassName) 
             throws Exception 
     {              
-        if (listenerClassName == null)
+        if (listenerClassName == null) {
             throw new NullPointerException("Class name cannot not be null");
+        }
         // make sure we can resolve the listener
         Class<?> listenerClass = Class.forName(listenerClassName);
         Constructor<?> listenerConstructor =
@@ -229,8 +243,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     
     /** {@inheritDoc} */
     public void removeListener(ProfileListener listener) {
-        if (listener == null)
+        if (listener == null) {
             throw new NullPointerException("Listener cannot be null");
+        }
         // Check to see if we're allowed to remove this listener
         Boolean canRemove = listeners.get(listener);
         if (canRemove != null && canRemove.equals(Boolean.TRUE)) {
@@ -239,8 +254,12 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
-    /** {@inheritDoc} */
-    public void notifyThreadAdded() {
+    /* -- Methods to support ProfileCollectorHandle -- */
+    
+    /**
+     * Notifies the collector that a thread has been added to the scheduler.
+     */
+    void notifyThreadAdded() {
         schedulerThreadCount++;
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
@@ -252,8 +271,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
-    /** {@inheritDoc} */
-    public void notifyThreadRemoved() {
+    /**
+     * Notifies the collector that a thread has been removed from the
+     * scheduler.
+     */
+    void notifyThreadRemoved() {
         schedulerThreadCount--;
 	PropertyChangeEvent event = 
 	    new PropertyChangeEvent(this, "com.sun.sgs.profile.threadcount",
@@ -265,23 +287,40 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
-    /** {@inheritDoc} */
-    public void startTask(KernelRunnable task, Identity owner,
-                          long scheduledStartTime, int readyCount)
+    /**
+     * Tells the collector that a new task is starting in the context of
+     * the calling thread.
+     * 
+     * @param task the <code>KernelRunnable</code> that is starting
+     * @param owner the <code>Identity</code> of the task owner
+     * @param scheduledStartTime the requested starting time for the task
+     * @param readyCount the number of ready tasks at the scheduler
+     */
+    void startTask(KernelRunnable task, Identity owner,
+                   long scheduledStartTime, int readyCount)
     {
-        if (task == null)
+        if (task == null) {
             throw new NullPointerException("Task cannot be null");
-        if (owner == null)
+        }
+        if (owner == null) {
             throw new NullPointerException("Owner cannot be null");
+        }
         profileReports.get().push(new ProfileReportImpl(task, owner,
                                                         scheduledStartTime,
                                                         readyCount));
     }
 
-    /** {@inheritDoc} */
-    public void noteTransactional(byte [] txnId) {
-        if (txnId == null)
+    /**
+     * Tells the collector that the current task associated with the calling
+     * thread (as associated by a call to {@code startTask}) is
+     * transactional. 
+     * 
+     * @param txnId the identifier for the transaction
+     */
+    void noteTransactional(byte [] txnId) {
+        if (txnId == null) {
             throw new NullPointerException("Transaction id cannot be null");
+        }
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -293,10 +332,17 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         profileReport.transactionId = txnId;
     }
 
-    /** {@inheritDoc} */
-    public void addParticipant(ProfileParticipantDetail participantDetail) {
-        if (participantDetail == null)
+    /**
+     * Tells the collector about a participant of a transaction when that
+     * participant has finished participating (i.e., has committed, has
+     * prepared read-only, or has aborted).
+     * 
+     * @param participantDetail the detail associated with the participant
+     */
+    void addParticipant(ProfileParticipantDetail participantDetail) {
+        if (participantDetail == null) {
             throw new NullPointerException("Participant detail cannot be null");
+        }
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -304,17 +350,23 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
         }
-        if (! profileReport.wasTaskTransactional()) {
+        if (!profileReport.wasTaskTransactional()) {
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
         }
         profileReport.participants.add(participantDetail);
     }
 
-    /** {@inheritDoc} */
-    public void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
-        if (detail == null)
+    /**
+     * Sets the detail for all objects accessed during the task as
+     * reported to the {@code AccessCoordinator}.
+     * 
+     * @param detail all detail of the accessed objects
+     */
+    void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
+        if (detail == null) {
             throw new NullPointerException("Access detail cannot be null");
+        }
         ProfileReportImpl profileReport = null;
         try {
             profileReport = profileReports.get().peek();
@@ -322,19 +374,33 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
         }
-        if (! profileReport.wasTaskTransactional())
+        if (!profileReport.wasTaskTransactional()) {
             throw new IllegalStateException("Object access cannot be added " +
                                             "to a non-transactional task");
+        }
         profileReport.accessedObjectsDetail = detail;
     }
 
-    /** {@inheritDoc} */
-    public void finishTask(int tryCount) {
+    /**
+     * Tells the collector that the current task associated with the
+     * calling thread (as associated by a call to
+     * {@code startTask}) has now successfully finished.
+     * 
+     * @param tryCount the number of times that the task has tried to run
+     */
+    void finishTask(int tryCount) {
 	finishTask(tryCount, null);
     }
 
-    /** {@inheritDoc} */
-    public void finishTask(int tryCount, Throwable t) {
+    /**
+     * Tells the collector that the current task associated with the
+     * calling thread (as associated by a call to
+     * {@code startTask}) has now successfully finished.
+     * 
+     * @param tryCount the number of times that the task has tried to run
+     * @param t the {@code Throwable} thrown during task execution
+     */
+    void finishTask(int tryCount, Throwable t) {
         long stopTime = System.currentTimeMillis();
         ProfileReportImpl profileReport = null;
         try {
@@ -433,10 +499,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                         try {
                             listener.report(profileReport);
                         } catch (Throwable t) {
-                            if (logger.isLoggable(Level.WARNING))
+                            if (logger.isLoggable(Level.WARNING)) {
                                 logger.logThrow(Level.WARNING, t,
                                                 "{0}: report method failed",
                                                 listener.getClass());
+                            }
                         }
                     }
                 }

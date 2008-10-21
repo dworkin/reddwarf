@@ -43,11 +43,11 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
@@ -315,10 +315,9 @@ public class TaskServiceImpl
                                             "be non-negative");
 
         // create our profiling info
-        ProfileRegistrar registrar = 
-            systemRegistry.getComponent(ProfileRegistrar.class);
-        ProfileConsumer consumer =
-            registrar.registerProfileProducer(getName());
+        ProfileCollector collector = 
+            systemRegistry.getComponent(ProfileCollector.class);
+        ProfileConsumer consumer = collector.getConsumer(getName());
 
         ProfileLevel level = ProfileLevel.MAX;
         scheduleNDTaskOp =

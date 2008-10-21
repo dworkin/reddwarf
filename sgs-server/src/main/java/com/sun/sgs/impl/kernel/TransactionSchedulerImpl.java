@@ -26,6 +26,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.kernel.schedule.SchedulerQueue;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
@@ -39,7 +40,6 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TransactionScheduler;
 
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileReport;
 
@@ -68,7 +68,8 @@ import java.util.logging.Logger;
  * used by the system for scheduling and running all transactional tasks.
  */
 final class TransactionSchedulerImpl
-    implements TransactionScheduler, PriorityScheduler, ProfileListener {
+    implements TransactionScheduler, PriorityScheduler, ProfileListener 
+{
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -107,7 +108,7 @@ final class TransactionSchedulerImpl
     private final SchedulerQueue backingQueue;
 
     // the collector used for profiling data
-    private final ProfileCollector profileCollector;
+    private final ProfileCollectorHandle profileCollectorHandle;
 
     // the coordinator for all transactional object access
     private final AccessCoordinatorImpl accessCoordinator;
@@ -133,8 +134,8 @@ final class TransactionSchedulerImpl
      * @param properties the {@code Properties} for the system
      * @param transactionCoordinator the {@code TransactionCoordinator} used
      *                               by the system to manage transactions
-     * @param profileCollector the {@code ProfileCollector} used by the
-     *                         system to collect profiling data
+     * @param profileCollectorHandle the {@code ProfileCollectorHandler} used to
+     *          manage collection of per-task profiling data
      * @param accessCoordinator the {@code AccessCoordinator} used by
      *                          the system to managed shared data
      *
@@ -144,23 +145,27 @@ final class TransactionSchedulerImpl
      */
     TransactionSchedulerImpl(Properties properties,
                              TransactionCoordinator transactionCoordinator,
-                             ProfileCollector profileCollector,
+                             ProfileCollectorHandle profileCollectorHandle,
                              AccessCoordinatorImpl accessCoordinator)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating a Transaction Scheduler");
 
-        if (properties == null)
+        if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
-        if (transactionCoordinator == null)
+        }
+        if (transactionCoordinator == null) {
             throw new NullPointerException("Coordinator cannot be null");
-        if (profileCollector == null)
+        }
+        if (profileCollectorHandle == null) {
             throw new NullPointerException("Collector cannot be null");
-	if (accessCoordinator == null)
+        }
+	if (accessCoordinator == null) {
 	    throw new NullPointerException("AccessCoordinator cannot be null");
+        }
 
         this.transactionCoordinator = transactionCoordinator;
-        this.profileCollector = profileCollector;
+        this.profileCollectorHandle = profileCollectorHandle;
         this.accessCoordinator = accessCoordinator;
 
         String queueName = properties.getProperty(SCHEDULER_QUEUE_PROPERTY,
@@ -170,16 +175,18 @@ final class TransactionSchedulerImpl
             Constructor<?> queueCtor =
                 queueClass.getConstructor(Properties.class);
             this.backingQueue = 
-                (SchedulerQueue)(queueCtor.newInstance(properties));
+                (SchedulerQueue) (queueCtor.newInstance(properties));
         } catch (InvocationTargetException e) {
-            if (logger.isLoggable(Level.CONFIG)) 
+            if (logger.isLoggable(Level.CONFIG)) {
                 logger.logThrow(Level.CONFIG, e.getCause(), "Queue {0} " +
                                 "failed to initialize", queueName);
+            }
             throw e;
         } catch (Exception e) {
-            if (logger.isLoggable(Level.CONFIG))
+            if (logger.isLoggable(Level.CONFIG)) {
                 logger.logThrow(Level.CONFIG, e, "Queue {0} unavailable",
                                 queueName);
+            }
             throw e;
         }
 
@@ -190,12 +197,14 @@ final class TransactionSchedulerImpl
         int requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
-        if (logger.isLoggable(Level.CONFIG))
+        if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "Using {0} transaction consumer threads",
                        requestedThreads);
+        }
         this.executor = Executors.newCachedThreadPool();
-        for (int i = 0; i < requestedThreads; i++)
+        for (int i = 0; i < requestedThreads; i++) {
             executor.submit(new TaskConsumer());
+        }
     }
 
     /**
@@ -225,7 +234,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
-                                       long startTime) {
+                                       long startTime) 
+    {
         ScheduledTaskImpl t =
             new ScheduledTaskImpl(task, owner, defaultPriority, startTime);
         return backingQueue.reserveTask(t);
@@ -244,7 +254,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public void scheduleTask(KernelRunnable task, Identity owner,
-                             long startTime) {
+                             long startTime) 
+    {
         backingQueue.
             addTask(new ScheduledTaskImpl(task, owner, defaultPriority,
                                           startTime));
@@ -256,7 +267,8 @@ final class TransactionSchedulerImpl
     public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
                                                      Identity owner,
                                                      long startTime,
-                                                     long period) {
+                                                     long period) 
+    {
         ScheduledTaskImpl scheduledTask =
             new ScheduledTaskImpl(task, owner, defaultPriority, startTime,
                                   period);
@@ -270,8 +282,9 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public TaskQueue createTaskQueue() {
-        if (isShutdown)
+        if (isShutdown) {
             throw new IllegalStateException("Scheduler is shutdown");
+        }
         return new TaskQueueImpl();
     }
 
@@ -279,8 +292,9 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public void runTask(KernelRunnable task, Identity owner) throws Exception {
-        if (isShutdown)
+        if (isShutdown) {
             throw new IllegalStateException("Scheduler is shutdown");
+        }
         if (ContextResolver.isCurrentTransaction()) {
             // we're already active in a transaction, so just run the task
             task.run();
@@ -340,8 +354,9 @@ final class TransactionSchedulerImpl
      */
     public void shutdown() {
         synchronized (this) {
-            if (isShutdown)
+            if (isShutdown) {
                 throw new IllegalStateException("Already shutdown");
+            }
             isShutdown = true;
         }
         executor.shutdownNow();
@@ -373,17 +388,19 @@ final class TransactionSchedulerImpl
                 backingQueue.notifyCancelled(task);
                 throw ie;
             }
-            if (task.isCancelled())
+            if (task.isCancelled()) {
                 throw ie;
+            }
             t = task.get();
         }
 
         // if the result of the task was a permananent failure, then
         // re-throw the exception
         if (t != null) {
-            if (t instanceof Exception)
-                throw (Exception)t;
-            throw (Error)t;
+            if (t instanceof Exception) {
+                throw (Exception) t;
+            }
+            throw (Error) t;
         }
     }
 
@@ -403,11 +420,13 @@ final class TransactionSchedulerImpl
     void runUnboundedTask(KernelRunnable task, Identity owner)
         throws Exception
     {
-        if (isShutdown)
+        if (isShutdown) {
             throw new IllegalStateException("Scheduler is shutdown");
-        if (ContextResolver.isCurrentTransaction())
+        }
+        if (ContextResolver.isCurrentTransaction()) {
             throw new IllegalStateException("Cannot be called from within " +
                                             "an active transaction");
+        }
 
         // NOTE: in the current system we only use this method once, and
         // that's when the application is initialized, in which case there
@@ -426,7 +445,7 @@ final class TransactionSchedulerImpl
      * tasks as they become ready.
      */
     private void notifyThreadJoining() {
-        profileCollector.notifyThreadAdded();
+        profileCollectorHandle.notifyThreadAdded();
         threadCount.incrementAndGet();
     }
 
@@ -435,7 +454,7 @@ final class TransactionSchedulerImpl
      * finishing its work.
      */
     private void notifyThreadLeaving() {
-        profileCollector.notifyThreadRemoved();
+        profileCollectorHandle.notifyThreadRemoved();
         // NOTE: we're not yet trying to adapt the number of threads being
         // used, so we assume that threads are only lost when the system
         // wants to shutdown...in practice, this should look at some
@@ -462,7 +481,7 @@ final class TransactionSchedulerImpl
                     // wait for the next task, at which point we may get
                     // interrupted and should therefore return
                     ScheduledTaskImpl task =
-                        (ScheduledTaskImpl)(backingQueue.getNextTask(true));
+                        (ScheduledTaskImpl) (backingQueue.getNextTask(true));
 
                     // run the task, checking if it completed
                     if (executeTask(task, false)) {
@@ -475,14 +494,16 @@ final class TransactionSchedulerImpl
                         }
                         // if it has dependent tasks, schedule the next one
                         TaskQueueImpl queue =
-                            (TaskQueueImpl)(task.getTaskQueue());
-                        if (queue != null)
+                            (TaskQueueImpl) (task.getTaskQueue());
+                        if (queue != null) {
                             queue.scheduleNextTask();
+                        }
                     }
                 }
             } catch (InterruptedException ie) {
-                if (logger.isLoggable(Level.FINE))
+                if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(Level.FINE, ie, "Consumer is finishing");
+                }
             } catch (Exception e) {
                 // this should never happen, since running the task should
                 // never throw an exception that isn't handled
@@ -522,7 +543,7 @@ final class TransactionSchedulerImpl
             // keep trying to run the task until we succeed, tracking how
             // many tries it actually took
             while (true) {
-                if (! task.setRunning(true)) {
+                if (!task.setRunning(true)) {
                     // this task is already finished
                     return true;
                 }
@@ -531,8 +552,10 @@ final class TransactionSchedulerImpl
                 // so we should figure out how we want to represent these
                 int waitSize =
                     backingQueue.getReadyCount() + dependencyCount.get();
-                profileCollector.startTask(task.getTask(), task.getOwner(),
-                                           task.getStartTime(), waitSize);
+                profileCollectorHandle.startTask(task.getTask(), 
+                                                 task.getOwner(),
+                                                 task.getStartTime(), 
+                                                 waitSize);
                 task.incrementTryCount();
 
                 Transaction transaction = null;
@@ -546,7 +569,8 @@ final class TransactionSchedulerImpl
                     
                     try {
                         // notify the profiler and access coordinator
-                        profileCollector.noteTransactional(transaction.getId());
+                        profileCollectorHandle.noteTransactional(
+                                                    transaction.getId());
                         accessCoordinator.
                             notifyNewTransaction(task.getStartTime(),
                                                  task.getTryCount());
@@ -563,51 +587,56 @@ final class TransactionSchedulerImpl
                     // chance that the application code masked the orginal
                     // cause of a failure, so we'll check for that first,
                     // re-throwing the root cause in that case
-                    if (transaction.isAborted())
+                    if (transaction.isAborted()) {
                         throw transaction.getAbortCause();
+                    }
                     handle.commit();
 
                     // the task completed successfully, so we're done
-                    profileCollector.finishTask(task.getTryCount());
+                    profileCollectorHandle.finishTask(task.getTryCount());
                     task.setDone(null);
                     return true;
                 } catch (InterruptedException ie) {
                     // make sure the transaction was aborted
-                    if (! transaction.isAborted())
+                    if (!transaction.isAborted()) {
                         transaction.abort(ie);
-                    profileCollector.finishTask(task.getTryCount(), ie);
+                    }
+                    profileCollectorHandle.finishTask(task.getTryCount(), ie);
                     // if the task didn't finish because of the interruption
                     // then we want to re-queue it to run in a usable thread
-                    if (! task.isDone()) {
+                    if (!task.isDone()) {
                         task.setRunning(false);
-                        if (! handoffRetry(task, ie)) {
+                        if (!handoffRetry(task, ie)) {
                             // if the task couldn't be re-queued, then there's
                             // nothing left to do but drop it
                             task.setRunning(true);
                             task.setDone(ie);
-                            if (logger.isLoggable(Level.WARNING))
+                            if (logger.isLoggable(Level.WARNING)) {
                                 logger.logThrow(Level.WARNING, ie, "dropping " +
                                                 "an interrupted task: {0}" +
                                                 task);
+                            }
                         }
                     }
                     // always re-throw the interruption
                     throw ie;
                 } catch (Throwable t) {
                     // make sure the transaction was aborted
-                    if ((transaction != null) && (! transaction.isAborted()))
+                    if ((transaction != null) && (!transaction.isAborted())) {
                         transaction.abort(t);
-                    profileCollector.finishTask(task.getTryCount(), t);
+                    }
+                    profileCollectorHandle.finishTask(task.getTryCount(), t);
                     // some error occurred, so see if we should re-try
-                    if (! shouldRetry(task, t)) {
+                    if (!shouldRetry(task, t)) {
                         // the task is not being re-tried
                         task.setDone(t);
                         return true;
                     } else {
                         // see if the re-try should be handed-off
                         task.setRunning(false);
-                        if (handoffRetry(task, t))
+                        if (handoffRetry(task, t)) {
                             return false;
+                        }
                     }
                 }
             }
@@ -628,8 +657,10 @@ final class TransactionSchedulerImpl
         // caller to try again if retry is requested, but other strategies
         // (like the number of times re-tried) might be considered later
         if ((t instanceof ExceptionRetryStatus) &&
-            (((ExceptionRetryStatus)t).shouldRetry()))
+            (((ExceptionRetryStatus) t).shouldRetry())) 
+        {
             return true;
+        }
 
         // we're not re-trying the task, so log that it's being dropped
         if (logger.isLoggable(Level.WARNING)) {
