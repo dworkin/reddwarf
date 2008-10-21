@@ -128,18 +128,18 @@ public interface ProfileConsumer {
     /**
      * Creates the named sample collection in this consumer.  If a sample has
      * already been created by this consumer with the same {@code name},
-     * {@code type} and {@code minLevel}, it is returned.
+     * {@code type}, {@code minLevel}, and for aggregating sample types,
+     * {@code maxSamples}, it is returned.  
      * <p>
-     *  A negative value for {@code maxSamples} indicates an infinite
-     *  number of samples.  Note that for non-task-local sample
-     *  sources, this is a potential memory leak as the number of
-     *  samples increases.  Once the limit of samples has been
-     *  reached, older samples will be dropped to make room for the
-     *  newest samples.
+     * The {@code maxSamples} paramenter is used for aggregating sample types
+     * only.   A negative value for {@code maxSamples} indicates an infinite
+     * number of samples.  Once the limit of samples has been
+     * reached, older samples will be dropped to make room for the
+     * newest samples.
      *
      * @param name a name or description of the sample type
      * @param type the type of operation to create
-     * @param maxSamples the maximum number of samples to keep.
+     * @param maxSamples the maximum number of samples to keep
      * @param minLevel the minimum level of profiling that must be set to record
      *              this sample  
      *
@@ -147,7 +147,8 @@ public interface ProfileConsumer {
      * 
      * @throws IllegalArgumentException if a sample collection  has already been
      *         created with this {@code name} but a different {@code type}
-     *         or {@code minLevel}
+     *         {@code maxSamples}, {@code minLevel}, or, for aggregating 
+     *         samples, {@code maxSamples}
      */
     ProfileSample createSample(String name, 
                                ProfileDataType type,

@@ -202,8 +202,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
     public synchronized ProfileSample createSample(String name, 
             ProfileDataType type, long maxSamples, ProfileLevel minLevel) 
     {
-        // REMINDER: this assume maxSamples isn't necessary when
-	// deciding whether a sample source is already present.
         if (samples.containsKey(name)) {
             ProfileSample oldSample = samples.get(name);
             // Check minLevel and type
@@ -227,7 +225,18 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 throw new IllegalArgumentException(
                         "Sample with name " + name + 
                         " already created with an unknown type");
-            }   
+            }
+            
+            if (oldSample instanceof AggregateProfileSampleImpl) {
+                AggregateProfileSampleImpl old = 
+                        (AggregateProfileSampleImpl) oldSample;
+                if (old.maxSamples != maxSamples) {
+                    throw new IllegalArgumentException(
+                            "Sample with name " + name + 
+                            " already created, but with max level of " +  
+                            old.maxSamples);
+                }
+            }
             return samples.get(name);
         } else {
             ProfileSample sample;
@@ -560,6 +569,8 @@ class ProfileConsumerImpl implements ProfileConsumer {
 	    this.maxSamples = maxSamples;
         }
 
+        long getMaxSamples() { return maxSamples; }
+        
         public void addSample(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
