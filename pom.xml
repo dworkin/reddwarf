@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>7</version>
+  <version>8</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -231,6 +231,12 @@
 	<groupId>junit</groupId>
 	<artifactId>junit</artifactId>
 	<version>${junit.version}</version>
+	<scope>test</scope>
+      </dependency>
+      <dependency>
+	<groupId>org.easymock</groupId>
+	<artifactId>easymock</artifactId>
+	<version>${easymock.version}</version>
 	<scope>test</scope>
       </dependency>
 
@@ -552,6 +558,7 @@
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.2.23</bdb.je.version>
     <junit.version>4.5</junit.version>
+    <easymock.version>2.4</easymock.version>
     <org.apache.mina.version>1.1.0</org.apache.mina.version>
     <slf4j-api.version>1.4.0</slf4j-api.version>
     <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
