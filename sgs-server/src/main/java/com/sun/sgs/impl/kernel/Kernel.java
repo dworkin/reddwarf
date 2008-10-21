@@ -139,9 +139,6 @@ class Kernel {
     // the application that is running in this kernel
     private KernelContext application;
     
-    // the default manager locator for the application
-    private final ManagerLocator managerLocator = new ManagerLocatorImpl();
-
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
@@ -359,7 +356,7 @@ class Kernel {
         ContextResolver.setTaskState(application, owner);
         
         // tell the AppContext how to find the managers
-        InternalContext.setManagerLocator(managerLocator);
+        InternalContext.setManagerLocator(new ManagerLocatorImpl());
 
         // notify all of the services that the application state is ready
         try {

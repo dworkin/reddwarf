@@ -27,9 +27,6 @@
     <dependency>
       <groupId>org.easymock</groupId>
       <artifactId>easymock</artifactId>
-      <!-- TODO: move version and scope to super pom -->
-      <version>2.4</version>
-      <scope>test</scope>
     </dependency>
 
     <dependency>

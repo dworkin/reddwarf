@@ -17,16 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.app;
+package com.sun.sgs.test.app;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.ManagerNotFoundException;
 import com.sun.sgs.internal.InternalContext;
 import com.sun.sgs.internal.ManagerLocator;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-
 import org.junit.Test;
-import org.junit.After;
 import org.junit.Assert;
 
 import org.easymock.EasyMock;
@@ -42,27 +43,6 @@ public class TestAppContext {
     private ChannelManager channelManager;
     private TaskManager taskManager;
     private Object arbitraryManager;
-    
-    /**
-     * Resets the private static state of the AppContext to 
-     * its original state using Reflection.  This is not ideal as it requires 
-     * knowledge of the
-     * internal state of AppContext.  Since it is static, however, we have
-     * few alternatives.
-     */
-    @After
-    public void resetAppContextState() throws Exception {
-        
-        Field[] allFields = AppContext.class.getDeclaredFields();
-       
-        for(Field f : allFields) {
-            int modifiers = f.getModifiers();
-            if(Modifier.isPrivate(modifiers) && Modifier.isStatic(modifiers)) {
-                f.setAccessible(true);
-                f.set(AppContext.class, null);
-            }
-        }
-    }
     
     /**
      * setup the dummy AppContext
@@ -119,6 +99,11 @@ public class TestAppContext {
         EasyMock.expect(managerLocator.getManager(Object.class)).
                 andThrow(m);
         EasyMock.replay(managerLocator);
+    }
+    
+    @Test(expected=IllegalStateException.class)
+    public void testGetManagerLocatorBeforeInit() {
+        InternalContext.getManagerLocator();
     }
 
     @Test(expected=IllegalStateException.class)
@@ -225,26 +210,6 @@ public class TestAppContext {
         Assert.assertNull(o2);
     }
     
-    @Test
-    public void testValidResetManagerLocator() {
-        System.setProperty("com.sun.sgs.app.AppContext.resetAllowed", "true");
-        
-        initStableAppContext();
-        ManagerLocator m1 = managerLocator;
-        
-        initStableAppContext();
-        ManagerLocator m2 = managerLocator;
-        
-        InternalContext.setManagerLocator(m1);
-        InternalContext.setManagerLocator(m2);
-    }
-    
-    @Test
-    public void testEmptyManagerLocator() {
-        initEmptyAppContext();
-        InternalContext.setManagerLocator(managerLocator);
-    }
-    
     @Test(expected=ManagerNotFoundException.class)
     public void testGetDataManagerWithEmptyManagerLocator() {
         initEmptyAppContext();
@@ -267,6 +232,14 @@ public class TestAppContext {
         InternalContext.setManagerLocator(managerLocator);
         
         AppContext.getChannelManager();
+    }
+    
+    @Test(expected=IllegalStateException.class)
+    public void testSetNullManagerLocator() {
+        initEmptyAppContext();
+        InternalContext.setManagerLocator(null);
+        
+        InternalContext.getManagerLocator();
     }
     
 }
