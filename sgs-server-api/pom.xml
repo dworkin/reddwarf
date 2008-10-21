@@ -62,6 +62,7 @@
                   <artifact>com.projectdarkstar.server:sgs-server</artifact>
                   <includes>
                     <include>com/sun/sgs/app/**</include>
+                    <include>com/sun/sgs/internal/**</include>
                   </includes>
 		</filter>
 		<filter>

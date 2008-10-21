@@ -159,7 +159,7 @@
                 Inc. All rights reserved</font>]]>
 	      </bottom>
 	      <finalName>api</finalName>
-	      <subpackages>com.sun.sgs.app:com.sun.sgs.protocol.simple</subpackages>
+	      <subpackages>com.sun.sgs.app:com.sun.sgs.internal:com.sun.sgs.protocol.simple</subpackages>
 	      <outputDirectory>${project.build.directory}/api-docs</outputDirectory>
 	    </configuration>
 	  </execution>

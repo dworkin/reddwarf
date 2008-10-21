@@ -21,6 +21,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.internal.InternalContext;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
@@ -136,7 +137,7 @@ class Kernel {
 
     // the application that is running in this kernel
     private KernelContext application;
-
+    
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
@@ -358,6 +359,9 @@ class Kernel {
         transactionScheduler.setContext(application);
         taskScheduler.setContext(application);
         ContextResolver.setTaskState(application, owner);
+        
+        // tell the AppContext how to find the managers
+        InternalContext.setManagerLocator(new ManagerLocatorImpl());
 
         // notify all of the services that the application state is ready
         try {
