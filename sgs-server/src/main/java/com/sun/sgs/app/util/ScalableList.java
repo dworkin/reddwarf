@@ -38,9 +38,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.util.RobTest.ListNode;
-import com.sun.sgs.app.util.RobTest.RobTestIterator;
-import com.sun.sgs.app.util.RobTest.TreeNode;
 
 /**
  * This class represents a {@code java.util.List} which supports a concurrent
@@ -1311,7 +1308,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 		if (parentRef != null && childRef != null) {
 		    Node<E> child = childRef.getForUpdate();
 		    TreeNode<E> parent = parentRef.getForUpdate();
-		    parent.setChild(child, child.size(), 1);  // <--------------------------
+		    parent.setChild(child, child.size(), 
+			    parent.getChildCount() - 1);
 		    child.setParent(parent);
 		}
 	    }
@@ -1673,6 +1671,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		// remove entries in ListNode, and if false, then we
 		// are ready to start removing TreeNodes from queue
 		if (!removeSomeElements()) {
+		    AppContext.getDataManager().markForUpdate(this);
 		    current =
 			    AppContext.getDataManager().createReference(
 				    (Node<E>) queue.remove(0).get());
@@ -1731,7 +1730,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    count++;
 
 		    // If the entry was an Element object, delete it
-		    // since the user did not have it persist
+		    // since the Element object is a wrapper
 		    if (entry instanceof Element) {
 			AppContext.getDataManager().removeObject(entry);
 		    }
@@ -1739,8 +1738,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    // Remove SubList attached to this ListNode ManagedObject.
 		    // We don't need to remove the ListNode as the remove()
 		    // method above already takes care of it.
-		    AppContext.getDataManager().removeObject(
-			    currentListNode.getSubList());
 		    currentListNode = currentListNode.next();
 
 		    // Add the parent to the queue if it doesn't
@@ -1754,6 +1751,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	    // If we are leaving this method, then save the
 	    // currentListNode so we can continue when we come back
+	    AppContext.getDataManager().markForUpdate(this);
 	    current =
 		    AppContext.getDataManager().createReference(
 			    (Node<E>) currentListNode);
@@ -1778,13 +1776,13 @@ public class ScalableList<E> extends AbstractList<E> implements
 		TreeNode<E> temp = null;
 
 		temp = queue.get(i).get();
-		
+
 		// It already exists, so return
 		if (temp.equals(parent)) {
 		    return;
 		}
 	    }
-
+	    AppContext.getDataManager().markForUpdate(this);
 	    queue.add(AppContext.getDataManager().createReference(parent));
 	}
 
@@ -1795,6 +1793,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@code false} if complete
 	 */
 	private boolean removeSomeTreeNodes() {
+	    AppContext.getDataManager().markForUpdate(this);
 	    TreeNode<E> currentTreeNode =
 		    uncheckedCast(current.getForUpdate());
 	    int count = 0;
@@ -2019,7 +2018,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * The iteration location of the list; this value is a double because
 	 * it points to the regions between elements
 	 */
-	public double cursor;
+	protected double cursor;
 
 	/**
 	 * Flag which only lets one removal happen per call to {@code next()}
@@ -2178,16 +2177,16 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @return the next element
 	 */
 	public E next() {
+	    // Check the integrity of the ListNode to see if
+	    // any changes were made since we last operated.
+	    // Throw a ConcurrentModificationException if so.
+	    checkDataIntegrity();
+
 	    wasNextCalled = true;
 
 	    AppContext.getDataManager().markForUpdate(this);
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
-
-	    // Check the integrity of the ListNode to see if
-	    // any changes were made since we last operated.
-	    // Throw a ConcurrentModificationException if so.
-	    checkDataIntegrity();
 
 	    // Retrieve the next value from the list; we may have to load
 	    // up a new ListNode
@@ -2242,12 +2241,18 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@code ConcurrentModificationException} if so.
 	 * 
 	 * @throws ConcurrentModificationException if the data integrity value
-	 * has changed
+	 * has changed or if it cannot be verified
 	 */
 	void checkDataIntegrity() {
-	    if (referenceNode.get().getDataIntegrityValue() != listNodeReferenceValue) {
-		throw new ConcurrentModificationException(
-			"The ListNode has been modified.");
+	    String exceptionString =
+		    "The ListNode has been modified or removed";
+	    try {
+		if (referenceNode.get()
+			.getDataIntegrityValue() != listNodeReferenceValue) {
+		    throw new ConcurrentModificationException(exceptionString);
+		}
+	    } catch (ObjectNotFoundException onfe) {
+		throw new ConcurrentModificationException(exceptionString);
 	    }
 	}
 
@@ -2256,9 +2261,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * 
 	 * @return {@code true} if there is a next element, or {@code false}
 	 * otherwise
-	 * @throws ConcurrentModificationException if the current
-	 * {@code ListNode} has been modified since the last iterator
-	 * operation
+	 * @exception ConcurrentModificationException if the {@code ListNode}
+	 * has been modified or removed
 	 */
 	public boolean hasNext() {
 
@@ -2447,6 +2451,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * 
 	 * @return <tt>true</tt> if the list iterator has more elements when
 	 * traversing the list in the reverse direction.
+	 * @exception ConcurrentModificationException if the {@code ListNode}
+	 * has been modified or removed
 	 */
 	public boolean hasPrevious() {
 	    checkDataIntegrity();
@@ -2468,18 +2474,22 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * alternating calls to <tt>next</tt> and <tt>previous</tt> will
 	 * return the same element repeatedly.)
 	 * 
-	 * @return the previous element in the list.
+	 * @return the previous element in the list
 	 * @exception NoSuchElementException if the iteration has no previous
-	 * element.
+	 * element
+	 * @exception ConcurrentModificationException if the {@code ListNode}
+	 * has been modified or removed
 	 */
 	public E previous() {
-	    AppContext.getDataManager().markForUpdate(this);
 
 	    // Check the integrity of the ListNode to see if
 	    // any changes were made since we last operated.
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
+
+	    AppContext.getDataManager().markForUpdate(this);
 	    wasNextCalled = false;
+	    alreadyRemoved = false;
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
 
@@ -2501,8 +2511,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    referenceNode = currentNode;
 
 	    ManagedReference<E> ref =
-		    uncheckedCast(currentNode.get().getSubList()
-			    .getElements().get((int) (--cursor + 0.5)));
+		    uncheckedCast(elements.get((int) (--cursor + 0.5)));
 	    Object obj = ref.get();
 
 	    // In case we wrapped the item with an
@@ -2535,13 +2544,25 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * the iterator. This can only be called once per call to {@code next}.
 	 */
 	public void remove() {
-	    if (!wasNextCalled && !alreadyRemoved) {
+	    if (alreadyRemoved) {
+		return;
+	    }
+	    alreadyRemoved = true;
+
+	    if (!wasNextCalled) {
 		AppContext.getDataManager().markForUpdate(this);
 		doRemove(false);
-		alreadyRemoved = true;
 	    } else {
 		super.remove();
 	    }
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public E next() {
+	    alreadyRemoved = false;
+	    return super.next();
 	}
 
 	/**
@@ -2892,6 +2913,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    }
 
 	    // This is an empty node, so remove it from Data Store.
+	    AppContext.getDataManager().removeObject(getSubList());
 	    AppContext.getDataManager().removeObject(this);
 	}
 
@@ -3029,7 +3051,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param ref the {@code ManagedReference} storing the value
 	 * @return the value stored in the reference
 	 */
-	static <E> E getValueFromReference(ManagedReference<ManagedObject> ref) {
+	static <E> E getValueFromReference(
+		ManagedReference<ManagedObject> ref) {
 	    ManagedReference<E> temp = uncheckedCast(ref);
 
 	    E obj = temp.get();
@@ -3159,6 +3182,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	@SuppressWarnings("unchecked")
 	E set(int index, Object obj) {
+	    AppContext.getDataManager().markForUpdate(this);
+
 	    assert (obj != null);
 	    ManagedReference<ManagedObject> old = null;
 	    Object oldObj = null;
@@ -3194,7 +3219,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // If it is not yet a ManagedObject, then
 	    // create a new Element to make it a ManagedObject
 	    ManagedReference<ManagedObject> ref = createRefForAdd(e);
-
+	    AppContext.getDataManager().markForUpdate(this);
 	    return contents.add(ref);
 	}
 
@@ -3236,6 +3261,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * of the range of the underlying list
 	 */
 	void insert(int index, E e) {
+	    AppContext.getDataManager().markForUpdate(this);
 	    assert (e != null);
 	    if (index < 0) {
 		throw new IndexOutOfBoundsException(
@@ -3324,6 +3350,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 			"The index is out of bounds");
 	    }
 	    E value = null;
+	    AppContext.getDataManager().markForUpdate(this);
 	    ManagedReference<ManagedObject> removed = contents.remove(index);
 
 	    // Determine how to extract the element, based on whether it
@@ -3346,6 +3373,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@code false} otherwise
 	 */
 	boolean remove(Object obj) {
+
 	    Iterator<ManagedReference<ManagedObject>> iter =
 		    contents.iterator();
 	    boolean success = false;
@@ -3362,6 +3390,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    if (object instanceof Element) {
 			AppContext.getDataManager().removeObject(object);
 		    }
+		    AppContext.getDataManager().markForUpdate(this);
 		    success = contents.remove(current);
 		    break;
 		}
