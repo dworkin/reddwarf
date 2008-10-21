@@ -44,7 +44,7 @@ public final class AppContext {
     public static ChannelManager getChannelManager() {
         try {
             return InternalContext.getManagerLocator().getChannelManager();
-        } catch(IllegalStateException ise) {
+        } catch (IllegalStateException ise) {
             throw new ManagerNotFoundException("ManagerLocator is " +
                                                "unavailable", ise);
         }
@@ -62,7 +62,7 @@ public final class AppContext {
     public static DataManager getDataManager() {
         try {
             return InternalContext.getManagerLocator().getDataManager();
-        } catch(IllegalStateException ise) {
+        } catch (IllegalStateException ise) {
             throw new ManagerNotFoundException("ManagerLocator is " +
                                                "unavailable", ise);
         }
@@ -80,7 +80,7 @@ public final class AppContext {
     public static TaskManager getTaskManager() {
         try {
             return InternalContext.getManagerLocator().getTaskManager();
-        } catch(IllegalStateException ise) {
+        } catch (IllegalStateException ise) {
             throw new ManagerNotFoundException("ManagerLocator is " +
                                                "unavailable", ise);
         }
@@ -100,7 +100,7 @@ public final class AppContext {
     public static <T> T getManager(Class<T> type) {
         try {
             return InternalContext.getManagerLocator().getManager(type);
-        } catch(IllegalStateException ise) {
+        } catch (IllegalStateException ise) {
             throw new ManagerNotFoundException("ManagerLocator is " +
                                                "unavailable", ise);
         }

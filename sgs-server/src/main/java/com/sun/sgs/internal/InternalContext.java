@@ -42,7 +42,7 @@ public final class InternalContext {
      *
      * @return	the {@code ManagerLocator} for the current application
      * @throws	IllegalStateException if the {@code ManagerLocator}
-     *          is set to null
+     *          is uninitialized
      */
     public static ManagerLocator getManagerLocator() {
         ManagerLocator locator = managerLocator;
@@ -64,11 +64,12 @@ public final class InternalContext {
      * to call this method, and doing so could cause unexpected
      * results. <p>
      * 
-     * It is valid to set the {@code ManagerLocator} to null.
-     * Doing so will reset the {@code InternalContext} to its original state.
+     * Specifying {@code null} for {@code managerLocator} sets the 
+     * {@code ManagerLocator} back to its original, uninitialized state.
      * 
      * @param managerLocator the {@code ManagerLocator} that the 
      *        {@code InternalContext} should use to retrieve managers
+     *        or {@code null} to make it uninitialized
      */
     public static synchronized void 
             setManagerLocator(ManagerLocator managerLocator) {
