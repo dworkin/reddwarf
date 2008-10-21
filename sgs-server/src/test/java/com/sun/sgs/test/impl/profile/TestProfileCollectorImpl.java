@@ -511,10 +511,9 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            // Print the original stack trace, plus fail directly, so we
-            // can get stack traces for both threads.
-            error.printStackTrace(System.err);
-            fail("Got an exception: " + error);
+            // Rethrow with the original error as the cause so we see
+            // both stack traces.
+            throw new AssertionError(error);
         }
 
         txnScheduler.runTask(
@@ -525,8 +524,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            error.printStackTrace(System.err);
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
 
@@ -565,7 +563,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         cons1.setProfileLevel(ProfileLevel.MAX);
@@ -580,7 +578,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
     
@@ -619,7 +617,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
     
@@ -660,7 +658,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
         
@@ -738,8 +736,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            error.printStackTrace(System.err);
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         txnScheduler.runTask(
@@ -750,8 +747,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            error.printStackTrace(System.err);
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
 
@@ -787,7 +783,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         cons1.setProfileLevel(ProfileLevel.MEDIUM);
@@ -800,7 +796,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
     
@@ -836,7 +832,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         cons1.setProfileLevel(ProfileLevel.MAX);
@@ -849,7 +845,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
     
@@ -885,7 +881,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         cons1.setProfileLevel(ProfileLevel.MEDIUM);
@@ -899,7 +895,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
         
         cons1.setProfileLevel(ProfileLevel.MAX);
@@ -912,7 +908,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
        
@@ -954,7 +950,7 @@ public class TestProfileCollectorImpl {
                             assertTrue(opIndex1 != -1);
                             assertTrue(opIndex2 != -1);
                             assertTrue(op1Index1 != -1);
-                            assertTrue(op1Index2 == -1);
+                            assertTrue(op1Index2 == op1Index1);
 
                             // We expect the op ordering to be maintained
                             assertTrue(opIndex1 < op1Index1);
@@ -983,6 +979,12 @@ public class TestProfileCollectorImpl {
                     op.report();
                 }
             }, myOwner);
+            
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            throw new AssertionError(error);
+        }
     }
      
     /* -- Sample tests -- */
@@ -1084,8 +1086,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            error.printStackTrace(System.err);
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         txnScheduler.runTask(
@@ -1096,8 +1097,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            error.printStackTrace(System.err);
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
 
@@ -1140,7 +1140,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         cons1.setProfileLevel(ProfileLevel.MAX);
@@ -1157,7 +1157,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
     
@@ -1201,7 +1201,7 @@ public class TestProfileCollectorImpl {
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
 
         txnScheduler.runTask(
@@ -1222,8 +1222,7 @@ public class TestProfileCollectorImpl {
             
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
-            System.err.println(error);
-            fail("Got an exception: " + error);
+            throw new AssertionError(error);
         }
     }
     
