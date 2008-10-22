@@ -95,6 +95,12 @@ public class BootEnvironment {
     public static final String DEFAULT_SGS_LOGGING = 
             "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
             "conf" + File.separator + "sgs-logging.properties";
+    /**
+     * The standard location to look for application properties config
+     * file in jars from the SGS_DEPLOY directory.
+     */
+    public static final String DEFAULT_APP_PROPERTIES = 
+            "META-INF/app.properties";
     
     
     public static final String DEFAULT_BDB_ROOT = 

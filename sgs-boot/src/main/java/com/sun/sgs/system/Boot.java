@@ -30,6 +30,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.List;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.jar.JarFile;
 
 /**
  * Bootstraps and launches a Project Darkstar server
@@ -147,8 +149,6 @@ public class Boot {
         ProcessBuilder pb = new ProcessBuilder(executeCmd);
         pb.environment().put(BootEnvironment.SGS_HOME, 
                              properties.getProperty(BootEnvironment.SGS_HOME));
-        pb.environment().put(BootEnvironment.SGS_DEPLOY, 
-                             properties.getProperty(BootEnvironment.SGS_DEPLOY));
         pb.environment().put(BootEnvironment.SGS_PROPERTIES,
                              properties.getProperty(BootEnvironment.SGS_PROPERTIES));
         pb.directory(new File(properties.getProperty(BootEnvironment.SGS_HOME)));
@@ -189,7 +189,8 @@ public class Boot {
      * in subdirectories of the $SGS_HOME directory from the environment
      * (with the exception of the $SGS_HOME/sgs-server directory).
      * It also contains any jar files in the $SGS_HOME/sgs-server/lib
-     * directory.
+     * directory.  Finally, it recursively includes jar files from the
+     * $SGS_DEPLOY directory.
      * 
      * @param env environment with SGS_HOME set
      * @return classpath to use to run the kernel
@@ -232,7 +233,69 @@ public class Boot {
             }
         }
         
+        //recursively add jars from SGS_DEPLOY
+        File sgsDeployDir = new File(
+                env.getProperty(BootEnvironment.SGS_DEPLOY));
+        List<File> jars = new ArrayList<File>();
+        int appPropsFound = appJars(sgsDeployDir, jars);
+        if(appPropsFound == 0) {
+            logger.log(Level.WARNING, "No application jar found with a " +
+                       BootEnvironment.DEFAULT_APP_PROPERTIES +
+                       " configuration file in the " +
+                       sgsDeployDir + " directory");
+        }
+        if(appPropsFound > 1) {
+            logger.log(Level.SEVERE, "Multiple application jars " +
+                       "found with a " +
+                       BootEnvironment.DEFAULT_APP_PROPERTIES +
+                       " configuration file in the " +
+                       sgsDeployDir + " directory");
+            System.exit(1);
+        }
+        for (File jar : jars) {
+            if (buf.length() != 0)
+                buf.append(File.pathSeparator + jar.getAbsolutePath());
+            else
+                buf.append(jar.getAbsolutePath());
+        }
+        
         return buf.toString();
+    }
+    
+    /**
+     * Helper method that recursively searches the given directory and adds
+     * any jar files found to the jars list.
+     * 
+     * @param directory directory to search for jar files
+     * @param jars list of Files to add any jar files found
+     * @return the number of jar files found that have a
+     *         {@link BootEnvironment.DEFAULT_APP_PROPERTIES} file in them
+     */
+    private static int appJars(File directory, List<File> jars) {
+       int appPropsFound = 0;
+       if(directory.isDirectory() && directory.canRead()) {
+           for (File f : directory.listFiles()) {
+               if (f.isFile() && f.getName().endsWith(".jar")) {
+                   try {
+                       JarFile jar = new JarFile(f);
+                       jars.add(f);
+                       if (jar.getJarEntry(
+                               BootEnvironment.DEFAULT_APP_PROPERTIES) != null) {
+                           appPropsFound++;
+                       }
+                   } catch(IOException e) {
+                       //not a jar file, log and ignore
+                       logger.log(Level.WARNING, "File " + f.getAbsolutePath() +
+                               " is not a jar file");
+                   }
+               }
+               else if(f.isDirectory()) {
+                   appPropsFound += appJars(f, jars);
+               }
+           }
+        }
+       
+        return appPropsFound;
     }
     
 }

@@ -826,108 +826,38 @@ class Kernel {
     }
     
     /**
-     * Creates a ClassLoader which includes the jar files included
-     * in the SGS_DEPLOY directory.
-     */
-    private static ClassLoader buildAppClassLoader() throws Exception {
-        String deployDirLoc = System.getenv(BootProperties.SGS_DEPLOY);
-        if(deployDirLoc == null) {
-            logger.log(Level.SEVERE, "Missing required system property " +
-                       BootProperties.SGS_DEPLOY);
-            throw new IllegalStateException("Missing required " +
-                                            "system property " +
-                                            BootProperties.SGS_DEPLOY);
-        }
-        
-        File deployDir = new File(deployDirLoc);
-        if(!deployDir.isDirectory()) {
-            logger.log(Level.SEVERE, BootProperties.SGS_DEPLOY + 
-                       " directory: " + deployDirLoc +
-                       " does not exist");
-            throw new IllegalStateException(BootProperties.SGS_DEPLOY + 
-                                            " directory: " + deployDirLoc +
-                                            " does not exist");
-        }
-
-        // generate a list of URLs of the jar files in the directory
-        // also scan each jar for an application properties file
-        // one jar must have one
-        int appPropsFound = 0;
-        List<URL> urls = new ArrayList<URL>();
-        for (File f : deployDir.listFiles()) {
-            if(f.isFile() && f.getName().endsWith(".jar")) {
-                urls.add(f.toURI().toURL());
-                JarFile jar = new JarFile(f);
-                if(jar.getJarEntry(
-                        BootProperties.DEFAULT_APP_PROPERTIES) != null)
-                    appPropsFound++;
-            }
-        }
-        if(appPropsFound == 0) {
-            logger.log(Level.SEVERE, "No application jar found with a " +
-                       BootProperties.DEFAULT_APP_PROPERTIES +
-                       " configuration file in the " +
-                       deployDirLoc + " directory");
-            throw new IllegalStateException(
-                    "No application jar found with a " +
-                    BootProperties.DEFAULT_APP_PROPERTIES +
-                    " configuration file in the " +
-                    deployDirLoc + " directory");
-        }
-        if(appPropsFound > 1) {
-            logger.log(Level.WARNING, "Multiple application jars " +
-                       "found with a " +
-                       BootProperties.DEFAULT_APP_PROPERTIES +
-                       " configuration file in the " +
-                       deployDirLoc + " directory");
-        }
-
-        // feed URLs to a URLClassLoader
-        ClassLoader classLoader = new URLClassLoader(
-                urls.toArray(new URL[0]),
-                ClassLoader.getSystemClassLoader().getParent());
-
-        return classLoader;
-    }
-    
-    /**
      * This method is used to automatically determine an application's set
      * of configuration properties.
      */
     private static Properties findProperties() throws Exception {
-        // load the default set of configuration properties from the
-        // file indicated by the SGS_PROPERTIES system property
+        // load the application specific configuration file
+        // as the default set of options if it exists
         Properties baseProperties = null;
-        String basePropLoc = System.getenv(BootProperties.SGS_PROPERTIES);
-        if(basePropLoc != null) {
-            File basePropFile = new File(basePropLoc);
-            if(!basePropFile.isFile() || !basePropFile.canRead()) {
-                logger.log(Level.SEVERE, "can't access " +
-                        BootProperties.SGS_PROPERTIES +
-                       " file: " + basePropFile);
-                throw new IllegalStateException("can't access " +
-                                                BootProperties.SGS_PROPERTIES +
-                                                " file: " + basePropFile);
-            }
-            baseProperties = loadProperties(basePropFile.toURI().toURL(),
-                                            null);
-        }
-        else {
-            baseProperties = new Properties();
+        URL propsIn = Kernel.class.getClassLoader().
+                getResource(BootProperties.DEFAULT_APP_PROPERTIES);
+        if(propsIn != null) {
+            baseProperties = loadProperties(propsIn, null);
         }
         
-        // load the application specific configuration file
-        // on top of the defaults
-        URL propsIn = Thread.currentThread().getContextClassLoader().
-                getResource(BootProperties.DEFAULT_APP_PROPERTIES);
-        if(propsIn == null) {
-            logger.log(Level.SEVERE, BootProperties.DEFAULT_APP_PROPERTIES +
-                       " not found");
-            throw new IllegalStateException(
-                    BootProperties.DEFAULT_APP_PROPERTIES +
-                    " not found");
+        // load the overriding set of configuration properties from the
+        // file indicated by the SGS_PROPERTIES system property
+        String overPropLoc = System.getenv(BootProperties.SGS_PROPERTIES);
+        if(overPropLoc != null) {
+            File overPropFile = new File(overPropLoc);
+            if(!overPropFile.isFile() || !overPropFile.canRead()) {
+                logger.log(Level.SEVERE, "can't access " +
+                        BootProperties.SGS_PROPERTIES +
+                       " file: " + overPropFile);
+                throw new IllegalStateException("can't access " +
+                                                BootProperties.SGS_PROPERTIES +
+                                                " file: " + overPropFile);
+            }
+            return loadProperties(overPropFile.toURI().toURL(),
+                                  baseProperties);
         }
-        return loadProperties(propsIn, baseProperties);
+        else {
+            return baseProperties;
+        }
     }
     
     /**
@@ -974,8 +904,6 @@ class Kernel {
         // if no arguments are given on the command line, find configuration
         // files from system properties
         if(args.length == 0) {
-            ClassLoader appLoader = buildAppClassLoader();
-            Thread.currentThread().setContextClassLoader(appLoader);
             appProperties = findProperties();
         }
         // if an argument is given on the command line, assume it is
