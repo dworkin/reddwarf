@@ -19,11 +19,15 @@
 
 package com.sun.sgs.test.app.util;
 
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
+
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Random;
 
@@ -84,6 +88,74 @@ public class TestScalableList extends Assert {
     }
 
     /**
+     * Tests instantiating a ScalableList using the copy constructor.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testCopyConstructor() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = null;
+		Collection<String> c = new ArrayList<String>();
+		c.add("A");
+
+		try {
+		    list = new ScalableList<String>(-1, -1, c);
+		    fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException iae) {
+		}
+
+		try {
+		    list = new ScalableList<String>(-1, 2, c);
+		    fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException iae) {
+		}
+		try {
+		    list = new ScalableList<String>(2, -1, c);
+		    fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException iae) {
+		}
+		try {
+		    list = new ScalableList<String>(1, 0, c);
+		    fail("Expected IllegalArgumentException");
+		} catch (IllegalArgumentException iae) {
+		}
+
+		try {
+		    list = new ScalableList<String>(3, 3, c);
+		} catch (Exception e) {
+		    fail("Was not expecting an exception: " +
+			    e.getLocalizedMessage());
+		}
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests creating a new {@code ScalableList} using the empty constructor
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testEmptyConstructor() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = null;
+		try {
+		    list = new ScalableList<String>();
+		} catch (Exception e) {
+		    fail("Was not expecting an exception: " +
+			    e.getLocalizedMessage());
+		}
+		AppContext.getDataManager().removeObject(list);
+
+	    }
+	}, taskOwner);
+    }
+
+    /**
      * Tests instantiating a ScalableList with illegal argument(s).
      * 
      * @throws Exception
@@ -94,33 +166,33 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = null;
 		try {
-		    new ScalableList<String>(-1, -1);
+		    list = new ScalableList<String>(-1, -1);
 		    fail("Expected IllegalArgumentException");
 		} catch (IllegalArgumentException iae) {
 		}
 
 		try {
-		    new ScalableList<String>(-1, 2);
+		    list = new ScalableList<String>(-1, 2);
 		    fail("Expected IllegalArgumentException");
 		} catch (IllegalArgumentException iae) {
 		}
 		try {
-		    new ScalableList<String>(2, -1);
+		    list = new ScalableList<String>(2, -1);
 		    fail("Expected IllegalArgumentException");
 		} catch (IllegalArgumentException iae) {
 		}
 		try {
-		    new ScalableList<String>(1, 0);
+		    list = new ScalableList<String>(1, 0);
 		    fail("Expected IllegalArgumentException");
 		} catch (IllegalArgumentException iae) {
 		}
-		
+
 	    }
 	}, taskOwner);
     }
 
     /**
-     * Tests instantiating a ScalableList with illegal argument(s).
+     * Tests instantiating a ScalableList with legal argument(s).
      * 
      * @throws Exception
      */
@@ -293,7 +365,7 @@ public class TestScalableList extends Assert {
 
 		assertTrue(list.addAll(c));
 		assertEquals(3, list.size());
-		
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -341,6 +413,78 @@ public class TestScalableList extends Assert {
 			dataService.createReference(list);
 
 		assertTrue(list1Ref.get().equals(list2Ref.get()));
+
+		// Test two different list implementations
+		List<String> ref1 = new ArrayList<String>();
+		ref1.add("A");
+		ref1.add("B");
+		ref1.add("C");
+		ref1.add("D");
+		ref1.add("E");
+		list = new ScalableList<String>(3, 3);
+		list.add("A");
+		list.add("B");
+		list.add("C");
+		list.add("D");
+		list.add("E");
+		assertTrue(ref1.equals(list));
+
+		// Test two differently-sized branching factors
+		ScalableList<String> smallerBranchingFactor =
+			new ScalableList<String>(3, 3);
+		ScalableList<String> largerBranchingFactor =
+			new ScalableList<String>(9, 3);
+		smallerBranchingFactor.add("A");
+		smallerBranchingFactor.add("B");
+		smallerBranchingFactor.add("C");
+		smallerBranchingFactor.add("D");
+		smallerBranchingFactor.add("E");
+		smallerBranchingFactor.add("F");
+		smallerBranchingFactor.add("G");
+		smallerBranchingFactor.add("H");
+		smallerBranchingFactor.add("I");
+		smallerBranchingFactor.add("J");
+		largerBranchingFactor.add("A");
+		largerBranchingFactor.add("B");
+		largerBranchingFactor.add("C");
+		largerBranchingFactor.add("D");
+		largerBranchingFactor.add("E");
+		largerBranchingFactor.add("F");
+		largerBranchingFactor.add("G");
+		largerBranchingFactor.add("H");
+		largerBranchingFactor.add("I");
+		largerBranchingFactor.add("J");
+		assertTrue(smallerBranchingFactor
+			.equals(largerBranchingFactor));
+
+		// Test two differently-sized bucket sizes
+		ScalableList<String> smallerBucketSize =
+			new ScalableList<String>(3, 3);
+		ScalableList<String> largerBucketSize =
+			new ScalableList<String>(3, 9);
+		smallerBucketSize.add("A");
+		smallerBucketSize.add("B");
+		smallerBucketSize.add("C");
+		smallerBucketSize.add("D");
+		smallerBucketSize.add("E");
+		smallerBucketSize.add("F");
+		smallerBucketSize.add("G");
+		smallerBucketSize.add("H");
+		smallerBucketSize.add("I");
+		smallerBucketSize.add("J");
+		largerBucketSize.add("A");
+		largerBucketSize.add("B");
+		largerBucketSize.add("C");
+		largerBucketSize.add("D");
+		largerBucketSize.add("E");
+		largerBucketSize.add("F");
+		largerBucketSize.add("G");
+		largerBucketSize.add("H");
+		largerBucketSize.add("I");
+		largerBucketSize.add("J");
+		assertTrue(smallerBranchingFactor
+			.equals(largerBranchingFactor));
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -369,7 +513,7 @@ public class TestScalableList extends Assert {
 		assertEquals(5, list.size());
 		// get the middle element
 		assertEquals("D", list.get(2));
-		
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -468,7 +612,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		assertEquals("C", list.get(2));
-		
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -865,7 +1009,7 @@ public class TestScalableList extends Assert {
 		assertTrue(list.contains("A"));
 		assertTrue(list.contains("B"));
 		assertTrue(list.contains("C"));
-		
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -905,6 +1049,7 @@ public class TestScalableList extends Assert {
     public void testRetainAll() throws Exception {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
+		// test that retainAll returns true if changes are made
 		ScalableList<String> list = new ScalableList<String>(6, 6);
 		assertTrue(list.add("A"));
 		assertTrue(list.add("B"));
@@ -919,6 +1064,21 @@ public class TestScalableList extends Assert {
 		assertEquals(2, list.size());
 		assertEquals("A", list.get(0));
 		assertEquals("B", list.get(1));
+
+		// check that retainAll returns false if contents
+		// do not change
+		list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+		c = new ArrayList<String>();
+		c.add("B");
+		c.add("D");
+		c.add("A");
+		c.add("C");
+		assertFalse(list.retainAll(c));
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -1079,7 +1239,40 @@ public class TestScalableList extends Assert {
 		}
 		assertEquals(5, list.size());
 		assertEquals(true, list.contains(valueToAddAndCheck));
-		assertEquals(2, list.indexOf(valueToAddAndCheck));
+		assertEquals(3, list.indexOf(valueToAddAndCheck));
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests the iterator's ability to add an element to the list.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testListIteratoGetNextAndPrevIndex() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+
+		ListIterator<String> iter = list.listIterator();
+		assertTrue(iter.hasNext());
+		int count = 0;
+
+		// check the indices
+		while (iter.hasNext()) {
+		    iter.next();
+		    assertEquals(count - 1, iter.previousIndex());
+		    assertEquals(count + 1, iter.nextIndex());
+		    count++;
+		}
+
+		assertEquals(4, list.size());
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -1231,8 +1424,8 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = makeList();
 
-		list.clear();
-		assertTrue(list.isEmpty());
+		//list.clear();
+		//assertTrue(list.isEmpty());
 
 		list.add("A");
 		list.add("B");
@@ -1952,6 +2145,44 @@ public class TestScalableList extends Assert {
     }
 
     /**
+     * Tests the lists ability to detect when an element is trying to be added
+     * to an invalid index.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testAddingAllToInvalidIndex() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		list.add("A");
+		list.add("B");
+
+		Collection<String> c = new ArrayList<String>();
+		c.add("C");
+		c.add("D");
+		c.add("E");
+		c.add("F");
+
+		try {
+		    list.addAll(3, c);
+		    fail("Expected an IndexOutOfBoundsException when adding to "
+			    + "an invalid index");
+		} catch (IndexOutOfBoundsException e) {
+		}
+
+		try {
+		    list.addAll(-1, c);
+		    fail("Expected an IndexOutOfBoundsException when adding to "
+			    + "an invalid index");
+		} catch (IndexOutOfBoundsException e) {
+		}
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
      * Tests the list's ability to throw an exception when trying to retrieve
      * a value from an invalid index.
      * 
@@ -2046,7 +2277,7 @@ public class TestScalableList extends Assert {
 		    fail("Expecting NullPointerException");
 		} catch (NullPointerException npe) {
 		}
-		
+
 		AppContext.getDataManager().removeObject(list);
 
 	    }
@@ -2154,6 +2385,39 @@ public class TestScalableList extends Assert {
     }
 
     /**
+     * Tests the list's ability to not find a duplicated object after it has
+     * been removed, using the lastIndexOf() method.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testRemoveWithInvalidIndex() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 3);
+		list.add("A");
+		list.add("B");
+		list.add("C");
+		list.add("D");
+		list.add("E");
+
+		try {
+		    list.remove(-1);
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		}
+
+		try {
+		    list.remove(5);
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		}
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
      * Tests expected exceptions from the {@code subList()} operation
      * 
      * @throws Exception
@@ -2195,4 +2459,732 @@ public class TestScalableList extends Assert {
 	}, taskOwner);
     }
 
+    /**
+     * Tests the list's ability to not find a duplicated object after it has
+     * been removed, using the lastIndexOf() method.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testSetWithInvalidIndex() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(3, 3);
+		list.add("A");
+		list.add("B");
+		list.add("C");
+		list.add("D");
+		list.add("E");
+
+		try {
+		    list.set(-1, "Z");
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		}
+
+		try {
+		    list.set(5, "Z");
+		    fail("Expecting IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		}
+		assertFalse(list.contains("Z"));
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /*
+     * //////////////////////////////////////////////////// TEST USING DATA
+     * SERVICE ////////////////////////////////////////////////////
+     */
+
+    /**
+     * Tests retrieving the list and making modifications
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testRetrievingAndModifyingListFromDataService()
+	    throws Exception {
+	final String name = "testScalableList";
+
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> d = new ScalableList<String>(3, 3);
+		for (int i = 0; i < 10; ++i)
+		    d.add(Integer.toString(i));
+		AppContext.getDataManager().setBinding(name, d);
+	    }
+	}, taskOwner);
+
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> d =
+			uncheckedCast((AppContext.getDataManager()
+				.getBinding(name)));
+		assertEquals(10, d.size());
+
+		// compare elements
+		for (int i = 0; i < d.size(); i++) {
+		    assertEquals(Integer.toString(i), d.get(i));
+		}
+
+		AppContext.getDataManager().removeBinding(name);
+	    }
+	}, taskOwner);
+    }
+
+    @Test
+    public void testSeriazableWithRemovals() throws Exception {
+	final String name = "testScalableList";
+	final int total = 5;
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>();
+		for (int i = 0; i < 10; i++)
+		    list.add(Integer.toString(i));
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// remove some elements
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		for (int i = 0; i < 5; i++) {
+		    list.remove(0);
+		}
+	    }
+	}, taskOwner);
+
+	// check that the changes were made
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		Iterator<String> iter = list.iterator();
+		int count = 0;
+
+		while (iter.hasNext()) {
+		    iter.next();
+		    count++;
+		}
+
+		assertEquals(total, count);
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    @Test
+    public void testSeriazableWithAdditions() throws Exception {
+	final String name = "testScalableList";
+	final int total = 15;
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>();
+		for (int i = 0; i < 10; i++)
+		    list.add(Integer.toString(i));
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// remove some elements
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		for (int i = 0; i < 5; i++) {
+		    list.add(Integer.toString(10 + i));
+		}
+	    }
+	}, taskOwner);
+
+	// check that the changes were made
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		Iterator<String> iter = list.iterator();
+		int count = 0;
+
+		while (iter.hasNext()) {
+		    iter.next();
+		    count++;
+		}
+
+		assertEquals(total, count);
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests whether the iterator throws a
+     * {@code ConcurrentModificationException} if the {@code ListNode} is
+     * modified while the iterator is serialized.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testConcurrentModificationException() throws Exception {
+	final String name = "testScalableList2";
+	final String iterName = "testIterator";
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>(3, 3);
+		for (int i = 0; i < 10; i++) {
+		    list.add(Integer.toString(i));
+		}
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// iterate to a location and serialize
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		ListIterator<String> iter = list.listIterator();
+		int count = 0;
+		while (count++ < 3) {
+		    iter.next();
+		}
+
+		AppContext.getDataManager().setBinding(iterName, iter);
+	    }
+	}, taskOwner);
+
+	// see what the iterator does
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+
+		list.remove(2);
+
+		ListIterator<String> iter =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				iterName));
+		try {
+		    iter.hasNext();
+		    fail("Expecting ConcurrentModificationException");
+		} catch (ConcurrentModificationException cme) {
+		    // Expected
+		} catch (Exception e) {
+		    fail("Expecting ConcurrentModificationException: " + e.getLocalizedMessage());
+		}
+
+		try {
+		    iter.next();
+		    fail("Expecting ConcurrentModificationException");
+		} catch (ConcurrentModificationException cme) {
+		    // Expected
+		} catch (Exception e) {
+		    fail("Expecting ConcurrentModificationException" + e.getLocalizedMessage());
+		}
+
+		try {
+		    iter.previous();
+		    fail("Expecting ConcurrentModificationException");
+		} catch (ConcurrentModificationException cme) {
+		    // Expected
+		} catch (Exception e) {
+		    fail("Expecting ConcurrentModificationException");
+		}
+
+		try {
+		    iter.hasPrevious();
+		    fail("Expecting ConcurrentModificationException");
+		} catch (ConcurrentModificationException cme) {
+		    // Expected
+		} catch (Exception e) {
+		    fail("Expecting ConcurrentModificationException");
+		}
+
+		AppContext.getDataManager().removeBinding(iterName);
+		AppContext.getDataManager().removeObject(iter);
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests whether the iterator throws a
+     * {@code ConcurrentModificationException} if the {@code ListNode} is
+     * modified while the iterator is serialized.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testNoConcurrentModificationException() throws Exception {
+	final String name = "testScalableList3";
+	final String iterName = "testIterator3";
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+		for (int i = 0; i < 10; i++) {
+		    list.add(Integer.toString(i));
+		}
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// iterate to a location and serialize
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		ListIterator<String> iter = list.listIterator();
+		int count = 0;
+		while (count++ < 5) {
+		    iter.next();
+		}
+
+		AppContext.getDataManager().setBinding(iterName, iter);
+	    }
+	}, taskOwner);
+
+	// see what the iterator does
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+
+		// remove elements which will not affect the
+		// node the iterator is pointing at
+		list.remove(6);
+		list.remove(2);
+		assertEquals(8, list.size());
+
+		// fetch iterator and see what it does
+		ListIterator<String> iter =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				iterName));
+		try {
+		    assertTrue(iter.hasNext());
+		    assertTrue(iter.hasPrevious());
+		} catch (Exception e) {
+		    fail("Not expecting an exception: " +
+			    e.getLocalizedMessage());
+		}
+
+		try {
+		    iter.next();
+		    iter.previous();
+		} catch (Exception e) {
+		    fail("Was not expecting an exception: " +
+			    e.getLocalizedMessage());
+		}
+
+		AppContext.getDataManager().removeBinding(iterName);
+		AppContext.getDataManager().removeObject(iter);
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Tests whether an iterator only removes an element once, as defined by
+     * the {@code ListIterator.remove()} method.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testEnsureIteratorRemovesOnce() throws Exception {
+	final String name = "testScalableList4";
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+		for (int i = 0; i < 10; i++) {
+		    list.add(Integer.toString(i));
+		}
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// iterate to a location and remove
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		ListIterator<String> iter = list.listIterator();
+		int count = 0;
+		while (count++ < 5) {
+		    iter.next();
+		}
+		iter.remove();
+		assertEquals(9, list.size());
+		iter.remove();
+		// Removing a second time should not cause a change
+		// unless next() or prev() was called
+		assertEquals(9, list.size());
+
+		// test next()
+		if (iter.hasNext()) {
+		    iter.next();
+		    iter.remove();
+		    assertEquals(8, list.size());
+		}
+
+		// test previous()
+		if (iter.hasPrevious()) {
+		    iter.previous();
+		    iter.remove();
+		    assertEquals(7, list.size());
+		}
+
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+
+    }
+
+    /**
+     * Tests whether an iterator is able to add to the list multiple times
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testMultipleIteratorAdds() throws Exception {
+	final String name = "testScalableList5";
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+		for (int i = 0; i < 10; i++) {
+		    list.add(Integer.toString(i));
+		}
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// iterate to a location and start adding
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		ListIterator<String> iter = list.listIterator();
+		int count = 0;
+		while (count++ < 5) {
+		    iter.next();
+		}
+		iter.add("X");
+		assertEquals(11, list.size());
+		iter.add("Y");
+		iter.add("Z");
+		assertEquals(13, list.size());
+
+		assertEquals(7, list.indexOf("X"));
+		assertEquals(6, list.indexOf("Y"));
+		assertEquals(5, list.indexOf("Z"));
+
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+
+    }
+
+    /**
+     * Tests whether multiple iterators can coexist on the same list.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testMultipleIteratorOperations() throws Exception {
+	final String name = "testScalableList5";
+	final String iterName = "testIterator5";
+	final String iterName2 = "testIterator6";
+
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+		for (int i = 0; i < 10; i++) {
+		    list.add(Integer.toString(i));
+		}
+		AppContext.getDataManager().setBinding(name, list);
+	    }
+	}, taskOwner);
+
+	// create iterators, iterate to a certain location
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		ListIterator<String> iter = list.listIterator();
+		ListIterator<String> iter2 = list.listIterator();
+
+		AppContext.getDataManager().setBinding(iterName, iter);
+		AppContext.getDataManager().setBinding(iterName2, iter2);
+	    }
+	}, taskOwner);
+
+	// try adding/removing
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		Random random = new Random();
+		ScalableList<String> list =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		ListIterator<String> iter =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				iterName));
+		ListIterator<String> iter2 =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				iterName2));
+
+		int count = 0;
+		int value = random.nextInt(list.size() - 1);
+		while (count++ <= value) {
+		    iter.next();
+		    iter2.next();
+		}
+
+		assertEquals(value, iter.nextIndex() - 1);
+		assertEquals(value, iter2.nextIndex() - 1);
+
+		// node was removed
+		iter.remove();
+		try {
+		    iter2.next();
+		    fail("Expecting a ConcurrentModificationException");
+		} catch (ConcurrentModificationException cme) {
+		}
+
+		count = 0;
+		iter = list.listIterator();
+		iter2 = list.listIterator();
+		value = random.nextInt(list.size() - 1);
+		while (count++ <= value) {
+		    iter.next();
+		    iter2.next();
+		}
+
+		// node was added
+		iter.add("Z");
+		try {
+		    iter2.hasNext();
+		} catch (ConcurrentModificationException cme) {
+		    fail("Not expecting a ConcurrentModificationException");
+		}
+
+		// test set; it shouldn't throw an exception because the
+		// node will remain the same, with the exception of the
+		// one element that was changed.
+		count = 0;
+		iter = list.listIterator();
+		iter2 = list.listIterator();
+		value = random.nextInt(list.size() - 1);
+		while (count++ <= value) {
+		    iter.next();
+		    iter2.next();
+		}
+
+		iter.set("Z");
+		try {
+		    iter2.hasNext();
+		} catch (ConcurrentModificationException cme) {
+		    fail("Not expecting a ConcurrentModificationException");
+		}
+
+		AppContext.getDataManager().removeBinding(iterName);
+		AppContext.getDataManager().removeObject(iter);
+		AppContext.getDataManager().removeBinding(iterName2);
+		AppContext.getDataManager().removeObject(iter2);
+		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
+
+    
+    
+    
+    /**
+     * Tests random operations
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testListIteratorOperationsAgainstShadow() throws Exception {
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		List<String> shadow = new ArrayList<String>();
+		ScalableList<String> list = new ScalableList<String>(4, 9);
+
+		assertEquals(shadow.size(), list.size());
+		// Populate the lists
+		for (int i = 0; i < 20; i++) {
+		    shadow.add(Integer.toString(i));
+		    list.add(Integer.toString(i));
+		    assertEquals(Integer.toString(i) + ":", shadow.size(), list.size());
+		}
+		assertEquals(shadow.size(), list.size());
+
+		// place iterators in the middle
+		ListIterator<String> shadowIter = shadow.listIterator();
+		ListIterator<String> listIter = list.listIterator();
+		for (int i = 0; i < 10; i++) {
+		    shadowIter.next();
+		    listIter.next();
+		}
+
+		assertEquals(shadow.size(), list.size());
+		
+		// perform some operations
+		listIter.add("A");
+		shadowIter.add("A");
+		assertEquals(shadow.size(), list.size());
+		listIter.add("A");
+		shadowIter.add("A");
+		assertEquals(shadow.size(), list.size());
+		listIter.add("A");
+		shadowIter.add("A");
+		assertEquals(shadow.size(), list.size());
+		listIter.add("A");
+		shadowIter.add("A");
+		assertEquals(shadow.size(), list.size());
+		listIter.add("A");
+		shadowIter.add("A");
+		assertEquals(shadow.size(), list.size());
+		
+		
+
+	    }
+	}, taskOwner);
+
+    }
+    
+    
+    
+    
+    
+    /**
+     * Tests random operations
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testRandomListIteratorOperations() throws Exception {
+	// create the list
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		List<String> shadow = new ArrayList<String>();
+		ScalableList<String> list = new ScalableList<String>(3, 1);
+
+		// Populate the lists
+		for (int i = 0; i < 20; i++) {
+		    shadow.add(Integer.toString(i));
+		    list.add(Integer.toString(i));
+		}
+
+		// place iterators in the middle
+		ListIterator<String> shadowIter = shadow.listIterator();
+		ListIterator<String> listIter = list.listIterator();
+		for (int i = 0; i < 10; i++) {
+		    shadowIter.next();
+		    listIter.next();
+		}
+
+		// perform random operations
+		Random random = new Random(); ArrayList<String> t = new ArrayList<String>(); t.listIterator();
+		for (int i = 0; i < 20; i++) {
+		    int operation = random.nextInt(4);
+		    String value = Integer.toString(random.nextInt());
+		    try {
+			listIter = performOperation(listIter, operation, value);
+		    } catch (Exception e) {
+			// won't worry about exceptions
+		    }
+		    try {
+			shadowIter = performOperation(shadowIter, operation, value);
+		    } catch (Exception e){
+			// won't worry about exceptions
+		    }
+		}
+		assertEquals(shadow.size(), list.size());
+		
+
+	    }
+	}, taskOwner);
+
+    }
+
+    /**
+     * Performs the supplied operation
+     * 
+     * @param list the list to modify
+     * @param operation the operation to perform
+     * @param value the value to add, if applicable
+     * @return the modified list
+     */
+    private ListIterator<String> performOperation(ListIterator<String> iter,
+	    int operation, String value) throws NoSuchElementException {
+	switch (operation) {
+	    case 0:
+	    case 1:
+		if (iter.hasNext()) {
+		    iter.next();
+		}
+		break;
+	    case 2:
+	    case 3:
+		if (iter.hasPrevious()) {
+		    iter.previous();
+		}
+		break;
+	    case 4:
+		iter.add(value);
+		break;
+	    case 5:
+		iter.remove();
+		break;
+	    case 6:
+		iter.set(value);
+		break;
+	    default:
+		break;
+	}
+	return iter;
+    }
 }

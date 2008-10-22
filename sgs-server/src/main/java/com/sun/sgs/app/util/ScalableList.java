@@ -38,6 +38,8 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.util.RobTest.Node;
+import com.sun.sgs.app.util.RobTest.TreeNode;
 
 /**
  * This class represents a {@code java.util.List} which supports a concurrent
@@ -1095,9 +1097,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 		Node<E> child, int numberChildren, int size) {
 
 	    owner = AppContext.getDataManager().createReference(list);
-	    this.branchingFactor = owner.get().getBranchingFactor();
+	    this.branchingFactor = list.getBranchingFactor();
 	    nextRef = null;
-	    this.bucketSize = owner.get().getBucketSize();
+	    this.bucketSize = list.getBucketSize();
 
 	    // Set up links
 	    DataManager dm = AppContext.getDataManager();
@@ -1124,9 +1126,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    assert (e != null);
 
 	    owner = AppContext.getDataManager().createReference(list);
-	    this.branchingFactor = owner.get().getBranchingFactor();
+	    this.branchingFactor = list.getBranchingFactor();
 	    nextRef = null;
-	    this.bucketSize = owner.get().getBucketSize();
+	    this.bucketSize = list.getBucketSize();
 
 	    ListNode<E> n = new ListNode<E>(this, bucketSize, e);
 	    size = n.size();
@@ -1145,9 +1147,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	TreeNode(ScalableList<E> list, TreeNode<E> parent) {
 	    owner = AppContext.getDataManager().createReference(list);
-	    this.branchingFactor = owner.get().getBranchingFactor();
+	    this.branchingFactor = list.getBranchingFactor();
 	    nextRef = null;
-	    this.bucketSize = owner.get().getBucketSize();
+	    this.bucketSize = list.getBucketSize();
 
 	    ListNode<E> n = new ListNode<E>(this, bucketSize);
 	    size = n.size();
@@ -1253,6 +1255,17 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
+	 * {@inheritDoc}
+	 */
+	public void clear() {
+	    TreeNode<E> parent = getParent();
+	    AppContext.getDataManager().removeObject(this);
+	    if (parent != null) {
+		parent.clear();
+	    }
+	}
+
+	/**
 	 * Retrieves the number of immediate children beneath this node.
 	 * 
 	 * @return the number of immediate children
@@ -1285,7 +1298,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * deletion. This method re-links references that are dangling as a
 	 * result of this node's removal.
 	 */
-	void prune() {
+	boolean prune() {
 
 	    // Decide how to perform re-linking of the nodes,
 	    if (prevRef != null) {
@@ -1298,9 +1311,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 		    prevRef.getForUpdate().setNext(null);
 		}
 	    } else if (nextRef != null) {
-		// relink head
+		// relink head and temporarily point to the next sibling.
+		// If the next sibling didn't belong to the parent, then
+		// the parent will be removed anyway since its child
+		// count will have reached 0.
 		nextRef.getForUpdate().setPrev(null);
-		// TODO: update the child pointer
+		parentRef.getForUpdate().setChild(nextRef.get(),
+			parentRef.get().size(),
+			parentRef.get().getChildCount());
 
 	    } else {
 		// its an only child; join the parent to the child
@@ -1308,13 +1326,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 		if (parentRef != null && childRef != null) {
 		    Node<E> child = childRef.getForUpdate();
 		    TreeNode<E> parent = parentRef.getForUpdate();
-		    parent.setChild(child, child.size(), 
-			    parent.getChildCount() - 1);
+		    parent.setChild(child, size, childrenCount);
 		    child.setParent(parent);
+		} else {
+		    return false;
 		}
 	    }
 	    AppContext.getDataManager().removeObject(this);
-
+	    return true;
 	}
 
 	/**
@@ -1356,7 +1375,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	    // Perform split by creating and linking new sibling
 	    newNode = createAndLinkSibling(tmp, childrenCount);
-	    childrenCount = childrenCount - calculateSplitSize(childrenCount);
 
 	    // Link the new sibling to the tree
 	    newNode.setPrev(this);
@@ -1391,7 +1409,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    Node<E> newChild = child;
 	    int i = 0;
 	    int children = 0;
-	    while (child != null) {
+	    while (child != null && i < numberOfChildren) {
 
 		// When we reach halfway, save the child as it
 		// will be the child of the new TreeNode. When
@@ -1504,52 +1522,25 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * static fields.
 	 */
 	void decrementChildrenAndSize() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    size--;
-	    childrenCount--;
-
 	    TreeNode<E> parent = getParent();
 
-	    // If we are at the parent, check if it needs to be pruned
+	    // We are done when we reach the root
 	    if (parent == null) {
-		int numberOfRootChildren =
-			getNumberOfChildrenUsingIteration();
-		if (numberOfRootChildren == 1 &&
-			!(getChild() instanceof ListNode)) {
-		    pruneRoot();
-		}
 		return;
 	    }
 
-	    // prune child if there is only one and its not a ListNode.
-	    // Otherwise if there are no children, remove this from
-	    // the tree and decrement parent's number of children and
-	    // size. Otherwise, only propagate decrementing
-	    if (childrenCount == 1 && !(getChild() instanceof ListNode)) {
-		TreeNode<E> child = uncheckedCast(getChild());
-		child.prune();
-	    } else if (size() == 0) {
-		prune();
+	    AppContext.getDataManager().markForUpdate(this);
+
+	    size--;
+	    childrenCount--;
+
+	    // If there are no children and pruning is successful,
+	    // then propagate changes to the parent
+	    if (childrenCount == 0 && size() == 0 && prune()) {
+		parent.decrementChildrenAndSize();
+		return;
 	    }
 	    parent.decrement();
-	}
-
-	/**
-	 * In the event that a removal leaves the root with only one child,
-	 * that one child is to be the new root. This avoids having a long
-	 * chain of parents and children, which harm the searching performance
-	 * of the ScalableList.
-	 */
-	private void pruneRoot() {
-	    // Ensure that the child is not a ListNode and that this
-	    // instance is the root
-	    assert !(getChild() instanceof ListNode);
-	    assert (owner.get().getRoot().equals(this));
-
-	    TreeNode<E> newRoot = uncheckedCast(getChild());
-	    AppContext.getDataManager().removeObject(this);
-
-	    owner.getForUpdate().setRoot(newRoot);
 	}
 
 	/**
@@ -1573,10 +1564,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@inheritDoc}
 	 */
 	public SearchResult<E> search(int currentValue, int destIndex) {
-
 	    TreeNode<E> t = this;
 
-	    // iterate through siblings
+	    // Iterate through siblings
 	    while ((currentValue + t.size) < destIndex) {
 		currentValue += t.size;
 		t = t.next();
@@ -1616,22 +1606,16 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * A reference to the current {@code Node} whose children are being
 	 * deleted
 	 */
-	private ManagedReference<Node<E>> current;
-
-	/**
-	 * A queue to hold onto the parents
-	 */
-	private ArrayList<ManagedReference<TreeNode<E>>> queue;
+	private ManagedReference<ListNode<E>> current;
 
 	/**
 	 * Constructor for the asynchronous task
 	 * 
 	 * @param root the root node of the entire tree structure
 	 */
-	AsynchronousClearTask(Node<E> node) {
+	AsynchronousClearTask(ListNode<E> node) {
 	    assert (node != null);
 	    current = AppContext.getDataManager().createReference(node);
-	    queue = new ArrayList<ManagedReference<TreeNode<E>>>();
 	}
 
 	/**
@@ -1653,45 +1637,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * Starting at the bottom, remove some nodes but stop so that the task
-	 * can reschedule itself.
-	 * 
-	 * @return whether there is more work (clearing) to be performed;
-	 * {@code true} if so, and {@code false} otherwise.
-	 */
-	private boolean doWork() {
-
-	    // adds the parent to the queue if it doesn't already exist
-	    enqueueIfNecessary(current.get().getParent());
-
-	    // if there are ListNodes, get rid of them first. Otherwise
-	    // use the queue to start removing TreeNodes.
-	    if (current.get() instanceof ListNode) {
-
-		// remove entries in ListNode, and if false, then we
-		// are ready to start removing TreeNodes from queue
-		if (!removeSomeElements()) {
-		    AppContext.getDataManager().markForUpdate(this);
-		    current =
-			    AppContext.getDataManager().createReference(
-				    (Node<E>) queue.remove(0).get());
-		}
-
-	    } else {
-		// It is a TreeNode; use the queue. In here we will
-		// check whether the current node is the root.
-		// If it returns false, then we are done
-		// (task exit condition).
-		if (!removeSomeTreeNodes()) {
-		    return false;
-		}
-	    }
-
-	    // there is more work to be done
-	    return true;
-	}
-
-	/**
 	 * Removes MAX_OPERATION number of elements from the ScalableList and
 	 * returns {@code true} if there is more work to be done. If there are
 	 * no more elements to remove, then it will return {@code false},
@@ -1701,129 +1646,56 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @return {@code true} if more work needs to be done, and
 	 * {@code false} if there are no more elements to remove.
 	 */
-	private boolean removeSomeElements() {
-	    ListNode<E> currentListNode = uncheckedCast(current.get());
-	    TreeNode<E> parent;
+	private boolean doWork() {
+	    ListNode<E> currentListNode = current.get();
+	    AppContext.getDataManager().markForUpdate(currentListNode);
+	    ListNode<E> next;
 	    int count = 0;
 	    E entry = null;
 
-	    // Add the parent to the queue if it doesn't
-	    // already exist
-	    parent = currentListNode.getParent();
-	    enqueueIfNecessary(parent);
-
-	    // remove elements; delete the ones that
-	    // are Element<E> objects
+	    // Perform some removals
 	    while (count < MAX_OPERATIONS) {
-		// Exit condition -- declare that all ListNodes have
-		// been removed
+		// When currentListNode becomes null, we are done
 		if (currentListNode == null) {
 		    return false;
 		}
+		next = currentListNode.next();
 
 		// Repeatedly remove the head element in the
 		// ListNode as long as one exists.
 		if (currentListNode.size() > 0) {
-		    AppContext.getDataManager()
-			    .markForUpdate(currentListNode);
 		    entry = currentListNode.remove(0);
 		    count++;
 
 		    // If the entry was an Element object, delete it
-		    // since the Element object is a wrapper
+		    // since the Element object is only a wrapper
 		    if (entry instanceof Element) {
 			AppContext.getDataManager().removeObject(entry);
 		    }
 		} else {
-		    // Remove SubList attached to this ListNode ManagedObject.
-		    // We don't need to remove the ListNode as the remove()
-		    // method above already takes care of it.
-		    currentListNode = currentListNode.next();
 
-		    // Add the parent to the queue if it doesn't
-		    // already exist
-		    if (currentListNode != null) {
-			parent = currentListNode.getParent();
-			enqueueIfNecessary(parent);
+		    // If we have reached the end, forcefully
+		    // remove the current node and its ancestors
+		    // because remove() by default will leave a
+		    // basic tree if the list is empty.
+		    if (next == null) {
+			currentListNode.clear();
+		    } else {
+			AppContext.getDataManager().markForUpdate(next);
 		    }
+
+		    // Get the next node since this one is empty.
+		    // We don't need to remove the ListNode as remove()
+		    // has deleted it, or we deleted it above.
+		    currentListNode = next;
 		}
 	    }
 
 	    // If we are leaving this method, then save the
 	    // currentListNode so we can continue when we come back
-	    AppContext.getDataManager().markForUpdate(this);
 	    current =
 		    AppContext.getDataManager().createReference(
-			    (Node<E>) currentListNode);
-
-	    return true;
-	}
-
-	/**
-	 * add parent to queue if not already there. The queue will be popped
-	 * when we are ready to start removing parents
-	 * 
-	 * @param parent the TreeNode to add if it doesn't already exist.
-	 */
-	private void enqueueIfNecessary(TreeNode<E> parent) {
-	    if (parent == null) {
-		return;
-	    }
-
-	    // Since all elements are ManagedReferences, iterate through
-	    // the list and retrieve the objects, checking for a match
-	    for (int i = 0; i < queue.size(); i++) {
-		TreeNode<E> temp = null;
-
-		temp = queue.get(i).get();
-
-		// It already exists, so return
-		if (temp.equals(parent)) {
-		    return;
-		}
-	    }
-	    AppContext.getDataManager().markForUpdate(this);
-	    queue.add(AppContext.getDataManager().createReference(parent));
-	}
-
-	/**
-	 * Delete some TreeNodes from the queue
-	 * 
-	 * @return {@code true} if there are more nodes to remove, or
-	 * {@code false} if complete
-	 */
-	private boolean removeSomeTreeNodes() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    TreeNode<E> currentTreeNode =
-		    uncheckedCast(current.getForUpdate());
-	    int count = 0;
-
-	    // Remove as many nodes as the maximum number of
-	    // operations allows
-	    while (count < MAX_OPERATIONS) {
-
-		// Add parent to the queue if it doesn't already exist
-		enqueueIfNecessary(currentTreeNode.getParent());
-
-		// remove node
-		AppContext.getDataManager().removeObject(currentTreeNode);
-
-		// pop the queue to remove the next TreeNode, or if none,
-		// then we are done.
-		if (queue.size() > 0) {
-		    currentTreeNode = queue.remove(0).get();
-		} else {
-		    return false;
-		}
-		count++;
-	    }
-
-	    // If we are leaving this method, then save the
-	    // currentTreeNode so we can continue when we come back
-	    current =
-		    AppContext.getDataManager().createReference(
-			    (Node<E>) currentTreeNode);
-
+			    currentListNode);
 	    return true;
 	}
 
@@ -2160,7 +2032,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // aggregate the first node's size because
 	    // we already found the offset from the
 	    // caller.
-	    while (node.prev() != null) {
+	    while (!parent.getChild().equals(node)) {
 		node = node.prev();
 		size += node.size();
 	    }
@@ -2247,8 +2119,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    String exceptionString =
 		    "The ListNode has been modified or removed";
 	    try {
-		if (referenceNode.get()
-			.getDataIntegrityValue() != listNodeReferenceValue) {
+		if (referenceNode.get().getDataIntegrityValue() != 
+		    	listNodeReferenceValue) {
 		    throw new ConcurrentModificationException(exceptionString);
 		}
 	    } catch (ObjectNotFoundException onfe) {
@@ -2603,6 +2475,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * @param <E> the type of element stored in the {@code ScalableList}
      */
     static class ListNode<E> implements ManagedObject, Serializable, Node<E> {
+
 	private Random random = new Random(System.currentTimeMillis());
 	private static final int DATA_INTEGRITY_STARTING_VALUE =
 		Integer.MIN_VALUE;
@@ -2829,15 +2702,37 @@ public class ScalableList<E> extends AbstractList<E> implements
 	E remove(int index) {
 	    E old = getSubList().remove(index);
 	    if (old != null) {
-		AppContext.getDataManager().markForUpdate(this);
-		count--;
-		dataIntegrityVal++;
-		this.getParent().decrement();
-
-		// remove list node if necessary
-		checkRemoveListNode();
+		doRemoveWork();
 	    }
 	    return old;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void clear() {
+	    TreeNode<E> parent = getParent();
+	    AppContext.getDataManager().removeObject(this);
+	    parent.clear();
+	}
+
+	/**
+	 * Performs the work of calling the recursive update methods
+	 */
+	private void doRemoveWork() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    count--;
+	    dataIntegrityVal++;
+
+	    TreeNode<E> parent = getParent();
+	    if (count == 0) {
+
+		int parentChildrenCount = parent.getChildCount();
+		parent.decrementChildrenAndSize();
+		checkRemoveListNode(--parentChildrenCount);
+	    } else {
+		parent.decrement();
+	    }
 	}
 
 	/**
@@ -2854,13 +2749,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // If a removal took place, then update
 	    // count information accordingly
 	    if (result) {
-		AppContext.getDataManager().markForUpdate(this);
-		count--;
-		dataIntegrityVal++;
-		this.getParent().decrement();
-
-		// remove list node if it is empty
-		checkRemoveListNode();
+		doRemoveWork();
 	    }
 	    return result;
 	}
@@ -2870,7 +2759,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * from a list of other {@code ListNode<E>}s. Update previous to
 	 * point to next (doubly) and remove this object from Data Store
 	 */
-	private void checkRemoveListNode() {
+	private void checkRemoveListNode(int parentNumChildren) {
 
 	    // If the size is not zero, then we
 	    // will not be removing any nodes,
@@ -2897,24 +2786,36 @@ public class ScalableList<E> extends AbstractList<E> implements
 		prev().setNext(next());
 		next().setPrev(prev());
 	    } else if (next() != null) {
-		getParent().setChild(next(), getParent().size(),
-			getParent().getChildCount() - 1);
 		next().setPrev(null);
 	    } else {
 		prev().setNext(null);
 	    }
 
-	    // If we are removing the child of the
-	    // TreeNode and the parent has other children,
-	    // then we need to give it a substitute
-	    if (getParent().size() > 0 && getParent().getChild().equals(this)) {
-		getParent().setChild(next(), getParent().size(),
-			getParent().getChildCount() - 1);
-	    }
+	    linkParentToNextIfNecessary(parentNumChildren);
 
 	    // This is an empty node, so remove it from Data Store.
 	    AppContext.getDataManager().removeObject(getSubList());
 	    AppContext.getDataManager().removeObject(this);
+	}
+
+	/**
+	 * Determines if the parent should be connected to the next sibling.
+	 * This will occur as long as the next sibling has the same parent as
+	 * {@code this} and if the parent was not yet removed.
+	 * 
+	 * @param children the number of children the parent has
+	 */
+	private void linkParentToNextIfNecessary(int children) {
+	    if (children == 0) {
+		return;
+	    }
+
+	    TreeNode<E> parent = getParent();
+	    if (parent.equals(next().getParent())) {
+		parent
+			.setChild(next(), parent.size(), parent
+				.getChildCount());
+	    }
 	}
 
 	/**
@@ -3429,6 +3330,13 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @return the size of this node.
 	 */
 	int size();
+
+	/**
+	 * Walks up the tree and removes the object and any of its parents.
+	 * This method is intended to be called during the
+	 * {@code AsynchronousClearTask} operation.
+	 */
+	void clear();
 
 	/**
 	 * Traverses the tree (recursively) in search of the ListNode<E>
