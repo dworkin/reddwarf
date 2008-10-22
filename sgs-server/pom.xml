@@ -25,6 +25,11 @@
       <artifactId>junit</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.easymock</groupId>
+      <artifactId>easymock</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
     </dependency>
