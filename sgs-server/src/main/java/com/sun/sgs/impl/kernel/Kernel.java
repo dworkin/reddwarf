@@ -829,34 +829,49 @@ class Kernel {
      * This method is used to automatically determine an application's set
      * of configuration properties.
      */
-    private static Properties findProperties() throws Exception {
+    private static Properties findProperties(String propLoc) throws Exception {
         // load the application specific configuration file
+        // backed by the system properties
         // as the default set of options if it exists
         Properties baseProperties = null;
         URL propsIn = Kernel.class.getClassLoader().
                 getResource(BootProperties.DEFAULT_APP_PROPERTIES);
         if(propsIn != null) {
-            baseProperties = loadProperties(propsIn, null);
+            baseProperties = loadProperties(propsIn, System.getProperties());
+        }
+        else {
+            baseProperties = System.getProperties();
         }
         
         // load the overriding set of configuration properties from the
         // file indicated by the SGS_PROPERTIES system property
-        String overPropLoc = System.getenv(BootProperties.SGS_PROPERTIES);
-        if(overPropLoc != null) {
-            File overPropFile = new File(overPropLoc);
-            if(!overPropFile.isFile() || !overPropFile.canRead()) {
+        Properties nextProperties = baseProperties;
+        if(propLoc != null) {
+            File propFile = new File(propLoc);
+            if(!propFile.isFile() || !propFile.canRead()) {
                 logger.log(Level.SEVERE, "can't access " +
                         BootProperties.SGS_PROPERTIES +
-                       " file: " + overPropFile);
+                       " file: " + propFile);
                 throw new IllegalStateException("can't access " +
                                                 BootProperties.SGS_PROPERTIES +
-                                                " file: " + overPropFile);
+                                                " file: " + propFile);
             }
-            return loadProperties(overPropFile.toURI().toURL(),
-                                  baseProperties);
+            nextProperties = loadProperties(propFile.toURI().toURL(),
+                                            baseProperties);
+        }
+        
+        // if a properties file exists in the user's home directory, use
+        // it to override any properties, otherwise just use the 
+        // nextProperties alone
+        File homeConfig = new File(System.getProperty("user.home") +
+                                   File.separator + 
+                                   BootProperties.DEFAULT_HOME_CONFIG_FILE);
+        if(homeConfig.isFile() && homeConfig.canRead()) {
+            return loadProperties(homeConfig.toURI().toURL(),
+                                  nextProperties);
         }
         else {
-            return baseProperties;
+            return nextProperties;
         }
     }
     
@@ -864,32 +879,35 @@ class Kernel {
      * Main-line method that starts the {@code Kernel}. Each kernel
      * instance runs a single application.
      * <p>
-     * There are two ways of booting up the {@code Kernel} using this method.
-     * The first involves sending a single argument in on the command-line.
-     * When using this method, it is assumed that all of the classes
-     * required for the application are included in the system classpath.
-     * The argument on the command-line is a {@code Properties} file for the
-     * application.
+     * There are two ways of booting up the {@code Kernel} using this method:
+     * with a single argument, and with no arguments.  If a single argument
+     * is given, the value of the argument is assumed to be a filename and
+     * is used as the {@link BootProperties#SGS_PROPERTIES SGS_PROPERTIES}
+     * environment variable.  If no arguments are given, it is assumed that
+     * this environment variable is already set.  In either case, this file
+     * is used in combination with additional configuration settings to 
+     * determine an application's configuration properties.
      * <p>
-     * The order of precedence for properties is as follows. If a value is
-     * provided for a given property key by the application's configuration,
-     * then that value takes precedence over any others. If no value is
-     * provided by the application's configuration, then the system
-     * property value, if specified (provided on the command-line
-     * using a "-D" flag) is used. If no value is specified for a given
-     * property in either of these places, then a default is used
+     * The order of precedence for properties is as follows (from highest
+     * to lowest):
+     * <ol>
+     * <li>Properties specified in the 
+     * {@link BootProperties#DEFAULT_HOME_CONFIG_FILE configuration file} from
+     * the user's home directory.</li>
+     * <li>Properties specified in the file with the filename specified
+     * with the {@link BootProperties#SGS_PROPERTIES SGS_PROPERTIES} environment
+     * variable.</li>
+     * <li>Properties specified in the file with the name equal to
+     * {@link BootProperties#DEFAULT_APP_PROPERTIES DEFAULT_APP_PROPERTIES}.
+     * This file is typically included as part of the application jar file.</li>
+     * <li>System properties specified on the command line using a 
+     * "-D" flag</li>
+     * </ol>
+     * 
+     * If no value is specified for a given
+     * property in any of these places, then a default is used
      * or an <code>Exception</code> is thrown (depending on whether a default
-     * value is available).
-     * <p>
-     * The second mechanism of booting the kernel requires no arguments to 
-     * be passed in on the command-line.  If no arguments are passed, the
-     * assumption is that only classes required by the core Project Darkstar
-     * server are included in the system classpath.  A set of system properties
-     * are used to build a custom classloader for the application-specific
-     * classes, as well as locate the application configuration.  See
-     * {@link BootProperties} for additional details.
-     * <p>
-     * In both cases, certain properties are required to be 
+     * value is available).  Certain properties are required to be 
      * specified somewhere in the application's configuration.
      * See {@link StandardProperties} for the required and optional properties.
      * 
@@ -899,51 +917,31 @@ class Kernel {
      * @throws Exception if there is any problem starting the system
      */
     public static void main(String [] args) throws Exception {
-        Properties appProperties = null;
-        
-        // if no arguments are given on the command line, find configuration
-        // files from system properties
-        if(args.length == 0) {
-            appProperties = findProperties();
-        }
-        // if an argument is given on the command line, assume it is
-        // a configuration file and we are ready to go
-        else if (args.length == 1) {
-            // Get the properties, merging properties given on the command line
-            // with the first argument, which is the application config file.
-            // The config file properties have precedence.
-            appProperties = loadProperties(new File(args[0]).toURI().toURL(),
-                                           System.getProperties());
-        }
-        // otherwise, there is a problem
-        else {
+        // ensure we don't have too many arguments
+        if(args.length > 1) {
             logger.log(Level.SEVERE, "Invalid number of arguments: halting");
             System.exit(1);
         }
-
-        // if a properties file exists in the user's home directory, use
-        // it to override any properties, otherwise just use the 
-        // appProperties alone
-        Properties finalProperties = null;
-        File homeConfig = new File(System.getProperty("user.home") +
-                                   File.separator + 
-                                   BootProperties.DEFAULT_HOME_CONFIG_FILE);
-        if(homeConfig.isFile() && homeConfig.canRead()) {
-            finalProperties = loadProperties(homeConfig.toURI().toURL(),
-                                             appProperties);
+        
+        // if an argument is specified on the command line, use it
+        // for the value of SGS_PROPERTIES env variable
+        Properties appProperties = null;
+        if (args.length == 1) {
+            appProperties = findProperties(args[0]);
         }
         else {
-            finalProperties = appProperties;
+            appProperties = findProperties(System.getenv(
+                                           BootProperties.SGS_PROPERTIES));
         }
         
         // filter the properties with appropriate defaults
-        filterProperties(finalProperties);
+        filterProperties(appProperties);
         
         // check the standard properties
-        checkProperties(finalProperties);
+        checkProperties(appProperties);
         
         // boot the kernel
-        new Kernel(finalProperties);
+        new Kernel(appProperties);
     }
 
 }
