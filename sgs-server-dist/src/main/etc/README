@@ -38,14 +38,29 @@ COMPATIBILITY section below for information about compatibility.
 
 CONTENTS
 
-This distribution contains the following subdirectories:
+The sgs-server directory contains the following subdirectories:
 
-- doc
-  Documentation for the server API
+- bin
+  The bootstrap JAR file used to bootup a Project Darkstar Server
+  and the application deployed into it
+
+- conf
+  Configuration files used to configure the runtime state of
+  the server
+
+- deploy
+  Location used to deploy applications by dropping in application
+  jar files
+
+- javadoc
+  Javadoc documentation for the server API
 
 - lib
   JAR files needed to develop for the Project Darkstar Server, and to
   run server applications
+
+- src
+  The source code for the Project Darkstar server
 
 - tutorial
   Documentation and sample code for the server tutorial
@@ -79,29 +94,15 @@ from:
 
   http://www.oracle.com/database/berkeley-db/db/index.html
 
-The db.jar and the subdirectories containing the native libraries for
-the platforms of interest should be copied to the lib/bdb subdirectory.
-If using files compiled separately, the Berkeley DB JAR file should be
-copied to the lib/bdb subdirectory, and the natives libraries for the
-current platform should be copied to proper subdirectory as specified in
-the startup scripts.
-
 This distribution supports Berkeley DB Java edition version
 ${bdb.je.version}, which can be obtained from:
 
   http://www.oracle.com/database/berkeley-db/je/index.html
 
-The je-${bdb.je.version}.jar JAR file should be copied to the lib
-subdirectory.  The JAR file is only needed when the system is configured
-to run with Berkeley DB Java edition.
-
 This distribution requires Apache MINA, version ${org.apache.mina.version}, which may be
 bundled with this distribution, or else can be obtained from:
 
   http://mina.apache.org/
-
-The mina-core-${org.apache.mina.version}.jar JAR file should be copied to the lib
-subdirectory.
 
 MINA also requires Simple Logging Facade for Java (SLF4J), version 1.4,
 which may be bundled with this distribution, or else can be obtained
@@ -109,37 +110,28 @@ from:
 
   http://www.slf4j.org/
 
-The slf4j-api-${slf4j-api.version}.jar and slf4j-jdk14-${slf4j-jdk14.version}.jar
-JAR files should be copied to the lib subdirectory.
-
 DEVELOPING AND RUNNING
 
-To develop server applications, include the following JAR file in your
-classpath:
+The Project Darkstar server can be started up using the executable bootstrapper JAR
+file in the sgs-server/bin directory.
 
-   lib/sgs-server.jar
+  java -jar sgs-server/bin/sgs-boot.jar
 
-To run the Project Darkstar server:
+Project Darkstar is an application container in which applications (or games)
+can be deployed.  By default, any jar files that are placed into the
+sgs-server/deploy directory are considered part of the deployed application.
+Additionally, a single application jar should contain an embedded 
+META-INF/app.properties file.  This file is automatically used by the 
+Project Darkstar server to set the runtime configuration properties of the application.
 
-1. Change to the directory containing the installation, or set the
-   SGSHOME environment variable to the installation directory and
-   include that directory in your path
+For example, to deploy the Hello World tutorial application into the default
+Project Darkstar container, copy the tutorial.jar file from the tutorial directory
+into the deploy directory.  Then bootup the server using the executable bootstrapper
+described above.
 
-2. On Windows, type:
-
-   sgs <path to application classes> <path to application config file>
-
-   On all other systems, type:
-
-   sgs.sh <path to application classes> <path to application config file>
-
-   For example, to run the tutorial's HelloWorld example when running on
-   Windows, assuming the SGSHOME environment variable is set to the
-   installation directory, that directory is included in your path, and
-   your working directory is the tutorial subdirectory of the
-   installation directory, type:
-
-   sgs tutorial.jar HelloWorld.properties
+Additional customization of the location of deployed applications and runtime
+configuration files is possible.  See the configuration files located in the
+sgs-server/conf directory for additional details.
 
 
 RELEASE COMPATIBILITY

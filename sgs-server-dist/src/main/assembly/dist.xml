@@ -113,7 +113,7 @@
     
     <!-- Include the main distribution license and readme files -->
     <fileSet>
-      <directory>src/main/etc</directory>
+      <directory>${basedir}/src/main/etc</directory>
       <excludes>
         <exclude>README</exclude>
         <exclude>sgs-server/NOTICE.txt</exclude>
@@ -124,7 +124,7 @@
 
     <!-- Filter the README and NOTICE files to replace parameterized versions -->
     <fileSet>
-      <directory>src/main/etc</directory>
+      <directory>${basedir}/src/main/etc</directory>
       <includes>
         <include>README</include>
         <include>sgs-server/NOTICE.txt</include>
