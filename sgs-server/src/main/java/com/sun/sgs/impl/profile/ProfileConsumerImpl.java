@@ -32,6 +32,7 @@ import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.profile.TaskProfileSample;
 import java.beans.PropertyChangeEvent;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
 import java.util.List;
@@ -107,7 +108,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     break;
                 case TASK_AGGREGATE:
                 default:
-                    op = new AggregateTaskProfileOperationImpl(name, type, 
+                    op = new TaskAggregateProfileOperationImpl(name, type, 
                                                                minLevel);
                     break;
             }
@@ -186,7 +187,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 case TASK_AGGREGATE:
                 default:
                     counter = 
-                            new AggregateTaskProfileCounterImpl(name, type, 
+                            new TaskAggregateProfileCounterImpl(name, type, 
                                                                 minLevel);
                     break;
             }
@@ -252,7 +253,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 case TASK_AGGREGATE:
                 default:
                     sample = 
-                            new AggregateTaskProfileSampleImpl(name, type,
+                            new TaskAggregateProfileSampleImpl(name, type,
                                                                maxSamples, 
                                                                minLevel);
                     break;
@@ -276,11 +277,15 @@ class ProfileConsumerImpl implements ProfileConsumer {
         return ops.values();
     }
 
+    /**
+     * Abstract base class for all profile data implementations, to hold
+     * common information.
+     */
     private abstract class AbstractProfileData {
         protected final String name;
         protected final ProfileLevel minLevel;
         /* Type used for error checking in factory method */
-        private final ProfileDataType type;
+        protected final ProfileDataType type;
         AbstractProfileData(String name, ProfileDataType type, 
                             ProfileLevel minLevel) 
         {
@@ -293,6 +298,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             return name;
         }
 
+        //JANE?
         public String toString() {
             return name;
         }
@@ -305,9 +311,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             return type;
         }
     }
+    
     /**
-     * A private implementation of {@code ProfileOperation} that is
-     * returned from any call to {@code createOperation}.
+     * Aggregating profile operation.
      */
     private class AggregateProfileOperationImpl 
             extends AbstractProfileData
@@ -336,16 +342,21 @@ class ProfileConsumerImpl implements ProfileConsumer {
             if (minLevel.ordinal() > profileLevel.ordinal()) {
                 return;
             }
+            System.out.println("Incrementing op for name " + name);
             count.incrementAndGet();
         }
     }
     
+    /**
+     * Task reporting profile operation.
+     */
     private class TaskProfileOperationImpl 
             extends AbstractProfileData
             implements TaskProfileOperation
     {
         TaskProfileOperationImpl(String opName, ProfileDataType type, 
-                                 ProfileLevel minLevel) {
+                                 ProfileLevel minLevel) 
+        {
             super(opName, type, minLevel);
         }
         
@@ -358,6 +369,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
             
             try {
+                System.out.println("Adding task op for name " + name);
                 ProfileReportImpl profileReport = 
                         profileCollector.getCurrentProfileReport();
                 profileReport.ops.add(this);
@@ -367,30 +379,49 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
         }
     }
-    
-    private class AggregateTaskProfileOperationImpl
-            extends AggregateProfileOperationImpl
-            implements TaskProfileOperation
+
+    /**
+     * A profile operation which both aggregates and is reported per-task.
+     * Because the task operations are included directly in the profile
+     * report, we extend the task implementation and include an instance
+     * of the aggregator.  This allows us to compare an operation in the
+     * profile report with the operation created through a profile consumer.
+     */
+    private class TaskAggregateProfileOperationImpl
+            extends TaskProfileOperationImpl
+            implements AggregateProfileOperation
     {
-        private final TaskProfileOperationImpl taskOperation;
-        AggregateTaskProfileOperationImpl(String opName, ProfileDataType type, 
-                                          ProfileLevel minLevel) 
+        private final AggregateProfileOperationImpl aggOperation;
+        TaskAggregateProfileOperationImpl(String opName, ProfileDataType type,
+                                          ProfileLevel minLevel)
         {
             super(opName, type, minLevel);
-            taskOperation = 
-                    new TaskProfileOperationImpl(opName, type, minLevel);
+            aggOperation = new AggregateProfileOperationImpl(opName, 
+                                                             type, minLevel);
         }
-        
+        /** {@inheritDoc} */
+        public void clearCount() {
+            aggOperation.clearCount();
+        }
+
+        /** {@inheritDoc} */
+        public long getCount() {
+            return aggOperation.getCount();
+        }
+
         /** {@inheritDoc} */
         public void report() {
-            super.report();
-            taskOperation.report();
+            try {
+                super.report();
+            } catch (IllegalStateException e) {
+                // there is no task to report to
+            }
+            aggOperation.report();
         }
     }
 
     /**
-     * The concrete implementation of {@code AbstractProfileCounter} used
-     * for counters that aggregate across tasks.
+     * Aggregating profile counter.
      */
     private class AggregateProfileCounterImpl
             extends AbstractProfileData 
@@ -438,8 +469,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
 
 
     /**
-     * The concrete implementation of {@code AbstractProfileCounter} used
-     * for counters that are local to tasks.
+     * Profile counter which reports task-local data.
      */
     private class TaskProfileCounterImpl 
             extends AbstractProfileData 
@@ -488,12 +518,16 @@ class ProfileConsumerImpl implements ProfileConsumer {
         }
     }
 
-    private class AggregateTaskProfileCounterImpl
+    /**
+     * Profile counter which both aggregates globally and reports
+     * task-local data into profile reports.
+     */
+    private class TaskAggregateProfileCounterImpl
             extends AggregateProfileCounterImpl
             implements TaskProfileCounter 
     {
         private final TaskProfileCounterImpl taskCounter;
-        AggregateTaskProfileCounterImpl(String opName, ProfileDataType type,
+        TaskAggregateProfileCounterImpl(String opName, ProfileDataType type,
                                         ProfileLevel minLevel) 
         {
             super(opName, type, minLevel);
@@ -503,17 +537,151 @@ class ProfileConsumerImpl implements ProfileConsumer {
         /** {@inheritDoc} */
         public void incrementCount() {
             super.incrementCount();
-            taskCounter.incrementCount();
+            try {
+                taskCounter.incrementCount();
+            } catch (IllegalStateException e) {
+                // there is no task to report to
+            }
         }
         
         /** {@inheritDoc} */
         public void incrementCount(long value) {
             super.incrementCount(value);
-            taskCounter.incrementCount(value);
+            try {
+                taskCounter.incrementCount(value);
+            } catch (IllegalStateException e) {
+                // there is no task to report to
+            }
         }
     }
 
-    /** The task-local implementation of {@code ProfileSample} */
+    /**
+     * Aggregating profile sample.
+     */
+    private class AggregateProfileSampleImpl
+            extends AbstractProfileData 
+            implements AggregateProfileSample
+    {    
+        private final LinkedList<Long> samples = new LinkedList<Long>();
+	private final long maxSamples;       
+	
+        /** 
+         * Smoothing factor for exponential smoothing, between 0 and 1.
+         * A value closer to one provides less smoothing of the data, and
+         * more weight to recent data;  a value closer to zero provides more
+         * smoothing but is less responsive to recent changes.
+         */
+        private float smoothingFactor = (float) 0.7;
+        private long minSampleValue = Long.MAX_VALUE;
+        private long maxSampleValue = Long.MIN_VALUE;
+        private final ExponentialAverage avgSampleValue = 
+                new ExponentialAverage();
+        
+	AggregateProfileSampleImpl(String name, ProfileDataType type,
+                                   long maxSamples, ProfileLevel minLevel) 
+        {
+            super(name, type, minLevel);
+	    this.maxSamples = maxSamples;
+        }
+
+        long getMaxSamples() { return maxSamples; }
+        
+        public void addSample(long value) {
+            // If the minimum level we want to profile at is greater than
+            // the current level, just return.
+            if (minLevel.ordinal() > profileLevel.ordinal()) {
+                return;
+            }
+            
+            synchronized (this) {
+                if (samples.size() == maxSamples) {
+                    samples.removeFirst(); // remove oldest
+                }
+                samples.add(value);
+                // Update the statistics
+                if (value > maxSampleValue) {
+                    maxSampleValue = value;
+                } 
+                if (value < minSampleValue) {
+                    minSampleValue = value;
+                }
+                avgSampleValue.update(value);
+            }
+
+        }
+        
+        /** {@inheritDoc} */
+         public synchronized List<Long> getSamples() {
+             return new LinkedList<Long>(samples);
+         }
+         
+         /** {@inheritDoc} */
+         public synchronized int getNumSamples() {
+             return samples.size();
+         }
+         
+         /** {@inheritDoc} */
+         public synchronized void clearSamples() {
+             samples.clear();
+             avgSampleValue.clear();
+             maxSampleValue = Long.MIN_VALUE;
+             minSampleValue = Long.MAX_VALUE;
+         }
+
+        /** {@inheritDoc} */
+        public double getAverage() {
+            return avgSampleValue.avg;
+        }
+
+        /** {@inheritDoc} */
+        public synchronized long getMaxSample() {
+            return maxSampleValue;
+        }
+
+        /** {@inheritDoc} */
+        public synchronized long getMinSample() {
+            return minSampleValue;
+        }
+         
+        private class ExponentialAverage {
+            private boolean first = true;
+            private double last;
+            double avg;
+
+            void update(long sample) {
+                // calculate the exponential smoothed data:
+                // current avg = 
+                //   (smoothingFactor * current sample) 
+                // + ((1 - smoothingFactor) * last avg)
+                // This is the same as:
+                // current avg =
+                //    (smoothingFactor * current sample)
+                //  + (last avg)
+                //  - (smoothingFactor * last avg)
+                // Which simplifies to:
+                // current avg =
+                //   (current sample - lastAvg) * smoothingFactor + lastAvg
+
+                if (first) {
+                    avg = sample;
+                    first = false;
+                } else {
+                    avg = (sample - last) * smoothingFactor + last;
+                }
+                last = avg;
+//                System.out.println("avg: " + avg);
+            }
+            
+            void clear() {
+                last = 0;
+                avg = 0;
+            }
+        }
+    }
+    
+    /**
+     * Task-local profile sample.
+     */
     private class TaskProfileSampleImpl 
             extends AbstractProfileData 
             implements TaskProfileSample
@@ -540,123 +708,14 @@ class ProfileConsumerImpl implements ProfileConsumer {
     }
 
     /**
-     * The {@code ProfileSample} implementation that collects samples
-     * for the lifetime the program.
+     * Profile sample which both aggregates and provides task-local information.
      */
-    private class AggregateProfileSampleImpl
-            extends AbstractProfileData 
-            implements AggregateProfileSample
-    {    
-	private final LinkedList<Long> samples = new LinkedList<Long>();
-	private final long maxSamples;       
-	
-        /** 
-         * Smoothing factor for exponential smoothing, between 0 and 1.
-         * A value closer to one provides less smoothing of the data, and
-         * more weight to recent data;  a value closer to zero provides more
-         * smoothing but is less responsive to recent changes.
-         */
-        private float smoothingFactor = (float) 0.9;
-        private long minSampleValue = Long.MAX_VALUE;
-        private long maxSampleValue = Long.MIN_VALUE;
-        private final ExponentialAverage avgSampleValue = 
-                new ExponentialAverage();
-        
-	AggregateProfileSampleImpl(String name, ProfileDataType type,
-                                   long maxSamples, ProfileLevel minLevel) 
-        {
-            super(name, type, minLevel);
-	    this.maxSamples = maxSamples;
-        }
-
-        long getMaxSamples() { return maxSamples; }
-        
-        public void addSample(long value) {
-            // If the minimum level we want to profile at is greater than
-            // the current level, just return.
-            if (minLevel.ordinal() > profileLevel.ordinal()) {
-                return;
-            }
-            
-	    if (samples.size() == maxSamples) {
-		samples.removeFirst(); // remove oldest
-            }
-	    samples.add(value);
-            // Update the statistics
-            if (value > maxSampleValue) {
-                maxSampleValue = value;
-            } 
-            if (value < minSampleValue) {
-                minSampleValue = value;
-            }
-            avgSampleValue.update(value);
-
-        }
-        
-        /** {@inheritDoc} */
-         public synchronized List<Long> getSamples() {
-             return new LinkedList<Long>(samples);
-         }
-         /** {@inheritDoc} */
-         public synchronized void clearSamples() {
-             samples.clear();
-             avgSampleValue.clear();
-             maxSampleValue = Long.MIN_VALUE;
-             minSampleValue = Long.MAX_VALUE;
-         }
-
-        /** {@inheritDoc} */
-        public synchronized double getAverage() {
-            return avgSampleValue.avg;
-        }
-
-        /** {@inheritDoc} */
-        public synchronized long getMaxSample() {
-            return maxSampleValue;
-        }
-
-        /** {@inheritDoc} */
-        public synchronized long getMinSample() {
-            return minSampleValue;
-        }
-         
-        private class ExponentialAverage {
-
-            private double last;
-            double avg;
-
-            void update(long sample) {
-                // calculate the exponential smoothed data:
-                // current avg = 
-                //   (smoothingFactor * current sample) 
-                // + ((1 - smoothingFactor) * last avg)
-                // This is the same as:
-                // current avg =
-                //    (smoothingFactor * current sample)
-                //  + (last avg)
-                //  - (smoothingFactor * last avg)
-                // Which simplifies to:
-                // current avg =
-                //   (current sample - lastAvg) * smoothingFactor + lastAvg
-
-                avg = (sample - last) * smoothingFactor + last;
-                last = avg;
-//                System.out.println("avg: " + avg);
-            }
-            
-            void clear() {
-                last = 0;
-                avg = 0;
-            }
-        }
-    }
-    
-    private class AggregateTaskProfileSampleImpl
+    private class TaskAggregateProfileSampleImpl
             extends AggregateProfileSampleImpl
             implements TaskProfileSample
     {
         private final TaskProfileSample taskSample;
-        AggregateTaskProfileSampleImpl(String name, ProfileDataType type,
+        TaskAggregateProfileSampleImpl(String name, ProfileDataType type,
                                        long maxSamples, 
                                        ProfileLevel minLevel) 
         {
@@ -667,7 +726,11 @@ class ProfileConsumerImpl implements ProfileConsumer {
         /** {@inheritDoc} */
         public void addSample(long value) {
             super.addSample(value);
-            taskSample.addSample(value);
+            try {
+                taskSample.addSample(value);
+            } catch (IllegalStateException e) {
+                // there is no task to report to
+            }
         }
     }
 }

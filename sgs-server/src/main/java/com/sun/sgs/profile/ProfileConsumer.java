@@ -139,7 +139,8 @@ public interface ProfileConsumer {
      *
      * @param name a name or description of the sample type
      * @param type the type of operation to create
-     * @param maxSamples the maximum number of samples to keep
+     * @param maxSamples the maximum number of samples to keep for aggregating
+     *           sample collections
      * @param minLevel the minimum level of profiling that must be set to record
      *              this sample  
      *

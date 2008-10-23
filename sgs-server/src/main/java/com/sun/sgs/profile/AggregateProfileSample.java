@@ -39,23 +39,33 @@ public interface AggregateProfileSample extends ProfileSample {
     void clearSamples();
     
     /**
-     * Returns the average of the samples.
+     * Returns the average of the added samples. This value is undefined
+     * if no samples have been added.
      * 
      * @return the average of the samples
      */
     double getAverage();
     
     /**
-     * Gets the maximum sample value.
+     * Gets the maximum sample value added. This value is undefined
+     * if no samples have been added.
      * 
      * @return the maximum sample
      */
     long getMaxSample();
     
     /**
-     * Gets the minimum sample value.
+     * Gets the minimum sample value added. This value is undefined
+     * if no samples have been added.
      * 
      * @return the minimum sample
      */
     long getMinSample();
+    
+    /**
+     * Returns the number of samples added.
+     * 
+     * @return the number of samples added
+     */
+    int getNumSamples();
 }
