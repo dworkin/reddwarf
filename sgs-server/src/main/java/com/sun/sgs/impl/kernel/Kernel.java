@@ -61,15 +61,12 @@ import java.io.InputStream;
 import java.io.IOException;
 
 import java.net.URL;
-import java.net.URLClassLoader;
 
 import java.lang.reflect.Constructor;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.Properties;
-import java.util.jar.JarFile;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -846,7 +843,7 @@ class Kernel {
         // load the overriding set of configuration properties from the
         // file indicated by the SGS_PROPERTIES system property
         Properties nextProperties = baseProperties;
-        if(propLoc != null) {
+        if(propLoc != null && !propLoc.equals("")) {
             File propFile = new File(propLoc);
             if(!propFile.isFile() || !propFile.canRead()) {
                 logger.log(Level.SEVERE, "can't access " +
