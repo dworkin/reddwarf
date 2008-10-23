@@ -119,6 +119,7 @@ public class TestSubstitutionProperties {
         SubstitutionProperties p = new SubstitutionProperties(testProps);
         
         Assert.assertEquals(p.getProperty("name1"), "");
+        Assert.assertNull(p.getProperty("name2"));
     }
     
     @Test(expected=IllegalStateException.class)

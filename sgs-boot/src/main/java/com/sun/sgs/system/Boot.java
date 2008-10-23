@@ -46,14 +46,15 @@ public class Boot {
         }
         
         //load properties from configuration file
-        Properties properties = new SubstitutionProperties();
+        SubstitutionProperties properties = new SubstitutionProperties();
+        URL sgsBoot = null;
         try {
-            URL sgsBoot = null;
-            if(args.length == 0)
+            if (args.length == 0) {
                 sgsBoot = ClassLoader.getSystemClassLoader().
                         getResource(BootEnvironment.SGS_BOOT);
-            else
+            } else {
                 sgsBoot = new File(args[0]).toURI().toURL();
+            }
             properties.load(sgsBoot.openStream());
         } catch(Exception e) {
             logger.log(Level.SEVERE, "Unable to load initial configuration", e);
@@ -63,6 +64,7 @@ public class Boot {
         //determine SGS_HOME
         String sgsHome = properties.getProperty(BootEnvironment.SGS_HOME);
         if(sgsHome == null) {
+            properties.clear();
             URL jarLocation = Boot.class.getProtectionDomain().getCodeSource().getLocation();
             String jarPath = jarLocation.getPath();
             int jarFileIndex = jarPath.indexOf(BootEnvironment.SGS_JAR);
@@ -73,6 +75,14 @@ public class Boot {
             else {
                 sgsHome = jarPath.substring(0, jarFileIndex - 1);
                 properties.setProperty(BootEnvironment.SGS_HOME, sgsHome);
+                //reload the properties so that the value for SGS_HOME
+                //is interpolated correctly in any other variables
+                try {
+                    properties.load(sgsBoot.openStream());
+                } catch (Exception e) {
+                    logger.log(Level.SEVERE, "Unable to load initial configuration", e);
+                    System.exit(1);
+                }
             }
         }
         logger.log(Level.CONFIG, "SGS_HOME set to "+sgsHome);

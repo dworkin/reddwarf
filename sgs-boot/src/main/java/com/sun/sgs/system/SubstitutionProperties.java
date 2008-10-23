@@ -96,8 +96,6 @@ public class SubstitutionProperties extends Properties {
      * of ${PROPNAME} with the value of PROPNAME if it exists.  If such
      * a string is found in a property and and the property to lookup does
      * not exist, it is replaced with the empty string. <p>
-     * 
-     * 
      */
     private void replaceAll() {
         Set<String> properties = super.stringPropertyNames();
@@ -121,7 +119,9 @@ public class SubstitutionProperties extends Properties {
     private String replace(String propName, Set<String> beingInterpolated) 
             throws IllegalStateException {
         beingInterpolated.add(propName);
-        String propValue = super.getProperty(propName, "");
+        String propValue = super.getProperty(propName);
+        if(propValue == null || propValue.equals(""))
+            return "";
         
         //walk through the value, building a new string and replacing
         //properties as we go
