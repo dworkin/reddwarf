@@ -28,15 +28,12 @@ import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.test.util.UtilReflection;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -78,11 +75,6 @@ public class TestProfileDataTask {
     
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
-    
-    private Field profileCollectorField = 
-            UtilReflection.getField(
-                com.sun.sgs.impl.profile.ProfileRegistrarImpl.class, 
-                "profileCollector");
     
     private final ProfileDataType testType;
     /**
@@ -146,21 +138,15 @@ public class TestProfileDataTask {
     
     /** Returns the profile collector for a given node */
     private ProfileCollector getCollector(SgsTestNode node) throws Exception {
-        ProfileRegistrar registrar = getRegistrar(node);
-        return (ProfileCollector) profileCollectorField.get(registrar);
-    }
-    
-    /** Returns the profile registrar for a given node */
-    private ProfileRegistrar getRegistrar(SgsTestNode node) {
-        return  node.getSystemRegistry().getComponent(ProfileRegistrar.class);
+        return node.getSystemRegistry().getComponent(ProfileCollector.class);
     }
     
     /* -- counter tests -- */
     @Test
     public void testCounter() throws Exception {
         final String name = "counter";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.createCounter(name, testType, ProfileLevel.MIN);   
@@ -211,8 +197,8 @@ public class TestProfileDataTask {
     @Test
     public void testCounterLevel() throws Exception {
         final String name = "MyCounter";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be updated only at the max level
         final ProfileCounter counter = 
                 cons1.createCounter(name, testType, ProfileLevel.MAX);
@@ -263,9 +249,9 @@ public class TestProfileDataTask {
     }
     
    @Test(expected=IllegalArgumentException.class)
-    public void testCounterIncrementValueBad() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testCounterIncrementValueBad() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileCounter counter = 
                 cons1.createCounter("my counter", 
                                     testType, ProfileLevel.MIN);
@@ -277,8 +263,8 @@ public class TestProfileDataTask {
     public void testCounterIncrementValue() throws Exception {
         final String name = "counter";
         final int incValue = 5;
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.createCounter(name, testType, ProfileLevel.MIN);
@@ -316,8 +302,8 @@ public class TestProfileDataTask {
     public void testCounterIncrementMultiple() throws Exception {
         final String name = "counterforstuff";
         final int incValue = 3;
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.createCounter(name, testType, ProfileLevel.MIN);
@@ -357,8 +343,8 @@ public class TestProfileDataTask {
     public void testCounterIncrementValueMultiple() throws Exception {
         final String name = "counterforstuff";
         final int incValue = 5;
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final ProfileCounter counter = 
                 cons1.createCounter(name, testType, ProfileLevel.MIN);
@@ -396,8 +382,8 @@ public class TestProfileDataTask {
     
     @Test
     public void testOperation() throws Exception {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
                 cons1.createOperation("something", testType, ProfileLevel.MIN);
         
@@ -442,8 +428,8 @@ public class TestProfileDataTask {
         
     @Test
     public void testOperationMediumLevel() throws Exception {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
                 cons1.createOperation("something", testType, 
                                       ProfileLevel.MEDIUM);
@@ -492,8 +478,8 @@ public class TestProfileDataTask {
     
     @Test
     public void testOperationMediumToMaxLevel() throws Exception {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
             cons1.createOperation("something", testType,ProfileLevel.MEDIUM);
         
@@ -541,8 +527,8 @@ public class TestProfileDataTask {
     
     @Test
     public void testOperationMaxLevel() throws Exception {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
                 cons1.createOperation("something", testType, ProfileLevel.MAX);
         
@@ -603,8 +589,8 @@ public class TestProfileDataTask {
     }
         @Test
     public void testOperationMultiple() throws Exception {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
                 cons1.createOperation("something", testType, ProfileLevel.MIN);
         final ProfileOperation op1 =
@@ -679,8 +665,8 @@ public class TestProfileDataTask {
             @Test
     public void testSample() throws Exception {
         final String name = "sample";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final ProfileSample sample = 
             cons1.createSample(name, testType, -1, ProfileLevel.MIN);
@@ -735,8 +721,8 @@ public class TestProfileDataTask {
     @Test
     public void testSampleLevel() throws Exception {
         final String name = "MySamples";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("cons1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("cons1");
         final ProfileSample sample = 
             cons1.createSample(name, testType, -1, ProfileLevel.MAX);
         
@@ -795,8 +781,8 @@ public class TestProfileDataTask {
     @Test
     public void testSampleLevelChange() throws Exception {
         final String name = "samples";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        final ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        final ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileSample sample = 
             cons1.createSample(name, testType, -1, ProfileLevel.MAX);
 

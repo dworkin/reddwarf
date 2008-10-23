@@ -46,11 +46,11 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -450,11 +450,11 @@ public final class DataServiceImpl implements DataService {
 		baseStore = new DataStoreClient(properties);
 	    }
             storeToShutdown = baseStore;
-            ProfileRegistrar registrar = 
-		systemRegistry.getComponent(ProfileRegistrar.class);
-	    store = new DataStoreProfileProducer(baseStore, registrar);
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+	    store = new DataStoreProfileProducer(baseStore, collector);
             ProfileConsumer consumer =
-                registrar.registerProfileProducer(getClass().getName());
+                collector.getConsumer(getClass().getName());
             createReferenceOp = consumer.createOperation(
 		"createReference", ProfileDataType.TASK_AGGREGATE,
                 ProfileLevel.MAX);

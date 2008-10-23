@@ -19,12 +19,12 @@
 
 package com.sun.sgs.impl.service.data.store;
 
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -97,13 +97,12 @@ public class DataStoreProfileProducer
      * TransactionParticipant} methods to {@code dataStore}.
      *
      * @param	dataStore the object for delegating operations
-     * @param	registrar the object for registering profile producers and
-     *		operations
+     * @param	collector the object for collecting profile data
      * @throws	IllegalArgumentException if {@code dataStore} does not
      *		implement {@code TransactionParticipant}
      */
     public DataStoreProfileProducer(DataStore dataStore,
-				    ProfileRegistrar registrar)
+				    ProfileCollector collector)
     {
 	if (dataStore == null) {
 	    throw new NullPointerException(
@@ -116,7 +115,7 @@ public class DataStoreProfileProducer
 	this.dataStore = dataStore;
 	participant = (TransactionParticipant) dataStore;
         ProfileConsumer consumer =
-	    registrar.registerProfileProducer(DataStore.class.getName());
+	    collector.getConsumer(DataStore.class.getName());
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AGGREGATE;
 	createObjectOp = consumer.createOperation("createObject", type, level);

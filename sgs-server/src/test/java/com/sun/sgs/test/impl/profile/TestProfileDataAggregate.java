@@ -29,12 +29,8 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.UtilReflection;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -75,11 +71,6 @@ public class TestProfileDataAggregate {
     
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
-    
-    private Field profileCollectorField = 
-            UtilReflection.getField(
-                com.sun.sgs.impl.profile.ProfileRegistrarImpl.class, 
-                "profileCollector");
     
     private final ProfileDataType testType;
     /**
@@ -143,20 +134,14 @@ public class TestProfileDataAggregate {
     
     /** Returns the profile collector for a given node */
     private ProfileCollector getCollector(SgsTestNode node) throws Exception {
-        ProfileRegistrar registrar = getRegistrar(node);
-        return (ProfileCollector) profileCollectorField.get(registrar);
-    }
-    
-    /** Returns the profile registrar for a given node */
-    private ProfileRegistrar getRegistrar(SgsTestNode node) {
-        return  node.getSystemRegistry().getComponent(ProfileRegistrar.class);
+        return node.getSystemRegistry().getComponent(ProfileCollector.class);
     }
     
    @Test
     public void testAggregateProfileCounter() throws Exception {
         final String name = "counter";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final AggregateProfileCounter counter = 
                 (AggregateProfileCounter) 
@@ -178,8 +163,8 @@ public class TestProfileDataAggregate {
    @Test
    public void testAggregateProfileOperation() throws Exception {
         final String name = "operation";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final AggregateProfileOperation op =
                 (AggregateProfileOperation) 
                     cons1.createOperation(name, testType, ProfileLevel.MIN);
@@ -200,8 +185,8 @@ public class TestProfileDataAggregate {
    @Test
    public void testAggregateProfileSample() throws Exception {
         final String name = "sample";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final AggregateProfileSample samp =
                 (AggregateProfileSample) 
                     cons1.createSample(name, testType, -1, ProfileLevel.MIN);

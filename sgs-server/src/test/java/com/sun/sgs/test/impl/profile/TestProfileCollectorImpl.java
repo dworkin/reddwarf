@@ -32,8 +32,6 @@ import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
-import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.profile.TaskProfileCounter;
 import com.sun.sgs.profile.TaskProfileOperation;
@@ -42,11 +40,7 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.test.util.UtilReflection;
-import java.beans.PropertyChangeEvent;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -61,7 +55,6 @@ import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
@@ -85,11 +78,6 @@ public class TestProfileCollectorImpl {
     
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
-    
-    private Field profileCollectorField = 
-            UtilReflection.getField(
-                com.sun.sgs.impl.profile.ProfileRegistrarImpl.class, 
-                "profileCollector");
     
     /** Test setup. */
     @Before
@@ -143,16 +131,9 @@ public class TestProfileCollectorImpl {
     
     /** Returns the profile collector for a given node */
     private ProfileCollector getCollector(SgsTestNode node) throws Exception {
-        ProfileRegistrar registrar = getRegistrar(node);
-        return (ProfileCollector) profileCollectorField.get(registrar);
+        return node.getSystemRegistry().getComponent(ProfileCollector.class);
     }
-    
-    /** Returns the profile registrar for a given node */
-    private ProfileRegistrar getRegistrar(SgsTestNode node) {
-        return  node.getSystemRegistry().getComponent(ProfileRegistrar.class);
-    }
-    
-    
+
         ////////     The tests     /////////
     
     /*-- Global profile level tests --*/
@@ -231,14 +212,14 @@ public class TestProfileCollectorImpl {
     public void testConsumerMapAdd() throws Exception {
         // Create a ProfileConsumer, and make sure it appears in the consumer
         // map.
-        ProfileRegistrar registrar = getRegistrar(serverNode);
+        ProfileCollector collector = getCollector(serverNode);
         
         Map<String, ProfileConsumer> consumerMap = 
                 profileCollector.getConsumers();
         int count = consumerMap.size();
         
-        ProfileConsumer pc1 = registrar.registerProfileProducer("Cons1");
-        ProfileConsumer pc2 = registrar.registerProfileProducer("Cons2");
+        ProfileConsumer pc1 = collector.getConsumer("Cons1");
+        ProfileConsumer pc2 = collector.getConsumer("Cons2");
         
         consumerMap = profileCollector.getConsumers();
         assertSame(count+2, consumerMap.size());
@@ -248,9 +229,9 @@ public class TestProfileCollectorImpl {
     
     @Test
     public void testConsumerMapBadAdd() throws Exception {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        registrar.registerProfileProducer("Cons1");
-        registrar.registerProfileProducer("Cons2");
+        ProfileCollector collector = getCollector(serverNode);
+        collector.getConsumer("Cons1");
+        collector.getConsumer("Cons2");
         
         Map<String, ProfileConsumer> consumerMap =
                 profileCollector.getConsumers();
@@ -259,7 +240,7 @@ public class TestProfileCollectorImpl {
         
         // Test that the map isn't modified if we try adding the same
         // named consumer a second time
-        ProfileConsumer pc2 = registrar.registerProfileProducer("Cons2");
+        ProfileConsumer pc2 = collector.getConsumer("Cons2");
         assertSame(count, consumerMap.size());
         assertSame(pc2, pc1);
     }
@@ -390,17 +371,17 @@ public class TestProfileCollectorImpl {
     
     /* -- Consumer tests -- */
     @Test
-    public void testConsumerName() {
+    public void testConsumerName() throws Exception {
         final String name = "consumer1";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons = registrar.registerProfileProducer(name);
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons = collector.getConsumer(name);
         assertEquals(name, cons.getName());
     }
     
     @Test
-    public void testConsumerSetLevel() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testConsumerSetLevel() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         assertEquals(profileCollector.getDefaultProfileLevel(), 
                      cons1.getProfileLevel());
         
@@ -413,16 +394,16 @@ public class TestProfileCollectorImpl {
     }
     
     @Test
-    public void testConsumerSetCollectorLevel() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testConsumerSetCollectorLevel() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileLevel cons1Level = cons1.getProfileLevel();
         assertEquals(profileCollector.getDefaultProfileLevel(), cons1Level);
 
         // Change default level from what the kernel set, make sure it
         // affects later consumers.
         profileCollector.setDefaultProfileLevel(ProfileLevel.MIN);
-        ProfileConsumer cons2 = registrar.registerProfileProducer("c2");
+        ProfileConsumer cons2 = collector.getConsumer("c2");
         assertEquals(profileCollector.getDefaultProfileLevel(), 
                      cons2.getProfileLevel());
         // and make sure other consumers aren't affected
@@ -431,9 +412,9 @@ public class TestProfileCollectorImpl {
     
     /* -- Counter tests -- */
     @Test
-    public void testCounterName() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testCounterName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         String name = "taskcounter";
         ProfileCounter counter1 = 
                 cons1.createCounter(name, 
@@ -454,10 +435,10 @@ public class TestProfileCollectorImpl {
     }
     
     @Test
-    public void testCounterTwice() {
+    public void testCounterTwice() throws Exception {
         final String name = "counter";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileCounter counter1 = 
                 cons1.createCounter(name, 
                                     ProfileDataType.TASK, ProfileLevel.MAX);
@@ -514,9 +495,9 @@ public class TestProfileCollectorImpl {
     }
     
     @Test
-    public void testCounterType() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testCounterType() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileCounter counter = 
                 cons1.createCounter("counter", 
                                     ProfileDataType.TASK, ProfileLevel.MIN);
@@ -540,9 +521,9 @@ public class TestProfileCollectorImpl {
     }
 
     @Test(expected=IllegalStateException.class)
-    public void testTaskCounterIncrementNoTransaction() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testTaskCounterIncrementNoTransaction() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileCounter counter = 
                 cons1.createCounter("my counter", 
                                     ProfileDataType.TASK, ProfileLevel.MIN);
@@ -551,9 +532,9 @@ public class TestProfileCollectorImpl {
     }
     
     @Test(expected=IllegalStateException.class)
-    public void testTaskCounterIncrementValueNoTransaction() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testTaskCounterIncrementValueNoTransaction() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileCounter counter = 
                 cons1.createCounter("my counter", 
                                     ProfileDataType.TASK, ProfileLevel.MIN);
@@ -564,8 +545,8 @@ public class TestProfileCollectorImpl {
     @Test
     public void testAggregateProfileCounterNotInTaskReport() throws Exception {
         final String name = "counter";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final AggregateProfileCounter counter = 
                 (AggregateProfileCounter) 
@@ -608,8 +589,8 @@ public class TestProfileCollectorImpl {
     @Test
     public void testTaskAggregateProfileCounter() throws Exception {
         final String name = "counter";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final AggregateProfileCounter counter = 
                 (AggregateProfileCounter) 
@@ -671,9 +652,9 @@ public class TestProfileCollectorImpl {
     
     /* -- Operation tests -- */
     @Test
-    public void testOperationName() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testOperationName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         String name = "myOperation";
         ProfileOperation op1 = 
                 cons1.createOperation(name, 
@@ -694,10 +675,10 @@ public class TestProfileCollectorImpl {
     }
     
     @Test
-    public void testOperationTwice() {
+    public void testOperationTwice() throws Exception {
         final String name = "myOperation";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileOperation op1 = 
                 cons1.createOperation(name, 
                                       ProfileDataType.TASK, ProfileLevel.MAX);
@@ -753,9 +734,9 @@ public class TestProfileCollectorImpl {
     
 
     @Test
-    public void testOperationType() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testOperationType() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileOperation op1 = 
             cons1.createOperation("op1", ProfileDataType.TASK, 
                                   ProfileLevel.MAX);
@@ -777,10 +758,10 @@ public class TestProfileCollectorImpl {
      
     /* -- Sample tests -- */
     @Test
-    public void testSampleName() {
+    public void testSampleName() throws Exception {
         final String name = "SomeSamples";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileSample sample1 = 
                 cons1.createSample(name, ProfileDataType.TASK, 
                                    -1, ProfileLevel.MAX);
@@ -788,10 +769,10 @@ public class TestProfileCollectorImpl {
     }
     
     @Test
-    public void testSampleTwice() {
+    public void testSampleTwice() throws Exception {
         final String name = "mySamples";
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileSample s1 = 
                 cons1.createSample(name, ProfileDataType.TASK, 
                                    -1, ProfileLevel.MAX);
@@ -882,9 +863,9 @@ public class TestProfileCollectorImpl {
     
 
     @Test
-    public void testSampleType() {
-        ProfileRegistrar registrar = getRegistrar(serverNode);
-        ProfileConsumer cons1 = registrar.registerProfileProducer("c1");
+    public void testSampleType() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileSample s1 = 
             cons1.createSample("samples1", ProfileDataType.TASK, 
                                -1, ProfileLevel.MAX);
