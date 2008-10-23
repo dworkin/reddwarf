@@ -51,8 +51,7 @@ public interface TaskService extends TaskManager, Service {
      * @throws TransactionException if the operation failed because of a
      *		                        problem with the current transaction
      */
-    public void scheduleNonDurableTask(KernelRunnable task,
-                                       boolean transactional);
+    void scheduleNonDurableTask(KernelRunnable task, boolean transactional);
 
     /**
      * Schedules a single task to run, after the given delay, once the
@@ -71,7 +70,7 @@ public interface TaskService extends TaskManager, Service {
      * @throws TransactionException if the operation failed because of a
      *		                        problem with the current transaction
      */
-    public void scheduleNonDurableTask(KernelRunnable task, long delay,
-                                       boolean transactional);
+    void scheduleNonDurableTask(KernelRunnable task, long delay, 
+                                boolean transactional);
 
 }

@@ -44,6 +44,6 @@ public interface ComponentRegistry extends Iterable<Object>
      *                                  available, or if there is more
      *                                  than one matching component
      */
-    public <T> T getComponent(Class<T> type);
+    <T> T getComponent(Class<T> type);
 
 }
