@@ -117,8 +117,8 @@ public final class TransactionCoordinatorImpl
      * properties.
      *
      * @param	properties the properties for configuring this service
-     * @param	collectorHandle the <code>ProfileCollector</code> used to report
-     *       	participant detail
+     * @param	collectorHandle the {@code ProfileCollectorHandle} used 
+     *          to report participant detail
      * @throws	IllegalArgumentException if the bounded or
      *		unbounded timeout properties are less than {@code 1}
      */

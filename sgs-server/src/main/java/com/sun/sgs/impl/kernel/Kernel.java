@@ -706,8 +706,9 @@ class Kernel {
                     break;    // do nothing, this is the default
                 case coreServerNode:
                     // Don't start an application
-                    properties.setProperty(StandardProperties.APP_LISTENER,
-                                         StandardProperties.APP_LISTENER_NONE);
+                    properties.setProperty(
+                            StandardProperties.APP_LISTENER,
+                            StandardProperties.APP_LISTENER_NONE);
                     // Only run basic services
                     properties.setProperty(StandardProperties.FINAL_SERVICE,
                                            "NodeMappingService");

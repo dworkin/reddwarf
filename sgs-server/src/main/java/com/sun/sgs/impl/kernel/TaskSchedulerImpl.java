@@ -80,7 +80,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
     // the executor used to run tasks
     private final ScheduledExecutorService executor;
 
-    // the collector used for profiling data
+    // the collector handle used for profiling data
     private final ProfileCollectorHandle profileCollectorHandle;
 
     // the number of tasks waiting to run
@@ -111,7 +111,7 @@ final class TaskSchedulerImpl implements TaskScheduler {
             throw new NullPointerException("Properties cannot be null");
         }
         if (profileCollectorHandle == null) {
-            throw new NullPointerException("Collector cannot be null");
+            throw new NullPointerException("Collector handle cannot be null");
         }
 
         this.profileCollectorHandle = profileCollectorHandle;

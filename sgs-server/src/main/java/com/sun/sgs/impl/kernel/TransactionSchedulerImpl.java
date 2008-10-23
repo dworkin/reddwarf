@@ -107,7 +107,7 @@ final class TransactionSchedulerImpl
     // the backing scheduler queue used for ordering tasks
     private final SchedulerQueue backingQueue;
 
-    // the collector used for profiling data
+    // the collector handle used for profiling data
     private final ProfileCollectorHandle profileCollectorHandle;
 
     // the coordinator for all transactional object access
@@ -158,7 +158,7 @@ final class TransactionSchedulerImpl
             throw new NullPointerException("Coordinator cannot be null");
         }
         if (profileCollectorHandle == null) {
-            throw new NullPointerException("Collector cannot be null");
+            throw new NullPointerException("Collector handle cannot be null");
         }
 	if (accessCoordinator == null) {
 	    throw new NullPointerException("AccessCoordinator cannot be null");

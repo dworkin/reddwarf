@@ -395,7 +395,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     /**
      * Tells the collector that the current task associated with the
      * calling thread (as associated by a call to
-     * {@code startTask}) has now successfully finished.
+     * {@code startTask}) has now finished.
      * 
      * @param tryCount the number of times that the task has tried to run
      * @param t the {@code Throwable} thrown during task execution
