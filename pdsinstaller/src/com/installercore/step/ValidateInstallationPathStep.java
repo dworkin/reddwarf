@@ -1,6 +1,5 @@
 package com.installercore.step;
 
-import java.io.File;
 import java.util.regex.Pattern;
 
 /**
@@ -25,19 +24,25 @@ public class ValidateInstallationPathStep implements IStep {
 	
 	public void run() throws StepException {
 		Pattern p = null;
-		String unsupportedWindowsCharacters = ".*[\\*\\/<>\\\"\\?\\|:].*";
+		String unsupportedWindowsCharacters = ".*[<>:\\*\\\"\\?\\|].*";
 		String os = System.getProperty("os.name");
 		if(os.toLowerCase().startsWith("windows"))
 		{
 			String installPathOld = installPath;
 			try
 			{
-				this.installPath = installPath.substring(installPath.indexOf(File.separator), installPath.length());
+				char fileSep = this.installPath.charAt(2);
+				this.installPath = installPath.substring(installPath.indexOf(fileSep), installPath.length());
 			} catch (StringIndexOutOfBoundsException e) {
 				this.installPath = installPathOld;
 			}
 			p = Pattern.compile(unsupportedWindowsCharacters);
 		}
+		else
+		{
+			return;
+		}
+		
 		if(p.matcher(installPath).matches())
 		{
 			throw new StepException("Invalid install path");

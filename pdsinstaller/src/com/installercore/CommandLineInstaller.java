@@ -25,7 +25,7 @@ public class CommandLineInstaller {
 	public void install() throws Exception
 	{
 		try {
-			new InitializeStep(DSInstallerStrings.metadataLocation).run();
+			new InitializeStep(DSInstallerStrings.metadataLocation, DSInstallerStrings.sysvarsLocation).run();
 			metadataItems = MetadataDatabase.count();
 			new ValidateInstallationPathStep(installPath).run();
 			

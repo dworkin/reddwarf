@@ -1,29 +1,144 @@
 	EMBEDDED
-name:PDSInstall
+name:PDS_SERVER
 source:/targets/
 file:pds-server.zip
-destination:./pds-server/
+destination:./#PDS_BINARY_DIR#/server/
 
 	EMBEDDED
-name:BDB
+name:PDS_SERVER_BDB
 source:/targets/
 file:bdb.zip
-destination:./pds-server/lib/bdb/
+destination:./#PDS_BINARY_DIR#/server/lib/bdb/
 
 	EMBEDDED
-name:MINA
+name:PDS_SERVER_MINA
 source:/targets/
 file:mina-core.zip
-destination:./pds-server/lib/
+destination:./#PDS_BINARY_DIR#/server/lib/
 
 	EMBEDDED
-name:slf4j
+name:PDS_SERVER_SLF4J
 source:/targets/
 file:slf4j.zip
-destination:./pds-server/lib/
+destination:./#PDS_BINARY_DIR#/server/lib/
 
 	EMBEDDED
-name:CLIENT
+name:PDS_CLIENT
 source:/targets/
 file:pds-client.zip
-destination:./pds-client/
+destination:./#PDS_BINARY_DIR#/client/
+
+	EMBEDDED
+name:SNOWMAN_EXEC
+source:/targets/
+file:snowmanexec.zip
+destination:./#SNOWMAN_DIR#/
+
+	EMBEDDED
+name:SNOWMAN_CLIENT_LIB
+source:/targets/
+file:sm_clientlib.zip
+destination:./#SNOWMAN_DIR#/Client/lib/
+
+	EMBEDDED
+name:SNOWMAN_CLIENT_LIB_LWJGL_BIN
+source:/targets/
+file:lwjgl_bin.zip
+destination:./#SNOWMAN_DIR#/Client/lib/lwjgl/
+
+	EMBEDDED
+name:SNOWMAN_CLIENT_LIB_LWJGL_JAR
+source:/targets/
+file:lwjgl_jar.zip
+destination:./#SNOWMAN_DIR#/Client/lib/
+
+	EMBEDDED
+name:SNOWMAN_CLIENT_LIB_MINA
+source:/targets/
+file:mina-core.zip
+destination:./#SNOWMAN_DIR#/Client/lib/
+
+	EMBEDDED
+name:SNOWMAN_CLIENT_LIB_SLF4J
+source:/targets/
+file:slf4j.zip
+destination:./#SNOWMAN_DIR#/Client/lib/
+
+	EMBEDDED
+name:SNOWMAN_CLIENT_LIB_JORBIS
+source:/targets/
+file:jorbis.zip
+destination:./#SNOWMAN_DIR#/Client/lib/
+
+	EMBEDDED
+name:SNOWMAN_SERVER_LIB
+source:/targets/
+file:sm_serverlib.zip
+destination:./#SNOWMAN_DIR#/Server/lib/
+
+	EMBEDDED
+name:SNOWMAN_SERVER_LIB_BDB
+source:/targets/
+file:bdb.zip
+destination:./#SNOWMAN_DIR#/Server/lib/bdb/
+
+	EMBEDDED
+name:SNOWMAN_SERVER_LIB_MINA
+source:/targets/
+file:mina_core.zip
+destination:./#SNOWMAN_DIR#/Server/lib/
+
+	EMBEDDED
+name:SNOWMAN_SERVER_LIB_MINA
+source:/targets/
+file:slf4j.zip
+destination:./#SNOWMAN_DIR#/Server/lib/
+
+	EMBEDDED
+name:PDS_TUTORIALS
+source:/targets/
+file:tutorials.zip
+destination:./#TUTORIAL_DIR#/
+
+
+	EMBEDDED
+name:PDS_TUTORIALS_MINA
+source:/targets/
+file:mina-core.zip
+destination:./#TUTORIAL_DIR#/tutorial_projects/tutorial_libs/
+
+	EMBEDDED
+name:PDS_TUTORIALS_BDB_JAR
+source:/targets/bdb.zip/
+file:db.jar
+destination:./#TUTORIAL_DIR#/tutorial_projects/tutorial_libs/
+
+	EMBEDDED
+name:PDS_TUTORIALS_BDB_BIN
+source:/targets/bdb.zip/
+file:#BDB#
+destination:./#TUTORIAL_DIR#/tutorial_projects/tutorial_libs/bdb/
+
+	EMBEDDED
+name:PDS_TUTORIALS_SGS
+source:/targets/pds-server.zip/lib/
+file:sgs.jar
+destination:./#TUTORIAL_DIR#/tutorial_projects/tutorial_libs/
+
+	EMBEDDED
+name:PDS_TUTORIALS_SLF4J
+source:/targets/
+file:slf4j.zip
+destination:./#TUTORIAL_DIR#/tutorial_projects/tutorial_libs/
+
+	EMBEDDED
+name:PDS_TUTORIALS_SGS_CLIENT_JAR
+source:/targets/pds-client.zip/lib/
+file:sgs-client.jar
+destination:./#TUTORIAL_DIR#/tutorial_projects/tutorial_libs/
+
+	EMBEDDED
+name:PDS_TUTORIALS_TUTORIAL_PROJECTS
+source:/targets/
+file:nb_projects.zip
+destination:./#TUTORIAL_DIR#/tutorial_projects/

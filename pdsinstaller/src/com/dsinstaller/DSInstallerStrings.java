@@ -3,8 +3,9 @@ package com.dsinstaller;
 public class DSInstallerStrings {
 	// Constants
 	public static final String seperator = "/";
-	public static final String targetLocation = "/com/dsinstaller/resources/";	
+	public static final String targetLocation = "/com/dsinstaller/resources/";
 	public static final String metadataLocation = targetLocation + "metadata.txt";
+	public static final String sysvarsLocation = targetLocation + "vars.properties";
 	
 	public static final String InstallSuccessfulTextLocation = targetLocation + "Complete.txt";
 	public static final String InstallErrorTextLocation = targetLocation + "Error.txt";

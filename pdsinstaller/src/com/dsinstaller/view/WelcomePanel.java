@@ -74,7 +74,7 @@ public class WelcomePanel extends JPanel implements IInstallerGUIStep, ActionLis
 	
 	public void runInitialSteps()
 	{
-		InitializeStep is = new InitializeStep(DSInstallerStrings.metadataLocation);
+		InitializeStep is = new InitializeStep(DSInstallerStrings.metadataLocation, DSInstallerStrings.sysvarsLocation);
 		try {
 			is.run();
 		} catch (StepException e) {

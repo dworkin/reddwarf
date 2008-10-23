@@ -9,8 +9,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.dsinstaller.DSInstallerStrings;
+import com.installercore.info.SystemInfo;
+import com.installercore.var.VarDatabase;
 
 /**
  * {@link MetadataDatabase} contains all metadata files that are available
@@ -170,6 +174,9 @@ public class MetadataDatabase {
 	
 	private static void addMetadata(List<IMetadata> lulwut, String header, String name, String source, String file, String destination)
 	{
+		source = processPath(source);
+		file = processPath(file);
+		destination = processPath(destination);
 		if(header.equals(MetadataTypes.ExternalFile.toString()))
 		{
 			lulwut.add(new ExternalMetadata(name, source, file, destination));
@@ -178,6 +185,32 @@ public class MetadataDatabase {
 		{
 			lulwut.add(new EmbeddedMetadata(name, source, file, destination));
 		}
+	}
+	
+	/**
+	 * Processes a path or file by replacing all system and architecture 
+	 * variables with the corresponding property.
+	 * @param s The command to process.
+	 * @param properties The application properties.
+	 * @return The processed command.
+	 */
+	private static String processPath(String s)
+	{
+		String commonSeparator = "#:#";
+		String arch = SystemInfo.getPathSeparator();
+		s = s.replace(commonSeparator, arch);
+		
+		Pattern p = Pattern.compile("\\w*(#\\w+#)\\w*");
+		Matcher m = p.matcher(s);
+		
+		while(m.find())
+		{
+			String match = m.group(1);
+			String replacement = match.substring(1, match.length()-1); 
+			s = s.replace(match, VarDatabase.getValue(replacement));
+		}
+		
+		return s;
 	}
 	
 	
