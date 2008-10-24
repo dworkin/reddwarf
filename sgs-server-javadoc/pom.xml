@@ -1,13 +1,10 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                      http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                       http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.8-SNAPSHOT</version>
+    <version>0.9.7.2</version>
   </parent>
 
   <artifactId>sgs-server-javadoc</artifactId>
@@ -118,7 +115,7 @@
 	      <doctitle>Project Darkstar Server ${project.version} API</doctitle>
 	      <footer>
 		<![CDATA[<font size="-1">Project Darkstar, Version
-                ${project.version}<br/>${buildNumber}</font>]]>
+                ${project.version}<br />${buildNumber}</font>]]>
 	      </footer>
 	      <bottom>
 		<![CDATA[<font size="-1">Copyright &copy; 
@@ -151,7 +148,7 @@
 	      <doctitle>Project Darkstar Server ${project.version} External API</doctitle>
 	      <footer>
 		<![CDATA[<font size="-1">Project Darkstar, Version
-                ${project.version}<br/>${buildNumber}</font>]]>
+                ${project.version}<br />${buildNumber}</font>]]>
 	      </footer>
 	      <bottom>
 		<![CDATA[<font size="-1">Copyright &copy; 
