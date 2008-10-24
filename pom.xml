@@ -18,6 +18,17 @@
   <version>0.9.8-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
+  <scm>
+    <connection>
+      scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/trunk
+    </connection>
+    <developerConnection>
+      scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/trunk
+    </developerConnection>
+    <url>
+      https://sgs-java-client.dev.java.net/source/browse/sgs-java-client/trunk
+    </url>
+  </scm>
   <description>
     Parent POM for the Project Darkstar Client
   </description>
