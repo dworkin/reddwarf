@@ -10,7 +10,7 @@
   <scm>
     <connection>scm:svn:https://dtc.dev.java.net/svn/dtc/trunk</connection>
     <developerConnection>scm:svn:https://dtc.dev.java.net/svn/dtc/trunk</developerConnection>
-    <url>https://dtc.dev.java.net/source/browse/dtc/branches/trunk</url>
+    <url>https://dtc.dev.java.net/source/browse/dtc/trunk</url>
   </scm>
 
   <modules>
