@@ -18,6 +18,17 @@
   <version>1.0</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
+  <scm>
+    <connection>
+      scm:svn:https://sgs-shared.dev.java.net/svn/sgs-shared/trunk
+    </connection>
+    <developerConnection>
+      scm:svn:https://sgs-shared.dev.java.net/svn/sgs-shared/trunk
+    </developerConnection>
+    <url>
+      https://sgs-shared.dev.java.net/source/browse/sgs-shared/trunk
+    </url>
+  </scm>
   <description>
     The sgs-shared module is a standard jar package that includes
     classes used by both the sgs-server and sgs-client packages
