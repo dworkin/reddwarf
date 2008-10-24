@@ -1,4 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                       http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <!-- Inherit from the global SGS super POM -->
@@ -16,9 +16,9 @@
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
-    <connection>scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/tags/sgs-0.9.7.2</connection>
-    <developerConnection>scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/tags/sgs-0.9.7.2</developerConnection>
-    <url>https://sgs-java-client.dev.java.net/source/browse/sgs-java-client/tags/sgs-0.9.7.2</url>
+    <connection>scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/trunk</connection>
+    <developerConnection>scm:svn:https://sgs-java-client.dev.java.net/svn/sgs-java-client/trunk</developerConnection>
+    <url>https://sgs-java-client.dev.java.net/source/browse/sgs-java-client/trunk</url>
   </scm>
   <description>
     Parent POM for the Project Darkstar Client
