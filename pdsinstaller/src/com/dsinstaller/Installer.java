@@ -48,6 +48,10 @@ public class Installer {
 				if(arguments.hasArgument("path"))
 				{
 					installPath = arguments.getArgumentValue("path");
+					if(!installPath.endsWith("/"))
+					{
+						installPath += "/";
+					}
 				}
 				else
 				{
