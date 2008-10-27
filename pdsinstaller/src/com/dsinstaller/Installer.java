@@ -48,10 +48,6 @@ public class Installer {
 				if(arguments.hasArgument("path"))
 				{
 					installPath = arguments.getArgumentValue("path");
-					if(!installPath.endsWith("/"))
-					{
-						installPath += "/";
-					}
 				}
 				else
 				{
@@ -60,6 +56,11 @@ public class Installer {
 				
 				File pathOfInstall = new File(installPath);
 				pathOfInstall.mkdirs();
+				
+				if(!installPath.endsWith("/"))
+				{
+					installPath += "/";
+				}
 				
 				new CommandLineInstaller(installPath).install();
 			} catch (Exception e) {
