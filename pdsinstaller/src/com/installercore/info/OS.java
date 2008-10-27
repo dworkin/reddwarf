@@ -9,7 +9,9 @@ public enum OS
 {
 	WINDOWS_XP		("Windows XP", "windows", Kernel.WINDOWS),
 	WINDOWS_VISTA	("Windows Vista", "windows", Kernel.WINDOWS),
-	MAC_OSX			("MacOSX", "macosx", Kernel.UNIX),
+	WINDOWS_2000	("Windows 2000", "windows", Kernel.WINDOWS),
+	WINDOWS_2003	("Windows 2003", "windows", Kernel.WINDOWS),
+	MAC_OSX			("Mac OS X", "macosx", Kernel.UNIX),
 	SOLARIS			("Solaris", "solaris", Kernel.UNIX),
 	LINUX			("Linux", "linux", Kernel.UNIX);
 	
@@ -48,7 +50,7 @@ public enum OS
 	{
 		for(OS currOS : OS.values())
 		{
-			if(currOS.toString().equals(osStr))
+			if(currOS.toString().equalsIgnoreCase(osStr))
 			{
 				return currOS;
 			}
