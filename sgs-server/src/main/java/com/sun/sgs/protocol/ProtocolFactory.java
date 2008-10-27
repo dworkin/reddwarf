@@ -17,14 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.transport;
+package com.sun.sgs.protocol;
 
 import java.util.Properties;
 
 /**
- * A factory for creating {@link Transport} instances for
- * sending and receiving messages.
- * A {@code TransportFactory} must have a constructor that takes
+ * A factory for creating {@link Protocol}  instances for
+ * sending protcol messages to and receiving protocol messages.
+ * A {@code ProtocolFactory} must have a constructor that takes
  * the following arguments:
  *
  * <ul>
@@ -33,28 +33,28 @@ import java.util.Properties;
  * <li>{@link com.sun.sgs.service.TransactionProxy}</li>
  * </ul>
  */
-public interface TransportFactory {
-
+public interface ProtocolFactory {
+    
     /**
-     * Start a new transport.
-     * The transport name must resolve to a class that implements
-     * {@link Transport}. The class should be public, not abstract, and should
+     * Creates a new protocol.
+     * The protocol name must resolve to a class that implements
+     * {@link Protocol}. The class should be public, not abstract, and should
      * provide a public constructor with a {@link Properties} and
-     * {@link ConnectionHandler} parameter. The newly created transport object
-     * is returned and each call will return a new instance.
-     * 
-     * @param transportClassName name of the class that implements
-     * {@link Transport}
+     * {@link ProtocolConnectionHandler} parameter. The newly created protocol
+     * object is returned and each call will return a new instance.
+     *
+     * @param protocolClassName name of the class that implements
+     * {@link Protocol}
      * @param properties properties passed to the transport's constructor
      * @param handler handler passed to the transport's constructor
-     * @return the transport object
+     * @return the protocol object
      * @throws IllegalArgumentException if any argument is {@code null} or if
-     * the class specified by {@code transportClassName} does not implement
-     * {@link Transport}
-     * @throws Exception thrown from the transport's constructor
+     * the class specified by {@code protocolClassName} does not implement
+     * {@link Protocol}
+     * @throws Exception thrown from the protocol's constructor
      */
-    Transport startTransport(String transportClassName,
-                             Properties properties,
-                             ConnectionHandler handler) throws Exception;
-
+    Protocol newProtocol(String protocolClassName,
+                         Properties properties,
+                         ProtocolConnectionHandler handler)
+        throws Exception;
 }

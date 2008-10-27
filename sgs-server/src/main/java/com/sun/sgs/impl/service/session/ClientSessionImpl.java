@@ -38,10 +38,9 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -96,7 +95,7 @@ public class ClientSessionImpl
     private final Identity identity;
     
     /** The underlying transport for this session. */
-    private final TransportDescriptor transportDesc;
+    private final ProtocolDescriptor protocolDesc;
 
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
@@ -130,7 +129,7 @@ public class ClientSessionImpl
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
 		      Identity identity,
-                      TransportDescriptor transportDesc)
+                      ProtocolDescriptor protocolDesc)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
@@ -140,7 +139,7 @@ public class ClientSessionImpl
 	}
 	this.sessionService = sessionService;
 	this.identity = identity;
-        this.transportDesc = transportDesc;
+        this.protocolDesc = protocolDesc;
 	this.nodeId = sessionService.getLocalNodeId();
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
@@ -179,13 +178,9 @@ public class ClientSessionImpl
      */
     public ClientSession send(ByteBuffer message) {
 	try {
-            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
-                throw new IllegalArgumentException(
-                    "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
-            } else if (!isConnected()) {
+            if (!isConnected())
 		throw new IllegalStateException("client session not connected");
-	    }
+
             /*
              * TBD: Possible optimization: if we have passed our own special
              * buffer to the app, we can detect that here and possibly avoid a
@@ -193,11 +188,7 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
-            buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
-               .put(message)
-               .flip();
-	    addEvent(new SendEvent(buf.array()));
+	    addEvent(new SendEvent(message.array()));
 
 	    return getWrappedClientSession();
 
@@ -332,7 +323,7 @@ public class ClientSessionImpl
     }
 
     public boolean canSupport(Delivery required) {
-        return transportDesc.canSupport(required);
+        return protocolDesc.canSupport(required);
     }
     
     /**
@@ -735,8 +726,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.sendProtocolMessage(
-		sessionImpl, ByteBuffer.wrap(message), Delivery.RELIABLE);
+            sessionImpl.sessionService.addSessionMessage(sessionImpl, message);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -762,7 +752,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.disconnect(sessionImpl);
+            sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

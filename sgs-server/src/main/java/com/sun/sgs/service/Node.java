@@ -19,7 +19,7 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.transport.TransportDescriptor;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 
 /**
  * An abstraction for node information, used in conjunction
@@ -58,7 +58,7 @@ public interface Node {
      * 
      * @return the set of transport descriptors or {@code null}
      */
-    TransportDescriptor[] getClientListeners();
+    ProtocolDescriptor[] getClientListeners();
     
     /**
      * Sets the set of transports listening for client connections on this node.
@@ -66,6 +66,6 @@ public interface Node {
      * 
      * @param descriptors set of transport descriptors
      */
-    void setClientListener(TransportDescriptor[] descriptors);
+    void setClientListener(ProtocolDescriptor[] descriptors);
 
 }

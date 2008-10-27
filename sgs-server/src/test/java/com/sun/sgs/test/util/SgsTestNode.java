@@ -33,6 +33,7 @@ import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -41,7 +42,6 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import com.sun.sgs.transport.TransportDescriptor;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.File;
 import java.io.Serializable;
@@ -263,8 +263,8 @@ public class SgsTestNode {
 		    public void run() {
                         long localNodeId = watchdogService.getLocalNodeId();
                         Node node = watchdogService.getNode(localNodeId);
-                        TransportDescriptor[] desc = node.getClientListeners();
-                        appPort = desc[0].getListeningPort();
+                        ProtocolDescriptor[] desc = node.getClientListeners();
+                        appPort = desc[0].getTransport().getListeningPort();
                     } },
                     txnProxy.getCurrentOwner());
 	}

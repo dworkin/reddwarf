@@ -17,44 +17,39 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.transport;
+package com.sun.sgs.impl.protocol;
 
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 
 /**
- * Base transport descriptor class. A transport may use this class directly
- * or extend it, overring methods for transport specific needs.
+ * Base protocol descriptor class. A protocl may use this class directly
+ * or extend it, overring methods for transport specific needs. For delivery
+ * related methods, {@code getSupportedDelivery} and {@code canSupport}
+ * this class defers to the transport descriptor.
  */
-public class TransportDescriptorImpl
-        implements TransportDescriptor, Serializable
+public class ProtocolDescriptorImpl implements ProtocolDescriptor,
+                                               Serializable
 {
     private static final long serialVersionUID = 1L;
 
     private final String type;
-    private final Delivery[] supportedDelivery;
-    private final String hostName;
-    private final int listeningPort;
+    private final TransportDescriptor transportDesc;   
         
     /**
      * Constructor.
-     * @param type transport type
-     * @param supportedDelivery supported delivery modes
-     * @param hostName host name
-     * @param listeningPort port transport is listening on
+     * @param type type of protocol
+     * @param transportDesc transport descriptor
      */
-    public TransportDescriptorImpl(String type,
-                                      Delivery[] supportedDelivery,
-                                      String hostName,
-                                      int listeningPort) {
+    public ProtocolDescriptorImpl(String type,
+                                  TransportDescriptor transportDesc)
+    {
         assert type != null;
-        assert supportedDelivery != null;
-        assert hostName != null;
+        assert transportDesc != null;
         this.type = type;
-        this.supportedDelivery = supportedDelivery;
-        this.hostName = hostName;
-        this.listeningPort = listeningPort;
+        this.transportDesc = transportDesc;
     }
     
     @Override
@@ -64,30 +59,21 @@ public class TransportDescriptorImpl
 
     @Override
     public Delivery[] getSupportedDelivery() {
-        return supportedDelivery;
+        return transportDesc.getSupportedDelivery();
     }
 
     @Override
     public boolean canSupport(Delivery required) {
-        for (Delivery delivery : supportedDelivery) {
-            if (delivery.equals(required))
-                return true;
-        }
-        return false;
+        return transportDesc.canSupport(required);
     }
 
     @Override
-    public String getHostName() {
-        return hostName;
+    public TransportDescriptor getTransport() {
+        return transportDesc;
     }
 
     @Override
-    public int getListeningPort() {
-        return listeningPort;
-    }
-
-    @Override
-    public boolean isCompatibleWith(TransportDescriptor descriptor) {
+    public boolean isCompatibleWith(ProtocolDescriptor descriptor) {
         if (getType().equals(descriptor.getType())) {
             for (Delivery required : descriptor.getSupportedDelivery()) {
                 if (!canSupport(required))

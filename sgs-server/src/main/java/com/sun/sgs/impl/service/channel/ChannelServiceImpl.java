@@ -30,7 +30,6 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -43,7 +42,7 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.protocol.session.SessionMessageChannel;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -495,29 +494,14 @@ public final class ChannelServiceImpl
 		}
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
-			MessageBuffer msg =
-			    new MessageBuffer(1 +
-				MessageBuffer.getSize(name) +
-					      channelId.length);
-			msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-			    putString(name).
-			    putBytes(channelId);
-			sessionService.sendProtocolMessageNonTransactional(
- 		    	    sessionRefId,
-			    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
-			    Delivery.RELIABLE);
+                        sessionService.getProtocolMessageChannel(sessionRefId,
+                                                                 Delivery.RELIABLE).channelJoin(name, channelRefId);
 		    }
 		}
 		if (leavers != null) {
 		    for (BigInteger sessionRefId : leavers) {
-			ByteBuffer msg =
-			    ByteBuffer.allocate(1 + channelId.length);
-			msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
-			    put(channelId).
-			    flip();
-			sessionService.sendProtocolMessageNonTransactional(
-			    sessionRefId, msg.asReadOnlyBuffer(),
-			    Delivery.RELIABLE);
+                        sessionService.getProtocolMessageChannel(sessionRefId,
+                                                                 Delivery.RELIABLE).channelLeave(channelRefId);
 		    }
 		}
 
@@ -573,17 +557,8 @@ public final class ChannelServiceImpl
 		channelSet.add(channelRefId);
 
 		// Send CHANNEL_JOIN protocol message.
-		MessageBuffer msg =
-		    new MessageBuffer(1 +
-			MessageBuffer.getSize(name) +
-			channelId.length);
-		msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-		    putString(name).
-		    putBytes(channelId);
-		sessionService.sendProtocolMessageNonTransactional(
- 		    sessionRefId,
-		    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
-		    Delivery.RELIABLE);
+                sessionService.getProtocolMessageChannel(
+			sessionRefId, Delivery.RELIABLE).channelJoin(name, channelRefId);
 
 	    } finally {
 		callFinished();
@@ -625,12 +600,9 @@ public final class ChannelServiceImpl
 		}
 
 		// Send CHANNEL_LEAVE protocol message.
-		ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
-		msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
-		    put(channelId).
-		    flip();
-		    sessionService.sendProtocolMessageNonTransactional(
-		        sessionRefId, msg.asReadOnlyBuffer(), Delivery.RELIABLE);
+                sessionService.getProtocolMessageChannel(
+                        sessionRefId, Delivery.RELIABLE).channelLeave(channelRefId);
+                
 	    } finally {
 		callFinished();
 	    }
@@ -653,14 +625,9 @@ public final class ChannelServiceImpl
 		Set<BigInteger> localMembers;
 		localMembers = localChannelMembersMap.remove(channelRefId);
 		if (localMembers != null) {
-		    ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
-		    msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
-			put(channelId).
-			flip();
 		    for (BigInteger sessionRefId : localMembers) {
-			sessionService.sendProtocolMessageNonTransactional(
-			    sessionRefId, msg.asReadOnlyBuffer(),
-			    Delivery.RELIABLE);
+                        sessionService.getProtocolMessageChannel(
+				sessionRefId, Delivery.RELIABLE).channelLeave(channelRefId);
 		    }
 		}
 		
@@ -700,19 +667,14 @@ public final class ChannelServiceImpl
 		    // What error should be reported here?
 		    return;
 		}
-
-		ByteBuffer msg =
-		    ByteBuffer.allocate(3 + channelId.length + message.length);
-		msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
-		   .putShort((short) channelId.length)
-		   .put(channelId)
-		   .put(message)
-		   .flip();
 		
 		for (BigInteger sessionRefId : localMembers) {
-		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, msg.asReadOnlyBuffer(),
-			Delivery.RELIABLE);
+                    SessionMessageChannel msgChannel =
+                    sessionService.getProtocolMessageChannel(sessionRefId,
+                                                             Delivery.RELIABLE);
+                    if (msgChannel != null)
+                        msgChannel.channelMessage(channelRefId,
+                                                  ByteBuffer.wrap(message));
 		}
 
 	    } finally {

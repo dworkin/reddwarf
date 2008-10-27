@@ -19,8 +19,6 @@
 
 package com.sun.sgs.transport;
 
-import com.sun.sgs.transport.TransportFactory;
-
 /**
  * I/O transport. A tranport object handles incoming connection request for
  * a specific transport type.

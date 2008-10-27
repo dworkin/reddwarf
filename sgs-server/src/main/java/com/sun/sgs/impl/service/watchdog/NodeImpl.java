@@ -23,9 +23,9 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -66,7 +66,7 @@ class NodeImpl
     private final int instance;
     
     /** The client listeners set, or {@code null} if not an application node. */
-    private TransportDescriptor[] clientListeners = null;
+    private ProtocolDescriptor[] clientListeners = null;
 
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
@@ -177,13 +177,13 @@ class NodeImpl
     
     /** {@inheritDoc} */
     @Override
-    public TransportDescriptor[] getClientListeners() {
+    public ProtocolDescriptor[] getClientListeners() {
         return clientListeners;
     }
     
     /** {@inheritDoc} */
     @Override
-    public void setClientListener(TransportDescriptor[] descriptors) {
+    public void setClientListener(ProtocolDescriptor[] descriptors) {
         clientListeners = descriptors;
     }
 

@@ -42,8 +42,13 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.transport.TransportFactory;
-import com.sun.sgs.nio.channels.AsynchronousByteChannel;
+import com.sun.sgs.protocol.MessageChannel;
+import com.sun.sgs.protocol.MessageHandler;
+import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.Protocol;
+import com.sun.sgs.protocol.ProtocolConnectionHandler;
+import com.sun.sgs.protocol.ProtocolFactory;
+import com.sun.sgs.protocol.session.SessionMessageChannel;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -55,9 +60,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
-import com.sun.sgs.transport.ConnectionHandler;
-import com.sun.sgs.transport.Transport;
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -91,7 +93,7 @@ import java.util.logging.Logger;
  */
 public final class ClientSessionServiceImpl
     extends AbstractService
-    implements ClientSessionService, ConnectionHandler
+    implements ClientSessionService, ProtocolConnectionHandler
 {
     /** The package name. */
     public static final String PKG_NAME = "com.sun.sgs.impl.service.session";
@@ -114,12 +116,12 @@ public final class ClientSessionServiceImpl
     private static final int MINOR_VERSION = 0;
     
     /** The transport(s) to use for incomming client connections. */
-    private static final String TRANSPORT_LIST_PROPERTY =
-        PKG_NAME + ".transports";
+    private static final String PROTOCOL_LIST_PROPERTY =
+        PKG_NAME + ".protocols";
     
     /** The transport properties base */
-    private static final String TRANSPORT_PROPERTIES_BASE =
-        PKG_NAME + ".transport.properties.";
+    private static final String PROTOCOL_PROPERTIES_BASE =
+        PKG_NAME + ".protocol.properties.";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -215,15 +217,15 @@ public final class ClientSessionServiceImpl
     /** The identity manager. */
     final IdentityCoordinator identityManager;
     
-    /** Transport factory */
-    private final TransportFactory transportFactory;
+    /** Protocol factory */
+    private final ProtocolFactory protocolFactory;
    
     
-    /** Transport class name(s). */
-    private final String transportList;
+    /** Protocol class name(s). */
+    private final String protocolList;
     
     /** Transport object(s). */
-    private final List<Transport> transports = new ArrayList<Transport>();
+    private final List<Protocol> protocols = new ArrayList<Protocol>();
 
     /** The exporter for the ClientSessionServer. */
     private final Exporter<ClientSessionServer> exporter;
@@ -286,11 +288,11 @@ public final class ClientSessionServiceImpl
 	wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-            transportList = wrappedProps.getProperty(TRANSPORT_LIST_PROPERTY);
+            protocolList = wrappedProps.getProperty(PROTOCOL_LIST_PROPERTY);
             
-            if (transportList == null)
+            if (protocolList == null)
                 throw new IllegalArgumentException(
-                        "at least one transport must be specified");
+                        "at least one protocol must be specified");
 
 	    /*
 	     * Get the property for controlling session event processing
@@ -344,7 +346,7 @@ public final class ClientSessionServiceImpl
 	     */
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
-            transportFactory = systemRegistry.getComponent(TransportFactory.class);
+            protocolFactory = systemRegistry.getComponent(ProtocolFactory.class);
 	    flushContextsThread.start();
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
@@ -410,17 +412,17 @@ public final class ClientSessionServiceImpl
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
         try {
             int i = 0;
-            for (String transportClassName : transportList.split(":")) {
-                transports.add(
-                        transportFactory.startTransport(transportClassName,
-                                                        wrappedProps.getEmbeddedProperties(TRANSPORT_PROPERTIES_BASE + i++),
-                                                        this));
+            for (String protocolClassName : protocolList.split(":")) {
+                protocols.add(
+                        protocolFactory.newProtocol(protocolClassName,
+                                                    wrappedProps.getEmbeddedProperties(PROTOCOL_PROPERTIES_BASE + i++),
+                                                    this));
             }
-            final TransportDescriptor[] descriptors =
-                                    new TransportDescriptor[transports.size()];
+            final ProtocolDescriptor[] descriptors =
+                                    new ProtocolDescriptor[protocols.size()];
             i = 0;
-            for (Transport transport : transports)
-                descriptors[i++] = transport.descriptor();
+            for (Protocol protocol : protocols)
+                descriptors[i++] = protocol.getDescriptor();
 
             transactionScheduler.runTask(new AbstractKernelRunnable() {
 		    public void run() {
@@ -437,12 +439,13 @@ public final class ClientSessionServiceImpl
     /** {@inheritDoc} */
     @Override
     public void doShutdown() {
-        for (Transport transport : transports)
-            transport.shutdown();
+        for (Protocol protocol : protocols)
+            protocol.shutdown();
 
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
 	}
+        System.out.println("*** CLEAR " );
 	handlers.clear();
 
 	if (exporter != null) {
@@ -510,99 +513,95 @@ public final class ClientSessionServiceImpl
         }
         sessionDisconnectListeners.add(listener);
     }
-    
+
     /** {@inheritDoc} */
     @Override
-    public void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
+    public SessionMessageChannel getProtocolMessageChannel(BigInteger sessionRefId,
+                                                           Delivery delivery)
     {
-	ClientSessionHandler handler = handlers.get(sessionRefId);
+        ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
-	 * If a local handler exists, forward message to local handler
-	 * to send to client session.
+	 * If a local handler exists, return protocol message channel
 	 */
 	if (handler != null) {
-	    byte[] bytes = new byte[message.remaining()];
-	    message.get(bytes);
-	    handler.sendProtocolMessage(bytes, delivery);
+	    return handler.getSessionMessageChannel();
 	} else {
 	    logger.log(
 		Level.FINE,
-		"Discarding messages for unknown session:{0}",
+		"Discarding message for unknown session:{0}",
 		sessionRefId);
-		return;
+	    // TBD: is throwing this exception the right thing to do?
+	    throw new IllegalArgumentException(
+		"unknown session: " + sessionRefId);
 	}
-    }
 
+                
+//        if (handler != null && handler.isConnected()) {
+//            return handler.getSessionMessageChannel();
+//        }
+//        return null;
+    }
+    
     /* -- Package access methods for adding commit actions -- */
     
     /**
-     * Sends the specified protocol {@code message} to the specified
-     * client {@code session} with the specified {@code delivery}
-     * guarantee.  This method must be called within a transaction.
+     * Enqueues the specified session {@code message} in the current
+     * context for delivery to the specified client {@code session} when
+     * the context commits.  This method must be called within a
+     * transaction.
      *
      * @param	session	a client session
      * @param	message a complete protocol message
-     * @param	delivery a delivery requirement
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void sendProtocolMessage(
-	ClientSessionImpl session, ByteBuffer message, Delivery delivery)
-    {
-        byte[] bytes = new byte[message.remaining()];
-        message.get(bytes);
-	checkContext().addMessage(session, bytes, delivery);
+    void addSessionMessage(ClientSessionImpl session, byte[] message) {
+	checkContext().addMessage(session, message);
     }
 
     /**
-     * Sends the specified login acknowledgment {@code message} to the
-     * specified client {@code session} with the specified {@code delivery}
-     * guarantee.  If {@code success} is false, then no further messages
-     * can be sent to this session, even if they have been enqueued during
-     * the current transaction.
+     * Records the login result in the current context for delivery to the
+     * specified client {@code session} when the context commits.  If
+     * {@code success} is {@code false}, a {@link
+     * ProtocolMessageChannel#loginFailure loginFailure} message will be
+     * sent and no subsequent session messages will be forwarded to the
+     * session, even if they have been enqueued during the current
+     * transaction.  If success if {@code true}, then a {@link
+     * ProtocolMessageChannel#loginSuccess loginSuccess}
      *
      * <p>When the transaction commits, the login acknowledgment message is
      * delivered to the client session first, and if {@code success} is
-     * true, all other enqueued messages will be delivered.
+     * {@code true}, all other enqueued messages will be delivered.
      *
      * @param	session	a client session
-     * @param	message a complete protocol message
-     * @param	delivery a delivery requirement
      * @param	success if {@code true}, login was successful
+     * @param	throwable an exception that occurred while processing the
+     *		login request, or {@code null} (only valid if {@code
+     *		success} is {@code false}
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void sendLoginAck(
- 	ClientSessionImpl session, byte[] message,
-	Delivery delivery, boolean success)
+    void addLoginResult(
+	ClientSessionImpl session, boolean success, Throwable throwable)
     {
 	Context context = checkContext();
-	context.addLoginAck(session, message, delivery, success);
+	context.addLoginResult(session, success, throwable);
     }
 
     /**
-     * Disconnects the specified client {@code session}.  This method must
-     * be invoked within a transaction.
+     * Adds a request to disconnect the specified client {@code session} when
+     * the current context commits.  This method must be invoked within a
+     * transaction.
      *
      * @param	session a client session
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void disconnect(ClientSessionImpl session) {
+    void addDisconnectRequest(ClientSessionImpl session) {
 	checkContext().requestDisconnect(session);
-    }
-
-    /**
-     * Returns the size of the read buffer to use for new connections.
-     * 
-     * @return the size of the read buffer to use for new connections
-     */
-    int getReadBufferSize() {
-        return readBufferSize;
     }
 
     /**
@@ -618,16 +617,19 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     @Override
-    public void newConnection(AsynchronousByteChannel channel,
-                              TransportDescriptor desc) {
-        logger.log(Level.FINER, "new connection on {0}", channel);
+    public MessageHandler newConnection(MessageChannel msgChannel,
+                                        ProtocolDescriptor descriptor)
+        throws Exception
+    {
+        assert msgChannel instanceof SessionMessageChannel;
+        
+        logger.log(Level.FINER, "new connection on {0}", msgChannel);
 
         /* The handler will call addHandler if login succeeds */
-        new ClientSessionHandler(this,
-                                 dataService,
-                                 new AsynchronousMessageChannel(channel,
-                                                                readBufferSize),
-                                 desc);
+        return new ClientSessionHandler(this,
+                                        dataService,
+                                        (SessionMessageChannel)msgChannel,
+                                        descriptor);
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -659,28 +661,26 @@ public final class ClientSessionServiceImpl
 	    super(txn);
 	}
 
-	/**
-	 * Adds a login acknowledgment message be sent to the specified
+        /**
+	 * Adds the specified login result be sent to the specified
 	 * session after this transaction commits.  If {@code success} is
 	 * {@code false}, no other messages are sent to the session after
 	 * the login acknowledgment.
 	 */
-	void addLoginAck(
- 	    ClientSessionImpl session, byte[] message, Delivery delivery,
-	    boolean success)
+	void addLoginResult(ClientSessionImpl session,
+                            boolean success,
+                            Throwable throwable)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addLoginAck success:{0} session:{1}," +
-			"message:{2}", success, session, message);
+			"Context.addLoginAck success:{0} session:{1}",
+			success, session);
 		}
 		checkPrepared();
 
-		getCommitActions(session).addLoginAck(message, success);
-
-	    
+		getCommitActions(session).addLoginResult(success, throwable);
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
@@ -695,9 +695,7 @@ public final class ClientSessionServiceImpl
 	 * Adds a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
-	private void addMessage(
-	    ClientSessionImpl session, byte[] message, Delivery delivery)
-	{
+	private void addMessage(ClientSessionImpl session, byte[] message) {
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
@@ -846,11 +844,14 @@ public final class ClientSessionServiceImpl
 	/** The client session ID as a BigInteger. */
 	private final BigInteger sessionRefId;
 
-	/** The login ack protocol message, or null. */
-	private byte[] loginAck = null;
-
-	/** The login outcome, only valid if {@code loginAck} is non-null. */
+	/** Indicates whether a login result should be sent. */
+	private boolean sendLoginResult = false;
+	
+	/** The login result. */
 	private boolean loginSuccess = false;
+
+	/** The login exception. */
+	private Throwable loginException;
 	
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
@@ -869,17 +870,18 @@ public final class ClientSessionServiceImpl
 	    messages.add(message);
 	}
 
-	void addLoginAck(byte[] message, boolean success) {
-	    loginAck = message;
+	void addLoginResult(boolean success, Throwable throwable) {
+	    sendLoginResult = true;
 	    loginSuccess = success;
+	    loginException = throwable;
 	}
 	
 	void setDisconnect() {
 	    disconnect = true;
 	}
 
-	void flush() {
-	    sendMessages();
+        void flush() {
+	    sendSessionMessages();
 	    if (disconnect) {
 		ClientSessionHandler handler = handlers.get(sessionRefId);
 		/*
@@ -897,24 +899,27 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 
-	void sendMessages() {
-
+        void sendSessionMessages() {
 	    ClientSessionHandler handler = handlers.get(sessionRefId);
+            
 	    /*
 	     * If a local handler exists, forward messages to local
 	     * handler to send to client session; otherwise log
 	     * error message.
 	     */
 	    if (handler != null && handler.isConnected()) {
-		if (loginAck != null) {
-		    handler.sendLoginProtocolMessage(
-			loginAck, Delivery.RELIABLE, loginSuccess);
-		    if (!loginSuccess) {
+		if (sendLoginResult) {
+		    if (loginSuccess) {
+			handler.loginSuccess();
+		    } else {
+			handler.loginFailure("login refused", loginException);
 			return;
 		    }
 		}
+		SessionMessageChannel msgChannel =
+		    handler.getSessionMessageChannel();//(Delivery.RELIABLE);
 		for (byte[] message : messages) {
-		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
+		    msgChannel.sessionMessage(ByteBuffer.wrap(message));
 		}
 	    } else {
 		logger.log(
@@ -1168,6 +1173,8 @@ public final class ClientSessionServiceImpl
      * client has successfully logged in.
      */
     void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
+        assert handler != null;
+        System.out.println("*** Added " + sessionRefId);
 	handlers.put(sessionRefId, handler);
     }
     
@@ -1177,6 +1184,7 @@ public final class ClientSessionServiceImpl
      * disconnected.
      */
     void removeHandler(BigInteger sessionRefId) {
+        System.out.println("*** Remove " + sessionRefId);
 	if (shuttingDown()) {
 	    return;
 	}

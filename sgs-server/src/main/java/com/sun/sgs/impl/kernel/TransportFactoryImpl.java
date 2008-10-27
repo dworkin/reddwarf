@@ -31,16 +31,16 @@ import java.util.logging.Logger;
 /**
  * Implementation of a transport manager.
  */
-public class TransportManagerImpl implements TransportFactory {
+public class TransportFactoryImpl implements TransportFactory {
 
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(TransportManagerImpl.class.getName()));
+        new LoggerWrapper(Logger.getLogger(TransportFactoryImpl.class.getName()));
     
     /**
      * @param appProperties
      */
-    public TransportManagerImpl(Properties appProperties) {
-        logger.log(Level.CONFIG, "Creating an IO manager");
+    public TransportFactoryImpl(Properties appProperties) {
+        logger.log(Level.CONFIG, "Creating a transport factory");
     }
     
     /** {@inheritDoc} */
@@ -54,7 +54,7 @@ public class TransportManagerImpl implements TransportFactory {
             throw new IllegalArgumentException("properties can not be null");
 
         if (transportClassName == null)
-            throw new IllegalArgumentException("transport can not be null");
+            throw new IllegalArgumentException("transportClassName can not be null");
         
         if (handler == null)
             throw new IllegalArgumentException("handler can not be null");

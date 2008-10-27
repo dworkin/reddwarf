@@ -21,19 +21,16 @@ package com.sun.sgs.test.impl.service.task;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.RecoveryListener;
-
-import com.sun.sgs.transport.TransportDescriptor;
 import java.util.Iterator;
 import java.util.Properties;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -163,12 +160,12 @@ public class DummyWatchdogService implements WatchdogService {
         }
 
         @Override
-        public TransportDescriptor[] getClientListeners() {
+        public ProtocolDescriptor[] getClientListeners() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
 
         @Override
-        public void setClientListener(TransportDescriptor[] descriptors) {
+        public void setClientListener(ProtocolDescriptor[] descriptors) {
             throw new UnsupportedOperationException("Not supported yet.");
         }
     }
