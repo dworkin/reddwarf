@@ -32,12 +32,10 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-api</artifactId>
-      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
-      <version>${sgs-shared.version}</version>
     </dependency>
 
     <dependency>

@@ -82,6 +82,68 @@
     </plugins>
   </build>
 
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-shared</artifactId>
+	<version>${sgs-shared.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-shared</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs-shared.version}</version>
+      </dependency>
+
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-api</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-api</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-javadoc</artifactId>
+	<classifier>api</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-tutorial-server</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-tutorial-server</artifactId>
+	<classifier>sources</classifier>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-tutorial-server-dist</artifactId>
+	<type>zip</type>
+	<version>${sgs.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <repositories>
     <repository>
       <id>java.net</id>
