@@ -21,15 +21,15 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 import com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileRegistrar;
 
 
 /** Simple profiling utility to support tests. */
@@ -37,8 +37,8 @@ public class DummyProfileCoordinator {
 
     // the production collector
     private final ProfileCollectorImpl collector;
-    // and registrar
-    private final ProfileRegistrarImpl registrar;
+    // and its management handle
+    private final ProfileCollectorHandle collectorHandle;
 
     // a dummy task that represents all reports
     private static final KernelRunnable task = new DummyKernelRunnable();
@@ -60,7 +60,7 @@ public class DummyProfileCoordinator {
     private DummyProfileCoordinator() {
         collector = new ProfileCollectorImpl(ProfileLevel.MIN, 
                                              System.getProperties(), null);
-        registrar = new ProfileRegistrarImpl(collector);
+        collectorHandle = new ProfileCollectorHandleImpl(collector);
         OperationLoggingProfileOpListener listener =
             new OperationLoggingProfileOpListener(System.getProperties(),
                                                   owner, null);
@@ -70,11 +70,6 @@ public class DummyProfileCoordinator {
     /** Get the singleton, backing collector. */
     public static ProfileCollectorImpl getCollector() {
         return instance.collector;
-    }
-
-    /** Get the singleton registrar, used for creating services. */
-    public static ProfileRegistrar getRegistrar() {
-        return instance.registrar;
     }
 
     /** Starts profiling */
@@ -96,9 +91,9 @@ public class DummyProfileCoordinator {
         synchronized (lockObject) {
             if (instance != null) {
                 try {
-                    instance.collector.
+                    instance.collectorHandle.
                         startTask(task, owner, System.currentTimeMillis(), 0);
-                    instance.collector.noteTransactional(dummyTxnId);
+                    instance.collectorHandle.noteTransactional(dummyTxnId);
                 } catch (Exception e) { e.printStackTrace(); }
             }
         }
@@ -109,9 +104,9 @@ public class DummyProfileCoordinator {
         synchronized (lockObject) {
             if (instance != null) {
                 if (committed)
-                    instance.collector.finishTask(1);
+                    instance.collectorHandle.finishTask(1);
                 else
-                    instance.collector.finishTask(1, new Exception(""));
+                    instance.collectorHandle.finishTask(1, new Exception(""));
             }
         }
     }

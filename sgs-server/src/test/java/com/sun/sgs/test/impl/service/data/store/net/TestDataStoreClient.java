@@ -92,7 +92,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     @Override
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props), DummyProfileCoordinator.getRegistrar());
+	    new DataStoreClient(props), DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

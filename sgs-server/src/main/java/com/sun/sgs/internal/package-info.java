@@ -17,24 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.kernel;
-
-import com.sun.sgs.auth.Identity;
-
-
 /**
- * This interface defines a dependency between tasks, such that tasks are
- * run in the order in which they are submitted, and the next task isn't
- * started until the current task has completed.
+ * Provides implementation hooks for a Project Darkstar Server to configure
+ * the underlying behavior of the system.
  */
-public interface TaskQueue {
-
-    /**
-     * Adds a task to this dependency queue.
-     *
-     * @param task the {@code KernelRunnable} to add
-     * @param owner the {@code Identity} that owns the task
-     */
-    void addTask(KernelRunnable task, Identity owner);
-
-}
+package com.sun.sgs.internal;

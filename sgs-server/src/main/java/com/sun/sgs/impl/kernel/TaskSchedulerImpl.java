@@ -23,6 +23,7 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
@@ -31,7 +32,6 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import com.sun.sgs.profile.ProfileCollector;
 
 import java.util.LinkedList;
 import java.util.Properties;
@@ -80,8 +80,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
     // the executor used to run tasks
     private final ScheduledExecutorService executor;
 
-    // the collector used for profiling data
-    private final ProfileCollector profileCollector;
+    // the collector handle used for profiling data
+    private final ProfileCollectorHandle profileCollectorHandle;
 
     // the number of tasks waiting to run
     private final AtomicInteger waitingSize = new AtomicInteger(0);
@@ -96,28 +96,33 @@ final class TaskSchedulerImpl implements TaskScheduler {
      * Creates an instance of {@code TaskSchedulerImpl}.
      *
      * @param properties the {@code Properties} for the system
-     * @param profileCollector the {@code ProfileCollector} used by the
-     *                         system to collect profiling data
+     * @param profileCollectorHandle the {@code ProfileCollectorHandler} used to
+     *          manage collection of per-task profiling data
      *
      * @throws Exception if there is any failure creating the scheduler
      */
     TaskSchedulerImpl(Properties properties,
-                      ProfileCollector profileCollector) throws Exception {
+                      ProfileCollectorHandle profileCollectorHandle) 
+        throws Exception 
+    {
         logger.log(Level.CONFIG, "Creating a Task Scheduler");
 
-        if (properties == null)
+        if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
-        if (profileCollector == null)
-            throw new NullPointerException("Collector cannot be null");
+        }
+        if (profileCollectorHandle == null) {
+            throw new NullPointerException("Collector handle cannot be null");
+        }
 
-        this.profileCollector = profileCollector;
+        this.profileCollectorHandle = profileCollectorHandle;
 
         int requestedThreads =
             Integer.parseInt(properties.getProperty(CONSUMER_THREADS_PROPERTY,
                                                     DEFAULT_CONSUMER_THREADS));
-        if (logger.isLoggable(Level.CONFIG))
+        if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "Using {0} task consumer threads",
                        requestedThreads);
+        }
         // NOTE: this is replicating previous behavior where there is a
         // fixed-size pool for running tasks, but in practice we may
         // want a flexible pool that allows (e.g.) for tasks that run
@@ -151,7 +156,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
-                                       long startTime) {
+                                       long startTime) 
+    {
         return new TaskReservationImpl(new TaskDetail(task, owner, startTime));
     }
 
@@ -173,7 +179,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
      * {@inheritDoc}
      */
     public void scheduleTask(KernelRunnable task, Identity owner,
-                             long startTime) {
+                             long startTime) 
+    {
         try {
             TaskDetail detail = new TaskDetail(task, owner, startTime);
             executor.schedule(new TaskRunner(detail),
@@ -191,9 +198,11 @@ final class TaskSchedulerImpl implements TaskScheduler {
     public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
                                                      Identity owner,
                                                      long startTime,
-                                                     long period) {
-        if (period <= 0)
+                                                     long period) 
+    {
+        if (period <= 0) {
             throw new IllegalArgumentException("Illegal period: " + period);
+        }
 
         return new RecurringTaskHandleImpl(new TaskDetail(task, owner,
                                                           startTime, period));
@@ -203,8 +212,9 @@ final class TaskSchedulerImpl implements TaskScheduler {
      * {@inheritDoc}
      */
     public TaskQueue createTaskQueue() {
-        if (isShutdown)
+        if (isShutdown) {
             throw new IllegalStateException("Scheduler is shutdown");
+        }
         return new TaskQueueImpl();
     }
 
@@ -219,8 +229,9 @@ final class TaskSchedulerImpl implements TaskScheduler {
      */
     void shutdown() {
         synchronized (this) {
-            if (isShutdown)
+            if (isShutdown) {
                 throw new IllegalStateException("Already shutdown");
+            }
             isShutdown = true;
         }
         executor.shutdown();
@@ -236,9 +247,10 @@ final class TaskSchedulerImpl implements TaskScheduler {
         }
         /** {@inheritDoc} */
         public synchronized void cancel() {
-            if (usedOrCancelled)
+            if (usedOrCancelled) {
                 throw new IllegalStateException("This reservation cannot be " +
                                                 "cancelled");
+            }
             usedOrCancelled = true;
         }
         /**
@@ -249,9 +261,10 @@ final class TaskSchedulerImpl implements TaskScheduler {
          */
         public void use() {
             synchronized (this) {
-                if (usedOrCancelled)
+                if (usedOrCancelled) {
                     throw new IllegalStateException("This reservation cannot " +
                                                     "be used");
+                }
                 usedOrCancelled = true;
             }
 
@@ -276,27 +289,32 @@ final class TaskSchedulerImpl implements TaskScheduler {
         private volatile ScheduledFuture<?> future = null;
         /** Creates an instance of {@code RecurringTaskHandleImpl}. */
         RecurringTaskHandleImpl(TaskDetail taskDetail) {
-            if (isShutdown)
+            if (isShutdown) {
                 throw new IllegalStateException("Scheduler is shutdown");
+            }
             this.taskDetail = taskDetail;
         }
         /** {@inheritDoc} */
         public void cancel() {
-            synchronized(this) {
-                if (isCancelled)
+            synchronized (this) {
+                if (isCancelled) {
                     throw new IllegalStateException("Handle already cancelled");
+                }
                 isCancelled = true;
             }
-            if (future != null)
+            if (future != null) {
                 future.cancel(false);
+            }
         }
         /** {@inheritDoc} */
         public void start() {
-            synchronized(this) {
-                if (isCancelled)
+            synchronized (this) {
+                if (isCancelled) {
                     throw new IllegalStateException("Handle already cancelled");
-                if ((future != null) || (isStarted))
+                }
+                if ((future != null) || (isStarted)) {
                     throw new IllegalStateException("Handle already used");
+                }
                 isStarted = true;
             }
 
@@ -327,11 +345,14 @@ final class TaskSchedulerImpl implements TaskScheduler {
         }
         /** Creates an instance of {@code TaskDetail}. */
         TaskDetail(KernelRunnable task, Identity owner, long startTime,
-                   long period) {
-            if (task == null)
+                   long period) 
+        {
+            if (task == null) {
                 throw new NullPointerException("Task cannot be null");
-            if (owner == null)
+            }
+            if (owner == null) {
                 throw new NullPointerException("Owner cannot be null");
+            }
 
             this.task = task;
             this.owner = owner;
@@ -341,12 +362,15 @@ final class TaskSchedulerImpl implements TaskScheduler {
         }
         /** Creates an instance of {@code TaskDetail} with dependency. */
         TaskDetail(KernelRunnable task, Identity owner, TaskQueueImpl queue) {
-            if (task == null)
+            if (task == null) {
                 throw new NullPointerException("Task cannot be null");
-            if (owner == null)
+            }
+            if (owner == null) {
                 throw new NullPointerException("Owner cannot be null");
-            if (queue == null)
+            }
+            if (queue == null) {
                 throw new NullPointerException("TaskQueue cannot be null");
+            }
 
             this.task = task;
             this.owner = owner;
@@ -376,10 +400,11 @@ final class TaskSchedulerImpl implements TaskScheduler {
 
             int queueSize = (taskDetail.isRecurring() ? waitingSize.get() :
                              waitingSize.decrementAndGet());
-            profileCollector.startTask(taskDetail.task, taskDetail.owner,
+            profileCollectorHandle.startTask(taskDetail.task, taskDetail.owner,
                                        taskDetail.startTime, queueSize);
-            if (taskDetail.isRecurring())
+            if (taskDetail.isRecurring()) {
                 taskDetail.startTime += taskDetail.period;
+            }
 
             // store the current owner, and then push the new thread detail
             Identity parent = ContextResolver.getCurrentOwner();
@@ -387,24 +412,26 @@ final class TaskSchedulerImpl implements TaskScheduler {
 
             try {
                 taskDetail.task.run();
-                profileCollector.finishTask(1);
+                profileCollectorHandle.finishTask(1);
             } catch (Exception e) {
-                profileCollector.finishTask(1, e);
+                profileCollectorHandle.finishTask(1, e);
                 if (logger.isLoggable(Level.WARNING)) {
-                    if (taskDetail.isRecurring())
+                    if (taskDetail.isRecurring()) {
                         logger.logThrow(Level.WARNING, e, "failed to run " +
                                         "task {0}", taskDetail.task);
-                    else
+                    } else {
                         logger.logThrow(Level.WARNING, e, "failed to run " +
                                         "recurrence of task {0}",
                                         taskDetail.task);
+                    }
                 }
             } finally {
                 // always restore the previous owner before leaving
                 ContextResolver.setTaskState(kernelContext, parent);
                 // schedule the next task, if any
-                if (taskDetail.queue != null)
+                if (taskDetail.queue != null) {
                     taskDetail.queue.scheduleNextTask();
+                }
             }
         }
     }

@@ -35,7 +35,7 @@ import com.sun.sgs.service.Transaction;
  * This class is used to resolve the state associated with the current task's
  * context, including its owner and active transaction.
  */
-public final class ContextResolver {
+final class ContextResolver {
 
     // the context of any current thread, needed only so that we can run
     // multiple stacks in the same VM
