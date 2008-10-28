@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -151,8 +152,8 @@ class ClientSessionHandler implements ProtocolHandler {
     /* -- Implement ProtocolHandler -- */
     
     /** {@inheritDoc} */
-    public void loginRequest(final String name, final String password,
-			     CompletionFuture future)
+    public CompletionFuture loginRequest(final String name,
+					 final String password)
     {
 	scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("HandleLoginRequest") {
@@ -160,25 +161,19 @@ class ClientSessionHandler implements ProtocolHandler {
 		    handleLoginRequest(name, password);
 		} });
 	// Enable protocol message channel to read immediately
-	if (future != null) {
-	    future.done();
-	}
+	return (new CompletionFutureImpl()).done();
     }
     
 
     /** {@inheritDoc} */
-    public void sessionMessage(
-	final ByteBuffer message, CompletionFuture future)
-    {
+    public CompletionFuture sessionMessage(final ByteBuffer message) {
+	CompletionFutureImpl future = new CompletionFutureImpl();
 	if (!loggedIn) {
 	    logger.log(
 		Level.WARNING,
 		"session message received before login completed:{0}",
 		this);
-	    if (future != null) {
-		future.done();
-	    }
-	    return;
+	    return future.done();
 	}
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("NotifyListenerMessageReceived") {
@@ -197,25 +192,21 @@ class ClientSessionHandler implements ProtocolHandler {
 		} }, identity);
 
 	// Wait until processing is complete before notifying future
-	if (future != null) {
-	    enqueueCompletionFuture(future);
-	}
+	enqueueCompletionFuture(future);
+	return future;
     }
 
     /** {@inheritDoc} */
-    public void channelMessage(final BigInteger channelId,
-			       final ByteBuffer message,
-			       CompletionFuture future)
+    public CompletionFuture channelMessage(final BigInteger channelId,
+					   final ByteBuffer message)
     {
+	CompletionFutureImpl future = new CompletionFutureImpl();
 	if (!loggedIn) {
 	    logger.log(
 		Level.WARNING,
 		"channel message received before login completed:{0}",
 		this);
-	    if (future != null) {
-		future.done();
-	    }
-	    return;
+	    return future.done();
 	}
 
 	taskQueue.addTask(
@@ -237,31 +228,26 @@ class ClientSessionHandler implements ProtocolHandler {
 		} }, identity);
 
 	// Wait until processing is complete before notifying future
-	if (future != null) {
-	    enqueueCompletionFuture(future);
-	}
+	enqueueCompletionFuture(future);
+	return future;
     }
 
     /** {@inheritDoc} */
-    public void logoutRequest(CompletionFuture future) {
+    public CompletionFuture logoutRequest() {
 	// TBD: identity may be null. Fix to pass a non-null identity
 	// when scheduling the task.
 	scheduleHandleDisconnect(isConnected(), false);
 
 	// Enable protocol message channel to read immediately
-	if (future != null) {
-	    future.done();
-	}
+	return (new CompletionFutureImpl()).done();
     }
 
     /** {@inheritDoc} */
-    public void disconnect(CompletionFuture future) {
+    public CompletionFuture disconnect() {
 	scheduleHandleDisconnect(false, true);
 	
 	// TBD: should we wait to notify until client disconnects connection?
-	if (future != null) {
-	    future.done();
-	}
+	return (new CompletionFutureImpl()).done();
     }
 
     /* -- Instance methods -- */
@@ -495,7 +481,7 @@ class ClientSessionHandler implements ProtocolHandler {
      *
      * @param	future a completion future
      */
-    private void enqueueCompletionFuture(final CompletionFuture future) {
+    private void enqueueCompletionFuture(final CompletionFutureImpl future) {
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("ScheduleCompletionNotification") {
 		public void run() {
@@ -893,6 +879,81 @@ class ClientSessionHandler implements ProtocolHandler {
 		sessionService.addLoginResult(sessionImpl, false, ex);
 		sessionImpl.disconnect();
 	    }
+	}
+    }
+
+    /**
+     * This future is returned from {@link ProtocolHandler} operations.
+     */
+    private class CompletionFutureImpl implements CompletionFuture {
+
+	/**
+	 * Indicates whether the operation associated with this future
+	 * is complete.
+	 */
+	private boolean done = false;
+
+	/** Lock for accessing the {@code done} field. */
+	private Object lock = new Object();
+	
+	/** Constructs an instance. */
+	CompletionFutureImpl() {
+	}
+
+	/** {@inheritDoc} */
+	public boolean cancel(boolean mayInterruptIfRunning) {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public Void get() {
+	    synchronized (lock) {
+		if (!done) {
+		    try {
+			lock.wait();
+		    } catch (InterruptedException ignore) {
+		    }
+		}
+	    }
+	    return null;
+	}
+
+	/** {@inheritDoc} */
+	public Void get(long timeout, TimeUnit unit) {
+	    synchronized (lock) {
+		if (!done) {
+		    try {
+			unit.timedWait(lock, timeout);
+		    } catch (InterruptedException ignore) {
+		    }
+		}
+	    }
+	    return null;
+	}
+
+	/** {@inheritDoc} */
+	public boolean isCancelled() {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public boolean isDone() {
+	    synchronized (lock) {
+		return done;
+	    }
+	}
+
+	/**
+	 * Indicates that the operation associated with this future
+	 * is complete. Subsequent invocations to {@link #isDone
+	 * isDone} will return {@code true}.
+	 */
+	CompletionFuture done() {
+	    synchronized (lock) {
+		done = true;
+		lock.notifyAll();
+	    }
+	    return this;
 	}
     }
 }

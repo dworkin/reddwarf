@@ -415,7 +415,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 				    SimpleSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
-		handler.disconnect(null);
+		handler.disconnect();
             }
         }
     }
@@ -478,7 +478,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    handler.disconnect(null);
+                    handler.disconnect();
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -507,7 +507,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                handler.disconnect(null);
+                handler.disconnect();
             }
         }
 
@@ -535,13 +535,13 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-		    handler.disconnect(null);
+		    handler.disconnect();
 	            break;
 	        }
 
 		final String name = msg.getString();
 		final String password = msg.getString();
-		handler.loginRequest(name, password, null);
+		handler.loginRequest(name, password);
                 // Resume reading immediately
 		read();
 
@@ -550,7 +550,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		handler.sessionMessage(clientMessage, null);
+		handler.sessionMessage(clientMessage);
 
 		// TBD: need to use future and resume reading when notified.
 		read();
@@ -562,7 +562,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
 		ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		handler.channelMessage(channelRefId, channelMessage, null);
+		handler.channelMessage(channelRefId, channelMessage);
 
 		// TBD: need to use future and resume reading when notified.
 		read();
@@ -571,7 +571,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-		handler.logoutRequest(null);
+		handler.logoutRequest();
 
 		// Resume reading immediately
                 read();
@@ -585,7 +585,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 			"unknown opcode 0x{0}",
 			Integer.toHexString(opcode));
 		}
-		handler.disconnect(null);
+		handler.disconnect();
 		break;
 	    }
 	}

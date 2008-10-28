@@ -32,9 +32,6 @@ import java.nio.ByteBuffer;
  * so that it can perform some throttling, for example only resuming
  * reading when a protocol message has been processed by the handler, or
  * controlling the number of clients connected at any given time.
- *
- * <p>TBD: should a future be returned by the handler's methods instead of
- * supplied to them?
  */
 public interface ChannelProtocolHandler {
 
@@ -42,16 +39,14 @@ public interface ChannelProtocolHandler {
      * Processes a channel message sent by the associated client on the
      * channel with the specified {@code channelId}.
      *
-     * <p>When this handler has completed processing the channel message, it
-     * must invoke the given {@code future}'s {@link CompletionFuture#done
-     * done} method to notify the caller that the request has been
-     * processed.
+     * <p>When this handler has completed processing the channel message,
+     * it invokes the returned future's {@link CompletionFuture#done done}
+     * method to notify the caller that the request has been processed.
      *
      * @param	channelId a channel ID
      * @param	message a message
-     * @param	future a future to be notified when the request has been
-     *		processed, or {@code null}
+     * @return	future a future to be notified when the request has been
+     *		processed
      */
-    void channelMessage(BigInteger channelId, ByteBuffer messsage,
-			CompletionFuture future);
+    CompletionFuture channelMessage(BigInteger channelId, ByteBuffer messsage);
 }
