@@ -31,8 +31,8 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.WritePendingException;
 import com.sun.sgs.protocol.CompletionFuture;
-import com.sun.sgs.protocol.ProtocolMessageChannel;
-import com.sun.sgs.protocol.ProtocolMessageHandler;
+import com.sun.sgs.protocol.Protocol;
+import com.sun.sgs.protocol.ProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
 import java.io.EOFException;
@@ -50,19 +50,19 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A wrapper channel that reads and writes complete messages by framing
- * messages with a 2-byte message length, and masking (and re-issuing) partial
- * I/O operations.  Also enforces a fixed buffer size when reading.
+ * Implements the protocol messages defined in {@code SimpleSgsProtocol}.  The
+ * implementation uses a wrapper channel, {@link AsynchronousMessageChannel},
+ * that reads and writes complete messages by framing messages with a 2-byte
+ * message length, and masking (and re-issuing) partial I/O operations.  Also
+ * enforces a fixed buffer size when reading.
  */
-public class SimpleSgsProtocolMessageChannel
-    implements ProtocolMessageChannel
-{
+public class SimpleSgsProtocolImpl implements Protocol {
     /** The number of bytes used to represent the message length. */
     public static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(SimpleSgsProtocolMessageChannel.class.getName()));
+	Logger.getLogger(SimpleSgsProtocolImpl.class.getName()));
 
     /**
      * The underlying channel (possibly another layer of abstraction,
@@ -70,8 +70,8 @@ public class SimpleSgsProtocolMessageChannel
      */
     final AsynchronousMessageChannel asyncMsgChannel;
 
-    /** The protocol message handler. */
-    final ProtocolMessageHandler handler;
+    /** The protocol handler. */
+    final ProtocolHandler handler;
 
     /** This message channel's protocol factory. */
     final SimpleSgsProtocolFactory protocolFactory;
@@ -93,15 +93,15 @@ public class SimpleSgsProtocolMessageChannel
 
     /**
      * Creates a new instance of this class with the given byte channel},
-     * protocol message handler, protocol factory, and read buffer size.
+     * protocol handler, protocol factory, and read buffer size.
      * 
      * @param	byteChannel a byte channel
-     * @param	handler a protocol message handler
+     * @param	handler a protocol handler
      * @param	protocolFactory a protocol factory
      * @param	readBufferSize the number of bytes in the read buffer
      */
-    public SimpleSgsProtocolMessageChannel(
-	AsynchronousByteChannel byteChannel, ProtocolMessageHandler handler,
+    public SimpleSgsProtocolImpl(
+	AsynchronousByteChannel byteChannel, ProtocolHandler handler,
 	SimpleSgsProtocolFactory protocolFactory, int readBufferSize)
     {
 	// The read buffer size lower bound is enforced by the protocol factory
@@ -346,7 +346,7 @@ public class SimpleSgsProtocolMessageChannel
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST,
 			   "write channel:{0} message:{1} first:{2}",
-                           SimpleSgsProtocolMessageChannel.this,
+                           SimpleSgsProtocolImpl.this,
 			   HexDumper.format(message, 0x50), first);
             }
             if (first) {
@@ -371,7 +371,7 @@ public class SimpleSgsProtocolMessageChannel
                 logger.log(
 		    Level.FINEST,
 		    "processQueue channel:{0} size:{1,number,#} head={2}",
-		    SimpleSgsProtocolMessageChannel.this, pendingWrites.size(),
+		    SimpleSgsProtocolImpl.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
             }
             try {
@@ -379,7 +379,7 @@ public class SimpleSgsProtocolMessageChannel
             } catch (RuntimeException e) {
                 logger.logThrow(Level.SEVERE, e,
 				"{0} processing message {1}",
-				SimpleSgsProtocolMessageChannel.this,
+				SimpleSgsProtocolImpl.this,
 				HexDumper.format(message, 0x50));
                 throw e;
             }
@@ -397,7 +397,7 @@ public class SimpleSgsProtocolMessageChannel
 		resetMessage.reset();
                 logger.log(Level.FINEST,
 			   "completed write session:{0} message:{1}",
-			   SimpleSgsProtocolMessageChannel.this,
+			   SimpleSgsProtocolImpl.this,
 			   HexDumper.format(resetMessage, 0x50));
             }
             try {
@@ -412,7 +412,7 @@ public class SimpleSgsProtocolMessageChannel
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(Level.FINE, e,
 				    "write session:{0} message:{1} throws",
-				    SimpleSgsProtocolMessageChannel.this,
+				    SimpleSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
 		handler.disconnect(null);
@@ -485,7 +485,7 @@ public class SimpleSgsProtocolMessageChannel
                     logger.log(
                         Level.FINEST,
                         "completed read channel:{0} message:{1}",
-                        SimpleSgsProtocolMessageChannel.this,
+                        SimpleSgsProtocolImpl.this,
 			HexDumper.format(message, 0x50));
                 }
 

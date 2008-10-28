@@ -50,8 +50,9 @@ import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.protocol.ChannelProtocol;
+import com.sun.sgs.protocol.Protocol;
 import com.sun.sgs.protocol.ProtocolFactory;
-import com.sun.sgs.protocol.ProtocolMessageChannel;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -589,15 +590,13 @@ public final class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    public ProtocolMessageChannel getProtocolMessageChannel(
-	BigInteger sessionRefId, Delivery delivery)
-    {
+    public Protocol getProtocol(BigInteger sessionRefId) {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
 	 * If a local handler exists, return protocol message channel
 	 */
 	if (handler != null) {
-	    return handler.getProtocolMessageChannel(delivery);
+	    return handler.getProtocol();
 	} else {
 	    logger.log(
 		Level.FINE,
@@ -609,6 +608,28 @@ public final class ClientSessionServiceImpl
 	}
     }
 
+    /** {@inheritDoc} */
+    public ChannelProtocol getChannelProtocol(BigInteger sessionRefId,
+				       Delivery delivery,
+				       boolean bestAvailable)
+    {
+	ClientSessionHandler handler = handlers.get(sessionRefId);
+	/*
+	 * If a local handler exists, return protocol message channel
+	 */
+	if (handler != null) {
+	    return handler.getChannelProtocol(delivery, bestAvailable);
+	} else {
+	    logger.log(
+		Level.FINE,
+		"Discarding message for unknown session:{0}",
+		sessionRefId);
+	    // TBD: is throwing this exception the right thing to do?
+	    throw new IllegalArgumentException(
+		"unknown session: " + sessionRefId);
+	}
+    }
+    
     /* -- Package access methods for adding commit actions -- */
     
     /**
@@ -631,11 +652,11 @@ public final class ClientSessionServiceImpl
      * Records the login result in the current context for delivery to the
      * specified client {@code session} when the context commits.  If
      * {@code success} is {@code false}, a {@link
-     * ProtocolMessageChannel#loginFailure loginFailure} message will be
+     * Protocol#loginFailure loginFailure} message will be
      * sent and no subsequent session messages will be forwarded to the
      * session, even if they have been enqueued during the current
      * transaction.  If success if {@code true}, then a {@link
-     * ProtocolMessageChannel#loginSuccess loginSuccess}
+     * Protocol#loginSuccess loginSuccess}
      *
      * <p>When the transaction commits, the login acknowledgment message is
      * delivered to the client session first, and if {@code success} is
@@ -1009,10 +1030,9 @@ public final class ClientSessionServiceImpl
 			return;
 		    }
 		}
-		ProtocolMessageChannel msgChannel =
-		    handler.getProtocolMessageChannel(Delivery.RELIABLE);
+		Protocol protocol = handler.getProtocol();
 		for (byte[] message : messages) {
-		    msgChannel.sessionMessage(ByteBuffer.wrap(message));
+		    protocol.sessionMessage(ByteBuffer.wrap(message));
 		}
 	    } else {
 		logger.log(

@@ -21,27 +21,26 @@ package com.sun.sgs.protocol;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channel;
 
 /**
- * A channel for sending protocol messages to a client.  A {@code
- * ProtocolMessageChannel} is created by the {@link
- * ProtocolFactory#newChannel ProtocolFactory.newChannel} method.
+ * A protocol for sending session messages and reliable channel messages to
+ * a client.  A {@code Protocol} is created by the {@link
+ * ProtocolFactory#newProtocol ProtocolFactory.newProtocol} method.
  *
- * <p>Note: If the protocol specification (implemented by a given {@code
+ * <p>Note: If a protocol specification (implemented by a given {@code
  * ProtocolMessageChannel}) requires that a login acknowledgment be
  * delivered to the client before any other protocol messages, the protocol
- * message channel must implement this requirement.  It is possible that a
- * caller may request that other messages be sent before the login
- * acknowledgment, and if the protocol requires, these messages should be
- * enqueued until the login acknowledgment has been sent to the client.
+ * must implement this requirement.  It is possible that a caller may
+ * request that other messages be sent before a login acknowledgment, and
+ * if the protocol requires, these messages should be enqueued until the
+ * login acknowledgment has been sent to the client.
  * 
  * <p>TBD: should reconnection be handled a this layer or transparently by
  * the transport layer?   Perhaps the {@code AsynchronousByteChannel}
  * managed by the transport layer could handle the reconnection under the
  * covers?
  */
-public interface ProtocolMessageChannel extends Channel {
+public interface Protocol extends ChannelProtocol {
 
     /**
      * Notifies the associated client that it should redirect its login
@@ -80,32 +79,6 @@ public interface ProtocolMessageChannel extends Channel {
      * @param	message a message
      */
     void sessionMessage(ByteBuffer message);
-
-    /**
-     * Notifies the associated client that it is joined to the channel
-     * with the specified {@code name} and {@code channelId}.
-     *
-     * @param	name a channel name
-     * @param	channel a channelId
-     */
-    void channelJoin(String name, BigInteger channelId);
-
-    /**
-     * Notifies the associated client that it is no longer a member of
-     * the channel with the specified {@code channelId}.
-     *
-     * @param	channelId a channel ID
-     */
-    void channelLeave(BigInteger channelId);
-
-    /**
-     * Notifies the associated client that the specified {@code message}
-     * is sent on the channel with the specified {@code channelId}.
-     *
-     * @param	channelId a channel ID
-     * @param	message a channel message
-     */
-    void channelMessage(BigInteger channelId, ByteBuffer message);
 
     /**
      * Notifies the associated client that it has successfully logged out.

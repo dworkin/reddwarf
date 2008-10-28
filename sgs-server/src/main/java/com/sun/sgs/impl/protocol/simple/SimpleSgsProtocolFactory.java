@@ -19,16 +19,15 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
+import com.sun.sgs.protocol.Protocol;
 import com.sun.sgs.protocol.ProtocolFactory;
-import com.sun.sgs.protocol.ProtocolMessageChannel;
-import com.sun.sgs.protocol.ProtocolMessageHandler;
+import com.sun.sgs.protocol.ProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.Properties;
@@ -36,11 +35,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A protocol factory for creating new {@code SimpleProtocolMessageChannel}
- * instances.  Such channels implement the {@link SimpleSgsProtocol}.
+ * A protocol factory for creating new {@link SimpleSgsProtocolImpl}
+ * instances, which implement the protocol messages defined in {@link
+ * SimpleSgsProtocol}.
  */
-public class SimpleSgsProtocolFactory implements ProtocolFactory {
-    
+public class SimpleSgsProtocolFactory
+    extends AbstractService
+    implements ProtocolFactory
+{
     /** The package name. */
     public static final String PKG_NAME = "com.sun.sgs.impl.protocol.simple";
     
@@ -55,15 +57,6 @@ public class SimpleSgsProtocolFactory implements ProtocolFactory {
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
     private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
-    /** The transaction proxy, or null if configure has not been called. */    
-    private static volatile TransactionProxy txnProxy = null;
-
-    /** The task scheduler. */
-    private final TaskScheduler taskScheduler;
-
-    /** The task owner. */
-    private final Identity taskOwner;
-
     /** The read buffer size for new connections. */
     private final int readBufferSize;
 
@@ -79,6 +72,8 @@ public class SimpleSgsProtocolFactory implements ProtocolFactory {
 	Properties properties, ComponentRegistry systemRegistry,
 	TransactionProxy txnProxy)
     {
+	super(properties, systemRegistry, txnProxy, logger);
+	
 	logger.log(Level.CONFIG,
 		   "Creating SimpleSgsProtcolFactory properties:{0}",
 		   properties);
@@ -91,22 +86,13 @@ public class SimpleSgsProtocolFactory implements ProtocolFactory {
 	    throw new NullPointerException("null txnProxy");
 	}
 	
-	synchronized (SimpleSgsProtocolFactory.class) {
-	    if (SimpleSgsProtocolFactory.txnProxy == null) {
-		SimpleSgsProtocolFactory.txnProxy = txnProxy;
-	    } else {
-		assert SimpleSgsProtocolFactory.txnProxy == txnProxy;
-	    }
-	}
-	
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
             readBufferSize = wrappedProps.getIntProperty(
                 READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-	    
-	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-	    taskOwner = txnProxy.getCurrentOwner();
+
+	    // TBD: check service version?
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -119,13 +105,34 @@ public class SimpleSgsProtocolFactory implements ProtocolFactory {
     }
 
     /** {@inheritDoc} */
-    public ProtocolMessageChannel newChannel(
-	AsynchronousByteChannel channel, ProtocolMessageHandler handler)
+    public Protocol newProtocol(
+	AsynchronousByteChannel channel, ProtocolHandler handler)
     {
-	return new SimpleSgsProtocolMessageChannel(
+	return new SimpleSgsProtocolImpl(
 	    channel, handler, this, readBufferSize);
     }
 
+    /* -- Implement AbstractService -- */
+    
+    /** {@inheritDoc} */
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
+    }
+    
+    /** {@inheritDoc} */
+    public void doReady() {
+    }
+    
+    /** {@inheritDoc} */
+    public void doShutdown() {
+    }
+
+    /* -- other methods -- */
+    
     /**
      * Schedules a non-durable, non-transactional {@code task}.
      *

@@ -25,7 +25,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolMessageChannel;
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -35,11 +35,13 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.protocol.CompletionFuture;
+import com.sun.sgs.protocol.ChannelProtocol;
+import com.sun.sgs.protocol.Protocol;
 import com.sun.sgs.protocol.ProtocolFactory;
-import com.sun.sgs.protocol.ProtocolMessageChannel;
-import com.sun.sgs.protocol.ProtocolMessageHandler;
+import com.sun.sgs.protocol.ProtocolHandler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.UnsupportedDeliveryException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -56,7 +58,7 @@ import javax.security.auth.login.LoginException;
  * Handles sending/receiving messages to/from a client session and
  * disconnecting a client session.
  */
-class ClientSessionHandler implements ProtocolMessageHandler {
+class ClientSessionHandler implements ProtocolHandler {
 
     /** Connection state. */
     private static enum State {
@@ -85,7 +87,7 @@ class ClientSessionHandler implements ProtocolMessageHandler {
     private final DataService dataService;
 
     /** The I/O channel for sending messages to the client. */
-    private final ProtocolMessageChannel messageChannel;
+    private final Protocol protocol;
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
@@ -131,13 +133,13 @@ class ClientSessionHandler implements ProtocolMessageHandler {
 	} else if (dataService == null) {
 	    throw new NullPointerException("null dataService");
 	} else if (protocolFactory == null) {
-	    throw new NullPointerException("null messageChannel");
+	    throw new NullPointerException("null protocolFactory");
 	} else if (byteChannel == null) {
 	    throw new NullPointerException("null byteChannel");
 	}
 	this.sessionService = sessionService;
         this.dataService = dataService;
-	this.messageChannel = protocolFactory.newChannel(byteChannel, this);
+	this.protocol = protocolFactory.newProtocol(byteChannel, this);
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -146,7 +148,7 @@ class ClientSessionHandler implements ProtocolMessageHandler {
 	}
     }
 
-    /* -- Implement ProtocolMessageHandler -- */
+    /* -- Implement ProtocolHandler -- */
     
     /** {@inheritDoc} */
     public void loginRequest(final String name, final String password,
@@ -289,14 +291,33 @@ class ClientSessionHandler implements ProtocolMessageHandler {
     }
 
     /**
-     * Returns the protocol message channel with the specified {@code
-     * delivery} requirement.
+     * Returns the protocol for the associated client session.
+     *
+     * @return	a protocol
+     */
+    Protocol getProtocol() {
+	return protocol;
+    }
+
+    /**
+     * Returns the channel protocol for the associated client session.
      *
      * @param	delivery a delivery requirement
-     * @return	a protocol message channel
+     * @param	bestAvailable if {@code true} and the exact delivery
+     *		requirement can't be satisfied, then the best protocol that
+     *		meets the delivery requirement is returned
+     * @return	a channel protocol matching the specified delivery
+     *		requirement, or if {@code bestAvailable} is {@code true}
+     * @throws	UnsupportedDeliveryException if there is no {@code
+     *		ChannelProtocol} with the given {@code delivery} requirement
      */
-    ProtocolMessageChannel getProtocolMessageChannel(Delivery delivery) {
-	return messageChannel;
+    ChannelProtocol getChannelProtocol(Delivery delivery, boolean bestAvailable)
+	throws UnsupportedDeliveryException
+    {
+	if (delivery != Delivery.RELIABLE && !bestAvailable) {
+	    throw new UnsupportedDeliveryException(delivery.toString());
+	}
+	return protocol;
     }
 
     /**
@@ -372,7 +393,7 @@ class ClientSessionHandler implements ProtocolMessageHandler {
 		// TBD: does anything special need to be done here?
 		// Bypass sendProtocolMessage method which prevents sending
 		// messages to disconnecting sessions.
-		messageChannel.logoutSuccess();
+		protocol.logoutSuccess();
 	    }
 
 	    if (closeConnection) {
@@ -430,15 +451,15 @@ class ClientSessionHandler implements ProtocolMessageHandler {
      * Closes the connection associated with this instance.
      */
     void closeConnection() {
-	if (messageChannel.isOpen()) {
+	if (protocol.isOpen()) {
 	    try {
-		messageChannel.close();
+		protocol.close();
 	    } catch (IOException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e,
 			"closing connection for handle:{0} throws",
-			messageChannel);
+			protocol);
 		}
 	    }
 	}
@@ -650,7 +671,7 @@ class ClientSessionHandler implements ProtocolMessageHandler {
     private void loginRedirect(String host, int port) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    messageChannel.loginRedirect(host, port);
+	    protocol.loginRedirect(host, port);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -664,7 +685,7 @@ class ClientSessionHandler implements ProtocolMessageHandler {
 	synchronized (lock) {
 	    checkConnectedState();
 	    loggedIn = true;
-	    messageChannel.loginSuccess(sessionRefId);
+	    protocol.loginSuccess(sessionRefId);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -681,7 +702,7 @@ class ClientSessionHandler implements ProtocolMessageHandler {
     void loginFailure(String reason, Throwable throwable) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    messageChannel.loginFailure(reason, throwable);
+	    protocol.loginFailure(reason, throwable);
 	    state = State.LOGIN_HANDLED;
 	}
     }

@@ -19,14 +19,15 @@
 
 package com.sun.sgs.protocol;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.service.Service;
 
 /**
- * A factory for creating {@link Protocol} instances for sending protcol
- * messages to and receiving protocol messages from a client.  A {@code
- * ProtocolFactory} must have a constructor that takes the following
- * arguments:
+ * A factory for creating {@link ChannelProtocol} instances for sending
+ * channel-related protocolmessages to and receiving channel protocol
+ * messages from a client.  A {@code ChannelProtocolFactory} must have a
+ * constructor that takes the following arguments:
  *
  * <ul>
  * <li>{@link java.util.Properties}</li>
@@ -34,17 +35,18 @@ import com.sun.sgs.service.Service;
  * <li>{@link com.sun.sgs.service.TransactionProxy}</li>
  * </ul>
  */
-public interface ProtocolFactory extends Service {
+public interface ChannelProtocolFactory extends Service {
 
     /**
-     * Creates a new protocol instance with an underlying byte
+     * Creates a new channel protocol instance with an underlying byte
      * {@code channel}.  Incoming messages should be dispatched to the
      * specified protocol {@code handler} as appropriate.
      *
      * @param	channel a byte channel
      * @param	handler a protocol handler
+     * @param	delivery a delivery requirement for channel messages
      */
-    Protocol newProtocol(
-	AsynchronousByteChannel channel, ProtocolHandler handler);
-
+    ChannelProtocol newChannelProtocol(AsynchronousByteChannel channel,
+				       ChannelProtocolHandler handler,
+				       Delivery delivery);
 }

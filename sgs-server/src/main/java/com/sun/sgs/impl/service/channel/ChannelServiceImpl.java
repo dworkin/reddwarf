@@ -43,7 +43,7 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.ProtocolMessageChannel;
+import com.sun.sgs.protocol.ChannelProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -498,18 +498,18 @@ public final class ChannelServiceImpl
 		}
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
-			ProtocolMessageChannel msgChannel =
-			    sessionService.getProtocolMessageChannel(
- 				sessionRefId, Delivery.RELIABLE);
-			msgChannel.channelJoin(name, channelRefId);
+			ChannelProtocol protocol =
+			    sessionService.getChannelProtocol(
+ 				sessionRefId, Delivery.RELIABLE, false);
+			protocol.channelJoin(name, channelRefId);
 		    }
 		}
 		if (leavers != null) {
 		    for (BigInteger sessionRefId : leavers) {
-			ProtocolMessageChannel msgChannel =
-			    sessionService.getProtocolMessageChannel(
-				sessionRefId, Delivery.RELIABLE);
-			msgChannel.channelLeave(channelRefId);
+			ChannelProtocol protocol =
+			    sessionService.getChannelProtocol(
+				sessionRefId, Delivery.RELIABLE, false);
+			protocol.channelLeave(channelRefId);
 		    }
 		}
 
@@ -565,10 +565,10 @@ public final class ChannelServiceImpl
 		channelSet.add(channelRefId);
 
 		// Send CHANNEL_JOIN protocol message.
-		ProtocolMessageChannel msgChannel =
-		    sessionService.getProtocolMessageChannel(
-			sessionRefId, Delivery.RELIABLE);
-		msgChannel.channelJoin(name, channelRefId);
+		ChannelProtocol protocol =
+		    sessionService.getChannelProtocol(
+			sessionRefId, Delivery.RELIABLE, false);
+		protocol.channelJoin(name, channelRefId);
 
 	    } finally {
 		callFinished();
@@ -610,10 +610,10 @@ public final class ChannelServiceImpl
 		}
 
 		// Send CHANNEL_LEAVE protocol message.
-		ProtocolMessageChannel msgChannel =
-		    sessionService.getProtocolMessageChannel(
- 			sessionRefId, Delivery.RELIABLE);
-		msgChannel.channelLeave(channelRefId);
+		ChannelProtocol protocol =
+		    sessionService.getChannelProtocol(
+ 			sessionRefId, Delivery.RELIABLE, false);
+		protocol.channelLeave(channelRefId);
 		
 	    } finally {
 		callFinished();
@@ -638,10 +638,10 @@ public final class ChannelServiceImpl
 		localMembers = localChannelMembersMap.remove(channelRefId);
 		if (localMembers != null) {
 		    for (BigInteger sessionRefId : localMembers) {
-			ProtocolMessageChannel msgChannel =
-			    sessionService.getProtocolMessageChannel(
-				sessionRefId, Delivery.RELIABLE);
-			msgChannel.channelLeave(channelRefId);
+			ChannelProtocol protocol =
+			    sessionService.getChannelProtocol(
+				sessionRefId, Delivery.RELIABLE, false);
+			protocol.channelLeave(channelRefId);
 		    }
 		}
 		
@@ -683,10 +683,10 @@ public final class ChannelServiceImpl
 		}
 
 		for (BigInteger sessionRefId : localMembers) {
-		    ProtocolMessageChannel msgChannel =
-			sessionService.getProtocolMessageChannel(
-			    sessionRefId, Delivery.RELIABLE);
-		    msgChannel.channelMessage(
+		    ChannelProtocol protocol =
+			sessionService.getChannelProtocol(
+			    sessionRefId, Delivery.RELIABLE, false);
+		    protocol.channelMessage(
 			channelRefId, ByteBuffer.wrap(message));
 		}
 

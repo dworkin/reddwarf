@@ -23,7 +23,8 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 /**
- * A handler for protocol messages for an associated client session.
+ * A handler for session and channel protocol messages for an associated
+ * client session.
  *
  * Each operation has a {@code CompletionFuture} argument that, if
  * non-null, must be notified when the corresponding operation has been
@@ -38,7 +39,7 @@ import java.nio.ByteBuffer;
  * <p>TBD: should a future be returned by the handler's methods instead of
  * supplied to them?
  */
-public interface ProtocolMessageHandler {
+public interface ProtocolHandler extends ChannelProtocolHandler {
 
     /**
      * Processes a login request with the specified {@code name}, and {@code
@@ -71,23 +72,6 @@ public interface ProtocolMessageHandler {
     void sessionMessage(ByteBuffer message, CompletionFuture future);
 
     /**
-     * Processes a channel message sent by the associated client on the
-     * channel with the specified {@code channelId}.
-     *
-     * <p>When this handler has completed processing the channel message, it
-     * must invoke the given {@code future}'s {@link CompletionFuture#done
-     * done} method to notify the caller that the request has been
-     * processed.
-     *
-     * @param	channelId a channel ID
-     * @param	message a message
-     * @param	future a future to be notified when the request has been
-     *		processed, or {@code null}
-     */
-    void channelMessage(BigInteger channelId, ByteBuffer messsage,
-			CompletionFuture future);
-
-    /**
      * Processes a logout request from the associated client.
      *
      * <p>When this handler has completed processing the channel message, it
@@ -101,7 +85,8 @@ public interface ProtocolMessageHandler {
     void logoutRequest(CompletionFuture future);
 
     /**
-     * Processes disconnection request.
+     * Processes disconnection request.  This method is used to indicate
+     * that a non-graceful disconnect from the client has occurred.
      *
      * @param	future a future to be notified when the request has been
      *		processed, or {@code null}
