@@ -50,6 +50,13 @@
     <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
   </Match>
 
-
+  <!-- OK to declare ManagedReference as serializable field -->
+  <Match>
+    <Or>
+      <Field type="com.sun.sgs.app.ManagedReference"/>
+      <Field type="com.sun.sgs.app.ManagedReference[]"/>
+    </Or>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
 
 </FindBugsFilter>
