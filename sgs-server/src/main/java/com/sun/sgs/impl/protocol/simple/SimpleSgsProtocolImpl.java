@@ -71,7 +71,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
     final AsynchronousMessageChannel asyncMsgChannel;
 
     /** The protocol handler. */
-    final ProtocolHandler handler;
+    final ProtocolHandler protocolHandler;
 
     /** This message channel's protocol factory. */
     final SimpleSgsProtocolFactory protocolFactory;
@@ -109,7 +109,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	this.asyncMsgChannel =
 	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
 	this.protocolFactory = protocolFactory;
-	this.handler = handler;
+	this.protocolHandler = handler;
 	
 	/*
 	 * TBD: It might be a good idea to implement high- and low-water marks
@@ -234,7 +234,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
 		public void run() {
 		    logger.log(
-			Level.FINER, "resuming reads channel:{0}", this);
+			Level.FINER, "resuming reads protocol:{0}", this);
 		    if (isOpen()) {
 			readHandler.read();
 		    }
@@ -345,7 +345,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
             }
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST,
-			   "write channel:{0} message:{1} first:{2}",
+			   "write protocol:{0} message:{1} first:{2}",
                            SimpleSgsProtocolImpl.this,
 			   HexDumper.format(message, 0x50), first);
             }
@@ -370,7 +370,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(
 		    Level.FINEST,
-		    "processQueue channel:{0} size:{1,number,#} head={2}",
+		    "processQueue protocol:{0} size:{1,number,#} head={2}",
 		    SimpleSgsProtocolImpl.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
             }
@@ -415,7 +415,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 				    SimpleSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
-		handler.disconnect();
+		protocolHandler.disconnect();
             }
         }
     }
@@ -478,13 +478,13 @@ public class SimpleSgsProtocolImpl implements Protocol {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    handler.disconnect();
+                    protocolHandler.disconnect();
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(
                         Level.FINEST,
-                        "completed read channel:{0} message:{1}",
+                        "completed read protocol:{0} message:{1}",
                         SimpleSgsProtocolImpl.this,
 			HexDumper.format(message, 0x50));
                 }
@@ -507,7 +507,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                handler.disconnect();
+                protocolHandler.disconnect();
             }
         }
 
@@ -535,13 +535,13 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-		    handler.disconnect();
+		    protocolHandler.disconnect();
 	            break;
 	        }
 
 		final String name = msg.getString();
 		final String password = msg.getString();
-		handler.loginRequest(name, password);
+		protocolHandler.loginRequest(name, password);
                 // Resume reading immediately
 		read();
 
@@ -550,9 +550,23 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		handler.sessionMessage(clientMessage);
+		CompletionFuture sessionMessageFuture =
+		    protocolHandler.sessionMessage(clientMessage);
 
-		// TBD: need to use future and resume reading when notified.
+		// Wait for session message to processed before resuming reading.
+		try {
+		    sessionMessageFuture.get();
+		} catch (InterruptedException ignore) {
+		} catch (ExecutionException e) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(
+			    Level.FINE, e,
+			    "Processing session message:{0} " +
+			    "for protocol:{1} throws",
+			    HexDumper.format(clientMessage, 0x50),
+			    SimpleSgsProtocolImpl.this);
+		    }
+		}
 		read();
 
 		break;
@@ -562,16 +576,30 @@ public class SimpleSgsProtocolImpl implements Protocol {
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
 		ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		handler.channelMessage(channelRefId, channelMessage);
+		CompletionFuture channelMessageFuture =
+		    protocolHandler.channelMessage(channelRefId, channelMessage);
 
-		// TBD: need to use future and resume reading when notified.
+		// Wait for channel message to be processed before resuming reading.
+		try {
+		    channelMessageFuture.get();
+		} catch (InterruptedException ignore) {
+		} catch (ExecutionException e) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(
+			    Level.FINE, e,
+			    "Processing channel message:{0} " +
+			    "for protocol:{1} throws",
+			    HexDumper.format(channelMessage, 0x50),
+			    SimpleSgsProtocolImpl.this);
+		    }
+		}
 		read();
 		
 		break;
 
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-		handler.logoutRequest();
+		protocolHandler.logoutRequest();
 
 		// Resume reading immediately
                 read();
@@ -585,7 +613,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 			"unknown opcode 0x{0}",
 			Integer.toHexString(opcode));
 		}
-		handler.disconnect();
+		protocolHandler.disconnect();
 		break;
 	    }
 	}
