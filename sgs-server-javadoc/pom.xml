@@ -26,17 +26,19 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
       <classifier>sources</classifier>
+      <version>${sgs-shared.version}</version>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server</artifactId>
       <classifier>sources</classifier>
+      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-api</artifactId>
-      <version>${version}</version>
       <classifier>sources</classifier>
+      <version>${version}</version>
     </dependency>
 
     <!-- Included in the classpath since it is not a

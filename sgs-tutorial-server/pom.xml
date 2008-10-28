@@ -24,8 +24,8 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-api</artifactId>
-      <version>${version}</version>
       <scope>provided</scope>
+      <version>${version}</version>
     </dependency>
   </dependencies>
 

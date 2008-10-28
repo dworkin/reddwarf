@@ -24,11 +24,13 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-tutorial-server</artifactId>
+      <version>${version}</version>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-tutorial-server</artifactId>
       <classifier>sources</classifier>
+      <version>${version}</version>
     </dependency>
   </dependencies>
 

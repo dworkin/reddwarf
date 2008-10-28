@@ -37,6 +37,7 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
+      <version>${sgs-shared.version}</version>
     </dependency>
 
     <dependency>
