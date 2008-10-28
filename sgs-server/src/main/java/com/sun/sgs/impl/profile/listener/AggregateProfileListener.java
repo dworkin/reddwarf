@@ -65,10 +65,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AggregateProfileListener implements ProfileListener {
 
-    private Map<ProfileOperation, Long> sOpCounts =
-            new HashMap<ProfileOperation, Long>();
-    private Map<ProfileOperation, Long> fOpCounts =
-            new HashMap<ProfileOperation, Long>();
+    private Map<String, Long> sOpCounts =
+            new HashMap<String, Long>();
+    private Map<String, Long> fOpCounts =
+            new HashMap<String, Long>();
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -142,14 +142,14 @@ public class AggregateProfileListener implements ProfileListener {
                 equals("com.sun.sgs.profile.newop")) 
         {          
 	    ProfileOperation op = (ProfileOperation) (event.getNewValue());
-	    sOpCounts.put(op, 0L);
-	    fOpCounts.put(op, 0L);
+	    sOpCounts.put(op.getName(), 0L);
+	    fOpCounts.put(op.getName(), 0L);
 	}
     }
 
     /** {@inheritDoc}*/
     public void report(ProfileReport profileReport) {
-        List<ProfileOperation> ops = profileReport.getReportedOperations();
+        List<String> ops = profileReport.getReportedOperations();
         if (profileReport.wasTaskSuccessful()) {
             sTaskCount++;
             sTaskOpCount += ops.size();
@@ -157,7 +157,7 @@ public class AggregateProfileListener implements ProfileListener {
             delayTime += (profileReport.getActualStartTime() -
                           profileReport.getScheduledStartTime());
             tryCount += profileReport.getRetryCount();
-            for (ProfileOperation op : ops) {
+            for (String op : ops) {
                 Long i = sOpCounts.get(op);
 		sOpCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	    }
@@ -165,7 +165,7 @@ public class AggregateProfileListener implements ProfileListener {
             fTaskCount++;
             fTaskOpCount += ops.size();
             fRunTime += profileReport.getRunningTime();
-            for (ProfileOperation op : ops) {
+            for (String op : ops) {
                 Long i = fOpCounts.get(op);
 		fOpCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	    }
@@ -240,7 +240,7 @@ public class AggregateProfileListener implements ProfileListener {
 
             reportStr.format("OpCounts:%n");
 	    int j, k = 0;
-	    for (ProfileOperation op : sOpCounts.keySet()) {
+	    for (String op : sOpCounts.keySet()) {
 		j = sOpCounts.get(op).intValue();
                 reportStr.format("   %s=%d/%d", op, j, j + fOpCounts.get(op));
 		if (++k % 3 == 0) {
