@@ -31,6 +31,11 @@
 
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-api</artifactId>
+      <version>${version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
     </dependency>
 
@@ -74,6 +79,7 @@
 		bdb/db.jar
 		je-${bdb.je.version}.jar
 		sgs-shared-${sgs-shared.version}.jar
+		sgs-server-api-${sgs.version}.jar
 	      </Class-Path>
 	    </manifestEntries>
           </archive>

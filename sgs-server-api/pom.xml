@@ -22,77 +22,40 @@
 
   <build>
     <plugins>
-      <!-- This is a workaround of a bug in the shade plugin
-	   Executes a clean during the validate phase to ensure
-	   there are no problems -->
+
+      <!-- Always attach a sources jar (with the assembly plugin)
+	   Normally the maven-source-plugin should be used for this.
+	   However, that plugin currently does not attach classifier
+	   artifacts that are consumable by other modules in the reactor
+	   (i.e. the javadoc module).  Using this as a workaround -->
       <plugin>
-        <artifactId>maven-clean-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>auto-clean</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>clean</goal>
-            </goals>
-          </execution>
-        </executions>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-assembly-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <phase>package</phase>
+	    <goals>
+              <goal>attached</goal>
+	    </goals>
+	    <configuration>
+	      <descriptors>
+		<descriptor>src/main/assembly/sources.xml</descriptor>
+              </descriptors>
+	      <attach>true</attach>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
-
-      <!-- The shade plugin pulls together the classes necessary
-	   for the exposed server api -->
+      <!-- Activate the resource bundle plugin to include the license
+	   file in the jar -->
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-	      <artifactSet>
-		<includes>
-		  <include>com.projectdarkstar.server:sgs-server</include>
-		  <include>com.projectdarkstar.server:sgs-shared</include>
-		</includes>
-	      </artifactSet>
-              <filters>
-		<filter>
-                  <artifact>com.projectdarkstar.server:sgs-server</artifact>
-                  <includes>
-                    <include>com/sun/sgs/app/**</include>
-                    <include>com/sun/sgs/internal/**</include>
-                  </includes>
-		</filter>
-		<filter>
-		  <artifact>com.projectdarkstar.server:sgs-shared</artifact>
-		  <includes>
-		    <include>com/sun/sgs/protocol/simple/SimpleSgsProtocol*</include>
-		  </includes>
-		</filter>
-              </filters>
-            </configuration>
-          </execution>
-        </executions>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
+
     </plugins>
   </build>
-
-
-  <dependencies>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-server</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
-      <optional>true</optional>
-    </dependency>
-  </dependencies>
-
-
 
 </project>
