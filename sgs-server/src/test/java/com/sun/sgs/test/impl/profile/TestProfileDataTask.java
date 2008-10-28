@@ -30,6 +30,7 @@ import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
+import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +58,7 @@ import static org.junit.Assert.assertTrue;
 public class TestProfileDataTask {
 
     private final static String APP_NAME = "TestProfileDataTask";
+    private final long TIMEOUT = 100;
     
     @Parameterized.Parameters
     public static Collection data() {
@@ -162,7 +165,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("owner");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(name, positiveOwner, errorExchanger, 1));
+            new CounterReportRunnable(counter.getName(), 
+                                      positiveOwner, errorExchanger, 1));
         profileCollector.addListener(test, true);
 
         // We run with the myOwner because we expect to see the
@@ -175,7 +179,7 @@ public class TestProfileDataTask {
             }, positiveOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             // Rethrow with the original error as the cause so we see
             // both stack traces.
@@ -188,7 +192,8 @@ public class TestProfileDataTask {
                 }
             }, taskOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = 
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -214,7 +219,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("counterlevel");
         SimpleTestListener test = new SimpleTestListener( 
-            new CounterReportRunnable(name, positiveOwner, errorExchanger, 1));
+            new CounterReportRunnable(counter.getName(), 
+                                      positiveOwner, errorExchanger, 1));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -227,7 +233,7 @@ public class TestProfileDataTask {
             }, taskOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -242,7 +248,8 @@ public class TestProfileDataTask {
                 }
             }, positiveOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = 
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -280,7 +287,7 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("counterinc");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(name, positiveOwner, 
+            new CounterReportRunnable(counter.getName(), positiveOwner, 
                                       errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
@@ -292,7 +299,7 @@ public class TestProfileDataTask {
             }, positiveOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -319,7 +326,7 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("countermult");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(name, positiveOwner, 
+            new CounterReportRunnable(counter.getName(), positiveOwner, 
                                       errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
@@ -333,7 +340,7 @@ public class TestProfileDataTask {
             }, positiveOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -360,7 +367,7 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("countermult");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(name, positiveOwner, 
+            new CounterReportRunnable(counter.getName(), positiveOwner, 
                                       errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
@@ -374,7 +381,73 @@ public class TestProfileDataTask {
             }, positiveOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            throw new AssertionError(error);
+        }
+    }
+    
+    @Test
+    public void testTaskCounterMultConsumer() throws Exception {
+        final String name = "sharedName";
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileConsumer cons2 = collector.getConsumer("c2");
+        final ProfileCounter counter1 = 
+                cons1.createCounter(name, testType, ProfileLevel.MIN);
+        final ProfileCounter counter2 = 
+                cons2.createCounter(name, testType, ProfileLevel.MIN);
+        
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        final Identity myOwner = new DummyIdentity("me");
+        SimpleTestListener test = new SimpleTestListener(
+            new Runnable() {
+                public void run() {
+                    AssertionError error = null;
+                    ProfileReport report = SimpleTestListener.report;
+                    if (report.getTaskOwner().equals(myOwner)) {
+                        try {
+                            Map<String, Long> counts = 
+                                SimpleTestListener.report.getUpdatedTaskCounters();
+                            
+                            System.err.println("+++");
+                            for (Map.Entry<String, Long> entry : counts.entrySet()) {
+                                System.err.println("+ " + entry.getKey() + ", " + entry.getValue());
+                            }
+                            
+                            
+                        } catch (AssertionError e) {
+                            error = e;
+                        }
+                    }
+
+                    // Signal that we're done, and return the exception
+                    try { 
+                        errorExchanger.exchange(error);
+                    } catch (InterruptedException ignored) {
+                        // do nothing
+                    }
+                }
+        });
+        profileCollector.addListener(test, true);
+        
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    counter1.incrementCount();
+                    counter2.incrementCount();
+                    counter1.incrementCount();
+                }
+            }, myOwner);
+            
+        AssertionError error = 
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -398,7 +471,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opowner");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op, positiveOwner, errorExchanger));
+            new OperationReportRunnable(op.getName(), positiveOwner, 
+                                        errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -409,7 +483,7 @@ public class TestProfileDataTask {
             }, positiveOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -420,7 +494,8 @@ public class TestProfileDataTask {
                 }
             }, taskOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = 
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -445,7 +520,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opmed");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op, positiveOwner, errorExchanger));
+            new OperationReportRunnable(op.getName(), positiveOwner, 
+                                        errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -457,7 +533,7 @@ public class TestProfileDataTask {
             }, taskOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -470,7 +546,8 @@ public class TestProfileDataTask {
                 }
             }, positiveOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = 
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -494,7 +571,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opmedtomax");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op, positiveOwner, errorExchanger));
+            new OperationReportRunnable(op.getName(), positiveOwner, 
+                                        errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -506,7 +584,7 @@ public class TestProfileDataTask {
             }, taskOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+                errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -519,7 +597,7 @@ public class TestProfileDataTask {
                 }
             }, positiveOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -543,7 +621,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opmax");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op, positiveOwner, errorExchanger));
+            new OperationReportRunnable(op.getName(), positiveOwner, 
+                                        errorExchanger));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -555,7 +634,7 @@ public class TestProfileDataTask {
             }, taskOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -569,7 +648,7 @@ public class TestProfileDataTask {
                 }
             }, taskOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -582,19 +661,22 @@ public class TestProfileDataTask {
                 }
             }, positiveOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
     }
-        @Test
+    
+    @Test
     public void testOperationMultiple() throws Exception {
+        final String opName = "something";
+        final String op1Name = "else";
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
-                cons1.createOperation("something", testType, ProfileLevel.MIN);
+                cons1.createOperation(opName, testType, ProfileLevel.MIN);
         final ProfileOperation op1 =
-                cons1.createOperation("else", testType, ProfileLevel.MIN);
+                cons1.createOperation(op1Name, testType, ProfileLevel.MIN);
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -611,15 +693,15 @@ public class TestProfileDataTask {
                     ProfileReport report = SimpleTestListener.report;
                     if (report.getTaskOwner().equals(myOwner)) {
                         try {
-                            List<ProfileOperation> ops =
+                            List<String> ops =
                                 SimpleTestListener.report.getReportedOperations();
-                            for (ProfileOperation po : ops) {
+                            for (String po : ops) {
                                 System.err.println(po);
                             }
-                            int opIndex1 = ops.indexOf(op);
-                            int opIndex2 = ops.lastIndexOf(op);
-                            int op1Index1 = ops.indexOf(op1);
-                            int op1Index2 = ops.lastIndexOf(op1);
+                            int opIndex1 = ops.indexOf(op.getName());
+                            int opIndex2 = ops.lastIndexOf(op.getName());
+                            int op1Index1 = ops.indexOf(op1.getName());
+                            int op1Index2 = ops.lastIndexOf(op1.getName());
 
                             // We expect to see op twice, and op1 once
                             assertTrue(opIndex1 != -1);
@@ -656,13 +738,13 @@ public class TestProfileDataTask {
             }, myOwner);
             
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
     }
         
-            @Test
+    @Test
     public void testSample() throws Exception {
         final String name = "sample";
         ProfileCollector collector = getCollector(serverNode);
@@ -686,8 +768,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("sampleowner");
         SimpleTestListener test = new SimpleTestListener(
-            new SampleReportRunnable(name, positiveOwner, 
-                                 errorExchanger, testValues));
+            new SampleReportRunnable(sample.getName(), positiveOwner, 
+                                     errorExchanger, testValues));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -701,7 +783,7 @@ public class TestProfileDataTask {
             }, positiveOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+                errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -712,7 +794,7 @@ public class TestProfileDataTask {
                 }
             }, taskOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -740,8 +822,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("samplelevel");
         SimpleTestListener test = new SimpleTestListener(
-            new SampleReportRunnable(name, positiveOwner, 
-                                 errorExchanger, testValues));
+            new SampleReportRunnable(sample.getName(), positiveOwner, 
+                                     errorExchanger, testValues));
         profileCollector.addListener(test, true);
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
@@ -755,7 +837,7 @@ public class TestProfileDataTask {
             }, taskOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -772,7 +854,7 @@ public class TestProfileDataTask {
                 }
             }, positiveOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -800,8 +882,8 @@ public class TestProfileDataTask {
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("samplechange");
         SimpleTestListener test = new SimpleTestListener(
-            new SampleReportRunnable(name, positiveOwner, 
-                                 errorExchanger, testValues));
+            new SampleReportRunnable(sample.getName(), positiveOwner, 
+                                     errorExchanger, testValues));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -816,7 +898,7 @@ public class TestProfileDataTask {
             }, taskOwner);
 
         AssertionError error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+            errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }
@@ -837,7 +919,7 @@ public class TestProfileDataTask {
                 }
             }, positiveOwner);
             
-        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
             throw new AssertionError(error);
         }

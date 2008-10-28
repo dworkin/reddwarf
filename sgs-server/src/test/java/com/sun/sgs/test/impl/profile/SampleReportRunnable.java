@@ -46,7 +46,7 @@ class SampleReportRunnable implements Runnable {
     final List<Long> expectedValues;
 
     public SampleReportRunnable(String sampleName, 
-            Identity positiveIdentity, 
+                                Identity positiveIdentity, 
                                 Exchanger<AssertionError> errorExchanger, 
                                 List<Long> expectedValues) 
     {

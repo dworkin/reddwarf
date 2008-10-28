@@ -32,7 +32,6 @@ import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.profile.TaskProfileSample;
 import java.beans.PropertyChangeEvent;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
 import java.util.List;
@@ -46,7 +45,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * backing <code>ProfileCollectorImpl</code>.
  */
 class ProfileConsumerImpl implements ProfileConsumer {
-    // the name of the consumer
+    // the fullName of the consumer
     private final String name;
 
     // the collector that aggregates our data
@@ -64,7 +63,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * Creates an instance of <code>ProfileConsumerImpl</code>.
      *
      * @param profileCollector the backing <code>ProfileCollectorImpl</code>
-     * @param name an identifier for this consumer
+     * @param fullName an identifier for this consumer
      */
     ProfileConsumerImpl(ProfileCollectorImpl profileCollector, String name) {
         if (profileCollector == null) {
@@ -95,24 +94,28 @@ class ProfileConsumerImpl implements ProfileConsumer {
     public synchronized ProfileOperation createOperation(String name, 
             ProfileDataType type, ProfileLevel minLevel) 
     {
-	ProfileOperation op = ops.get(name);
+        if (name == null) {
+            throw new NullPointerException("Operation name must not be null");
+        }
+        String fullName = getCanonicalName(name);
+	ProfileOperation op = ops.get(fullName);
         
 	if (op == null) {
             switch (type) {
                 case TASK:
-                    op = new TaskProfileOperationImpl(name, type, minLevel);
+                    op = new TaskProfileOperationImpl(fullName, type, minLevel);
                     break;
                 case AGGREGATE:
-                    op = new AggregateProfileOperationImpl(name, type, 
+                    op = new AggregateProfileOperationImpl(fullName, type, 
                                                            minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
-                    op = new TaskAggregateProfileOperationImpl(name, type, 
+                    op = new TaskAggregateProfileOperationImpl(fullName, type, 
                                                                minLevel);
                     break;
             }
-	    ops.put(name, op);
+	    ops.put(fullName, op);
 	} else {
             // Check minLevel and type
             if (op instanceof AbstractProfileData) {
@@ -149,8 +152,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
     public synchronized ProfileCounter createCounter(String name, 
             ProfileDataType type, ProfileLevel minLevel) 
     {
-        if (counters.containsKey(name)) {
-            ProfileCounter oldCounter = counters.get(name);
+        if (name == null) {
+            throw new NullPointerException("Counter name must not be null");
+        }
+        String fullName = getCanonicalName(name);
+        if (counters.containsKey(fullName)) {
+            ProfileCounter oldCounter = counters.get(fullName);
             // Check minLevel and type
             if (oldCounter instanceof AbstractProfileData) {
                 AbstractProfileData oldData = (AbstractProfileData) oldCounter;
@@ -178,21 +185,22 @@ class ProfileConsumerImpl implements ProfileConsumer {
             ProfileCounter counter;
             switch (type) {
                 case TASK:
-                    counter = new TaskProfileCounterImpl(name, type, minLevel);
+                    counter = new TaskProfileCounterImpl(fullName, type, 
+                                                         minLevel);
                     break;
                 case AGGREGATE:
-                    counter = new AggregateProfileCounterImpl(name, type, 
+                    counter = new AggregateProfileCounterImpl(fullName, type, 
                                                               minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
                     counter = 
-                            new TaskAggregateProfileCounterImpl(name, type, 
+                            new TaskAggregateProfileCounterImpl(fullName, type, 
                                                                 minLevel);
                     break;
             }
             
-            counters.put(name, counter);
+            counters.put(fullName, counter);
             return counter;
         }
     }
@@ -203,8 +211,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
     public synchronized ProfileSample createSample(String name, 
             ProfileDataType type, long maxSamples, ProfileLevel minLevel) 
     {
-        if (samples.containsKey(name)) {
-            ProfileSample oldSample = samples.get(name);
+        if (name == null) {
+            throw new NullPointerException("Sample name must not be null");
+        }
+        String fullName = getCanonicalName(name);
+        if (samples.containsKey(fullName)) {
+            ProfileSample oldSample = samples.get(fullName);
             // Check minLevel and type
             if (oldSample instanceof AbstractProfileData) {
                 AbstractProfileData oldData = (AbstractProfileData) oldSample;
@@ -238,27 +250,28 @@ class ProfileConsumerImpl implements ProfileConsumer {
                             old.maxSamples);
                 }
             }
-            return samples.get(name);
+            return samples.get(fullName);
         } else {
             ProfileSample sample;
             switch (type) {
                 case TASK:
-                    sample = new TaskProfileSampleImpl(name, type, minLevel);
+                    sample = new TaskProfileSampleImpl(fullName, type, 
+                                                       minLevel);
                     break;
                 case AGGREGATE:
-                    sample =  new AggregateProfileSampleImpl(name, type,
+                    sample =  new AggregateProfileSampleImpl(fullName, type,
                                                              maxSamples, 
                                                              minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
                     sample = 
-                            new TaskAggregateProfileSampleImpl(name, type,
+                            new TaskAggregateProfileSampleImpl(fullName, type,
                                                                maxSamples, 
                                                                minLevel);
                     break;
             }
-            samples.put(name, sample);
+            samples.put(fullName, sample);
             return sample;
         }
     }
@@ -268,6 +281,17 @@ class ProfileConsumerImpl implements ProfileConsumer {
         return name;
     }
     
+    /**
+     * Given a name for a profiling data object, return its canonical name,
+     * which is unique across profile consumers.
+     * 
+     * @param name the name of the profile data
+     * @return the canonical name for the data, which includes this collector's
+     *          name
+     */
+    private String getCanonicalName(String name) {
+        return this.name + "." + name;
+    }
     /**
      * Package private method to access all operations. Used by the
      * {@code ProfileCollector}.
@@ -286,9 +310,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
         protected final ProfileLevel minLevel;
         /* Type used for error checking in factory method */
         protected final ProfileDataType type;
+        
         AbstractProfileData(String name, ProfileDataType type, 
                             ProfileLevel minLevel) 
         {
+            if (name == null) {
+                throw new NullPointerException("Name must not be null");
+            }
             this.name = name;
             this.type = type;
             this.minLevel = minLevel;
@@ -369,10 +397,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
             
             try {
-                System.out.println("Adding task op for name " + name);
                 ProfileReportImpl profileReport = 
                         profileCollector.getCurrentProfileReport();
-                profileReport.ops.add(this);
+                profileReport.addOperation(name);
             } catch (EmptyStackException ese) {
                 throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
@@ -382,41 +409,32 @@ class ProfileConsumerImpl implements ProfileConsumer {
 
     /**
      * A profile operation which both aggregates and is reported per-task.
-     * Because the task operations are included directly in the profile
-     * report, we extend the task implementation and include an instance
-     * of the aggregator.  This allows us to compare an operation in the
-     * profile report with the operation created through a profile consumer.
      */
     private class TaskAggregateProfileOperationImpl
-            extends TaskProfileOperationImpl
-            implements AggregateProfileOperation
+            extends AggregateProfileOperationImpl
+            implements TaskProfileOperation
     {
-        private final AggregateProfileOperationImpl aggOperation;
+        private final TaskProfileOperationImpl taskOperation;
         TaskAggregateProfileOperationImpl(String opName, ProfileDataType type,
                                           ProfileLevel minLevel)
         {
             super(opName, type, minLevel);
-            aggOperation = new AggregateProfileOperationImpl(opName, 
-                                                             type, minLevel);
+            taskOperation = 
+                    new TaskProfileOperationImpl(opName, type, minLevel);
         }
-        /** {@inheritDoc} */
-        public void clearCount() {
-            aggOperation.clearCount();
+        
+        void updateCounter() {
+            super.report();
         }
-
-        /** {@inheritDoc} */
-        public long getCount() {
-            return aggOperation.getCount();
-        }
-
         /** {@inheritDoc} */
         public void report() {
+            super.report();
+
             try {
-                super.report();
+                taskOperation.report();
             } catch (IllegalStateException e) {
                 // there is no task to report to
             }
-            aggOperation.report();
         }
     }
 

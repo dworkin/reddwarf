@@ -32,6 +32,7 @@ import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileListener;
 import com.sun.sgs.profile.ProfileOperation;
+import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.profile.TaskProfileCounter;
 import com.sun.sgs.profile.TaskProfileOperation;
@@ -415,23 +416,46 @@ public class TestProfileCollectorImpl {
     public void testCounterName() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileConsumer cons2 = collector.getConsumer("c2");
         String name = "taskcounter";
-        ProfileCounter counter1 = 
-                cons1.createCounter(name, 
-                                    ProfileDataType.TASK, ProfileLevel.MAX);
-        assertEquals(name, counter1.getName());
+        {
+            ProfileCounter counter1 = 
+                    cons1.createCounter(name, 
+                                        ProfileDataType.TASK, ProfileLevel.MAX);
+            ProfileCounter counter2 =
+                    cons2.createCounter(name, 
+                                        ProfileDataType.TASK, ProfileLevel.MAX);
+            assertFalse(counter1.getName().equals(counter2.getName()));
+            assertTrue(counter1.getName().contains(name));
+            assertTrue(counter2.getName().contains(name));
+        }
+        //JANE way to get a given counter from a name?
         
         name = "aggregateCounter";
-        ProfileCounter counter2 = 
-                cons1.createCounter(name, ProfileDataType.AGGREGATE, 
-                                    ProfileLevel.MAX);
-        assertEquals(name, counter2.getName());
+        {
+            ProfileCounter counter1 = 
+                    cons1.createCounter(name, ProfileDataType.AGGREGATE, 
+                                        ProfileLevel.MAX);
+            ProfileCounter counter2 = 
+                    cons2.createCounter(name, ProfileDataType.AGGREGATE, 
+                                        ProfileLevel.MAX);
+            assertFalse(counter1.getName().equals(counter2.getName()));
+            assertTrue(counter1.getName().contains(name));
+            assertTrue(counter2.getName().contains(name));
+        }
         
         name = "bothCounter";
-        ProfileCounter counter3 = 
+        {
+            ProfileCounter counter1 = 
                 cons1.createCounter(name, ProfileDataType.TASK_AGGREGATE, 
                                     ProfileLevel.MAX);
-        assertEquals(name, counter3.getName());
+            ProfileCounter counter2 = 
+                cons2.createCounter(name, ProfileDataType.TASK_AGGREGATE, 
+                                    ProfileLevel.MAX);
+            assertFalse(counter1.getName().equals(counter2.getName()));
+            assertTrue(counter1.getName().contains(name));
+            assertTrue(counter2.getName().contains(name));
+        }
     }
     
     @Test
@@ -609,7 +633,8 @@ public class TestProfileCollectorImpl {
         // task owner
         final Identity owner1 = new DummyIdentity("hello");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(name, owner1, errorExchanger, 1));
+            new CounterReportRunnable(counter.getName(), owner1, 
+                                      errorExchanger, 1));
         profileCollector.addListener(test, true);
         
         // We expect to see the counter updated in the task report
@@ -637,8 +662,7 @@ public class TestProfileCollectorImpl {
                 }
             }, owner1);
 
-        error = 
-                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
             // Rethrow with the original error as the cause so we see
             // both stack traces.
@@ -655,23 +679,45 @@ public class TestProfileCollectorImpl {
     public void testOperationName() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileConsumer cons2 = collector.getConsumer("c2");
         String name = "myOperation";
-        ProfileOperation op1 = 
+        {
+            ProfileOperation op1 = 
                 cons1.createOperation(name, 
                                       ProfileDataType.TASK, ProfileLevel.MAX);
-        assertEquals(name, op1.getName());
+            ProfileOperation op2 = 
+                cons2.createOperation(name, 
+                                      ProfileDataType.TASK, ProfileLevel.MAX);
+            assertFalse(op1.getName().equals(op2.getName()));
+            assertTrue(op1.getName().contains(name));
+            assertTrue(op2.getName().contains(name));
+        }
         
         name = "aggOp";
-        ProfileOperation op2 = 
+        {
+            ProfileOperation op1 = 
                 cons1.createOperation(name, ProfileDataType.AGGREGATE, 
                                       ProfileLevel.MAX);
-        assertEquals(name, op2.getName());
+            ProfileOperation op2 = 
+                cons2.createOperation(name, ProfileDataType.AGGREGATE, 
+                                      ProfileLevel.MAX);
+            assertFalse(op1.getName().equals(op2.getName()));
+            assertTrue(op1.getName().contains(name));
+            assertTrue(op2.getName().contains(name));
+        }
         
         name = "bothOp";
-        ProfileOperation op3 = 
+        {
+            ProfileOperation op1 = 
                 cons1.createOperation(name, ProfileDataType.TASK_AGGREGATE, 
                                       ProfileLevel.MAX);
-        assertEquals(name, op3.getName());
+            ProfileOperation op2 = 
+                cons2.createOperation(name, ProfileDataType.TASK_AGGREGATE, 
+                                      ProfileLevel.MAX);
+            assertFalse(op1.getName().equals(op2.getName()));
+            assertTrue(op1.getName().contains(name));
+            assertTrue(op2.getName().contains(name));
+        }
     }
     
     @Test
@@ -755,17 +801,144 @@ public class TestProfileCollectorImpl {
         assertTrue(op3 instanceof TaskProfileOperation);
         assertTrue(op3 instanceof AggregateProfileOperation);
     }
-     
+        
+    @Test
+    public void testTaskAggregateOperationUnique() throws Exception {
+        final String opName = "something";
+        final String op1Name = "else";
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final ProfileOperation op =
+                cons1.createOperation(opName, 
+                                      ProfileDataType.TASK_AGGREGATE, 
+                                      ProfileLevel.MIN);
+        final ProfileOperation op1 =
+                cons1.createOperation(op1Name, 
+                                      ProfileDataType.TASK_AGGREGATE, 
+                                      ProfileLevel.MIN);
+        final AggregateProfileOperation opAgg = (AggregateProfileOperation) op;
+        final AggregateProfileOperation op1Agg = 
+                (AggregateProfileOperation) op1;
+        
+        final TaskProfileOperation opTask = (TaskProfileOperation) op;
+        final TaskProfileOperation op1Task = (TaskProfileOperation) op1;
+        // Because the listener is running in a different thread, JUnit
+        // is not able to report the assertions and failures.
+        // Use an exchanger to synchronize between the threads and communicate
+        // any problems.
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        final Identity myOwner = new DummyIdentity("me");
+        SimpleTestListener test = new SimpleTestListener(
+            new Runnable() {
+                public void run() {
+                    AssertionError error = null;
+                    ProfileReport report = SimpleTestListener.report;
+                    if (report.getTaskOwner().equals(myOwner)) {
+                        try {
+                            List<String> ops =
+                                SimpleTestListener.report.getReportedOperations();
+                            System.err.println("+++");
+                            for (String name : ops) {
+                                assertTrue(name.contains(opName) 
+                                        || name.contains(op1Name));
+                                
+                                System.err.println("+ " + name);
+                            }
+                            System.err.println("+++");
+                            
+                            // Our aggregate counter knows that it was updated
+                            assertEquals(4, opAgg.getCount());
+                            assertEquals(2, op1Agg.getCount());
+                            
+                            
+                            
+                        } catch (AssertionError e) {
+                            error = e;
+                        }
+                    }
+
+                    // Signal that we're done, and return the exception
+                    try { 
+                        errorExchanger.exchange(error);
+                    } catch (InterruptedException ignored) {
+                        // do nothing
+                    }
+                }
+        });
+        profileCollector.addListener(test, true);
+
+        op.report();
+        op1.report();
+        assertEquals(1, opAgg.getCount());
+        assertEquals(1, op1Agg.getCount());
+        op.report();
+        assertEquals(2, opAgg.getCount());
+        
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    // We expect to see the operations in the profile report
+                    op.report();
+                    op1.report();
+                    op.report();
+                }
+            }, myOwner);
+            
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            throw new AssertionError(error);
+        }
+        assertEquals(4, opAgg.getCount());
+        assertEquals(2, op1Agg.getCount());
+    }
+    
     /* -- Sample tests -- */
     @Test
     public void testSampleName() throws Exception {
-        final String name = "SomeSamples";
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
-        ProfileSample sample1 = 
+        ProfileConsumer cons2 = collector.getConsumer("c2");
+        String name = "mySample";
+        {
+            ProfileSample samp1 = 
                 cons1.createSample(name, ProfileDataType.TASK, 
                                    -1, ProfileLevel.MAX);
-        assertEquals(name, sample1.getName());
+            ProfileSample samp2 = 
+                cons2.createSample(name, ProfileDataType.TASK, 
+                                   -1, ProfileLevel.MAX);
+            assertFalse(samp1.getName().equals(samp2.getName()));
+            assertTrue(samp1.getName().contains(name));
+            assertTrue(samp2.getName().contains(name));
+        }
+        
+        name = "aggSample";
+        {
+            ProfileSample samp1 = 
+                cons1.createSample(name, ProfileDataType.AGGREGATE, 
+                                   -1, ProfileLevel.MAX);
+            ProfileSample samp2 = 
+                cons2.createSample(name, ProfileDataType.AGGREGATE, 
+                                   -1, ProfileLevel.MAX);
+            assertFalse(samp1.getName().equals(samp2.getName()));
+            assertTrue(samp1.getName().contains(name));
+            assertTrue(samp2.getName().contains(name));
+        }
+        
+        name = "bothSample";
+        {
+            ProfileSample samp1 = 
+                cons1.createSample(name, ProfileDataType.TASK_AGGREGATE, 
+                                   -1, ProfileLevel.MAX);
+            ProfileSample samp2 = 
+                cons2.createSample(name, ProfileDataType.TASK_AGGREGATE, 
+                                   -1, ProfileLevel.MAX);
+            assertFalse(samp1.getName().equals(samp2.getName()));
+            assertTrue(samp1.getName().contains(name));
+            assertTrue(samp2.getName().contains(name));
+        }
     }
     
     @Test

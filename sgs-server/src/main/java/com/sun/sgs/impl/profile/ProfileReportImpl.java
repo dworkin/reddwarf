@@ -24,7 +24,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.AccessedObjectsDetail;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileReport;
 
@@ -37,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
 /**
  * Package-private implementation of <code>ProfileReport</code>.
  */
@@ -49,7 +47,11 @@ class ProfileReportImpl implements ProfileReport {
      */
     private static final Map<String, Long> EMPTY_COUNTER_MAP = 
 	Collections.emptyMap();
-
+    
+    /**
+     * An empty list for returning when no operations have been updated.
+     */
+    private static final List<String> EMPTY_OPS = Collections.emptyList();
     /**
      * An empty map for returning when no profile samples have been
      * updated.  We need this map as well because typing issues
@@ -71,19 +73,19 @@ class ProfileReportImpl implements ProfileReport {
     long runningTime = 0;
     int tryCount = 0;
     Throwable throwable = null;
-    AccessedObjectsDetail accessedObjectsDetail = null;
+    private AccessedObjectsDetail accessedObjectsDetail = null;
 
-    Set<ProfileParticipantDetail> participants;
+    private Set<ProfileParticipantDetail> participants;
 
     // counters that are updated through methods on this class
-    Map<String, Long> taskCounters;
+    private Map<String, Long> taskCounters;
 
     // a list of operations performed, which is updated through
     // methods on this class
-    List<ProfileOperation> ops;
+    private List<String>ops;
 
     // samples that are aggregated through methods on this class
-    Map<String, List<Long>> localSamples;
+    private Map<String, List<Long>> localSamples;
 
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
@@ -104,9 +106,10 @@ class ProfileReportImpl implements ProfileReport {
         this.readyCount = readyCount;
         this.actualStartTime = System.currentTimeMillis();
 
-	ops = new ArrayList<ProfileOperation>();
 	participants = new HashSet<ProfileParticipantDetail>();
+
 	taskCounters = null;
+        ops = null;
 	localSamples = null;
     }
 
@@ -155,7 +158,27 @@ class ProfileReportImpl implements ProfileReport {
         }
 	samples.add(value);
     }
+    
+    /**
+     * Package-private method used to add an operation.
+     * 
+     * @param operationName name of the operation
+     */
+    void addOperation(String operationName) {
+        if (ops == null) {
+            ops = new ArrayList<String>(); 
+        }
+        ops.add(operationName);
+    }
 
+    void addParticipant(ProfileParticipantDetail participantDetail) {
+        participants.add(participantDetail);
+    }
+    
+    void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
+        accessedObjectsDetail = detail;
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -229,8 +252,8 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public List<ProfileOperation> getReportedOperations() {
-        return ops;
+    public List<String> getReportedOperations() {
+        return (ops == null) ? EMPTY_OPS : ops;
     }
 
     /**
@@ -323,7 +346,7 @@ class ProfileReportImpl implements ProfileReport {
 
 	if (report.ops != null) {
 	    if (ops == null) {
-		ops = new LinkedList<ProfileOperation>(report.ops);
+                ops = new LinkedList<String>(report.ops);
 	    } else {
 		ops.addAll(report.ops);
 	    }
@@ -339,4 +362,21 @@ class ProfileReportImpl implements ProfileReport {
 	//       children.
     }
 
+    /**
+     * Package-private method to note that a task has finished running.
+     * All collections are modified to be immutable.
+     */
+    void finish() {
+        if (ops != null) {
+            ops = Collections.unmodifiableList(ops);
+        }
+        if (taskCounters != null) {
+            taskCounters = Collections.unmodifiableMap(taskCounters);
+        }
+        if (localSamples != null) {
+            localSamples = Collections.unmodifiableMap(localSamples);
+        }
+        
+        participants = Collections.unmodifiableSet(participants);
+    }
 }

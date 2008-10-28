@@ -120,10 +120,10 @@ public interface ProfileReport {
      * running of the task. If no operations were reported, then an
      * empty <code>List</code> is returned.
      *
-     * @return a <code>List</code> of <code>ProfileOperation</code>
-     *         representing the ordered set of reported operations
+     * @return a {@code List} of {@code String}s of the names of the reported
+     *         operations, in the order they were reported
      */
-    List<ProfileOperation> getReportedOperations();
+    List<String> getReportedOperations();
 
     /**
      * Returns the values of the task-local counters that were updated

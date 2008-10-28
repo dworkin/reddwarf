@@ -19,7 +19,6 @@
 package com.sun.sgs.test.impl.profile;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 import java.util.concurrent.Exchanger;
 import static org.junit.Assert.assertEquals;
@@ -29,16 +28,16 @@ import static org.junit.Assert.assertEquals;
  */
 class OperationReportRunnable implements Runnable {
 
-    final ProfileOperation operation;
+    final String name;
     final Identity owner;
     final Exchanger<AssertionError> errorExchanger;
 
-    public OperationReportRunnable(ProfileOperation operation, 
+    public OperationReportRunnable(String name, 
                                    Identity owner, 
                                    Exchanger<AssertionError> errorExchanger) 
     {
         super();
-        this.operation = operation;
+        this.name = name;
         this.owner = owner;
         this.errorExchanger = errorExchanger;
     }
@@ -46,17 +45,15 @@ class OperationReportRunnable implements Runnable {
     public void run() {
         AssertionError error = null;
         ProfileReport report = SimpleTestListener.report;
-        // Check to see if we expected the operation to be in this report.
+        // Check to see if we expected the name to be in this report.
         boolean expected = report.getTaskOwner().equals(owner);
-        boolean found = report.getReportedOperations().contains(operation);
+        boolean found = report.getReportedOperations().contains(name);
         try {
             assertEquals(expected, found);
         } catch (AssertionError e) {
             error = e;
-            for (ProfileOperation op : report.getReportedOperations()) {
+            for (String op : report.getReportedOperations()) {
                 System.out.println(op);
-                System.out.println("equals? " + op.equals(operation));
-                System.out.println(operation);
             }
         }
         try {

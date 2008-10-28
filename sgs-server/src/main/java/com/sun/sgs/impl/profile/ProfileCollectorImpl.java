@@ -354,7 +354,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
         }
-        profileReport.participants.add(participantDetail);
+        profileReport.addParticipant(participantDetail);
     }
 
     /**
@@ -378,7 +378,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("Object access cannot be added " +
                                             "to a non-transactional task");
         }
-        profileReport.accessedObjectsDetail = detail;
+        profileReport.setAccessedObjectsDetail(detail);
     }
 
     /**
@@ -422,6 +422,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             profileReports.get().peek().merge(profileReport);
         }
 
+        // Note that we're done modifying this report
+        profileReport.finish();
+        
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
     }
@@ -486,14 +489,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                         "  StatQueueNonEmpty=" + percentQueueNotEmpty +
                         "%  ]\n\n";
                      */
-
-                    // make sure that the collections can't be modified by
-                    // a listener
-                    profileReport.ops =
-                        Collections.unmodifiableList(profileReport.ops);
-                    profileReport.participants =
-                        Collections.
-                        unmodifiableSet(profileReport.participants);
 
                     for (ProfileListener listener : listeners.keySet()) {
                         try {
