@@ -63,7 +63,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * Creates an instance of <code>ProfileConsumerImpl</code>.
      *
      * @param profileCollector the backing <code>ProfileCollectorImpl</code>
-     * @param fullName an identifier for this consumer
+     * @param name an identifier for this consumer
      */
     ProfileConsumerImpl(ProfileCollectorImpl profileCollector, String name) {
         if (profileCollector == null) {
