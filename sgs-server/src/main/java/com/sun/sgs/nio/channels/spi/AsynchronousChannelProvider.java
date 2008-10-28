@@ -37,6 +37,7 @@ import com.sun.sgs.nio.channels.Channels;
 import com.sun.sgs.nio.channels.ManagedChannelFactory;
 import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
+import com.sun.sgs.impl.nio.DefaultAsyncChannelProvider;
 
 /**
  * Service-provider class for asynchronous channels.
@@ -83,9 +84,10 @@ public abstract class AsynchronousChannelProvider {
      */
     protected AsynchronousChannelProvider() {
         SecurityManager sm = System.getSecurityManager();
-        if (sm != null)
+        if (sm != null) {
             sm.checkPermission(
                 new RuntimePermission("asynchronousChannelProvider"));
+        }
     }
 
     /**
@@ -96,12 +98,13 @@ public abstract class AsynchronousChannelProvider {
     private static boolean loadProviderFromProperty() {
         String cn = System.getProperty(
             "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");
-        if (cn == null)
+        if (cn == null) {
             return false;
+        }
         try {
             Class<?> c = Class.forName(cn, true,
                 ClassLoader.getSystemClassLoader());
-            provider = (AsynchronousChannelProvider)c.newInstance();
+            provider = (AsynchronousChannelProvider) c.newInstance();
             return true;
         } catch (ClassNotFoundException x) {
             throw new ExceptionInInitializerError(x);
@@ -149,14 +152,16 @@ public abstract class AsynchronousChannelProvider {
      */
     public static AsynchronousChannelProvider provider() {
         synchronized (lock) {
-            if (provider != null)
+            if (provider != null) {
                 return provider;
+            }
             return AccessController.doPrivileged(
                 new PrivilegedAction<AsynchronousChannelProvider>() {
                     public AsynchronousChannelProvider run() {
-                        if (loadProviderFromProperty())
+                        if (loadProviderFromProperty()) {
                             return provider;
-                        provider = com.sun.sgs.impl.nio.DefaultAsyncChannelProvider.create();
+                        }
+                        provider = DefaultAsyncChannelProvider.create();
                         return provider;
                     }
                 });

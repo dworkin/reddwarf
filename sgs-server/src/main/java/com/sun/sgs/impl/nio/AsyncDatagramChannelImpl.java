@@ -186,21 +186,25 @@ class AsyncDatagramChannelImpl
     public AsynchronousDatagramChannel bind(SocketAddress local)
         throws IOException
     {
-        if ((local != null) && (!(local instanceof InetSocketAddress)))
+        if ((local != null) && (!(local instanceof InetSocketAddress))) {
             throw new UnsupportedAddressTypeException();
+        }
 
         InetSocketAddress inetLocal = (InetSocketAddress) local;
-        if ((inetLocal != null) && inetLocal.isUnresolved())
+        if ((inetLocal != null) && inetLocal.isUnresolved()) {
             throw new UnresolvedAddressException();
+        }
 
         final DatagramSocket socket = channel.socket();
         try {
             socket.bind(inetLocal);
         } catch (SocketException e) {
-            if (socket.isBound())
+            if (socket.isBound()) {
                 throw Util.initCause(new AlreadyBoundException(), e);
-            if (socket.isClosed())
+            }
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
 
@@ -221,63 +225,65 @@ class AsyncDatagramChannelImpl
     public AsyncDatagramChannelImpl setOption(SocketOption name, Object value)
         throws IOException
     {
-        if (! (name instanceof StandardSocketOption))
+        if (!(name instanceof StandardSocketOption)) {
             throw new IllegalArgumentException("Unsupported option " + name);
+        }
 
-        if (value == null || !name.type().isAssignableFrom(value.getClass()))
+        if (value == null || !name.type().isAssignableFrom(value.getClass())) {
             throw new IllegalArgumentException("Bad parameter for " + name);
+        }
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final DatagramSocket socket = channel.socket();
+        MulticastSocket msocket;
         
         try {
             switch (stdOpt) {
             case SO_SNDBUF:
-                socket.setSendBufferSize(((Integer)value).intValue());
+                socket.setSendBufferSize(((Integer) value).intValue());
                 break;
 
             case SO_RCVBUF:
-                socket.setReceiveBufferSize(((Integer)value).intValue());
+                socket.setReceiveBufferSize(((Integer) value).intValue());
                 break;
 
             case SO_REUSEADDR:
-                socket.setReuseAddress(((Boolean)value).booleanValue());
+                socket.setReuseAddress(((Boolean) value).booleanValue());
                 break;
 
             case SO_BROADCAST:
-                socket.setBroadcast(((Boolean)value).booleanValue());
+                socket.setBroadcast(((Boolean) value).booleanValue());
                 break;
 
             case IP_TOS:
-                socket.setTrafficClass(((Integer)value).intValue());
+                socket.setTrafficClass(((Integer) value).intValue());
                 break;
 
-            case IP_MULTICAST_IF: {
-                MulticastSocket msocket = (MulticastSocket) socket;
-                msocket.setNetworkInterface((NetworkInterface)value);
+            case IP_MULTICAST_IF: 
+                msocket = (MulticastSocket) socket;
+                msocket.setNetworkInterface((NetworkInterface) value);
                 break;
-            }
 
-            case IP_MULTICAST_TTL: {
-                MulticastSocket msocket = (MulticastSocket) socket;
-                msocket.setTimeToLive(((Integer)value).intValue());
+            case IP_MULTICAST_TTL: 
+                msocket = (MulticastSocket) socket;
+                msocket.setTimeToLive(((Integer) value).intValue());
                 break;
-            }
 
-            case IP_MULTICAST_LOOP: {
-                MulticastSocket msocket = (MulticastSocket) socket;
+            case IP_MULTICAST_LOOP: 
+                msocket = (MulticastSocket) socket;
                 // TODO should we reverse the sense of setLoopbackMode? -JM
-                msocket.setLoopbackMode(((Boolean)value).booleanValue());
+                msocket.setLoopbackMode(((Boolean) value).booleanValue());
                 break;
-            }
+            
 
             default:
                 throw new IllegalArgumentException("Unsupported option " +
                     name);
             }
         } catch (SocketException e) {
-            if (socket.isClosed())
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
         return this;
@@ -287,11 +293,13 @@ class AsyncDatagramChannelImpl
      * {@inheritDoc}
      */
     public Object getOption(SocketOption name) throws IOException {
-        if (! (name instanceof StandardSocketOption))
+        if (!(name instanceof StandardSocketOption)) {
             throw new IllegalArgumentException("Unsupported option " + name);
+        }
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final DatagramSocket socket = channel.socket();
+        MulticastSocket msocket;
         
         try {
             switch (stdOpt) {
@@ -310,29 +318,27 @@ class AsyncDatagramChannelImpl
             case IP_TOS:
                 return socket.getTrafficClass();
 
-            case IP_MULTICAST_IF: {
-                MulticastSocket msocket = (MulticastSocket) socket;
+            case IP_MULTICAST_IF: 
+                msocket = (MulticastSocket) socket;
                 return msocket.getNetworkInterface();
-            }
 
-            case IP_MULTICAST_TTL: {
-                MulticastSocket msocket = (MulticastSocket) socket;
+            case IP_MULTICAST_TTL: 
+                msocket = (MulticastSocket) socket;
                 return msocket.getTimeToLive();
-            }
 
-            case IP_MULTICAST_LOOP: {
-                MulticastSocket msocket = (MulticastSocket) socket;
+            case IP_MULTICAST_LOOP: 
+                msocket = (MulticastSocket) socket;
                 // TODO should we reverse the sense of getLoopbackMode? -JM
                 return (msocket.getLoopbackMode());
-            }
 
             default:
                 throw new IllegalArgumentException("Unsupported option " +
                     name);
             }
         } catch (SocketException e) {
-            if (socket.isClosed())
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
     }
@@ -350,28 +356,34 @@ class AsyncDatagramChannelImpl
     public MembershipKey join(InetAddress group, NetworkInterface interf)
         throws IOException
     {
-        if (!(channel.socket() instanceof MulticastSocket))
+        if (!(channel.socket() instanceof MulticastSocket)) {
             throw new UnsupportedOperationException("not a multicast socket");
+        }
 
         MulticastSocket msocket = ((MulticastSocket) channel.socket());
 
-        if (group == null)
+        if (group == null) {
             throw new NullPointerException("null multicast group");
+        }
 
-        if (interf == null)
+        if (interf == null) {
             throw new NullPointerException("null interface");
+        }
 
-        if (! group.isMulticastAddress())
+        if (!group.isMulticastAddress()) {
             throw new UnsupportedAddressTypeException();
+        }
 
         if (protocolFamily == StandardProtocolFamily.INET) {
-            if (! ((group instanceof Inet4Address)
-                   || ((group instanceof Inet6Address)
-                       && ((Inet6Address)group).isIPv4CompatibleAddress())))
+            if (!((group instanceof Inet4Address) ||
+                   ((group instanceof Inet6Address) &&
+                       ((Inet6Address) group).isIPv4CompatibleAddress()))) {
                 throw new UnsupportedAddressTypeException();
+            }
         } else if (protocolFamily == StandardProtocolFamily.INET6) {
-            if (!(group instanceof Inet6Address))
+            if (!(group instanceof Inet6Address)) {
                 throw new UnsupportedAddressTypeException();
+            }
         }
 
         InetSocketAddress mcastaddr = new InetSocketAddress(group, 0);
@@ -380,8 +392,9 @@ class AsyncDatagramChannelImpl
         MembershipKeyImpl existingKey =
             mcastKeys.putIfAbsent(newKey, newKey);
 
-        if (existingKey != null)
+        if (existingKey != null) {
             return existingKey;
+        }
 
         boolean success = false;
         try {
@@ -389,8 +402,9 @@ class AsyncDatagramChannelImpl
             success = true;
             return newKey;
         } finally {
-            if (! success)
+            if (!success) {
                 mcastKeys.remove(newKey);
+            }
         }
     }
 
@@ -423,12 +437,14 @@ class AsyncDatagramChannelImpl
             final A attachment,
             final CompletionHandler<Void, ? super A> handler)
     {
-        if ((remote != null) && (!(remote instanceof InetSocketAddress)))
+        if ((remote != null) && (!(remote instanceof InetSocketAddress))) {
             throw new UnsupportedAddressTypeException();
+        }
 
         InetSocketAddress inetRemote = (InetSocketAddress) remote;
-        if ((inetRemote != null) && inetRemote.isUnresolved())
+        if ((inetRemote != null) && inetRemote.isUnresolved()) {
             throw new UnresolvedAddressException();
+        }
 
         FutureTask<Void> task = new FutureTask<Void>(
             new Callable<Void>() {
@@ -440,7 +456,7 @@ class AsyncDatagramChannelImpl
                             new ClosedAsynchronousChannelException(), e);
                     }
                     return null;
-                }})
+                } })
             {
                 @Override protected void done() {
                     connectionPending.set(false);
@@ -448,11 +464,13 @@ class AsyncDatagramChannelImpl
                 }
             };
 
-        if (! channel.isOpen())
+        if (!channel.isOpen()) {
             throw new ClosedAsynchronousChannelException();
+        }
 
-        if (! connectionPending.compareAndSet(false, true))
+        if (!connectionPending.compareAndSet(false, true)) {
             throw new ConnectionPendingException();
+        }
 
         key.execute(task);
         return AttachedFuture.wrap(task, attachment);
@@ -468,20 +486,22 @@ class AsyncDatagramChannelImpl
         FutureTask<Void> task = new FutureTask<Void>(
             new Callable<Void>() {
                 public Void call() throws IOException {
-                    if (! channel.isOpen())
+                    if (!channel.isOpen()) {
                         throw new ClosedAsynchronousChannelException();
+                    }
 
                     channel.disconnect();
                     return null;
-                }})
+                } })
             {
                 @Override protected void done() {
                     key.runCompletion(handler, attachment, this);
                 }
             };
 
-        if (! channel.isOpen())
+        if (!channel.isOpen()) {
             throw new ClosedAsynchronousChannelException();
+        }
 
         key.execute(task);
         return AttachedFuture.wrap(task, attachment);
@@ -523,7 +543,7 @@ class AsyncDatagramChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -547,7 +567,7 @@ class AsyncDatagramChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -570,7 +590,7 @@ class AsyncDatagramChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -593,7 +613,7 @@ class AsyncDatagramChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -635,19 +655,21 @@ class AsyncDatagramChannelImpl
         @Override
         public void drop() throws IOException {
             mcastKeys.remove(this);
-            MulticastSocket msocket = (MulticastSocket)channel.socket();
+            MulticastSocket msocket = (MulticastSocket) channel.socket();
             msocket.leaveGroup(mcastaddr, netIf);
         }
 
         /**
          * {@inheritDoc}
          * <p>
-         * This implementation always throws {@code UnsupportedOperationException}.
+         * This implementation always throws {@code 
+         * UnsupportedOperationException}.
          */
         @Override
         public MembershipKey block(InetAddress source) throws IOException {
-            if (source == null)
+            if (source == null) {
                 throw new NullPointerException("null source");
+            }
             throw new UnsupportedOperationException(
                 "source filtering not supported");
         }
@@ -660,8 +682,9 @@ class AsyncDatagramChannelImpl
          */
         @Override
         public MembershipKey unblock(InetAddress source) throws IOException {
-            if (source == null)
+            if (source == null) {
                 throw new NullPointerException("null source");
+            }
             throw new IllegalStateException(
                 "source filtering not supported, so none are blocked");
         }
@@ -706,16 +729,19 @@ class AsyncDatagramChannelImpl
          */
         @Override
         public boolean equals(Object obj) {
-            if (obj == this)
+            if (obj == this) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (!(obj instanceof MembershipKey))
+            }
+            if (!(obj instanceof MembershipKey)) {
                 return false;
+            }
             MembershipKey o = (MembershipKey) obj;
-            return getChannel().equals(o.getChannel())
-                   && getGroup().equals(o.getGroup())
-                   && getNetworkInterface().equals(o.getNetworkInterface());
+            return getChannel().equals(o.getChannel()) &&
+                   getGroup().equals(o.getGroup())     &&
+                   getNetworkInterface().equals(o.getNetworkInterface());
         }
 
         /**
@@ -723,9 +749,9 @@ class AsyncDatagramChannelImpl
          */
         @Override
         public int hashCode() {
-            return getChannel().hashCode()
-                    ^ getGroup().hashCode()
-                    ^ getNetworkInterface().hashCode();
+            return getChannel().hashCode() ^
+                   getGroup().hashCode()   ^
+                   getNetworkInterface().hashCode();
         }
     }
 }

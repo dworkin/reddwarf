@@ -126,8 +126,9 @@ public final class Channels {
             {
                 checkBounds(b, off, len);
 
-                if (len == 0)
+                if (len == 0) {
                     return 0;
+                }
 
                 ByteBuffer buf = ByteBuffer.wrap(b);
                 buf.position(off).limit(off + len);
@@ -169,7 +170,7 @@ public final class Channels {
             @Override
             public synchronized void write(int b) throws IOException {
                 byte[] oneByte = new byte[1];
-                oneByte[0] = (byte)b;
+                oneByte[0] = (byte) b;
                 write(oneByte);
             }
 
@@ -179,8 +180,9 @@ public final class Channels {
             {
                 checkBounds(b, off, len);
 
-                if (len == 0)
+                if (len == 0) {
                     return;
+                }
 
                 ByteBuffer buf = ByteBuffer.wrap(b);
                 buf.position(off).limit(off + len);
@@ -236,7 +238,7 @@ public final class Channels {
         for (Object provider : providers) {
             if (provider instanceof ManagedChannelFactory) {
                 result.addAll(
-                    ((ManagedChannelFactory)provider).getChannelPoolMXBeans());
+                    ((ManagedChannelFactory) provider).getChannelPoolMXBeans());
             }
         }
 
