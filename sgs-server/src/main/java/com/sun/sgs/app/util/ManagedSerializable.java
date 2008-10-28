@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.util;
+package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
