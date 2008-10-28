@@ -1166,6 +1166,24 @@ public class TestScalableList extends Assert {
 	}, taskOwner);
     }
 
+    public void testIteratorHasNext() throws Exception {
+	txnScheduler.runTask(new AbstractKernelRunnable() {
+	    public void run() throws Exception {
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+		Iterator<String> iter = list.iterator();
+
+		iter.hasNext();
+		iter.hasNext();
+		iter.hasNext();
+		iter.hasNext();
+	    }
+	}, taskOwner);
+    }
+
     /**
      * Tests retrieving an array of the contents by providing it an array
      * parameter
@@ -1185,9 +1203,16 @@ public class TestScalableList extends Assert {
 		Iterator<String> iter = list.iterator();
 		assertTrue(iter.hasNext());
 
-		// This should not do anything because next() has
+		// This should throw an exception because next() has
 		// not yet been called
-		iter.remove();
+		try {
+		    iter.remove();
+		    fail("Expecting an IllegalStateException");
+		} catch (IllegalStateException ise) {
+		} catch (Exception e) {
+		    fail("Not expecting the exception: " +
+			    e.getLocalizedMessage());
+		}
 		assertEquals(4, list.size());
 		Random random = new Random();
 		int randomIndex = random.nextInt(list.size() - 1);
@@ -1202,7 +1227,9 @@ public class TestScalableList extends Assert {
 			iter.remove();
 		    }
 		    i++;
+
 		}
+
 		assertEquals(3, list.size());
 		assertEquals(false, list.contains(verify));
 		AppContext.getDataManager().removeObject(list);
@@ -1424,8 +1451,8 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = makeList();
 
-		//list.clear();
-		//assertTrue(list.isEmpty());
+		// list.clear();
+		// assertTrue(list.isEmpty());
 
 		list.add("A");
 		list.add("B");
@@ -2019,25 +2046,35 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = new ScalableList<String>(3, 3);
 		ArrayList<String> shadow = new ArrayList<String>();
-		Random random = new Random(System.currentTimeMillis());
+
+		long time = System.currentTimeMillis();
+		Random random = new Random(time);
 		int operation;
 		String value;
 
-		// perform random operations
-		for (int i = 0; i < 20; i++) {
-		    operation = random.nextInt(5);
-		    value = Integer.toString(random.nextInt(999));
-		    performRandomOperation(list, operation, value);
-		    performRandomOperation(shadow, operation, value);
+		try {
+		    // perform random operations
+		    for (int i = 0; i < 20; i++) {
+			operation = random.nextInt(5);
+			value = Integer.toString(random.nextInt(999));
+			performRandomOperation(list, operation, value);
+			performRandomOperation(shadow, operation, value);
+
+			    // check integrity
+
+			    for (int j = 0; j < shadow.size(); j++) {
+				assertEquals("(" + time + ") iteration #" + i +
+					": ", shadow.get(j), list.get(j));
+			    }
+		    }
+		} catch (Exception e) {
+		    fail("Not expecting an exception: " +
+			    e.getLocalizedMessage());
 		}
 
 		// Check that the list and shadow list match
-		int size = shadow.size();
-		assertEquals(size, list.size());
-		for (int i = 0; i < size; i++) {
-		    assertEquals("iteration #" + i + ": ", shadow.get(i),
-			    list.get(i));
-		}
+		assertEquals(shadow.size(), list.size());
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -2692,7 +2729,8 @@ public class TestScalableList extends Assert {
 		} catch (ConcurrentModificationException cme) {
 		    // Expected
 		} catch (Exception e) {
-		    fail("Expecting ConcurrentModificationException: " + e.getLocalizedMessage());
+		    fail("Expecting ConcurrentModificationException: " +
+			    e.getLocalizedMessage());
 		}
 
 		try {
@@ -2701,7 +2739,8 @@ public class TestScalableList extends Assert {
 		} catch (ConcurrentModificationException cme) {
 		    // Expected
 		} catch (Exception e) {
-		    fail("Expecting ConcurrentModificationException" + e.getLocalizedMessage());
+		    fail("Expecting ConcurrentModificationException" +
+			    e.getLocalizedMessage());
 		}
 
 		try {
@@ -2846,7 +2885,13 @@ public class TestScalableList extends Assert {
 		}
 		iter.remove();
 		assertEquals(9, list.size());
-		iter.remove();
+		try {
+		    iter.remove();
+		} catch (IllegalStateException ise) {
+		} catch (Exception e) {
+		    fail("Not expecting the exception: " +
+			    e.getLocalizedMessage());
+		}
 		// Removing a second time should not cause a change
 		// unless next() or prev() was called
 		assertEquals(9, list.size());
@@ -2910,9 +2955,9 @@ public class TestScalableList extends Assert {
 		iter.add("Z");
 		assertEquals(13, list.size());
 
-		assertEquals(7, list.indexOf("X"));
+		assertEquals(5, list.indexOf("X"));
 		assertEquals(6, list.indexOf("Y"));
-		assertEquals(5, list.indexOf("Z"));
+		assertEquals(7, list.indexOf("Z"));
 
 		AppContext.getDataManager().removeBinding(name);
 		AppContext.getDataManager().removeObject(list);
@@ -2961,7 +3006,8 @@ public class TestScalableList extends Assert {
 	// try adding/removing
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
-		Random random = new Random();
+		long time = System.currentTimeMillis();
+		Random random = new Random(time);
 		ScalableList<String> list =
 			uncheckedCast(AppContext.getDataManager().getBinding(
 				name));
@@ -2988,6 +3034,9 @@ public class TestScalableList extends Assert {
 		    iter2.next();
 		    fail("Expecting a ConcurrentModificationException");
 		} catch (ConcurrentModificationException cme) {
+		} catch (Exception e) {
+		    fail("(seed = " + time + ") Not expecting exception: " +
+			    e.getLocalizedMessage());
 		}
 
 		count = 0;
@@ -3000,6 +3049,7 @@ public class TestScalableList extends Assert {
 		}
 
 		// node was added
+		iter.next();
 		iter.add("Z");
 		try {
 		    iter2.hasNext();
@@ -3036,9 +3086,6 @@ public class TestScalableList extends Assert {
 	}, taskOwner);
     }
 
-    
-    
-    
     /**
      * Tests random operations
      * 
@@ -3057,7 +3104,8 @@ public class TestScalableList extends Assert {
 		for (int i = 0; i < 20; i++) {
 		    shadow.add(Integer.toString(i));
 		    list.add(Integer.toString(i));
-		    assertEquals(Integer.toString(i) + ":", shadow.size(), list.size());
+		    assertEquals(Integer.toString(i) + ":", shadow.size(),
+			    list.size());
 		}
 		assertEquals(shadow.size(), list.size());
 
@@ -3070,7 +3118,7 @@ public class TestScalableList extends Assert {
 		}
 
 		assertEquals(shadow.size(), list.size());
-		
+
 		// perform some operations
 		listIter.add("A");
 		shadowIter.add("A");
@@ -3087,18 +3135,12 @@ public class TestScalableList extends Assert {
 		listIter.add("A");
 		shadowIter.add("A");
 		assertEquals(shadow.size(), list.size());
-		
-		
 
 	    }
 	}, taskOwner);
 
     }
-    
-    
-    
-    
-    
+
     /**
      * Tests random operations
      * 
@@ -3127,23 +3169,29 @@ public class TestScalableList extends Assert {
 		}
 
 		// perform random operations
-		Random random = new Random(); ArrayList<String> t = new ArrayList<String>(); t.listIterator();
+		Random random = new Random();
 		for (int i = 0; i < 20; i++) {
 		    int operation = random.nextInt(4);
 		    String value = Integer.toString(random.nextInt());
 		    try {
-			listIter = performOperation(listIter, operation, value);
+			listIter =
+				performOperation(listIter, operation, value);
 		    } catch (Exception e) {
 			// won't worry about exceptions
 		    }
 		    try {
-			shadowIter = performOperation(shadowIter, operation, value);
-		    } catch (Exception e){
+			shadowIter =
+				performOperation(shadowIter, operation, value);
+		    } catch (Exception e) {
 			// won't worry about exceptions
 		    }
 		}
 		assertEquals(shadow.size(), list.size());
-		
+
+		// ensure that all the entries are the same
+		for (int i = 0; i < shadow.size(); i++) {
+		    assertEquals(shadow.get(i), list.get(i));
+		}
 
 	    }
 	}, taskOwner);
@@ -3181,7 +3229,6 @@ public class TestScalableList extends Assert {
 		break;
 	    case 6:
 		iter.set(value);
-		break;
 	    default:
 		break;
 	}
