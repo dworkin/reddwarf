@@ -791,6 +791,8 @@ public class ScalableList<E> extends AbstractList<E> implements
      * 
      * @return a {@code ListIterator} over the elements in the list
      * @param index the index
+     * @throws IndexOutOfBoundsException if the index is out of bounds:
+     * {@code index < 0 || index > size()}
      */
     public ListIterator<E> listIterator(int index) {
 	// Special case: if the index provided equals the size,
@@ -1251,6 +1253,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * Unlinks itself from the tree without performing a recursive
 	 * deletion. This method re-links references that are dangling as a
 	 * result of this node's removal.
+	 * 
+	 * @return {@code true} if a prune occurred and {@code false}
+	 * otherwise
 	 */
 	boolean prune() {
 
@@ -1781,10 +1786,10 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * Determines if there is a next element to iterate over; that is, if
-	 * the next {@code ListNode} is not null.
+	 * Determines if there is a previous element to iterate over; that is,
+	 * if the previous {@code ListNode} is not null.
 	 * 
-	 * @return {@code true} if the next element is not null, and
+	 * @return {@code true} if the previous element is not null, and
 	 * {@code false} otherwise
 	 */
 	public boolean hasPrev() {
@@ -1843,21 +1848,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 	protected ManagedReference<ListNode<E>> currentNode;
 
 	/**
-	 * The iteration location of the list; this value is a double because
-	 * it points to the regions between elements
+	 * The iteration location of the list
 	 */
-	protected double cursor;
+	protected int cursor;
 
 	/**
 	 * Flag which only lets one removal happen per call to {@code next()}
 	 */
 	protected boolean wasNextCalled;
-
-	/**
-	 * A reference to the node which the {@code Iterator} is currently
-	 * examining.
-	 */
-	protected ManagedReference<ListNode<E>> referenceNode;
 
 	/**
 	 * The value for the current {@code ListNode} to determine if any
@@ -1889,44 +1887,18 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param head the head {@code ListNode} of the collection
 	 */
 	ScalableIterator(ScalableList<E> list) {
-	    owner = AppContext.getDataManager().createReference(list);
-	    currentNode =
-		    AppContext.getDataManager().createReference(
-			    list.getHead());
-	    referenceNode = currentNode;
-	    cursor = -0.5;
-	    listNodeReferenceValue =
-		    currentNode.get().getDataIntegrityValue();
-	    wasNextCalled = false;
+	    this(list, list.getHead());
 	}
 
 	ScalableIterator(ScalableList<E> list, ListNode<E> startingNode) {
 	    owner = AppContext.getDataManager().createReference(list);
 	    currentNode =
 		    AppContext.getDataManager().createReference(startingNode);
-	    referenceNode = currentNode;
-	    cursor = -0.5;
+
+	    cursor = 0;
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
 	    wasNextCalled = false;
-	}
-
-	/**
-	 * Retrieves the index of the cursor. This operation is dependent on
-	 * the previously examined direction because it determines if the
-	 * returned index is before or after the
-	 * 
-	 * @param isDirectionNext
-	 * @return the index the iterator is pointing to
-	 */
-	int getCursorLocation(boolean isDirectionNext) {
-	    // Choose the element on either side of the cursor
-	    // depending on what our mode of operation was
-	    if (isDirectionNext) {
-		return (int) (cursor - 0.5);
-	    } else {
-		return (int) (cursor + 0.5);
-	    }
 	}
 
 	/**
@@ -1940,8 +1912,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @return the absolute index of the current element being examined
 	 */
 	int getCurrentIndex(boolean isDirectionNext) {
-	    return getAbsoluteIndex(currentNode.get(), 1) +
-		    getCursorLocation(isDirectionNext);
+	    return getAbsoluteIndex(currentNode.get(), 1) + cursor;
 	}
 
 	/**
@@ -2010,15 +1981,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
 
-	    wasNextCalled = true;
-
 	    AppContext.getDataManager().markForUpdate(this);
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
 
 	    // Retrieve the next value from the list; we may have to load
 	    // up a new ListNode
-	    if (!isNextWithinRange((int) (cursor + 0.5), currentNode.get())) {
+	    cursor = getIndexBasedOnPreviousAction(true);
+	    if (!isNextWithinRange(cursor, currentNode.get())) {
 		if (loadNextListNode()) {
 		    elements = currentNode.get().getSubList().getElements();
 		} else {
@@ -2027,13 +1997,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 		}
 	    }
 
+	    wasNextCalled = true;
+
 	    // Once we have located the next node,
 	    // update the reference values
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
-	    referenceNode = currentNode;
-	    int index = (int) (++cursor - 0.5);
-	    ManagedReference<E> ref = uncheckedCast(elements.get(index));
+
+	    ManagedReference<E> ref = uncheckedCast(elements.get(cursor));
 	    Object obj = ref.get();
 
 	    // In case we wrapped the item with an
@@ -2043,6 +2014,22 @@ public class ScalableList<E> extends AbstractList<E> implements
 		return tmp.getValue();
 	    }
 	    return ref.get();
+	}
+
+	/**
+	 * Retrieve the index of interest, based on our previous direction and
+	 * intended direction
+	 * 
+	 * @param next whether we intend on travelling in the {@code next}
+	 * direction; {@code true} if so, and {@code false} otherwise
+	 * @return the index corresponding to the cursor
+	 */
+	protected int getIndexBasedOnPreviousAction(boolean next) {
+	    if (next) {
+		return (wasNextCalled ? cursor + 1 : cursor);
+	    } else {
+		return (wasNextCalled ? cursor : cursor - 1);
+	    }
 	}
 
 	/**
@@ -2058,7 +2045,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		AppContext.getDataManager().markForUpdate(this);
 		currentNode =
 			AppContext.getDataManager().createReference(next);
-		cursor = -0.5;
+		cursor = 0;
 		return true;
 	    }
 	    return false;
@@ -2075,8 +2062,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    String exceptionString =
 		    "The ListNode has been modified or removed";
 	    try {
-		if (referenceNode.get().getDataIntegrityValue() != 
-		    	listNodeReferenceValue) {
+		if (currentNode.get().getDataIntegrityValue() != 
+		    listNodeReferenceValue) {
 		    throw new ConcurrentModificationException(exceptionString);
 		}
 	    } catch (ObjectNotFoundException onfe) {
@@ -2099,7 +2086,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // If there is an element in the iterator still,
 	    // then simply return true since it will be the
 	    // next element to be returned.
-	    if (isNextWithinRange((int) (cursor + 0.5), currentNode.get())) {
+	    if (isNextWithinRange(getIndexBasedOnPreviousAction(true),
+		    currentNode.get())) {
 		return true;
 	    }
 
@@ -2116,69 +2104,42 @@ public class ScalableList<E> extends AbstractList<E> implements
 		throw new IllegalStateException(
 			"remove() can only proceed next() or previous()");
 	    }
-	    doRemove(true);
+	    doRemove();
 	    wasNextCalled = false;
 	}
 
 	/**
 	 * Performs the remove and updates the references if necessary
 	 */
-	void doRemove(boolean isDirectionNext) {
+	void doRemove() {
 	    AppContext.getDataManager().markForUpdate(this);
-	    int index = getCurrentIndex(isDirectionNext);
 	    ListNode<E> prev = currentNode.get().prev();
 	    ListNode<E> next = currentNode.get().next();
-	    owner.get().remove(index);
+	    int size = currentNode.get().size();
+	    currentNode.get().remove(owner.get(), cursor);
 
 	    // if the removal caused a ListNode to be removed,
 	    // then we need to replace the currentNode with a
-	    // valid one. For this, we need to check the direction.
-	    // We don't need to change the cursor since it will
-	    // be pointing in the correct location.
-	    try {
-		currentNode.get();
-	    } catch (ObjectNotFoundException onfe) {
-		if ((wasNextCalled && prev != null) ||
-			(!wasNextCalled && next == null)) {
-		    currentNode =
-			    AppContext.getDataManager().createReference(prev);
-		} else {
-		    currentNode =
-			    AppContext.getDataManager().createReference(next);
-		}
-
-		listNodeReferenceValue =
-			currentNode.get().getDataIntegrityValue();
-		referenceNode = currentNode;
-		return;
-	    }
-
-	    /*
-	     * To avoid a cursor less than -0.5, we will load the previous
-	     * node and set the cursor to point after the last element.
-	     * Otherwise, if there is no previous node, keep the cursor at
-	     * -0.5
-	     */
-	    if (--cursor < -0.5) {
+	    // valid one.
+	    if (size == 1 || cursor == 0) {
 		if (prev != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(prev);
-		    cursor = currentNode.get().size() - 0.5;
+		    cursor = currentNode.get().size() - 1;
 		} else if (next != null) {
 		    currentNode =
 			    AppContext.getDataManager().createReference(next);
-		    cursor = -0.5;
+		    cursor = 0;
 		} else {
-		    // there is no next or prev, but this ListNode cannot
-		    // be removed because it is the only one. Just reset
-		    // the cursor
-		    cursor = -0.5;
-		    return;
+		    cursor = 0;
 		}
+	    } else {
+		cursor--;
 	    }
+
+	    // update the data integrity value
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
-	    referenceNode = currentNode;
 	}
     }
 
@@ -2213,9 +2174,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	}
 
 	/**
-	 * Constructor which creates a {@code RobTestIterator} given the list,
-	 * a {@code startingNode} and a {@code startingIndex} denoting the
-	 * starting point. This constructor is used primarily for when the
+	 * Constructor which creates a {@code ScalableListIterator} given the
+	 * list, a {@code startingNode} and a {@code startingIndex} denoting
+	 * the starting point. This constructor is used primarily for when the
 	 * user specifies an index that is one larger than the highest index
 	 * value.
 	 * 
@@ -2227,7 +2188,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		int startingIndex) {
 	    super(list, startingNode);
 	    wasNextCalled = false;
-	    cursor = startingIndex - 0.5;
+	    cursor = startingIndex;
 	}
 
 	/**
@@ -2240,7 +2201,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	ScalableListIterator(ScalableList<E> list,
 		SearchResult<E> searchResult) {
 	    super(list, searchResult.node);
-	    cursor = searchResult.offset - 0.5;
+	    cursor = searchResult.offset;
 	    cannotRemoveOrSet = false;
 	}
 
@@ -2275,7 +2236,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		AppContext.getDataManager().markForUpdate(this);
 		currentNode =
 			AppContext.getDataManager().createReference(prev);
-		cursor = currentNode.get().size() - 0.5;
+		cursor = currentNode.get().size() - 1;
 		return true;
 	    }
 	    return false;
@@ -2323,7 +2284,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	    // If the future index will be equal to or larger than 0,
 	    // then another element exists
-	    if (isPrevWithinRange((int) (cursor - 0.5), currentNode.get())) {
+	    if (isPrevWithinRange(getIndexBasedOnPreviousAction(false),
+		    currentNode.get())) {
 		return true;
 	    }
 
@@ -2350,16 +2312,16 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // any changes were made since we last operated.
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
-
 	    AppContext.getDataManager().markForUpdate(this);
-	    wasNextCalled = false;
+
 	    cannotRemoveOrSet = false;
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
 
 	    // Retrieve the value from the list; we may have to load
 	    // up a new ListNode
-	    if (!isPrevWithinRange((int) (cursor - 0.5), currentNode.get())) {
+	    cursor = getIndexBasedOnPreviousAction(false);
+	    if (!isPrevWithinRange(cursor, currentNode.get())) {
 		if (loadPrevListNode()) {
 		    elements = currentNode.get().getSubList().getElements();
 		} else {
@@ -2370,12 +2332,11 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	    // Once we have found the previous node,
 	    // update the reference values
+	    wasNextCalled = false;
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
-	    referenceNode = currentNode;
 
-	    ManagedReference<E> ref =
-		    uncheckedCast(elements.get((int) (--cursor + 0.5)));
+	    ManagedReference<E> ref = uncheckedCast(elements.get(cursor));
 	    Object obj = ref.get();
 
 	    // In case we wrapped the item with an
@@ -2403,7 +2364,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 			"set() can only proceed next() or previous()");
 	    }
 	    AppContext.getDataManager().markForUpdate(this);
-	    owner.get().set(getCurrentIndex(wasNextCalled), o);
+	    currentNode.get().getSubList().set(cursor, o);
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
 	}
@@ -2424,10 +2385,44 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	    if (!wasNextCalled) {
 		AppContext.getDataManager().markForUpdate(this);
-		doRemove(false);
+		this.doRemove();
 	    } else {
 		super.remove();
 	    }
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	void doRemove() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    ListNode<E> prev = currentNode.get().prev();
+	    ListNode<E> next = currentNode.get().next();
+	    int size = currentNode.get().size();
+	    currentNode.get().remove(owner.get(), cursor);
+
+	    // if the removal caused a ListNode to be removed,
+	    // then we need to replace the currentNode with a
+	    // valid one.
+	    if (size == 1 || cursor == 0) {
+		if (next != null) {
+		    currentNode =
+			    AppContext.getDataManager().createReference(next);
+		    cursor = 0;
+		} else if (prev != null) {
+		    currentNode =
+			    AppContext.getDataManager().createReference(prev);
+		    cursor = currentNode.get().size() - 1;
+		} else {
+		    cursor = 0;
+		}
+	    } else {
+		cursor++;
+	    }
+
+	    // update the data integrity value
+	    listNodeReferenceValue =
+		    currentNode.get().getDataIntegrityValue();
 	}
 
 	/**
@@ -2457,23 +2452,21 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public void add(E o) {
 	    // Add element to what will be the next index
-	    int index = getCurrentIndex(false);
-	    owner.get().add(index, o);
+	    currentNode.get().insert(++cursor, o);
 
 	    // If the addition added a new list node,
 	    // then we need to point to it
-	    if (++cursor > currentNode.get().size()) {
+	    if (cursor > currentNode.get().size() - 1) {
 		currentNode =
 			AppContext.getDataManager().createReference(
 				currentNode.get().next());
-		cursor = 0.5;
+		cursor = 0;
 	    }
 
 	    AppContext.getDataManager().markForUpdate(this);
 	    cannotRemoveOrSet = true;
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
-	    referenceNode = currentNode;
 	}
     }
 

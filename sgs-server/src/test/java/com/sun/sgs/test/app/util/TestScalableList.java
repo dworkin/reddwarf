@@ -31,6 +31,8 @@ import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.Random;
 
+import javax.management.ValueExp;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -1247,11 +1249,16 @@ public class TestScalableList extends Assert {
 	txnScheduler.runTask(new AbstractKernelRunnable() {
 	    public void run() throws Exception {
 		ScalableList<String> list = new ScalableList<String>(6, 6);
+		List<String> shadow = new ArrayList<String>();
 		assertTrue(list.add("A"));
 		assertTrue(list.add("B"));
 		assertTrue(list.add("C"));
 		assertTrue(list.add("D"));
-
+		shadow.add("A");
+		shadow.add("B");
+		shadow.add("C");
+		shadow.add("D");
+		ListIterator<String> shadowIter = shadow.listIterator();
 		ListIterator<String> iter = list.listIterator();
 		assertTrue(iter.hasNext());
 		int count = 0;
@@ -1259,14 +1266,19 @@ public class TestScalableList extends Assert {
 
 		while (iter.hasNext()) {
 		    iter.next();
+		    shadowIter.next();
 		    if (count == 2) {
 			iter.add(valueToAddAndCheck);
+			shadowIter.add(valueToAddAndCheck);
 		    }
 		    count++;
 		}
-		assertEquals(5, list.size());
-		assertEquals(true, list.contains(valueToAddAndCheck));
-		assertEquals(3, list.indexOf(valueToAddAndCheck));
+		assertEquals(shadow.size(), list.size());
+		assertEquals(shadow.contains(valueToAddAndCheck), list
+			.contains(valueToAddAndCheck));
+		assertEquals(shadow.indexOf(valueToAddAndCheck), list
+			.indexOf(valueToAddAndCheck));
+
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -2060,12 +2072,12 @@ public class TestScalableList extends Assert {
 			performRandomOperation(list, operation, value);
 			performRandomOperation(shadow, operation, value);
 
-			    // check integrity
+			// check integrity
 
-			    for (int j = 0; j < shadow.size(); j++) {
-				assertEquals("(" + time + ") iteration #" + i +
-					": ", shadow.get(j), list.get(j));
-			    }
+			for (int j = 0; j < shadow.size(); j++) {
+			    assertEquals("(" + time + ") iteration #" + i +
+				    ": ", shadow.get(j), list.get(j));
+			}
 		    }
 		} catch (Exception e) {
 		    fail("Not expecting an exception: " +
@@ -2944,20 +2956,29 @@ public class TestScalableList extends Assert {
 		ScalableList<String> list =
 			uncheckedCast(AppContext.getDataManager().getBinding(
 				name));
+		List<String> shadow = new ArrayList<String>();
+		for (int i = 0; i < 10; i++) {
+		    shadow.add(Integer.toString(i));
+		}
 		ListIterator<String> iter = list.listIterator();
+		ListIterator<String> shadowIter = shadow.listIterator();
 		int count = 0;
 		while (count++ < 5) {
 		    iter.next();
+		    shadowIter.next();
 		}
 		iter.add("X");
-		assertEquals(11, list.size());
+		shadowIter.add("X");
+		assertEquals(shadow.size(), list.size());
 		iter.add("Y");
+		shadowIter.add("Y");
 		iter.add("Z");
-		assertEquals(13, list.size());
+		shadowIter.add("Z");
+		assertEquals(shadow.size(), list.size());
 
-		assertEquals(5, list.indexOf("X"));
-		assertEquals(6, list.indexOf("Y"));
-		assertEquals(7, list.indexOf("Z"));
+		assertEquals(shadow.indexOf("X"), list.indexOf("X"));
+		assertEquals(shadow.indexOf("Y"), list.indexOf("Y"));
+		assertEquals(shadow.indexOf("Z"), list.indexOf("Z"));
 
 		AppContext.getDataManager().removeBinding(name);
 		AppContext.getDataManager().removeObject(list);
