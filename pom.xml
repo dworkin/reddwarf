@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>8</version>
+  <version>9</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -259,99 +259,6 @@
       </dependency>
 
       <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-shared</artifactId>
-	<version>${sgs-shared.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server-api</artifactId>
-	<scope>provided</scope>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server-javadoc</artifactId>
-	<classifier>api</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-shared</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs-shared.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-server</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-tutorial-server</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-tutorial-server</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-tutorial-server-dist</artifactId>
-	<type>zip</type>
-	<version>${sgs.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-client</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-client-api</artifactId>
-	<scope>provided</scope>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-client-javadoc</artifactId>
-	<classifier>api</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-client</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-tutorial-client</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-tutorial-client</artifactId>
-	<classifier>sources</classifier>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-tutorial-client-dist</artifactId>
-	<type>zip</type>
-	<version>${sgs.version}</version>
-      </dependency>
-
-      <dependency>
 	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
 	<artifactId>db</artifactId>
 	<version>${bdb.version}</version>
@@ -544,13 +451,6 @@
     
     <projectYear>2008</projectYear>
     
-    <!-- These two values should be overridden by children POMs
-	 The reason for this is so that it is not necessary to do a
-	 new release of this POM every time there is a new release
-	 of the darkstar distributions -->
-    <sgs.version>0</sgs.version>
-    <sgs-shared.version>0</sgs-shared.version>
-
     <sgs-build-utilities.version>1.0</sgs-build-utilities.version>
     <sgs-jar-resources-gpl.version>1.0</sgs-jar-resources-gpl.version>
     <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
