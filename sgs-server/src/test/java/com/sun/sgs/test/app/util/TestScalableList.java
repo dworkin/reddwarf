@@ -2481,7 +2481,7 @@ public class TestScalableList extends Assert {
 		list.add("C");
 
 		try {
-		    list.subList(1, 3);
+		    list.subList(1, 4);
 		    fail("Expecting IndexOutOfBoundsException");
 		} catch (IndexOutOfBoundsException e) {
 		}
