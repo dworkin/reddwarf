@@ -75,7 +75,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  *
  * This class provides one parameter for tuning performance.  The
  * {@code supportsConcurrentIterators} constructor parameter
- * determines how a deque's iterators will behavior when the deque is
+ * determines how a deque's iterators will behave when the deque is
  * concurrently modified during traversal.  If the parameter is set to
  * {@code true}, iterators will correctly traverse all elements of the
  * deque, even if the iterator's next element is removed between
@@ -84,7 +84,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * multiple iterators at the same time will cause contention.  In
  * addition each mutating operation incurs a small performance penalty
  * for keeping the iterators consistent with the state of the deque.
- * Developers should use this feature if they will need to iterator
+ * Developers should use this feature if they will need to iterate
  * over the deque at the same time it is being modified and want to
  * ensure that the iterator will traverse all the elements.
  *
@@ -96,7 +96,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * iterator is to return was been removed during a separate task, the
  * iterator <i>will</i> throw a {@code
  * ConcurrentModificationException}.  In this behavior, not supporting
- * concurrent updates incur no performance overhead for mutating
+ * concurrent updates incurs no performance overhead for mutating
  * operations.  Furthermore, multiple iterators will not cause any
  * addtional contention.
  *
@@ -163,7 +163,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
  * is done being used it should be removed from the data store using
  * {@link DataManager#removeObject(Object) removeObject}.  If using
  * concurrent iterators, failure to remove unused iterators will
- * result in degrated performance linear to the number of excess
+ * result in degraded performance linear to the number of excess
  * iterator instances.
  *
  * <p>
