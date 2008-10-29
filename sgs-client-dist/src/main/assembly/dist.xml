@@ -13,7 +13,7 @@
       <includes>
 	<include>com.projectdarkstar.client:sgs-client:jar</include>
       </includes>
-      <outputDirectory>sgs-client-${sgs.version}/lib</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}/lib</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
       <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
     </dependencySet>
@@ -23,7 +23,7 @@
       <includes>
 	<include>com.projectdarkstar.client:sgs-client:jar:sources</include>
       </includes>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
@@ -36,7 +36,7 @@
         <include>org.slf4j:slf4j-api</include>
         <include>org.slf4j:slf4j-jdk14</include>
       </includes>
-      <outputDirectory>sgs-client-${sgs.version}/lib</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}/lib</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
@@ -45,7 +45,7 @@
       <includes>
 	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
       </includes>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
@@ -55,7 +55,7 @@
 	<include>com.projectdarkstar.client:sgs-tutorial-client-dist:zip</include>
       </includes>
       <unpack>true</unpack>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
@@ -73,7 +73,7 @@
 	  <exclude>options</exclude>
 	</excludes>
       </unpackOptions>
-      <outputDirectory>sgs-client-${sgs.version}/doc</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}/doc</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
   </dependencySets>
@@ -87,7 +87,7 @@
 	<exclude>LICENSE</exclude>
 	<exclude>NOTICE.txt</exclude>
       </excludes>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
     </fileSet>
   </fileSets>
 
@@ -96,7 +96,7 @@
     <!-- Filter README with parameterized version numbers -->
     <file>
       <source>src/main/etc/sgs-client/README</source>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <filtered>true</filtered>
       <fileMode>644</fileMode>
     </file>
@@ -104,13 +104,13 @@
     <!-- Filter LICENSE and NOTICE with current year -->
     <file>
       <source>src/main/etc/sgs-client/LICENSE</source>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <filtered>true</filtered>
       <fileMode>644</fileMode>
     </file>
     <file>
       <source>src/main/etc/sgs-client/NOTICE.txt</source>
-      <outputDirectory>sgs-client-${sgs.version}</outputDirectory>
+      <outputDirectory>sgs-client-${sgs-client.version}</outputDirectory>
       <filtered>true</filtered>
       <fileMode>644</fileMode>
     </file>
