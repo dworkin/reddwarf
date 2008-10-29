@@ -27,8 +27,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 
-import com.sun.sgs.impl.util.ManagedSerializable;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -44,12 +42,9 @@ import java.util.Iterator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
-
-import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 
 /**
  * A scalable {@code Deque} implementation.  This implementation
@@ -2056,5 +2051,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 		AppContext.getDataManager().removeObject(this);
 	    }
 	}
-    }       
+    }   
+    
+    @SuppressWarnings("unchecked")
+    private static <T> T uncheckedCast(Object object) {
+        return (T) object;
+    }
 }
