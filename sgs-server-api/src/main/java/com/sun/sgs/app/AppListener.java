@@ -19,7 +19,6 @@
 
 package com.sun.sgs.app;
 
-import java.io.Serializable;
 import java.util.Properties;
 
 /**
@@ -28,7 +27,8 @@ import java.util.Properties;
  * client sessions log in.
  *
  * <p>An implementation of a {@code AppListener} should implement
- * the {@link Serializable} interface, so that application listeners
+ * the {@link java.io.Serializable Serializable} interface, 
+ * so that application listeners
  * can be stored persistently.  If a given listener has mutable state,
  * that listener should also implement the {@link ManagedObject}
  * interface.
@@ -63,7 +63,8 @@ public interface AppListener extends ManagedObject {
      * Notifies this listener that the specified client session has
      * logged in, and returns a {@link ClientSessionListener} for that
      * session.  The returned listener should implement {@link
-     * Serializable} so that it can be stored persistently.  If the
+     * java.io.Serializable Serializable} so that it can be stored persistently.
+     * If the
      * returned listener does not implement {@code Serializable},
      * then the client session is disconnected without completing the
      * login process.

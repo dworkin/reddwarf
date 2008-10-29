@@ -191,9 +191,9 @@ import java.util.Stack;
  * @see Serializable
  * @see ManagedObject
  */
-public class ScalableHashMap<K,V>
-    extends AbstractMap<K,V>
-    implements Serializable, ManagedObjectRemoval {
+public class ScalableHashMap<K, V>
+        extends AbstractMap<K, V>
+        implements Serializable, ManagedObjectRemoval {
 
     /*
      * This class's implementation is based on the paper "Extendible hashing -
@@ -311,7 +311,7 @@ public class ScalableHashMap<K,V>
      *
      * @serial
      */
-    private ManagedReference<ScalableHashMap<K,V>> parentRef;
+    private ManagedReference<ScalableHashMap<K, V>> parentRef;
 
     // NOTE: the leftLeafRef and rightLeafRef references form a doubly-linked
     //       list for the leaf nodes of the tree, which allows us to quickly
@@ -324,7 +324,7 @@ public class ScalableHashMap<K,V>
      *
      * @serial
      */
-    ManagedReference<ScalableHashMap<K,V>> leftLeafRef;
+    ManagedReference<ScalableHashMap<K, V>> leftLeafRef;
 
     /**
      * The leaf node immediately to the right of this node if this is a leaf
@@ -332,7 +332,7 @@ public class ScalableHashMap<K,V>
      *
      * @serial
      */
-    ManagedReference<ScalableHashMap<K,V>> rightLeafRef;
+    ManagedReference<ScalableHashMap<K, V>> rightLeafRef;
 
     /**
      * The lookup directory for deciding which node to access based on a
@@ -597,32 +597,34 @@ public class ScalableHashMap<K,V>
 
 	DataManager dm = AppContext.getDataManager();
 	dm.markForUpdate(this);
-	ManagedReference<ScalableHashMap<K,V>> thisRef =
+        ManagedReference<ScalableHashMap<K, V>> thisRef =
 	    dm.createReference(this);
 
 	ScalableHashMap[] leaves = new ScalableHashMap[numLeaves];
 	for (int i = 0; i < numLeaves; ++i) {
-	    ScalableHashMap<K,V> leaf = new ScalableHashMap<K,V>(
+            ScalableHashMap<K, V> leaf = new ScalableHashMap<K, V>(
 		depth + leafBits, minDepth, splitThreshold, 1 << maxDirBits);
 	    leaves[i] = leaf;
 	    leaf.parentRef = thisRef;
 	}
 
 	// for the linked list for the leaves
-	for (int i = 1; i < numLeaves-1; ++i) {
-	    ScalableHashMap<K,V> leaf = uncheckedCast(leaves[i]);
-	    leaf.leftLeafRef = uncheckedCast(dm.createReference(leaves[i-1]));
-	    leaf.rightLeafRef = uncheckedCast(dm.createReference(leaves[i+1]));
+        for (int i = 1; i < numLeaves - 1; ++i) {
+            ScalableHashMap<K, V> leaf = uncheckedCast(leaves[i]);
+            leaf.leftLeafRef = uncheckedCast(
+                    dm.createReference(leaves[i - 1]));
+            leaf.rightLeafRef = uncheckedCast(
+                    dm.createReference(leaves[i + 1]));
 	}
 
 	// edge updating - Note that since there are guaranteed to be at least
 	// two leaves, these absolute offset calls are safe
-	ScalableHashMap<K,V> firstLeaf = uncheckedCast(leaves[0]);
+        ScalableHashMap<K, V> firstLeaf = uncheckedCast(leaves[0]);
 	firstLeaf.leftLeafRef = leftLeafRef;
 	firstLeaf.rightLeafRef = uncheckedCast(dm.createReference(leaves[1]));
-	ScalableHashMap<K,V> lastLeaf = uncheckedCast(leaves[numLeaves-1]);
+        ScalableHashMap<K, V> lastLeaf = uncheckedCast(leaves[numLeaves - 1]);
 	lastLeaf.leftLeafRef =
-	    uncheckedCast(dm.createReference(leaves[numLeaves-2]));
+                uncheckedCast(dm.createReference(leaves[numLeaves - 2]));
 	lastLeaf.rightLeafRef = rightLeafRef;
 
 	// since this node is now a directory, invalidate its leaf-list
@@ -710,10 +712,10 @@ public class ScalableHashMap<K,V>
      * @return the entry associated with the key or {@code null} if no such
      *         entry exists
      */
-    PrefixEntry<K,V> getEntry(Object key) {
+    PrefixEntry<K, V> getEntry(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	ScalableHashMap<K,V> leaf = lookup(hash);
-	for (PrefixEntry<K,V> e = leaf.getBucket(leaf.indexFor(hash));
+        ScalableHashMap<K, V> leaf = lookup(hash);
+        for (PrefixEntry<K, V> e = leaf.getBucket(leaf.indexFor(hash));
 	     e != null; e = e.next)
 	{
 	    if (e.hash == hash) {
@@ -753,7 +755,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the entry or {@code null}
      */
-    private PrefixEntry<K,V> getBucket(int index) {
+    private PrefixEntry<K, V> getBucket(int index) {
 	return uncheckedCast(table[index]);
     }
 
@@ -763,9 +765,9 @@ public class ScalableHashMap<K,V>
      *
      * @return the first entry in this leaf or {@code null}
      */
-    PrefixEntry<K,V> firstEntry() {
+    PrefixEntry<K, V> firstEntry() {
 	for (int i = 0; i < table.length; i++) {
-	    PrefixEntry<K,V> entry = getBucket(i);
+            PrefixEntry<K, V> entry = getBucket(i);
 	    if (entry != null) {
 		return entry;
 	    }
@@ -783,10 +785,10 @@ public class ScalableHashMap<K,V>
      *
      * @return the next entry or {@code null}
      */
-    PrefixEntry<K,V> nextEntry(int hash, ManagedReference<?> keyRef) {
+    PrefixEntry<K, V> nextEntry(int hash, ManagedReference<?> keyRef) {
 	BigInteger keyId = keyRef.getId();
 	for (int i = indexFor(hash); i < table.length; i++) {
-	    for (PrefixEntry<K,V> e = getBucket(i); e != null; e = e.next) {
+            for (PrefixEntry<K, V> e = getBucket(i); e != null; e = e.next) {
 		if (unsignedLessThan(e.hash, hash)) {
 		    continue;
 		} else if (e.hash != hash ||
@@ -851,12 +853,12 @@ public class ScalableHashMap<K,V>
 	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 
-	ScalableHashMap<K,V> leftChild =
-	    new ScalableHashMap<K,V>(
-		depth+1, minDepth, splitThreshold, 1 << maxDirBits);
-	ScalableHashMap<K,V> rightChild =
-	    new ScalableHashMap<K,V>(
-		depth+1, minDepth, splitThreshold, 1 << maxDirBits);
+        ScalableHashMap<K, V> leftChild =
+                new ScalableHashMap<K, V>(
+                depth + 1, minDepth, splitThreshold, 1 << maxDirBits);
+        ScalableHashMap<K, V> rightChild =
+                new ScalableHashMap<K, V>(
+                depth + 1, minDepth, splitThreshold, 1 << maxDirBits);
 
 	// to add this node to the parent directory, we need to determine the
 	// prefix that will lead to this node.  Grabbing a hash code from one
@@ -867,15 +869,15 @@ public class ScalableHashMap<K,V>
 	// the right child or left child
 	int firstRight = table.length / 2;
 	for (int i = 0; i < table.length; i++) {
-	    ScalableHashMap<K,V> child =
-		(i < firstRight) ? leftChild : rightChild;
-	    PrefixEntry<K,V> prev = null;
+            ScalableHashMap<K, V> child =
+                    (i < firstRight) ? leftChild : rightChild;
+            PrefixEntry<K, V> prev = null;
 	    int prevIndex = 0;
-	    PrefixEntry<K,V> e = getBucket(i);
+            PrefixEntry<K, V> e = getBucket(i);
 	    while (e != null) {
 		prefix = e.hash;
 		int index = child.indexFor(e.hash);
-		PrefixEntry<K,V> next = e.next;
+                PrefixEntry<K, V> next = e.next;
 		/* Chain to the previous node if the index is the same */
 		child.addEntry(e, index == prevIndex ? prev : null);
 		prev = e;
@@ -889,20 +891,20 @@ public class ScalableHashMap<K,V>
 	size = 0;
 
 	// create the references to the new children
-	ManagedReference<ScalableHashMap<K,V>> leftChildRef =
-	    dataManager.createReference(leftChild);
-	ManagedReference<ScalableHashMap<K,V>> rightChildRef =
-	    dataManager.createReference(rightChild);
+        ManagedReference<ScalableHashMap<K, V>> leftChildRef =
+                dataManager.createReference(leftChild);
+        ManagedReference<ScalableHashMap<K, V>> rightChildRef =
+                dataManager.createReference(rightChild);
 
 	if (leftLeafRef != null) {
-	    ScalableHashMap<K,V> leftLeaf = leftLeafRef.get();
+            ScalableHashMap<K, V> leftLeaf = leftLeafRef.get();
 	    leftLeaf.rightLeafRef = leftChildRef;
 	    leftChild.leftLeafRef = leftLeafRef;
 	    leftLeafRef = null;
 	}
 
 	if (rightLeafRef != null) {
-	    ScalableHashMap<K,V> rightLeaf = rightLeafRef.get();
+            ScalableHashMap<K, V> rightLeaf = rightLeafRef.get();
 	    rightLeaf.leftLeafRef = rightChildRef;
 	    rightChild.rightLeafRef = rightLeafRef;
 	    rightLeafRef = null;
@@ -937,7 +939,7 @@ public class ScalableHashMap<K,V>
 	    depth == minDepth) {
 
 	    // this leaf node will become a directory node
-	    ManagedReference<ScalableHashMap<K,V>> thisRef =
+            ManagedReference<ScalableHashMap<K, V>> thisRef =
 		dataManager.createReference(this);
 	    rightChild.parentRef = thisRef;
 	    leftChild.parentRef = thisRef;
@@ -980,8 +982,8 @@ public class ScalableHashMap<K,V>
      * @return the leaf table responsible for storing all entries with the
      *         specified prefix
      */
-    ScalableHashMap<K,V> lookup(int prefix) {
-	ScalableHashMap<K,V> node = this;
+    ScalableHashMap<K, V> lookup(int prefix) {
+        ScalableHashMap<K, V> node = this;
 	while (!node.isLeafNode()) {
 	    int index = highBits(prefix << node.depth, node.getNodeDirBits());
 	    node = node.getChildNode(index);
@@ -996,7 +998,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the child node
      */
-    private ScalableHashMap<K,V> getChildNode(int index) {
+    private ScalableHashMap<K, V> getChildNode(int index) {
 	return uncheckedCast(nodeDirectory[index].get());
     }
 
@@ -1024,9 +1026,9 @@ public class ScalableHashMap<K,V>
      * @param rightChildRef the right child of the node that will be replaced
      */
     private void addLeavesToDirectory(
-	int prefix,
-	ManagedReference<ScalableHashMap<K,V>> leftChildRef,
-	ManagedReference<ScalableHashMap<K,V>> rightChildRef)
+            int prefix,
+            ManagedReference<ScalableHashMap<K, V>> leftChildRef,
+            ManagedReference<ScalableHashMap<K, V>> rightChildRef)
     {
 	prefix <<= this.depth;
 
@@ -1034,7 +1036,7 @@ public class ScalableHashMap<K,V>
 	int index = highBits(prefix, dirBits);
 
 	// the leaf is under this node, so just look it up using the directory
-	ScalableHashMap<K,V> leaf = getChildNode(index);
+        ScalableHashMap<K, V> leaf = getChildNode(index);
 
 	DataManager dm = AppContext.getDataManager();
 
@@ -1045,7 +1047,7 @@ public class ScalableHashMap<K,V>
 
 	// update the new children nodes to point to this directory node as
 	// their parent
-	ManagedReference<ScalableHashMap<K,V>> thisRef =
+        ManagedReference<ScalableHashMap<K, V>> thisRef =
 	    dm.createReference(this);
 	rightChildRef.get().parentRef = thisRef;
 	leftChildRef.get().parentRef = thisRef;
@@ -1095,7 +1097,7 @@ public class ScalableHashMap<K,V>
      *	       been removed from the {@link DataManager}
      */
     public V get(Object key) {
-	PrefixEntry<K,V> entry = getEntry(key);
+        PrefixEntry<K, V> entry = getEntry(key);
 	return (entry == null) ? null : entry.getValue();
     }
 
@@ -1159,15 +1161,15 @@ public class ScalableHashMap<K,V>
      */
     private V putInternal(K key, V value, boolean returnOldValue) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	ScalableHashMap<K,V> leaf = lookup(hash);
+        ScalableHashMap<K, V> leaf = lookup(hash);
 	AppContext.getDataManager().markForUpdate(leaf);
 	leaf.modifications++;
 
 	int i = leaf.indexFor(hash);
-	PrefixEntry<K,V> newEntry = null;
+        PrefixEntry<K, V> newEntry = null;
 	BigInteger keyId = null;
-	PrefixEntry<K,V> prev = null;
-	for (PrefixEntry<K,V> e = leaf.getBucket(i); e != null; e = e.next) {
+        PrefixEntry<K, V> prev = null;
+        for (PrefixEntry<K, V> e = leaf.getBucket(i); e != null; e = e.next) {
 	    /*
 	     * Keep bucket chain sorted by hash code, treating the hash codes
 	     * as unsigned integers so that they sort the same way as directory
@@ -1201,7 +1203,7 @@ public class ScalableHashMap<K,V>
 	    }
 	    /* Create the new entry to get the ID of its key ref */
 	    if (newEntry == null) {
-		newEntry = new PrefixEntry<K,V>(hash, key, value);
+                newEntry = new PrefixEntry<K, V>(hash, key, value);
 		keyId = newEntry.keyRef().getId();
 	    }
 	    /* Keep bucket chain sorted by key reference object ID */
@@ -1215,7 +1217,7 @@ public class ScalableHashMap<K,V>
 
 	// we found no key match, so add an entry
 	if (newEntry == null) {
-	    newEntry = new PrefixEntry<K,V>(hash, key, value);
+            newEntry = new PrefixEntry<K, V>(hash, key, value);
 	}
 	leaf.addEntryMaybeSplit(newEntry, prev);
 
@@ -1252,7 +1254,7 @@ public class ScalableHashMap<K,V>
      *	       from the argument may have already been added to this map.
      */
     public void putAll(Map<? extends K, ? extends V> m) {
-	for (Entry<? extends K,? extends V> e : m.entrySet()) {
+        for (Entry<? extends K, ? extends V> e : m.entrySet()) {
 	    K key = e.getKey();
 	    if (key != null && !(key instanceof Serializable)) {
 		throw new IllegalArgumentException(
@@ -1275,8 +1277,8 @@ public class ScalableHashMap<K,V>
      * @param prev the entry immediately prior to the entry to add, or {@code
      *	      null} if the entry should be the first in the bucket
      */
-    private void addEntryMaybeSplit(PrefixEntry<K,V> entry,
-				    PrefixEntry<K,V> prev)
+    private void addEntryMaybeSplit(PrefixEntry<K, V> entry,
+                                    PrefixEntry<K, V> prev)
     {
 	addEntry(entry, prev);
 	// ensure that the prefix has enough precision to support
@@ -1296,7 +1298,7 @@ public class ScalableHashMap<K,V>
      * @param prev the entry immediately prior to the entry to add, or {@code
      *	      null} if the entry should be the first in the list
      */
-    private void addEntry(PrefixEntry<K,V> entry, PrefixEntry<K,V> prev) {
+    private void addEntry(PrefixEntry<K, V> entry, PrefixEntry<K, V> prev) {
 	size++;
 	if (prev == null) {
 	    int index = indexFor(entry.hash);
@@ -1305,7 +1307,7 @@ public class ScalableHashMap<K,V>
 	} else {
 	    assert indexFor(entry.hash) == indexFor(prev.hash) :
 		"Previous node was in a different bucket";
-	    PrefixEntry<K,V> next = prev.next;
+            PrefixEntry<K, V> next = prev.next;
 	    prev.next = entry;
 	    entry.next = next;
 	}
@@ -1320,7 +1322,7 @@ public class ScalableHashMap<K,V>
 	if (isLeafNode() && size == 0) {
 	    return true;
 	} else {
-	    ScalableHashMap<K,V> cur = leftMost();
+            ScalableHashMap<K, V> cur = leftMost();
 	    if (cur.size > 0) {
 		return false;
 	    }
@@ -1352,7 +1354,7 @@ public class ScalableHashMap<K,V>
 	    return size;
 	}
 	int totalSize = 0;
-	ScalableHashMap<K,V> cur = leftMost();
+        ScalableHashMap<K, V> cur = leftMost();
 	totalSize += cur.size;
 	while (cur.rightLeafRef != null) {
 	    cur = cur.rightLeafRef.get();
@@ -1381,13 +1383,13 @@ public class ScalableHashMap<K,V>
      */
     public V remove(Object key) {
 	int hash = (key == null) ? 0x0 : hash(key.hashCode());
-	ScalableHashMap<K,V> leaf = lookup(hash);
+        ScalableHashMap<K, V> leaf = lookup(hash);
 
 	int i = leaf.indexFor(hash);
-	PrefixEntry<K,V> e = leaf.getBucket(i);
-	PrefixEntry<K,V> prev = e;
+        PrefixEntry<K, V> e = leaf.getBucket(i);
+        PrefixEntry<K, V> prev = e;
 	while (e != null) {
-	    PrefixEntry<K,V> next = e.next;
+            PrefixEntry<K, V> next = e.next;
 	    if (unsignedLessThan(hash, e.hash)) {
 		break;
 	    } else if (e.hash == hash) {
@@ -1443,8 +1445,8 @@ public class ScalableHashMap<K,V>
      */
     void remove(int hash, ManagedReference<?> keyRef) {
 	int index = indexFor(hash);
-	PrefixEntry<K,V> prev = null;
-	for (PrefixEntry<K,V> e = getBucket(index); e != null; e = e.next) {
+        PrefixEntry<K, V> prev = null;
+        for (PrefixEntry<K, V> e = getBucket(index); e != null; e = e.next) {
 	    if (unsignedLessThan(hash, e.hash)) {
 		break;
 	    } else if (e.hash == hash && keyRef.equals(e.keyRef())) {
@@ -1468,7 +1470,7 @@ public class ScalableHashMap<K,V>
      *
      * @return the left-most child under this node
      */
-    ScalableHashMap<K,V> leftMost() {
+    ScalableHashMap<K, V> leftMost() {
 	// NOTE: the left-most node will have a bit prefix of all zeros, which
 	// is what we use when searching for it
 	return lookup(0x0);
@@ -1525,7 +1527,7 @@ public class ScalableHashMap<K,V>
 	    taskManager.scheduleTask(new RemoveNodeEntriesTask(this));
 	    table = null;
 	} else {
-	    taskManager.scheduleTask(new RemoveNodesTask<K,V>(this));
+            taskManager.scheduleTask(new RemoveNodesTask<K, V>(this));
 	    nodeDirectory = null;
 	}
     }
@@ -1646,18 +1648,18 @@ public class ScalableHashMap<K,V>
      * entries visited, all in an attempt to keep the work small enough to fit
      * within the transaction timeout.
      */
-    private static final class RemoveNodesTask<K,V>
+    private static final class RemoveNodesTask<K, V>
 	implements ManagedObject, Serializable, Task
     {
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
 
 	/** A reference to the current node. */
-	private ManagedReference<ScalableHashMap<K,V>> currentNodeRef;
+        private ManagedReference<ScalableHashMap<K, V>> currentNodeRef;
 
 	/** A collection of references to more nodes to remove. */
-	private final Stack<ManagedReference<ScalableHashMap<K,V>>> nodeRefs =
-	    new Stack<ManagedReference<ScalableHashMap<K,V>>>();
+        private final Stack<ManagedReference<ScalableHashMap<K, V>>> nodeRefs =
+                new Stack<ManagedReference<ScalableHashMap<K, V>>>();
 
 	/**
 	 * A stack of values for each directory node at or above the current
@@ -1667,16 +1669,16 @@ public class ScalableHashMap<K,V>
 	private final Stack<Integer> offsets = new Stack<Integer>();
 
 	/** Creates an instance for the specified directory node. */
-	private RemoveNodesTask(ScalableHashMap<K,V> node) {
+        private RemoveNodesTask(ScalableHashMap<K, V> node) {
 	    assert !node.isLeafNode();
 	    DataManager dm = AppContext.getDataManager();
-	    ManagedReference<ScalableHashMap<K,V>> lastRef = null;
+            ManagedReference<ScalableHashMap<K, V>> lastRef = null;
 	    for (int i = 0; i < node.nodeDirectory.length; i++) {
-		ManagedReference<ScalableHashMap<K,V>> ref =
+                ManagedReference<ScalableHashMap<K, V>> ref =
 		    uncheckedCast(node.nodeDirectory[i]);
 		/* Skip clearing duplicate nodes in the directory */
 		if (ref != lastRef) {
-		    ScalableHashMap<K,V> child = ref.get();
+                    ScalableHashMap<K, V> child = ref.get();
 		    /*
 		     * Clear the parent reference so we don't walk up to the
 		     * root node, which is being reused.
@@ -1714,7 +1716,7 @@ public class ScalableHashMap<K,V>
 	private boolean doWork() {
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.markForUpdate(this);
-	    ScalableHashMap<K,V> node = currentNodeRef.get();
+            ScalableHashMap<K, V> node = currentNodeRef.get();
 	    /* Find the leaf node */
 	    if (!node.isLeafNode()) {
 		while (true) {
@@ -1779,7 +1781,7 @@ public class ScalableHashMap<K,V>
      *
      * This class performs an optimization if both key and value do not
      * implement {@code ManagedObject}.  In this case, both objects will be
-     * stored together in a {@link KeyValuePair}, which reduces the number of
+     * stored together in a {@code KeyValuePair}, which reduces the number of
      * accesses to the data store.
      *
      * <p>
@@ -1795,8 +1797,8 @@ public class ScalableHashMap<K,V>
      *
      * @see ManagedSerializable
      */
-    static class PrefixEntry<K,V>
-	implements Entry<K,V>, Serializable {
+    static class PrefixEntry<K, V>
+            implements Entry<K, V>, Serializable {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 1;
@@ -1833,7 +1835,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	PrefixEntry<K,V> next;
+        PrefixEntry<K, V> next;
 
 	/**
 	 * The hash value for this entry.  This value is also used to compute
@@ -1873,7 +1875,7 @@ public class ScalableHashMap<K,V>
 		setKeyValuePair();
 		keyOrPairRef = dm.createReference(
 		    new ManagedSerializable<Object>(
-			new KeyValuePair<K,V>(k, v)));
+                        new KeyValuePair<K, V>(k, v)));
 	    } else {
 		// For the key and value, if each is already a ManagedObject,
 		// then we obtain a ManagedReference to the object itself,
@@ -1941,7 +1943,7 @@ public class ScalableHashMap<K,V>
 	 */
 	public final K getKey() {
 	    if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
+                ManagedSerializable<KeyValuePair<K, V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
 		return msPair.get().getKey();
 	    } else if (isKeyWrapped()) {
@@ -1980,7 +1982,7 @@ public class ScalableHashMap<K,V>
 	 */
 	public final V getValue() {
 	    if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
+                ManagedSerializable<KeyValuePair<K, V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
 		return msPair.get().getValue();
 	    } else if (isValueWrapped()) {
@@ -2018,7 +2020,7 @@ public class ScalableHashMap<K,V>
 	    if (newValue instanceof ManagedObject) {
 		if (isKeyValuePair()) {
 		    /* Switch from wrapping key/value pair to wrapping key */
-		    ManagedSerializable<KeyValuePair<K,V>> msPair =
+                    ManagedSerializable<KeyValuePair<K, V>> msPair =
 			uncheckedCast(keyOrPairRef.get());
 		    ManagedSerializable<K> msKey =
 			uncheckedCast(keyOrPairRef.get());
@@ -2030,16 +2032,16 @@ public class ScalableHashMap<K,V>
 		}
 		valueRef = dm.createReference(newValue);
 	    } else if (isKeyValuePair()) {
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
+                ManagedSerializable<KeyValuePair<K, V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
 		msPair.get().setValue(newValue);
 	    } else if (isKeyWrapped()) {
 		/* Switch from wrapping key to wrapping key/value pair */
 		ManagedSerializable<K> msKey =
 		    uncheckedCast(keyOrPairRef.get());
-		ManagedSerializable<KeyValuePair<K,V>> msPair =
+                ManagedSerializable<KeyValuePair<K, V>> msPair =
 		    uncheckedCast(keyOrPairRef.get());
-		msPair.set(new KeyValuePair<K,V>(msKey.get(), newValue));
+                msPair.set(new KeyValuePair<K, V>(msKey.get(), newValue));
 		if (isValueWrapped()) {
 		    dm.removeObject(valueRef.get());
 		}
@@ -2075,8 +2077,8 @@ public class ScalableHashMap<K,V>
 	public final int hashCode() {
 	    K key = getKey();
 	    V value = getValue();
-	    return ((key==null   ? 0 : key.hashCode())) ^
-		    (value==null ? 0 : value.hashCode());
+            return ((key == null ? 0 : key.hashCode())) ^
+                    (value == null ? 0 : value.hashCode());
 	}
 
 	/**
@@ -2129,7 +2131,7 @@ public class ScalableHashMap<K,V>
      * together, this saves a {@link ManagedReference#get ManagedReference.get}
      * call per access.
      */
-    private static class KeyValuePair<K,V> implements Serializable {
+    private static class KeyValuePair<K, V> implements Serializable {
 
 	private static final long serialVersionUID = 0x1L;
 
@@ -2162,8 +2164,8 @@ public class ScalableHashMap<K,V>
      * additions and removals made to the collection during iteration, and may
      * also visit more than once a key value that is removed and re-added.
      */
-    abstract static class ConcurrentIterator<E,K,V>
-	implements Iterator<E>, Serializable {
+    abstract static class ConcurrentIterator<E, K, V>
+            implements Iterator<E>, Serializable {
 
 	/** The version of the serialized form. */
 	private static final long serialVersionUID = 2;
@@ -2174,7 +2176,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
+        private final ManagedReference<ScalableHashMap<K, V>> rootRef;
 
 	/**
 	 * A reference to the leaf containing the current position of the
@@ -2182,7 +2184,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private ManagedReference<ScalableHashMap<K,V>> currentLeafRef = null;
+        private ManagedReference<ScalableHashMap<K, V>> currentLeafRef = null;
 
 	/**
 	 * The hash code of the current entry, if any.
@@ -2215,13 +2217,13 @@ public class ScalableHashMap<K,V>
 	private int rootModifications;
 
 	/** The leaf containing the next entry, or null if not computed. */
-	private transient ScalableHashMap<K,V> nextLeaf = null;
+        private transient ScalableHashMap<K, V> nextLeaf = null;
 
 	/**
 	 * The next entry, or null if there is no next entry or if not
 	 * computed.
 	 */
-	private transient PrefixEntry<K,V> nextEntry = null;
+        private transient PrefixEntry<K, V> nextEntry = null;
 
 	/**
 	 * The value of the modification count when the nextLeaf and
@@ -2240,7 +2242,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @param root the root node of the {@code ScalableHashMap}
 	 */
-	ConcurrentIterator(ScalableHashMap<K,V> root) {
+        ConcurrentIterator(ScalableHashMap<K, V> root) {
 	    rootRef = AppContext.getDataManager().createReference(root);
 	    getNext();
 	}
@@ -2276,7 +2278,7 @@ public class ScalableHashMap<K,V>
 	}
 
 	/** Returns the current leaf. */
-	private ScalableHashMap<K,V> getCurrentLeaf() {
+        private ScalableHashMap<K, V> getCurrentLeaf() {
 	    boolean rootChanged = false;
 	    if (!checkedRootModifications) {
 		int currentRootModifications = rootRef.get().modifications;
@@ -2288,7 +2290,7 @@ public class ScalableHashMap<K,V>
 	    }
 	    if (!rootChanged) {
 		try {
-		    ScalableHashMap<K,V> leaf = currentLeafRef.get();
+                    ScalableHashMap<K, V> leaf = currentLeafRef.get();
 		    /* Check that leaf was not converted to a directory node */
 		    if (leaf.nodeDirectory == null) {
 			return leaf;
@@ -2297,7 +2299,7 @@ public class ScalableHashMap<K,V>
 		    /* The leaf was removed */
 		}
 	    }
-	    ScalableHashMap<K,V> leaf = rootRef.get().lookup(currentHash);
+            ScalableHashMap<K, V> leaf = rootRef.get().lookup(currentHash);
 	    currentLeafRef = AppContext.getDataManager().createReference(leaf);
 	    return leaf;
 	}
@@ -2327,7 +2329,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @throws NoSuchElementException if no further entries exist
 	 */
-	Entry<K,V> nextEntry() {
+        Entry<K, V> nextEntry() {
 	    if (!hasNext()) {
 		throw new NoSuchElementException();
 	    }
@@ -2336,7 +2338,7 @@ public class ScalableHashMap<K,V>
 	    currentHash = nextEntry.hash;
 	    currentKeyRef = nextEntry.keyRef();
 	    currentRemoved = false;
-	    Entry<K,V> result = nextEntry;
+            Entry<K, V> result = nextEntry;
 	    getNext();
 	    return result;
 	}
@@ -2371,8 +2373,8 @@ public class ScalableHashMap<K,V>
     /**
      * An iterator over the entry set
      */
-    private static final class EntryIterator<K,V>
-	extends ConcurrentIterator<Entry<K,V>,K,V> {
+    private static final class EntryIterator<K, V>
+            extends ConcurrentIterator<Entry<K, V>, K, V> {
 
 	private static final long serialVersionUID = 0x1L;
 
@@ -2381,14 +2383,14 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie
 	 */
-	EntryIterator(ScalableHashMap<K,V> root) {
+        EntryIterator(ScalableHashMap<K, V> root) {
 	    super(root);
 	}
 
 	/**
 	 * {@inheritDoc}
 	 */
-	public Entry<K,V> next() {
+        public Entry<K, V> next() {
 	    return nextEntry();
 	}
     }
@@ -2396,8 +2398,8 @@ public class ScalableHashMap<K,V>
     /**
      * An iterator over the keys in the map.
      */
-    private static final class KeyIterator<K,V>
-	extends ConcurrentIterator<K,K,V>
+    private static final class KeyIterator<K, V>
+            extends ConcurrentIterator<K, K, V>
     {
 	private static final long serialVersionUID = 0x1L;
 
@@ -2406,7 +2408,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie
 	 */
-	KeyIterator(ScalableHashMap<K,V> root) {
+        KeyIterator(ScalableHashMap<K, V> root) {
 	    super(root);
 	}
 
@@ -2422,8 +2424,8 @@ public class ScalableHashMap<K,V>
     /**
      * An iterator over the values in the tree.
      */
-    private static final class ValueIterator<K,V>
-	extends ConcurrentIterator<V,K,V> {
+    private static final class ValueIterator<K, V>
+            extends ConcurrentIterator<V, K, V> {
 
 	public static final long serialVersionUID = 0x1L;
 
@@ -2432,7 +2434,7 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @param root the root node of the backing trie
 	 */
-	ValueIterator(ScalableHashMap<K,V> root) {
+        ValueIterator(ScalableHashMap<K, V> root) {
 	    super(root);
 	}
 
@@ -2458,16 +2460,16 @@ public class ScalableHashMap<K,V>
      *
      * @return the set of all mappings contained in this map
      */
-    public Set<Entry<K,V>> entrySet() {
-	return new EntrySet<K,V>(this);
+    public Set<Entry<K, V>> entrySet() {
+        return new EntrySet<K, V>(this);
     }
 
     /**
      * An internal-view {@code Set} implementation for viewing all the entries
      * in this map.
      */
-    private static final class EntrySet<K,V>
-	extends AbstractSet<Entry<K,V>>
+    private static final class EntrySet<K, V>
+            extends AbstractSet<Entry<K, V>>
 	implements Serializable {
 
 	private static final long serialVersionUID = 0x1L;
@@ -2477,15 +2479,15 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
+        private final ManagedReference<ScalableHashMap<K, V>> rootRef;
 
 	/**
 	 * A cached version of the root node for faster accessing
 	 */
-	private transient ScalableHashMap<K,V> root;
+        private transient ScalableHashMap<K, V> root;
 
 
-	EntrySet(ScalableHashMap<K,V> root) {
+        EntrySet(ScalableHashMap<K, V> root) {
 	    this.root = root;
 	    rootRef = AppContext.getDataManager().createReference(root);
 	}
@@ -2496,9 +2498,9 @@ public class ScalableHashMap<K,V>
 	    }
 	}
 
-	public Iterator<Entry<K,V>> iterator() {
+        public Iterator<Entry<K, V>> iterator() {
 	    checkCache();
-	    return new EntryIterator<K,V>(root);
+            return new EntryIterator<K, V>(root);
 	}
 
 	public boolean isEmpty() {
@@ -2516,8 +2518,8 @@ public class ScalableHashMap<K,V>
 	    if (!(o instanceof Entry)) {
 		return false;
 	    }
-	    Entry<K,V> e = uncheckedCast(o);
-	    PrefixEntry<K,V> pe = root.getEntry(e.getKey());
+            Entry<K, V> e = uncheckedCast(o);
+            PrefixEntry<K, V> pe = root.getEntry(e.getKey());
 	    return pe != null && pe.equals(e);
 	}
 
@@ -2542,15 +2544,15 @@ public class ScalableHashMap<K,V>
      * @return the set of all keys contained in this map
      */
     public Set<K> keySet() {
-	return new KeySet<K,V>(this);
+        return new KeySet<K, V>(this);
     }
 
     /**
      * An internal collections view class for viewing the keys in the map.
      */
-    private static final class KeySet<K,V>
-	extends AbstractSet<K>
-	implements Serializable {
+    private static final class KeySet<K, V>
+            extends AbstractSet<K>
+            implements Serializable {
 
 	private static final long serialVersionUID = 0x1L;
 
@@ -2559,14 +2561,14 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
+        private final ManagedReference<ScalableHashMap<K, V>> rootRef;
 
 	/**
 	 * A cached version of the root node for faster accessing.
 	 */
-	private transient ScalableHashMap<K,V> root;
+        private transient ScalableHashMap<K, V> root;
 
-	KeySet(ScalableHashMap<K,V> root) {
+        KeySet(ScalableHashMap<K, V> root) {
 	    this.root = root;
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}
@@ -2579,7 +2581,7 @@ public class ScalableHashMap<K,V>
 
 	public Iterator<K> iterator() {
 	    checkCache();
-	    return new KeyIterator<K,V>(root);
+            return new KeyIterator<K, V>(root);
 	}
 
 	public boolean isEmpty() {
@@ -2618,13 +2620,13 @@ public class ScalableHashMap<K,V>
      * @return the collection of all values contained in this map
      */
     public Collection<V> values() {
-	return new Values<K,V>(this);
+        return new Values<K, V>(this);
     }
 
     /**
      * An internal collections-view of all the values contained in this map.
      */
-    private static final class Values<K,V>
+    private static final class Values<K, V>
 	extends AbstractCollection<V>
 	implements Serializable {
 
@@ -2635,14 +2637,14 @@ public class ScalableHashMap<K,V>
 	 *
 	 * @serial
 	 */
-	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
+        private final ManagedReference<ScalableHashMap<K, V>> rootRef;
 
 	/**
 	 * A cached version of the root node for faster accessing.
 	 */
-	private transient ScalableHashMap<K,V> root;
+        private transient ScalableHashMap<K, V> root;
 
-	Values(ScalableHashMap<K,V> root) {
+        Values(ScalableHashMap<K, V> root) {
 	    this.root = root;
 	     rootRef = AppContext.getDataManager().createReference(root);
 	}
@@ -2655,7 +2657,7 @@ public class ScalableHashMap<K,V>
 
 	public Iterator<V> iterator() {
 	    checkCache();
-	    return new ValueIterator<K,V>(root);
+            return new ValueIterator<K, V>(root);
 	}
 
 	public boolean isEmpty() {
@@ -2708,7 +2710,8 @@ public class ScalableHashMap<K,V>
 		    s.writeObject(e);
 		    do { // count any chained entries
 			elements++;
-		    } while ((e = e.next) != null);
+                        e = e.next;
+		    } while (e != null);
 		}
 	    }
 	}
@@ -2732,7 +2735,7 @@ public class ScalableHashMap<K,V>
 	// read in entries and assign them back their positions in the table,
 	// noting that some positions may have chained entries
 	for (int i = 0; i < size; i++) {
-	    PrefixEntry<K,V> e = uncheckedCast(s.readObject());
+            PrefixEntry<K, V> e = uncheckedCast(s.readObject());
 	    table[indexFor(e.hash)] = e;
 	    while ((e = e.next) != null) {
 		// count chained entries
@@ -2749,7 +2752,7 @@ public class ScalableHashMap<K,V>
      * @return the minimum depth
      */
     private int getMinTreeDepth() {
-	ScalableHashMap<K,V> cur = leftMost();
+        ScalableHashMap<K, V> cur = leftMost();
 	int minDepth = cur.depth;
 	while (cur.rightLeafRef != null) {
 	    cur = cur.rightLeafRef.get();
@@ -2767,7 +2770,7 @@ public class ScalableHashMap<K,V>
      * @return the maximum depth
      */
     private int getMaxTreeDepth() {
-	ScalableHashMap<K,V> cur = leftMost();
+        ScalableHashMap<K, V> cur = leftMost();
 	int maxDepth = cur.depth;
 	while (cur.rightLeafRef != null) {
 	    cur = cur.rightLeafRef.get();
@@ -2784,7 +2787,7 @@ public class ScalableHashMap<K,V>
      * @return the average depth
      */
     private double getAvgTreeDepth() {
-	ScalableHashMap<K,V> cur = leftMost();
+        ScalableHashMap<K, V> cur = leftMost();
 	int maxDepth = cur.depth;
 	int leaves = 1;
 	while (cur.rightLeafRef != null) {

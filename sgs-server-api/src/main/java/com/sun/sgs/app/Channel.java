@@ -19,7 +19,6 @@
 
 package com.sun.sgs.app;
 
-import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Set;
@@ -27,7 +26,8 @@ import java.util.Set;
 /**
  * Interface representing a communication group, a {@code Channel},
  * consisting of multiple client sessions.  Classes that implement
- * {@code Channel} must also implement {@link Serializable}.
+ * {@code Channel} must also implement 
+ * {@link java.io.Serializable Serializable}.
  *
  * <p>A channel is created by invoking the {@link
  * ChannelManager#createChannel ChannelManager.createChannel} method with a

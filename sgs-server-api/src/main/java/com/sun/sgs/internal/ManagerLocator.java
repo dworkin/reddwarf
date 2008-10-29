@@ -39,8 +39,8 @@ public interface ManagerLocator {
      * application.  
      *
      * @return	the {@code ChannelManager} for the current application
-     * @throws	ManagerNotFoundException if the {@code ChannelManager} cannot
-     *          be located
+     * @throws	com.sun.sgs.app.ManagerNotFoundException if the 
+     *          {@code ChannelManager} cannot be located
      */
     ChannelManager getChannelManager();
 
@@ -48,8 +48,8 @@ public interface ManagerLocator {
      * Returns the {@code DataManager} for use by the current application.
      *
      * @return	the {@code DataManager} for the current application
-     * @throws	ManagerNotFoundException if the {@code DataManager} cannot
-     *          be located
+     * @throws	com.sun.sgs.app.ManagerNotFoundException if the 
+     *          {@code DataManager} cannot be located
      */
     DataManager getDataManager();
 
@@ -57,8 +57,8 @@ public interface ManagerLocator {
      * Returns the {@code TaskManager} for use by the current application.
      *
      * @return	the {@code TaskManager} for the current application
-     * @throws	ManagerNotFoundException if the {@code TaskManager} cannot
-     *          be located
+     * @throws	com.sun.sgs.app.ManagerNotFoundException if the 
+     *          {@code TaskManager} cannot be located
      */
     TaskManager getTaskManager();
     
@@ -69,8 +69,8 @@ public interface ManagerLocator {
      * @param	<T> the type of the manager
      * @param	type a class representing the type of the manager
      * @return	the manager of the specified type for the current application
-     * @throws	ManagerNotFoundException if no manager is found for the
-     *		specified type
+     * @throws	com.sun.sgs.app.ManagerNotFoundException if no manager is found
+     *          for the	specified type
      */
     <T> T getManager(Class<T> type);
 }
