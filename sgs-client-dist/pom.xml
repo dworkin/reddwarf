@@ -25,28 +25,12 @@
       <groupId>com.projectdarkstar.client</groupId>
       <artifactId>sgs-client</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.mina</groupId>
-      <artifactId>mina-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-jdk14</artifactId>
-    </dependency>
+
     <dependency>
       <groupId>com.projectdarkstar.client</groupId>
       <artifactId>sgs-client-javadoc</artifactId>
       <classifier>api</classifier>
     </dependency>
-    
 
     <dependency>
       <groupId>com.projectdarkstar.client</groupId>

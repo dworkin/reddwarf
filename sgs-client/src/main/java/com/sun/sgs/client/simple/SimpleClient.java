@@ -294,7 +294,7 @@ public class SimpleClient implements ServerSession {
      * @throws IllegalStateException if this client is not logged in
      */
     private void checkLoggedIn() {
-        if (! loggedIn) {
+        if (!loggedIn) {
             RuntimeException re =
                 new IllegalStateException("Client not logged in");
             logger.logThrow(Level.FINE, re, re.getMessage());
@@ -382,7 +382,7 @@ public class SimpleClient implements ServerSession {
                 return;
             }
             synchronized (SimpleClient.this) {
-                if (clientConnection == null && (! connectionStateChanging)) {
+                if (clientConnection == null && (!connectionStateChanging)) {
                     // Someone else beat us here
                     return;
                 }
@@ -410,7 +410,7 @@ public class SimpleClient implements ServerSession {
             // TBI implement graceful disconnect.
             // For now, look at the boolean we set when expecting
             // disconnect
-	    if (! suppressDisconnectedCallback) {
+            if (!suppressDisconnectedCallback) {
 		clientListener.disconnected(expectingDisconnect, reason);
 	    }
 	    suppressDisconnectedCallback = false;
@@ -458,174 +458,272 @@ public class SimpleClient implements ServerSession {
             byte command = msg.getByte();
             switch (command) {
             case SimpleSgsProtocol.LOGIN_SUCCESS:
-                logger.log(Level.FINER, "Logged in");
-                reconnectKey = msg.getBytes(msg.limit() - msg.position());
-                loggedIn = true;
-                clientListener.loggedIn();
+                handleLoginSuccess(msg);
                 break;
 
-            case SimpleSgsProtocol.LOGIN_FAILURE: {
-                String reason = msg.getString();
-                logger.log(Level.FINER, "Login failed: {0}", reason);
-		suppressDisconnectedCallback = true;
-                try {
-                    clientConnection.disconnect();
-                } catch (IOException e) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.logThrow(Level.FINE, e,
-                            "Disconnecting after login failure throws");
-                    }
-                    // ignore
-                }
-                clientListener.loginFailed(reason);
+            case SimpleSgsProtocol.LOGIN_FAILURE:
+                handleLoginFailure(msg);
                 break;
-            }
 
-            case SimpleSgsProtocol.LOGIN_REDIRECT: {
-                String host = msg.getString();
-                int port = msg.getInt();
-                logger.log(Level.FINER, "Login redirect: {0}:{1}", host, port);
-                
-                // Disconnect our current connection, and connect to the
-                // new host and port
-                ClientConnection oldConnection = clientConnection;
-                synchronized (SimpleClient.this) {
-                    clientConnection = null;
-                    connectionStateChanging = true;
-                }
-		try {
-		    oldConnection.disconnect();
-		}  catch (IOException e) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.logThrow(Level.FINE, e,
-                            "Disconnecting after login redirect throws");
-                    }
-                    // ignore
-                }
-                redirect = true;
-                Properties props = new Properties();
-                props.setProperty("host", host);
-                props.setProperty("port", String.valueOf(port));
-                ClientConnector connector = ClientConnector.create(props);
-                // We use a new listener so we don't have to worry about
-                // "redirect" being incorrect.
-                connListener = new SimpleClientConnectionListener();
-                // This eventually causes connected to be called
-                connector.connect(connListener);
+            case SimpleSgsProtocol.LOGIN_REDIRECT:
+                handleLoginRedirect(msg);
                 break;
-            }
 
-            case SimpleSgsProtocol.SESSION_MESSAGE: {
-                logger.log(Level.FINEST, "Direct receive");
-                checkLoggedIn();
-                byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
-                ByteBuffer buf = ByteBuffer.wrap(msgBytes);
-		try {
-		    clientListener.receivedMessage(buf.asReadOnlyBuffer());
-		} catch (RuntimeException e) {
-		    if (logger.isLoggable(Level.WARNING)) {
-			logger.logThrow(
-			    Level.WARNING, e,
-			    "SimpleClientListener.receivedMessage callback " +
-			    "throws");
-		    }
-		}
+            case SimpleSgsProtocol.SESSION_MESSAGE:
+                handleSessionMessage(msg);
                 break;
-            }
 
             case SimpleSgsProtocol.RECONNECT_SUCCESS:
-                logger.log(Level.FINER, "Reconnected");
-                loggedIn = true;
-                reconnectKey = msg.getBytes(msg.limit() - msg.position());
-                clientListener.reconnected();
+                handleReconnectSuccess(msg);
                 break;
 
             case SimpleSgsProtocol.RECONNECT_FAILURE:
-                try {
-                    String reason = msg.getString();
-                    logger.log(Level.FINER, "Reconnect failed: {0}", reason);
-                    clientConnection.disconnect();
-                } catch (IOException e) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.logThrow(Level.FINE, e,
-                            "Disconnecting a failed reconnect throws");
-                    }
-                    // ignore
-                }
+                handleReconnectFailure(msg);
                 break;
 
             case SimpleSgsProtocol.LOGOUT_SUCCESS:
-                logger.log(Level.FINER, "Logged out gracefully");
-                expectingDisconnect = true;
-                loggedIn = false;
-                try {
-                    clientConnection.disconnect();
-                } catch (IOException e) {
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.logThrow(Level.FINE, e,
-                            "Disconnecting after graceful logout throws");
-                    } 
-                    // ignore
-                }
+                handleLogoutSuccess(msg);
                 break;
 
-            case SimpleSgsProtocol.CHANNEL_JOIN: {
-                logger.log(Level.FINER, "Channel join");
-                checkLoggedIn();
-                String channelName = msg.getString();
-		byte[] channelIdBytes =
-		    msg.getBytes(msg.limit() - msg.position());
-		BigInteger channelId = new BigInteger(1, channelIdBytes);
-                SimpleClientChannel channel =
-                    new SimpleClientChannel(channelName, channelId);
-                if (channels.putIfAbsent(channelId, channel) == null) {
-                    channel.joined();
-                } else {
-                    logger.log(Level.WARNING,
-                        "Cannot join channel {0}: already a member",
-                        channelName);
-                }
+            case SimpleSgsProtocol.CHANNEL_JOIN:
+                handleChannelJoin(msg);
                 break;
-            }
 
-            case SimpleSgsProtocol.CHANNEL_LEAVE: {
-                logger.log(Level.FINER, "Channel leave");
-                checkLoggedIn();
-		byte[] channelIdBytes =
-		    msg.getBytes(msg.limit() - msg.position());
-		BigInteger channelId = new BigInteger(1, channelIdBytes);
-                SimpleClientChannel channel = channels.remove(channelId);
-                if (channel != null) {
-                    channel.left();
-                } else {
-                    logger.log(Level.WARNING,
-                        "Cannot leave channel {0}: not a member",
-                        channelId);
-                }
+            case SimpleSgsProtocol.CHANNEL_LEAVE:
+                handleChannelLeave(msg);
                 break;
-            }
 
             case SimpleSgsProtocol.CHANNEL_MESSAGE:
-                logger.log(Level.FINEST, "Channel recv");
-                checkLoggedIn();
-                BigInteger channelId =
-		    new BigInteger(1, msg.getBytes(msg.getShort()));
-                SimpleClientChannel channel = channels.get(channelId);
-                if (channel == null) {
-                    logger.log(Level.WARNING,
-                        "Ignore message on channel {0}: not a member",
-                        channelId);
-                    return;
-                }
-		byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
-		ByteBuffer buf = ByteBuffer.wrap(msgBytes);
-                channel.receivedMessage(buf.asReadOnlyBuffer());
+                handleChannelMessage(msg);
                 break;
 
             default:
                 throw new IOException(
                     String.format("Unknown session opcode: 0x%02X", command));
             }
+        }
+        
+        /**
+         * Process a login success message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleLoginSuccess(MessageBuffer msg) {
+            logger.log(Level.FINER, "Logged in");
+            reconnectKey = msg.getBytes(msg.limit() - msg.position());
+            loggedIn = true;
+            clientListener.loggedIn();
+        }
+        
+        /**
+         * Process a login failure message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleLoginFailure(MessageBuffer msg) {
+            String reason = msg.getString();
+            logger.log(Level.FINER, "Login failed: {0}", reason);
+            suppressDisconnectedCallback = true;
+            try {
+                clientConnection.disconnect();
+            } catch (IOException e) {
+                // ignore
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+                                    "Disconnecting after login failure throws");
+                }
+            }
+            clientListener.loginFailed(reason);
+        }
+        
+        /**
+         * Process a login redirect message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleLoginRedirect(MessageBuffer msg) 
+                throws IOException {
+            String host = msg.getString();
+            int port = msg.getInt();
+            logger.log(Level.FINER, "Login redirect: {0}:{1}", host, port);
+
+            // Disconnect our current connection, and connect to the
+            // new host and port
+            ClientConnection oldConnection = clientConnection;
+            synchronized (SimpleClient.this) {
+                clientConnection = null;
+                connectionStateChanging = true;
+            }
+            try {
+                oldConnection.disconnect();
+            } catch (IOException e) {
+                // ignore
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+                                    "Disconnecting after login redirect " + 
+                                    "throws");
+                }
+            }
+            redirect = true;
+            Properties props = new Properties();
+            props.setProperty("host", host);
+            props.setProperty("port", String.valueOf(port));
+            ClientConnector connector = ClientConnector.create(props);
+            // We use a new listener so we don't have to worry about
+            // "redirect" being incorrect.
+            connListener = new SimpleClientConnectionListener();
+            // This eventually causes connected to be called
+            connector.connect(connListener);
+        }
+        
+        /**
+         * Process a session message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleSessionMessage(MessageBuffer msg) {
+            logger.log(Level.FINEST, "Direct receive");
+            checkLoggedIn();
+            byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
+            ByteBuffer buf = ByteBuffer.wrap(msgBytes);
+            try {
+                clientListener.receivedMessage(buf.asReadOnlyBuffer());
+            } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.logThrow(
+                            Level.WARNING, e,
+                            "SimpleClientListener.receivedMessage callback " +
+                            "throws");
+                }
+            }
+        }
+        
+        /**
+         * Process a reconnect success message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleReconnectSuccess(MessageBuffer msg) {
+            logger.log(Level.FINER, "Reconnected");
+            loggedIn = true;
+            reconnectKey = msg.getBytes(msg.limit() - msg.position());
+            clientListener.reconnected();
+        }
+        
+        /**
+         * Process a reconnect failure message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleReconnectFailure(MessageBuffer msg) {
+            try {
+                String reason = msg.getString();
+                logger.log(Level.FINER, "Reconnect failed: {0}", reason);
+                clientConnection.disconnect();
+            } catch (IOException e) {
+                // ignore
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+                                    "Disconnecting a failed reconnect throws");
+                }
+            }
+        }
+        
+        /**
+         * Process a logout success message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleLogoutSuccess(MessageBuffer msg) {
+            logger.log(Level.FINER, "Logged out gracefully");
+            expectingDisconnect = true;
+            loggedIn = false;
+            try {
+                clientConnection.disconnect();
+            } catch (IOException e) {
+                // ignore
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+                                    "Disconnecting after graceful logout " +
+                                    "throws");
+                }
+            }
+        }
+        
+        /**
+         * Process a channel join message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleChannelJoin(MessageBuffer msg) {
+            logger.log(Level.FINER, "Channel join");
+            checkLoggedIn();
+            String channelName = msg.getString();
+            byte[] channelIdBytes =
+                    msg.getBytes(msg.limit() - msg.position());
+            BigInteger channelId = new BigInteger(1, channelIdBytes);
+            SimpleClientChannel channel =
+                    new SimpleClientChannel(channelName, channelId);
+            if (channels.putIfAbsent(channelId, channel) == null) {
+                channel.joined();
+            } else {
+                logger.log(Level.WARNING,
+                           "Cannot join channel {0}: already a member",
+                           channelName);
+            }
+        }
+        
+        /**
+         * Process a channel leave message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleChannelLeave(MessageBuffer msg) {
+            logger.log(Level.FINER, "Channel leave");
+            checkLoggedIn();
+            byte[] channelIdBytes =
+                    msg.getBytes(msg.limit() - msg.position());
+            BigInteger channelId = new BigInteger(1, channelIdBytes);
+            SimpleClientChannel channel = channels.remove(channelId);
+            if (channel != null) {
+                channel.left();
+            } else {
+                logger.log(Level.WARNING,
+                           "Cannot leave channel {0}: not a member",
+                           channelId);
+            }
+        }
+        
+        /**
+         * Process a channel message message
+         * 
+         * @param msg the message to process
+         * @throws IOException if an IO problem occurs
+         */
+        private void handleChannelMessage(MessageBuffer msg) {
+            logger.log(Level.FINEST, "Channel recv");
+            checkLoggedIn();
+            BigInteger channelId =
+                    new BigInteger(1, msg.getBytes(msg.getShort()));
+            SimpleClientChannel channel = channels.get(channelId);
+            if (channel == null) {
+                logger.log(Level.WARNING,
+                           "Ignore message on channel {0}: not a member",
+                           channelId);
+                return;
+            }
+            byte[] msgBytes = msg.getBytes(msg.limit() - msg.position());
+            ByteBuffer buf = ByteBuffer.wrap(msgBytes);
+            channel.receivedMessage(buf.asReadOnlyBuffer());
         }
 
         /**
@@ -696,7 +794,7 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public void send(ByteBuffer message) throws IOException {
-            if (! isJoined.get()) {
+            if (!isJoined.get()) {
                 throw new IllegalStateException(
                     "Cannot send on unjoined channel " + channelName);
             }
@@ -714,7 +812,7 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            if (! isJoined.compareAndSet(false, true)) {
+            if (!isJoined.compareAndSet(false, true)) {
                 throw new IllegalStateException(
                     "Already joined to channel " + channelName);
             }
@@ -736,7 +834,7 @@ public class SimpleClient implements ServerSession {
         }
 
         void left() {
-            if (! isJoined.compareAndSet(true, false)) {
+            if (!isJoined.compareAndSet(true, false)) {
                 throw new IllegalStateException(
                     "Cannot leave unjoined channel " + channelName);
             }
@@ -748,7 +846,7 @@ public class SimpleClient implements ServerSession {
        }
         
         void receivedMessage(ByteBuffer message) {
-            if (!  isJoined.get()) {
+            if (!isJoined.get()) {
                 throw new IllegalStateException(
                     "Cannot receive on unjoined channel " + channelName);
             }

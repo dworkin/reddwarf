@@ -64,7 +64,8 @@ import com.sun.sgs.io.Connector;
  *	Specifies the server port.
  * <p>
  * <li> <i>Key:</i> {@code connectTimeout} <br>
- *	<i>Default:</i> {@value com.sun.sgs.impl.client.simple.SimpleClientConnector#DEFAULT_CONNECT_TIMEOUT}
+ *	<i>Default:</i> {@value 
+ * com.sun.sgs.impl.client.simple.SimpleClientConnector#DEFAULT_CONNECT_TIMEOUT}
  *      <br>
  *	Specifies the timeout (in milliseconds) for a connect attempt
  *	to the server.
@@ -185,7 +186,7 @@ class SimpleClientConnector extends ClientConnector {
 		// ignore
 	    }
 	    try {
-		if (! connector.isConnected()) {
+                if (!connector.isConnected()) {
 		    String reason =
 			connectFailureMessage != null ?
 			connectFailureMessage :
@@ -194,7 +195,7 @@ class SimpleClientConnector extends ClientConnector {
 			new MessageBuffer(MessageBuffer.getSize(reason));
 		    buf.putString(reason);
 		    listener.disconnected(false, buf.getBuffer());
-		    if (! connectComplete) {
+                    if (!connectComplete) {
 			try {
 			    connector.shutdown();
 			} catch (IllegalStateException e) {
