@@ -43,11 +43,11 @@ public interface ClientSessionService extends Service {
         ClientSessionDisconnectListener listener);
 
     /**
-     * Returns a protocol message handler with the specified {@code
+     * Returns a session message handler with the specified {@code
      * delivery} requirement for the <i>local</i> client session with the
      * specified {@code sessionRefId}. If the specified client session is
      * not connected to the local node, an {@code IllegalArgumentException}
-     * is thrown.  If there is no {@code ProtocolMessageChannel} with the
+     * is thrown.  If there is no {@link SessionMessageChannel} with the
      * given {@code delivery} requirement for the specified client session,
      * an {@code UnsupportedDeliveryException} is thrown.
      *
@@ -57,6 +57,8 @@ public interface ClientSessionService extends Service {
      *
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
      * @param	delivery a delivery requirement
+     * @return the {@code SessionMessageChannel} associated with the
+     * specified session
      */
     SessionMessageChannel getProtocolMessageChannel(
 	BigInteger sessionRefId, Delivery delivery);

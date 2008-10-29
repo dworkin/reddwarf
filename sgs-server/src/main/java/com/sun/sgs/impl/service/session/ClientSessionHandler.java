@@ -178,7 +178,7 @@ class ClientSessionHandler implements SessionMessageHandler {
      * Handles a disconnect request (if not already handled) by doing
      * the following: <ol>
      *
-     * <li> sending a disconnect acknowledgment (LOGOUT_SUCCESS)
+     * <li> sending a disconnect acknowledgment (logout success)
      *    if 'graceful' is true
      *
      * <li> if {@code closeConnection} is {@code true}, closing this
@@ -197,7 +197,7 @@ class ClientSessionHandler implements SessionMessageHandler {
      *
      * <p>Note:if {@code graceful} is {@code true}, then {@code
      * closeConnection} must be {@code false} so that the client will receive
-     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * the logout success message.  The client may not
      * receive the message if the connection is disconnected immediately
      * after sending the message.
      *
@@ -210,7 +210,7 @@ class ClientSessionHandler implements SessionMessageHandler {
     void handleDisconnect(final boolean graceful, boolean closeConnection) {
 
 	logger.log(Level.FINEST, "handleDisconnect handler:{0}", this);
-	
+        
 	synchronized (lock) {
 	    if (disconnectHandled) {
 		return;
@@ -274,12 +274,12 @@ class ClientSessionHandler implements SessionMessageHandler {
      *
      * <p>Note:if {@code graceful} is {@code true}, then {@code
      * closeConnection} must be {@code false} so that the client will receive
-     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * the logout success message.  The client may not
      * receive the message if the connection is disconnected immediately
      * after sending the message.
      *
      * @param	graceful if {@code true}, disconnection is graceful (i.e.,
-     * 		a LOGOUT_SUCCESS protocol message is sent before
+     * 		a logout success message is sent before
      * 		disconnecting the client session)
      * @param	closeConnection if {@code true}, close this session's
      *		connection immediately, otherwise monitor the connection to
@@ -335,6 +335,7 @@ class ClientSessionHandler implements SessionMessageHandler {
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
+    @Override
     public String toString() {
 	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
     }
@@ -358,8 +359,8 @@ class ClientSessionHandler implements SessionMessageHandler {
     /**
      * Handles a login request for the specified {@code name} and
      * {@code password}, scheduling the appropriate response to be
-     * sent to the client (either LOGIN_SUCCESS, LOGIN_FAILURE, or
-     * LOGIN_REDIRECT).
+     * sent to the client (either logout success, login failure, or
+     * login redirect).
      */
     private void handleLoginRequest(String name, String password) {
 
@@ -543,7 +544,7 @@ class ClientSessionHandler implements SessionMessageHandler {
     }
 
         /**
-     * Sends a {@code loginFailure} protocol message to the client and
+     * Sends a login failure message to the client and
      * disconnects the client session.
      *
      * @param   throwable an exception that occurred while processing the

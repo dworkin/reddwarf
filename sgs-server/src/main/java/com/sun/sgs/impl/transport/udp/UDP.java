@@ -431,7 +431,7 @@ public class UDP implements Transport {
     }
 
     @Override
-    public TransportDescriptor descriptor() {
+    public TransportDescriptor getDescriptor() {
         return descriptor;
     }
 }

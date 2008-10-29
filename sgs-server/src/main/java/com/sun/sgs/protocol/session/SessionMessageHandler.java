@@ -86,7 +86,7 @@ public interface SessionMessageHandler extends MessageHandler {
      * @param	future a future to be notified when the request has been
      *		processed, or {@code null}
      */
-    void channelMessage(BigInteger channelId, ByteBuffer messsage,
+    void channelMessage(BigInteger channelId, ByteBuffer message,
 			CompletionFuture future);
 
     /**

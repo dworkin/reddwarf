@@ -17,26 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.protocol;
+/** Provides an implementation of {@link com.sun.sgs.app.ChannelManager}. */
+package com.sun.sgs.impl.service.channel;
 
-/**
- * A protocol.
- */
-public interface Protocol {
-
-    /**
-     * Returns the descriptor for this protocol. Multiple calls to this
-     * method may return the same object.
-     * 
-     * @return the descriptor for this protocol
-     */
-    ProtocolDescriptor getDescriptor();
-    
-    /**
-     * Shutdown the protocol. The actions of this method are implementation
-     * dependent, but typically involve closing open network connections,
-     * releasing system resources, etc.. All shutdown activity is
-     * synchronous with this call.
-     */
-    void shutdown();
-}

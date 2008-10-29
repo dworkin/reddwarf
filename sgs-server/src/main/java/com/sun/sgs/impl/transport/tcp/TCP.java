@@ -61,7 +61,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	{@value #LISTEN_PORT_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> Required property<br>
+ *	<i>Default:</i> Required property.<br>
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies the network port that the transport instance will listen on.
@@ -310,7 +310,7 @@ public class TCP implements Transport {
     }
     
     @Override
-    public TransportDescriptor descriptor() {
+    public TransportDescriptor getDescriptor() {
         return descriptor;
     }
 }

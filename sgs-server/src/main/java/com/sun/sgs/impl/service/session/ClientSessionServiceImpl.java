@@ -90,13 +90,40 @@ import java.util.logging.Logger;
  * these public configuration <a
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
+ * 
+ * * The {@link #ClientSessionServiceImpl constructor} supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #PROTOCOL_LIST_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> Required property.
+ *
+ * <dd style="padding-top: .5em">Specifies a colon ":" separated list of
+ * protocol class names to use for session communication. Specified
+ * classes must implement {@link SessionMessageChannel}<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #PROTOCOL_PROPERTIES_BASE}.n
+ *	</b></code><br>
+ *	<i>Default:</i> Required property(s). There needs to be a numbered
+ * property speciied for each protocol class name specified in
+ * {@value #PROTOCOL_LIST_PROPERTY}.<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies a colon ":" separated list of name value pairs which
+ * are intrepreted as properites which are passed to the protocol factory.<p>
+ * 
+ * </dl> <p>
  */
 public final class ClientSessionServiceImpl
     extends AbstractService
     implements ClientSessionService, ProtocolConnectionHandler
 {
     /** The package name. */
-    public static final String PKG_NAME = "com.sun.sgs.impl.service.session";
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.session";
     
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -116,11 +143,11 @@ public final class ClientSessionServiceImpl
     private static final int MINOR_VERSION = 0;
     
     /** The transport(s) to use for incomming client connections. */
-    private static final String PROTOCOL_LIST_PROPERTY =
+    public static final String PROTOCOL_LIST_PROPERTY =
         PKG_NAME + ".protocols";
     
     /** The transport properties base */
-    private static final String PROTOCOL_PROPERTIES_BASE =
+    public static final String PROTOCOL_PROPERTIES_BASE =
         PKG_NAME + ".protocol.properties.";
     
     /** The name of the server port property. */
@@ -135,13 +162,6 @@ public final class ClientSessionServiceImpl
 
     /** The default events per transaction. */
     private static final int DEFAULT_EVENTS_PER_TXN = 1;
-
-    /** The name of the read buffer size property. */
-    private static final String READ_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.read.max";
-
-    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
-    private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
@@ -166,9 +186,6 @@ public final class ClientSessionServiceImpl
     /** Properties. */
     private final PropertiesWrapper wrappedProps;
     
-    /** The read buffer size for new connections. */
-    private final int readBufferSize;
-
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
 
@@ -301,10 +318,6 @@ public final class ClientSessionServiceImpl
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
-
-            readBufferSize = wrappedProps.getIntProperty(
-                READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
-                8192, Integer.MAX_VALUE);
 
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
@@ -445,7 +458,6 @@ public final class ClientSessionServiceImpl
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
 	}
-        System.out.println("*** CLEAR " );
 	handlers.clear();
 
 	if (exporter != null) {
@@ -520,26 +532,25 @@ public final class ClientSessionServiceImpl
                                                            Delivery delivery)
     {
         ClientSessionHandler handler = handlers.get(sessionRefId);
-	/*
-	 * If a local handler exists, return protocol message channel
-	 */
-	if (handler != null) {
-	    return handler.getSessionMessageChannel();
-	} else {
-	    logger.log(
-		Level.FINE,
-		"Discarding message for unknown session:{0}",
-		sessionRefId);
-	    // TBD: is throwing this exception the right thing to do?
-	    throw new IllegalArgumentException(
-		"unknown session: " + sessionRefId);
-	}
-
+//	/*
+//	 * If a local handler exists, return protocol message channel
+//	 */
+//	if (handler != null) {
+//	    return handler.getSessionMessageChannel();
+//	} else {
+//	    logger.log(
+//		Level.FINE,
+//		"Discarding message for unknown session:{0}",
+//		sessionRefId);
+//	    // TBD: is throwing this exception the right thing to do?
+//	    throw new IllegalArgumentException(
+//		"unknown session: " + sessionRefId);
+//	}
                 
-//        if (handler != null && handler.isConnected()) {
-//            return handler.getSessionMessageChannel();
-//        }
-//        return null;
+        if (handler != null && handler.isConnected()) {
+            return handler.getSessionMessageChannel();
+        }
+        return null;
     }
     
     /* -- Package access methods for adding commit actions -- */
@@ -640,6 +651,7 @@ public final class ClientSessionServiceImpl
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public Context createContext(Transaction txn) {
 	    return new Context(txn);
 	}
@@ -1011,6 +1023,7 @@ public final class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
+        @Override
 	public void serviceEventQueue(final byte[] sessionId) {
 	    callStarted();
 	    try {
@@ -1174,7 +1187,6 @@ public final class ClientSessionServiceImpl
      */
     void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
         assert handler != null;
-        System.out.println("*** Added " + sessionRefId);
 	handlers.put(sessionRefId, handler);
     }
     
@@ -1184,7 +1196,6 @@ public final class ClientSessionServiceImpl
      * disconnected.
      */
     void removeHandler(BigInteger sessionRefId) {
-        System.out.println("*** Remove " + sessionRefId);
 	if (shuttingDown()) {
 	    return;
 	}
@@ -1281,6 +1292,7 @@ public final class ClientSessionServiceImpl
 	extends AbstractKernelRunnable
     {
 	/** {@inheritDoc} */
+        @Override
 	public void run() {
 	    long now = System.currentTimeMillis();
 	    if (!disconnectingHandlersMap.isEmpty() &&
@@ -1304,6 +1316,7 @@ public final class ClientSessionServiceImpl
 	implements RecoveryListener
     {
 	/** {@inheritDoc} */
+        @Override
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
 	    final TaskService taskService = getTaskService();

@@ -1156,8 +1156,8 @@ public class TestWatchdogServiceImpl extends TestCase {
             // server.  We expect to see a socket BindException rather
             // than an IllegalArgumentException.
  	    Properties props1 = getPropsForApplication(appName + "1");
- 	    props1.setProperty("com.sun.sgs.impl.service.session.transport.properties.0",
- 			       props.getProperty("com.sun.sgs.impl.service.session.transport.properties.0"));
+ 	    props1.setProperty("com.sun.sgs.impl.service.session.protocol.properties.0",
+ 			       props.getProperty("com.sun.sgs.impl.service.session.protocol.properties.0"));
 	    node1 = new SgsTestNode(appName, null, props1, true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {

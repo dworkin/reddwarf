@@ -34,7 +34,7 @@ public interface Transport {
      * 
      * @return the descriptor for this transport
      */
-    TransportDescriptor descriptor();
+    TransportDescriptor getDescriptor();
     
 //    /**
 //     * Start the transport. If {@code start} has been call, subsequent

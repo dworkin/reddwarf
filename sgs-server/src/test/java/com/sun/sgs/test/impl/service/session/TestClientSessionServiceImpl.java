@@ -129,9 +129,11 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-            "com.sun.sgs.impl.service.session.transports",
-                "com.sun.sgs.impl.transport.tcp.TCP",
-            "com.sun.sgs.impl.service.session.transport.properties.0",
+            "com.sun.sgs.impl.service.session.protocols",
+                "com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl",
+            "com.sun.sgs.impl.service.session.protocol.properties.0",
+                "com.sun.sgs.impl.protocol.simple.transport:" +
+                    "com.sun.sgs.impl.transport.tcp.TCP:" +
                 "com.sun.sgs.impl.transport.tcp.listen.port:20000");
 
     /** The node that creates the servers. */

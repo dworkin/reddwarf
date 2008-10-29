@@ -56,11 +56,11 @@ public interface ProtocolDescriptor {
     TransportDescriptor getTransport();
     
     /**
-     * Check if a protocol is compatible with the transport this descriptor
-     * represents. The comparison is transport specific.
+     * Check if the specified protocol is compatible with the protocol this
+     * descriptor represents. The comparison is protocol specific.
      * @param descriptor to compare
-     * @return {@code true} if the specified descriptor represents a transport
-     * compatible with the transport this descriptor represents, and
+     * @return {@code true} if the specified descriptor represents a protocol
+     * compatible with the protocol this descriptor represents, and
      * {@code false} otherwise
      */
     boolean isCompatibleWith(ProtocolDescriptor descriptor);

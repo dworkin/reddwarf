@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.protocol.ProtocolDescriptorImpl;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -45,6 +46,28 @@ import java.util.logging.Logger;
 /**
  * A protocol factory for creating new {@code SimpleProtocolMessageChannel}
  * instances.  Such channels implement the {@link SimpleSgsProtocolImpl}.
+ * The {@link #SimpleSgsProtocolImpl constructor} supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #READ_BUFFER_SIZE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_READ_BUFFER_SIZE}
+ *
+ * <dd style="padding-top: .5em">Specifies the read buffer size. Value must be
+ * between 8192 and {@code Integer.MAX_VALUE}.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #TRANSPORT_CLASS_NAME_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> Required property.<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the class name of the transport to use.<p>
+ * 
+ * </dl> <p>
  */
 public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
     
@@ -56,14 +79,14 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
     /** The name of the read buffer size property. */
-    private static final String READ_BUFFER_SIZE_PROPERTY =
+    public static final String READ_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".buffer.read.max";
 
-    private static final String TRANSPORT_CLASS_NAME =
+    public static final String TRANSPORT_CLASS_NAME_PROPERTY =
         PKG_NAME + ".transport";
             
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
-    private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
+    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
     /** The transaction proxy, or null if configure has not been called. */    
     private static volatile TransactionProxy txnProxy = null;
@@ -79,7 +102,7 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
 
     private final Transport transport;
     
-    private final ProtocolConnectionHandler handler;
+    private final ProtocolConnectionHandler connectionHandler;
     
     private final ProtocolDescriptor protocolDesc;
     
@@ -94,7 +117,7 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
     public SimpleSgsProtocolImpl(Properties properties,
                                  ComponentRegistry systemRegistry,
                                  TransactionProxy txnProxy,
-                                 ProtocolConnectionHandler handler)
+                                 ProtocolConnectionHandler connectionHandler)
     {
 	logger.log(Level.CONFIG,
 		   "Creating SimpleSgsProtcolFactory properties:{0}",
@@ -129,7 +152,7 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 systemRegistry.getComponent(TransportFactory.class);
             
             String transportClassName =
-                    wrappedProps.getProperty(TRANSPORT_CLASS_NAME);
+                    wrappedProps.getProperty(TRANSPORT_CLASS_NAME_PROPERTY);
             if (transportClassName == null)
                 throw new IllegalArgumentException(
                         "a transport must be specified");
@@ -137,9 +160,15 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
             transport = transportFactory.startTransport(transportClassName,
                                                         properties,
                                                         this);
+            
+            if (!transport.getDescriptor().canSupport(Delivery.RELIABLE)) {
+                transport.shutdown();
+                throw new IllegalArgumentException(
+                        "transport must support RELIABLE delivery");
+            }
             protocolDesc = new ProtocolDescriptorImpl(SimpleSgsProtocol.TYPE,
-                                                      transport.descriptor());
-            this.handler = handler;
+                                                      transport.getDescriptor());
+            this.connectionHandler = connectionHandler;
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -163,9 +192,9 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 new SimpleSgsProtocolMessageChannel(byteChannel,
                                                     this,
                                                     readBufferSize);
-        MessageHandler msgHandler = handler.newConnection(msgChannel,
-                                                          protocolDesc);
-        assert handler instanceof SessionMessageHandler;
+        MessageHandler msgHandler =
+                    connectionHandler.newConnection(msgChannel, protocolDesc);
+        assert msgHandler instanceof SessionMessageHandler;
         msgChannel.setHandler((SessionMessageHandler)msgHandler);
     }
 
@@ -178,11 +207,13 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
         taskScheduler.scheduleTask(task, taskOwner);
     }
 
+    /** {@inheritDoc} */
     @Override
     public ProtocolDescriptor getDescriptor() {
         return protocolDesc;
     }
 
+    /** {@inheritDoc} */
     @Override
     public void shutdown() {
         transport.shutdown();

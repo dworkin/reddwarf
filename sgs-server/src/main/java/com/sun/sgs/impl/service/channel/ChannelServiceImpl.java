@@ -310,6 +310,7 @@ public final class ChannelServiceImpl
     /* -- Implement AbstractService methods -- */
 
     /** {@inheritDoc} */
+    @Override
     protected void handleServiceVersionMismatch(
 	Version oldVersion, Version currentVersion)
     {
@@ -319,10 +320,12 @@ public final class ChannelServiceImpl
     }
     
      /** {@inheritDoc} */
+    @Override
     protected void doReady() {
     }
 
     /** {@inheritDoc} */
+    @Override
     protected void doShutdown() {
 	logger.log(Level.FINEST, "shutdown");
 	
@@ -339,6 +342,7 @@ public final class ChannelServiceImpl
     /* -- Implement ChannelManager -- */
 
     /** {@inheritDoc} */
+    @Override
     public Channel createChannel(String name,
 				 ChannelListener listener,
 				 Delivery delivery)
@@ -355,6 +359,7 @@ public final class ChannelServiceImpl
     }
 
     /** {@inheritDoc} */
+    @Override
     public Channel getChannel(String name) {
 	try {
 	    return ChannelImpl.getInstance(name);
@@ -371,7 +376,7 @@ public final class ChannelServiceImpl
      * Handles a channel {@code message} that the specified {@code session}
      * is sending on the channel with the specified {@code channelRefId}.
      * This method is invoked from the {@code ClientSessionHandler} of the
-     * given session, when it receives a {@code CHANNEL_MESSAGE} protocol
+     * given session, when it receives a channel
      * message.  This method must be called from within a transaction. <p>
      *
      * @param	channelRefId the channel ID, as a {@code BigInteger}
@@ -398,6 +403,7 @@ public final class ChannelServiceImpl
 	 * servicing a channel event accesses a single per-channel data
 	 * structure (the channel's event queue).
 	 */
+        @Override
 	public void serviceEventQueue(final byte[] channelId) {
 	    callStarted();
 	    try {
@@ -432,9 +438,10 @@ public final class ChannelServiceImpl
 	 * Reads the local membership list for the specified
 	 * {@code channelId}, and updates the local membership cache
 	 * for that channel.  If any join or leave notifications were
-	 * missed, then send the appropriate CHANNEL_JOIN or CHANNEL_LEAVE
-	 * protocol message to the effected session(s).
+	 * missed, then send the appropriate channel join or channel join
+	 * message to the effected session(s).
 	 */
+        @Override
 	public void refresh(String name, byte[] channelId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
@@ -469,7 +476,7 @@ public final class ChannelServiceImpl
 
 		/*
 		 * Determine which join and leave events were missed and
-		 * send protocol messages to clients accordingly.
+		 * send messages to clients accordingly.
 		 */
 		Set<BigInteger> oldLocalMembers =
 		    localChannelMembersMap.put(channelRefId, newLocalMembers);
@@ -494,14 +501,22 @@ public final class ChannelServiceImpl
 		}
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
-                        sessionService.getProtocolMessageChannel(sessionRefId,
-                                                                 Delivery.RELIABLE).channelJoin(name, channelRefId);
+                        SessionMessageChannel msgChannel =
+                            sessionService.getProtocolMessageChannel(
+                                                            sessionRefId,
+                                                            Delivery.RELIABLE);
+                        if (msgChannel != null)
+                            msgChannel.channelJoin(name, channelRefId);
 		    }
 		}
 		if (leavers != null) {
 		    for (BigInteger sessionRefId : leavers) {
-                        sessionService.getProtocolMessageChannel(sessionRefId,
-                                                                 Delivery.RELIABLE).channelLeave(channelRefId);
+                        SessionMessageChannel msgChannel =
+                            sessionService.getProtocolMessageChannel(
+                                                            sessionRefId,
+                                                            Delivery.RELIABLE);
+                        if (msgChannel != null)
+                            msgChannel.channelLeave(channelRefId);
 		    }
 		}
 
@@ -514,9 +529,10 @@ public final class ChannelServiceImpl
 	 *
 	 * Adds the specified {@code sessionId} to the per-channel cache
 	 * for the given channel's local member sessions, and sends a
-	 * CHANNEL_JOIN protocol message to the session with the corresponding
+	 * channel join message to the session with the corresponding
 	 * {@code sessionId}.
 	 */
+        @Override
 	public void join(String name, byte[] channelId, byte[] sessionId) {
 	    callStarted();
 	    try {
@@ -526,8 +542,24 @@ public final class ChannelServiceImpl
 			       HexDumper.toHexString(sessionId));
 		}
 
-		// Update local channel membership cache.
 		BigInteger channelRefId = new BigInteger(1, channelId);
+                BigInteger sessionRefId = new BigInteger(1, sessionId);
+
+                SessionMessageChannel msgChannel =
+                    sessionService.getProtocolMessageChannel(sessionRefId,
+                                                             Delivery.RELIABLE);
+                if (msgChannel != null) {
+                    if (logger.isLoggable(Level.FINEST)) {
+                        logger.log(Level.FINEST,
+                                   "join channelId {0} failed, " +
+                                   "sessionId {1} disconnected",
+                                   HexDumper.toHexString(channelId),
+                                   HexDumper.toHexString(sessionId));
+                    }
+                    return;
+                }
+                
+                // Update local channel membership cache.
 		Set<BigInteger> localMembers =
 		    localChannelMembersMap.get(channelRefId);
 		if (localMembers == null) {
@@ -539,7 +571,6 @@ public final class ChannelServiceImpl
 			localMembers = newLocalMembers;
 		    }
 		}
-		BigInteger sessionRefId = new BigInteger(1, sessionId);
 		localMembers.add(sessionRefId);
 
 		// Update per-session channel set cache.
@@ -556,9 +587,8 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
-		// Send CHANNEL_JOIN protocol message.
-                sessionService.getProtocolMessageChannel(
-			sessionRefId, Delivery.RELIABLE).channelJoin(name, channelRefId);
+		// Send channel join message.
+                msgChannel.channelJoin(name, channelRefId);
 
 	    } finally {
 		callFinished();
@@ -569,9 +599,10 @@ public final class ChannelServiceImpl
 	 *
 	 * Removes the specified {@code sessionId} from the per-channel
 	 * cache for the given channel's local member sessions, and sends a
-	 * CHANNEL_LEAVE protocol message to the session with the corresponding
+	 * channel leave message to the session with the corresponding
 	 * {@code sessionId}.
 	 */
+        @Override
 	public void leave(byte[] channelId, byte[] sessionId) {
 	    callStarted();
 	    try {
@@ -599,9 +630,12 @@ public final class ChannelServiceImpl
 		    channelSet.remove(channelRefId);
 		}
 
-		// Send CHANNEL_LEAVE protocol message.
-                sessionService.getProtocolMessageChannel(
-                        sessionRefId, Delivery.RELIABLE).channelLeave(channelRefId);
+		// Send channel leave message.
+                SessionMessageChannel msgChannel =
+                        sessionService.getProtocolMessageChannel(
+                                             sessionRefId, Delivery.RELIABLE);
+                if (msgChannel != null)
+                    msgChannel.channelLeave(channelRefId);
                 
 	    } finally {
 		callFinished();
@@ -611,9 +645,10 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Removes the channel from the per-channel cache of local member
-	 * sessions, and sends a CHANNEL_LEAVE protocol message to the
+	 * sessions, and sends a channel leave message to the
 	 * channel's local member sessions.
 	 */
+        @Override
 	public void leaveAll(byte[] channelId) {
 	    callStarted();
 	    try {
@@ -626,8 +661,11 @@ public final class ChannelServiceImpl
 		localMembers = localChannelMembersMap.remove(channelRefId);
 		if (localMembers != null) {
 		    for (BigInteger sessionRefId : localMembers) {
-                        sessionService.getProtocolMessageChannel(
-				sessionRefId, Delivery.RELIABLE).channelLeave(channelRefId);
+                        SessionMessageChannel msgChannel =
+                                sessionService.getProtocolMessageChannel(
+                                             sessionRefId, Delivery.RELIABLE);
+                        if (msgChannel != null)
+                            msgChannel.channelLeave(channelRefId);
 		    }
 		}
 		
@@ -644,6 +682,7 @@ public final class ChannelServiceImpl
 	 * TBD: (optimization) this method should handle sending multiple
 	 * messages to a given channel.
 	 */
+        @Override
 	public void send(byte[] channelId, byte[] message) {
 	    callStarted();
 	    try {
@@ -670,9 +709,15 @@ public final class ChannelServiceImpl
 		
 		for (BigInteger sessionRefId : localMembers) {
                     SessionMessageChannel msgChannel =
-                    sessionService.getProtocolMessageChannel(sessionRefId,
-                                                             Delivery.RELIABLE);
-                    if (msgChannel != null)
+                        sessionService.getProtocolMessageChannel(
+                                            sessionRefId, Delivery.RELIABLE);
+                    if (msgChannel == null)
+                        if (logger.isLoggable(Level.FINEST))
+                            logger.log(
+                                Level.FINEST,
+                                "Discarding message for unknown session: {0}",
+                                sessionRefId);
+                    else
                         msgChannel.channelMessage(channelRefId,
                                                   ByteBuffer.wrap(message));
 		}
@@ -687,6 +732,7 @@ public final class ChannelServiceImpl
 	 * Removes the specified channel from the per-channel cache of
 	 * local members.
 	 */
+        @Override
 	public void close(byte[] channelId) {
 	    callStarted();
 	    try {
@@ -712,6 +758,7 @@ public final class ChannelServiceImpl
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public synchronized void run() {
 	    localMembers = ChannelImpl.getSessionRefIdsForNode(
 		dataService, channelRefId, localNodeId);
@@ -946,6 +993,7 @@ public final class ChannelServiceImpl
         /**
          * {@inheritDoc}
 	 */
+        @Override
 	public void disconnected(final BigInteger sessionRefId) {
 
 	    Set<BigInteger> channelSet =
@@ -1059,6 +1107,7 @@ public final class ChannelServiceImpl
 	implements RecoveryListener
     {
 	/** {@inheritDoc} */
+        @Override
 	public void recover(Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
 	    final TaskService taskService = getTaskService();
@@ -1122,11 +1171,13 @@ public final class ChannelServiceImpl
 	implements NodeListener
     {
 	/** {@inheritDoc} */
+        @Override
 	public void nodeStarted(Node node) {
 	    // TBD: cache channel server for node?
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public void nodeFailed(Node node) {
 	    final long nodeId = node.getId();
 	    channelServerMap.remove(nodeId);
@@ -1215,6 +1266,7 @@ public final class ChannelServiceImpl
 	}
 
 	/** {@inheritDoc} */
+        @Override
 	public void run() {
 	    String channelServerKey = getChannelServerKey(nodeId);
 	    try {

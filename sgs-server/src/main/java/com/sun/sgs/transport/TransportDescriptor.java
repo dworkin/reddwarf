@@ -61,8 +61,8 @@ public interface TransportDescriptor {
     int getListeningPort();
     
     /**
-     * Check if a transport is compatible with the transport this descriptor
-     * represents. The comparison is transport specific.
+     * Check if the specified transport is compatible with the transport this
+     * descriptor represents. The comparison is transport specific.
      * @param descriptor to compare
      * @return {@code true} if the specified descriptor represents a transport
      * compatible with the transport this descriptor represents, and

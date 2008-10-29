@@ -79,7 +79,7 @@ public class ProtocolDescriptorImpl implements ProtocolDescriptor,
                 if (!canSupport(required))
                     return false;
             }
-            return true;
+            return getTransport().isCompatibleWith(descriptor.getTransport());
         }
         return false;
     }

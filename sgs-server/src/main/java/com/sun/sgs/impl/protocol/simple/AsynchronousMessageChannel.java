@@ -41,29 +41,29 @@ import java.util.logging.Logger;
  * messages with a 2-byte message length, and masking (and re-issuing) partial
  * I/O operations.  Also enforces a fixed buffer size when reading.
  */
-public class AsynchronousMessageChannel implements Channel {
+class AsynchronousMessageChannel implements Channel {
 
     /** The number of bytes used to represent the message length. */
-    public static final int PREFIX_LENGTH = 2;
+    private static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
-    static final LoggerWrapper logger = new LoggerWrapper(
+    private static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(AsynchronousMessageChannel.class.getName()));
 
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...)
      */
-    final AsynchronousByteChannel channel;
+    private final AsynchronousByteChannel channel;
 
     /** Whether there is a read underway. */
-    final AtomicBoolean readPending = new AtomicBoolean();
+    private final AtomicBoolean readPending = new AtomicBoolean();
 
     /** Whether there is a write underway. */
-    final AtomicBoolean writePending = new AtomicBoolean();
+    private final AtomicBoolean writePending = new AtomicBoolean();
 
     /** The read buffer. */
-    final ByteBuffer readBuffer;
+    private final ByteBuffer readBuffer;
 
     /**
      * Creates a new instance of this class with the given channel and read
@@ -74,8 +74,8 @@ public class AsynchronousMessageChannel implements Channel {
      * @throws	IllegalArgumentException if {@code readBufferSize} is smaller
      *		than {@value #PREFIX_LENGTH}
      */
-    public AsynchronousMessageChannel(
-	AsynchronousByteChannel channel, int readBufferSize)
+    AsynchronousMessageChannel(AsynchronousByteChannel channel,
+                               int readBufferSize)
     {
 	if (readBufferSize < PREFIX_LENGTH) {
 	    throw new IllegalArgumentException(
@@ -103,8 +103,7 @@ public class AsynchronousMessageChannel implements Channel {
      *		space to read the next message
      * @throws	ReadPendingException if a read is in progress
      */
-    public IoFuture<ByteBuffer, Void> read(
-	CompletionHandler<ByteBuffer, Void> handler)
+    IoFuture<ByteBuffer, Void> read(CompletionHandler<ByteBuffer, Void> handler)
     {
         if (!readPending.compareAndSet(false, true)) {
             throw new ReadPendingException();
@@ -123,8 +122,8 @@ public class AsynchronousMessageChannel implements Channel {
      * @return	a future representing the result of the operation
      * @throws	WritePendingException if a write is in progress
      */
-    public IoFuture<Void, Void> write(
-	ByteBuffer src, CompletionHandler<Void, Void> handler)
+    IoFuture<Void, Void> write(ByteBuffer src,
+                               CompletionHandler<Void, Void> handler)
     {
         if (!writePending.compareAndSet(false, true)) {
             throw new WritePendingException();
@@ -135,11 +134,13 @@ public class AsynchronousMessageChannel implements Channel {
     /* -- Implement Channel -- */
 
     /** {@inheritDoc} */
+    @Override
     public void close() throws IOException {
         channel.close();
     }
 
     /** {@inheritDoc} */
+    @Override
     public boolean isOpen() {
         return channel.isOpen();
     }

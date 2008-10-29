@@ -20,12 +20,27 @@
 package com.sun.sgs.protocol;
 
 /**
- *
- * @author kbt
+ * Interface implemented by objects implementing a protocol connection handler.
+ * A protocol connection handler is passed to a
+ * {@link ProtocolFactory#newProtocol ProtocolFactory.newProtocol} when
+ * creating a protocol.
+ * When a new connection is received by the protocol,
+ * {@link #newConnection newConnection} is invoked with the new message channel
+ * for that connection.
+ * 
+ * @see ProtocolFactory
  */
 public interface ProtocolConnectionHandler {
 
+    /**
+     * Notify the handler that a new connection has been initiated. If an
+     * exception is thrown the connection will be refused.
+     * @param channel for sending protocol messages
+     * @param descriptor of the protocol on which the connection is made
+     * @return handler to receive protocol messages
+     * @throws Exception if the connection is to be refused
+     */
     MessageHandler newConnection(MessageChannel channel,
-                                         ProtocolDescriptor descriptor)
+                                 ProtocolDescriptor descriptor)
         throws Exception;
 }
