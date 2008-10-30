@@ -37,6 +37,7 @@ import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Deque;
+import java.util.Queue;
 import java.util.Iterator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -55,7 +56,7 @@ import java.util.Set;
  * <p>
  *
  * Developers should use this as a drop-in replaced for any {@code
- * Deque} or {@link java.util.Queue Queue} implementation 
+ * Deque} or {@link Queue} implementation 
  * if the size of the data
  * structure will be more than a small number of elements, or if the
  * data structure needs to support concurrent writers for putting and
