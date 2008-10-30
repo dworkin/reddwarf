@@ -530,27 +530,13 @@ public final class ClientSessionServiceImpl
     @Override
     public SessionMessageChannel getProtocolMessageChannel(BigInteger sessionRefId,
                                                            Delivery delivery)
-    {
+    {  
         ClientSessionHandler handler = handlers.get(sessionRefId);
-//	/*
-//	 * If a local handler exists, return protocol message channel
-//	 */
-//	if (handler != null) {
-//	    return handler.getSessionMessageChannel();
-//	} else {
-//	    logger.log(
-//		Level.FINE,
-//		"Discarding message for unknown session:{0}",
-//		sessionRefId);
-//	    // TBD: is throwing this exception the right thing to do?
-//	    throw new IllegalArgumentException(
-//		"unknown session: " + sessionRefId);
-//	}
                 
-        if (handler != null && handler.isConnected()) {
-            return handler.getSessionMessageChannel();
-        }
-        return null;
+        if (handler == null || !handler.isConnected())
+            return null;
+        
+        return handler.getSessionMessageChannel();
     }
     
     /* -- Package access methods for adding commit actions -- */

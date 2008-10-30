@@ -159,6 +159,7 @@ public class ClientSessionImpl
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */
+    @Override
     public String getName() {
 	if (!isConnected()) {
 	    throw new IllegalStateException("client session is not connected");
@@ -168,6 +169,7 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
+    @Override
     public boolean isConnected() {
 	return connected;
     }
@@ -176,6 +178,7 @@ public class ClientSessionImpl
      *
      * Enqueues a send event to this client session's event queue for servicing.
      */
+    @Override
     public ClientSession send(ByteBuffer message) {
 	try {
             if (!isConnected())
@@ -188,7 +191,9 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-	    addEvent(new SendEvent(message.array()));
+            byte[] msgBytes = new byte[message.remaining()];
+	    message.asReadOnlyBuffer().get(msgBytes);
+	    addEvent(new SendEvent(msgBytes));
 
 	    return getWrappedClientSession();
 

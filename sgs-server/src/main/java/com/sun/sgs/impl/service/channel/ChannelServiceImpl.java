@@ -548,7 +548,7 @@ public final class ChannelServiceImpl
                 SessionMessageChannel msgChannel =
                     sessionService.getProtocolMessageChannel(sessionRefId,
                                                              Delivery.RELIABLE);
-                if (msgChannel != null) {
+                if (msgChannel == null) {
                     if (logger.isLoggable(Level.FINEST)) {
                         logger.log(Level.FINEST,
                                    "join channelId {0} failed, " +
@@ -711,17 +711,16 @@ public final class ChannelServiceImpl
                     SessionMessageChannel msgChannel =
                         sessionService.getProtocolMessageChannel(
                                             sessionRefId, Delivery.RELIABLE);
-                    if (msgChannel == null)
+                    if (msgChannel == null) {
                         if (logger.isLoggable(Level.FINEST))
                             logger.log(
                                 Level.FINEST,
                                 "Discarding message for unknown session: {0}",
                                 sessionRefId);
-                    else
+                    } else
                         msgChannel.channelMessage(channelRefId,
                                                   ByteBuffer.wrap(message));
 		}
-
 	    } finally {
 		callFinished();
 	    }
