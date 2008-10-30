@@ -182,8 +182,15 @@ public final class DataServiceImpl implements DataService {
 	CLASSNAME + ".data.store.class";
 
     /** The property that specifies to use optimistic write locking. */
-    public static final String OPTIMISTIC_WRITE_LOCKS =
+    public static final String OPTIMISTIC_WRITE_LOCKS_PROPERTY =
 	CLASSNAME + ".optimistic.write.locks";
+
+    /** The system property that specifies the size of the object cache. */
+    private static final String OBJECT_CACHE_SIZE_PROPERTY =
+	CLASSNAME + ".object.cache.size";
+
+    /** The default object cache size. */
+    private static final int DEFAULT_OBJECT_CACHE_SIZE = 10000;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -258,6 +265,9 @@ public final class DataServiceImpl implements DataService {
     /** Our profiling operations. */
     private final ProfileOperation createReferenceOp;
     
+    /** The object cache. */
+    final ObjectCache objectCache;
+
     /**
      * Defines the transaction context map for this class.  This class checks
      * the service state and the reference table whenever the context is
@@ -430,7 +440,10 @@ public final class DataServiceImpl implements DataService {
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
 	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
-		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
+		OPTIMISTIC_WRITE_LOCKS_PROPERTY, Boolean.FALSE);
+	    int objectCacheSize = wrappedProps.getIntProperty(
+		OBJECT_CACHE_SIZE_PROPERTY, DEFAULT_OBJECT_CACHE_SIZE,
+		0, Integer.MAX_VALUE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -456,6 +469,7 @@ public final class DataServiceImpl implements DataService {
                 collector.getConsumer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", ProfileLevel.MAX);
+	    objectCache = new ObjectCache(objectCacheSize);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -619,7 +633,7 @@ public final class DataServiceImpl implements DataService {
 	try {
 	    checkManagedObject(object);
 	    context = getContext();
-	    ManagedReference<T> result = context.getReference(object);
+	    ManagedReferenceImpl<T> result = context.getReference(object);
 	    // mark that this object has been read locked
 	    oidAccesses.reportObjectAccess(result.getId(), AccessType.READ,
 					   object);
@@ -631,7 +645,7 @@ public final class DataServiceImpl implements DataService {
 		    " returns oid:{2,number,#}",
 		    contextTxnId(context), typeName(object), refId(result));
 	    }
-	    return result;
+	    return new ManagedReferenceWrapper<T>(result);
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
@@ -671,14 +685,14 @@ public final class DataServiceImpl implements DataService {
 	Context context = null;
 	try {
 	    context = getContext();
-	    ManagedReference<?> result = context.getReference(getOid(id));
+	    ManagedReferenceImpl<?> result = context.getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId tid:{0,number,#}," +
 			   " oid:{1,number,#} returns",
 			   contextTxnId(context), id);
 	    }
-	    return result;
+	    return new ManagedReferenceWrapper<Object>(result);
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
@@ -1131,15 +1145,6 @@ public final class DataServiceImpl implements DataService {
      */
     static void checkContext(Context context) {
 	getContextMap().checkContext(context);
-    }
-
-    /**
-     * Obtains the currently active context, throwing
-     * TransactionNotActiveException if none is active.  Does not join the
-     * transaction.
-     */
-    static Context getContextNoJoin() {
-	return getContextMap().getContext();
     }
 
     /**

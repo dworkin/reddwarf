@@ -334,6 +334,10 @@ public class TestDataServicePerformance extends TestCase {
 	Counter getForUpdate(int i) {
 	    return counters.get(i).getForUpdate();
 	}
+	public String toString() {
+	    return "Counters@" +
+		Integer.toHexString(System.identityHashCode(this));
+	}
     }
 
     /** A simple managed object that maintains a count. */
@@ -343,5 +347,9 @@ public class TestDataServicePerformance extends TestCase {
         private int count;
 	Counter() { }
 	int next() { return ++count; }
+	public String toString() {
+	    return "Counter@" +
+		Integer.toHexString(System.identityHashCode(this));
+	}
     }
 }

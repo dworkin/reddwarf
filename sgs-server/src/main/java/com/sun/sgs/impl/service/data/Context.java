@@ -41,7 +41,7 @@ final class Context extends TransactionContext {
 	new LoggerWrapper(Logger.getLogger(DataServiceImpl.class.getName()));
 
     /** The data service. */
-    private final DataServiceImpl service;
+    final DataServiceImpl service;
 
     /** The data store. */
     final DataStore store;
@@ -368,6 +368,15 @@ final class Context extends TransactionContext {
     }
 
     /* -- Other methods -- */
+
+    /**
+     * Returns a string representing this object.
+     *
+     * @return	a string representing this object.
+     */
+    public String toString() {
+	return "Context@" + Integer.toHexString(System.identityHashCode(this));
+    }
 
     /**
      * Checks the consistency of the reference table if the operation count

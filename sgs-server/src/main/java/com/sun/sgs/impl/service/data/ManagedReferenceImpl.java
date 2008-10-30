@@ -67,7 +67,7 @@ final class ManagedReferenceImpl<T>
      *   State		  object    unmodifiedBytes
      *   NEW		  non-null  null
      *   EMPTY		  null      null
-     *   NOT_MODIFIED	  non-null  null
+     *   NOT_MODIFIED	  non-null  null (or maybe non-null if no-detect mods)
      *   MAYBE_MODIFIED   non-null  non-null
      *   MODIFIED	  non-null  null
      *	 FLUSHED	  null      null
@@ -114,11 +114,23 @@ final class ManagedReferenceImpl<T>
     }
 
     /**
+     * Used to provide the context wrapper when performing serialization and
+     * deserialization.
+     */
+    private static final ThreadLocal<ContextWrapper> contextWrapperThread =
+	new ThreadLocal<ContextWrapper>();
+
+    /**
      * Information related to the transaction in which this reference was
      * created.  This field is logically final, but is not declared final so
      * that it can be set during deserialization.
      */
-    private transient Context context;
+    transient final Context context;
+
+    /**
+     * The context wrapper used by references within this reference's object.
+     */
+    private transient ContextWrapper contextWrapper;
 
     /** The value returned by getId, or null. */
     private transient BigInteger id;
@@ -293,9 +305,16 @@ final class ManagedReferenceImpl<T>
 	     * Presumably this object is being marked for update because it
 	     * will be modified, so fetch the object now.
 	     */
-	    object = deserialize(
-		context.store.getObject(
-		    context.txn, oid, !context.optimisticWriteLocks()));
+	    byte[] bytes = context.store.getObject(
+		context.txn, oid, !context.optimisticWriteLocks());
+	    ObjectCache.Value value =
+		context.service.objectCache.get(oid, bytes, context);
+	    if (value != null) {
+		object = value.object;
+		contextWrapper = value.contextWrapper;
+	    } else {
+		object = deserialize(bytes);
+	    }
 	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
@@ -347,17 +366,32 @@ final class ManagedReferenceImpl<T>
 	    context.oidAccesses.reportObjectAccess(getId(), AccessType.READ);
 	    switch (state) {
 	    case EMPTY:
-		ManagedObject tempObject = deserialize(
-		    context.store.getObject(context.txn, oid, false));
+		byte[] bytes =
+		    context.store.getObject(context.txn, oid, false);
+		ObjectCache.Value value =
+		    context.service.objectCache.get(oid, bytes, context);
+		if (value != null) {
+		    object = value.object;
+		    contextWrapper = value.contextWrapper;
+		    unmodifiedBytes = bytes;
+		} else {
+		    ManagedObject tempObject = deserialize(bytes);
+		    /*
+		     * We won't need the unmodified bytes if we are not
+		     * detecting modifications and the object ends up getting
+		     * modified, so wait until later in that case.
+		     */
+		    if (context.detectModifications) {
+			unmodifiedBytes = serialize(tempObject);
+		    }
+		    /* Do after creating unmodified bytes, in case it fails */
+		    object = tempObject;
+		}
 		if (context.detectModifications) {
-		    unmodifiedBytes = SerialUtil.serialize(
-			tempObject, context.classSerial);
 		    state = State.MAYBE_MODIFIED;
 		} else {
 		    state = State.NOT_MODIFIED;
 		}
-		/* Do after creating unmodified bytes, in case that fails */
-		object = tempObject;
 		context.refs.registerObject(this);
 		break;
 	    case NEW:
@@ -387,8 +421,8 @@ final class ManagedReferenceImpl<T>
 	    return result;
 	} catch (TransactionNotActiveException e) {
 	    throw new TransactionNotActiveException(
-		"Attempt to obtain the object associated with a managed " +
-		"reference that was created in another transaction",
+		"Attempt to obtain the object associated with managed " +
+		"reference oid:" + oid + ", created in another transaction",
 		e);
 	} catch (RuntimeException e) {
 	    DataServiceImpl.getExceptionLogger(e).logThrow(
@@ -409,9 +443,16 @@ final class ManagedReferenceImpl<T>
 	    context.oidAccesses.reportObjectAccess(getId(), AccessType.WRITE);
 	    switch (state) {
 	    case EMPTY:
-		object = deserialize(
-		    context.store.getObject(
-			context.txn, oid, !context.optimisticWriteLocks()));
+		byte[] bytes = context.store.getObject(
+		    context.txn, oid, !context.optimisticWriteLocks());
+		ObjectCache.Value value =
+		    context.service.objectCache.get(oid, bytes, context);
+		if (value != null) {
+		    object = value.object;
+		    contextWrapper = value.contextWrapper;
+		} else {
+		    object = deserialize(bytes);
+		}
 		context.refs.registerObject(this);
 		state = State.MODIFIED;
 		break;
@@ -491,6 +532,8 @@ final class ManagedReferenceImpl<T>
 	     * the same object IDs.  -tjb@sun.com (11/09/2007)
 	     */
 	    return oid == (((ManagedReferenceImpl) object).oid);
+	} else if (object instanceof ManagedReferenceWrapper) {
+	    return oid == ((ManagedReferenceWrapper) object).oid;
 	} else {
 	    return false;
 	}
@@ -498,27 +541,14 @@ final class ManagedReferenceImpl<T>
 
     /** {@inheritDoc} */
     public int hashCode() {
-	/*
-	 * Follow the suggestions in Effective Java to XOR the upper and lower
-	 * 32 bits of a long field, and add a non-zero constant.
-	 */
-	return (int) (oid ^ (oid >>> 32)) + 6883;
+	return hashCode(oid);
     }
 
     /* -- Implement Serializable -- */
 
     /** Replaces this instance with a canonical instance. */
     private Object readResolve() throws ObjectStreamException {
-	context = DataServiceImpl.getContextNoJoin();
-	state = State.EMPTY;
-	validate();
-	ManagedReferenceImpl ref = context.refs.find(oid);
-	if (ref == null) {
-	    context.refs.add(this);
-	    return this;
-	} else {
-	    return ref;
-	}
+	return new ManagedReferenceWrapper(contextWrapperThread.get(), oid);
     }
 
     /* -- Object methods -- */
@@ -528,6 +558,30 @@ final class ManagedReferenceImpl<T>
     }
 
     /* -- Other methods -- */
+
+    /**
+     * Returns the hash code for an object ID.
+     *
+     * @param	oid the object ID
+     * @return	the hash code.
+     */
+    static int hashCode(long oid) {
+	/*
+	 * Follow the suggestions in Effective Java to XOR the upper and lower
+	 * 32 bits of a long field, and add a non-zero constant.
+	 */
+	return (int) (oid ^ (oid >>> 32)) + 6883;
+    }
+
+    /**
+     * Returns the current {@code ContextWrapper} for use in serialization or
+     * deserialization.
+     *
+     * @return	the context wrapper
+     */
+    static ContextWrapper getCurrentContextWrapper() {
+	return contextWrapperThread.get();
+    }
 
     /**
      * Checks the consistency of the managed references table, throwing an
@@ -567,6 +621,14 @@ final class ManagedReferenceImpl<T>
 	    }
 	    break;
 	case NOT_MODIFIED:
+	    if (object == null) {
+		throw new AssertionError(state + " with no object");
+ 	    } else if (context.detectModifications &&
+		       unmodifiedBytes != null)
+	    {
+		throw new AssertionError(state + " with unmodifiedBytes");
+	    }
+	    break;
 	case MODIFIED:
 	case REMOVED_FETCHED:
 	    if (object == null) {
@@ -648,14 +710,17 @@ final class ManagedReferenceImpl<T>
 	    break;
 	case NEW:
 	case MODIFIED:
-	    result = SerialUtil.serialize(object, context.classSerial);
+	    result = serialize(object);
+	    context.service.objectCache.put(
+		oid, result, contextWrapper, object);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
-	    byte[] modified =
-		SerialUtil.serialize(object, context.classSerial);
+	    byte[] modified = serialize(object);
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
+		context.service.objectCache.put(
+		    oid, result, contextWrapper, object);
 		context.oidAccesses.
 		    reportObjectAccess(context.txn.originalTxn, 
 				       BigInteger.valueOf(oid),
@@ -669,9 +734,24 @@ final class ManagedReferenceImpl<T>
 			"Modified object was not marked for update: {0}",
 			Objects.fastToString(object));
 		}
+	    } else {
+		context.service.objectCache.put(
+		    oid, unmodifiedBytes, contextWrapper, object);
 	    }
-	    /* Fall through */
+	    context.refs.unregisterObject(object);
+	    break;
 	case NOT_MODIFIED:
+	    /*
+	     * If we are not detecting modifications, then create the
+	     * unmodified bytes if we haven't already done so.
+	     */
+	    if (unmodifiedBytes == null) {
+		unmodifiedBytes = serialize(object);
+	    }
+ 	    context.service.objectCache.put(
+ 		oid, unmodifiedBytes, contextWrapper, object);
+	    context.refs.unregisterObject(object);
+	    break;
 	case REMOVED_FETCHED:
 	    context.refs.unregisterObject(object);
 	    break;
@@ -717,19 +797,40 @@ final class ManagedReferenceImpl<T>
 	}
     }
 
+    /** Returns the bytes from serializing the managed object. */
+    private byte[] serialize(ManagedObject object) {
+	if (contextWrapper == null) {
+	    contextWrapper = new ContextWrapper(context);
+	}
+	try {
+	    contextWrapperThread.set(contextWrapper);
+	    return SerialUtil.serialize(object, context.classSerial);
+	} finally {
+	    contextWrapperThread.set(null);
+	}
+    }
+
     /**
      * Returns the managed object associated with serialized data.  Checks that
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	Object obj = SerialUtil.deserialize(data, context.classSerial);
-	if (obj == null) {
-	    throw new ObjectIOException(
-		"Managed object must not deserialize to null", false);
-	} else if (!(obj instanceof ManagedObject)) {
-	    throw new ObjectIOException(
-		"Deserialized object must implement ManagedObject", false);
+	if (contextWrapper == null) {
+	    contextWrapper = new ContextWrapper(context);
 	}
-	return (ManagedObject) obj;
+	try {
+	    contextWrapperThread.set(contextWrapper);
+	    Object obj = SerialUtil.deserialize(data, context.classSerial);
+	    if (obj == null) {
+		throw new ObjectIOException(
+		    "Managed object must not deserialize to null", false);
+	    } else if (!(obj instanceof ManagedObject)) {
+		throw new ObjectIOException(
+		    "Deserialized object must implement ManagedObject", false);
+	    }
+	    return (ManagedObject) obj;
+	} finally {
+	    contextWrapperThread.set(null);
+	}
     }
 }
