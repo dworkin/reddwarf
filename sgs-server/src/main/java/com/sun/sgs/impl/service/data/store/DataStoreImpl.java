@@ -997,13 +997,10 @@ public class DataStoreImpl
 	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	/*
-	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
-	 * without reading or writing, so get the object and ask for a write
-	 * lock.  -tjb@sun.com (10/06/2006)
-	 */
 	try {
-	    getObjectInternal(txn, oid, true);
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    oidsDb.markForUpdate(txnInfo.dbTxn, DataEncoding.encodeLong(oid));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
@@ -1024,8 +1021,14 @@ public class DataStoreImpl
 		       txn, oid, forUpdate);
 	}
 	try {
-	    byte[] result =
-		decodeValue(getObjectInternal(txn, oid, forUpdate));
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    byte[] result = oidsDb.get(
+		txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
+	    if (result == null || isPlaceholderValue(result)) {
+		throw new ObjectNotFoundException("Object not found: " + oid);
+	    }
+	    byte[] decodedResult = decodeValue(result);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -1033,26 +1036,12 @@ public class DataStoreImpl
 		    "returns",
 		    txn, oid, forUpdate);
 	    }
-	    return result;
+	    return decodedResult;
 	} catch (RuntimeException e) {
 	    throw convertException(txn, Level.FINEST, e,
 				   "getObject txn:" + txn + ", oid:" + oid +
 				   ", forUpdate:" + forUpdate);
 	}
-    }
-
-    /** Implement getObject, without logging. */
-    private byte[] getObjectInternal(
-	Transaction txn, long oid, boolean forUpdate)
-    {
-	checkId(oid);
-	TxnInfo txnInfo = checkTxn(txn);
-	byte[] result = oidsDb.get(
-	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
-	if (result == null || isPlaceholderValue(result)) {
-	    throw new ObjectNotFoundException("Object not found: " + oid);
-	}
-	return result;
     }
 
     /** {@inheritDoc} */
@@ -1131,12 +1120,10 @@ public class DataStoreImpl
 	    checkId(oid);
 	    TxnInfo txnInfo = checkTxn(txn);
 	    byte[] key = DataEncoding.encodeLong(oid);
-	    byte[] value = oidsDb.get(txnInfo.dbTxn, key, true);
-	    if (value == null || isPlaceholderValue(value)) {
+	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
+	    if (!found) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    }
-	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
-	    assert found : "Object not found during delete";
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,

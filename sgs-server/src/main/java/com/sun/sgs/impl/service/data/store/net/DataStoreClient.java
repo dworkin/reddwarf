@@ -141,8 +141,8 @@ public final class DataStoreClient
     private static final long GET_SERVER_WAIT = 10000;
 
     /**
-     * The name of the undocumented property that controls whether to replace
-     * Java(TM) RMI with an experimental, socket-based facility.
+     * Whether to replace Java(TM) RMI with an experimental, socket-based
+     * facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	PACKAGE + ".no.rmi");

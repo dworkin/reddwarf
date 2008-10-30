@@ -407,4 +407,9 @@ final class Context extends TransactionContext {
     BigInteger getTxnId() {
 	return new BigInteger(1, txn.getId());
     }
+
+    /** Returns whether to delay write locking until commit time. */
+    boolean optimisticWriteLocks() {
+	return service.optimisticWriteLocks;
+    }
 }

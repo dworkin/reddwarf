@@ -19,7 +19,6 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 

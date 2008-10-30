@@ -27,8 +27,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
-import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
-import com.sun.sgs.impl.util.ManagedSerializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -2795,5 +2793,10 @@ public class ScalableHashMap<K,V>
 	    leaves++;
 	}
 	return (maxDepth / (double) leaves) + 1;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private static <T> T uncheckedCast(Object object) {
+        return (T) object;
     }
 }

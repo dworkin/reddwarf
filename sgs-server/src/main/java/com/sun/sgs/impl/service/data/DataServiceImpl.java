@@ -46,10 +46,10 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -105,6 +105,18 @@ import java.util.logging.Logger;
  *	references table.  Note that the number of operations is measured
  *	separately for each transaction.  This property is intended for use in
  *	debugging. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS}
+ *	</b></code><br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to wait until commit time to obtain
+ *	write locks.  If <code>false</code>, which is the default, the service
+ *	acquires write locks as soon as it knows that an object is being
+ *	modified.  If <code>true</code>, the service delays obtaining write
+ *	locks until commit time, which may improve performance in some cases,
+ *	typically when there is low contention.  Note that setting this flag to
+ *	<code>true</code> does not delay write locks when removing objects.<p>
  *
  * </dl> <p>
  *
@@ -169,6 +181,10 @@ public final class DataServiceImpl implements DataService {
     public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
+    /** The property that specifies to use optimistic write locking. */
+    public static final String OPTIMISTIC_WRITE_LOCKS =
+	CLASSNAME + ".optimistic.write.locks";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -205,6 +221,9 @@ public final class DataServiceImpl implements DataService {
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
+
+    /** Whether to delay obtaining write locks. */
+    final boolean optimisticWriteLocks;
 
     /**
      * Synchronize on this object before accessing the state,
@@ -410,6 +429,8 @@ public final class DataServiceImpl implements DataService {
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
+	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
+		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -428,11 +449,11 @@ public final class DataServiceImpl implements DataService {
 		baseStore = new DataStoreClient(properties);
 	    }
             storeToShutdown = baseStore;
-            ProfileRegistrar registrar = 
-		systemRegistry.getComponent(ProfileRegistrar.class);
-	    store = new DataStoreProfileProducer(baseStore, registrar);
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+	    store = new DataStoreProfileProducer(baseStore, collector);
             ProfileConsumer consumer =
-                registrar.registerProfileProducer(getClass().getName());
+                collector.getConsumer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);

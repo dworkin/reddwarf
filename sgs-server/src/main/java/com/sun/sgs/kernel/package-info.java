@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -17,23 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.profile;
-
-
 /**
- * A registration interface where profile producers register
- * and get {@code ProfileConsumer}s used to consume profiling data.
+ * Provides the core system interfaces used by the Project Darkstar Server.
  */
-public interface ProfileRegistrar {
-
-    /**
-     * Registers the given unique name as a profile producer.
-     *
-     * @param name the unique name of the profile producer
-     *
-     * @return a {@code ProfileConsumer} that will consume profiling
-     *         data from the provided named producer
-     */
-    ProfileConsumer registerProfileProducer(String name);
-
-}
+package com.sun.sgs.kernel;

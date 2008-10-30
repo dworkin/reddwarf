@@ -294,17 +294,22 @@ final class ManagedReferenceImpl<T>
 	     * will be modified, so fetch the object now.
 	     */
 	    object = deserialize(
-		context.store.getObject(context.txn, oid, true));
+		context.store.getObject(
+		    context.txn, oid, !context.optimisticWriteLocks()));
 	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
 	case MAYBE_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
+	    if (!context.optimisticWriteLocks()) {
+		context.store.markForUpdate(context.txn, oid);
+	    }
 	    unmodifiedBytes = null;
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
+	    if (!context.optimisticWriteLocks()) {
+		context.store.markForUpdate(context.txn, oid);
+	    }
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -405,17 +410,22 @@ final class ManagedReferenceImpl<T>
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
-		    context.store.getObject(context.txn, oid, true));
+		    context.store.getObject(
+			context.txn, oid, !context.optimisticWriteLocks()));
 		context.refs.registerObject(this);
 		state = State.MODIFIED;
 		break;
 	    case MAYBE_MODIFIED:
-		context.store.markForUpdate(context.txn, oid);
+		if (!context.optimisticWriteLocks()) {
+		    context.store.markForUpdate(context.txn, oid);
+		}
 		unmodifiedBytes = null;
 		state = State.MODIFIED;
 		break;
 	    case NOT_MODIFIED:
-		context.store.markForUpdate(context.txn, oid);
+		if (!context.optimisticWriteLocks()) {
+		    context.store.markForUpdate(context.txn, oid);
+		}
 		state = State.MODIFIED;
 		break;
 	    case FLUSHED:
