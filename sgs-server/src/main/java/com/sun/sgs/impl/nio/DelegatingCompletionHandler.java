@@ -49,11 +49,12 @@ import java.util.concurrent.ExecutionException;
  *         AsynchronousByteChannel channel, ByteBuffer dst,
  *         A attachment, CompletionHandler&lt;Integer, A&gt; handler)
  *     {
- *         return new PrintReader&lt;A&gt;(channel, dst, attachment, handler).start();
+ *         return new PrintReader&lt;A&gt;(channel, dst, 
+ *                                         attachment, handler).start();
  *     }
  * 
  *     private PrintReader(AsynchronousByteChannel channel, ByteBuffer dst,
- *                      A attachment, CompletionHandler&lt;Integer, A&gt; handler)
+ *                  A attachment, CompletionHandler&lt;Integer, A&gt; handler)
  *     {
  *         super(attachment, handler);
  *         this.channel = channel;
@@ -65,7 +66,8 @@ import java.util.concurrent.ExecutionException;
  *         return channel.read(dst, null);
  *     }
  * 
- *     protected IoFuture&lt;Integer, A&gt; implCompleted(IoFuture&lt;Integer, A&gt; result) {
+ *     protected IoFuture&lt;Integer, A&gt; implCompleted(
+ *                                  IoFuture&lt;Integer, A&gt; result) {
  *         System.err.println("Done reading");
  *         return null;
  *     }
