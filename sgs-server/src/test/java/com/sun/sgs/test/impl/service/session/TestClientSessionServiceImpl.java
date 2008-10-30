@@ -242,7 +242,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    /*
+
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -973,8 +973,33 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect();
 	}
     }
-*/
+
     public void testClientSessionSendSameBuffer() throws Exception {
+	String msgString = "buffer";
+	MessageBuffer msg =
+	    new MessageBuffer(MessageBuffer.getSize(msgString));
+	msg.putString(msgString);
+	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
+	sendBufferToClient(buf, msgString);
+    }
+
+    public void testClientSessionSendSameBufferWithOffset()
+	throws Exception
+    {
+	String msgString = "offset buffer";
+	MessageBuffer msg =
+	    new MessageBuffer(MessageBuffer.getSize(msgString) + 1);
+	msg.putByte(0);
+	msg.putString(msgString);
+	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
+	buf.position(1);
+	sendBufferToClient(buf, msgString);
+    }
+
+    private void sendBufferToClient(final ByteBuffer buf,
+				    final String expectedMsgString)
+	throws Exception
+    {	
 	final String name = "dummy";
 	DummyClient client = new DummyClient(name);
 	try {
@@ -985,16 +1010,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 		public void run() {
 		    ClientSession session = (ClientSession)
 			AppContext.getDataManager().getBinding(name);
-		    MessageBuffer msg =
-			new MessageBuffer(MessageBuffer.getSize(name));
-		    msg.putString(name);
-		    ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
 		    System.err.println("Sending messages");
 		    for (int i = 0; i < numMessages; i++) {
 			session.send(buf);
 		    }
 		}}, taskOwner);
-
+	
 	    System.err.println("waiting for client to receive messages");
 	    Queue<byte[]> messages =
 		client.waitForClientToRecieveExpectedMessages(numMessages);
@@ -1003,19 +1024,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    fail("message buffer emtpy");
 		}
 		String msgString = (new MessageBuffer(message)).getString();
-		if (!msgString.equals(name)) {
-		    fail("expected: " + name + ", received: " + msgString);
+		if (!msgString.equals(expectedMsgString)) {
+		    fail("expected: " + expectedMsgString + ", received: " +
+			 msgString);
 		} else {
 		    System.err.println("received expected message: " +
 				       msgString);
 		}
 	    }
-	    
 	} finally {
 	    client.disconnect();
 	}
     }
-    /*
+    
     private static class Counter implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
@@ -1111,7 +1132,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
-    */
+    
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
@@ -1123,7 +1144,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-	    client.sendMessagesInSequence(numMessages, expectedMessages, exception);
+	    client.sendMessagesInSequence(
+		numMessages, expectedMessages, exception);
 	} finally {
 	    client.disconnect();
 	}
@@ -1402,13 +1424,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Sends the number of messages, each containing a sequence number,
-	 * then waits for all the messages to be received by this client's
-	 * associated {@code ClientSessionListener}, and validates the
-	 * sequence of messages received by the listener.  If {@code
-	 * throwException} is non-null, the {@code ClientSessionListener} will
-	 * throw the specified exception in its {@code receivedMessage} method
-	 * for only the first message it receives.
+	 * From this client, sends the number of messages (each containing a
+	 * monotonically increasing sequence number), then waits for all the
+	 * messages to be received by this client's associated {@code
+	 * ClientSessionListener}, and validates the sequence of messages
+	 * received by the listener.  If {@code throwException} is non-null,
+	 * the {@code ClientSessionListener} will throw the specified
+	 * exception in its {@code receivedMessage} method for only the first
+	 * message it receives.
 	 */
 	void sendMessagesInSequence(
 	    int numMessages, int expectedMessages, RuntimeException re)
@@ -1438,7 +1461,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * Waits for this client to receive the number of messages sent from
 	 * the application.
 	 */
-	Queue<byte[]> waitForClientToRecieveExpectedMessages(int expectedMessages) {
+	Queue<byte[]> waitForClientToRecieveExpectedMessages(
+	    int expectedMessages)
+	{
 	    waitForExpectedMessages(listener.messageList, expectedMessages);
 	    return listener.messageList;
 	}
@@ -1751,7 +1776,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 
 	DummyClientSessionListener(
-	    String name, ClientSession session, boolean disconnectedThrowsException)
+	    String name, ClientSession session,
+	    boolean disconnectedThrowsException)
 	{
 	    this.name = name;
 	    session = ((ClientSessionWrapper) session).getClientSession();
