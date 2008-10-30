@@ -235,7 +235,6 @@ class AsyncDatagramChannelImpl
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final DatagramSocket socket = channel.socket();
-        MulticastSocket msocket;
         
         try {
             switch (stdOpt) {
@@ -260,19 +259,19 @@ class AsyncDatagramChannelImpl
                 break;
 
             case IP_MULTICAST_IF: 
-                msocket = (MulticastSocket) socket;
-                msocket.setNetworkInterface((NetworkInterface) value);
+                ((MulticastSocket) socket).
+                    setNetworkInterface((NetworkInterface) value);
                 break;
 
             case IP_MULTICAST_TTL: 
-                msocket = (MulticastSocket) socket;
-                msocket.setTimeToLive(((Integer) value).intValue());
+                ((MulticastSocket) socket).
+                    setTimeToLive(((Integer) value).intValue());
                 break;
 
             case IP_MULTICAST_LOOP: 
-                msocket = (MulticastSocket) socket;
                 // TODO should we reverse the sense of setLoopbackMode? -JM
-                msocket.setLoopbackMode(((Boolean) value).booleanValue());
+                ((MulticastSocket) socket).
+                    setLoopbackMode(((Boolean) value).booleanValue());
                 break;
             
 

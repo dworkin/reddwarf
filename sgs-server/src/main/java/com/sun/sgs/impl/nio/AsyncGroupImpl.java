@@ -113,8 +113,7 @@ abstract class AsyncGroupImpl
      */
     private <T extends Throwable> void uncaught(T exception) {
         try {
-            final Thread.UncaughtExceptionHandler ueh = 
-                    uncaughtHandler;                
+            final Thread.UncaughtExceptionHandler ueh =  uncaughtHandler;
 
             if (ueh != null) {
                 ueh.uncaughtException(Thread.currentThread(), exception);
