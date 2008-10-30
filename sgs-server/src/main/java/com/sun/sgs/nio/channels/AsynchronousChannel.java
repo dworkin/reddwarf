@@ -106,8 +106,9 @@ public abstract class AsynchronousChannel implements Channel {
      * @param provider the provider that created this channel
      */
     protected AsynchronousChannel(AsynchronousChannelProvider provider) {
-        if (provider == null)
+        if (provider == null) {
             throw new NullPointerException("null provider");
+        }
         this.provider = provider;
     }
 

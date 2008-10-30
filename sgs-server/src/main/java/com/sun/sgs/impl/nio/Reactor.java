@@ -189,8 +189,9 @@ class Reactor {
 			    try {
 				Closeable asyncKey =
 				    (Closeable) key.attachment();
-				if (asyncKey != null)
+				if (asyncKey != null) {
 				    asyncKey.close();
+                                }
 			    } catch (IOException ignore) { }
 			}
 		    } catch (ConcurrentModificationException e) {
@@ -215,7 +216,7 @@ class Reactor {
      */
     boolean performWork() throws IOException {
 
-        if (! selector.isOpen()) {
+        if (!selector.isOpen()) {
             log.log(Level.WARNING, "{0} selector is closed", this);
             return false;
         }
@@ -306,11 +307,12 @@ class Reactor {
 
             int readyOps;
             synchronized (asyncKey) {
-                if (! key.isValid())
+                if (!key.isValid()) {
                     continue;
+                }
                 try {
                     readyOps = key.readyOps();
-                    key.interestOps(key.interestOps() & (~ readyOps));
+                    key.interestOps(key.interestOps() & (~readyOps));
                 } catch (CancelledKeyException e) {
                     // swallow exception
                     continue;
@@ -324,8 +326,9 @@ class Reactor {
             new ArrayList<TimeoutHandler>();
         timeouts.drainTo(expiredHandlers);
 
-        for (TimeoutHandler expired : expiredHandlers)
+        for (TimeoutHandler expired : expiredHandlers) {
             expired.run();
+        }
 
         expiredHandlers.clear();
 
@@ -346,8 +349,9 @@ class Reactor {
     ReactiveAsyncKey
     register(SelectableChannel ch) throws IOException {
         synchronized (selectorLock) {
-            if (lifecycleState != RUNNING)
+            if (lifecycleState != RUNNING) {
                 throw new ShutdownChannelGroupException();
+            }
 
             selector.wakeup();
             SelectionKey key = ch.register(selector, 0);
@@ -409,8 +413,9 @@ class Reactor {
             SelectableChannel channel = asyncKey.channel();
             int interestOps;
             synchronized (asyncKey) {
-                if (key == null || (! key.isValid()))
+                if (key == null || (!key.isValid())) {
                     throw new ClosedAsynchronousChannelException();
+                }
 
 		try {
 		    interestOps = key.interestOps();
@@ -428,12 +433,14 @@ class Reactor {
                     switch (op) {
                     case OP_READ:
                     case OP_WRITE:
-                        if (! ((SocketChannel) channel).isConnected())
+                        if (!((SocketChannel) channel).isConnected()) {
                             throw new NotYetConnectedException();
+                        }
                         break;
                     case OP_CONNECT:
-                        if (((SocketChannel) channel).isConnected())
+                        if (((SocketChannel) channel).isConnected()) {
                             throw new AlreadyConnectedException();
+                        }
                         break;
                     default:
                         break;
@@ -607,8 +614,9 @@ class Reactor {
                 TimeUnit unit,
                 Callable<R> callable)
         {
-            if (timeout < 0)
+            if (timeout < 0) {
                 throw new IllegalArgumentException("Negative timeout");
+            }
 
             AsyncOp<R> opTask = new AsyncOp<R>(callable) {
                 @Override
@@ -617,11 +625,12 @@ class Reactor {
                     cleanupTask();
                     // Invoke the completion handler, if any
                     asyncKey.runCompletion(handler, attachment, this);
-                }};
+                } };
 
             // Indicate that a task is pending
-            if (! task.compareAndSet(null, opTask))
+            if (!task.compareAndSet(null, opTask)) {
                 pendingPolicy();
+            }
 
             // Set the timeout handler for the pending task, if any
             if (timeout > 0) {
@@ -671,28 +680,28 @@ class Reactor {
             new PendingOperation(this, OP_ACCEPT) {
                 protected void pendingPolicy() {
                     throw new AcceptPendingException();
-                }};
+                } };
 
         /** The handler for an asynchronous {@code connect} operation. */
         private final PendingOperation pendingConnect =
             new PendingOperation(this, OP_CONNECT) {
                 protected void pendingPolicy() {
                     throw new ConnectionPendingException();
-                }};
+                } };
 
         /** The handler for an asynchronous {@code read} operation. */
         private final PendingOperation pendingRead =
             new PendingOperation(this, OP_READ) {
                 protected void pendingPolicy() {
                     throw new ReadPendingException();
-                }};
+                } };
 
         /** The handler for an asynchronous {@code write} operation. */
         private final PendingOperation pendingWrite = 
             new PendingOperation(this, OP_WRITE) {
                 protected void pendingPolicy() {
                     throw new WritePendingException();
-                }};
+                } };
 
         /**
          * Creates a new instance that wraps the given selector key.
@@ -721,7 +730,7 @@ class Reactor {
          */
         public void close() throws IOException {
             log.log(Level.FINER, "closing {0}", this);
-            if (! key.isValid()) {
+            if (!key.isValid()) {
                 log.log(Level.FINE, "key is already invalid {0}", this);
             }
 
@@ -773,14 +782,18 @@ class Reactor {
          */
         public void selected(int readyOps) {
             // Dispatch writes first in hopes of reducing roundtrip latency
-            if ((readyOps & OP_WRITE) != 0)
+            if ((readyOps & OP_WRITE) != 0) {
                 pendingWrite.selected();
-            if ((readyOps & OP_READ) != 0)
+            }
+            if ((readyOps & OP_READ) != 0) {
                 pendingRead.selected();
-            if ((readyOps & OP_CONNECT) != 0)
+            }
+            if ((readyOps & OP_CONNECT) != 0) {
                 pendingConnect.selected();
-            if ((readyOps & OP_ACCEPT) != 0)
+            }
+            if ((readyOps & OP_ACCEPT) != 0) {
                 pendingAccept.selected();
+            }
         }
 
         /**
@@ -823,8 +836,9 @@ class Reactor {
                       A attachment,
                       Future<R> future)
         {
-            if (handler == null)
+            if (handler == null) {
                 return;
+            }
 
             // TODO the spec indicates that we can run the
             // completion handler in the current thread, but
@@ -901,11 +915,12 @@ class Reactor {
 
         /** {@inheritDoc} */
         public int compareTo(Delayed o) {
-            if (o == this)
+            if (o == this) {
                 return 0;
+            }
             if (o instanceof TimeoutHandler) {
                 return Long.signum(
-                    deadlineMillis - ((TimeoutHandler)o).deadlineMillis);
+                    deadlineMillis - ((TimeoutHandler) o).deadlineMillis);
             } else {
                 return Long.signum(getDelay(TimeUnit.MILLISECONDS) -
                                    o.getDelay(TimeUnit.MILLISECONDS));
@@ -915,10 +930,12 @@ class Reactor {
         /** {@inheritDoc} */
         @Override
         public boolean equals(Object obj) {
-            if (obj == this)
+            if (obj == this) {
                 return true;
-            if (!(obj instanceof TimeoutHandler))
+            }
+            if (!(obj instanceof TimeoutHandler)) {
                 return false;
+            }
             TimeoutHandler other = (TimeoutHandler) obj;
             return (deadlineMillis == other.deadlineMillis) &&
                    task.equals(other.task);
@@ -928,7 +945,7 @@ class Reactor {
         @Override
         public int hashCode() {
             // high-order bits of deadlineMillis aren't useful for hashing
-            return task.hashCode() ^ (int)deadlineMillis;
+            return task.hashCode() ^ (int) deadlineMillis;
         }
     }
 }
