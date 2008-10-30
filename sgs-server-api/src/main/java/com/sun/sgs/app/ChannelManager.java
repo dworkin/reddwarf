@@ -19,6 +19,8 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
  * Manager for creating and obtaining channels.  A {@link Channel} is a
  * communication group consisting of multiple client sessions and the
@@ -48,7 +50,7 @@ public interface ChannelManager {
      * invoked for messages that the server sends on the channel via
      * the channel's {@link Channel#send send} method.  If the specified
      * {@code listener} is non-{@code null}, then it must also
-     * be {@link java.io.Serializable Serializable}.
+     * be {@link Serializable}.
      *
      * <p>Supplying a non-{@code null} listener (although not required) is
      * <i>strongly</i> suggested.  A listener's {@code receivedMessage}

@@ -19,11 +19,13 @@
 
 package com.sun.sgs.app;
 
+import java.io.DataInput;
+import java.io.Serializable;
+
 /**
  * Provides facilities for managing access to shared, persistent objects.
  * Managed objects are objects that implement the {@link ManagedObject} and
- * {@link java.io.Serializable Serializable} interfaces.  Each managed object 
- * is stored separately
+ * {@link Serializable} interfaces.  Each managed object is stored separately
  * along with all of the serializable, non-managed objects it refers to.  If a
  * managed object refers to another managed object, it must do so through an
  * instance of {@link ManagedReference}, created by the {@link #createReference
@@ -48,7 +50,7 @@ package com.sun.sgs.app;
  * @see         AppContext#getDataManager
  * @see		ManagedObject
  * @see		ManagedReference
- * @see		java.io.Serializable Serializable
+ * @see		Serializable
  */
 public interface DataManager {
 
@@ -74,8 +76,7 @@ public interface DataManager {
     /**
      * Binds an object to a name, replacing any previous binding.  The object
      * must implement {@link ManagedObject}, and both the object and any
-     * objects it refers to must implement 
-     * {@link java.io.Serializable Serializable}.  Note that
+     * objects it refers to must implement {@link Serializable}.  Note that
      * this method will throw {@link IllegalArgumentException} if
      * <code>object</code> does not implement <code>Serializable</code>, but is
      * not guaranteed to check that all referred to objects implement
@@ -87,8 +88,7 @@ public interface DataManager {
      * @param	name the name
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement both {@link ManagedObject} and 
-     *          {@link java.io.Serializable Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
@@ -120,7 +120,7 @@ public interface DataManager {
      * encoding used can be either <em>standard UTF-8</em>, as defined by the
      * IETF in <a href="http://tools.ietf.org/html/rfc3629">RFC 3629</a>, or
      * <em>modified UTF-8</em>, as used by serialization and defined by the
-     * {@link java.io.DataInput DataInput} interface.
+     * {@link DataInput} interface.
      *
      * @param	name the name to search after, or <code>null</code> to start at
      *		the beginning
@@ -149,8 +149,7 @@ public interface DataManager {
      *
      * @param	object the object
      * @throws	IllegalArgumentException if {@code object} does not implement
-     *		both {@link ManagedObject} and 
-     *          {@link java.io.Serializable Serializable}
+     *		both {@link ManagedObject} and {@link Serializable}
      * @throws	IllegalStateException if {@code object} implements {@code
      *		ManagedObjectRemoval} and {@code removeObject} is called
      *		recursively on the object through a call to {@link
@@ -173,8 +172,7 @@ public interface DataManager {
      *
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement both {@link ManagedObject} and 
-     *          {@link java.io.Serializable Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
@@ -191,8 +189,7 @@ public interface DataManager {
      * @param	object the object
      * @return	the managed reference
      * @throws	IllegalArgumentException if <code>object</code> does not
-     *		implement both {@link ManagedObject} and 
-     *          {@link java.io.Serializable Serializable}
+     *		implement both {@link ManagedObject} and {@link Serializable}
      * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction

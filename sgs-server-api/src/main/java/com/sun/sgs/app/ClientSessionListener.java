@@ -19,6 +19,7 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 /**
@@ -26,8 +27,7 @@ import java.nio.ByteBuffer;
  * server.
  *
  * <p>An implementation of a {@code ClientSessionListener} should
- * implement the {@link java.io.Serializable Serializable} interface,
- * so that session
+ * implement the {@link Serializable} interface, so that session
  * listeners can be stored persistently.  If a given listener has
  * mutable state, that listener should also implement the {@link
  * ManagedObject} interface.

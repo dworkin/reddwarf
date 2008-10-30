@@ -19,12 +19,12 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
 import java.math.BigInteger;
 
 /**
  * Represents a reference to a managed object.  Classes that implement
- * <code>ManagedReference</code> must also implement 
- * {@link java.io.Serializable Serializable}.
+ * <code>ManagedReference</code> must also implement {@link Serializable}.
  * Applications should create instances of this interface using the {@link
  * DataManager#createReference DataManager.createReference} method.  These
  * <code>ManagedReference</code> instances should be used to store references
@@ -51,8 +51,7 @@ public interface ManagedReference<T> {
 
     /**
      * Obtains the object associated with this reference.  The object returned
-     * will implement {@link ManagedObject} and 
-     * {@link java.io.Serializable Serializable}.  For
+     * will implement {@link ManagedObject} and {@link Serializable}.  For
      * implementations that need to be notified of object modifications,
      * applications should call {@link #getForUpdate getForUpdate} or {@link
      * DataManager#markForUpdate DataManager.markForUpdate} before modifying
@@ -71,8 +70,7 @@ public interface ManagedReference<T> {
     /**
      * Obtains the managed object associated with this reference, and notifies
      * the system that the object is going to be modified.  The object returned
-     * will implement {@link ManagedObject} and 
-     * {@link java.io.Serializable Serializable}.
+     * will implement {@link ManagedObject} and {@link Serializable}.
      *
      * @return	the associated object
      * @throws	ObjectNotFoundException if the object associated with this

@@ -19,10 +19,12 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
  * Defines an application operation that will be run by the {@link
  * TaskManager}.  Classes that implement <code>Task</code> must also implement
- * {@link java.io.Serializable Serializable}.
+ * {@link Serializable}.
  *
  * @see		TaskManager
  */

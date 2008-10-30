@@ -19,11 +19,12 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
  * A marker interface implemented by shared, persistent objects managed by
  * {@link DataManager}.  Classes that implement {@code ManagedObject} must also
- * implement {@link java.io.Serializable Serializable}, 
- * as should any non-managed objects they refer
+ * implement {@link Serializable}, as should any non-managed objects they refer
  * to.  Any instances of {@code ManagedObject} that a managed object refers to
  * directly, or indirectly through non-managed objects, need to be referred to
  * through instances of {@link ManagedReference}. <p>
@@ -35,6 +36,6 @@ package com.sun.sgs.app;
  *
  * @see		DataManager
  * @see		ManagedReference
- * @see		java.io.Serializable Serializable
+ * @see		Serializable
  */
 public interface ManagedObject { }

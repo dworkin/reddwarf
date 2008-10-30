@@ -19,6 +19,7 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 /**
@@ -27,8 +28,7 @@ import java.nio.ByteBuffer;
  * any client session sends a message on that channel. 
  *
  * <p>An implementation of a {@code ChannelListener} should implement
- * the {@link java.io.Serializable Serializable} interface, 
- * so that channel listeners
+ * the {@link Serializable} interface, so that channel listeners
  * can be stored persistently.  If a given listener has mutable state,
  * that listener should also implement the {@link ManagedObject}
  * interface.

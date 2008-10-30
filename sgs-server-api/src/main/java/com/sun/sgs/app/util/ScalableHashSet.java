@@ -20,8 +20,11 @@
 package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Collection;
@@ -37,8 +40,7 @@ import java.util.Iterator;
  * <p>
  *
  * Developers may use this class as a drop-in replacement for the {@link
- * java.util.HashSet} class for use in a 
- * {@link com.sun.sgs.app.ManagedObject ManagedObject}.  A {@code
+ * java.util.HashSet} class for use in a {@link ManagedObject}.  A {@code
  * HashSet} will typically perform better than this class when the number of
  * mappings is small, the objects being stored are small, and minimal
  * concurrency is required.  As the size of the serialized {@code HashSet}
@@ -79,8 +81,7 @@ import java.util.Iterator;
  * <p>
  *
  * This class marks itself for update as necessary; no additional calls to the
- * {@link com.sun.sgs.app.DataManager DataManager} are necessary when modifying 
- * the map.  Developers do not
+ * {@link DataManager} are necessary when modifying the map.  Developers do not
  * need to call {@code markForUpdate} or {@code getForUpdate} on this set, as
  * this will eliminate all the concurrency benefits of this class.  However,
  * calling {@code getForUpdate} or {@code markForUpdate} can be used if a
@@ -135,8 +136,7 @@ import java.util.Iterator;
  * <p>
  *
  * If a call to the {@link Iterator#next next} method on the iterator causes a
- * {@link com.sun.sgs.app.ObjectNotFoundException} to be thrown because the 
- * return value has
+ * {@link ObjectNotFoundException} to be thrown because the return value has
  * been removed from the {@code DataManager}, the iterator will still have
  * successfully moved to the next entry in its iteration.  In this case, the
  * {@link Iterator#remove remove} method may be called on the iterator to
@@ -155,7 +155,7 @@ import java.util.Iterator;
  * @see java.util.HashSet
  * @see ScalableHashMap
  * @see Serializable
- * @see com.sun.sgs.app.ManagedObject ManagedObject
+ * @see ManagedObject
  */
 public class ScalableHashSet<E>
     extends AbstractSet<E>
@@ -183,7 +183,7 @@ public class ScalableHashSet<E>
      *
      * @serial
      */
-    private final ManagedReference<ScalableHashMap<E, Marker>> map;
+    private final ManagedReference<ScalableHashMap<E,Marker>> map;
 
     /**
      * Creates an empty set; the backing {@code ScalableHashMap} has the
@@ -193,7 +193,7 @@ public class ScalableHashSet<E>
      */
     public ScalableHashSet() {
 	map = AppContext.getDataManager().
-                createReference(new ScalableHashMap<E, Marker>());
+	    createReference(new ScalableHashMap<E,Marker>());
     }
 
     /**
@@ -210,7 +210,7 @@ public class ScalableHashSet<E>
      */
     public ScalableHashSet(int minConcurrency) {
 	map = AppContext.getDataManager().
-                createReference(new ScalableHashMap<E, Marker>(minConcurrency));
+	    createReference(new ScalableHashMap<E,Marker>(minConcurrency));
     }
 
     /**

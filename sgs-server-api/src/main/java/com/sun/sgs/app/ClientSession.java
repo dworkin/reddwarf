@@ -19,13 +19,13 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 /**
  * Interface representing a single, connected login session between a
  * client and the server.  Classes that implement
- * {@code ClientSession} must also implement 
- * {@link java.io.Serializable Serializable}.
+ * {@code ClientSession} must also implement {@link Serializable}.
  *
  * <p>When a client logs in, the application's {@link
  * AppListener#loggedIn(ClientSession) AppListener.loggedIn} method is
@@ -91,10 +91,10 @@ public interface ClientSession extends ManagedObject {
      *
      * @throws	IllegalStateException if this session is disconnected
      * @throws	IllegalArgumentException if the message exceeds the allowed
-     *		payload length defined by the constant 
-     * {@link com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
-     *		whose value is 
-     * {@value com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     *		payload length defined by the constant {@link
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     *		whose value is {@value
+     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH} 
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of

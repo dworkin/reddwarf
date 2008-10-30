@@ -19,11 +19,12 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
  * Provides facilities for managing a {@link Task} scheduled with the {@link
  * TaskManager} to run periodically.  Classes that implement
- * <code>PeriodicTaskHandle</code> must also implement
- * {@link java.io.Serializable Serializable}.
+ * <code>PeriodicTaskHandle</code> must also implement {@link Serializable}.
  *
  * @see		TaskManager#schedulePeriodicTask 
  *		TaskManager.schedulePeriodicTask

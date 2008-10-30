@@ -19,6 +19,8 @@
 
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
  * Provides facilities for scheduling tasks.  Each task is a serializable
  * object that can be scheduled to be run now, at some time in the future, or
@@ -67,7 +69,7 @@ public interface TaskManager {
      *
      * @param	task the task to run
      * @throws	IllegalArgumentException if <code>task</code> does not
-     *		implement {@link java.io.Serializable Serializable}
+     *		implement {@link Serializable}
      * @throws	TaskRejectedException if the <code>TaskManager</code> refuses
      *		to accept the task because of resource limitations
      * @throws	TransactionException if the operation failed because of a
@@ -97,8 +99,8 @@ public interface TaskManager {
      * @param	delay the number of milliseconds to delay before running the
      *		task
      * @throws	IllegalArgumentException if <code>task</code> does not
-     *		implement {@link java.io.Serializable Serializable}, 
-     *          or if delay is less than <code>0</code>
+     *		implement {@link Serializable}, or if delay is less than
+     *		<code>0</code>
      * @throws	TaskRejectedException if the <code>TaskManager</code> refuses
      *		to accept the task because of resource limitations
      * @throws	TransactionException if the operation failed because of a
@@ -144,8 +146,7 @@ public interface TaskManager {
      *		the starts of periodic attempts to run the task
      * @return	a handle for managing the scheduling of the task
      * @throws	IllegalArgumentException if <code>task</code> does not
-     *		implement {@link java.io.Serializable Serializable}, 
-     *          if delay is less than
+     *		implement {@link Serializable}, if delay is less than
      *		<code>0</code>, or if period is less than <code>0</code>
      * @throws	TaskRejectedException if the <code>TaskManager</code> refuses
      *		to accept the task because of resource limitations

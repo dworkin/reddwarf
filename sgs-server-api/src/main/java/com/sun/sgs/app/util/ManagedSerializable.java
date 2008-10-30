@@ -20,7 +20,9 @@
 package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import java.io.Serializable;
 
 /**
@@ -52,15 +54,14 @@ import java.io.Serializable;
  * <b>Before:</b>
  *
  * <pre>
- * <code>
  * public class MyPlayerObj {
  *     String name;
- *     Collection< Item > inventory;
+ *     Collection&lt;Item&gt; inventory;
  *     MapArea currentLocation;
  *
  *     public MyPlayerObj(...) {
  *         ...
- *         inventory = new ArrayList< Item >();
+ *         inventory = new ArrayList&lt;Item&gt;();
  *     }
  *
  *     ...
@@ -70,30 +71,30 @@ import java.io.Serializable;
  *             ...
  *     }
  * }
- * </code>
  * </pre>
  *
  * <b>After:</b>
  *
  * <pre>
- * {@code
  * public class MyPlayerObj {
  *     String name;
- *     ManagedReference< ManagedSerializable< Collection< Item >>> inventoryRef;
- *     ManagedReference< ManagedSerializable< MapArea >> currentLocationRef;
+ *
+ *     ManagedReference&lt;ManagedSerializable&lt;Collection&lt;Item&gt;&gt;&gt; inventoryRef;
+ *
+ *     ManagedReference&lt;ManagedSerializable&lt;MapArea&gt;&gt; currentLocationRef;
  *
  *     public MyPlayerObj(...) {
  *         ...
- *         Collection< Item > inventory = new ArrayList< Item >();
+ *         Collection&lt;Item&gt; inventory = new ArrayList&lt;Item&gt;();
  *         inventoryRef = AppContext.getDataManager().
  *             createReference(
- *                 new ManagedSerializable< Collection< Item>>(inventory));
+ *                 new ManagedSerializable&lt;Collection&lt;Item&gt;&gt;(inventory));
  *     }
  *
  *     ...
  *
  *     public void findNearbyPlayers() {
- *         ManagedSerializable< MapArea > curLocWrapper =
+ *         ManagedSerializable&lt;MapArea&gt; curLocWrapper =
  *             currentLocationRef.get();
  *         MapArea currentLocation = curLocWrapper.get();
  *
@@ -101,16 +102,13 @@ import java.io.Serializable;
  *             ...
  *     }
  * }
- * }
  * </pre>
  *
  * Application developers are responsible for removing {@code
- * ManagedSerializable} instances by calling 
- * {@link com.sun.sgs.app.DataManager#removeObject
+ * ManagedSerializable} instances by calling {@link DataManager#removeObject
  * DataManager.removeObject}.  Developers should call {@link
- * com.sun.sgs.app.DataManager#markForUpdate DataManager.markForUpdate} 
- * or {@link com.sun.sgs.app.ManagedReference#getForUpdate 
- * ManagedReference.getForUpdate} if the application
+ * DataManager#markForUpdate DataManager.markForUpdate} or {@link
+ * ManagedReference#getForUpdate DataManager.getForUpdate} if the application
  * modifies objects wrapped by instances of this class.
  *
  * @param <T> the type of the wrapped object
