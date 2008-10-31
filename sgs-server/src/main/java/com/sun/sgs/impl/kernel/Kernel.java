@@ -581,18 +581,37 @@ class Kernel {
      * Private helper that creates an instance of a <code>service</code> with
      * no manager, based on fully qualified class names.
      */
-    private Service createService(Class<?> serviceClass)
-        throws Exception
-    {
-        // find the appropriate constructor
-        Constructor<?> serviceConstructor =
-            serviceClass.getConstructor(Properties.class,
-                                        ComponentRegistry.class,
-                                        TransactionProxy.class);
+    private Service createService(Class<?> serviceClass) throws Exception {
+	Constructor<?> serviceConstructor;
 
-        // return a new instance
-        return (Service) (serviceConstructor.
-                          newInstance(appProperties, systemRegistry, proxy));
+	// If the service is the watchdog, then attach a special
+	// object that enables call-back for node shutdown.
+	// Otherwise, construct the service as usual.
+	if (serviceClass.equals(appProperties
+		.getProperty(StandardProperties.WATCHDOG_SERVICE))) {
+
+	    serviceConstructor =
+		    serviceClass.getConstructor(Properties.class,
+			    ComponentRegistry.class, TransactionProxy.class,
+			    KernelShutdownController.class);
+
+	    // return a new instance using the four-argument constructor
+	    KernelShutdownController ctrl =
+		    KernelShutdownController.getSingleton(this);
+	    return (Service) (serviceConstructor.newInstance(appProperties,
+		    systemRegistry, proxy, ctrl));
+
+	} else {
+
+	    // find the appropriate constructor
+	    serviceConstructor =
+		    serviceClass.getConstructor(Properties.class,
+			    ComponentRegistry.class, TransactionProxy.class);
+
+	    // return a new instance
+	    return (Service) (serviceConstructor.newInstance(appProperties,
+		    systemRegistry, proxy));
+	}
     }
 
     /** Start the application, throwing an exception if there is a problem. */
@@ -630,7 +649,7 @@ class Kernel {
                        application);
         }
     }
-        
+
     /**
      * Shut down all services (in reverse order) and the schedulers.
      */
@@ -649,7 +668,7 @@ class Kernel {
             taskScheduler.shutdown();
         }
     }
-    
+
     /**
      * Creates a new identity authenticator.
      */
@@ -807,7 +826,7 @@ class Kernel {
                        appName);
         }
     }
-    
+
     /**
      * This runnable calls the application's <code>initialize</code> method,
      * if it hasn't been called before, to start the application for the
@@ -846,7 +865,7 @@ class Kernel {
             }
         }
     }
-    
+
     /**
      * Main-line method that starts the {@code Kernel}. Each kernel
      * instance runs a single application.

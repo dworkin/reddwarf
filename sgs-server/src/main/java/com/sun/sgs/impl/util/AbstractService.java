@@ -57,6 +57,20 @@ public abstract class AbstractService implements Service {
      * IoRunnable} in the {@code runIoTask} method. */ 
     private static final int WAIT_TIME_BEFORE_RETRY = 100;
 
+    /** The number of attempts to try renewing during an {@code IOException} */
+    private final int MAX_IO_ATTEMPTS = 5;
+
+    /** The number of I/O resolution attempts performed so far */
+    private int attempts = MAX_IO_ATTEMPTS;
+
+    /**
+     * Failure constants to use when reporting issues to the Watchdog
+     */
+    public static final int FAILURE_FATAL  = 3;
+    public static final int FAILURE_SEVERE = 2;
+    public static final int FAILURE_MEDIUM = 1;
+    public static final int FAILURE_MINOR  = 0;
+
     /** Service state. */
     protected static enum State {
         /** The service is initialized. */
@@ -92,10 +106,10 @@ public abstract class AbstractService implements Service {
 
     /** The lock for {@code state} and {@code callsInProgress} fields. */
     private final Object lock = new Object();
-    
+
     /** The server state. */
     private State state;
-    
+
     /** The count of calls in progress. */
     private int callsInProgress = 0;
 
@@ -104,24 +118,21 @@ public abstract class AbstractService implements Service {
 
     /**
      * Constructs an instance with the specified {@code properties}, {@code
-     * systemRegistry}, {@code txnProxy}, and {@code logger}.  It initializes
-     * the {@code appName} field to the value of the {@code
-     * com.sun.sgs.app.name} property and sets this service's state to {@code
-     * INITIALIZED}.
-     *
-     * @param	properties service properties
-     * @param	systemRegistry system registry
-     * @param	txnProxy transaction proxy
-     * @param	logger the service's logger
-     *
-     * @throws	IllegalArgumentException if the {@code com.sun.sgs.app.name}
-     *		property is not defined in {@code properties}
+     * systemRegistry}, {@code txnProxy}, and {@code logger}. It initializes
+     * the {@code appName} field to the value of the
+     * {@code com.sun.sgs.app.name} property and sets this service's state to
+     * {@code INITIALIZED}.
+     * 
+     * @param properties service properties
+     * @param systemRegistry system registry
+     * @param txnProxy transaction proxy
+     * @param logger the service's logger
+     * @throws IllegalArgumentException if the {@code com.sun.sgs.app.name}
+     * property is not defined in {@code properties}
      */
     protected AbstractService(Properties properties,
-			      ComponentRegistry systemRegistry,
-			      TransactionProxy txnProxy,
-			      LoggerWrapper logger)
-    {
+	    ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+	    LoggerWrapper logger) {
 	if (properties == null) {
 	    throw new NullPointerException("null properties");
 	} else if (systemRegistry == null) {
@@ -131,7 +142,7 @@ public abstract class AbstractService implements Service {
 	} else if (logger == null) {
 	    throw new NullPointerException("null logger");
 	}
-	
+
 	synchronized (AbstractService.class) {
 	    if (AbstractService.txnProxy == null) {
 		AbstractService.txnProxy = txnProxy;
@@ -141,15 +152,15 @@ public abstract class AbstractService implements Service {
 	}
 	appName = properties.getProperty(StandardProperties.APP_NAME);
 	if (appName == null) {
-	    throw new IllegalArgumentException(
-		"The " + StandardProperties.APP_NAME +
-		" property must be specified");
-	}	
-	
+	    throw new IllegalArgumentException("The " +
+		    StandardProperties.APP_NAME +
+		    " property must be specified");
+	}
+
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	this.transactionScheduler =
-	    systemRegistry.getComponent(TransactionScheduler.class);
+		systemRegistry.getComponent(TransactionScheduler.class);
 	this.dataService = txnProxy.getService(DataService.class);
 	this.taskOwner = txnProxy.getCurrentOwner();
 
@@ -163,97 +174,87 @@ public abstract class AbstractService implements Service {
 
     /**
      * {@inheritDoc}
-     *
-     * <p>If this service is in the {@code INITIALIZED} state, this
-     * method sets the state to {@code READY} and invokes the {@link
-     * #doReady doReady} method.  If this service is already in the
-     * {@code READY} state, this method performs no actions.  If this
-     * service is shutting down, or is already shut down, this method
-     * throws {@code IllegalStateException}.
-     *
-     * @throws	IllegalStateException if this service is shutting down
-     *		or is already shut down
+     * <p>
+     * If this service is in the {@code INITIALIZED} state, this method sets
+     * the state to {@code READY} and invokes the {@link #doReady doReady}
+     * method. If this service is already in the {@code READY} state, this
+     * method performs no actions. If this service is shutting down, or is
+     * already shut down, this method throws {@code IllegalStateException}.
+     * 
+     * @throws IllegalStateException if this service is shutting down or is
+     * already shut down
      */
     public void ready() {
 	logger.log(Level.FINEST, "ready");
 	synchronized (lock) {
 	    switch (state) {
-		
-	    case INITIALIZED:
-		setState(State.READY);
-		break;
-		
-	    case READY:
-		return;
-		
-	    case SHUTTING_DOWN:
-	    case SHUTDOWN:
-		throw new IllegalStateException("service shutting down");
-	    default:
-		throw new AssertionError();
+
+		case INITIALIZED:
+		    setState(State.READY);
+		    break;
+
+		case READY:
+		    return;
+
+		case SHUTTING_DOWN:
+		case SHUTDOWN:
+		    throw new IllegalStateException("service shutting down");
 	    }
 	}
 	doReady();
     }
 
     /**
-     * Performs ready operations.  This method is invoked by the
-     * {@link #ready ready} method only once so that the subclass can
-     * perform any operations necessary during the "ready" phase.
+     * Performs ready operations. This method is invoked by the
+     * {@link #ready ready} method only once so that the subclass can perform
+     * any operations necessary during the "ready" phase.
      */
     protected abstract void doReady();
 
     /**
      * {@inheritDoc}
-     *
-     * <p>If this service is in the {@code INITIALIZED} state, this
-     * method throws {@code IllegalStateException}.  If this service
-     * is in the {@code READY} state, this method sets the state to
-     * {@code SHUTTING_DOWN}, waits for all calls in progress to
-     * complete, then starts a thread to invoke the {@link #doShutdown
-     * doShutdown} method, waits for that thread to complete, and
-     * returns {@code true}.  If the service is in the {@code
-     * SHUTTING_DOWN} state, this method waits for the shutdown thread
-     * to complete, and returns {@code true}.  If this service is in
-     * the {@code SHUTDOWN} state, then this method returns {@code
-     * true}.
-     *
-     * <p>If the current thread is interrupted while waiting for calls
-     * to complete or while waiting for the shutdown thread to finish,
-     * this method returns {@code false}.
-     *
-     * TODO: If shutdown is interrupted, it should be possible to
-     * re-initiate shutdown.
+     * <p>
+     * If this service is in the {@code INITIALIZED} state, this method throws
+     * {@code IllegalStateException}. If this service is in the {@code READY}
+     * state, this method sets the state to {@code SHUTTING_DOWN}, waits for
+     * all calls in progress to complete, then starts a thread to invoke the
+     * {@link #doShutdown doShutdown} method, waits for that thread to
+     * complete, and returns {@code true}. If the service is in the {@code
+     * SHUTTING_DOWN} state, this method waits for the shutdown thread to
+     * complete, and returns {@code true}. If this service is in the
+     * {@code SHUTDOWN} state, then this method returns {@code true}.
+     * <p>
+     * If the current thread is interrupted while waiting for calls to
+     * complete or while waiting for the shutdown thread to finish, this
+     * method returns {@code false}. TODO: If shutdown is interrupted, it
+     * should be possible to re-initiate shutdown.
      */
     public boolean shutdown() {
 	logger.log(Level.FINEST, "shutdown");
-	
+
 	synchronized (lock) {
 	    switch (state) {
-		
-	    case INITIALIZED:
-	    case READY:
-		logger.log(Level.FINEST, "initiating shutdown");
-		setState(State.SHUTTING_DOWN);
-		while (callsInProgress > 0) {
-		    try {
-			lock.wait();
-		    } catch (InterruptedException e) {
-			return false;
+
+		case INITIALIZED:
+		case READY:
+		    logger.log(Level.FINEST, "initiating shutdown");
+		    setState(State.SHUTTING_DOWN);
+		    while (callsInProgress > 0) {
+			try {
+			    lock.wait();
+			} catch (InterruptedException e) {
+			    return false;
+			}
 		    }
-		}
-		shutdownThread = new ShutdownThread();
-		shutdownThread.start();
-		break;
+		    shutdownThread = new ShutdownThread();
+		    shutdownThread.start();
+		    break;
 
-	    case SHUTTING_DOWN:
-		break;
-		
-	    case SHUTDOWN:
-		return true;
+		case SHUTTING_DOWN:
+		    break;
 
-	    default:
-		throw new AssertionError();
+		case SHUTDOWN:
+		    return true;
 	    }
 	}
 
@@ -267,48 +268,46 @@ public abstract class AbstractService implements Service {
     }
 
     /**
-     * Performs shutdown operations.  This method is invoked by the
-     * {@link #shutdown shutdown} method only once so that the
-     * subclass can perfom any operations necessary to shutdown the
-     * service.
+     * Performs shutdown operations. This method is invoked by the
+     * {@link #shutdown shutdown} method only once so that the subclass can
+     * perfom any operations necessary to shutdown the service.
      */
     protected abstract void doShutdown();
 
     /**
-     * Checks the service version.  If a version is not associated with the
+     * Checks the service version. If a version is not associated with the
      * given {@code versionKey}, then a new {@link Version} object
      * (constructed with the specified {@code majorVersion} and {@code
      * minorVersion}) is bound in the data service with the specified key.
-     *
-     * <p>If an old version is bound to the specified key and that old
-     * version is not equal to the current version (as specified by {@code
-     * majorVersion}/{@code minorVersion}), then the {@link
-     * #handleServiceVersionMismatch handleServiceVersionMismatch} method is
-     * invoked to convert the old version to the new version.  If the {@code
-     * handleVersionMismatch} method returns normally, the old version is
-     * removed and the current version is bound to the specified key.
-     *
-     * <p>This method must be called within a transaction.
-     *
-     * @param	versionKey a key for the version
-     * @param	majorVersion a major version
-     * @param	minorVersion a minor version
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     * @throws	IllegalStateException if {@code handleVersionMismatch} is
-     *		invoked and throws a {@code RuntimeException}
+     * <p>
+     * If an old version is bound to the specified key and that old version is
+     * not equal to the current version (as specified by {@code majorVersion}/{@code minorVersion}),
+     * then the {@link #handleServiceVersionMismatch
+     * handleServiceVersionMismatch} method is invoked to convert the old
+     * version to the new version. If the {@code handleVersionMismatch} method
+     * returns normally, the old version is removed and the current version is
+     * bound to the specified key.
+     * <p>
+     * This method must be called within a transaction.
+     * 
+     * @param versionKey a key for the version
+     * @param majorVersion a major version
+     * @param minorVersion a minor version
+     * @throws TransactionException if there is a problem with the current
+     * transaction
+     * @throws IllegalStateException if {@code handleVersionMismatch} is
+     * invoked and throws a {@code RuntimeException}
      */
-    protected final void checkServiceVersion(
-	String versionKey, int majorVersion, int minorVersion)
-    {
-	if (versionKey ==  null) {
+    protected final void checkServiceVersion(String versionKey,
+	    int majorVersion, int minorVersion) {
+	if (versionKey == null) {
 	    throw new NullPointerException("null versionKey");
 	}
 	Version currentVersion = new Version(majorVersion, minorVersion);
 	try {
-	    Version oldVersion = (Version)
-		dataService.getServiceBinding(versionKey);
-	    
+	    Version oldVersion =
+		    (Version) dataService.getServiceBinding(versionKey);
+
 	    if (!currentVersion.equals(oldVersion)) {
 		try {
 		    handleServiceVersionMismatch(oldVersion, currentVersion);
@@ -318,8 +317,8 @@ public abstract class AbstractService implements Service {
 		    throw e;
 		} catch (RuntimeException e) {
 		    throw new IllegalStateException(
-		        "exception occurred while upgrading from version: " +
-		        oldVersion + ", to: " + currentVersion, e);
+			    "exception occurred while upgrading from version: " +
+				    oldVersion + ", to: " + currentVersion, e);
 		}
 	    }
 
@@ -328,24 +327,24 @@ public abstract class AbstractService implements Service {
 	    dataService.setServiceBinding(versionKey, currentVersion);
 	}
     }
-    
+
     /**
      * Handles conversion from the {@code oldVersion} to the {@code
-     * currentVersion}.  This method is invoked by {@link #checkServiceVersion
+     * currentVersion}. This method is invoked by {@link #checkServiceVersion
      * checkServiceVersion} if a version mismatch is detected and is invoked
      * from within a transaction.
-     *
-     * @param	oldVersion the old version
-     * @param	currentVersion the current version
-     * @throws	IllegalStateException if the old version cannot be upgraded
-     *		to the current version
+     * 
+     * @param oldVersion the old version
+     * @param currentVersion the current version
+     * @throws IllegalStateException if the old version cannot be upgraded to
+     * the current version
      */
-    protected abstract void handleServiceVersionMismatch(
-	Version oldVersion, Version currentVersion);
-    
+    protected abstract void handleServiceVersionMismatch(Version oldVersion,
+	    Version currentVersion);
+
     /**
      * Returns this service's state.
-     *
+     * 
      * @return this service's state
      */
     protected State getState() {
@@ -353,15 +352,15 @@ public abstract class AbstractService implements Service {
 	    return state;
 	}
     }
-    
+
     /**
-     * Increments the number of calls in progress.  This method should
-     * be invoked by remote methods to both increment in progress call
-     * count and to check the state of this server.  When the call has
-     * completed processing, the remote method should invoke {@link
-     * #callFinished callFinished} before returning.
-     *
-     * @throws	IllegalStateException if this service is shutting down
+     * Increments the number of calls in progress. This method should be
+     * invoked by remote methods to both increment in progress call count and
+     * to check the state of this server. When the call has completed
+     * processing, the remote method should invoke {@link #callFinished
+     * callFinished} before returning.
+     * 
+     * @throws IllegalStateException if this service is shutting down
      */
     protected void callStarted() {
 	synchronized (lock) {
@@ -373,10 +372,10 @@ public abstract class AbstractService implements Service {
     }
 
     /**
-     * Decrements the in progress call count, and if this server is
-     * shutting down and the count reaches 0, then notifies the waiting
-     * shutdown thread that it is safe to continue.  A remote method
-     * should invoke this method when it has completed processing.
+     * Decrements the in progress call count, and if this server is shutting
+     * down and the count reaches 0, then notifies the waiting shutdown thread
+     * that it is safe to continue. A remote method should invoke this method
+     * when it has completed processing.
      */
     protected void callFinished() {
 	synchronized (lock) {
@@ -389,48 +388,61 @@ public abstract class AbstractService implements Service {
 
     /**
      * Returns {@code true} if this service is shutting down.
-     *
-     * @return	{@code true} if this service is shutting down
+     * 
+     * @return {@code true} if this service is shutting down
      */
     protected boolean shuttingDown() {
 	synchronized (lock) {
-	    return
-		state == State.SHUTTING_DOWN ||
-		state == State.SHUTDOWN;
+	    return state == State.SHUTTING_DOWN || state == State.SHUTDOWN;
 	}
     }
-    
-    /** 
-     * Returns {@code true} if this service is in the initialized state
-     * but is not yet ready to run.
+
+    /**
+     * Returns {@code true} if this service is in the initialized state but is
+     * not yet ready to run.
      * 
      * @return {@code true} if this service is in the initialized state
      */
     protected boolean isInInitializedState() {
-        synchronized (lock) {
-            return state == State.INITIALIZED;
-        }
+	synchronized (lock) {
+	    return state == State.INITIALIZED;
+	}
     }
-    
+
+    /**
+     * Notifies the {@code Watchdog} of a problem with the service, enabling
+     * the {@code Watchdog} to shut down the node.
+     * 
+     * @param severity the severity of the failure; values can be
+     * {@code FAILURE_MINOR},{@code FAILURE_MEDIUM}, {@code FAILURE_SEVERE},
+     * or {@code FAILURE_FATAL}
+     */
+    protected void notifyWatchdogOfFailure(int severity) {
+	assert (severity >= FAILURE_MINOR && severity <= FAILURE_SEVERE);
+
+	// Get the watchdog and report the problem
+	WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
+	watchdog.reportFailure(this.getClass().toString(), severity);
+    }
+
     /**
      * Runs a transactional task to query the status of the node with the
      * specified {@code nodeId} and returns {@code true} if the node is alive
      * and {@code false} otherwise.
-     *
-     * <p>This method must be called from outside a transaction or {@code
+     * <p>
+     * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
-     *
-     * @param	nodeId a node ID
-     * @return	{@code true} if the node with the associated ID is
-     *		considered alive, otherwise returns {@code false}
-     * @throws	IllegalStateException if this method is invoked inside a
-     *		transactional context 
+     * 
+     * @param nodeId a node ID
+     * @return {@code true} if the node with the associated ID is considered
+     * alive, otherwise returns {@code false}
+     * @throws IllegalStateException if this method is invoked inside a
+     * transactional context
      */
     public boolean isAlive(long nodeId) {
 	checkNonTransactionalContext();
 	try {
-	    CheckNodeStatusTask nodeStatus =
-		new CheckNodeStatusTask(nodeId);
+	    CheckNodeStatusTask nodeStatus = new CheckNodeStatusTask(nodeId);
 	    transactionScheduler.runTask(nodeStatus, taskOwner);
 	    return nodeStatus.isAlive;
 	} catch (IllegalStateException ignore) {
@@ -438,52 +450,55 @@ public abstract class AbstractService implements Service {
 	} catch (Exception e) {
 	    // This shouldn't happen, so log.
 	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING, e, "running CheckNodeStatusTask throws");
+		logger.logThrow(Level.WARNING, e,
+			"running CheckNodeStatusTask throws");
 	    }
 	}
-	// TBD: is this the correct value to return?  We can't really tell
+	// TBD: is this the correct value to return? We can't really tell
 	// what the status of a non-local node is if the local node is
 	// shutting down.
 	return false;
-    } 
+    }
 
-    /**
-     * Creates a {@code TaskQueue} for dependent, transactional tasks.
-     *
-     * @return	the task queue
-     */
+    /** Creates a {@code TaskQueue} for dependent, transactional tasks. */
     public TaskQueue createTaskQueue() {
 	return transactionScheduler.createTaskQueue();
     }
 
     /**
      * Executes the specified {@code ioTask} by invoking its {@link
-     * IoRunnable#run run} method.  If the specified task throws an
-     * {@code IOException}, this method will retry the task while the
-     * node with the given {@code nodeId} is alive until the task
-     * completes successfully.
-     *
-     * <p>This method must be called from outside a transaction or {@code
+     * IoRunnable#run run} method. If the specified task throws an
+     * {@code IOException}, this method will retry the task while the node
+     * with the given {@code nodeId} is alive until the task completes
+     * successfully.
+     * <p>
+     * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
-     *
-     * @param	ioTask a task with IO-related operations
-     * @param	nodeId the node that is the target of the IO operations
-     * @throws	IllegalStateException if this method is invoked within a
-     * 		transactional context
+     * 
+     * @param ioTask a task with IO-related operations
+     * @param nodeId the node that is the target of the IO operations
+     * @throws IllegalStateException if this method is invoked within a
+     * transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
 	checkNonTransactionalContext();
+	boolean hasNotified = false;
 	do {
 	    try {
 		ioTask.run();
 		return;
 	    } catch (IOException e) {
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.logThrow(
-			Level.FINEST, e,
-			"IoRunnable {0} throws", ioTask);
+		    logger.logThrow(Level.FINEST, e, "IoRunnable {0} throws",
+			    ioTask);
 		}
+		// If the maximum number of attempts have been tried,
+		// then we are forced to shutdown
+		if (!hasNotified && --attempts == 0) {
+		    notifyWatchdogOfFailure(FAILURE_MEDIUM);
+		    hasNotified = true;
+		}
+
 		try {
 		    // TBD: what back-off policy do we want here?
 		    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
@@ -491,14 +506,23 @@ public abstract class AbstractService implements Service {
 		}
 	    }
 	} while (isAlive(nodeId));
+
+	// Reset the allowable number of I/O attempts
+	attempts = MAX_IO_ATTEMPTS;
     }
-    
+
+    /**
+     * Defines a method which enables the service to inform the
+     * {@code Watchdog} that it has failed
+     */
+    // public abstract void notifyOfFailure();
+
     /**
      * Returns the data service relevant to the current context.
-     *
+     * 
      * @return the data service relevant to the current context
      */
-    public static synchronized DataService getDataService() {
+    public synchronized static DataService getDataService() {
 	if (txnProxy == null) {
 	    throw new IllegalStateException("Service not initialized");
 	} else {
@@ -508,98 +532,100 @@ public abstract class AbstractService implements Service {
 
     /**
      * Returns {@code true} if the specified exception is retryable, and
-     * {@code false} otherwise.  A retryable exception is one that
-     * implements {@link ExceptionRetryStatus} and invoking its {@link
+     * {@code false} otherwise. A retryable exception is one that implements
+     * {@link ExceptionRetryStatus} and invoking its {@link
      * ExceptionRetryStatus#shouldRetry shouldRetry} method returns {@code
      * true}.
-     *
-     * @param	e an exception
-     * @return	{@code true} if the specified exception is retryable, annd
-     *		{@code false} otherwise
+     * 
+     * @param e an exception
+     * @return {@code true} if the specified exception is retryable, annd
+     * {@code false} otherwise
      */
     public static boolean isRetryableException(Exception e) {
 	return (e instanceof ExceptionRetryStatus) &&
-	    ((ExceptionRetryStatus) e).shouldRetry();
+		((ExceptionRetryStatus) e).shouldRetry();
     }
-    
+
     /**
-     * An immutable class to hold the current version of the keys
-     * and data persisted by a service.
-     */   
+     * An immutable class to hold the current version of the keys and data
+     * persisted by a service.
+     */
     public static class Version implements ManagedObject, Serializable {
-        /** Serialization version. */
-        private static final long serialVersionUID = 1L;
-        
-        private final int majorVersion;
-        private final int minorVersion;
+	/** Serialization version. */
+	private static final long serialVersionUID = 1L;
+
+	private final int majorVersion;
+	private final int minorVersion;
 
 	/**
 	 * Constructs an instance with the specified {@code major} and
 	 * {@code minor} version numbers.
-	 *
+	 * 
 	 * @param major a major version number
 	 * @param minor a minor version number
 	 */
-        public Version(int major, int minor) {
-            majorVersion = major;
-            minorVersion = minor;
-        }
-        
-        /**
-         * Returns the major version number.
-         * @return the major version number
-         */
-        public int getMajorVersion() {
-            return majorVersion;
-        }
-        
-        /**
-         * Returns the minor version number.
-         * @return the minor version number
-         */
-        public int getMinorVersion() {
-            return minorVersion;
-        }
-        
-        /** {@inheritDoc} */
-        @Override
-        public String toString() {
-            return "Version[major:" + majorVersion + 
-                    ", minor:" + minorVersion + "]";
-        }
+	public Version(int major, int minor) {
+	    majorVersion = major;
+	    minorVersion = minor;
+	}
 
-        /** {@inheritDoc} */
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            } else if (obj == null) {
-                return false;
-            } else if (obj.getClass() == this.getClass()) {
-                Version other = (Version) obj;
-                return majorVersion == other.majorVersion && 
-                       minorVersion == other.minorVersion;
+	/**
+	 * Returns the major version number.
+	 * 
+	 * @return the major version number
+	 */
+	public int getMajorVersion() {
+	    return majorVersion;
+	}
 
-            }
-            return false;
-        }
+	/**
+	 * Returns the minor version number.
+	 * 
+	 * @return the minor version number
+	 */
+	public int getMinorVersion() {
+	    return minorVersion;
+	}
 
-        /** {@inheritDoc} */
-        @Override
-        public int hashCode() {
-            int result = 17;
-            result = 37 * result + majorVersion;
-            result = 37 * result + minorVersion;
-            return result;              
-        }
+	/** {@inheritDoc} */
+	@Override
+	public String toString() {
+	    return "Version[major:" + majorVersion + ", minor:" +
+		    minorVersion + "]";
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public boolean equals(Object obj) {
+	    if (this == obj) {
+		return true;
+	    } else if (obj == null) {
+		return false;
+	    } else if (obj.getClass() == this.getClass()) {
+		Version other = (Version) obj;
+		return majorVersion == other.majorVersion &&
+			minorVersion == other.minorVersion;
+
+	    }
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	@Override
+	public int hashCode() {
+	    int result = 17;
+	    result = 37 * result + majorVersion;
+	    result = 37 * result + minorVersion;
+	    return result;
+	}
     }
 
     /* -- Private methods and classes -- */
-    
+
     /**
      * Sets this service's state to {@code newState}.
-     *
-     * @param	newState a new state.
+     * 
+     * @param newState a new state.
      */
     private void setState(State newState) {
 	synchronized (lock) {
@@ -608,19 +634,19 @@ public abstract class AbstractService implements Service {
     }
 
     /**
-     * Checks that the current thread is not in a transactional context
-     * and throws {@code IllegalStateException} if the thread is in a
+     * Checks that the current thread is not in a transactional context and
+     * throws {@code IllegalStateException} if the thread is in a
      * transactional context.
      */
     private void checkNonTransactionalContext() {
 	try {
 	    txnProxy.getCurrentTransaction();
 	    throw new IllegalStateException(
-		"operation not allowed from a transactional context");
+		    "operation not allowed from a transactional context");
 	} catch (TransactionNotActiveException e) {
 	}
     }
-	
+
     /**
      * A task to obtain the status of a given node.
      */
@@ -637,12 +663,12 @@ public abstract class AbstractService implements Service {
 	/** {@inheritDoc} */
 	public void run() {
 	    WatchdogService watchdogService =
-		txnProxy.getService(WatchdogService.class);
+		    txnProxy.getService(WatchdogService.class);
 	    Node node = watchdogService.getNode(nodeId);
 	    isAlive = node != null && node.isAlive();
 	}
     }
-    
+
     /**
      * Thread for shutting down service/server.
      */
@@ -659,8 +685,8 @@ public abstract class AbstractService implements Service {
 	    try {
 		doShutdown();
 	    } catch (RuntimeException e) {
-		logger.logThrow(
-		    Level.WARNING, e, "shutting down service throws");
+		logger.logThrow(Level.WARNING, e,
+			"shutting down service throws");
 		// swallow exception
 	    }
 	    setState(AbstractService.State.SHUTDOWN);

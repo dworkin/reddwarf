@@ -139,4 +139,14 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
 
     
+    /**
+     * A hook for services to call when there is a known problem
+     * that requires the watchdog to shut down the node.
+     * @param severity the severity of the failure; values can be
+     * {@code AbstractService.FAILURE_MINOR},
+     * {@code AbstractService.FAILURE_MEDIUM}, 
+     * {@code AbstractService.FAILURE_SEVERE}, or 
+     * {@code AbstractService.FAILURE_FATAL} 
+     */
+    void reportFailure(String className, int severity);
 }
