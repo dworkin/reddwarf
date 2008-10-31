@@ -21,5 +21,9 @@ package com.sun.sgs.protocol;
 
 import java.util.concurrent.Future;
 
+/**
+ * A future for the completion of {@link ProtocolHandler} and {@code
+ * ChannelProtocolHandler} operations.
+ */
 public interface CompletionFuture extends Future<Void> {
 }

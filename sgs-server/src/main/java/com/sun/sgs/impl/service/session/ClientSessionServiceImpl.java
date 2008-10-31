@@ -592,20 +592,7 @@ public final class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public Protocol getProtocol(BigInteger sessionRefId) {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
-	/*
-	 * If a local handler exists, return protocol message channel
-	 */
-	if (handler != null) {
-	    return handler.getProtocol();
-	} else {
-	    logger.log(
-		Level.FINE,
-		"Discarding message for unknown session:{0}",
-		sessionRefId);
-	    // TBD: is throwing this exception the right thing to do?
-	    throw new IllegalArgumentException(
-		"unknown session: " + sessionRefId);
-	}
+	return handler != null ? handler.getProtocol() : null;
     }
 
     /** {@inheritDoc} */
@@ -614,20 +601,10 @@ public final class ClientSessionServiceImpl
 				       boolean bestAvailable)
     {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
-	/*
-	 * If a local handler exists, return protocol message channel
-	 */
-	if (handler != null) {
-	    return handler.getChannelProtocol(delivery, bestAvailable);
-	} else {
-	    logger.log(
-		Level.FINE,
-		"Discarding message for unknown session:{0}",
-		sessionRefId);
-	    // TBD: is throwing this exception the right thing to do?
-	    throw new IllegalArgumentException(
-		"unknown session: " + sessionRefId);
-	}
+	return
+	    handler != null ?
+	    handler.getChannelProtocol(delivery, bestAvailable) :
+	    null;
     }
     
     /* -- Package access methods for adding commit actions -- */
@@ -1031,8 +1008,10 @@ public final class ClientSessionServiceImpl
 		    }
 		}
 		Protocol protocol = handler.getProtocol();
-		for (byte[] message : messages) {
-		    protocol.sessionMessage(ByteBuffer.wrap(message));
+		if (protocol != null) {
+		    for (byte[] message : messages) {
+			protocol.sessionMessage(ByteBuffer.wrap(message));
+		    }
 		}
 	    } else {
 		logger.log(

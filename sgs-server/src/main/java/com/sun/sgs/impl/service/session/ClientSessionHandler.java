@@ -908,7 +908,7 @@ class ClientSessionHandler implements ProtocolHandler {
 	/** {@inheritDoc} */
 	public Void get() {
 	    synchronized (lock) {
-		if (!done) {
+		while (!done) {
 		    try {
 			lock.wait();
 		    } catch (InterruptedException ignore) {

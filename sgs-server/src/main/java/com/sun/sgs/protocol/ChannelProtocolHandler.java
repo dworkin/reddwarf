@@ -48,5 +48,5 @@ public interface ChannelProtocolHandler {
      * @return	future a future to be notified when the request has been
      *		processed
      */
-    CompletionFuture channelMessage(BigInteger channelId, ByteBuffer messsage);
+    CompletionFuture channelMessage(BigInteger channelId, ByteBuffer message);
 }

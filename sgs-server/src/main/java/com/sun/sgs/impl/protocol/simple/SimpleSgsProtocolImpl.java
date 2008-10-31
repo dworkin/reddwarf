@@ -553,7 +553,8 @@ public class SimpleSgsProtocolImpl implements Protocol {
 		CompletionFuture sessionMessageFuture =
 		    protocolHandler.sessionMessage(clientMessage);
 
-		// Wait for session message to processed before resuming reading.
+		// Wait for session message to be processed before
+		// resuming reading.
 		try {
 		    sessionMessageFuture.get();
 		} catch (InterruptedException ignore) {
@@ -577,9 +578,11 @@ public class SimpleSgsProtocolImpl implements Protocol {
 		ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
 		CompletionFuture channelMessageFuture =
-		    protocolHandler.channelMessage(channelRefId, channelMessage);
+		    protocolHandler.channelMessage(
+			channelRefId, channelMessage);
 
-		// Wait for channel message to be processed before resuming reading.
+		// Wait for channel message to be processed before
+		// resuming reading.
 		try {
 		    channelMessageFuture.get();
 		} catch (InterruptedException ignore) {

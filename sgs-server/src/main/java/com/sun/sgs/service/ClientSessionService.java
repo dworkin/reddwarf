@@ -47,29 +47,27 @@ public interface ClientSessionService extends Service {
 
     /**
      * Returns a protocol for the <i>local</i> client session with the
-     * specified {@code sessionRefId}. If the specified client session is
-     * not connected to the local node, an {@code IllegalArgumentException}
-     * is thrown.
+     * specified {@code sessionRefId} or {@code null} if the specified
+     * client session is not connected to the local node.
      *
      * <p> The {@code sessionRefId} is the ID obtained by invoking {@link
      * ManagedReference#getId getId} on a {@link ManagedReference} to the
      * associated {@code ClientSession}.
      *
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
-     * @param	delivery a delivery requirement
-     * @throws	IllegalArgumentException if the specified client session is
-     *		not connected to the local node
+     * @return	a protocol, or {@code null}
      */
     Protocol getProtocol(BigInteger sessionRefId);
 
     /**
      * Returns a channel protocol with the specified {@code delivery}
      * requirement for the <i>local</i> client session with the specified
-     * {@code sessionRefId}. If the specified client session is not
-     * connected to the local node, an {@code IllegalArgumentException} is
-     * thrown.  If there is no {@code ChannelProtocol} with the exact
-     * {@code delivery} requirement for the specified client session and
-     * {@code bestAvailable} is {@code false}, an {@code
+     * {@code sessionRefId}, or {@code null} if the specified client
+     * session is not connected to the local node.
+     *
+     * <p>If there is no {@code ChannelProtocol} with the exact {@code
+     * delivery} requirement for the specified client session and {@code
+     * bestAvailable} is {@code false}, an {@code
      * UnsupportedDeliveryException} is thrown.  If {@code bestAvailable}
      * is {@code true}, then the best protocol that meets the specified
      * {@code delivery} requirement is returned.  In this case, the
@@ -86,15 +84,12 @@ public interface ClientSessionService extends Service {
      *		requirement can't be satisfied, then the best protocol that
      *		meets the delivery requirement is returned
      * @return	a channel protocol matching the specified delivery
-     *		requirement, or if {@code bestAvailable} is {@code true}
+     *		requirement, or {@code null}
      *
-     * @throws	IllegalArgumentException if the specified client session is
-     *		not connected to the local node
      * @throws	UnsupportedDeliveryException if there is no {@code
      *		ChannelProtocol} with the given {@code delivery} requirement
      */
     ChannelProtocol getChannelProtocol(BigInteger sessionRefId,
 				       Delivery delivery,
-				       boolean bestAvailable)
-	throws UnsupportedDeliveryException;
+				       boolean bestAvailable);
 }

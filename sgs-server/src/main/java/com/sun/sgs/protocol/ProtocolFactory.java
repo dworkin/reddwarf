@@ -37,12 +37,13 @@ import com.sun.sgs.service.Service;
 public interface ProtocolFactory extends Service {
 
     /**
-     * Creates a new protocol instance with an underlying byte
+     * Creates a new protocol instance with the specified underlying byte
      * {@code channel}.  Incoming messages should be dispatched to the
      * specified protocol {@code handler} as appropriate.
      *
      * @param	channel a byte channel
      * @param	handler a protocol handler
+     * @return	a protocol
      */
     Protocol newProtocol(
 	AsynchronousByteChannel channel, ProtocolHandler handler);

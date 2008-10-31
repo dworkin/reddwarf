@@ -190,7 +190,7 @@ public class ClientSessionImpl
              * pre-allocate buffers. -JM
              */
 	    byte[] msgBytes = new byte[message.remaining()];
-	    message.get(msgBytes);
+	    message.asReadOnlyBuffer().get(msgBytes);
 	    addEvent(new SendEvent(msgBytes));
 
 	    return getWrappedClientSession();

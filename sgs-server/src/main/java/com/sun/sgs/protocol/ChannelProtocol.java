@@ -35,7 +35,7 @@ public interface ChannelProtocol extends Channel {
      * with the specified {@code name} and {@code channelId}.
      *
      * @param	name a channel name
-     * @param	channel a channelId
+     * @param	channelId channelId
      */
     void channelJoin(String name, BigInteger channelId);
 

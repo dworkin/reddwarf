@@ -45,6 +45,7 @@ public interface ChannelProtocolFactory extends Service {
      * @param	channel a byte channel
      * @param	handler a protocol handler
      * @param	delivery a delivery requirement for channel messages
+     * @return	a channel protocol
      */
     ChannelProtocol newChannelProtocol(AsynchronousByteChannel channel,
 				       ChannelProtocolHandler handler,

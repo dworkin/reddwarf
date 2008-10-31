@@ -501,7 +501,9 @@ public final class ChannelServiceImpl
 			ChannelProtocol protocol =
 			    sessionService.getChannelProtocol(
  				sessionRefId, Delivery.RELIABLE, false);
-			protocol.channelJoin(name, channelRefId);
+			if (protocol != null) {
+			    protocol.channelJoin(name, channelRefId);
+			}
 		    }
 		}
 		if (leavers != null) {
@@ -509,7 +511,9 @@ public final class ChannelServiceImpl
 			ChannelProtocol protocol =
 			    sessionService.getChannelProtocol(
 				sessionRefId, Delivery.RELIABLE, false);
-			protocol.channelLeave(channelRefId);
+			if (protocol != null) {
+			    protocol.channelLeave(channelRefId);
+			}
 		    }
 		}
 
@@ -568,7 +572,9 @@ public final class ChannelServiceImpl
 		ChannelProtocol protocol =
 		    sessionService.getChannelProtocol(
 			sessionRefId, Delivery.RELIABLE, false);
-		protocol.channelJoin(name, channelRefId);
+		if (protocol != null) {
+		    protocol.channelJoin(name, channelRefId);
+		}
 
 	    } finally {
 		callFinished();
@@ -613,7 +619,9 @@ public final class ChannelServiceImpl
 		ChannelProtocol protocol =
 		    sessionService.getChannelProtocol(
  			sessionRefId, Delivery.RELIABLE, false);
-		protocol.channelLeave(channelRefId);
+		if (protocol != null) {
+		    protocol.channelLeave(channelRefId);
+		}
 		
 	    } finally {
 		callFinished();
@@ -641,7 +649,9 @@ public final class ChannelServiceImpl
 			ChannelProtocol protocol =
 			    sessionService.getChannelProtocol(
 				sessionRefId, Delivery.RELIABLE, false);
-			protocol.channelLeave(channelRefId);
+			if (protocol != null) {
+			    protocol.channelLeave(channelRefId);
+			}
 		    }
 		}
 		
@@ -686,8 +696,10 @@ public final class ChannelServiceImpl
 		    ChannelProtocol protocol =
 			sessionService.getChannelProtocol(
 			    sessionRefId, Delivery.RELIABLE, false);
-		    protocol.channelMessage(
-			channelRefId, ByteBuffer.wrap(message));
+		    if (protocol != null) {
+			protocol.channelMessage(
+			    channelRefId, ByteBuffer.wrap(message));
+		    }
 		}
 
 	    } finally {
