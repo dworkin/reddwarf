@@ -3273,15 +3273,4 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    this.offset = offset;
 	}
     }
-
-    public static void main(String[] args) {
-	ArrayList<String> list = new ArrayList<String>();
-	list.add("A");
-	list.add("B");
-	ListIterator<String> iter = list.listIterator(2);
-
-	for (int i = 0; i < list.size(); i++) {
-	    System.out.println(list.get(i));
-	}
-    }
 }

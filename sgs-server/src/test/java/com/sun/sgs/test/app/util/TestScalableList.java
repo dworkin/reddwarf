@@ -59,7 +59,6 @@ public class TestScalableList extends Assert {
     /**
      * Test management.
      */
-
     @BeforeClass
     public static void setUpClass() throws Exception {
 	serverNode =
@@ -2186,9 +2185,7 @@ public class TestScalableList extends Assert {
 	    }
 	}, taskOwner);
     }
-    
-    
-    
+
     /**
      * Tests retrieving an empty sublist
      * 
@@ -2200,43 +2197,41 @@ public class TestScalableList extends Assert {
 	    public void run() throws Exception {
 		ScalableList<String> list = makeList();
 		ListIterator<String> iter = null;
-		
+
 		try {
 		    iter = list.listIterator(0);
-		} catch (IndexOutOfBoundsException ioobe){
-		    fail ("Not expecting an IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		    fail("Not expecting an IndexOutOfBoundsException");
 		}
-		
+
 		try {
 		    iter = list.listIterator(list.size() - 3);
-		} catch (IndexOutOfBoundsException ioobe){
-		    fail ("Not expecting an IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		    fail("Not expecting an IndexOutOfBoundsException");
 		}
-		
+
 		try {
 		    iter = list.listIterator(list.size());
-		} catch (IndexOutOfBoundsException ioobe){
-		    fail ("Not expecting an IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
+		    fail("Not expecting an IndexOutOfBoundsException");
 		}
-		
+
 		try {
 		    iter = list.listIterator(-1);
-		    fail ("Expecting an IndexOutOfBoundsException");
-		} catch (IndexOutOfBoundsException ioobe){
+		    fail("Expecting an IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
 		}
-		
+
 		try {
 		    iter = list.listIterator(list.size() + 1);
-		    fail ("Expecting an IndexOutOfBoundsException");
-		} catch (IndexOutOfBoundsException ioobe){
+		    fail("Expecting an IndexOutOfBoundsException");
+		} catch (IndexOutOfBoundsException ioobe) {
 		}
 
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
-    
-    
 
     /*
      * //////////////////////////////////////////////////////////////
@@ -2619,9 +2614,8 @@ public class TestScalableList extends Assert {
     }
 
     /*
-     * //////////////////////////////////////////////////// 
-     * TEST USING DATA SERVICE 
-     * ////////////////////////////////////////////////////
+     * //////////////////////////////////////////////////// TEST USING DATA
+     * SERVICE ////////////////////////////////////////////////////
      */
 
     /**
@@ -3259,19 +3253,22 @@ public class TestScalableList extends Assert {
 		}
 
 		Random random = new Random();
-		int startingPoint = random.nextInt(shadow.size()-1);
-		
+		int startingPoint = random.nextInt(shadow.size() - 1);
+
 		// place iterators in the middle
-		ListIterator<String> shadowIter = shadow.listIterator(startingPoint);
-		ListIterator<String> listIter = list.listIterator(startingPoint);
+		ListIterator<String> shadowIter =
+			shadow.listIterator(startingPoint);
+		ListIterator<String> listIter =
+			list.listIterator(startingPoint);
 		String opList = "";
 
 		// perform random operations
 		for (int i = 0; i < 20; i++) {
 		    int operation = random.nextInt(11);
 		    opList += Integer.toString(operation) + ",";
-		    
-		    String value = Integer.toString(random.nextInt()/100000);
+
+		    String value =
+			    Integer.toString(random.nextInt() / 100000);
 		    Object listResult;
 		    Object shadowResult;
 		    ReturnObject retObj;
