@@ -22,6 +22,7 @@ package com.sun.sgs.internal;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.ManagerNotFoundException;
 
 /**
  * Defines the boundary API for accessing managers for use by the current

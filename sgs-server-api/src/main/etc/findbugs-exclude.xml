@@ -59,4 +59,12 @@
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
 
+  <!-- ScalableDeque knowingly breaks the equals contract internally
+       to support random access removals.  This is completely
+       hidden from the user and so we are allowing it here -->
+  <Match>
+    <Class name="com.sun.sgs.app.util.ScalableDeque$Element"/>
+    <Bug pattern="EC_UNRELATED_TYPES"/>
+  </Match>
+
 </FindBugsFilter>
