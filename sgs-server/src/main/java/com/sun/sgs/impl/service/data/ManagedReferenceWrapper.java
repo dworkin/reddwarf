@@ -59,32 +59,25 @@ final class ManagedReferenceWrapper<T>
      */
     private transient int generation;
 
+    /** The value returned by getId, or null. */
+    private transient BigInteger id;
+
     /**
      * Creates an instance for the associated implementation.
      *
      * @param	impl the implementation
      */
     ManagedReferenceWrapper(ManagedReferenceImpl impl) {
-	this.oid = impl.oid;
-	contextWrapper = new ContextWrapper(impl.context);
-	this.impl = impl;
-	generation = contextWrapper.getGeneration();
+	this(impl, new ContextWrapper(impl.context));
     }
 
-    /**
-     * Creates an instance for the specified context and object ID.
-     *
-     * @param	contextWrapper the wrapped context
-     * @param	oid the object ID.
-     */
-    ManagedReferenceWrapper(ContextWrapper contextWrapper, long oid) {
-	if (contextWrapper == null) {
-	    throw new NullPointerException(
-		"The contextWrapper must not be null");
-	}
+    ManagedReferenceWrapper(ManagedReferenceImpl impl,
+			    ContextWrapper contextWrapper)
+    {
+	this.oid = impl.oid;
 	this.contextWrapper = contextWrapper;
-	this.oid = oid;
-	generation = contextWrapper.getGeneration();
+	this.impl = impl;
+	generation = contextWrapper.getGeneration();	
     }
 
     /**
@@ -110,14 +103,12 @@ final class ManagedReferenceWrapper<T>
 	return getImpl().getForUpdate();
     }
 
-    /**
-     * {@inheritDoc} <p>
-     *
-     * This implementation delegates to the underlying reference
-     * implementation.
-     */
+    /** {@inheritDoc} */
     public BigInteger getId() {
-	return getImpl().getId();
+	if (id == null) {
+	    id = BigInteger.valueOf(oid);
+	}
+	return id;
     }
 
     /**
@@ -169,12 +160,25 @@ final class ManagedReferenceWrapper<T>
      * implementation so that it will be obtained from the context.
      */
     private Object writeReplace() throws ObjectStreamException {
-	Object result = getImpl();
-	setContextWrapper(ManagedReferenceImpl.getCurrentContextWrapper());
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST,
-		       "Setting context wrapper to {0} in reference {1}",
-		       contextWrapper, this);
+	Object result = impl;
+	if (result == null) {
+	    result = new ManagedReferenceImpl<Object>(
+		contextWrapper.getContext(), oid);
+	}
+	ContextWrapper currentContextWrapper =
+	    ManagedReferenceImpl.getCurrentContextWrapper();
+	if (currentContextWrapper != null) {
+	    setContextWrapper(currentContextWrapper);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "Setting context wrapper: {0} {1}",
+			   this, currentContextWrapper);
+	    }
+	} else {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "Not setting context wrapper: {0}",
+			   this);
+	    }
 	}
 	return result;
     }

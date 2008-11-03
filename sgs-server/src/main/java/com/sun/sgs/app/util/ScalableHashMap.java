@@ -2274,6 +2274,8 @@ public class ScalableHashMap<K,V>
 		nextLeaf = nextLeaf.rightLeafRef.get();
 		nextEntry = nextLeaf.firstEntry();
 	    }
+	    System.err.println("ConcurrentIterator.getNext nextLeaf=" +
+			       nextLeaf.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(nextLeaf)));
 	    nextLeafModifications = nextLeaf.modifications;
 	}
 

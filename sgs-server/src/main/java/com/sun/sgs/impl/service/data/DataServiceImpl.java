@@ -186,7 +186,7 @@ public final class DataServiceImpl implements DataService {
 	CLASSNAME + ".optimistic.write.locks";
 
     /** The system property that specifies the size of the object cache. */
-    private static final String OBJECT_CACHE_SIZE_PROPERTY =
+    public static final String OBJECT_CACHE_SIZE_PROPERTY =
 	CLASSNAME + ".object.cache.size";
 
     /** The default object cache size. */
@@ -1145,6 +1145,15 @@ public final class DataServiceImpl implements DataService {
      */
     static void checkContext(Context context) {
 	getContextMap().checkContext(context);
+    }
+
+    /**
+     * Obtains the currently active context, throwing
+     * TransactionNotActiveException if none is active.  Does not join the
+     * transaction.
+     */
+    static Context getContextNoJoin() {
+	return getContextMap().getContext();
     }
 
     /**

@@ -125,7 +125,7 @@ final class ManagedReferenceImpl<T>
      * created.  This field is logically final, but is not declared final so
      * that it can be set during deserialization.
      */
-    transient final Context context;
+    transient Context context;
 
     /**
      * The context wrapper used by references within this reference's object.
@@ -257,7 +257,7 @@ final class ManagedReferenceImpl<T>
     }
 
     /** Creates an EMPTY reference to an object ID. */
-    private ManagedReferenceImpl(Context context, long oid) {
+    ManagedReferenceImpl(Context context, long oid) {
 	this.context = context;
 	this.oid = oid;
 	state = State.EMPTY;
@@ -299,6 +299,7 @@ final class ManagedReferenceImpl<T>
 
     @SuppressWarnings("fallthrough")
     void markForUpdate() {
+	System.err.println("markForUpdate " + this);
 	switch (state) {
 	case EMPTY:
 	    /*
@@ -310,9 +311,11 @@ final class ManagedReferenceImpl<T>
 	    ObjectCache.Value value =
 		context.service.objectCache.get(oid, bytes, context);
 	    if (value != null) {
+		System.err.println("markForUpdate A " + this);
 		object = value.object;
 		contextWrapper = value.contextWrapper;
 	    } else {
+		System.err.println("markForUpdate B " + this);
 		object = deserialize(bytes);
 	    }
 	    context.refs.registerObject(this);
@@ -329,6 +332,7 @@ final class ManagedReferenceImpl<T>
 	    if (!context.optimisticWriteLocks()) {
 		context.store.markForUpdate(context.txn, oid);
 	    }
+	    unmodifiedBytes = null;
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -358,6 +362,7 @@ final class ManagedReferenceImpl<T>
      */
     @SuppressWarnings("fallthrough")
     T get(boolean checkContext) {
+	System.err.println("get " + this + " " + (object == null ? "" : object.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(object))));
 	try {
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
@@ -371,10 +376,12 @@ final class ManagedReferenceImpl<T>
 		ObjectCache.Value value =
 		    context.service.objectCache.get(oid, bytes, context);
 		if (value != null) {
+		    System.err.println("get A " + this);
 		    object = value.object;
 		    contextWrapper = value.contextWrapper;
 		    unmodifiedBytes = bytes;
 		} else {
+		    System.err.println("get B " + this);
 		    ManagedObject tempObject = deserialize(bytes);
 		    /*
 		     * We won't need the unmodified bytes if we are not
@@ -436,6 +443,7 @@ final class ManagedReferenceImpl<T>
     /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public T getForUpdate() {
+	System.err.println("getForUpdate " + this);
 	RuntimeException exception;
 	try {
 	    DataServiceImpl.checkContext(context);
@@ -448,9 +456,11 @@ final class ManagedReferenceImpl<T>
 		ObjectCache.Value value =
 		    context.service.objectCache.get(oid, bytes, context);
 		if (value != null) {
+		    System.err.println("getForUpdate A " + this);
 		    object = value.object;
 		    contextWrapper = value.contextWrapper;
 		} else {
+		    System.err.println("getForUpdate B " + this);
 		    object = deserialize(bytes);
 		}
 		context.refs.registerObject(this);
@@ -467,6 +477,7 @@ final class ManagedReferenceImpl<T>
 		if (!context.optimisticWriteLocks()) {
 		    context.store.markForUpdate(context.txn, oid);
 		}
+		unmodifiedBytes = null;
 		state = State.MODIFIED;
 		break;
 	    case FLUSHED:
@@ -548,13 +559,29 @@ final class ManagedReferenceImpl<T>
 
     /** Replaces this instance with a canonical instance. */
     private Object readResolve() throws ObjectStreamException {
-	return new ManagedReferenceWrapper(contextWrapperThread.get(), oid);
+	contextWrapper = contextWrapperThread.get();
+	if (contextWrapper == null) {
+	    context = DataServiceImpl.getContextNoJoin();
+	    contextWrapper = new ContextWrapper(context);
+	} else {
+	    context = contextWrapper.getContext();
+	}
+	state = State.EMPTY;
+	validate();
+	ManagedReferenceImpl ref = context.refs.find(oid);
+	if (ref == null) {
+	    context.refs.add(this);
+	    ref = this;
+	}
+	return new ManagedReferenceWrapper(ref, contextWrapper);
     }
 
     /* -- Object methods -- */
 
     public String toString() {
-	return "ManagedReferenceImpl[oid:" + oid + ", state:" + state + "]";
+	return "ManagedReferenceImpl@" +
+	    Integer.toHexString(System.identityHashCode(this)) +
+	    "[oid:" + oid + ", state:" + state + "]";
     }
 
     /* -- Other methods -- */
@@ -703,6 +730,7 @@ final class ManagedReferenceImpl<T>
      */
     @SuppressWarnings("fallthrough")
     byte[] flush() {
+	System.err.println("flush " + this);
 	byte[] result = null;
 	switch (state) {
 	case EMPTY:
@@ -711,16 +739,12 @@ final class ManagedReferenceImpl<T>
 	case NEW:
 	case MODIFIED:
 	    result = serialize(object);
-	    context.service.objectCache.put(
-		oid, result, contextWrapper, object);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
 	    byte[] modified = serialize(object);
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
-		context.service.objectCache.put(
-		    oid, result, contextWrapper, object);
 		context.oidAccesses.
 		    reportObjectAccess(context.txn.originalTxn, 
 				       BigInteger.valueOf(oid),
@@ -735,6 +759,7 @@ final class ManagedReferenceImpl<T>
 			Objects.fastToString(object));
 		}
 	    } else {
+		System.err.println("flush C " + this);
 		context.service.objectCache.put(
 		    oid, unmodifiedBytes, contextWrapper, object);
 	    }
@@ -748,6 +773,7 @@ final class ManagedReferenceImpl<T>
 	    if (unmodifiedBytes == null) {
 		unmodifiedBytes = serialize(object);
 	    }
+	    System.err.println("flush D " + this);
  	    context.service.objectCache.put(
  		oid, unmodifiedBytes, contextWrapper, object);
 	    context.refs.unregisterObject(object);

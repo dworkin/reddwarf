@@ -686,6 +686,11 @@ public class TestDataServiceImpl{
     private void testGetBindingDeserializationFails(final boolean app)
 	throws Exception
     {
+	/* Disable the object cache to make sure deserialization occurs */
+        Properties properties = getProperties();
+        properties.setProperty(
+	    DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	serverNodeRestart(properties, false);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
@@ -2629,6 +2634,11 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testGetReferenceDeserializationFails() throws Exception {
+	/* Disable the object cache to make sure deserialization occurs */
+        Properties properties = getProperties();
+        properties.setProperty(
+	    DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	serverNodeRestart(properties, false);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
@@ -3078,6 +3088,11 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
+	/* Disable the object cache to make sure deserialization occurs */
+        Properties properties = getProperties();
+        properties.setProperty(
+	    DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	serverNodeRestart(properties, false);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
@@ -3850,6 +3865,11 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testNotSerializableAfterDeserialize() throws Exception {
+	/* Disable the object cache to make sure deserialization occurs */
+        Properties properties = getProperties();
+        properties.setProperty(
+	    DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	serverNodeRestart(properties, false);
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
