@@ -24,6 +24,15 @@ import java.util.List;
 /**
  * A profile sample which is aggregated until explicitly cleared.
  * Some simple statistics are gathered about the samples.
+ * <p>
+ * The samples and statistics can be cleared by calling {@link #clearSamples}.
+ * <p>
+ * The {@code capacity} is the maxiumum number of samples that will
+ * be held.  Once this limit is reached, older samples will be dropped
+ * to make room for the newest samples.  The statistics are over all the
+ * gathered samples since creation or the last {@code clearSamples} call;
+ * thus, they might not reflect the current list returned by 
+ * {@link #getSamples}.
  */
 public interface AggregateProfileSample extends ProfileSample {
     /**
