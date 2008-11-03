@@ -183,7 +183,7 @@ public class ScalableHashSet<E>
      *
      * @serial
      */
-    private final ManagedReference<ScalableHashMap<E,Marker>> map;
+    private final ManagedReference<ScalableHashMap<E, Marker>> map;
 
     /**
      * Creates an empty set; the backing {@code ScalableHashMap} has the
@@ -193,7 +193,7 @@ public class ScalableHashSet<E>
      */
     public ScalableHashSet() {
 	map = AppContext.getDataManager().
-	    createReference(new ScalableHashMap<E,Marker>());
+                createReference(new ScalableHashMap<E, Marker>());
     }
 
     /**
@@ -210,7 +210,7 @@ public class ScalableHashSet<E>
      */
     public ScalableHashSet(int minConcurrency) {
 	map = AppContext.getDataManager().
-	    createReference(new ScalableHashMap<E,Marker>(minConcurrency));
+                createReference(new ScalableHashMap<E, Marker>(minConcurrency));
     }
 
     /**

@@ -22,76 +22,81 @@
 
   <build>
     <plugins>
-      <!-- This is a workaround of a bug in the shade plugin
-	   Executes a clean during the validate phase to ensure
-	   there are no problems -->
+
+      <!-- Always attach a sources jar (with the assembly plugin)
+	   Normally the maven-source-plugin should be used for this.
+	   However, that plugin currently does not attach classifier
+	   artifacts that are consumable by other modules in the reactor
+	   (i.e. the javadoc module).  Using this as a workaround -->
       <plugin>
-        <artifactId>maven-clean-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>auto-clean</id>
-            <phase>validate</phase>
-            <goals>
-              <goal>clean</goal>
-            </goals>
-          </execution>
-        </executions>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-assembly-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>attach-sources</id>
+	    <phase>package</phase>
+	    <goals>
+              <goal>attached</goal>
+	    </goals>
+	    <configuration>
+	      <descriptors>
+		<descriptor>src/main/assembly/sources.xml</descriptor>
+              </descriptors>
+	      <attach>true</attach>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
-
-      <!-- The shade plugin pulls together the classes necessary
-	   for the exposed server api -->
+      <!-- Activate the resource bundle plugin to include the license
+	   file in the jar -->
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-	      <artifactSet>
-		<includes>
-		  <include>com.projectdarkstar.server:sgs-server</include>
-		  <include>com.projectdarkstar.server:sgs-shared</include>
-		</includes>
-	      </artifactSet>
-              <filters>
-		<filter>
-                  <artifact>com.projectdarkstar.server:sgs-server</artifact>
-                  <includes>
-                    <include>com/sun/sgs/app/**</include>
-                  </includes>
-		</filter>
-		<filter>
-		  <artifact>com.projectdarkstar.server:sgs-shared</artifact>
-		  <includes>
-		    <include>com/sun/sgs/protocol/simple/SimpleSgsProtocol*</include>
-		  </includes>
-		</filter>
-              </filters>
-            </configuration>
-          </execution>
-        </executions>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
       </plugin>
+
     </plugins>
   </build>
 
+  <reporting>
+    <plugins>
 
-  <dependencies>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-server</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
-      <optional>true</optional>
-    </dependency>
-  </dependencies>
+      <!-- Configure checkstyle to run during site lifecycle -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<configuration>
+	  <linkXRef>false</linkXRef>
+	  <consoleOutput>true</consoleOutput>
+	  <enableRulesSummary>false</enableRulesSummary>
+	  <configLocation>${checkstyle.config}</configLocation>
+	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
+	  <packageNamesLocation>
+	    ${checkstyle.packageNames}
+	  </packageNamesLocation>
+	  <propertyExpansion>
+	    checkstyle.unusedImports=${checkstyle.unusedImports}
+	  </propertyExpansion>
+        </configuration>
+      </plugin>
 
+      <!-- Configure findbugs to run during site lifecycle -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+	<configuration>
+	  <effort>Max</effort>
+	  <excludeFilterFile>
+	    ${basedir}/src/main/etc/findbugs-exclude.xml
+	  </excludeFilterFile>
+	  <threshold>Low</threshold>
+	  <xmlOutput>true</xmlOutput>
+	  <findbugsXmlOutput>true</findbugsXmlOutput>
+	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
+	</configuration>
+      </plugin>
 
+    </plugins>
+  </reporting>
 
 </project>

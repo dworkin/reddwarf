@@ -21,6 +21,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.internal.InternalContext;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
@@ -32,9 +33,10 @@ import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 
 import com.sun.sgs.impl.kernel.logging.TransactionAwareLogManager;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
-import com.sun.sgs.impl.profile.ProfileRegistrarImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -51,7 +53,6 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
 
-import com.sun.sgs.profile.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
@@ -136,16 +137,12 @@ class Kernel {
 
     // the application that is running in this kernel
     private KernelContext application;
-
+    
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
-    // collector and reporter of profile information
-    // note that this object should never escape this kernel, as it contains
-    // methods that should only be called by objects created by this kernel
+    // collector of profile information
     private final ProfileCollectorImpl profileCollector;
-    // the registry object for creating profiling content objects
-    private final ProfileRegistrar profileRegistrar;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -188,7 +185,8 @@ class Kernel {
             
             profileCollector = new ProfileCollectorImpl(profileLevel, 
                                               appProperties, systemRegistry);
-            profileRegistrar = new ProfileRegistrarImpl(profileCollector);
+            ProfileCollectorHandle profileCollectorHandle = 
+                    new ProfileCollectorHandleImpl(profileCollector);
 
             // create the authenticators and identity coordinator
             ArrayList<IdentityAuthenticator> authenticators =
@@ -197,15 +195,17 @@ class Kernel {
                 appProperties.getProperty(StandardProperties.AUTHENTICATORS,
                                     DEFAULT_IDENTITY_AUTHENTICATOR).split(":");
 
-            for (String authenticatorClassName : authenticatorClassNames)
+            for (String authenticatorClassName : authenticatorClassNames) {
                 authenticators.add(getAuthenticator(authenticatorClassName,
                                                     appProperties));
+            }
             IdentityCoordinator identityCoordinator =
                 new IdentityCoordinatorImpl(authenticators);
 
             // initialize the transaction coordinator
             TransactionCoordinator transactionCoordinator =
-                new TransactionCoordinatorImpl(appProperties, profileCollector);
+                new TransactionCoordinatorImpl(appProperties, 
+                                               profileCollectorHandle);
 
 	    // possibly upgrade loggers to be transactional
 	    LogManager logManager = LogManager.getLogManager();
@@ -215,24 +215,24 @@ class Kernel {
 	    // instance of TransactionAwareLogManager
 	    if (logManager instanceof TransactionAwareLogManager) {
 		TransactionAwareLogManager txnAwareLogManager =
-		    (TransactionAwareLogManager)logManager;
+		    (TransactionAwareLogManager) logManager;
 		txnAwareLogManager.configure(appProperties, proxy);
 	    }
 
             // create the access coordinator
             AccessCoordinatorImpl accessCoordinator =
                 new AccessCoordinatorImpl(appProperties, proxy,
-                                          profileCollector);
+                                          profileCollectorHandle);
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
             transactionScheduler =
                 new TransactionSchedulerImpl(appProperties,
                                              transactionCoordinator,
-                                             profileCollector,
+                                             profileCollectorHandle,
                                              accessCoordinator);
             taskScheduler =
-                new TaskSchedulerImpl(appProperties, profileCollector);
+                new TaskSchedulerImpl(appProperties, profileCollectorHandle);
                         
             KernelContext ctx = new StartupKernelContext("Kernel");
             transactionScheduler.setContext(ctx);
@@ -243,23 +243,25 @@ class Kernel {
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
-            systemRegistry.addComponent(profileRegistrar);
+            systemRegistry.addComponent(profileCollector);
 
             // create the profiling listeners.  It is important to not
             // do this until we've finished adding components to the
             // system registry, as some listeners use those components.
             loadProfileListeners(profileCollector);
 
-            if (logger.isLoggable(Level.INFO))
+            if (logger.isLoggable(Level.INFO)) {
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
                         Version.getVersion());
+            }
 
             // the core system is ready, so start up the application
             createAndStartApplication();
 
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
+            if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, e, "Failed on Kernel boot");
+            }
             // shut down whatever we've started
             shutdown();
             throw e;
@@ -279,18 +281,20 @@ class Kernel {
                     profileCollector.addListener(listenerClassName);
                 } catch (InvocationTargetException e) {
                     // Strip off exceptions found via reflection
-                    if (logger.isLoggable(Level.WARNING))
+                    if (logger.isLoggable(Level.WARNING)) {
                         logger.logThrow(Level.WARNING, e.getCause(), 
                                 "Failed to load ProfileListener {0} ... " +
                                 "it will not be available for profiling",
                                 listenerClassName);
+                    }
               
                 } catch (Exception e) {
-                    if (logger.isLoggable(Level.WARNING))
+                    if (logger.isLoggable(Level.WARNING)) {
                         logger.logThrow(Level.WARNING, e, 
                                 "Failed to load ProfileListener {0} ... " +
                                 "it will not be available for profiling",
                                  listenerClassName);
+                    }
                 }
             }
         }
@@ -312,8 +316,9 @@ class Kernel {
     private void createAndStartApplication() throws Exception {
         String appName = appProperties.getProperty(StandardProperties.APP_NAME);
 
-        if (logger.isLoggable(Level.CONFIG))
+        if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "{0}: starting application", appName);
+        }
 
         // start the service creation 
         IdentityImpl owner = new IdentityImpl("app:" + appName);
@@ -329,8 +334,9 @@ class Kernel {
     private void createServices(String appName, Identity owner) 
         throws Exception
     {
-        if (logger.isLoggable(Level.CONFIG))
+        if (logger.isLoggable(Level.CONFIG)) {
             logger.log(Level.CONFIG, "{0}: starting services", appName);
+        }
 
         // create and install a temporary context to use during startup
         application = new StartupKernelContext(appName);
@@ -339,11 +345,12 @@ class Kernel {
         ContextResolver.setTaskState(application, owner);
 
         try {
-            fetchServices((StartupKernelContext)application);
+            fetchServices((StartupKernelContext) application);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
+            if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, e, "{0}: failed to create " +
                                 "services", appName);
+            }
             throw e;
         }
 
@@ -352,14 +359,18 @@ class Kernel {
         transactionScheduler.setContext(application);
         taskScheduler.setContext(application);
         ContextResolver.setTaskState(application, owner);
+        
+        // tell the AppContext how to find the managers
+        InternalContext.setManagerLocator(new ManagerLocatorImpl());
 
         // notify all of the services that the application state is ready
         try {
             application.notifyReady();
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
+            if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, e, "{0}: failed when notifying " +
                                 "services that application is ready", appName);
+            }
             throw e;
         }
     }
@@ -382,30 +393,36 @@ class Kernel {
         String externalManagers =
             appProperties.getProperty(StandardProperties.MANAGERS);
         if (finalService != null) {
-            if ((externalServices != null) || (externalManagers != null))
+            if ((externalServices != null) || (externalManagers != null)) {
                 throw new IllegalArgumentException(
                     "Cannot specify external services and a final service");
+            }
 
             // validate the final service
             try {
                 finalStandardService =
                     Enum.valueOf(StandardService.class, finalService);
             } catch (IllegalArgumentException iae) {
-                if (logger.isLoggable(Level.SEVERE))
+                if (logger.isLoggable(Level.SEVERE)) {
                     logger.logThrow(Level.SEVERE, iae, "Invalid final " +
                                     "service name: {0}", finalService);
+                }
                 throw iae;
             }
 
             // make sure we're not running with an application
-            if (! appProperties.getProperty(StandardProperties.APP_LISTENER).
-                equals(StandardProperties.APP_LISTENER_NONE))
+            if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
+                equals(StandardProperties.APP_LISTENER_NONE)) 
+            {
                 throw new IllegalArgumentException("Cannot specify an app " +
                                                    "listener and a final " +
                                                    "service");
+            }
         } else {
             finalStandardService = StandardService.LAST_SERVICE;
         }
+        
+        final int finalServiceOrdinal = finalStandardService.ordinal();
 
         // load the data service
 
@@ -419,9 +436,9 @@ class Kernel {
 
         // load the watch-dog service, which has no associated manager
 
-        if (StandardService.WatchdogService.ordinal() >
-            finalStandardService.ordinal())
+        if (StandardService.WatchdogService.ordinal() > finalServiceOrdinal) {
             return;
+        }
 
         String watchdogServiceClass =
             appProperties.getProperty(StandardProperties.WATCHDOG_SERVICE,
@@ -430,9 +447,10 @@ class Kernel {
 
         // load the node mapping service, which has no associated manager
 
-        if (StandardService.NodeMappingService.ordinal() >
-            finalStandardService.ordinal())
+        if (StandardService.NodeMappingService.ordinal() > finalServiceOrdinal) 
+        {
             return;
+        }
 
         String nodemapServiceClass =
             appProperties.getProperty(StandardProperties.NODE_MAPPING_SERVICE,
@@ -441,9 +459,9 @@ class Kernel {
 
         // load the task service
 
-        if (StandardService.TaskService.ordinal() >
-            finalStandardService.ordinal())
+        if (StandardService.TaskService.ordinal() > finalServiceOrdinal) {
             return;
+        }
 
         String taskServiceClass =
             appProperties.getProperty(StandardProperties.TASK_SERVICE,
@@ -455,9 +473,11 @@ class Kernel {
 
         // load the client session service, which has no associated manager
 
-        if (StandardService.ClientSessionService.ordinal() >
-            finalStandardService.ordinal())
+        if (StandardService.ClientSessionService.ordinal() > 
+                finalServiceOrdinal)
+        {
             return;
+        }
 
         String clientSessionServiceClass =
             appProperties.getProperty(StandardProperties.
@@ -467,9 +487,9 @@ class Kernel {
 
         // load the channel service
 
-        if (StandardService.ChannelService.ordinal() >
-            finalStandardService.ordinal())
+        if (StandardService.ChannelService.ordinal() > finalServiceOrdinal) { 
             return;
+        }
 
         String channelServiceClass =
             appProperties.getProperty(StandardProperties.CHANNEL_SERVICE,
@@ -484,21 +504,23 @@ class Kernel {
             String [] serviceClassNames = externalServices.split(":", -1);
             String [] managerClassNames = externalManagers.split(":", -1);
             if (serviceClassNames.length != managerClassNames.length) {
-                if (logger.isLoggable(Level.SEVERE))
+                if (logger.isLoggable(Level.SEVERE)) {
                     logger.log(Level.SEVERE, "External service count " +
                                "({0}) does not match manager count ({1}).",
                                serviceClassNames.length,
                                managerClassNames.length);
+                }
                 throw new IllegalArgumentException("Mis-matched service " +
                                                    "and manager count");
             }
 
             for (int i = 0; i < serviceClassNames.length; i++) {
-                if (! managerClassNames[i].equals(""))
+                if (!managerClassNames[i].equals("")) {
                     setupService(serviceClassNames[i], managerClassNames[i],
                                  startupContext);
-                else
+                } else {
                     setupServiceNoManager(serviceClassNames[i], startupContext);
+                }
             }
         }
     }
@@ -543,9 +565,10 @@ class Kernel {
         }
 
         // if we didn't find a matching manager constructor, it's an error
-        if (managerConstructor == null)
+        if (managerConstructor == null) {
             throw new NoSuchMethodException("Could not find a constructor " +
                                             "that accepted the Service");
+        }
 
         // create the manager and put it and the service in the collections
         // and the temporary startup context
@@ -568,8 +591,8 @@ class Kernel {
                                         TransactionProxy.class);
 
         // return a new instance
-        return (Service)(serviceConstructor.
-                         newInstance(appProperties, systemRegistry, proxy));
+        return (Service) (serviceConstructor.
+                          newInstance(appProperties, systemRegistry, proxy));
     }
 
     /** Start the application, throwing an exception if there is a problem. */
@@ -580,12 +603,13 @@ class Kernel {
         // is to initialize the application by running a special
         // KernelRunnable in an unbounded transaction, unless we're
         // running without an application
-        if (! appProperties.getProperty(StandardProperties.APP_LISTENER).
+        if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
             equals(StandardProperties.APP_LISTENER_NONE)) {
             try {
-                if (logger.isLoggable(Level.CONFIG))
+                if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(Level.CONFIG, "{0}: starting application",
                                appName);
+                }
 
                 transactionScheduler.
                     runUnboundedTask(new AppStartupRunner(appProperties),
@@ -594,9 +618,10 @@ class Kernel {
                 logger.log(Level.INFO, 
                            "{0}: application is ready", application);
             } catch (Exception e) {
-                if (logger.isLoggable(Level.CONFIG))
+                if (logger.isLoggable(Level.CONFIG)) {
                     logger.logThrow(Level.CONFIG, e, "{0}: failed to " +
                                     "start application", appName);
+                }
                 throw e;
             }
         } else {
@@ -610,15 +635,19 @@ class Kernel {
      * Shut down all services (in reverse order) and the schedulers.
      */
     void shutdown() {
-        if (application != null)
+        if (application != null) {
             application.shutdownServices();
-        if (profileCollector != null) 
+        }
+        if (profileCollector != null) {
             profileCollector.shutdown();
+        }
         // The schedulers must be shut down last.
-        if (transactionScheduler != null)
+        if (transactionScheduler != null) {
             transactionScheduler.shutdown();
-        if (taskScheduler != null)
+        }
+        if (taskScheduler != null) {
             taskScheduler.shutdown();
+        }
     }
     
     /**
@@ -631,8 +660,8 @@ class Kernel {
         Class<?> authenticatorClass = Class.forName(className);
         Constructor<?> authenticatorConstructor =
             authenticatorClass.getConstructor(Properties.class);
-        return (IdentityAuthenticator)(authenticatorConstructor.
-                                       newInstance(properties));
+        return (IdentityAuthenticator) (authenticatorConstructor.
+                                        newInstance(properties));
     }
 
     /**
@@ -645,10 +674,11 @@ class Kernel {
         FileInputStream inputStream = null;
         try {
             Properties properties;
-            if (backingProperties == null)
+            if (backingProperties == null) {
                 properties = new Properties();
-            else
+            } else {
                 properties = new Properties(backingProperties);
+            }
             inputStream = new FileInputStream(filename);
             properties.load(inputStream);
             
@@ -672,11 +702,13 @@ class Kernel {
            
             switch (type) {
                 case singleNode:
+                default:
                     break;    // do nothing, this is the default
                 case coreServerNode:
                     // Don't start an application
-                    properties.setProperty(StandardProperties.APP_LISTENER,
-                                           StandardProperties.APP_LISTENER_NONE);
+                    properties.setProperty(
+                            StandardProperties.APP_LISTENER,
+                            StandardProperties.APP_LISTENER_NONE);
                     // Only run basic services
                     properties.setProperty(StandardProperties.FINAL_SERVICE,
                                            "NodeMappingService");
@@ -686,7 +718,8 @@ class Kernel {
                     // Start the network server for the data store
                     properties.setProperty(
                         DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
-                        "com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+                        "com.sun.sgs.impl.service.data." +
+                        "store.net.DataStoreClient");
                     break;
                 case appNode:
                     // Don't start the servers
@@ -697,24 +730,28 @@ class Kernel {
 
             return properties;
         } catch (IOException ioe) {
-            if (logger.isLoggable(Level.SEVERE))
+            if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, ioe, "Unable to load " +
                                 "properties file {0}: ", filename);
+            }
             throw ioe;
         } catch (IllegalArgumentException iae) {
-            if (logger.isLoggable(Level.SEVERE))
+            if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, iae, "Illegal data in " +
                                 "properties file {0}: ", filename);
+            }
             throw iae;
         } finally {
-            if (inputStream != null)
+            if (inputStream != null) {
                 try {
                     inputStream.close();
                 } catch (IOException e) {
-                    if (logger.isLoggable(Level.CONFIG))
-                        logger.logThrow(Level.CONFIG, e, "failed to close "+
+                    if (logger.isLoggable(Level.CONFIG)) {
+                        logger.logThrow(Level.CONFIG, e, "failed to close " +
                                         "property file {0}", filename);
+                    }
                 }
+            }
         }
     }
 
@@ -799,7 +836,7 @@ class Kernel {
                 String appClass =
                     properties.getProperty(StandardProperties.APP_LISTENER);
                 AppListener listener =
-                    (AppListener)(Class.forName(appClass).newInstance());
+                    (AppListener) (Class.forName(appClass).newInstance());
                 dataService.setServiceBinding(StandardProperties.APP_LISTENER,
                                               listener);
 

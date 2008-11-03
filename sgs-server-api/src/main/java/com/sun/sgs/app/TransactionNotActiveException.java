@@ -41,7 +41,7 @@ public class TransactionNotActiveException extends TransactionException
 
     /**
      * Creates an instance of this class with the specified detail message and
-     * cause. If {@cause} implements {@code ExceptionRetryStatus} then its
+     * cause. If {@code cause} implements {@code ExceptionRetryStatus} then its
      * {@code shouldRetry} method will be called when deciding if this
      * exception should be retried.
      *
@@ -62,10 +62,11 @@ public class TransactionNotActiveException extends TransactionException
      */
     public boolean shouldRetry() {
         Throwable t = getCause();
-        if (t == null)
+        if (t == null) {
             return false;
+        }
         return (t instanceof ExceptionRetryStatus) &&
-            ((ExceptionRetryStatus)t).shouldRetry();
+            ((ExceptionRetryStatus) t).shouldRetry();
     }
 
 }

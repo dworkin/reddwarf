@@ -43,8 +43,8 @@ public interface PriorityScheduler {
      *
      * @throws TaskRejectedException if a reservation cannot be made
      */
-    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
-                                       Priority priority);
+    TaskReservation reserveTask(KernelRunnable task, Identity owner,
+                                Priority priority);
 
     /**
      * Schedules a task to run as soon as possible based on the specific
@@ -57,7 +57,6 @@ public interface PriorityScheduler {
      *
      * @throws TaskRejectedException if the given task is not accepted
      */
-    public void scheduleTask(KernelRunnable task, Identity owner,
-                             Priority priority);
+    void scheduleTask(KernelRunnable task, Identity owner, Priority priority);
 
 }
