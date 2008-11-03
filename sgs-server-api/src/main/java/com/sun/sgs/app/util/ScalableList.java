@@ -1942,7 +1942,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	void checkDataIntegrity() {
 	    try {
 		if (currentNode.get().getDataIntegrityValue() == 
-		    listNodeReferenceValue) {
+		    	listNodeReferenceValue) {
 		    return;
 		}
 	    } catch (ObjectNotFoundException onfe) {
@@ -2103,10 +2103,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	/**
 	 * Get the previous {@code ListNode} for the
-	 * {@code ScalableListNodeIterator}. This sets the
-	 * {@code currentElementIndex} to be the size, so that future checks
-	 * for the previous element point to an existing element located at
-	 * index {@code currentNode.size() - 1}.
+	 * {@code ScalableListNodeIterator}.
 	 * 
 	 * @return {@code true} if there was a previous {@code ListNode}, and
 	 * {@code false} otherwise
@@ -2589,7 +2586,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * element in the fourth ListNode<E>, with a relative offset of 1.
 	 * 
 	 * @param list a reference to the {@code ScalableList}; this argument
-	 * should only ever be null during the clear operation
+	 * should only ever be null during the {@code AsynchronousClearTask}
+	 * operation
 	 * @param index the index corresponding to an element in the list (not
 	 * an absolute index with respect to the {@code ScalableList} object
 	 * @return the element that was removed
@@ -2634,8 +2632,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * Removes the {@code Object} from the {@code SubList<E>}, if it
 	 * exists.
 	 * 
-	 * @param list a reference to the {@code ScalableList}; this should
-	 * only ever be null during a clear operation
+	 * @param list a reference to the {@code ScalableList}; since this
+	 * method is not called by the {@code AsynchronousClearTask}, this
+	 * parameter must not be null.
 	 * @param obj the {@code Object} to remove
 	 * @return whether the object was removed or not; {@code true} if so,
 	 * {@code false} otherwise
