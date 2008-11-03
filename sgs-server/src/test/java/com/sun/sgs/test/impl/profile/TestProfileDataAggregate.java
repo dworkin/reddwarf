@@ -180,7 +180,7 @@ public class TestProfileDataAggregate {
         
         op.report();
         assertEquals(1, op.getCount());
-    }
+   }
    
    @Test
    public void testAggregateProfileSample() throws Exception {
@@ -198,38 +198,29 @@ public class TestProfileDataAggregate {
         
         final long[] testData = {4, 8, 2, -1, 5, 9, 11, 14};
         
-        int testIndex = 0;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, 4, 4, testData);
+        samp.addSample(testData[0]);
+        testStatistics(samp, /*size*/1, /*min*/4, /*max*/4, testData);
        
-        testIndex = 1;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, 4, 8, testData);
+        samp.addSample(testData[1]);
+        testStatistics(samp, 2, 4, 8, testData);
         
+        samp.addSample(testData[2]);
+        testStatistics(samp, 3, 2, 8, testData);
         
-        testIndex = 2;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, 2, 8, testData);
+        samp.addSample(testData[3]);
+        testStatistics(samp, 4, -1, 8, testData);
         
-        testIndex = 3;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, -1, 8, testData);
+        samp.addSample(testData[4]);
+        testStatistics(samp, 5, -1, 8, testData);
         
-        testIndex = 4;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, -1, 8, testData);
-        
-        testIndex = 5;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, -1, 9, testData);
+        samp.addSample(testData[5]);
+        testStatistics(samp, 6, -1, 9, testData);
          
-        testIndex = 6;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, -1, 11, testData);
+        samp.addSample(testData[6]);
+        testStatistics(samp, 7, -1, 11, testData);
         
-        testIndex = 7;
-        samp.addSample(testData[testIndex]);
-        testStatistics(samp, testIndex, -1, 14, testData);
+        samp.addSample(testData[7]);
+        testStatistics(samp, 8, -1, 14, testData);
         
         samp.clearSamples();
         assertEquals(0, samp.getNumSamples());
@@ -241,33 +232,61 @@ public class TestProfileDataAggregate {
         for (long data : testData) {
             samp.addSample(data);
         }
-        testStatistics(samp, testIndex, -1, 14, testData);
-    }
+        testStatistics(samp, 8, -1, 14, testData);
+   }
    
-    private void testStatistics(AggregateProfileSample samp, 
-                                 int testIndex,
+   @Test
+   public void testAggregateProfileSampleCapacity() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final AggregateProfileSample samp1 =
+                (AggregateProfileSample) 
+                    cons1.createSample("s1", testType, -1, ProfileLevel.MIN);
+        assertEquals(Integer.MAX_VALUE, samp1.getCapacity());
+        
+        final AggregateProfileSample samp2 =
+                (AggregateProfileSample) 
+                    cons1.createSample("s2", testType, 5, ProfileLevel.MIN);
+        assertEquals(5, samp2.getCapacity());
+        
+        // Add 5 samples, then make sure 6th causes the first to go away
+        final long[] testData = {1, 2, 3, 4, 5};
+        for (int i = 0; i < testData.length; i++) {
+            samp2.addSample(testData[i]);
+        }
+        
+        testStatistics(samp2, /*size*/5, /*min*/1, /*max*/5, testData);
+        
+        final long[] expectedData = {2, 3, 4, 5, 6};
+        samp2.addSample(6);
+        testStatistics(samp2, 5, 1, 6, expectedData);
+   }
+   
+   private void testStatistics(AggregateProfileSample samp, 
+                                 int expectedSize,
                                  long expectedMin,
                                  long expectedMax,
                                  long[] testData) 
-    {
+   {
         double currAvg = samp.getAverage();
         long currMin = samp.getMinSample();
         long currMax = samp.getMaxSample();
+        long currSize = samp.getNumSamples();
         System.err.println("Sample data:  " +
-                "index: " + testIndex +
-                " sample: " + testData[testIndex] +
+                "size: " + currSize +
                 " avg: " + currAvg +
                 " min: " + currMin +
                 " max: " + currMax);
-        
-        assertEquals(testIndex + 1, samp.getNumSamples());
+
+
+        assertEquals(expectedSize, currSize);
         assertEquals(expectedMin, currMin);
         assertEquals(expectedMax, currMax);
         assertTrue(currAvg <= currMax);
         assertTrue(currAvg >= currMin);
-        
+
         List<Long>samples = samp.getSamples();
-        assertEquals(testIndex + 1, samples.size());
+        assertEquals(currSize, samples.size());
         for (int i = 0; i < samp.getNumSamples(); i++) {
             assertEquals(testData[i], samples.get(i).longValue());
         }

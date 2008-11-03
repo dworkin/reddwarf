@@ -174,7 +174,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                    "Found consumer {0} already created", name);
             return oldpc;
         } else {
-            logger.log(Level.INFO, "Created consumer for {0}", name);
+            logger.log(Level.INFO, "Created consumer named {0}", name);
             return pc;
         }
     }

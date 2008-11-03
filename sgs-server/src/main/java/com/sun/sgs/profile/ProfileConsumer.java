@@ -129,17 +129,17 @@ public interface ProfileConsumer {
      * Creates the named sample collection in this consumer.  If a sample has
      * already been created by this consumer with the same {@code name},
      * {@code type}, {@code minLevel}, and for aggregating sample types,
-     * {@code maxSamples}, it is returned.  
+     * {@code capacity}, it is returned.  
      * <p>
-     * The {@code maxSamples} paramenter is used for aggregating sample types
-     * only.   A negative value for {@code maxSamples} indicates an infinite
+     * The {@code capacity} paramenter is used for aggregating sample types
+     * only.   A negative value for {@code capacity} indicates an infinite
      * number of samples.  Once the limit of samples has been
      * reached, older samples will be dropped to make room for the
      * newest samples.
      *
      * @param name a name or description of the sample type
      * @param type the type of operation to create
-     * @param maxSamples the maximum number of samples to keep for aggregating
+     * @param capacity the maximum number of samples to keep for aggregating
      *           sample collections
      * @param minLevel the minimum level of profiling that must be set to record
      *              this sample  
@@ -148,12 +148,11 @@ public interface ProfileConsumer {
      * 
      * @throws IllegalArgumentException if a sample collection  has already been
      *         created with this {@code name} but a different {@code type}
-     *         {@code maxSamples}, {@code minLevel}, or, for aggregating 
-     *         samples, {@code maxSamples}
+     *         {@code minLevel}, or, for aggregating samples, {@code capacity}
      */
     ProfileSample createSample(String name, 
                                ProfileDataType type,
-                               long maxSamples, 
+                               int capacity, 
                                ProfileLevel minLevel);
 
     /**

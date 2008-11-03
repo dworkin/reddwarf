@@ -115,7 +115,7 @@ public class DataStoreProfileProducer
 	this.dataStore = dataStore;
 	participant = (TransactionParticipant) dataStore;
         ProfileConsumer consumer =
-	    collector.getConsumer(DataStore.class.getName());
+	    collector.getConsumer("DataStore");
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AGGREGATE;
 	createObjectOp = consumer.createOperation("createObject", type, level);

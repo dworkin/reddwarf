@@ -209,7 +209,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * {@inheritDoc}
      */
     public synchronized ProfileSample createSample(String name, 
-            ProfileDataType type, long maxSamples, ProfileLevel minLevel) 
+            ProfileDataType type, int capacity, ProfileLevel minLevel) 
     {
         if (name == null) {
             throw new NullPointerException("Sample name must not be null");
@@ -243,11 +243,11 @@ class ProfileConsumerImpl implements ProfileConsumer {
             if (oldSample instanceof AggregateProfileSampleImpl) {
                 AggregateProfileSampleImpl old = 
                         (AggregateProfileSampleImpl) oldSample;
-                if (old.maxSamples != maxSamples) {
+                if (old.getCapacity() != capacity) {
                     throw new IllegalArgumentException(
                             "Sample with name " + name + 
                             " already created, but with max level of " +  
-                            old.maxSamples);
+                            old.getCapacity());
                 }
             }
             return samples.get(fullName);
@@ -260,14 +260,14 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     break;
                 case AGGREGATE:
                     sample =  new AggregateProfileSampleImpl(fullName, type,
-                                                             maxSamples, 
+                                                             capacity, 
                                                              minLevel);
                     break;
                 case TASK_AGGREGATE:
                 default:
                     sample = 
                             new TaskAggregateProfileSampleImpl(fullName, type,
-                                                               maxSamples, 
+                                                               capacity, 
                                                                minLevel);
                     break;
             }
@@ -370,7 +370,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
             if (minLevel.ordinal() > profileLevel.ordinal()) {
                 return;
             }
-            System.out.println("Incrementing op for name " + name);
             count.incrementAndGet();
         }
     }
@@ -581,7 +580,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements AggregateProfileSample
     {    
         private final LinkedList<Long> samples = new LinkedList<Long>();
-	private final long maxSamples;       
+	private final int capacity;       
 	
         /** 
          * Smoothing factor for exponential smoothing, between 0 and 1.
@@ -596,14 +595,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 new ExponentialAverage();
         
 	AggregateProfileSampleImpl(String name, ProfileDataType type,
-                                   long maxSamples, ProfileLevel minLevel) 
+                                   int capacity, ProfileLevel minLevel) 
         {
             super(name, type, minLevel);
-	    this.maxSamples = maxSamples;
+	    this.capacity = capacity;
         }
 
-        long getMaxSamples() { return maxSamples; }
-        
         public void addSample(long value) {
             // If the minimum level we want to profile at is greater than
             // the current level, just return.
@@ -612,7 +609,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
             
             synchronized (this) {
-                if (samples.size() == maxSamples) {
+                if (samples.size() == capacity) {
                     samples.removeFirst(); // remove oldest
                 }
                 samples.add(value);
@@ -660,7 +657,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public synchronized long getMinSample() {
             return minSampleValue;
         }
-         
+        
+        /** {@inheritDoc} */
+        public int getCapacity() { 
+            return capacity < 0 ? Integer.MAX_VALUE : capacity; 
+        }
+        
         private class ExponentialAverage {
             private boolean first = true;
             private double last;
@@ -734,10 +736,10 @@ class ProfileConsumerImpl implements ProfileConsumer {
     {
         private final TaskProfileSample taskSample;
         TaskAggregateProfileSampleImpl(String name, ProfileDataType type,
-                                       long maxSamples, 
+                                       int capacity, 
                                        ProfileLevel minLevel) 
         {
-            super(name, type, maxSamples, minLevel);
+            super(name, type, capacity, minLevel);
             taskSample = new TaskProfileSampleImpl(name, type, minLevel);
         }
         

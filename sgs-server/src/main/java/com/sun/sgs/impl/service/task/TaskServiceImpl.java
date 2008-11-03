@@ -318,7 +318,7 @@ public class TaskServiceImpl
         // create our profiling info
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
-        ProfileConsumer consumer = collector.getConsumer(getName());
+        ProfileConsumer consumer = collector.getConsumer("TaskService");
 
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AGGREGATE;
