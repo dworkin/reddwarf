@@ -298,7 +298,6 @@ class ClientSessionHandler implements ProtocolHandler {
      *		ChannelProtocol} with the given {@code delivery} requirement
      */
     ChannelProtocol getChannelProtocol(Delivery delivery, boolean bestAvailable)
-	throws UnsupportedDeliveryException
     {
 	if (delivery != Delivery.RELIABLE && !bestAvailable) {
 	    throw new UnsupportedDeliveryException(delivery.toString());
@@ -885,7 +884,7 @@ class ClientSessionHandler implements ProtocolHandler {
     /**
      * This future is returned from {@link ProtocolHandler} operations.
      */
-    private class CompletionFutureImpl implements CompletionFuture {
+    private static class CompletionFutureImpl implements CompletionFuture {
 
 	/**
 	 * Indicates whether the operation associated with this future
