@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -57,6 +58,9 @@ final class ObjectCache {
     /** The maximum size of the cache. */
     private final int maxSize;
 
+    /** The names of classes whose instances should not be cached. */
+    private final Set<String> notClasses;
+
     /** The sub-caches. */
     private final Cache[] caches = new Cache[NUM_SUBCACHES];
 
@@ -77,14 +81,17 @@ final class ObjectCache {
      * 0} defeats the cache efficiently.
      *
      * @param	maxSize the maximum size of the cache
+     * @param	notClasses the names of classes whose instances should not
+     *		be cached
      * @throws	IllegalArgumentException if {@code maxSize} is negative
      */
-    ObjectCache(int maxSize) {
+    ObjectCache(int maxSize, Set<String> notClasses) {
 	if (maxSize < 0) {
 	    throw new IllegalArgumentException(
 		"The maxSize argument must not be negative");
 	}
 	this.maxSize = maxSize;
+	this.notClasses = notClasses;
 	int maxSubcacheSize = maxSize / NUM_SUBCACHES;
 	for (int i = 0; i < NUM_SUBCACHES; i++) {
 	    caches[i] = new Cache(maxSubcacheSize);
@@ -154,15 +161,19 @@ final class ObjectCache {
      * Stores an object in the cache.
      *
      * @param	oid the object ID
-     * @param	bytes the object bytes
+     * @param	bytes the bytes used to construct the object
      * @param	contextWrapper the context wrapper used by references in the
      *		object
      * @param	object the object
+     * @param	unmodifiedBytes the bytes created by serializing the object, or
+     *		{@code null} if not detecting modifications
      */
     void put(long oid, byte[] bytes, ContextWrapper contextWrapper,
-	     ManagedObject object)
+	     ManagedObject object, byte[] unmodifiedBytes)
     {
-	if (maxSize == 0) {
+	if (maxSize == 0 ||
+	    notClasses.contains(object.getClass().getName()))
+	{
 	    return;
 	}
 	Cache map = getCache(oid);
@@ -183,7 +194,7 @@ final class ObjectCache {
 		}
 	    }
 	}
-	Value value = new Value(contextWrapper, object);	    
+	Value value = new Value(contextWrapper, object, unmodifiedBytes);
 	synchronized (list) {
 	    list.add(value);
 	}
@@ -318,14 +329,29 @@ final class ObjectCache {
 	final ManagedObject object;
 
 	/**
+	 * The bytes created by serializing this object, or {@code null} if not
+	 * detecting modifications.
+	 */
+	final byte[] unmodifiedBytes;
+
+	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	contextWrapper the context wrapper
 	 * @param	object the object
+	 * @param	unmodifiedBytes the bytes created by serializing the
+	 *		object, or {@code null}
 	 */
-	Value(ContextWrapper contextWrapper, ManagedObject object) {
+	Value(ContextWrapper contextWrapper, ManagedObject object,
+	      byte[] unmodifiedBytes)
+	{
+	    if (contextWrapper == null || object == null) {
+		throw new NullPointerException(
+		    "The contextWrapper and object must not be null");
+	    }
 	    this.contextWrapper = contextWrapper;
 	    this.object = object;
+	    this.unmodifiedBytes = unmodifiedBytes;
 	}
 
 	/**

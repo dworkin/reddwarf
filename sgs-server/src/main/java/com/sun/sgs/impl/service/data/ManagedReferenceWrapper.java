@@ -153,34 +153,15 @@ final class ManagedReferenceWrapper<T>
 
     /**
      * Replaces this object with the underlying implementation object during
-     * serialization.  As a side effect, updates the {@code contextWrapper}
-     * field to the value returned by {@link
-     * ManagedReference#getCurrentContextWrapper
-     * ManagedReference.getCurrentContextWrapper} and invalidates the
-     * implementation so that it will be obtained from the context.
+     * serialization.
      */
     private Object writeReplace() throws ObjectStreamException {
-	Object result = impl;
-	if (result == null) {
-	    result = new ManagedReferenceImpl<Object>(
+	if (impl != null) {
+	    return impl;
+	} else {
+	    return new ManagedReferenceImpl<Object>(
 		contextWrapper.getContext(), oid);
 	}
-	ContextWrapper currentContextWrapper =
-	    ManagedReferenceImpl.getCurrentContextWrapper();
-	if (currentContextWrapper != null) {
-	    setContextWrapper(currentContextWrapper);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "Setting context wrapper: {0} {1}",
-			   this, currentContextWrapper);
-	    }
-	} else {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "Not setting context wrapper: {0}",
-			   this);
-	    }
-	}
-	return result;
     }
 
     /**

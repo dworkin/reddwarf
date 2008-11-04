@@ -56,7 +56,9 @@ import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -191,6 +193,21 @@ public final class DataServiceImpl implements DataService {
 
     /** The default object cache size. */
     private static final int DEFAULT_OBJECT_CACHE_SIZE = 10000;
+
+    /**
+     * The system property that specifies the comma-separated names of classes
+     * whose instances should not be cached.
+     */
+    public static final String OBJECT_CACHE_NOT_CLASSES_PROPERTY =
+	CLASSNAME + ".object.cache.not.classes";
+
+    /** The names of system classes whose instances should not be cached. */
+    private static final String[] OBJECT_CACHE_NOT_SYSTEM_CLASSES = {
+	"com.sun.sgs.app.util.ScalableHashMap$EntryIterator",
+	"com.sun.sgs.app.util.ScalableHashMap$KeyIterator",
+	"com.sun.sgs.app.util.ScalableHashMap$ValueIterator",
+	"com.sun.sgs.impl.service.channel.OrderedUnreliableChannelImpl"
+    };
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -444,6 +461,8 @@ public final class DataServiceImpl implements DataService {
 	    int objectCacheSize = wrappedProps.getIntProperty(
 		OBJECT_CACHE_SIZE_PROPERTY, DEFAULT_OBJECT_CACHE_SIZE,
 		0, Integer.MAX_VALUE);
+	    String objectCacheNotClasses = wrappedProps.getProperty(
+		OBJECT_CACHE_NOT_CLASSES_PROPERTY);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -469,7 +488,17 @@ public final class DataServiceImpl implements DataService {
                 collector.getConsumer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", ProfileLevel.MAX);
-	    objectCache = new ObjectCache(objectCacheSize);
+	    Set<String> objectCacheAllNotClasses = new HashSet<String>();
+	    for (String name : OBJECT_CACHE_NOT_SYSTEM_CLASSES) {
+		objectCacheAllNotClasses.add(name);
+	    }
+	    if (objectCacheNotClasses != null) {
+		for (String name : objectCacheNotClasses.split(",")) {
+		    objectCacheAllNotClasses.add(name.trim());
+		}
+	    }
+	    objectCache =
+		new ObjectCache(objectCacheSize, objectCacheAllNotClasses);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -645,7 +674,7 @@ public final class DataServiceImpl implements DataService {
 		    " returns oid:{2,number,#}",
 		    contextTxnId(context), typeName(object), refId(result));
 	    }
-	    return new ManagedReferenceWrapper<T>(result);
+	    return result;
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
@@ -692,7 +721,7 @@ public final class DataServiceImpl implements DataService {
 			   " oid:{1,number,#} returns",
 			   contextTxnId(context), id);
 	    }
-	    return new ManagedReferenceWrapper<Object>(result);
+	    return result;
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {

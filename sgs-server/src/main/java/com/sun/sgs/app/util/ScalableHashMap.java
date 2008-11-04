@@ -2274,8 +2274,6 @@ public class ScalableHashMap<K,V>
 		nextLeaf = nextLeaf.rightLeafRef.get();
 		nextEntry = nextLeaf.firstEntry();
 	    }
-	    System.err.println("ConcurrentIterator.getNext nextLeaf=" +
-			       nextLeaf.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(nextLeaf)));
 	    nextLeafModifications = nextLeaf.modifications;
 	}
 
@@ -2483,51 +2481,33 @@ public class ScalableHashMap<K,V>
 	 */
 	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
 
-	/**
-	 * A cached version of the root node for faster accessing
-	 */
-	private transient ScalableHashMap<K,V> root;
-
-
 	EntrySet(ScalableHashMap<K,V> root) {
-	    this.root = root;
 	    rootRef = AppContext.getDataManager().createReference(root);
 	}
 
-	private void checkCache() {
-	    if (root == null) {
-		root = rootRef.get();
-	    }
-	}
-
 	public Iterator<Entry<K,V>> iterator() {
-	    checkCache();
-	    return new EntryIterator<K,V>(root);
+	    return new EntryIterator<K,V>(rootRef.get());
 	}
 
 	public boolean isEmpty() {
-	    checkCache();
-	    return root.isEmpty();
+	    return rootRef.get().isEmpty();
 	}
 
 	public int size() {
-	    checkCache();
-	    return root.size();
+	    return rootRef.get().size();
 	}
 
 	public boolean contains(Object o) {
-	    checkCache();
 	    if (!(o instanceof Entry)) {
 		return false;
 	    }
 	    Entry<K,V> e = uncheckedCast(o);
-	    PrefixEntry<K,V> pe = root.getEntry(e.getKey());
+	    PrefixEntry<K,V> pe = rootRef.get().getEntry(e.getKey());
 	    return pe != null && pe.equals(e);
 	}
 
 	public void clear() {
-	    checkCache();
-	    root.clear();
+	    rootRef.get().clear();
 	}
     }
 
@@ -2565,45 +2545,28 @@ public class ScalableHashMap<K,V>
 	 */
 	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
 
-	/**
-	 * A cached version of the root node for faster accessing.
-	 */
-	private transient ScalableHashMap<K,V> root;
-
 	KeySet(ScalableHashMap<K,V> root) {
-	    this.root = root;
-	     rootRef = AppContext.getDataManager().createReference(root);
-	}
-
-	private void checkCache() {
-	    if (root == null) {
-		root = rootRef.get();
-	    }
+	    rootRef = AppContext.getDataManager().createReference(root);
 	}
 
 	public Iterator<K> iterator() {
-	    checkCache();
-	    return new KeyIterator<K,V>(root);
+	    return new KeyIterator<K,V>(rootRef.get());
 	}
 
 	public boolean isEmpty() {
-	    checkCache();
-	    return root.isEmpty();
+	    return rootRef.get().isEmpty();
 	}
 
 	public int size() {
-	    checkCache();
-	    return root.size();
+	    return rootRef.get().size();
 	}
 
 	public boolean contains(Object o) {
-	    checkCache();
-	    return root.containsKey(o);
+	    return rootRef.get().containsKey(o);
 	}
 
 	public void clear() {
-	    checkCache();
-	    root.clear();
+	    rootRef.get().clear();
 	}
     }
 
@@ -2641,45 +2604,28 @@ public class ScalableHashMap<K,V>
 	 */
 	private final ManagedReference<ScalableHashMap<K,V>> rootRef;
 
-	/**
-	 * A cached version of the root node for faster accessing.
-	 */
-	private transient ScalableHashMap<K,V> root;
-
 	Values(ScalableHashMap<K,V> root) {
-	    this.root = root;
-	     rootRef = AppContext.getDataManager().createReference(root);
-	}
-
-	private void checkCache() {
-	    if (root == null) {
-		root = rootRef.get();
-	    }
+	    rootRef = AppContext.getDataManager().createReference(root);
 	}
 
 	public Iterator<V> iterator() {
-	    checkCache();
-	    return new ValueIterator<K,V>(root);
+	    return new ValueIterator<K,V>(rootRef.get());
 	}
 
 	public boolean isEmpty() {
-	    checkCache();
-	    return root.isEmpty();
+	    return rootRef.get().isEmpty();
 	}
 
 	public int size() {
-	    checkCache();
-	    return root.size();
+	    return rootRef.get().size();
 	}
 
 	public boolean contains(Object o) {
-	    checkCache();
-	    return root.containsValue(o);
+	    return rootRef.get().containsValue(o);
 	}
 
 	public void clear() {
-	    checkCache();
-	    root.clear();
+	    rootRef.get().clear();
 	}
     }
 
