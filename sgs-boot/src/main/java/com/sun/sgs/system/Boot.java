@@ -152,15 +152,12 @@ public class Boot {
                 " -Djava.util.logging.config.file=" + properties.getProperty(BootEnvironment.SGS_LOGGING) +
                 " -Djava.library.path=" + properties.getProperty(BootEnvironment.BDB_NATIVES) +
                 " " + javaOpts +
-                " " + BootEnvironment.KERNEL_CLASS;
+                " " + BootEnvironment.KERNEL_CLASS +
+                " " + properties.getProperty(BootEnvironment.SGS_PROPERTIES);
         List<String> executeCmd = Arrays.asList(execute.split("\\s+"));
         
         //build the process
         ProcessBuilder pb = new ProcessBuilder(executeCmd);
-        pb.environment().put(BootEnvironment.SGS_HOME, 
-                             properties.getProperty(BootEnvironment.SGS_HOME));
-        pb.environment().put(BootEnvironment.SGS_PROPERTIES,
-                             properties.getProperty(BootEnvironment.SGS_PROPERTIES));
         pb.directory(new File(properties.getProperty(BootEnvironment.SGS_HOME)));
         pb.redirectErrorStream(true);
         

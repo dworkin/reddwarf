@@ -846,12 +846,9 @@ class Kernel {
         if(propLoc != null && !propLoc.equals("")) {
             File propFile = new File(propLoc);
             if(!propFile.isFile() || !propFile.canRead()) {
-                logger.log(Level.SEVERE, "can't access " +
-                        BootProperties.SGS_PROPERTIES +
-                       " file: " + propFile);
-                throw new IllegalStateException("can't access " +
-                                                BootProperties.SGS_PROPERTIES +
-                                                " file: " + propFile);
+                logger.log(Level.SEVERE, "can't access file :" + propFile);
+                throw new IllegalStateException("can't access file " + 
+                                                propFile);
             }
             nextProperties = loadProperties(propFile.toURI().toURL(),
                                             baseProperties);
@@ -876,26 +873,21 @@ class Kernel {
      * Main-line method that starts the {@code Kernel}. Each kernel
      * instance runs a single application.
      * <p>
-     * There are two ways of booting up the {@code Kernel} using this method:
-     * with a single argument, and with no arguments.  If a single argument
-     * is given, the value of the argument is assumed to be a filename and
-     * is used as the {@link BootProperties#SGS_PROPERTIES SGS_PROPERTIES}
-     * environment variable.  If no arguments are given, it is assumed that
-     * this environment variable is already set.  In either case, this file
+     * If a single argument is given, the value of the argument is assumed 
+     * to be a filename.  This file
      * is used in combination with additional configuration settings to 
      * determine an application's configuration properties.
      * <p>
      * The order of precedence for properties is as follows (from highest
      * to lowest):
      * <ol>
-     * <li>Properties specified in the 
-     * {@link BootProperties#DEFAULT_HOME_CONFIG_FILE configuration file} from
-     * the user's home directory.</li>
-     * <li>Properties specified in the file with the filename specified
-     * with the {@link BootProperties#SGS_PROPERTIES SGS_PROPERTIES} environment
-     * variable.</li>
-     * <li>Properties specified in the file with the name equal to
-     * {@link BootProperties#DEFAULT_APP_PROPERTIES DEFAULT_APP_PROPERTIES}.
+     * <li>Properties specified in the file from the user's home directory
+     * with the name specified by
+     * {@link BootProperties#DEFAULT_HOME_CONFIG_FILE}.</li>
+     * <li>Properties specified in the file given as a command line 
+     * argument.</li>
+     * <li>Properties specified in the resource with the name 
+     * {@link BootProperties#DEFAULT_APP_PROPERTIES}
      * This file is typically included as part of the application jar file.</li>
      * <li>System properties specified on the command line using a 
      * "-D" flag</li>
@@ -921,14 +913,13 @@ class Kernel {
         }
         
         // if an argument is specified on the command line, use it
-        // for the value of SGS_PROPERTIES env variable
+        // for the value of the filename
         Properties appProperties = null;
         if (args.length == 1) {
             appProperties = findProperties(args[0]);
         }
         else {
-            appProperties = findProperties(System.getenv(
-                                           BootProperties.SGS_PROPERTIES));
+            appProperties = findProperties(null);
         }
         
         // filter the properties with appropriate defaults
