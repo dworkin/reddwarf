@@ -111,7 +111,7 @@ public interface ProfileConsumer {
      * {@code type} and {@code minLevel}, it is returned.
      *
      * @param name the name of the counter
-     * @param type the type of operation to create
+     * @param type the type of counter to create
      * @param minLevel the minimum level of profiling that must be set to update
      *              this counter
      *
@@ -137,8 +137,8 @@ public interface ProfileConsumer {
      * reached, older samples will be dropped to make room for the
      * newest samples.
      *
-     * @param name a name or description of the sample type
-     * @param type the type of operation to create
+     * @param name a name or description of the sample collection
+     * @param type the type of sample collection to create
      * @param capacity the maximum number of samples to keep for aggregating
      *           sample collections
      * @param minLevel the minimum level of profiling that must be set to record
@@ -146,7 +146,7 @@ public interface ProfileConsumer {
      *
      * @return a {@code ProfileSample} that collects {@code long} data
      * 
-     * @throws IllegalArgumentException if a sample collection  has already been
+     * @throws IllegalArgumentException if a sample collection has already been
      *         created with this {@code name} but a different {@code type}
      *         {@code minLevel}, or, for aggregating samples, {@code capacity}
      */
