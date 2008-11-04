@@ -19,7 +19,6 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 
@@ -92,10 +91,10 @@ public interface ClientSession extends ManagedObject {
      *
      * @throws	IllegalStateException if this session is disconnected
      * @throws	IllegalArgumentException if the message exceeds the allowed
-     *		payload length defined by the constant {@link
-     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
-     *		whose value is {@value
-     *		com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH} 
+     *		payload length defined by the constant 
+     * {@link com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     *		whose value is 
+     * {@value com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of

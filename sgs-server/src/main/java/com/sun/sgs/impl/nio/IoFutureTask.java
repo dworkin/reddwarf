@@ -95,8 +95,9 @@ public class IoFutureTask<R, A> extends FutureTask<R>
                 }
             }
         } finally {
-            if (wasInterrupted)
+            if (wasInterrupted) {
                 Thread.currentThread().interrupt();
+            }
         }
     }
 

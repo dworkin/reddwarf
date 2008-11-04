@@ -22,12 +22,11 @@ package com.sun.sgs.test.app.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
-
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableDeque;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.NameRunner;
