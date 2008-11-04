@@ -834,15 +834,15 @@ class Kernel {
         URL propsIn = Kernel.class.getClassLoader().
                 getResource(BootProperties.DEFAULT_APP_PROPERTIES);
         if(propsIn != null) {
-            baseProperties = loadProperties(propsIn, System.getProperties());
+            baseProperties = loadProperties(propsIn, null);
         }
         else {
             baseProperties = System.getProperties();
         }
         
         // load the overriding set of configuration properties from the
-        // file indicated by the SGS_PROPERTIES system property
-        Properties nextProperties = baseProperties;
+        // file indicated by the filename argument
+        Properties fileProperties = baseProperties;
         if(propLoc != null && !propLoc.equals("")) {
             File propFile = new File(propLoc);
             if(!propFile.isFile() || !propFile.canRead()) {
@@ -850,23 +850,28 @@ class Kernel {
                 throw new IllegalStateException("can't access file " + 
                                                 propFile);
             }
-            nextProperties = loadProperties(propFile.toURI().toURL(),
+            fileProperties = loadProperties(propFile.toURI().toURL(),
                                             baseProperties);
         }
         
         // if a properties file exists in the user's home directory, use
         // it to override any properties, otherwise just use the 
         // nextProperties alone
+        Properties homeProperties = fileProperties;
         File homeConfig = new File(System.getProperty("user.home") +
                                    File.separator + 
                                    BootProperties.DEFAULT_HOME_CONFIG_FILE);
         if(homeConfig.isFile() && homeConfig.canRead()) {
-            return loadProperties(homeConfig.toURI().toURL(),
-                                  nextProperties);
+            homeProperties = loadProperties(homeConfig.toURI().toURL(),
+                                            fileProperties);
         }
-        else {
-            return nextProperties;
+        
+        // override any properties with the values from the System properties
+        Properties finalProperties = new Properties(homeProperties);
+        for(String k : System.getProperties().stringPropertyNames()) {
+            finalProperties.setProperty(k, System.getProperty(k));
         }
+        return finalProperties;
     }
     
     /**
@@ -881,6 +886,8 @@ class Kernel {
      * The order of precedence for properties is as follows (from highest
      * to lowest):
      * <ol>
+     * <li>System properties specified on the command line using a 
+     * "-D" flag</li>
      * <li>Properties specified in the file from the user's home directory
      * with the name specified by
      * {@link BootProperties#DEFAULT_HOME_CONFIG_FILE}.</li>
@@ -889,8 +896,6 @@ class Kernel {
      * <li>Properties specified in the resource with the name 
      * {@link BootProperties#DEFAULT_APP_PROPERTIES}
      * This file is typically included as part of the application jar file.</li>
-     * <li>System properties specified on the command line using a 
-     * "-D" flag</li>
      * </ol>
      * 
      * If no value is specified for a given
