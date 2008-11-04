@@ -24,7 +24,20 @@ import java.util.concurrent.Exchanger;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Helper class for testing operations in ProfileReports
+ * Helper class for operation tests.  This runnable is run during
+ * the profile listener's report method.  It checks for a known
+ * task owner to know if a operation should have been added,
+ * otherwise the operation should not be in the profile report.
+ * <p>
+ * Synchronization with the test case is performed through an
+ * Exchanger. If an AssertionError is thrown, it is assumed to
+ * have come from the JUnit framework and is passed back to the
+ * test thread so it can be reported there.  Otherwise, JUnit
+ * does not note that the test has failed.
+ * <p>
+ * Note that when using this class, only one task should be run
+ * with the known owner provided at construction time.  We generally
+ * have no control over when tasks are run.
  */
 class OperationReportRunnable implements Runnable {
 

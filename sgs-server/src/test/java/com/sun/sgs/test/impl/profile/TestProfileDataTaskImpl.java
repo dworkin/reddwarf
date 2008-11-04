@@ -30,7 +30,6 @@ import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
-import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
@@ -55,7 +54,7 @@ import static org.junit.Assert.assertTrue;
  * {@code TASK} and {@code TASK_AGGREGATE}.
  */
 @RunWith(ParameterizedNameRunner.class)
-public class TestProfileDataTask {
+public class TestProfileDataTaskImpl {
 
     private final static String APP_NAME = "TestProfileDataTask";
     private final long TIMEOUT = 100;
@@ -84,7 +83,7 @@ public class TestProfileDataTask {
      * Create this test class.
      * @param testType the type of profile data to create
      */
-    public TestProfileDataTask(ProfileDataType testType) {
+    public TestProfileDataTaskImpl(ProfileDataType testType) {
         this.testType = testType;
         System.err.println("Test type is " + testType);
     }

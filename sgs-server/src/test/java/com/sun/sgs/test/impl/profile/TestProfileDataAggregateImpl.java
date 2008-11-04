@@ -49,7 +49,7 @@ import static org.junit.Assert.assertTrue;
  * {@code AGGREGATE} and {@code TASK_AGGREGATE}.
  */
 @RunWith(ParameterizedNameRunner.class)
-public class TestProfileDataAggregate {
+public class TestProfileDataAggregateImpl {
 
     private final static String APP_NAME = "TestProfileDataTask";
     
@@ -77,7 +77,7 @@ public class TestProfileDataAggregate {
      * Create this test class.
      * @param testType the type of profile data to create
      */
-    public TestProfileDataAggregate(ProfileDataType testType) {
+    public TestProfileDataAggregateImpl(ProfileDataType testType) {
         this.testType = testType;
         System.err.println("Test type is " + testType);
     }
