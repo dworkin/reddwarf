@@ -24,10 +24,9 @@ package com.sun.sgs.profile;
  * and start at zero. Counters can only be incremented. 
  * <p>
  * Profile counters are created with calls to 
- * {@link ProfileConsumer#createCounter(String, ProfileConsumer.ProfileDataType,
- * ProfileCollector.ProfileLevel) createCounter}.  A counter's name
- * includes both the {@code name} supplied to {@code createCounter} and
- * the value of {@link ProfileConsumer#getName()}.
+ * {@link ProfileConsumer#createCounter ProfileConsumer.createCounter}.  
+ * A counter's name includes both the {@code name} supplied to 
+ * {@code createCounter} and the value of {@link ProfileConsumer#getName}.
  */
 public interface ProfileCounter {
 

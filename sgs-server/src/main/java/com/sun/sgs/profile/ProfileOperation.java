@@ -24,10 +24,9 @@ package com.sun.sgs.profile;
  * An operation which has occurred.
  * <p>
  * Profile operations are created with calls to {@link 
- * ProfileConsumer#createOperation(String, ProfileConsumer.ProfileDataType,
- * ProfileCollector.ProfileLevel) createOperation}.  An operations's name
- * includes both the {@code name} supplied to {@code createOperation} and
- * the value of {@link ProfileConsumer#getName()}.
+ * ProfileConsumer#createOperation ProfileConsumer.createOperation}.  An 
+ * operations's name includes both the {@code name} supplied to 
+ * {@code createOperation} and the value of {@link ProfileConsumer#getName}.
  */
 public interface ProfileOperation {
 

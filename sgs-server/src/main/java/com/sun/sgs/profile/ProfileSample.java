@@ -24,10 +24,9 @@ package com.sun.sgs.profile;
  * A profile sample is a list of {@code long} data points.
  * <p>
  * Profile samples are created with calls to 
- * {@link ProfileConsumer#createSample(String, ProfileConsumer.ProfileDataType,
- * int, ProfileCollector.ProfileLevel) createSample}.  A sample's name
- * includes both the {@code name} supplied to {@code createSample} and
- * the value of {@link ProfileConsumer#getName()}.
+ * {@link ProfileConsumer#createSample ProfileConsumer.createSample}.  A 
+ * sample's name includes both the {@code name} supplied to {@code createSample}
+ * and the value of {@link ProfileConsumer#getName}.
  */
 public interface ProfileSample {
 
