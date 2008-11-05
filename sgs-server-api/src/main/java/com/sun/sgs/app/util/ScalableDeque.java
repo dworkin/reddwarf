@@ -18,6 +18,23 @@
  */
 package com.sun.sgs.app.util;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.math.BigInteger;
+import java.util.AbstractCollection;
+import java.util.Collection;
+import java.util.ConcurrentModificationException;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Queue;
+import java.util.Set;
+
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
@@ -25,25 +42,6 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
-
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-
-import java.math.BigInteger;
-
-import java.util.AbstractCollection;
-import java.util.Collection;
-import java.util.ConcurrentModificationException;
-import java.util.Deque;
-import java.util.Queue;
-import java.util.Iterator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Set;
 
 /**
  * A scalable {@code Deque} implementation.  This implementation
@@ -547,7 +545,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      */
     public void clear() {
         map().clear();
-
+	
         ManagedReference<Element<E>> headRef = headElement.get().get();
 
         // if the deque was already empty, we have no clean up to do
@@ -1080,6 +1078,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      */
     public void removingObject() {
         clear();
+        
+        // Remove the ManagedSerializable objects as well
+        AppContext.getDataManager().removeObject(backingMap);
+        AppContext.getDataManager().removeObject(headElement.get());
+        AppContext.getDataManager().removeObject(headCounter.get());
+        AppContext.getDataManager().removeObject(tailElement.get());
+        AppContext.getDataManager().removeObject(tailCounter.get());
     }
 
     /**
@@ -1097,6 +1102,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         }
         return size;
     }
+    
 
     /**
      * Returns whether this deque will support concurrent iterators.
@@ -1826,7 +1832,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
          * Removes this iterator from the registry of active
          * iterators.
          */
-        public void removingObject() {
+        public void removingObject() {            
             // check if this iterator has been configured to receive
             // concurrent updates, and if so remove its id.
             if (serializedIteratorsNextElementsRef != null) {
@@ -2033,3 +2039,4 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         return (T) object;
     }
 }
+
