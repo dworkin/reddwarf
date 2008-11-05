@@ -32,6 +32,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -125,11 +126,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private long coordNodeId;
 
-    /** The transaction. */
-    private transient Transaction txn;
-
     /** The data service. */
     private transient DataService dataService;
+
+    /** The task service. */
+    private transient TaskService taskService;
+
+    /** The transaction ID. */
+    private transient BigInteger txnId;
 
     /** Flag that is 'true' if this channel is closed. */
     private boolean isClosed = false;
@@ -170,7 +174,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 	this.delivery = delivery;
 	this.writeBufferCapacity = writeBufferCapacity;
-	this.txn = ChannelServiceImpl.getTransaction();
+	this.taskService = ChannelServiceImpl.getTaskService();
+	this.txnId = taskService.currentTransactionId();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
 	this.wrappedChannelRef =
 	    dataService.createReference(new ChannelWrapper(ref));
@@ -570,8 +575,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	throws IOException, ClassNotFoundException
     {
 	in.defaultReadObject();
-	txn = ChannelServiceImpl.getTransaction();
 	dataService = ChannelServiceImpl.getDataService();
+	taskService = ChannelServiceImpl.getTaskService();
+	txnId = taskService.currentTransactionId();
     }
 
     /* -- Binding prefix/key methods -- */
@@ -727,7 +733,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * throwing TransactionNotActiveException if it isn't.
      */
     private void checkContext() {
-	ChannelServiceImpl.checkTransaction(txn);
+	BigInteger currentTxnId = taskService.currentTransactionId();
+	if (!txnId.equals(currentTxnId)) {
+	    throw new TransactionNotActiveException(
+		"mismatched transaction; expected " + currentTxnId + ", got " +
+		txnId);
+	}
     }
 
     /**

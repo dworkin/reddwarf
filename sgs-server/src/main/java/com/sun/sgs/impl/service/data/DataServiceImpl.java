@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -1174,6 +1175,17 @@ public final class DataServiceImpl implements DataService {
      */
     static void checkContext(Context context) {
 	getContextMap().checkContext(context);
+    }
+
+    static boolean isContextValid(Context context) {
+	try {
+	    checkContext(context);
+	    return true;
+	} catch (IllegalStateException e) {
+	    return false;
+	} catch (TransactionNotActiveException e) {
+	    return false;
+	}
     }
 
     /**

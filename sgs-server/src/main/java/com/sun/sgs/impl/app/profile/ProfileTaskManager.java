@@ -22,7 +22,7 @@ package com.sun.sgs.impl.app.profile;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
-
+import java.math.BigInteger;
 
 /**
  * This is implementation of {@code TaskManager} simply calls its backing 
@@ -66,4 +66,11 @@ public class ProfileTaskManager implements TaskManager {
         return backingManager.schedulePeriodicTask(task, delay, period);
     }
 
+
+    /**
+     * {@inheritDoc}
+     */
+    public BigInteger currentTransactionId() {
+	return backingManager.currentTransactionId();
+    }
 }
