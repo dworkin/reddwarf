@@ -137,7 +137,7 @@
 
   <properties>
     <sgs-client.version>${version}</sgs-client.version>
-    <sgs-shared.version>1.1</sgs-shared.version>
+    <sgs-shared.version>1.2</sgs-shared.version>
   </properties>
 
 </project>
