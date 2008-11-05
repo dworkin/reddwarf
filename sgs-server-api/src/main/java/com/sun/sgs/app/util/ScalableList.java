@@ -32,6 +32,7 @@ import java.util.NoSuchElementException;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
@@ -136,7 +137,7 @@ import com.sun.sgs.app.Task;
  * @param <E> the type of the elements stored in the {@code ScalableList}
  */
 public class ScalableList<E> extends AbstractList<E> implements
-	ManagedObject, Serializable {
+	Serializable, ManagedObjectRemoval {
 
     private static final long serialVersionUID = 1L;
 
@@ -440,10 +441,16 @@ public class ScalableList<E> extends AbstractList<E> implements
 
 	// Otherwise, schedule asynchronous task here
 	// which will delete the list and replace it
-	// with an empty instance.
+	// with an empty (non-null) instance.
 	AppContext.getTaskManager().scheduleTask(clearTask);
 
+	// Remove the dummy entries since new ones will be created
+	DataManager dm = AppContext.getDataManager();
+	dm.removeObject(headRef.get());
+	dm.removeObject(tailRef.get());
+
 	TreeNode<E> t = new TreeNode<E>(this, null);
+
 	headRef =
 		AppContext.getDataManager().createReference(
 			new DummyConnector<E>(t.getChild()));
@@ -825,6 +832,23 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    current = current.next();
 	}
 	return size;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removingObject() {
+	clear();
+
+	// Remove existing ManagedObjects in tree
+	DataManager dm = AppContext.getDataManager();
+	ListNode<E> child = (ListNode<E>) root.get().getChild();
+	SubList<E> subList = child.getSubList();
+	dm.removeObject(subList);
+	dm.removeObject(child);
+	dm.removeObject(root.get());
+	dm.removeObject(headRef.get());
+	dm.removeObject(tailRef.get());
     }
 
     /*
@@ -2083,7 +2107,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 		SearchResult<E> searchResult) {
 	    super(list, searchResult.node);
 	    cursor = searchResult.offset;
-	    cannotRemoveOrSet = false;
+	    cannotRemoveOrSet = true;
 	}
 
 	/**
@@ -2605,7 +2629,9 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public void clear() {
 	    TreeNode<E> parent = getParent();
-	    AppContext.getDataManager().removeObject(this);
+	    DataManager dm = AppContext.getDataManager();
+	    dm.removeObject(getSubList());
+	    dm.removeObject(this);
 	    parent.clear();
 	}
 

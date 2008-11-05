@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.app.util;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
@@ -36,6 +37,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ScalableList;
 import com.sun.sgs.auth.Identity;
@@ -125,6 +127,7 @@ public class TestScalableList extends Assert {
 		    fail("Was not expecting an exception: " +
 			    e.getLocalizedMessage());
 		}
+		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
     }
@@ -483,6 +486,13 @@ public class TestScalableList extends Assert {
 			.equals(largerBranchingFactor));
 
 		AppContext.getDataManager().removeObject(list);
+
+		AppContext.getDataManager().removeObject(
+			smallerBranchingFactor);
+		AppContext.getDataManager().removeObject(
+			largerBranchingFactor);
+		AppContext.getDataManager().removeObject(smallerBucketSize);
+		AppContext.getDataManager().removeObject(largerBucketSize);
 	    }
 	}, taskOwner);
     }
@@ -871,6 +881,7 @@ public class TestScalableList extends Assert {
 		// Iteration amount should equal list size
 		assertEquals(size, list.size());
 		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -1177,6 +1188,9 @@ public class TestScalableList extends Assert {
 		iter.hasNext();
 		iter.hasNext();
 		iter.hasNext();
+
+		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -1230,6 +1244,7 @@ public class TestScalableList extends Assert {
 		assertEquals(3, list.size());
 		assertEquals(false, list.contains(verify));
 		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -1275,6 +1290,7 @@ public class TestScalableList extends Assert {
 			.indexOf(valueToAddAndCheck));
 
 		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -1314,6 +1330,7 @@ public class TestScalableList extends Assert {
 
 		assertEquals(shadow.size(), list.size());
 		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -1359,6 +1376,7 @@ public class TestScalableList extends Assert {
 		}
 		assertEquals(shadowIter.hasPrevious(), iter.hasPrevious());
 		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -1404,6 +1422,7 @@ public class TestScalableList extends Assert {
 		}
 		assertEquals(shadow.size(), list.size());
 		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(iter);
 	    }
 	}, taskOwner);
     }
@@ -2652,6 +2671,7 @@ public class TestScalableList extends Assert {
 		}
 
 		AppContext.getDataManager().removeBinding(name);
+		AppContext.getDataManager().removeObject(d);
 	    }
 	}, taskOwner);
     }
@@ -3228,6 +3248,8 @@ public class TestScalableList extends Assert {
 		shadowIter.add("A");
 		assertEquals(shadow.size(), list.size());
 
+		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(listIter);
 	    }
 	}, taskOwner);
 
@@ -3297,6 +3319,8 @@ public class TestScalableList extends Assert {
 		    assertEquals(shadow.get(i), list.get(i));
 		}
 
+		AppContext.getDataManager().removeObject(list);
+		AppContext.getDataManager().removeObject(listIter);
 	    }
 	}, taskOwner);
 
@@ -3379,5 +3403,79 @@ public class TestScalableList extends Assert {
     @SuppressWarnings("unchecked")
     private static <T> T uncheckedCast(Object object) {
 	return (T) object;
+    }
+
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
+
+	volatile int count = 0;
+
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+		// NOTE: this count is used at the end of the test to make
+		// sure
+		// that no objects were leaked in stressing the structure but
+		// any given service (e.g., the task service) may accumulate
+		// managed objects, so a more general way to exclude these
+		// from
+		// the count would be nice but for now the specific types that
+		// are accumulated get excluded from the count
+		ManagedReference<?> ref =
+			dataService.createReferenceForId(next);
+		String name = ref.get().getClass().getName();
+		if (!name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+		    // System.err.println(count + ": " + name);
+		    count++;
+		}
+		last = next;
+	    }
+	}
+    }
+
+    /**
+     * Test remove {@code ScalableList}
+     */
+    @Test
+    public void testRemoveScalableList() throws Exception {
+	int originalCount = getObjectCount();
+	System.err.println("originalCount: " + originalCount);
+	final String name = "list";
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		ScalableList<Integer> d = new ScalableList<Integer>();
+		for (int i = 0; i < 10; ++i) {
+		    d.add(i);
+		}
+		AppContext.getDataManager().setBinding(name, d);
+	    }
+	}, taskOwner);
+	int countAfterCreate = getObjectCount();
+	System.err.println("countAfterCreate: " + countAfterCreate);
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		DataManager dm = AppContext.getDataManager();
+		ScalableList<Integer> d = uncheckedCast(dm.getBinding(name));
+		dm.removeObject(d);
+	    }
+	}, taskOwner);
+	// removal is asynchronous, so wait
+	Thread.sleep(2000);
+	int countAfterRemove = getObjectCount();
+	System.err.println("countAfterRemove: " + countAfterRemove);
+	assertEquals(originalCount, countAfterRemove);
     }
 }
