@@ -20,7 +20,9 @@
 package com.sun.sgs.test.app.util;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableDeque;
@@ -42,6 +44,8 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+
+import java.math.BigInteger;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -103,7 +107,41 @@ public class TestScalableDeque extends Assert {
 	serverNode.shutdown(true);
     }
 
-
+    /*
+     * Test remove deque.
+     */
+    @Test public void testRemoveScalableDeque() throws Exception {
+	int originalCount = getObjectCount();
+	System.err.println("originalCount: " + originalCount);
+	final String name = "queue";
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() {
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) {
+			d.add(i);
+		    }
+		    AppContext.getDataManager().setBinding(name, d);
+		}
+	    }, taskOwner);
+	int countAfterCreate = getObjectCount();
+	System.err.println("countAfterCreate: " + countAfterCreate);
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() {
+		    DataManager dm = AppContext.getDataManager();
+		    ScalableDeque<Integer> d = 
+			uncheckedCast(dm.getBinding(name));
+		    dm.removeObject(d);
+		}
+	    }, taskOwner);
+	// removal is asynchronous, so wait
+	Thread.sleep(2000);
+	int countAfterRemove = getObjectCount();
+	System.err.println("countAfterRemove: " + countAfterRemove);
+	assertEquals(originalCount, countAfterRemove);
+    }
+    
     
     /*
      * Test constructors
@@ -1398,7 +1436,7 @@ public class TestScalableDeque extends Assert {
      * Test serializability
      */
 
-    @Test public void testDequeSeriazable() throws Exception {
+    @Test public void testDequeSerializable() throws Exception {
 	final String name = "test-deque";
 
 	txnScheduler.runTask(
@@ -1431,7 +1469,7 @@ public class TestScalableDeque extends Assert {
 
     }
 
-    @Test public void testIteratorSeriazable() throws Exception {
+    @Test public void testIteratorSerializable() throws Exception {
 	final String name = "test-iterator";
 
 	txnScheduler.runTask(
@@ -1463,7 +1501,7 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
 
-    @Test public void testIteratorSeriazableWithRemovals() throws Exception {
+    @Test public void testIteratorSerializableWithRemovals() throws Exception {
 	final String name = "test-iterator";
 	final String name2 = "test-deque";
 
@@ -1516,7 +1554,7 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
 
-    @Test public void testConcurrentIteratorSeriazableWithRemovalOfNextElements() 
+    @Test public void testConcurrentIteratorSerializableWithRemovalOfNextElements() 
 	throws Exception {
 
 	final String name = "test-iterator";
@@ -1572,7 +1610,7 @@ public class TestScalableDeque extends Assert {
 	    }, taskOwner);
     }
 
-    @Test public void testNonConcurrentIteratorSeriazableWithRemovalOfNextElements() 
+    @Test public void testNonConcurrentIteratorSerializableWithRemovalOfNextElements() 
 	throws Exception {
 
 	final String name = "test-iterator";
@@ -1688,7 +1726,43 @@ public class TestScalableDeque extends Assert {
     }
 
 
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
 
+	volatile int count = 0;
+	
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+                // NOTE: this count is used at the end of the test to make sure
+                // that no objects were leaked in stressing the structure but
+                // any given service (e.g., the task service) may accumulate
+                // managed objects, so a more general way to exclude these from
+                // the count would be nice but for now the specific types that
+                // are accumulated get excluded from the count
+		ManagedReference<?> ref = dataService.createReferenceForId(next);
+                String name = ref.get().getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+		    System.err.println(count + ": " + name);
+                    count++;
+		}
+                last = next;
+	    }
+	}
+    }
 
     private static Properties createProps(String appName) throws Exception {
         Properties props = SgsTestNode.getDefaultProperties(appName, null, 
