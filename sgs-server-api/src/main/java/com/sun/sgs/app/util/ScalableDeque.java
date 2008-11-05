@@ -1078,13 +1078,14 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      */
     public void removingObject() {
         clear();
-        
+
         // Remove the ManagedSerializable objects as well
-        AppContext.getDataManager().removeObject(backingMap);
-        AppContext.getDataManager().removeObject(headElement.get());
-        AppContext.getDataManager().removeObject(headCounter.get());
-        AppContext.getDataManager().removeObject(tailElement.get());
-        AppContext.getDataManager().removeObject(tailCounter.get());
+        DataManager dm = AppContext.getDataManager();
+        dm.removeObject(backingMap);
+        dm.removeObject(headElement.get());
+        dm.removeObject(headCounter.get());
+        dm.removeObject(tailElement.get());
+        dm.removeObject(tailCounter.get());
     }
 
     /**
