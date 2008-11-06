@@ -43,10 +43,10 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
@@ -308,13 +308,13 @@ public class TaskServiceImpl
                                             "be non-negative");
 
         // create our profiling info
-        ProfileService profileService =
-            txnProxy.getService(ProfileService.class);
-        serviceStats = new TaskServiceStats(profileService);
+        ProfileCollector collector =
+            systemRegistry.getComponent(ProfileCollector.class);
+        serviceStats = new TaskServiceStats(collector);
 
         // and register our MBean
         try {
-            profileService.registerMBean(serviceStats, 
+            collector.registerMBean(serviceStats, 
                 TaskServiceStats.TASK_SERVICE_MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");

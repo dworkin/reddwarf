@@ -20,10 +20,10 @@
 package com.sun.sgs.impl.service.nodemap;
 
 import com.sun.sgs.management.NodeMappingServiceMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.service.ProfileService;
 
 /**
  * The Statistics MBean object for the node mapping service.
@@ -37,9 +37,9 @@ public class NodeMappingServiceStats implements NodeMappingServiceMXBean {
     final ProfileOperation getNodeOp;
     final ProfileOperation setStatusOp;
     
-    NodeMappingServiceStats(ProfileService profileService, String name) {
+    NodeMappingServiceStats(ProfileCollector collector, String name) {
         ProfileConsumer consumer =
-            profileService.getProfileCollector().getConsumer(name);
+            collector.getConsumer(name);
 
         ProfileLevel level = ProfileLevel.MAX;
         addNodeMappingListenerOp =

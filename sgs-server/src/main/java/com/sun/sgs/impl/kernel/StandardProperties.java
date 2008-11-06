@@ -85,12 +85,6 @@ public final class StandardProperties {
      * <code>DataManager</code>.
      */
     public static final String DATA_MANAGER = NS + "dataManager";
-
-    /**
-     * An optional key specifying a specific class to use for the
-     * <code>ProfileService</code>.
-     */
-    public static final String PROFILE_SERVICE = NS + "profileService";
     
     /**
      * An optional key specifying a specific class to use for the
@@ -169,8 +163,6 @@ public final class StandardProperties {
      * ordering represents the order in which the services are configured.
      */
     public enum StandardService {
-        /** Enumeration for the Profile Service . */
-        ProfileService,
         /** Enumeration for the Data Service. */
         DataService,
         /** Enumeration for the Watchdog Service. */

@@ -116,8 +116,6 @@ class Kernel {
         "com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl";
     private static final String DEFAULT_NODE_MAPPING_SERVICE =
         "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
-    private static final String DEFAULT_PROFILE_SERVICE = 
-         "com.sun.sgs.impl.service.profile.ProfileServiceImpl";
 
     // the default managers
     private static final String DEFAULT_CHANNEL_MANAGER =
@@ -426,17 +424,6 @@ class Kernel {
         
         final int finalServiceOrdinal = finalStandardService.ordinal();
 
-        // load the profile service, which has no associated manager
-
-        if (StandardService.ProfileService.ordinal() > finalServiceOrdinal) {
-            return;
-        }
-
-        String profileServiceClass =
-            appProperties.getProperty(StandardProperties.PROFILE_SERVICE,
-                                      DEFAULT_PROFILE_SERVICE);
-        setupServiceNoManager(profileServiceClass, startupContext);
-        
         // load the data service
 
         String dataServiceClass =

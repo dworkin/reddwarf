@@ -26,7 +26,6 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.impl.service.data.store.net.NetworkException;
-import com.sun.sgs.impl.service.profile.ProfileServiceImpl;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -93,8 +92,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     @Override
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props), 
-            new ProfileServiceImpl(DummyProfileCoordinator.getCollector()));
+	    new DataStoreClient(props), DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

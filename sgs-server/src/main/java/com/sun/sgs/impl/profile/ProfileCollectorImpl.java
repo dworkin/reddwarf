@@ -37,6 +37,7 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 
 import java.beans.PropertyChangeEvent;
 
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
@@ -45,13 +46,21 @@ import java.util.EmptyStackException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.InstanceNotFoundException;
+import javax.management.JMException;
+import javax.management.MBeanRegistrationException;
+import javax.management.MBeanServer;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
 
 
 /**
@@ -100,6 +109,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     // The system registry, used to instantiate {@code ProfileListener}s
     private final ComponentRegistry systemRegistry;
     
+    // The MBeans registered for this node.
+    private ConcurrentMap<String, Object> registeredMBeans;
+    
     /**
      * Creates an instance of {@code ProfileCollectorImpl}.
      * @param level the default system profiling level
@@ -122,6 +134,21 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
         defaultProfileLevel = level;
         
+        registeredMBeans = new ConcurrentHashMap<String, Object>();
+        
+        // Create the task aggregator, add it as a listener, and register
+        // it as an MBean.  We do this here so we can gather task data for
+        // all services that are started after us.
+        TaskAggregate taskAgg = new TaskAggregate();
+        addListener(taskAgg, true);
+        try {
+            registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
+        
         // start a long-lived task to consume the other end of the queue
         reporterThread = new CollectorThread();
         reporterThread.start();
@@ -143,6 +170,26 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         for (Map.Entry<ProfileListener, Boolean> entry : listeners.entrySet()) {
             if (entry.getValue().equals(Boolean.TRUE)) {
                 entry.getKey().shutdown();
+            }
+        }
+        
+        // attempt to unregister all our registered MBeans
+        MBeanServer platServer = ManagementFactory.getPlatformMBeanServer();
+        Set<String> keys = registeredMBeans.keySet();
+        for (String name : keys) {
+            try {
+                platServer.unregisterMBean(new ObjectName(name));
+            } catch (MalformedObjectNameException ex) {
+                logger.logThrow(Level.WARNING, ex, 
+                                "Could not unregister MBean {0}", name);
+            } catch (InstanceNotFoundException ex) {
+                logger.logThrow(Level.WARNING, ex, 
+                                "Could not unregister MBean {0}", name);
+            } catch (MBeanRegistrationException ex) {
+                logger.logThrow(Level.WARNING, ex, 
+                                "Could not unregister MBean {0}", name);
+            } finally {
+                registeredMBeans.remove(name);
             }
         }
     }
@@ -254,6 +301,34 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
     }
 
+    /** {@inheritDoc} */
+    public void registerMBean(Object mBean, String mBeanName) 
+        throws JMException 
+    {
+        // Register beans with Platform MBeanServer
+        MBeanServer platServer = ManagementFactory.getPlatformMBeanServer();
+        
+        try {
+            ObjectName name = new ObjectName(mBeanName);
+            platServer.registerMBean(mBean, name);
+//                new StandardMBean(stats, DataStoreStatsMXBean.class) { },
+                    // Still not clear why I'd use an anon class here
+                    // Can provide descriptors for my attributes: how?
+                
+            registeredMBeans.putIfAbsent(mBeanName, mBean);
+            logger.log(Level.CONFIG, "Registered MBean {0}", name);
+        } catch (JMException ex) {
+            logger.logThrow(Level.CONFIG, ex, 
+                            "Could not register MBean {0}", mBeanName);
+            throw ex;
+        }
+    }
+
+    /** {@inheritDoc} */
+    public Object getRegisteredMBean(String mBeanName) {
+        return registeredMBeans.get(mBeanName);
+    }
+    
     /* -- Methods to support ProfileCollectorHandle -- */
     
     /**

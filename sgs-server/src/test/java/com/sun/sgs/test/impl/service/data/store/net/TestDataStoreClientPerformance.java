@@ -22,7 +22,6 @@ package com.sun.sgs.test.impl.service.data.store.net;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
-import com.sun.sgs.impl.service.profile.ProfileServiceImpl;
 import com.sun.sgs.test.impl.service.data.store.TestDataStorePerformance;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 
@@ -66,8 +65,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props),
-	    new ProfileServiceImpl(DummyProfileCoordinator.getCollector()));
+	    new DataStoreClient(props), DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

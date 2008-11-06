@@ -21,8 +21,8 @@ package com.sun.sgs.impl.service.data.store;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.management.DataStoreStatsMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.logging.Level;
@@ -60,13 +60,12 @@ public class DataStoreProfileProducer
      * TransactionParticipant} methods to {@code dataStore}.
      *
      * @param	dataStore the object for delegating operations
-     * @param	profileService the profile service for creating and using
-     *          profiling data, and for registering JMX MBeans
+     * @param	collector the object for collecting profile data
      * @throws	IllegalArgumentException if {@code dataStore} does not
      *		implement {@code TransactionParticipant}
      */
     public DataStoreProfileProducer(DataStore dataStore,
-                                    ProfileService profileService)
+                                    ProfileCollector collector)
 
     {
 	if (dataStore == null) {
@@ -79,10 +78,10 @@ public class DataStoreProfileProducer
 	}
 	this.dataStore = dataStore;
 	participant = (TransactionParticipant) dataStore;
-        stats = new DataStoreStats(profileService);
+        stats = new DataStoreStats(collector);
         
         try {
-            profileService.registerMBean(stats, 
+            collector.registerMBean(stats, 
                 DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");

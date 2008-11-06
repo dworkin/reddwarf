@@ -19,12 +19,12 @@
 
 package com.sun.sgs.impl.service.data.store;
 import com.sun.sgs.management.DataStoreStatsMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileSample;
-import com.sun.sgs.service.ProfileService;
 
 /**
  * Implementation of JMX MBean for the data store.
@@ -82,10 +82,10 @@ public class DataStoreStats implements DataStoreStatsMXBean {
     
     /**
      * Create a data store statistics object.
-     * @param profileService the profile service used to create profiling
+     * @param collector the profile collector used to create profiling
      *     objects and register the MBean with JMX
      */
-    public DataStoreStats(ProfileService profileService) {
+    public DataStoreStats(ProfileCollector collector) {
         // NOTE
         // Set up profiling stuff.  Can this be done statically?
         // What if I have a new ProfileStats (probably a bad name) object
@@ -97,8 +97,7 @@ public class DataStoreStats implements DataStoreStatsMXBean {
         // Or we could instantiate them with a ProfileConsumer, but it's
         // hard to see the advantage of that.
         ProfileConsumer consumer =
-	    profileService.getProfileCollector().
-                getConsumer(DataStore.class.getName());
+	    collector.getConsumer(DataStore.class.getName());
         ProfileLevel level = ProfileLevel.MAX;
         
 	createObjectOp = 

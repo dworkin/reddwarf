@@ -47,11 +47,11 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.management.DataServiceMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -454,18 +454,17 @@ public final class DataServiceImpl implements DataService, DataServiceMXBean {
 	    }
             storeToShutdown = baseStore;
             
-            ProfileService profileService = 
-                    txnProxy.getService(ProfileService.class);
-	    store = new DataStoreProfileProducer(baseStore, profileService);
+            ProfileCollector collector =
+                    systemRegistry.getComponent(ProfileCollector.class);
+	    store = new DataStoreProfileProducer(baseStore, collector);
             ProfileConsumer consumer =
-                profileService.getProfileCollector().
-                    getConsumer(getClass().getName());
+                collector.getConsumer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", true, ProfileLevel.MAX);
 
             // and register our MBean
             try {
-                profileService.registerMBean(this, 
+                collector.registerMBean(this, 
                     DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");

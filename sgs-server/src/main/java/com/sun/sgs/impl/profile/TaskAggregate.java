@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package com.sun.sgs.impl.service.profile;
+package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.management.TaskAggregateMXBean;
 import com.sun.sgs.profile.ProfileListener;

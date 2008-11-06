@@ -34,11 +34,11 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.management.NodeMappingServiceMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.UnknownIdentityException;
@@ -499,14 +499,14 @@ public class NodeMappingServiceImpl
                        ", fullStack:" + fullStack + "]";
             
             // create our profiling info
-            ProfileService profileService =
-                txnProxy.getService(ProfileService.class);
+            ProfileCollector collector =
+                systemRegistry.getComponent(ProfileCollector.class);
             serviceStats = 
-                new NodeMappingServiceStats(profileService, fullName);
+                new NodeMappingServiceStats(collector, fullName);
 
             // and register our MBean
             try {
-                profileService.registerMBean(serviceStats, 
+                collector.registerMBean(serviceStats, 
                     NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");

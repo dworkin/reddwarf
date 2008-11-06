@@ -21,7 +21,6 @@ package com.sun.sgs.test.impl.profile;
 
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.service.ProfileService;
 import com.sun.sgs.test.util.SgsTestNode;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
@@ -84,9 +83,7 @@ public class TestProfileCollectorImpl extends TestCase {
     
     /** Returns the profile collector for a given node */
     private ProfileCollector getCollector(SgsTestNode node) throws Exception {
-        ProfileService service = 
-            node.getProxy().getService(ProfileService.class);
-        return service.getProfileCollector();
+        return node.getSystemRegistry().getComponent(ProfileCollector.class);
     }
         ////////     The tests     /////////
     public void testDefaultKernel() {

@@ -20,10 +20,10 @@
 package com.sun.sgs.impl.service.task;
 
 import com.sun.sgs.management.TaskServiceMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.service.ProfileService;
 
 /**
  *
@@ -38,10 +38,9 @@ public class TaskServiceStats implements TaskServiceMXBean {
     final ProfileOperation scheduleTaskDelayedOp;
     final ProfileOperation scheduleTaskPeriodicOp;
     
-    TaskServiceStats(ProfileService profileService) {
+    TaskServiceStats(ProfileCollector collector) {
         ProfileConsumer consumer =
-            profileService.getProfileCollector().
-                getConsumer(TaskServiceImpl.NAME);
+            collector.getConsumer(TaskServiceImpl.NAME);
 
         ProfileLevel level = ProfileLevel.MAX;
         scheduleNDTaskOp =
