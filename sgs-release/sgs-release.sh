@@ -47,7 +47,7 @@ mvn clean
 svn --non-interactive commit -m "updating POM versions for release $VERSION"
 
 # deploy to java.net
-# mvn deploy
+mvn deploy -DskipTests
 
 # tag the branch
  svn --non-interactive --username $USERNAME --password $PASSWORD copy $URL/branches/$BRANCH $URL/tags/$TAG -m "tagging release $VERSION"
