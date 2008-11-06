@@ -111,7 +111,6 @@
 	    <configuration>
 	      <links>
 		<link>http://java.sun.com/javase/6/docs/api/</link>
-		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
 	      <show>package</show>
 	      <author>false</author>
@@ -144,7 +143,6 @@
 	    <configuration>
 	      <links>
 		<link>http://java.sun.com/javase/6/docs/api/</link>
-		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
 	      <show>public</show>
 	      <author>false</author>

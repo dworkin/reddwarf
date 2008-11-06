@@ -28,6 +28,10 @@
       <groupId>org.easymock</groupId>
       <artifactId>easymock</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.client</groupId>
+      <artifactId>sgs-client</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>

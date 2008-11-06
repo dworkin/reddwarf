@@ -78,23 +78,6 @@ The je-${bdb.je.version}.jar JAR file should be copied to the lib
 subdirectory.  The JAR file is only needed when the system is configured
 to run with Berkeley DB Java edition.
 
-This distribution requires Apache MINA, version ${org.apache.mina.version}, which may be
-bundled with this distribution, or else can be obtained from:
-
-  http://mina.apache.org/
-
-The mina-core-${org.apache.mina.version}.jar JAR file should be copied to the lib
-subdirectory.
-
-MINA also requires Simple Logging Facade for Java (SLF4J), version 1.4,
-which may be bundled with this distribution, or else can be obtained
-from:
-
-  http://www.slf4j.org/
-
-The slf4j-api-${slf4j-api.version}.jar and slf4j-jdk14-${slf4j-jdk14.version}.jar
-JAR files should be copied to the lib subdirectory.
-
 DEVELOPING AND RUNNING
 
 To develop server applications, include the following JAR file in your
