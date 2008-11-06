@@ -26,6 +26,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransientReference;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -109,7 +110,7 @@ import java.util.logging.Logger;
  *	separately for each transaction.  This property is intended for use in
  *	debugging. <p>
  *
- * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS}
+ * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> <code>false</code>
  *
@@ -201,14 +202,6 @@ public final class DataServiceImpl implements DataService {
      */
     public static final String OBJECT_CACHE_NOT_CLASSES_PROPERTY =
 	CLASSNAME + ".object.cache.not.classes";
-
-    /** The names of system classes whose instances should not be cached. */
-    private static final String[] OBJECT_CACHE_NOT_SYSTEM_CLASSES = {
-	"com.sun.sgs.app.util.ScalableHashMap$EntryIterator",
-	"com.sun.sgs.app.util.ScalableHashMap$KeyIterator",
-	"com.sun.sgs.app.util.ScalableHashMap$ValueIterator",
-	"com.sun.sgs.impl.service.channel.OrderedUnreliableChannelImpl"
-    };
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -462,7 +455,7 @@ public final class DataServiceImpl implements DataService {
 	    int objectCacheSize = wrappedProps.getIntProperty(
 		OBJECT_CACHE_SIZE_PROPERTY, DEFAULT_OBJECT_CACHE_SIZE,
 		0, Integer.MAX_VALUE);
-	    String objectCacheNotClasses = wrappedProps.getProperty(
+	    String objectCacheNotClassesProperty = wrappedProps.getProperty(
 		OBJECT_CACHE_NOT_CLASSES_PROPERTY);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
@@ -489,17 +482,14 @@ public final class DataServiceImpl implements DataService {
                 collector.getConsumer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", ProfileLevel.MAX);
-	    Set<String> objectCacheAllNotClasses = new HashSet<String>();
-	    for (String name : OBJECT_CACHE_NOT_SYSTEM_CLASSES) {
-		objectCacheAllNotClasses.add(name);
-	    }
-	    if (objectCacheNotClasses != null) {
-		for (String name : objectCacheNotClasses.split(",")) {
-		    objectCacheAllNotClasses.add(name.trim());
+	    Set<String> objectCacheNotClasses = new HashSet<String>();
+	    if (objectCacheNotClassesProperty != null) {
+		for (String name : objectCacheNotClassesProperty.split(",")) {
+		    objectCacheNotClasses.add(name.trim());
 		}
 	    }
 	    objectCache =
-		new ObjectCache(objectCacheSize, objectCacheAllNotClasses);
+		new ObjectCache(objectCacheSize, objectCacheNotClasses);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -663,7 +653,7 @@ public final class DataServiceImpl implements DataService {
 	try {
 	    checkManagedObject(object);
 	    context = getContext();
-	    ManagedReferenceImpl<T> result = context.getReference(object);
+	    ManagedReference<T> result = context.getReference(object);
 	    // mark that this object has been read locked
 	    oidAccesses.reportObjectAccess(result.getId(), AccessType.READ,
 					   object);
@@ -685,6 +675,66 @@ public final class DataServiceImpl implements DataService {
 		    contextTxnId(context), typeName(object));
 	    }
 	    throw e;
+	}
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public <T> TransientReference<T> createTransientReference(T object) {
+	Context context = null;
+	try {
+	    if (object == null) {
+		throw new NullPointerException(
+		    "The object argument must not be null");
+	    }
+	    context = getContext();
+	    TransientReference<T> result =
+		new TransientReferenceImpl<T>(object, context);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "createTransientReference tid:{0,number,#}," +
+			   " type:{1} returns",
+			   contextTxnId(context), typeName(object));
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
+	    if (exceptionLogger.isLoggable(Level.FINEST)) {
+		exceptionLogger.logThrow(
+		    Level.FINEST, e,
+		    "createTransientReference tid:{0,number,#}, type:{1}" +
+		    " throws",
+		    contextTxnId(context), typeName(object));
+	    }
+	    throw e;
+	}
+    }
+
+    /** Implement {@code TransientReference}. */
+    private static class TransientReferenceImpl<T>
+	implements TransientReference<T>
+    {
+	/** The associated object. */
+	private final T object;
+
+	/** The context when this instance was created. */
+	private final Context context;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	object the associated object
+	 * @param	context the current context
+	 */
+	TransientReferenceImpl(T object, Context context) {
+	    this.object = object;
+	    this.context = context;
+	}
+
+	/** {@inheritDoc} */
+	public T get() {
+	    return context.equals(getContextNoJoin()) ? object : null;
 	}
     }
 
@@ -715,7 +765,7 @@ public final class DataServiceImpl implements DataService {
 	Context context = null;
 	try {
 	    context = getContext();
-	    ManagedReferenceImpl<?> result = context.getReference(getOid(id));
+	    ManagedReference<?> result = context.getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId tid:{0,number,#}," +
@@ -1175,17 +1225,6 @@ public final class DataServiceImpl implements DataService {
      */
     static void checkContext(Context context) {
 	getContextMap().checkContext(context);
-    }
-
-    static boolean isContextValid(Context context) {
-	try {
-	    checkContext(context);
-	    return true;
-	} catch (IllegalStateException e) {
-	    return false;
-	} catch (TransactionNotActiveException e) {
-	    return false;
-	}
     }
 
     /**

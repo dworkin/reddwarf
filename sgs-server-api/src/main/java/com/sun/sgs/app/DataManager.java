@@ -195,4 +195,76 @@ public interface DataManager {
      *		problem with the current transaction
      */
     <T> ManagedReference<T> createReference(T object);
+
+    /**
+     * Creates a transient reference to an object, which maintains a reference
+     * to the specified object for use within the same run of the current task.
+     * The resulting transient reference will return the argument provided to
+     * this method if called from within the same run of the current task, and
+     * otherwise return {@code null}.  The object returned by this method is
+     * not serializable; applications should insure that it does not appear in
+     * the serialized form of a managed object, typically by only storing it in
+     * transient or static fields.  Applications should also insure that a
+     * single transient reference is shared among multiple managed objects.
+     * <p>
+     *
+     * Applications can use transient references to cache persistent objects in
+     * order to access them from within a single task rather than needing to
+     * compute them repeatedly by performing potentially expensive operations
+     * on managed objects obtained from the data manager. <p>
+     *
+     * Applications should not depend on managed objects being serialized or
+     * deserialized at task boundaries, in case deserialized objects are reused
+     * or are not serialized.  Applications should instead use {@code
+     * TransientReference} objects to make sure that they do not make use of
+     * objects obtained in a different task or a different run of the current
+     * task. <p>
+     *
+     * The following class provides a contrived example of using {@code
+     * TransientReference} to cache the item last fetched from a linked list.
+     *
+     * <pre>
+     * public class RememberPosition implements ManagedObject, Serializable {
+     *     private final ManagedReference<Item> head;
+     *     private int position;
+     *     private transient TransientReference<Item> last;
+     *     public RememberPosition(Item head) {
+     *         this.head = AppContext.getDataManager().createReference(head);
+     *     }
+     *     public Item get(int position) {
+     *         Item result = (head == null) ? null : head.get();
+     *         int p = -1;
+     *         while (result != null &amp;&amp; ++p &lt; position) {
+     *             result = result.next;
+     *         }
+     *         position = p;
+     *         last = (result == null) ? null
+     *             : AppContext.getDataManager().createTransientReference(result);
+     *         return result;
+     *     }
+     *     public Item last() {
+     *         Item result = (last != null) ? last.get() : null;
+     *         if (result == null) {
+     *             result = get(position);
+     *         }
+     *         return result;
+     *     }
+     *     public static class Item implements Serializable {
+     *         public final Object value;
+     *         public final Item next;
+     *         public Item(Object value, Item next) {
+     *             this.value = value;
+     *             this.next = next;
+     *         }
+     *     }
+     * }
+     * </pre>
+     *
+     * @param	<T> the type of the object
+     * @param	object the object
+     * @return	the transient reference
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    <T> TransientReference<T> createTransientReference(T object);
 }

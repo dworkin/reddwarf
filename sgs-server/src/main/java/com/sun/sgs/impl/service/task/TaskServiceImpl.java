@@ -546,13 +546,6 @@ public class TaskServiceImpl
     /**
      * {@inheritDoc}
      */
-    public BigInteger currentTransactionId() {
-	return new BigInteger(1, txnProxy.getCurrentTransaction().getId());
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public void scheduleNonDurableTask(KernelRunnable task,
                                        boolean transactional) {
         if (task == null)

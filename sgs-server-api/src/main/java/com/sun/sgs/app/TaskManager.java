@@ -20,7 +20,6 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
-import java.math.BigInteger;
 
 /**
  * Provides facilities for scheduling tasks.  Each task is a serializable
@@ -156,54 +155,4 @@ public interface TaskManager {
      */
     PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
                                             long period);
-
-    /**
-     * Returns the transaction ID for the currently running task.  Each
-     * scheduled run of each task has its own unique transaction ID.
-     * Calls to this method from within the same run of a given task will
-     * return values that are all equal; calls made from within different tasks
-     * or different runs of the same task will return different values. <p>
-     *
-     * Applications can use this method to cache values transiently in fields
-     * that are not part of the serialized state of the object.  Applications
-     * should use this method to check for invalid caches rather than depending
-     * on serialization hooks since managed objects are not guaranteed to be
-     * serialized or deserialized on transaction boundaries. <p>
-     *
-     * For example, the follow class provides a simple (and probably not very
-     * useful) example of a cache for the value of a managed object field:
-     *
-     * <pre>
-     * class CachedField implements ManagedObject, Serializable {
-     *     private static final long serialVersionUID = 1;
-     *     private ManagedReference<CachedField> nextRef;
-     *     private BigInteger txnId;
-     *     private transient CachedField next;
-     *     CachedField(CachedField next) {
-     *         nextRef = AppContext.getDataManager().createReference(next);
-     *         txnId = AppContext.getTaskManager().currentTransactionId();
-     *         this.next = next;
-     *     }
-     *     CachedField getNext() {
-     *         BigInteger currentTxnId =
-     *             AppContext.getTaskManager().currentTransactionId();
-     *         if (!txnId.equals(currentTxnId)) {
-     *             next = nextRef.get();
-     *         }
-     *         return next;
-     *     }
-     *     private void readObject(java.io.ObjectInputStream in)
-     *         throws IOException, ClassNotFoundException
-     *     {
-     *         in.defaultReadObject();
-     *         txnId = AppContext.getTaskManager().currentTransactionId();
-     *     }
-     * }
-     * </pre>
-     *
-     * @return  the current transaction ID
-     * @throws  TransactionNotActiveException if there is no transaction active
-     *          for the current task
-     */
-    BigInteger currentTransactionId();
 }

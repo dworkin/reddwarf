@@ -27,6 +27,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransientReference;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -2216,8 +2217,12 @@ public class ScalableHashMap<K, V>
 	 */
 	private int rootModifications;
 
-	/** The leaf containing the next entry, or null if not computed. */
-        private transient ScalableHashMap<K, V> nextLeaf = null;
+	/**
+	 * A transient reference to the leaf containing the next entry, or
+	 * null if not computed.
+	 */
+        private transient TransientReference<ScalableHashMap<K, V>>
+	    nextLeafRef = null;
 
 	/**
 	 * The next entry, or null if there is no next entry or if not
@@ -2238,12 +2243,6 @@ public class ScalableHashMap<K, V>
 	private transient boolean checkedRootModifications = false;
 
 	/**
-	 * The transaction ID of the transaction for which the transient fields
-	 * are up-to-date.
-	 */
-	private transient BigInteger txnId;
-
-	/**
 	 * Constructs a new {@code ConcurrentIterator}.
 	 *
 	 * @param root the root node of the {@code ScalableHashMap}
@@ -2256,8 +2255,8 @@ public class ScalableHashMap<K, V>
 	/** Makes sure that the next entry is up to date. */
 	private void checkNext() {
 	    maybeClearCache();
-	    if (nextLeaf == null ||
-		nextLeafModifications != nextLeaf.modifications)
+	    if (nextLeafRef == null ||
+		nextLeafModifications != nextLeafRef.get().modifications)
 	    {
 		getNext();
 	    }
@@ -2267,6 +2266,7 @@ public class ScalableHashMap<K, V>
 	 * Computes the next entry.
 	 */
 	private void getNext() {
+	    ScalableHashMap<K, V> nextLeaf;
 	    if (currentLeafRef == null) {
 		/* Find first entry */
 		nextLeaf = rootRef.get().leftMost();
@@ -2282,6 +2282,8 @@ public class ScalableHashMap<K, V>
 		nextEntry = nextLeaf.firstEntry();
 	    }
 	    nextLeafModifications = nextLeaf.modifications;
+	    nextLeafRef =
+		AppContext.getDataManager().createTransientReference(nextLeaf);
 	}
 
 	/** Returns the current leaf. */
@@ -2342,7 +2344,7 @@ public class ScalableHashMap<K, V>
 		throw new NoSuchElementException();
 	    }
 	    currentLeafRef =
-		AppContext.getDataManager().createReference(nextLeaf);
+		AppContext.getDataManager().createReference(nextLeafRef.get());
 	    currentHash = nextEntry.hash;
 	    currentKeyRef = nextEntry.keyRef();
 	    currentRemoved = false;
@@ -2370,14 +2372,11 @@ public class ScalableHashMap<K, V>
 	 * is made to use the iterator in another transaction.
 	 */
 	private void maybeClearCache() {
-	    BigInteger currentTxnId =
-		AppContext.getTaskManager().currentTransactionId();
-	    if (txnId == null || !txnId.equals(currentTxnId)) {
-		nextLeaf = null;
+	    if (nextLeafRef != null && nextLeafRef.get() == null) {
+		nextLeafRef = null;
 		nextEntry = null;
 		nextLeafModifications = 0;
 		checkedRootModifications = false;
-		txnId = currentTxnId;
 	    }
 	}
     }

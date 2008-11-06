@@ -815,19 +815,6 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Checks that the specified context is currently active, throwing
-     * TransactionNotActiveException if it isn't.
-     */
-    static void checkTransaction(Transaction txn) {
-	Transaction currentTxn = txnProxy.getCurrentTransaction();
-	if (currentTxn != txn) {
-	    throw new TransactionNotActiveException(
- 		"mismatched transaction; expected " + currentTxn + ", got " +
-		txn);
-	}
-    }
-
-    /**
      * Adds the specified {@code ioTask} (in a wrapper that runs the task by
      * invoking {@link AbstractService#runIoTask runIoTask} with the {@code
      * ioTask} and {@code nodeId}) to the task list of the given {@code

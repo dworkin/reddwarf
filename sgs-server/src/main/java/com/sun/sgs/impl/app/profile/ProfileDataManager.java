@@ -22,6 +22,7 @@ package com.sun.sgs.impl.app.profile;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.TransientReference;
 
 
 /**
@@ -89,6 +90,13 @@ public class ProfileDataManager implements DataManager {
      */
     public <T> ManagedReference<T> createReference(T object) {
         return backingManager.createReference(object);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public <T> TransientReference<T> createTransientReference(T object) {
+	return backingManager.createTransientReference(object);
     }
 
 }

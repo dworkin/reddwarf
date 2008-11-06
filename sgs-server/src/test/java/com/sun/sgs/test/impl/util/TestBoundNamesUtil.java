@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.util;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.TransientReference;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.service.DataService;
 import java.math.BigInteger;
@@ -322,6 +323,9 @@ public class TestBoundNamesUtil extends TestCase {
 	public void removeObject(Object object) { }
 	public void markForUpdate(Object object) { }
 	public <T> ManagedReference<T> createReference(T object) {
+	    return null;
+	}
+	public <T> TransientReference<T> createTransientReference(T object) {
 	    return null;
 	}
 	/* -- Stubs for DataService -- */

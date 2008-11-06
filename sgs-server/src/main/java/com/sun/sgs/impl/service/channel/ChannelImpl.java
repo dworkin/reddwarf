@@ -32,7 +32,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -47,7 +46,6 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -129,12 +127,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** The data service. */
     private transient DataService dataService;
 
-    /** The task service. */
-    private transient TaskService taskService;
-
-    /** The transaction ID. */
-    private transient BigInteger txnId;
-
     /** Flag that is 'true' if this channel is closed. */
     private boolean isClosed = false;
 
@@ -174,8 +166,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 	this.delivery = delivery;
 	this.writeBufferCapacity = writeBufferCapacity;
-	this.taskService = ChannelServiceImpl.getTaskService();
-	this.txnId = taskService.currentTransactionId();
 	ManagedReference<ChannelImpl> ref = dataService.createReference(this);
 	this.wrappedChannelRef =
 	    dataService.createReference(new ChannelWrapper(ref));
@@ -576,8 +566,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     {
 	in.defaultReadObject();
 	dataService = ChannelServiceImpl.getDataService();
-	taskService = ChannelServiceImpl.getTaskService();
-	txnId = taskService.currentTransactionId();
     }
 
     /* -- Binding prefix/key methods -- */
@@ -733,12 +721,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * throwing TransactionNotActiveException if it isn't.
      */
     private void checkContext() {
-	BigInteger currentTxnId = taskService.currentTransactionId();
-	if (!txnId.equals(currentTxnId)) {
-	    throw new TransactionNotActiveException(
-		"mismatched transaction; expected " + currentTxnId + ", got " +
-		txnId);
-	}
+	/*
+	 * Depend on ManagedReference.get to throw
+	 * TransactionNotActiveException if this object does not match the
+	 * current context.
+	 */
+	wrappedChannelRef.get();
     }
 
     /**
