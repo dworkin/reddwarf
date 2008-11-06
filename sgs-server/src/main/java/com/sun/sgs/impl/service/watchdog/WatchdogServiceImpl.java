@@ -198,6 +198,11 @@ public final class WatchdogServiceImpl extends AbstractService implements
     /** The application port. */
     final int appPort;
 
+    /**
+     * A flag indicating that this watchdog lives on the core server node
+     */
+    final boolean isCoreServerNode;
+
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
@@ -232,12 +237,6 @@ public final class WatchdogServiceImpl extends AbstractService implements
     private boolean isAlive = true;
 
     /**
-     * If {@code true}, the node should be scheduled to shut down during the
-     * next renew process.
-     */
-    private boolean markForShutdown = false;
-
-    /**
      * Constructs an instance of this class with the specified properties. See
      * the {@link WatchdogServiceImpl class documentation} for a list of
      * supported properties.
@@ -257,7 +256,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	try {
-	    boolean startServer =
+	    isCoreServerNode =
 		    wrappedProps.getBooleanProperty(START_SERVER_PROPERTY,
 			    wrappedProps.getBooleanProperty(
 				    StandardProperties.SERVER_START, true));
@@ -321,7 +320,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
 	    String host;
 	    int serverPort;
-	    if (startServer) {
+	    if (isCoreServerNode) {
 		serverImpl =
 			new WatchdogServerImpl(properties, systemRegistry,
 				txnProxy, clientHost, appPort, clientProxy,
@@ -347,7 +346,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		    (WatchdogServer) rmiRegistry
 			    .lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 
-	    if (startServer) {
+	    if (isCoreServerNode) {
 		localNodeId = serverImpl.localNodeId;
 		renewInterval = serverImpl.renewInterval;
 	    } else {
@@ -497,36 +496,52 @@ public final class WatchdogServiceImpl extends AbstractService implements
     /**
      * {@inheritDoc}
      */
-    public void reportFailure(String className, int severity) {
-
-	// Depending on the severity, decide what action to perform.
-	// In the future, we may want to differentiate the type of
-	// action to perform. For now, default all behaviour to the
-	// same action: node shutdown.
-	switch (severity) {
-	    case FAILURE_FATAL:
-	    case FAILURE_SEVERE:
-	    case FAILURE_MEDIUM:
-	    case FAILURE_MINOR:
-		logger.log(Level.SEVERE, "{0} reported failure", className);
-		markForShutdown = true;
-		break;
+    public void reportFailure(String className, FailureLevel severity) {
+	try {
+	    reportFailure(getLocalNodeId(), className, severity);
+	} catch (IOException ioe) {
+	    logger.log(Level.WARNING, "Unexpected exception thrown:" +
+		    ioe.getLocalizedMessage());
 	}
     }
 
     /**
-     * Notifies listeners about the node's imminent failure and performs
-     * shutdown procedures by calling {@code Kernel.shutdown()}
+     * Issues a shutdown, or, if the node Id corresponds to another node,
+     * notifies the {@code WatchdogServer} to issue the shutdown.
+     * 
+     * @param nodeId the node Id of the node to shutdown
+     * @param className the class issuing the failure
+     * @param severity the severity of the failure
      */
-    private void forceShutdown() {
-	logger.log(Level.SEVERE,
-		"Node forced to shutdown due to service failure");
-	setFailedThenNotify(true);
+    public void reportFailure(long nodeId, String className,
+	    FailureLevel severity) throws IOException {
+	// Depending on the severity, decide what action to perform.
+	// In the future, we may want to differentiate the type of
+	// action to perform. For now, default all behavior to the
+	// same action: node shutdown.
+	switch (severity) {
+	    case FATAL:
+	    case SEVERE:
+	    case MEDIUM:
+	    case MINOR:
 
-	doShutdown();
+		// Check if the node ID matches this node and that
+		// this node is not the application node; shutdown
+		// this node if so. Otherwise, find the node which
+		// should be shutdown instead
+		if (nodeId == getLocalNodeId()) {
+		    logger.log(Level.SEVERE, "{0} reported failure",
+			    className);
+		    setFailedThenNotify(true);
+		    serverProxy.setNodeAsFailed(nodeId);
+		    return;
+		}
 
-	// use controller to issue a shutdown
-	shutdownController.shutdownNode();
+		// Inform the server to shutdown the remote node.
+		// Note that this call may throw an IOException
+		serverImpl.setNodeAsFailed(nodeId, className, severity,
+			AbstractService.DEFAULT_MAX_IO_ATTEMPTS);
+	}
     }
 
     /**
@@ -566,19 +581,6 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
 		if (shuttingDown()) {
 		    return;
-		}
-
-		// Shut the node down if a service has toggled the flag.
-		// This occurs when a Service is aware of a problem.
-		if (getIsMarkedForShutdown()) {
-		    setFailedThenNotify(true);
-		    return;
-		}
-
-		// See if a service has reported a failure and
-		// requires the node to be shutdown
-		if (markForShutdown) {
-		    forceShutdown();
 		}
 
 		// Try to renew the node
@@ -645,18 +647,6 @@ public final class WatchdogServiceImpl extends AbstractService implements
     }
 
     /**
-     * Returns whether the node should be shutdown: {@code true} if so and
-     * false otherwise.
-     * 
-     * @return
-     */
-    private boolean getIsMarkedForShutdown() {
-	synchronized (lock) {
-	    return markForShutdown;
-	}
-    }
-
-    /**
      * Sets the local alive status of this node to {@code false}, and if
      * {@code notify} is {@code true}, notifies appropriate registered node
      * listeners of this node's failure. This method is called when this node
@@ -680,6 +670,12 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    Node node = new NodeImpl(localNodeId, localHost, appPort, false);
 	    notifyNodeListeners(node);
 	}
+
+	logger.log(Level.SEVERE,
+		" Node forced to shutdown due to service failure");
+
+	// use controller to issue a shutdown
+	shutdownController.shutdownNode();
     }
 
     /**
@@ -782,6 +778,14 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		}
 	    }
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void reportFailure(String className, FailureLevel severity) {
+	    setFailedThenNotify(true);
+	}
+
     }
 
     /**

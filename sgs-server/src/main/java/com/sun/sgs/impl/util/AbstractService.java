@@ -41,20 +41,23 @@ import java.io.Serializable;
 import java.util.Properties;
 import java.util.logging.Level;
 
+import sun.security.action.GetLongAction;
+
 /**
- * An abstract implementation of a service.  It manages state
- * transitions (i.e., initialized, ready, shutting down, shutdown), in
- * progress call tracking for services with embedded remote servers,
- * and shutdown support.
- *
- * <p>The {@link #getName getName} method invokes the instance's {@code
- * toString} method, so a concrete subclass of {@code AbstractService}
- * should provide an implementation of the {@code toString} method.
+ * An abstract implementation of a service. It manages state transitions
+ * (i.e., initialized, ready, shutting down, shutdown), in progress call
+ * tracking for services with embedded remote servers, and shutdown support.
+ * <p>
+ * The {@link #getName getName} method invokes the instance's {@code toString}
+ * method, so a concrete subclass of {@code AbstractService} should provide an
+ * implementation of the {@code toString} method.
  */
 public abstract class AbstractService implements Service {
 
-    /** The time (in milliseconds) to wait before retrying an (@code
-     * IoRunnable} in the {@code runIoTask} method. */ 
+    /**
+     * The time (in milliseconds) to wait before retrying an (@code
+     * IoRunnable} in the {@code runIoTask} method.
+     */
     private static final int WAIT_TIME_BEFORE_RETRY = 100;
 
     /** The number of attempts to try renewing during an {@code IOException} */
@@ -63,27 +66,19 @@ public abstract class AbstractService implements Service {
     /** The number of I/O resolution attempts performed so far */
     private int attempts = MAX_IO_ATTEMPTS;
 
-    /**
-     * Failure constants to use when reporting issues to the Watchdog
-     */
-    public static final int FAILURE_FATAL  = 3;
-    public static final int FAILURE_SEVERE = 2;
-    public static final int FAILURE_MEDIUM = 1;
-    public static final int FAILURE_MINOR  = 0;
-
     /** Service state. */
     protected static enum State {
-        /** The service is initialized. */
+	/** The service is initialized. */
 	INITIALIZED,
-        /** The service is ready. */
-        READY,
-        /** The service is shutting down. */
-        SHUTTING_DOWN,
-        /** The service is shut down. */
-        SHUTDOWN
+	/** The service is ready. */
+	READY,
+	/** The service is shutting down. */
+	SHUTTING_DOWN,
+	/** The service is shut down. */
+	SHUTDOWN
     }
 
-    /** The transaction proxy, or null if configure has not been called. */    
+    /** The transaction proxy, or null if configure has not been called. */
     protected static volatile TransactionProxy txnProxy = null;
 
     /** The application name. */
@@ -417,12 +412,26 @@ public abstract class AbstractService implements Service {
      * {@code FAILURE_MINOR},{@code FAILURE_MEDIUM}, {@code FAILURE_SEVERE},
      * or {@code FAILURE_FATAL}
      */
-    protected void notifyWatchdogOfFailure(int severity) {
-	assert (severity >= FAILURE_MINOR && severity <= FAILURE_SEVERE);
-
+    protected void notifyWatchdogOfFailure(
+	    WatchdogService.FailureLevel severity) {
 	// Get the watchdog and report the problem
 	WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
 	watchdog.reportFailure(this.getClass().toString(), severity);
+    }
+
+    /**
+     * Notifies the {@code Watchdog} of a problem with the service, enabling
+     * the {@code Watchdog} to shut down the node.
+     * 
+     * @param severity the severity of the failure; values can be
+     * {@code FAILURE_MINOR},{@code FAILURE_MEDIUM}, {@code FAILURE_SEVERE},
+     * or {@code FAILURE_FATAL}
+     */
+    protected void notifyWatchdogOfRemoteFailure(long nodeId,
+	    WatchdogService.FailureLevel severity) throws IOException {
+	// Get the watchdog and report the problem
+	WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
+	watchdog.reportFailure(nodeId, this.getClass().toString(), severity);
     }
 
     /**
@@ -470,7 +479,10 @@ public abstract class AbstractService implements Service {
      * IoRunnable#run run} method. If the specified task throws an
      * {@code IOException}, this method will retry the task while the node
      * with the given {@code nodeId} is alive until the task completes
-     * successfully.
+     * successfully. This method will provide a default value from the
+     * {@code com.sun.sgs.service.Service} interface which supplies the
+     * maximum IO attempts to perform before declaring that the service has
+     * failed.
      * <p>
      * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
@@ -481,6 +493,27 @@ public abstract class AbstractService implements Service {
      * transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
+	runIoTask(ioTask, nodeId, DEFAULT_MAX_IO_ATTEMPTS);
+    }
+
+    /**
+     * Executes the specified {@code ioTask} by invoking its {@link
+     * IoRunnable#run run} method. If the specified task throws an
+     * {@code IOException}, this method will retry the task while the node
+     * with the given {@code nodeId} is alive until the task completes
+     * successfully.
+     * <p>
+     * This method must be called from outside a transaction or {@code
+     * IllegalStateException} will be thrown.
+     * 
+     * @param ioTask a task with IO-related operations
+     * @param nodeId the node that is the target of the IO operations
+     * @param maxAttempts the maximum number of IO attempts to perform before
+     * issuing a service failure
+     * @throws IllegalStateException if this method is invoked within a
+     * transactional context
+     */
+    public void runIoTask(IoRunnable ioTask, long nodeId, int maxAttempts) {
 	checkNonTransactionalContext();
 	boolean hasNotified = false;
 	do {
@@ -494,8 +527,8 @@ public abstract class AbstractService implements Service {
 		}
 		// If the maximum number of attempts have been tried,
 		// then we are forced to shutdown
-		if (!hasNotified && --attempts == 0) {
-		    notifyWatchdogOfFailure(FAILURE_MEDIUM);
+		if (!hasNotified && --maxAttempts == 0) {
+		    notifyWatchdogOfFailure(WatchdogService.FailureLevel.MEDIUM);
 		    hasNotified = true;
 		}
 
@@ -506,9 +539,6 @@ public abstract class AbstractService implements Service {
 		}
 	    }
 	} while (isAlive(nodeId));
-
-	// Reset the allowable number of I/O attempts
-	attempts = MAX_IO_ATTEMPTS;
     }
 
     /**
@@ -516,7 +546,6 @@ public abstract class AbstractService implements Service {
      * {@code Watchdog} that it has failed
      */
     // public abstract void notifyOfFailure();
-
     /**
      * Returns the data service relevant to the current context.
      * 
