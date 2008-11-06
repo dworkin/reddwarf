@@ -35,23 +35,22 @@ import static org.junit.Assert.assertNull;
  * have come from the JUnit framework and is passed back to the
  * test thread so it can be reported there.  Otherwise, JUnit
  * does not note that the test has failed.
- * <p>
- * Note that when using this class, only one task should be run
- * with the known owner provided at construction time.  We generally
- * have no control over when tasks are run.
  */
 class CounterReportRunnable implements Runnable {
     final String name;
+    final Identity negativeOwner;
     final Identity positiveOwner;
     final Exchanger<AssertionError> errorExchanger;
     final int incrementValue;
 
-    public CounterReportRunnable(String name, Identity positiveOwner, 
+    public CounterReportRunnable(String name, Identity negativeOwner, 
+                                 Identity positiveOwner,
                                  Exchanger<AssertionError> errorExchanger, 
                                  int incrementValue) 
     {
         super();
         this.name = name;
+        this.negativeOwner = negativeOwner;
         this.positiveOwner = positiveOwner;
         this.errorExchanger = errorExchanger;
         this.incrementValue = incrementValue;
@@ -61,9 +60,14 @@ class CounterReportRunnable implements Runnable {
         AssertionError error = null;
         ProfileReport report = SimpleTestListener.report;
 
-        // Check to see if we expected the counter value to be
-        // updated in this report.
-        boolean update = report.getTaskOwner().equals(positiveOwner);
+        // Check to see if this is a report we care about by checking
+        // the owner of this task.
+        Identity owner = report.getTaskOwner();
+        boolean update = owner.equals(positiveOwner);
+        if (!update && !owner.equals(negativeOwner)) {
+            return;
+        }
+        
         if (update) {
             try {
                 Long value = report.getUpdatedTaskCounters().get(name);

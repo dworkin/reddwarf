@@ -26,7 +26,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * Helper class for operation tests.  This runnable is run during
  * the profile listener's report method.  It checks for a known
- * task owner to know if a operation should have been added,
+ * task positiveOwner to know if a operation should have been added,
  * otherwise the operation should not be in the profile report.
  * <p>
  * Synchronization with the test case is performed through an
@@ -34,24 +34,23 @@ import static org.junit.Assert.assertEquals;
  * have come from the JUnit framework and is passed back to the
  * test thread so it can be reported there.  Otherwise, JUnit
  * does not note that the test has failed.
- * <p>
- * Note that when using this class, only one task should be run
- * with the known owner provided at construction time.  We generally
- * have no control over when tasks are run.
  */
 class OperationReportRunnable implements Runnable {
 
     final String name;
-    final Identity owner;
+    final Identity negativeOwner;
+    final Identity positiveOwner;
     final Exchanger<AssertionError> errorExchanger;
 
     public OperationReportRunnable(String name, 
-                                   Identity owner, 
+                                   Identity negativeOwner,
+                                   Identity positiveOwner, 
                                    Exchanger<AssertionError> errorExchanger) 
     {
         super();
         this.name = name;
-        this.owner = owner;
+        this.negativeOwner = negativeOwner;
+        this.positiveOwner = positiveOwner;
         this.errorExchanger = errorExchanger;
     }
 
@@ -59,7 +58,11 @@ class OperationReportRunnable implements Runnable {
         AssertionError error = null;
         ProfileReport report = SimpleTestListener.report;
         // Check to see if we expected the name to be in this report.
-        boolean expected = report.getTaskOwner().equals(owner);
+        Identity owner = report.getTaskOwner();
+        boolean expected = owner.equals(positiveOwner);
+        if (!expected && !owner.equals(negativeOwner)) {
+            return;
+        }
         boolean found = report.getReportedOperations().contains(name);
         try {
             assertEquals(expected, found);

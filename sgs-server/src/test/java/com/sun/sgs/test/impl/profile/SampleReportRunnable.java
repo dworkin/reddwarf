@@ -36,26 +36,25 @@ import static org.junit.Assert.assertNull;
  * have come from the JUnit framework and is passed back to the
  * test thread so it can be reported there.  Otherwise, JUnit
  * does not note that the test has failed.
- * <p>
- * Note that when using this class, only one task should be run
- * with the known owner provided at construction time.  We generally
- * have no control over when tasks are run.
  */
 class SampleReportRunnable implements Runnable {
 
     final String name;
+    final Identity negativeOwner;
     final Identity positiveOwner;
     final Exchanger<AssertionError> errorExchanger;
     final List<Long> expectedValues;
 
     public SampleReportRunnable(String sampleName, 
-                                Identity positiveIdentity, 
+                                Identity negativeOwner,
+                                Identity positiveOwner, 
                                 Exchanger<AssertionError> errorExchanger, 
                                 List<Long> expectedValues) 
     {
         super();
         this.name = sampleName;
-        this.positiveOwner = positiveIdentity;
+        this.negativeOwner = negativeOwner;
+        this.positiveOwner = positiveOwner;
         this.errorExchanger = errorExchanger;
         this.expectedValues = expectedValues;
     }
@@ -65,7 +64,11 @@ class SampleReportRunnable implements Runnable {
         ProfileReport report = SimpleTestListener.report;
         // Check to see if we expected the sample values to be
         // updated in this report.
-        boolean update = report.getTaskOwner().equals(positiveOwner);
+        Identity owner = report.getTaskOwner();
+        boolean update = owner.equals(positiveOwner);
+        if (!update && !owner.equals(negativeOwner)) {
+            return;
+        }
         List<Long> values = report.getUpdatedTaskSamples().get(name);
         try {
             if (update) {

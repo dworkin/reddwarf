@@ -72,8 +72,6 @@ public class TestProfileDataTaskImpl {
     private ComponentRegistry systemRegistry;
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
-    /** The owner for tasks I initiate. */
-    private Identity taskOwner;
     
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
@@ -104,7 +102,6 @@ public class TestProfileDataTaskImpl {
         profileCollector = getCollector(serverNode);
         systemRegistry = serverNode.getSystemRegistry();
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
-        taskOwner = serverNode.getProxy().getCurrentOwner();
     }
   
     /** Shut down the nodes. */
@@ -163,8 +160,9 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("owner");
+        final Identity negativeOwner = new DummyIdentity("other");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(counter.getName(), 
+            new CounterReportRunnable(counter.getName(), negativeOwner,
                                       positiveOwner, errorExchanger, 1));
         profileCollector.addListener(test, true);
 
@@ -189,7 +187,7 @@ public class TestProfileDataTaskImpl {
             new TestAbstractKernelRunnable() {
 		public void run() {
                 }
-            }, taskOwner);
+            }, negativeOwner);
             
         error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -217,8 +215,9 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("counterlevel");
+        final Identity negativeOwner = new DummyIdentity("counterlevelneg");
         SimpleTestListener test = new SimpleTestListener( 
-            new CounterReportRunnable(counter.getName(), 
+            new CounterReportRunnable(counter.getName(), negativeOwner,
                                       positiveOwner, errorExchanger, 1));
         profileCollector.addListener(test, true);
 
@@ -229,7 +228,7 @@ public class TestProfileDataTaskImpl {
                     // to see the counter incremented.
                     counter.incrementCount();
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -285,8 +284,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("counterinc");
+        final Identity negativeOwner = new DummyIdentity("counterincneg");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(counter.getName(), positiveOwner, 
+            new CounterReportRunnable(counter.getName(), 
+                                      negativeOwner, positiveOwner, 
                                       errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
@@ -324,9 +325,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("countermult");
+        final Identity negativeOwner = new DummyIdentity("countermultneg");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(counter.getName(), positiveOwner, 
-                                      errorExchanger, incValue));
+            new CounterReportRunnable(counter.getName(), negativeOwner,
+                                      positiveOwner, errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
         txnScheduler.runTask(
@@ -365,8 +367,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("countermult");
+        final Identity negativeOwner = new DummyIdentity("countermultneg");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(counter.getName(), positiveOwner, 
+            new CounterReportRunnable(counter.getName(), 
+                                      negativeOwner, positiveOwner, 
                                       errorExchanger, incValue));
         profileCollector.addListener(test, true);
 
@@ -413,11 +417,15 @@ public class TestProfileDataTaskImpl {
                     if (report.getTaskOwner().equals(myOwner)) {
                         try {
                             Map<String, Long> counts = 
-                                SimpleTestListener.report.getUpdatedTaskCounters();
+                                SimpleTestListener.report.
+                                    getUpdatedTaskCounters();
                             
                             System.err.println("+++");
-                            for (Map.Entry<String, Long> entry : counts.entrySet()) {
-                                System.err.println("+ " + entry.getKey() + ", " + entry.getValue());
+                            for (Map.Entry<String, Long> entry : 
+                                 counts.entrySet()) 
+                            {
+                                System.err.println("+ " + entry.getKey() + 
+                                                   ", " + entry.getValue());
                             }
                             
                             
@@ -469,8 +477,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opowner");
+        final Identity negativeOwner = new DummyIdentity("opownerneg");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op.getName(), positiveOwner, 
+            new OperationReportRunnable(op.getName(), 
+                                        negativeOwner, positiveOwner, 
                                         errorExchanger));
         profileCollector.addListener(test, true);
 
@@ -491,7 +501,7 @@ public class TestProfileDataTaskImpl {
             new TestAbstractKernelRunnable() {
 		public void run() {
                 }
-            }, taskOwner);
+            }, negativeOwner);
             
         error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -518,8 +528,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opmed");
+        final Identity negativeOwner = new DummyIdentity("opmedneg");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op.getName(), positiveOwner, 
+            new OperationReportRunnable(op.getName(), 
+                                        negativeOwner, positiveOwner, 
                                         errorExchanger));
         profileCollector.addListener(test, true);
 
@@ -529,7 +541,7 @@ public class TestProfileDataTaskImpl {
                     // We do not expect to see this reported.
                     op.report();
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -569,8 +581,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opmedtomax");
+        final Identity negativeOwner = new DummyIdentity("opmedtomaxneg");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op.getName(), positiveOwner, 
+            new OperationReportRunnable(op.getName(), 
+                                        negativeOwner, positiveOwner, 
                                         errorExchanger));
         profileCollector.addListener(test, true);
 
@@ -580,7 +594,7 @@ public class TestProfileDataTaskImpl {
                     // We do not expect to see this reported.
                     op.report();
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -619,8 +633,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("opmax");
+        final Identity negativeOwner = new DummyIdentity("opmaxneg");
         SimpleTestListener test = new SimpleTestListener(
-            new OperationReportRunnable(op.getName(), positiveOwner, 
+            new OperationReportRunnable(op.getName(), 
+                                        negativeOwner, positiveOwner, 
                                         errorExchanger));
         profileCollector.addListener(test, true);
 
@@ -630,7 +646,7 @@ public class TestProfileDataTaskImpl {
                     // We do not expect to see this reported.
                     op.report();
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -645,7 +661,7 @@ public class TestProfileDataTaskImpl {
                     // No report expected:  the level is still too low
                     op.report();
                 }
-            }, taskOwner);
+            }, negativeOwner);
             
         error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -766,8 +782,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("sampleowner");
+        final Identity negativeOwner = new DummyIdentity("sampleownerneg");
         SimpleTestListener test = new SimpleTestListener(
-            new SampleReportRunnable(sample.getName(), positiveOwner, 
+            new SampleReportRunnable(sample.getName(), 
+                                     negativeOwner, positiveOwner, 
                                      errorExchanger, testValues));
         profileCollector.addListener(test, true);
 
@@ -791,7 +809,7 @@ public class TestProfileDataTaskImpl {
             new TestAbstractKernelRunnable() {
 		public void run() {
                 }
-            }, taskOwner);
+            }, negativeOwner);
             
         error = errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -820,8 +838,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("samplelevel");
+        final Identity negativeOwner = new DummyIdentity("samplelevelneg");
         SimpleTestListener test = new SimpleTestListener(
-            new SampleReportRunnable(sample.getName(), positiveOwner, 
+            new SampleReportRunnable(sample.getName(), 
+                                     negativeOwner, positiveOwner, 
                                      errorExchanger, testValues));
         profileCollector.addListener(test, true);
         txnScheduler.runTask(
@@ -833,7 +853,7 @@ public class TestProfileDataTaskImpl {
                         sample.addSample(v);
                     }
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);
@@ -880,8 +900,10 @@ public class TestProfileDataTaskImpl {
         // The owner for our positive test.  The listener uses this owner
         // to find the ProfileReport for the task in this test.
         final Identity positiveOwner = new DummyIdentity("samplechange");
+        final Identity negativeOwner = new DummyIdentity("samplechangeneg");
         SimpleTestListener test = new SimpleTestListener(
-            new SampleReportRunnable(sample.getName(), positiveOwner, 
+            new SampleReportRunnable(sample.getName(), 
+                                     negativeOwner, positiveOwner, 
                                      errorExchanger, testValues));
         profileCollector.addListener(test, true);
 
@@ -894,7 +916,7 @@ public class TestProfileDataTaskImpl {
                         sample.addSample(v);
                     }
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
             errorExchanger.exchange(null, TIMEOUT, TimeUnit.MILLISECONDS);

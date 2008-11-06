@@ -77,8 +77,6 @@ public class TestProfileConsumerImpl {
     private ComponentRegistry systemRegistry;
     /** The transaction scheduler. */
     private TransactionScheduler txnScheduler;
-    /** The owner for tasks I initiate. */
-    private Identity taskOwner;
     
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
@@ -98,7 +96,6 @@ public class TestProfileConsumerImpl {
         profileCollector = getCollector(serverNode);
         systemRegistry = serverNode.getSystemRegistry();
         txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
-        taskOwner = serverNode.getProxy().getCurrentOwner();
     }
   
     /** Shut down the nodes. */
@@ -352,8 +349,10 @@ public class TestProfileConsumerImpl {
                 new Exchanger<AssertionError>();
 
         final Identity positiveOwner = new DummyIdentity("never-used");
+        final Identity negativeOwner = new DummyIdentity("neg-owner");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(name, positiveOwner, errorExchanger, 1));
+            new CounterReportRunnable(name, negativeOwner, positiveOwner, 
+                                      errorExchanger, 1));
         profileCollector.addListener(test, true);
 
         // We don't expect to see the counter updated in the task report
@@ -362,7 +361,7 @@ public class TestProfileConsumerImpl {
 		public void run() { 
                     counter.incrementCount();
                 }
-            }, taskOwner);
+            }, negativeOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
@@ -397,9 +396,11 @@ public class TestProfileConsumerImpl {
 
         // Set up a couple of test listeners, each listening for a different
         // task owner
-        final Identity owner1 = new DummyIdentity("hello");
+        final Identity positiveOwner = new DummyIdentity("hello");
+        final Identity negativeOwner = new DummyIdentity("neg-hello");
         SimpleTestListener test = new SimpleTestListener(
-            new CounterReportRunnable(counter.getName(), owner1, 
+            new CounterReportRunnable(counter.getName(), 
+                                      negativeOwner, positiveOwner, 
                                       errorExchanger, 1));
         profileCollector.addListener(test, true);
         
@@ -409,7 +410,7 @@ public class TestProfileConsumerImpl {
 		public void run() { 
                     counter.incrementCount();
                 }
-            }, owner1);
+            }, positiveOwner);
 
         AssertionError error = 
                 errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
@@ -420,13 +421,17 @@ public class TestProfileConsumerImpl {
         }
         
         // We expect to see the counter updated in the task report,
-        // and it should be independent of the last report
+        // and it should be independent of the last report.
+        // Note that we assume the profile listener for the last task
+        // has already been called at this point.  This is safe, because
+        // we're using the ErrorExchanger to ensure the profile report for 
+        // the above task has been seen.
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
 		public void run() { 
                     counter.incrementCount();
                 }
-            }, owner1);
+            }, positiveOwner);
 
         error = errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
         if (error != null) {
@@ -586,8 +591,6 @@ public class TestProfileConsumerImpl {
         final AggregateProfileOperation op1Agg = 
                 (AggregateProfileOperation) op1;
         
-        final TaskProfileOperation opTask = (TaskProfileOperation) op;
-        final TaskProfileOperation op1Task = (TaskProfileOperation) op1;
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
         // Use an exchanger to synchronize between the threads and communicate
