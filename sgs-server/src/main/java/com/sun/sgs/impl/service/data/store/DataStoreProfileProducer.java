@@ -67,6 +67,7 @@ public class DataStoreProfileProducer
      */
     public DataStoreProfileProducer(DataStore dataStore,
                                     ProfileService profileService)
+
     {
 	if (dataStore == null) {
 	    throw new NullPointerException(

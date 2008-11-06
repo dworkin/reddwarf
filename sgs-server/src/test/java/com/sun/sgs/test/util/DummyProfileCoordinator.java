@@ -21,6 +21,7 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 
@@ -33,11 +34,11 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 
 /** Simple profiling utility to support tests. */
 public class DummyProfileCoordinator {
+
     // the production collector
     private final ProfileCollectorImpl collector;
-    
-    // collector handle for kernel-private actions
-    private final ProfileCollectorHandleImpl collectorHandle;
+    // and its management handle
+    private final ProfileCollectorHandle collectorHandle;
 
     // a dummy task that represents all reports
     private static final KernelRunnable task = new DummyKernelRunnable();
@@ -70,7 +71,6 @@ public class DummyProfileCoordinator {
     public static ProfileCollectorImpl getCollector() {
         return instance.collector;
     }
-
 
     /** Starts profiling */
     public static void startProfiling() {

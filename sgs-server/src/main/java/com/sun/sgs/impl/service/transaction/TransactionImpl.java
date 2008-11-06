@@ -19,13 +19,13 @@
 
 package com.sun.sgs.impl.service.transaction;
 
-import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -94,11 +94,8 @@ final class TransactionImpl implements Transaction {
      */
     private Throwable abortCause = null;
 
-    /** 
-     * The collector handle used to report participant detail, or null
-     * if no participant details are to be gathered. 
-     */
-    private final ProfileCollectorHandle collector;
+    /** The collectorHandle used to report participant detail. */
+    private final ProfileCollectorHandle collectorHandle;
 
     /** Collected profiling data on each participant, created only if
      *  global profiling is set to MEDIUM at the start of the transaction.
@@ -107,19 +104,22 @@ final class TransactionImpl implements Transaction {
 
     /**
      * Creates an instance with the specified transaction ID, timeout, 
-     * prepare and commit optimization flag, and collector.
+     * prepare and commit optimization flag, and collectorHandle.
      */
     TransactionImpl(long tid, long timeout, boolean usePrepareAndCommitOpt,
-                    ProfileCollectorHandle collector) 
+                    ProfileCollectorHandle collectorHandle) 
     {
 	this.tid = tid;
 	this.timeout = timeout;
         this.disablePrepareAndCommitOpt = usePrepareAndCommitOpt;
-	this.collector = collector;
+	this.collectorHandle = collectorHandle;
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
 	state = State.ACTIVE;
-        if (collector != null) {
+	if (collectorHandle.getCollector().
+                getDefaultProfileLevel().ordinal() >= 
+                ProfileLevel.MEDIUM.ordinal()) 
+        {
 	    detailMap = new HashMap<String, ProfileParticipantDetailImpl>();
 	} else {
 	    detailMap = null;
@@ -257,7 +257,7 @@ final class TransactionImpl implements Transaction {
 		ProfileParticipantDetailImpl detail =
 		    detailMap.get(participant.getTypeName());
 		detail.setAborted(finishTime - startTime);
-		collector.addParticipant(detail);
+		collectorHandle.addParticipant(detail);
 	    }
 	}
 	state = State.ABORTED;
@@ -357,7 +357,7 @@ final class TransactionImpl implements Transaction {
 		    if (readOnly) {
 			iter.remove();
 			if (detail != null) {
-			    collector.addParticipant(detail);
+			    collectorHandle.addParticipant(detail);
 			}
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -371,7 +371,7 @@ final class TransactionImpl implements Transaction {
 			detail.
 			    setCommittedDirectly(System.currentTimeMillis() -
 						 startTime);
-			collector.addParticipant(detail);
+			collectorHandle.addParticipant(detail);
 		    }
 		    iter.remove();
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -413,7 +413,7 @@ final class TransactionImpl implements Transaction {
 		if (detail != null) {
 		    detail.setCommitted(System.currentTimeMillis() -
 					startTime);
-		    collector.addParticipant(detail);
+		    collectorHandle.addParticipant(detail);
 		}
 	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {

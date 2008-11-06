@@ -19,10 +19,8 @@
 
 package com.sun.sgs.profile;
 
-import com.sun.sgs.app.NameExistsException;
 import java.util.List;
 import java.util.Map;
-
 
 /**
  * This is the main aggregation point for profiling data. Implementations of

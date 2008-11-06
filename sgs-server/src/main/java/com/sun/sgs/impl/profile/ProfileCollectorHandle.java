@@ -56,7 +56,7 @@ public interface ProfileCollectorHandle {
      * @param readyCount the number of ready tasks at the scheduler
      */
     void startTask(KernelRunnable task, Identity owner,
-            long scheduledStartTime, int readyCount);
+                   long scheduledStartTime, int readyCount);
 
     /**
      * Tells the collector that the current task associated with the calling
@@ -69,7 +69,7 @@ public interface ProfileCollectorHandle {
      *
      * @throws IllegalStateException if no task is bound to this thread
      */
-    void noteTransactional(byte[] transactionId);
+    void noteTransactional(byte [] transactionId);
 
     /**
      * Tells the collector about a participant of a transaction when that
@@ -79,7 +79,6 @@ public interface ProfileCollectorHandle {
      * <code>noteTransactional</code> must first have been called in
      * the context of the current thread.
      *
-     * <p><b> Note sure this belongs in this interface </b>
      * @param participantDetail the detail associated with the participant
      *
      * @throws IllegalStateException if no transactional task is bound to
@@ -91,7 +90,6 @@ public interface ProfileCollectorHandle {
      * Sets the detail for all objects accessed during the task as
      * reported to the <code>AccessCoordinator</code>.
      * 
-     * <p><b> Note sure this belongs in this interface </b>
      * @param detail all detail of the accessed objects
      *
      * @throws IllegalStateException if no transactional task is bound to
@@ -121,4 +119,11 @@ public interface ProfileCollectorHandle {
      * @throws IllegalStateException if no task is bound to this thread
      */
     void finishTask(int tryCount, Throwable t);
+    
+    /**
+     * Returns the underlying profile collector that this interface controls.
+     * 
+     * @return the underlying profile collector that this interface controls
+     */
+    ProfileCollector getCollector();
 }

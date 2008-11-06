@@ -50,7 +50,7 @@ public interface IdentityAuthenticator
      *
      * @return the identifiers for the supported credential types
      */
-    public String [] getSupportedCredentialTypes();
+    String [] getSupportedCredentialTypes();
 
     /**
      * Authenticates the given credentials. The returned <code>Identity</code>
@@ -62,7 +62,7 @@ public interface IdentityAuthenticator
      *
      * @throws LoginException if authentication fails
      */
-    public Identity authenticateIdentity(IdentityCredentials credentials)
+    Identity authenticateIdentity(IdentityCredentials credentials)
         throws LoginException;
 
 }

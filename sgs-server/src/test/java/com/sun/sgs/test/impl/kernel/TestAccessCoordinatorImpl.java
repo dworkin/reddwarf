@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 
 import com.sun.sgs.app.util.ScalableHashMap;
+import com.sun.sgs.app.util.ManagedSerializable;
 
 import com.sun.sgs.auth.Identity;
 
@@ -30,8 +31,6 @@ import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
-
-import com.sun.sgs.impl.util.ManagedSerializable;
 
 import com.sun.sgs.kernel.TransactionScheduler;
 

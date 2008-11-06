@@ -32,7 +32,7 @@ public interface RecurringTaskHandle
      *
      * @throws IllegalStateException if the task has already been cancelled
      */
-    public void cancel();
+    void cancel();
 
     /**
      * Starts the associated recurring task. A recurring task will not start
@@ -41,6 +41,6 @@ public interface RecurringTaskHandle
      * @throws IllegalStateException if the task has already been started,
      *                               or has been cancelled
      */
-    public void start();
+    void start();
 
 }

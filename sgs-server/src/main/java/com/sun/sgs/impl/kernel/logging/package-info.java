@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -17,23 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.app;
-
-import java.io.Serializable;
-
 /**
- * Defines an application operation that will be run by the {@link
- * TaskManager}.  Classes that implement <code>Task</code> must also implement
- * {@link Serializable}.
- *
- * @see		TaskManager
+ * Provides transactional logging facilities.
  */
-public interface Task {
-
-    /**
-     * Performs an action, throwing an exception if the action fails.
-     *
-     * @throws	Exception if the action fails
-     */
-    void run() throws Exception;
-}
+package com.sun.sgs.impl.kernel.logging;

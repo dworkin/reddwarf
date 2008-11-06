@@ -21,6 +21,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.internal.InternalContext;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
@@ -116,7 +117,7 @@ class Kernel {
     private static final String DEFAULT_NODE_MAPPING_SERVICE =
         "com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl";
     private static final String DEFAULT_PROFILE_SERVICE = 
-        "com.sun.sgs.impl.service.profile.ProfileServiceImpl";
+         "com.sun.sgs.impl.service.profile.ProfileServiceImpl";
 
     // the default managers
     private static final String DEFAULT_CHANNEL_MANAGER =
@@ -138,17 +139,12 @@ class Kernel {
 
     // the application that is running in this kernel
     private KernelContext application;
-
+    
     // The system registry which contains all shared system components
     private final ComponentRegistryImpl systemRegistry;
     
-    // collector and reporter of profile information
-    // note that this object should never escape this kernel, as it contains
-    // methods that should only be called by objects created by this kernel
+    // collector of profile information
     private final ProfileCollectorImpl profileCollector;
-
-    // the handle used for kernel private profileCollector actions
-    private final ProfileCollectorHandle profileCollectorHandle;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -191,7 +187,7 @@ class Kernel {
             
             profileCollector = new ProfileCollectorImpl(profileLevel, 
                                               appProperties, systemRegistry);
-            profileCollectorHandle = 
+            ProfileCollectorHandle profileCollectorHandle = 
                     new ProfileCollectorHandleImpl(profileCollector);
 
             // create the authenticators and identity coordinator
@@ -211,7 +207,6 @@ class Kernel {
             // initialize the transaction coordinator
             TransactionCoordinator transactionCoordinator =
                 new TransactionCoordinatorImpl(appProperties, 
-                                               profileCollector,
                                                profileCollectorHandle);
 
 	    // possibly upgrade loggers to be transactional
@@ -366,6 +361,9 @@ class Kernel {
         transactionScheduler.setContext(application);
         taskScheduler.setContext(application);
         ContextResolver.setTaskState(application, owner);
+        
+        // tell the AppContext how to find the managers
+        InternalContext.setManagerLocator(new ManagerLocatorImpl());
 
         // notify all of the services that the application state is ready
         try {
@@ -416,7 +414,8 @@ class Kernel {
 
             // make sure we're not running with an application
             if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
-                equals(StandardProperties.APP_LISTENER_NONE)) {
+                equals(StandardProperties.APP_LISTENER_NONE)) 
+            {
                 throw new IllegalArgumentException("Cannot specify an app " +
                                                    "listener and a final " +
                                                    "service");
@@ -424,23 +423,22 @@ class Kernel {
         } else {
             finalStandardService = StandardService.LAST_SERVICE;
         }
-        final int finalOrdinal = finalStandardService.ordinal();
+        
+        final int finalServiceOrdinal = finalStandardService.ordinal();
 
-        // load the profile service, which has no manager (yet)
-        if (StandardService.ProfileService.ordinal() > finalOrdinal) {
+        // load the profile service, which has no associated manager
+
+        if (StandardService.ProfileService.ordinal() > finalServiceOrdinal) {
             return;
         }
+
         String profileServiceClass =
             appProperties.getProperty(StandardProperties.PROFILE_SERVICE,
                                       DEFAULT_PROFILE_SERVICE);
         setupServiceNoManager(profileServiceClass, startupContext);
-                
+        
         // load the data service
 
-        if (StandardService.DataService.ordinal() > finalOrdinal) {
-            return;
-        }
-        
         String dataServiceClass =
             appProperties.getProperty(StandardProperties.DATA_SERVICE,
                                       DEFAULT_DATA_SERVICE);
@@ -451,7 +449,7 @@ class Kernel {
 
         // load the watch-dog service, which has no associated manager
 
-        if (StandardService.WatchdogService.ordinal() > finalOrdinal) {
+        if (StandardService.WatchdogService.ordinal() > finalServiceOrdinal) {
             return;
         }
 
@@ -462,7 +460,8 @@ class Kernel {
 
         // load the node mapping service, which has no associated manager
 
-        if (StandardService.NodeMappingService.ordinal() > finalOrdinal) {
+        if (StandardService.NodeMappingService.ordinal() > finalServiceOrdinal) 
+        {
             return;
         }
 
@@ -473,7 +472,7 @@ class Kernel {
 
         // load the task service
 
-        if (StandardService.TaskService.ordinal() > finalOrdinal) {
+        if (StandardService.TaskService.ordinal() > finalServiceOrdinal) {
             return;
         }
 
@@ -487,7 +486,9 @@ class Kernel {
 
         // load the client session service, which has no associated manager
 
-        if (StandardService.ClientSessionService.ordinal() > finalOrdinal) {
+        if (StandardService.ClientSessionService.ordinal() > 
+                finalServiceOrdinal)
+        {
             return;
         }
 
@@ -499,7 +500,7 @@ class Kernel {
 
         // load the channel service
 
-        if (StandardService.ChannelService.ordinal() > finalOrdinal) {
+        if (StandardService.ChannelService.ordinal() > finalServiceOrdinal) { 
             return;
         }
 
@@ -714,11 +715,13 @@ class Kernel {
            
             switch (type) {
                 case singleNode:
+                default:
                     break;    // do nothing, this is the default
                 case coreServerNode:
                     // Don't start an application
-                    properties.setProperty(StandardProperties.APP_LISTENER,
-                                       StandardProperties.APP_LISTENER_NONE);
+                    properties.setProperty(
+                            StandardProperties.APP_LISTENER,
+                            StandardProperties.APP_LISTENER_NONE);
                     // Only run basic services
                     properties.setProperty(StandardProperties.FINAL_SERVICE,
                                            "NodeMappingService");
@@ -728,17 +731,14 @@ class Kernel {
                     // Start the network server for the data store
                     properties.setProperty(
                         DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
-                        "com.sun.sgs.impl.service.data" +
-                        ".store.net.DataStoreClient");
+                        "com.sun.sgs.impl.service.data." +
+                        "store.net.DataStoreClient");
                     break;
                 case appNode:
                     // Don't start the servers
                     properties.setProperty(StandardProperties.SERVER_START, 
                                            "false");
                     break;
-                default:
-                    throw new IllegalArgumentException("Unexpected type " + 
-                                                        type);
             }
 
             return properties;

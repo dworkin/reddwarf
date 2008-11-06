@@ -16,20 +16,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package com.sun.sgs.impl.profile;
 
 import com.sun.sgs.auth.Identity;
-
 import com.sun.sgs.kernel.KernelRunnable;
-
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 
 /**
  * The portion of a profile collector that allows the kernel to modify
  * the state of a particular collection record (initiates one, finishes one,
  * that sort of thing).  Only particular classes are given access to instances
- * of this class.
+ * of this class by the kernel.
  */
 public class ProfileCollectorHandleImpl implements ProfileCollectorHandle {
 
@@ -37,7 +37,7 @@ public class ProfileCollectorHandleImpl implements ProfileCollectorHandle {
     
     /**
      * Instantiate a ProfileCollectorHandle.
-     * @param profileCollector the backing profile collector, which implements
+     * @param profileCollector the backing profile collector
      */
     public ProfileCollectorHandleImpl(ProfileCollectorImpl profileCollector) {
         this.profileCollector = profileCollector;
@@ -83,5 +83,10 @@ public class ProfileCollectorHandleImpl implements ProfileCollectorHandle {
     /** {@inheritDoc} */
     public void finishTask(int tryCount, Throwable t) {
         profileCollector.finishTask(tryCount, t);
+    }
+    
+    /** {@inheritDoc} */
+    public ProfileCollector getCollector() {
+        return profileCollector;
     }
 }

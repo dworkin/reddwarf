@@ -30,6 +30,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -40,7 +41,6 @@ import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractService.Version;
-import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -66,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -465,7 +466,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(false);
-	    client.sendMessages(1, 0, null);
+	    client.sendMessagesInSequence(1, 0, null);
 	} finally {
             client.disconnect();
 	}
@@ -476,7 +477,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login(true);
-	    client.sendMessages(1, 1, null);
+	    client.sendMessagesInSequence(1, 1, null);
 	} finally {
             client.disconnect();
 	}
@@ -889,7 +890,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testClientSessionSend() throws Exception {
+    public void testClientSessionSendSequence() throws Exception {
 	final String name = "dummy";
 	DummyClient client = new DummyClient(name);
 	try {
@@ -973,6 +974,69 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testClientSessionSendSameBuffer() throws Exception {
+	String msgString = "buffer";
+	MessageBuffer msg =
+	    new MessageBuffer(MessageBuffer.getSize(msgString));
+	msg.putString(msgString);
+	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
+	sendBufferToClient(buf, msgString);
+    }
+
+    public void testClientSessionSendSameBufferWithOffset()
+	throws Exception
+    {
+	String msgString = "offset buffer";
+	MessageBuffer msg =
+	    new MessageBuffer(MessageBuffer.getSize(msgString) + 1);
+	msg.putByte(0);
+	msg.putString(msgString);
+	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
+	buf.position(1);
+	sendBufferToClient(buf, msgString);
+    }
+
+    private void sendBufferToClient(final ByteBuffer buf,
+				    final String expectedMsgString)
+	throws Exception
+    {	
+	final String name = "dummy";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login();
+	    final int numMessages = 3;
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    ClientSession session = (ClientSession)
+			AppContext.getDataManager().getBinding(name);
+		    System.err.println("Sending messages");
+		    for (int i = 0; i < numMessages; i++) {
+			session.send(buf);
+		    }
+		}}, taskOwner);
+	
+	    System.err.println("waiting for client to receive messages");
+	    Queue<byte[]> messages =
+		client.waitForClientToRecieveExpectedMessages(numMessages);
+	    for (byte[] message : messages) {
+		if (message.length == 0) {
+		    fail("message buffer emtpy");
+		}
+		String msgString = (new MessageBuffer(message)).getString();
+		if (!msgString.equals(expectedMsgString)) {
+		    fail("expected: " + expectedMsgString + ", received: " +
+			 msgString);
+		} else {
+		    System.err.println("received expected message: " +
+				       msgString);
+		}
+	    }
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     private static class Counter implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
@@ -1068,7 +1132,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
-
+    
     /* -- other methods -- */
 
     private void sendMessagesAndCheck(
@@ -1080,7 +1144,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-	    client.sendMessages(numMessages, expectedMessages, exception);
+	    client.sendMessagesInSequence(
+		numMessages, expectedMessages, exception);
 	} finally {
 	    client.disconnect();
 	}
@@ -1159,8 +1224,7 @@ public class TestClientSessionServiceImpl extends TestCase {
      * Dummy client code for testing purposes.
      */
     private class DummyClient {
-
-
+	
 	private String name;
 	private String password;
 	private Connector<SocketAddress> connector;
@@ -1186,6 +1250,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	volatile RuntimeException throwException;
 	volatile int expectedMessages;
+	// Messages received by this client's associated ClientSessionListener
 	Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
 	
 
@@ -1344,7 +1409,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Sends a SESSION_MESSAGE.
+	 * Sends a SESSION_MESSAGE with the specified content.
 	 */
 	void sendMessage(byte[] message) {
 	    MessageBuffer buf =
@@ -1358,7 +1423,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 
-	void sendMessages(
+	/**
+	 * From this client, sends the number of messages (each containing a
+	 * monotonically increasing sequence number), then waits for all the
+	 * messages to be received by this client's associated {@code
+	 * ClientSessionListener}, and validates the sequence of messages
+	 * received by the listener.  If {@code throwException} is non-null,
+	 * the {@code ClientSessionListener} will throw the specified
+	 * exception in its {@code receivedMessage} method for only the first
+	 * message it receives.
+	 */
+	void sendMessagesInSequence(
 	    int numMessages, int expectedMessages, RuntimeException re)
 	{
 	    this.expectedMessages = expectedMessages;
@@ -1370,51 +1445,75 @@ public class TestClientSessionServiceImpl extends TestCase {
 		sendMessage(buf.getBuffer());
 	    }
 	    
-	    synchronized (receivedAllMessagesLock) {
-		if (messages.size() != expectedMessages) {
-		    try {
-			receivedAllMessagesLock.wait(WAIT_TIME);
-		    } catch (InterruptedException e) {
-		    }
-		    int receivedMessages = messages.size();
-		    if (receivedMessages != expectedMessages) {
-			fail(toString() + " expected " + expectedMessages +
-			     ", received " + receivedMessages);
-		    }
-		}
-	    }
+	    validateMessageSequence(messages, expectedMessages);
 	}
 
+	/**
+	 * Waits until all messages have been received by this client, and
+	 * validates that the expected number of messages were received by the
+	 * client in the correct sequence.
+	 */
 	void checkMessagesReceived(int expectedMessages) {
-	    this.expectedMessages = expectedMessages;
+	    validateMessageSequence(listener.messageList, expectedMessages);
+	}
 
+	/**
+	 * Waits for this client to receive the number of messages sent from
+	 * the application.
+	 */
+	Queue<byte[]> waitForClientToRecieveExpectedMessages(
+	    int expectedMessages)
+	{
+	    waitForExpectedMessages(listener.messageList, expectedMessages);
+	    return listener.messageList;
+	}
+
+	/**
+	 * Waits for the number of expected messages to be deposited in the
+	 * specified message queue.
+	 */
+	private void waitForExpectedMessages(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    this.expectedMessages = expectedMessages;
 	    synchronized (receivedAllMessagesLock) {
-		if (listener.messageList.size() != expectedMessages) {
+		if (messageQueue.size() != expectedMessages) {
 		    try {
 			receivedAllMessagesLock.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
-
-		    int receivedMessages = listener.messageList.size();
-		    if (receivedMessages != expectedMessages) {
-			fail(toString() + " expected " + expectedMessages +
-			     ", received " + receivedMessages);
-		    }
 		}
 	    }
-
-	    int i = 0;
-	    for (byte[] message : listener.messageList) {
-		MessageBuffer buf = new MessageBuffer(message);
-		int value = buf.getInt();
-		System.err.println(toString() + " received message " + value);
-		if (value != i) {
-		    fail("expected message " + i + ", got " + value);
-		}
-		i++;
+	    int receivedMessages = messageQueue.size();
+	    if (receivedMessages != expectedMessages) {
+		fail(toString() + " expected " + expectedMessages +
+		     ", received " + receivedMessages);
 	    }
 	}
 
+	/**
+	 * Waits for the number of expected messages to be recorded in the
+	 * specified 'list', and validates that the expected number of messages
+	 * were received by the ClientSessionListener in the correct sequence.
+	 */
+	private void validateMessageSequence(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    waitForExpectedMessages(messageQueue, expectedMessages);
+	    if (expectedMessages != 0) {
+		int i = (new MessageBuffer(messageQueue.peek())).getInt();
+		for (byte[] message : messageQueue) {
+		    MessageBuffer buf = new MessageBuffer(message);
+		    int value = buf.getInt();
+		    System.err.println(toString() + " received message " + value);
+		    if (value != i) {
+			fail("expected message " + i + ", got " + value);
+		    }
+		    i++;
+		}
+	    }
+	}
+	
 	void logout() {
             synchronized (lock) {
                 if (connected == false) {
@@ -1489,7 +1588,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	private class Listener implements ConnectionListener {
 
-	    List<byte[]> messageList = new ArrayList<byte[]>();
+	    Queue<byte[]> messageList = new LinkedList<byte[]>();
 	    
             /** {@inheritDoc} */
 	    public void bytesReceived(Connection conn, byte[] buffer) {
@@ -1674,11 +1773,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final String name;
 	private final BigInteger sessionRefId;
 	private final boolean disconnectedThrowsException;
-	private int seq = -1;
 
 
 	DummyClientSessionListener(
-	    String name, ClientSession session, boolean disconnectedThrowsException)
+	    String name, ClientSession session,
+	    boolean disconnectedThrowsException)
 	{
 	    this.name = name;
 	    session = ((ClientSessionWrapper) session).getClientSession();
@@ -1712,21 +1811,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void receivedMessage(ByteBuffer message) {
             byte[] bytes = new byte[message.remaining()];
             message.asReadOnlyBuffer().get(bytes);
-	    int num = message.getInt();
 	    DummyClient client = dummyClients.get(sessionRefId);
-	    System.err.println("receivedMessage: " + num + 
-			       "\nthrowException: " + client.throwException);
-	    if (num <= seq) {
-		throw new RuntimeException(
-		    "expected message greater than " + seq + ", got " + num);
-	    }
-	    AppContext.getDataManager().markForUpdate(this);
-	    client.messages.add(bytes);
-	    seq = num;
+	    System.err.println(
+		"receivedMessage: " + HexDumper.toHexString(bytes) + 
+		"\nthrowException: " + client.throwException);
 	    if (client.throwException != null) {
 		RuntimeException re = client.throwException;
 		client.throwException = null;
 		throw re;
+	    } else {
+		AppContext.getDataManager().markForUpdate(this);
+		client.messages.add(bytes);
 	    }
 	    if (client.messages.size() == client.expectedMessages) {
 		synchronized (client.receivedAllMessagesLock) {

@@ -160,7 +160,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         defaultProfileLevel = level;
     }
     
-   /** {@inheritDoc} */
+    /** {@inheritDoc} */
     public ProfileConsumer getConsumer(String name) {
         if (name == null) {
             throw new NullPointerException("Name cannot be null");
@@ -255,6 +255,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /* -- Methods to support ProfileCollectorHandle -- */
+    
     /**
      * Notifies the collector that a thread has been added to the scheduler.
      */
@@ -289,9 +290,14 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     /**
      * Tells the collector that a new task is starting in the context of
      * the calling thread.
+     * 
+     * @param task the <code>KernelRunnable</code> that is starting
+     * @param owner the <code>Identity</code> of the task owner
+     * @param scheduledStartTime the requested starting time for the task
+     * @param readyCount the number of ready tasks at the scheduler
      */
     void startTask(KernelRunnable task, Identity owner,
-                          long scheduledStartTime, int readyCount)
+                   long scheduledStartTime, int readyCount)
     {
         if (task == null) {
             throw new NullPointerException("Task cannot be null");
@@ -306,8 +312,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
     /**
      * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is
+     * thread (as associated by a call to {@code startTask}) is
      * transactional. 
+     * 
+     * @param txnId the identifier for the transaction
      */
     void noteTransactional(byte [] txnId) {
         if (txnId == null) {
@@ -328,6 +336,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
      * Tells the collector about a participant of a transaction when that
      * participant has finished participating (i.e., has committed, has
      * prepared read-only, or has aborted).
+     * 
+     * @param participantDetail the detail associated with the participant
      */
     void addParticipant(ProfileParticipantDetail participantDetail) {
         if (participantDetail == null) {
@@ -349,7 +359,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
     /**
      * Sets the detail for all objects accessed during the task as
-     * reported to the <code>AccessCoordinator</code>.
+     * reported to the {@code AccessCoordinator}.
+     * 
+     * @param detail all detail of the accessed objects
      */
     void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
         if (detail == null) {
@@ -372,7 +384,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     /**
      * Tells the collector that the current task associated with the
      * calling thread (as associated by a call to
-     * <code>startTask</code>) has now successfully finished.
+     * {@code startTask}) has now successfully finished.
+     * 
+     * @param tryCount the number of times that the task has tried to run
      */
     void finishTask(int tryCount) {
 	finishTask(tryCount, null);
@@ -381,7 +395,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     /**
      * Tells the collector that the current task associated with the
      * calling thread (as associated by a call to
-     * <code>startTask</code>) has now successfully finished.
+     * {@code startTask}) has now finished.
+     * 
+     * @param tryCount the number of times that the task has tried to run
+     * @param t the {@code Throwable} thrown during task execution
      */
     void finishTask(int tryCount, Throwable t) {
         long stopTime = System.currentTimeMillis();

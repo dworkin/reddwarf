@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.transaction;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
@@ -59,13 +58,9 @@ public final class TransactionCoordinatorImpl
 {
     /** The next transaction ID. */
     private AtomicLong nextTid = new AtomicLong(1);
-
-    /** The collector handle for reporting participant details. */
+    
+    /** The collectorHandle for reporting participant details. */
     private final ProfileCollectorHandle collectorHandle;
-    /** The collector to decide if we want to collect participant details for
-     *  a particular transaction.
-     */
-    private final ProfileCollector collector;
 
     /** The value for bounded timeout. */
     private final long boundedTimeout;
@@ -91,11 +86,12 @@ public final class TransactionCoordinatorImpl
 
 	/**
 	 * Creates a transaction with the specified ID, timeout, 
-         * prepareAndCommit optimization boolean, and collector.
+         * prepareAndCommit optimization boolean, and collectorHandle.
 	 */
 	TransactionHandleImpl(long tid, long timeout,
                               boolean disablePrepareAndCommitOpt,
-			      ProfileCollectorHandle collectorHandle) {
+			      ProfileCollectorHandle collectorHandle) 
+        {
 	    txn = new TransactionImpl(tid, timeout, 
                                       disablePrepareAndCommitOpt, 
                                       collectorHandle);
@@ -121,29 +117,20 @@ public final class TransactionCoordinatorImpl
      * properties.
      *
      * @param	properties the properties for configuring this service
-     * @param   collector the {@code ProfileCollector} used to decide if we
-     *           want to collect participant data for a particular transaction,
-     *           based on the current default collection level
-     * @param	collectorHandle the {@code ProfileCollectorHandle} used to 
-     *          report participant detail
+     * @param	collectorHandle the {@code ProfileCollectorHandle} used 
+     *          to report participant detail
      * @throws	IllegalArgumentException if the bounded or
      *		unbounded timeout properties are less than {@code 1}
      */
     public TransactionCoordinatorImpl(Properties properties,
-                                      ProfileCollector collector,
-				      ProfileCollectorHandle collectorHandle) 
+                                      ProfileCollectorHandle collectorHandle) 
     {
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
 	}
-        if (collector == null) {
-	    throw new NullPointerException("Collector must not be null");
-	}
         if (collectorHandle == null) {
-	    throw new NullPointerException("CollectorHandle must not be null");
+	    throw new NullPointerException("Collector handle must not be null");
 	}
-	
-        this.collector = collector;
         this.collectorHandle = collectorHandle;
 
 	PropertiesWrapper props = new PropertiesWrapper(properties);
@@ -164,21 +151,16 @@ public final class TransactionCoordinatorImpl
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction(boolean unbounded) {
-        boolean collectData = 
-            collector.getDefaultProfileLevel().ordinal() >= 
-                ProfileLevel.MEDIUM.ordinal();
 	if (unbounded) {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     unboundedTimeout, 
                                              disablePrepareAndCommitOpt,
-                                             collectData ? 
-                                                 collectorHandle : null);
+                                             collectorHandle);
 	} else {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     boundedTimeout, 
                                              disablePrepareAndCommitOpt,
-                                             collectData ? 
-                                                 collectorHandle : null);
+                                             collectorHandle);
 	}
     }
 }

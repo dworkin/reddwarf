@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -18,7 +18,6 @@
  */
 
 /**
- * Provides the interface to the Project Darkstar Server used by application
- * developers.
+ * Provides an implementation of the Project Darkstar Server kernel.
  */
-package com.sun.sgs.app;
+package com.sun.sgs.impl.kernel;

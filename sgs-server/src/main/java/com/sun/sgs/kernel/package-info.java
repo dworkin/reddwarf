@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -17,20 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.app;
-
 /**
- * Implemented by exception classes that want to control whether an operation
- * that throws an exception of that exception should be retried.
+ * Provides the core system interfaces used by the Project Darkstar Server.
  */
-public interface ExceptionRetryStatus {
-
-    /**
-     * Provides information about whether an operation that threw this
-     * exception should be retried.
-     *
-     * @return	<code>true</code> if the operation should be retried, else
-     *		<code>false</code> 
-     */
-    boolean shouldRetry();
-}
+package com.sun.sgs.kernel;

@@ -30,7 +30,6 @@ import java.nio.channels.UnresolvedAddressException;
 import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.concurrent.TimeUnit;
 
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 
 /**
@@ -144,7 +143,8 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
     public static AsynchronousSocketChannel open(AsynchronousChannelGroup group)
         throws IOException
     {
-        return AsynchronousChannelProvider.provider().openAsynchronousSocketChannel(group);
+        return AsynchronousChannelProvider.provider().
+                   openAsynchronousSocketChannel(group);
     }
 
     /**
@@ -160,7 +160,7 @@ public abstract class AsynchronousSocketChannel extends AsynchronousChannel
      * @throws IOException if an I/O error occurs
      */
     public static AsynchronousSocketChannel open() throws IOException {
-        return open((AsynchronousChannelGroup)null);
+        return open((AsynchronousChannelGroup) null);
     }
 
     /**

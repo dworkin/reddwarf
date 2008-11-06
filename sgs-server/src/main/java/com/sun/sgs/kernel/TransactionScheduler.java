@@ -63,7 +63,7 @@ public interface TransactionScheduler {
      *
      * @throws TaskRejectedException if a reservation cannot be made
      */
-    public TaskReservation reserveTask(KernelRunnable task, Identity owner);
+    TaskReservation reserveTask(KernelRunnable task, Identity owner);
 
     /**
      * Reserves the ability to run the given task at a specified point in
@@ -78,8 +78,8 @@ public interface TransactionScheduler {
      *
      * @throws TaskRejectedException if a reservation cannot be made
      */
-    public TaskReservation reserveTask(KernelRunnable task, Identity owner,
-                                       long startTime);
+    TaskReservation reserveTask(KernelRunnable task, Identity owner,
+                                long startTime);
 
     /**
      * Schedules a task to run as soon as possible based on the specific
@@ -90,7 +90,7 @@ public interface TransactionScheduler {
      *
      * @throws TaskRejectedException if the given task is not accepted
      */
-    public void scheduleTask(KernelRunnable task, Identity owner);
+    void scheduleTask(KernelRunnable task, Identity owner);
 
     /**
      * Schedules a task to run at a specified point in the future. The
@@ -104,8 +104,7 @@ public interface TransactionScheduler {
      *
      * @throws TaskRejectedException if the given task is not accepted
      */
-    public void scheduleTask(KernelRunnable task, Identity owner,
-                             long startTime);
+    void scheduleTask(KernelRunnable task, Identity owner, long startTime);
 
     /**
      * Schedules a task to start running at a specified point in the future,
@@ -133,10 +132,10 @@ public interface TransactionScheduler {
      * @throws IllegalArgumentException if {@code period} is less than or
      *                                  equal to zero
      */
-    public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
-                                                     Identity owner,
-                                                     long startTime,
-                                                     long period);
+    RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
+                                              Identity owner,
+                                              long startTime,
+                                              long period);
 
     /**
      * Runs the given task synchronously, returning when the task has
@@ -176,7 +175,7 @@ public interface TransactionScheduler {
      *                              the associated task does not complete
      * @throws Exception if the task fails and is not re-tried
      */
-    public void runTask(KernelRunnable task, Identity owner) throws Exception;
+    void runTask(KernelRunnable task, Identity owner) throws Exception;
 
     /**
      * Creates a new {@code TaskQueue} to use in scheduling dependent
@@ -187,6 +186,6 @@ public interface TransactionScheduler {
      *
      * @return a new {@code TaskQueue}
      */
-    public TaskQueue createTaskQueue();
+    TaskQueue createTaskQueue();
 
 }

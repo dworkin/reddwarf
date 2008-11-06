@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -18,7 +18,6 @@
  */
 
 /**
- * Provides utilities for use by Project Darkstar Server application
- * developers.
+ * Provides scheduling facilities for the kernel.
  */
-package com.sun.sgs.app.util;
+package com.sun.sgs.impl.kernel.schedule;
