@@ -193,10 +193,8 @@ public class Boot {
     /**
      * Constructs a classpath to be used when running the Project Darkstar
      * kernel.  The classpath consists of any jar files that live directly
-     * in subdirectories of the $SGS_HOME directory from the environment
-     * (with the exception of the $SGS_HOME/sgs-server directory).
-     * It also contains any jar files in the $SGS_HOME/sgs-server/lib
-     * directory.  Finally, it recursively includes jar files from the
+     * in the $SGS_HOME/lib
+     * directory.  It also recursively includes jar files from the
      * $SGS_DEPLOY directory.
      * 
      * @param env environment with SGS_HOME set
@@ -212,25 +210,10 @@ public class Boot {
         File sgsHomeDir = new File(sgsHome);
         if(!sgsHomeDir.isDirectory())
             return "";
-        
-        //build classpath from SGS_HOME subdirectories
-        StringBuffer buf = new StringBuffer();
-        for(File f : sgsHomeDir.listFiles()) {
-            if(f.isDirectory() && !f.getName().equals("sgs-server")) {
-                for(File jar : f.listFiles()) {
-                    if(jar.getName().endsWith(".jar")) {
-                        if(buf.length() != 0)
-                            buf.append(File.pathSeparator + jar.getAbsolutePath());
-                        else
-                            buf.append(jar.getAbsolutePath());
-                    }
-                }
-            }
-        }
-        
+        StringBuffer buf = new StringBuffer();        
+
         //add jars from SGS_HOME/sgs-server
-        File sgsLibDir = new File(sgsHome + File.separator + 
-                                  "sgs-server" + File.separator + "lib");
+        File sgsLibDir = new File(sgsHome + File.separator + "lib");
         for (File sgsJar : sgsLibDir.listFiles()) {
             if(sgsJar.isFile() && sgsJar.getName().endsWith(".jar")) {
                 if(buf.length() != 0)

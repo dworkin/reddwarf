@@ -31,7 +31,7 @@ public class BootEnvironment {
     /**
      * Default location of the bootstrapper jar relative to the SGS_HOME
      */
-    public static final String SGS_JAR = "sgs-server/bin/sgs-boot.jar";
+    public static final String SGS_JAR = "bin/sgs-boot.jar";
     
     /**
      * Name of the properties file to locate and retrieve properties
@@ -87,14 +87,13 @@ public class BootEnvironment {
     
     
     public static final String DEFAULT_SGS_DEPLOY = 
-            "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
-            "deploy";
+            "${SGS_HOME}" + File.separator + "deploy";
     public static final String DEFAULT_SGS_PROPERTIES = 
-            "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
-            "conf" + File.separator + "sgs-server.properties";
+            "${SGS_HOME}" + File.separator + "conf" + File.separator +
+            "sgs-server.properties";
     public static final String DEFAULT_SGS_LOGGING = 
-            "${SGS_HOME}" + File.separator + "sgs-server" + File.separator +
-            "conf" + File.separator + "sgs-logging.properties";
+            "${SGS_HOME}" + File.separator + "conf" + File.separator +
+            "sgs-logging.properties";
     /**
      * The standard location to look for application properties config
      * file in jars from the SGS_DEPLOY directory.
@@ -104,7 +103,7 @@ public class BootEnvironment {
     
     
     public static final String DEFAULT_BDB_ROOT = 
-            "${SGS_HOME}" + File.separator + "bdb";
+            "${SGS_HOME}" + File.separator + "natives";
     public static final String DEFAULT_BDB_LINUX_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "linux-x86";
     public static final String DEFAULT_BDB_LINUX_X86_64 = 

@@ -24,6 +24,10 @@
   <dependencies>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-boot</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server</artifactId>
     </dependency>
     <dependency>
