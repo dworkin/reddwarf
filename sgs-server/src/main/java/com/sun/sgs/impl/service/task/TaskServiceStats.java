@@ -41,7 +41,7 @@ public class TaskServiceStats implements TaskServiceMXBean {
     TaskServiceStats(ProfileService profileService) {
         ProfileConsumer consumer =
             profileService.getProfileCollector().
-                createConsumer(TaskServiceImpl.NAME);
+                getConsumer(TaskServiceImpl.NAME);
 
         ProfileLevel level = ProfileLevel.MAX;
         scheduleNDTaskOp =

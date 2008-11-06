@@ -459,7 +459,7 @@ public final class DataServiceImpl implements DataService, DataServiceMXBean {
 	    store = new DataStoreProfileProducer(baseStore, profileService);
             ProfileConsumer consumer =
                 profileService.getProfileCollector().
-                    createConsumer(getClass().getName());
+                    getConsumer(getClass().getName());
             createReferenceOp = consumer.registerOperation(
 		"createReference", true, ProfileLevel.MAX);
 

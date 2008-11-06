@@ -19,8 +19,6 @@
 
 package com.sun.sgs.impl.profile;
 
-// import com.sun.sgs.app.NameExistsException;
-
 import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
@@ -163,28 +161,22 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     }
     
    /** {@inheritDoc} */
-    public ProfileConsumer createConsumer(String name) {
+    public ProfileConsumer getConsumer(String name) {
         if (name == null) {
             throw new NullPointerException("Name cannot be null");
         }
         
         ProfileConsumerImpl pc = new ProfileConsumerImpl(this, name);
 
-        /*  commented out code:  our tests, particularly constructor tests,
-            cannot deal with this
         ProfileConsumerImpl oldpc = consumers.putIfAbsent(name, pc);
         if (oldpc != null) {
-            throw 
-               new NameExistsException("The consumer has already been created");
+            logger.log(Level.INFO, 
+                   "Found consumer {0} already created", name);
+            return oldpc;
+        } else {
+            logger.log(Level.INFO, "Created consumer for {0}", name);
+            return pc;
         }
-         */
-        consumers.put(name, pc);
-        return pc;
-    }
-    
-    /** {@inheritDoc} */
-    public ProfileConsumer getConsumer(String name) {
-        return consumers.get(name);
     }
     
     /** {@inheritDoc} */

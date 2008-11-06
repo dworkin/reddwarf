@@ -137,31 +137,19 @@ public interface ProfileCollector {
     void removeListener(ProfileListener listener);
     
     /**
-     * Creates a {@code ProfileConsumer} with the given name.
+     * Returns the named {@code ProfileConsumer}, or creates a new one with
+     * that name.
      *
      * @param name the unique name of the profile consumer
      *
      * @return a {@code ProfileConsumer} with the given name
-     * 
-     * @throws NameExistsException if the name is already in use
-     * <p><b> Actually, implementation doesn't throw this, as the tests 
-     * really want to be able to create multiple instances of each service </b>
-     */
-    ProfileConsumer createConsumer(String name);
-
-    /**
-     * Returns the named {@code ProfileConsumer}, or {@code null} if no
-     * consumers have that name.
-     * 
-     * @param name the name of the consumer
-     * @return the named consumer
      */
     ProfileConsumer getConsumer(String name);
     
     /**
      * Returns a read-only map of {@code ProfileConsumer} names to the 
      * {@code ProfileConsumer}s which have been created through a call to 
-     * {@link #createConsumer}.
+     * {@link #getConsumer}.
      * 
      * @return the map of names to consumers
      */
