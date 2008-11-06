@@ -326,7 +326,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
             return name;
         }
 
-        //JANE?
         public String toString() {
             return name;
         }
