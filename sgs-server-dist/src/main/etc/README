@@ -90,13 +90,13 @@ can be obtained from:
 DEVELOPING AND RUNNING
 
 The Project Darkstar server can be started up using the executable bootstrapper JAR
-file in the sgs-server/bin directory.
+file in the bin directory.
 
-  java -jar sgs-server/bin/sgs-boot.jar
+  java -jar bin/sgs-boot.jar
 
 Project Darkstar is an application container in which applications (or games)
 can be deployed.  By default, any jar files that are placed into the
-sgs-server/deploy directory are considered part of the deployed application.
+deploy directory are considered part of the deployed application.
 Additionally, a single application jar should contain an embedded 
 META-INF/app.properties file.  This file is automatically used by the 
 Project Darkstar server to set the runtime configuration properties of the application.
@@ -108,7 +108,7 @@ described above.
 
 Additional customization of the location of deployed applications and runtime
 configuration files is possible.  See the configuration files located in the
-sgs-server/conf directory for additional details.
+conf directory for additional details.
 
 
 RELEASE COMPATIBILITY
