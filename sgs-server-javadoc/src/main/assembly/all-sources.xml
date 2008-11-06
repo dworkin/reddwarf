@@ -15,6 +15,7 @@
     <!-- Include the sources jars -->
     <dependencySet>
       <includes>
+	<include>com.projectdarkstar.server:sgs-server-api:jar:sources</include>
 	<include>com.projectdarkstar.server:sgs-server:jar:sources</include>
 	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
       </includes>
