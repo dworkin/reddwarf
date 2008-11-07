@@ -23,6 +23,8 @@ package com.sun.sgs.impl.service.data;
  * An object that wraps a {@link Context} object, to permit changing which
  * context a set of references refer to without needing to update the
  * references individually.
+ *
+ * @see	ObjectCache
  */
 final class ContextWrapper {
 
@@ -30,7 +32,7 @@ final class ContextWrapper {
     private Context context;
 
     /** The generation number -- incremented when the context is changed. */
-    private int generation = 1;
+    private int generation = 0;
 
     /**
      * Creates an instance with the specified context.

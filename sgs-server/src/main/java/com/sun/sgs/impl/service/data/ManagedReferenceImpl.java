@@ -113,9 +113,7 @@ final class ManagedReferenceImpl<T>
 	REMOVED_FETCHED
     }
 
-    /**
-     * Used to provide the context wrapper when performing deserialization.
-     */
+    /** The context wrapper to use during deserialization. */
     private static final ThreadLocal<ContextWrapper> contextWrapperThread =
 	new ThreadLocal<ContextWrapper>();
 
@@ -124,7 +122,7 @@ final class ManagedReferenceImpl<T>
      * created.  This field is logically final, but is not declared final so
      * that it can be set during deserialization.
      */
-    transient Context context;
+    private transient Context context;
 
     /**
      * The context wrapper used by references within this reference's object.
@@ -601,16 +599,6 @@ final class ManagedReferenceImpl<T>
 	 * 32 bits of a long field, and add a non-zero constant.
 	 */
 	return (int) (oid ^ (oid >>> 32)) + 6883;
-    }
-
-    /**
-     * Returns the current {@code ContextWrapper} for use in serialization or
-     * deserialization.
-     *
-     * @return	the context wrapper
-     */
-    static ContextWrapper getCurrentContextWrapper() {
-	return contextWrapperThread.get();
     }
 
     /**

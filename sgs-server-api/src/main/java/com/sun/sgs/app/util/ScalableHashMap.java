@@ -2368,8 +2368,8 @@ public class ScalableHashMap<K, V>
 	}
 
 	/**
-	 * Clear transient fields so that they will be recomputed if an attempt
-	 * is made to use the iterator in another transaction.
+	 * Clear transient fields if needed so that they will be recomputed if
+	 * an attempt is made to use the iterator in another transaction.
 	 */
 	private void maybeClearCache() {
 	    if (nextLeafRef != null && nextLeafRef.get() == null) {

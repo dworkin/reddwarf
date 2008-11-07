@@ -63,14 +63,12 @@ final class ManagedReferenceWrapper<T>
     private transient BigInteger id;
 
     /**
-     * Creates an instance for the associated implementation.
+     * Creates an instance for the associated implementation and context
+     * wrapper.
      *
      * @param	impl the implementation
+     * @param	contextWrapper the context wrapper
      */
-    ManagedReferenceWrapper(ManagedReferenceImpl impl) {
-	this(impl, new ContextWrapper(impl.context));
-    }
-
     ManagedReferenceWrapper(ManagedReferenceImpl impl,
 			    ContextWrapper contextWrapper)
     {

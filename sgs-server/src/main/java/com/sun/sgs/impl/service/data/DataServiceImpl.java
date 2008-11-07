@@ -25,7 +25,6 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransientReference;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -109,6 +108,26 @@ import java.util.logging.Logger;
  *	references table.  Note that the number of operations is measured
  *	separately for each transaction.  This property is intended for use in
  *	debugging. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #OBJECT_CACHE_SIZE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_OBJECT_CACHE_SIZE}</code>
+ *
+ * <dd style="padding-top: .5em">The maximum number of objects to store in the
+ *	object cache for reuse in other tasks, to avoid the cost of
+ *	deserialization.  If <code>0</code>, then the cache is disabled.  Must
+ *	not be less than <code>0</code>. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #OBJECT_CACHE_NOT_CLASSES_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> <code>""</code>
+ *
+ * <dd style="padding-top: .5em">The fully qualified names of classes whose
+ *	instances should not be cached.  Multiple names should be separated by
+ *	commas.  Applications can add class names to this list to prevent
+ *	caching of classes that have unsafe usage of transient fields &emdash;
+ *	ones that have not been updated to use {@link TransientReference}
+ *	instances. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS_PROPERTY}
  *	</b></code><br>
@@ -194,7 +213,7 @@ public final class DataServiceImpl implements DataService {
 	CLASSNAME + ".object.cache.size";
 
     /** The default object cache size. */
-    private static final int DEFAULT_OBJECT_CACHE_SIZE = 10000;
+    public static final int DEFAULT_OBJECT_CACHE_SIZE = 10000;
 
     /**
      * The system property that specifies the comma-separated names of classes
@@ -735,6 +754,12 @@ public final class DataServiceImpl implements DataService {
 	/** {@inheritDoc} */
 	public T get() {
 	    return context.equals(getContextNoJoin()) ? object : null;
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    return "TransientReferenceImpl<" + typeName(object) + ">@" +
+		Integer.toHexString(System.identityHashCode(this));
 	}
     }
 
