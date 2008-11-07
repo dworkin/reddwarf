@@ -33,15 +33,16 @@ import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.IoRunnable;
-import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -60,6 +61,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -1257,7 +1259,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** The managed reference to the queue's channel. */
 	private final ManagedReference<ChannelImpl> channelRef;
 	/** The managed reference to the managed queue. */
-	private final ManagedReference<ManagedQueue<ChannelEvent>> queueRef;
+	private final ManagedReference<Queue<ChannelEvent>> queueRef;
 	/** The sequence number for events on this channel. */
 	private long seq = 0;
 	/** If {@code true}, a refresh should be sent to all channel's
@@ -1276,8 +1278,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	EventQueue(ChannelImpl channel) {
 	    channelRef = channel.dataService.createReference(channel);
-	    queueRef = channel.dataService.createReference(
-		new ManagedQueue<ChannelEvent>());
+	    queueRef = uncheckedCast(
+		channel.dataService.createReference(
+		    new ScalableDeque<ChannelEvent>()));
 	    writeBufferAvailable = channel.getWriteBufferCapacity();
 	}
 
@@ -1327,7 +1330,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/**
 	 * Returns the managed queue object.
 	 */
-	ManagedQueue<ChannelEvent> getQueue() {
+	Queue<ChannelEvent> getQueue() {
 	    return queueRef.get();
 	}
 
@@ -1422,9 +1425,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * true, then service all pending events.
 	     */
 	    int eventsToService = channelService.eventsPerTxn;
-	    ManagedQueue<ChannelEvent> eventQueue = getQueue();
+	    Queue<ChannelEvent> queue = getQueue();
 	    do {
-		ChannelEvent event = eventQueue.poll();
+		ChannelEvent event = queue.poll();
 		if (event == null) {
 		    return;
 		}

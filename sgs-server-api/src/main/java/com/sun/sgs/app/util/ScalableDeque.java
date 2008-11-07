@@ -319,7 +319,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * Creates a new empty {@code ScalableDeque} that does supports
+     * Creates a new empty {@code ScalableDeque} that does support
      * concurrent iterators if the the parameter is {@code true}.
      * Users of this constructor should refer to the class javadoc
      * regarding the performance behavior of concurrent iterators.
@@ -1080,6 +1080,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      */
     public void removingObject() {
         clear();
+
+	DataManager dm = AppContext.getDataManager();
+	dm.removeObject(backingMap);
+	dm.removeObject(headElement.get());
+	dm.removeObject(headCounter.get());
+	dm.removeObject(tailElement.get());
+	dm.removeObject(tailCounter.get());
     }
 
     /**

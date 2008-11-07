@@ -2749,10 +2749,12 @@ public class TestChannelServiceImpl extends TestCase {
                 // managed objects, so a more general way to exclude these from
                 // the count would be nice but for now the specific types that
                 // are accumulated get excluded from the count
-                String name = dataService.createReferenceForId(next).get().
-		    getClass().getName();
-                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask"))
+		ManagedReference<?> ref = dataService.createReferenceForId(next);
+                String name = ref.get().getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+		    //System.err.println(count + ": " + ref.get());
                     count++;
+		}
                 last = next;
 	    }
 	}
