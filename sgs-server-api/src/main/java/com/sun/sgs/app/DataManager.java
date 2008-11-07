@@ -205,20 +205,19 @@ public interface DataManager {
      * not serializable; applications should insure that it does not appear in
      * the serialized form of a managed object, typically by only storing it in
      * transient or static fields.  Applications should also insure that a
-     * single transient reference is shared among multiple managed objects.
+     * single transient reference is not shared by multiple managed objects.
      * <p>
      *
-     * Applications can use transient references to cache persistent objects in
-     * order to access them from within a single task rather than needing to
-     * compute them repeatedly by performing potentially expensive operations
-     * on managed objects obtained from the data manager. <p>
+     * Applications can use transient references to cache persistent objects
+     * for repeated use from within a single task, avoiding the need to
+     * recompute them by performing potentially expensive operations on managed
+     * objects obtained from the data manager. <p>
      *
      * Applications should not depend on managed objects being serialized or
-     * deserialized at task boundaries, in case deserialized objects are reused
-     * or are not serialized.  Applications should instead use {@code
-     * TransientReference} objects to make sure that they do not make use of
-     * objects obtained in a different task or a different run of the current
-     * task. <p>
+     * deserialized at task boundaries, in case objects are reused.
+     * Applications should instead use {@code TransientReference} objects to
+     * make sure that they do not make use of objects obtained in a different
+     * task or a different run of the current task. <p>
      *
      * The following class provides a contrived example of using {@code
      * TransientReference} to cache the item last fetched from a linked list.
@@ -226,7 +225,7 @@ public interface DataManager {
      * <pre>
      * public class RememberPosition implements ManagedObject, Serializable {
      *     private final ManagedReference<Item> head;
-     *     private int position;
+     *     private int position = -1;
      *     private transient TransientReference<Item> last;
      *     public RememberPosition(Item head) {
      *         this.head = AppContext.getDataManager().createReference(head);

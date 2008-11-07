@@ -23,7 +23,7 @@ package com.sun.sgs.app;
  * Represents a reference to an object that is only valid within the same run
  * of the task in which it was created, otherwise returning {@code null}.
  * Transient references should not be serializable.  Applications should also
- * insure that a single transient reference is shared among multiple managed
+ * insure that a single transient reference is not shared by multiple managed
  * objects.
  *
  * @param	<T> the type of the referenced object
@@ -34,8 +34,8 @@ public interface TransientReference<T> {
 
     /**
      * Returns the object associated with this reference, or {@code null} if
-     * the reference was created in another task, including another attempt to
-     * run of the same task.
+     * the reference was created in another task, including another run of the
+     * same task.
      *
      * @return	the object or {@code null}
      * @throws	TransactionException if the operation failed because of a
