@@ -22,15 +22,12 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
@@ -64,27 +61,9 @@ import com.sun.sgs.app.Task;
  * entirely during the lifetime of a task and the instance is never
  * persisted.
  *
- * <p> 
- *
- * This class provides one parameter for tuning performance.  The
- * {@code supportsConcurrentIterators} constructor parameter
- * determines how a deque's iterators will behavior when the deque is
- * concurrently modified during traversal.  If the parameter is set to
- * {@code true}, iterators will correctly traverse all elements of the
- * deque, even if the iterator's next element is removed between
- * tasks.  Also, the iterator will never throw a {@link
- * ConcurrentModificationException}.  However, in this case, using
- * multiple iterators at the same time will cause contention.  In
- * addition each mutating operation incurs a small performance penalty
- * for keeping the iterators consistent with the state of the deque.
- * Developers should use this feature if they will need to iterator
- * over the deque at the same time it is being modified and want to
- * ensure that the iterator will traverse all the elements.
- *
  * <p>
  *
- * If the {@code supportsConcurrentIterators} parameter is {@code
- * false}, the iterator will only make a best-effort to reflect any
+ * The iterator will only make a best-effort to reflect any
  * concurrent change to the deque.  If the next element that the
  * iterator is to return was been removed during a separate task, the
  * iterator <i>will</i> throw a {@code
@@ -119,7 +98,7 @@ import com.sun.sgs.app.Task;
  * <p>
  *
  * All elements stored by this deque must be instances of {@link
- * Serializable}.  This class supports additionally supports elements
+ * Serializable}.  This class additionally supports elements
  * that are instances of {@code ManagedObject}.  If a {@code
  * ManagedObject} is stored within this deque, the developer is still
  * responsible for removing it from the data store at the end of its
@@ -139,7 +118,7 @@ import com.sun.sgs.app.Task;
  *
  * <p>
  *
- * This class and its iterator mark themselves for update as
+ * This class will mark itself for update as
  * necessary; no additional calls to the {@link DataManager} are
  * necessary when modifying the deque.  Developers should not need to
  * call {@code markForUpdate} or {@code getForUpdate} on an deque
@@ -149,17 +128,22 @@ import com.sun.sgs.app.Task;
  * access to the map.  
  *
  * <p>
- * 
- * This class's {@link Iterator} implements {@link ManagedObject} and
- * may be persisted.  A single {@code Iterator} instance should not be
- * shared between mutliple {@link Task} instances.  When an iterator
- * is done being used it should be removed from the data store using
- * {@link DataManager#removeObject(Object) removeObject}.  If using
- * concurrent iterators, failure to remove unused iterators will
- * result in degrated performance linear to the number of excess
- * iterator instances.
  *
- * <p>
+ * Since the deque is capable of containing many elements, applications which
+ * use iterators to traverse elements should be aware that prolonged iterative
+ * tasks have the potential to lock out other concurrent tasks on the deque.
+ * Therefore, it is highly recommended (and considered good practice) that
+ * potentially long iterations be broken up into smaller tasks. This strategy
+ * improves the concurrency of the deque as it reduces the
+ * locked elements owned by any one task. In order to make use of a recurring
+ * task using non-{@code ManagedObject} iterators, it is necessary to wrap
+ * the iterator in a {@code ManagedObject}, like {@code ManagedSerializable},
+ * in order to apply a name binding and retrieve it again for the next
+ * execution of the task. As mentioned earlier, once the iterator is no longer
+ * needed, it will need to be manually disposed since the wrapper causes the
+ * iterator to be persisted in the data manager.
+ *
+ *<p>
  *
  * This class and its iterator support all the optional {@link
  * Collection} and {@code Iterator} operations.  This class does not
@@ -278,21 +262,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * @see ScalableDeque#addToTail(Element)
      */
     private final ManagedReference<ManagedSerializable<Long>> tailCounter;
-    /**
-     * A mapping from the unique Id of each outstanding {@code
-     * BidirectionalDequeIterator} to the marker that holds the next
-     * element the iterator will return, or {@code null} if this deque
-     * does not support concurrent iteration.  This mapping is used by
-     * each iterator to update its state before being serialized.  In
-     * doing so, this allows the deque to notify each iterator of a
-     * change to the backing deque that would result in the iterator's
-     * next element no longer being present.
-     *
-     * @see ScalableDeque#checkIterators(Element)
-     */
-    private final 
-            ManagedReference<ManagedSerializable<Map<
-            BigInteger, IteratorMarker<E>>>> serializedIteratorsNextElementsRef;
+    
     /**
      * A reference to the {@code ScalableHashMap} that will store all
      * the mappings
@@ -309,23 +279,11 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     private transient ScalableHashMap<Element<E>, Long> backingMap;
 
     /**
-     * Creates a new empty {@code ScalableDeque} that does not support
-     * concurrent iterators.
+     * Creates a new empty {@code ScalableDeque}.
+     * Users of this constructor should refer to the class javadoc
+     * regarding the structure's performance.
      */
     public ScalableDeque() {
-        this(false);
-    }
-
-    /**
-     * Creates a new empty {@code ScalableDeque} that does supports
-     * concurrent iterators if the the parameter is {@code true}.
-     * Users of this constructor should refer to the class javadoc
-     * regarding the performance behavior of concurrent iterators.
-     *
-     * @param supportsConcurrentIterators whether this deque should
-     *        support concurrent iterators
-     */
-    public ScalableDeque(boolean supportsConcurrentIterators) {
         backingMap = new ScalableHashMap<Element<E>, Long>();
 
         DataManager dm = AppContext.getDataManager();
@@ -348,27 +306,11 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         headCounter = dm.createReference(headCount);
         tailElement = dm.createReference(tail);
         tailCounter = dm.createReference(tailCount);
-
-        // If this deque supports concurrent iterators then initialize
-        // a mapping that this deque will use to notify iterators of
-        // any changes to the backing map
-        if (supportsConcurrentIterators) {
-            ManagedSerializable<Map<BigInteger, IteratorMarker<E>>> 
-                    serializedIteratorsNextElements =
-                    new ManagedSerializable<Map<BigInteger, IteratorMarker<E>>>(
-                    new HashMap<BigInteger, IteratorMarker<E>>());
-
-            serializedIteratorsNextElementsRef =
-                    dm.createReference(serializedIteratorsNextElements);
-        } else {
-            serializedIteratorsNextElementsRef = null;
-        }
     }
 
     /**
-     * Creates a {@code ScalableDeque} without support for concurrent
-     * iterators and adds all the elements in the provided collection
-     * according to their traversal ordering.
+     * Creates a {@code ScalableDeque} and adds all the elements in the 
+     * provided collection according to their traversal ordering.
      *
      * @param c the collection of elements the deque will initially
      *        contain
@@ -495,51 +437,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         oldTail.setNext(e);
     }
 
-    /**
-     * Examines the next {@code Element} for all outsanding {@code
-     * BidirectionalDequeIterator} instances to see if the provided,
-     * removed {@code Element} would have been their next element, and
-     * if so updates the iterator's state accordingly.
-     *
-     * @param removed the {@code Element} that is being removed
-     */
-    private void checkIterators(Element<E> removed) {
-        // If this map does not support concurrent iterators, the this
-        // method becomes a no-op
-        if (!supportsConcurrentIterators()) {
-            return;
-        }
-
-        Map<BigInteger, IteratorMarker<E>> iteratorToCurrentElement =
-                serializedIteratorsNextElementsRef.get().get();
-
-        DataManager dm = AppContext.getDataManager();
-        ManagedReference elementRef = dm.createReference(removed);
-
-        // examine each iterator's next element and see if it is the one
-        // we have just removed
-        for (Map.Entry<BigInteger, IteratorMarker<E>> e : 
-            iteratorToCurrentElement.entrySet()) {
-
-            IteratorMarker<E> marker = e.getValue();
-            ManagedReference<Element<E>> nextElement = marker.nextElement;
-
-            // if the iterator was going to return the removed element
-            // next, then we need to update it with the nextInsert
-            // value from the removed element
-            if (nextElement != null && nextElement.equals(elementRef)) {
-
-                // mark that the map has changed
-                dm.markForUpdate(serializedIteratorsNextElementsRef.get());
-
-                // then update the iterators next value based on which
-                // direction it was iterating		
-                marker.nextElement = (marker.isReverse)
-                        ? removed.prevElement : removed.nextElement;
-            }
-        }
-    }
-
+   
     /**
      * {@inheritDoc}
      */
@@ -561,26 +459,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         // reset the head and tail pointers
         headElement.get().set(null);
         tailElement.get().set(null);
-
-        if (supportsConcurrentIterators()) {
-            // update all the iterator's states by setting their next
-            // element to null since there are no longer any elements in
-            // the deque
-            Map<BigInteger, IteratorMarker<E>> iteratorToNextElement =
-                    serializedIteratorsNextElementsRef.getForUpdate().get();
-
-            for (Map.Entry<BigInteger, IteratorMarker<E>> e : 
-                iteratorToNextElement.entrySet()) {
-                e.getValue().nextElement = null;
-            }
-        }
     }
 
     /**
      * {@inheritDoc}.  This operation runs in constant time.
      */
     public boolean contains(Object o) {
-        return map().containsKey(new ElementMatcher(o));
+        return map().containsKey(new ElementMatcher<E>(o));
     }
 
     /**
@@ -604,6 +489,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     /**
      * {@inheritDoc}
      */
+    @SuppressWarnings("unchecked")
     public boolean equals(Object o) {
         /*
          * IMPLEMENTATION NOTE: The Java general contract for hashCode
@@ -863,7 +749,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 
         // repeatedly use the same matcher to look for elements with
         // the provided object in the backing map
-        ElementMatcher matcher = new ElementMatcher(o);
+        ElementMatcher<E> matcher = new ElementMatcher<E>(o);
         ScalableHashMap.PrefixEntry<Element<E>, Long> entry =
                 map().getEntry(matcher);
         Element<E> e = (entry == null) ? null : entry.getKey();
@@ -888,9 +774,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * all the deque-internal structures as necesary.  This method
      * will remove the element from the backing map, patch the element
      * doubly-linked list, and then if necessary, update head and tail
-     * references.  Lastly, this method will update any {@code
-     * BidirectionalDequeIterator} instances whose next element would
-     * have been the removed element.
+     * references. 
      *
      * @param e the {@code Element} to be removed from the deque
      *
@@ -926,11 +810,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
             tailElement.get().set((prev == null)
                                   ? null : dm.createReference(prev));
         }
-        
-        // check to see if the remove of this object affects any of
-        // the currently serialized iterators
-        checkIterators(e);
-
         AppContext.getDataManager().removeObject(e);
 
         return value;
@@ -964,7 +843,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 
         // repeatedly use the same matcher to look for elements with
         // the provided object in the backing map
-        ElementMatcher matcher = new ElementMatcher<E>(o);
+        ElementMatcher<E> matcher = new ElementMatcher<E>(o);
 
         ScalableHashMap.PrefixEntry<Element<E>, Long> entry =
                 map().getEntry(matcher);
@@ -1031,7 +910,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         }
         // repeatedly use the same matcher to look for elements with
         // the provided object in the backing map
-        ElementMatcher matcher = new ElementMatcher<E>(o);
+        ElementMatcher<E> matcher = new ElementMatcher<E>(o);
 
         ScalableHashMap.PrefixEntry<Element<E>, Long> entry =
                 map().getEntry(matcher);
@@ -1104,20 +983,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         return size;
     }
     
-
-    /**
-     * Returns whether this deque will support concurrent iterators.
-     * If {@code false}, the iterators of this deque will not receive
-     * updates regarding any changes to the deque and will throw
-     * {@link ConcurrentModificationException}s if next element was
-     * removed while the iterator was serialized.
-     *
-     * @see ScalableDeque$BidirectionalDequeIterator
-     * @see ScalableDeque#checkIterators(Element)
-     */
-    private boolean supportsConcurrentIterators() {
-        return serializedIteratorsNextElementsRef != null;
-    }
 
     /**
      * Returns the {@code Element} at the end of this deque, or
@@ -1288,7 +1153,8 @@ public class ScalableDeque<E> extends AbstractCollection<E>
                 // In this case, we use the ElementMatcher's equal
                 // function as it contains more state about the particular
                 // element for which the deque is looking.
-                return ((ElementMatcher) o).equals(this);
+        	ElementMatcher<E> matcher = uncheckedCast(o);
+                return matcher.equals(this);
             }
             return false;
         }
@@ -1547,7 +1413,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     }
 
     /**
-     * A concurrent, persistable {@code Iterator} implementation for
+     * A implementation of the iterator for
      * the {@code ScalableDeque} that allows element traverse from
      * head-to-tail or tail-to-head as required.
      *
@@ -1560,15 +1426,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * begin an the first entry in the map, if any, since its
      * deserialization.
      *
-     * <p> 
-     *
-     * Instance of this class are <i>not</i> designed to be shared
-     * between concurrent tasks.
-     *
      * @param <E> the type of elements returned by the iterator
      */
     static class BidirectionalDequeIterator<E>
-            implements Iterator<E>, Serializable, ManagedObjectRemoval {
+            implements Iterator<E>, Serializable {
 
         /** 
          * The version of the serialized form. 
@@ -1593,17 +1454,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
          * A reference to the backing deque
          */
         private final ManagedReference<ScalableDeque<E>> dequeRef;
-        /**
-         * A reference to the map where {@code DequeIterator}
-         * instances register their next elements so that upon
-         * deserialization, the iterator exhibits correct behavior, or
-         * {@code null} if the backing deque does not support
-         * concurrent iteration.
-         *
-         * @see ScalableDeque(boolean)
-         */
-        private final ManagedReference<ManagedSerializable<Map<BigInteger, 
-                IteratorMarker<E>>>> serializedIteratorsNextElementsRef;
+
         /**
          * {@code true} if this iterator was created with an empty
          * deque.  In this case the iterator will remain at the head
@@ -1612,17 +1463,13 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         private boolean nextElementWasNullOnCreation;
         /**
          * {@code true} if this iterator has just been deserialized
-         * and needs to recheck whether its next elemente is still
+         * and needs to recheck whether its next element is still
          * valid.
          *
          * @see #checkForNextElementUpdates()
          */
         private transient boolean recheckNextElement;
-        /**
-         * The id of this iterator that will be used in the {@code
-         * serializedIteratorsNextElementsRef} map.
-         */
-        private final BigInteger iteratorId;
+      
         /**
          * Whether this iterator is traversing the deque in reverse
          */
@@ -1655,28 +1502,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
                 nextElement = (head == null) ? null : dm.createReference(head);
             }
 
-            // mark if the next element was null.  If so, if we
-            // serialize this iterator and then deserialize it, we
-            // should refresh the first element in the map	   
+            // mark if the next element was null.	   
             nextElementWasNullOnCreation = nextElement == null;
-
-            // note that this field may be null, in which case, we
-            // don't update our state and will throw a concurrent
-            // modification exception
-            serializedIteratorsNextElementsRef =
-                    deque.serializedIteratorsNextElementsRef;
-
             dequeRef = dm.createReference(deque);
-            iteratorId = dm.createReference(this).getId();
-
             recheckNextElement = false;
-
-            // last, mark in the shared map what the next element will
-            // be for this iterator.  This ensures that if the
-            // iterator is left unused and serialized after
-            // construction that the the next element will be
-            // correctly updated if any future modifications occur
-            updatePersistentNextElement();
         }
 
         /**
@@ -1691,12 +1520,11 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 
         /**
          * After deserialization, this iterator should check that its
-         * reference to the next element is still valid.  Two cases
-         * exist to check.
+         * reference to the next element is still valid.
          *
          * <p>
          *
-         * First, if this iterator was created based on an empty deque,
+         * If this iterator was created based on an empty deque,
          * and has never iterated over the first element, the iterator
          * must check whether any new elements exist in the deque.  Once
          * an element exists, the iterator updates its nextElement
@@ -1704,11 +1532,10 @@ public class ScalableDeque<E> extends AbstractCollection<E>
          *
          * <p>
          *
-         * In the second case, while serialized, the next element
-         * could have been removed from the deque.  Should it have
-         * been removed, the deque will have updated the shared
-         * mapping from iterator to next element, with a reference as
-         * to what this iterator's new next element should.
+         * Otherwise, if the iterator was serialized and the next element
+         * was removed, the deque will throw a
+         * {@code ConcurrentModificationException} during a call
+         * to retrieve the next element.
          *
          * @see ScalableDeque#checkIterators(Element)
          */
@@ -1737,54 +1564,15 @@ public class ScalableDeque<E> extends AbstractCollection<E>
                 // never be set to true again.
                 if (nextElement != null) {
                     nextElementWasNullOnCreation = false;
-                    AppContext.getDataManager().markForUpdate(this);
                 }
-            } else if (serializedIteratorsNextElementsRef != null) {
-                // Check whether this iterator has support for concurrent
-                // updates.
-                
-                // If so, this iterator has seen at least one element
-                // and had updated the shared itereator-to-element map
-                // prior to serialization with what its next element
-                // was.  In this case, the iterator should simply use
-                // the reference mapped to its iteratorId, as this
-                // will have been updated based on any changes to the
-                // backing map.
-
-                Map<BigInteger, IteratorMarker<E>> iteratorToNextElement =
-                        serializedIteratorsNextElementsRef.getForUpdate().get();
-
-                ManagedReference<Element<E>> oldNext = nextElement;
-
-                // Assign whatever is listed as the next element for
-                // us.  We don't remove ourselves here in case next()
-                // is never called, in which case the next element in
-                // the map would still be valid.
-                nextElement = iteratorToNextElement.get(iteratorId).nextElement;
-
-                // the next element has changed, mark the iterator for
-                // update
-                if (!(nextElement == oldNext ||
-                        (nextElement != null && nextElement.equals(oldNext)))) {
-                    AppContext.getDataManager().markForUpdate(this);
-                }
-            }
+            } 
 
             recheckNextElement = false;
         }
 
         /**
-         * Returns the next element in the {@code ScalableDeque}.  Note that
-         * due to the concurrent nature of this iterator, this method may skip
-         * elements that have been added after the iterator was constructed.
-         * Likewise, it may return new elements that have been added.  This
-         * implementation is guaranteed never to return an element more than
-         * once.
-         *
-         * <p>
-         *
-         * If the backing deque does not support concurrent iterators,
-         * this method will throw a {@link
+         * Returns the next element in the {@code ScalableDeque}.  This
+         * method will throw a {@link
          * java.util.ConcurrentModificationException} if the next
          * element that the iterator was set to return has been
          * removed from the deque, and {@code hasNext()} as not been
@@ -1819,54 +1607,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
             nextElement = (isReverse) 
                     ? element.prevElement : element.nextElement;
 
-            // mark the iterator as updated
-            AppContext.getDataManager().markForUpdate(this);
-
-            // save the next element that we're going to return in case
-            // we're serialized after this call
-            updatePersistentNextElement();
-
             return element.getValue();
-        }
-
-        /**
-         * Removes this iterator from the registry of active
-         * iterators.
-         */
-        public void removingObject() {            
-            // check if this iterator has been configured to receive
-            // concurrent updates, and if so remove its id.
-            if (serializedIteratorsNextElementsRef != null) {
-                Map<BigInteger, IteratorMarker<E>> iteratorToNextElement =
-                        serializedIteratorsNextElementsRef.getForUpdate().get();
-
-                // remove this iterator's Id from the shared mapping
-                // to ensure that any future modifications don't
-                // require an unnecessary check for this iterator's
-                // next element.
-                iteratorToNextElement.remove(iteratorId);
-            }
-        }
-
-        /**
-         * If the backing deque is configured to notify iterators of
-         * concurrent updates, this saves the {@code ManagedReference}
-         * of the next element that this iterator is going to return
-         * to a peristant state.  This enables the iterator to receive
-         * updates from the deque while serialized if the next element
-         * that it should return was removed.
-         *
-         * @see ScalableDeque#checkIterators(Element)
-         */
-        private void updatePersistentNextElement() {
-
-            if (serializedIteratorsNextElementsRef != null) {
-                Map<BigInteger, IteratorMarker<E>> iteratorToNextElement =
-                        serializedIteratorsNextElementsRef.getForUpdate().get();
-
-                iteratorToNextElement.put(iteratorId, 
-                        new IteratorMarker<E>(isReverse, nextElement));
-            }
         }
 
         /**
@@ -1891,7 +1632,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
                 // unnecessary work.
             }
             currentRemoved = true;
-            AppContext.getDataManager().markForUpdate(this);
         }
 
         /**
@@ -1919,53 +1659,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
             // mark that the iterator should recheck what its next
             // element is prior to returning any next element.
             recheckNextElement = true;
-        }
-    }
-
-    /**
-     * An internal marker class for persistently storing the state of
-     * the iterator and the direction in which it is going while the
-     * iterator has been serialized.  When an element is removed, this
-     * class is used by the deque to determine which of the
-     * neighboring elements of the newly removed should be set as the
-     * serialized iterator's next element.  This class is used if the
-     * deque supports concurrent iterators.
-     * 
-     * @see ScalableDeque#checkIterators(Element)
-     * @see ScalableDeque#supportsConcurrentIterators()
-     *
-     * @param <E> the type of elements returned by the deque's
-     *        iterator
-     */
-    private static class IteratorMarker<E> implements Serializable {
-
-        /**
-         * {@inheritDoc}
-         */
-        private static final long serialVersionUID = 1L;
-        /**
-         * Whether the iterator that has marked the element as its
-         * next element is going in reverse
-         */
-        final boolean isReverse;
-        /**
-         * The next element that the iterator will visit
-         */
-        ManagedReference<Element<E>> nextElement;
-
-        /**
-         * Constructs a new {@code IteratorMarker} to represent the
-         * next element to be visited by the iterator
-         *
-         * @param isReverse whether the iterator is traversing the
-         *        deque from tail to head
-         * @param nextElement the next element in the deque that the
-         *        iterator will visit
-         */
-        public IteratorMarker(boolean isReverse,
-                              ManagedReference<Element<E>> nextElement) {
-            this.isReverse = isReverse;
-            this.nextElement = nextElement;
         }
     }
 
