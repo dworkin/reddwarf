@@ -105,9 +105,9 @@ import com.sun.sgs.app.Task;
  * element, the iterator is not affected by changes that occur in prior
  * {@code ListNode}s. However, if modifications happen after the current
  * {@code ListNode} being examined, they will be incorporated in the
- * iteration, suggesting that the element may not be the same one as when the
- * call was initially made. However, if a modification in the form of an
- * addition or removal happens on the same {@code ListNode}, then the
+ * iteration, suggesting that the target element may not be the same one as
+ * when the call was initially made. However, if a modification in the form of
+ * an addition or removal happens on the same {@code ListNode}, then the
  * iterator will throw a {@code ConcurrentModificationException} as a result
  * of a compromise to the integrity of the node. This exception is not thrown
  * if an element is replaced using the {@code set()} method because there
@@ -128,16 +128,22 @@ import com.sun.sgs.app.Task;
  * Since the list is capable of containing many elements, applications which
  * use iterators to traverse elements should be aware that prolonged iterative
  * tasks have the potential to lock out other concurrent tasks on the list.
- * Therefore, it is highly recommended that potentially long iterations be
- * broken up into smaller tasks. This strategy improves the concurrency of the
- * {@code ScalableList} as it reduces the locked elements owned by any one
- * task.
+ * Therefore, it is highly recommended (and considered good practice) that
+ * potentially long iterations be broken up into smaller tasks. This strategy
+ * improves the concurrency of the {@code ScalableList} as it reduces the
+ * locked elements owned by any one task. In order to make use of a recurring
+ * task using non-{@code ManagedObject} iterators, it is necessary to wrap
+ * the iterator in a {@code ManagedObject}, like {@code ManagedSerializable},
+ * in order to apply a name binding and retrieve it again for the next
+ * execution of the task. As mentioned earlier, once the iterator is no longer
+ * needed, it will need to be manually disposed since the wrapper causes the
+ * iterator to be persisted in the data manager.
  * <p>
  * 
  * @param <E> the type of the elements stored in the {@code ScalableList}
  */
-public class ScalableList<E> extends AbstractList<E> implements
-	Serializable, ManagedObjectRemoval {
+public class ScalableList<E> extends AbstractList<E> implements Serializable,
+	ManagedObjectRemoval {
 
     private static final long serialVersionUID = 1L;
 
@@ -198,7 +204,7 @@ public class ScalableList<E> extends AbstractList<E> implements
      * values for the {@code bucketSize} and {@code branchingFactor}.
      */
     public ScalableList() {
-	TreeNode<E> t = new TreeNode<E>(this, null);
+	TreeNode<E> t = new TreeNode<E>(this, null, false);
 	headRef =
 		AppContext.getDataManager().createReference(
 			new DummyConnector<E>(t.getChild()));
@@ -227,7 +233,7 @@ public class ScalableList<E> extends AbstractList<E> implements
 	isLegal(branchingFactor, bucketSize);
 	this.bucketSize = bucketSize;
 	this.branchingFactor = branchingFactor;
-	TreeNode<E> t = new TreeNode<E>(this, null);
+	TreeNode<E> t = new TreeNode<E>(this, null, false);
 	headRef =
 		AppContext.getDataManager().createReference(
 			new DummyConnector<E>(t.getChild()));
@@ -436,21 +442,11 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    return;
 	}
 
-	AsynchronousClearTask<E> clearTask =
-		new AsynchronousClearTask<E>(getHead());
+	// Otherwise, remove the entire object..
+	removingObject();
 
-	// Otherwise, schedule asynchronous task here
-	// which will delete the list and replace it
-	// with an empty (non-null) instance.
-	AppContext.getTaskManager().scheduleTask(clearTask);
-
-	// Remove the dummy entries since new ones will be created
-	DataManager dm = AppContext.getDataManager();
-	dm.removeObject(headRef.get());
-	dm.removeObject(tailRef.get());
-
-	TreeNode<E> t = new TreeNode<E>(this, null);
-
+	// ..and then supply a new empty structure
+	TreeNode<E> t = new TreeNode<E>(this, null, false);
 	headRef =
 		AppContext.getDataManager().createReference(
 			new DummyConnector<E>(t.getChild()));
@@ -838,17 +834,13 @@ public class ScalableList<E> extends AbstractList<E> implements
      * {@inheritDoc}
      */
     public void removingObject() {
-	clear();
 
-	// Remove existing ManagedObjects in tree
-	DataManager dm = AppContext.getDataManager();
-	ListNode<E> child = (ListNode<E>) root.get().getChild();
-	SubList<E> subList = child.getSubList();
-	dm.removeObject(subList);
-	dm.removeObject(child);
-	dm.removeObject(root.get());
-	dm.removeObject(headRef.get());
-	dm.removeObject(tailRef.get());
+	AsynchronousClearTask<E> clearTask =
+		new AsynchronousClearTask<E>(this);
+
+	// Schedule asynchronous task here
+	// which will delete the list
+	AppContext.getTaskManager().scheduleTask(clearTask);
     }
 
     /*
@@ -1038,13 +1030,20 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * @param list the {@code ScalableList} owner of this structure
 	 * @param parent the intended parent {@code ListNode}
 	 */
-	TreeNode(ScalableList<E> list, TreeNode<E> parent) {
+	TreeNode(ScalableList<E> list, TreeNode<E> parent, boolean isSplit) {
 	    this(list);
 
-	    ListNode<E> n = new ListNode<E>(this, bucketSize);
-	    size = n.size();
-	    DataManager dm = AppContext.getDataManager();
-	    childRef = dm.createReference((Node<E>) n);
+	    ListNode<E> n;
+	    if (!isSplit) {
+		n = new ListNode<E>(this, bucketSize);
+		DataManager dm = AppContext.getDataManager();
+		size = n.size();
+		childRef = dm.createReference((Node<E>) n);
+	    } else {
+		n = null;
+		size = 0;
+		childRef = null;
+	    }
 	    parentRef = createReferenceIfNecessary(parent);
 	}
 
@@ -1106,6 +1105,14 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    this.size = size;
 	    this.childrenCount = numberOfChildren;
 	    childRef = createReferenceIfNecessary(child);
+	}
+
+	/**
+	 * Sets the child to null for the relinking process.
+	 */
+	void setChildToNull() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    childRef = null;
 	}
 
 	/**
@@ -1219,16 +1226,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 			parentRef.get().getChildCount());
 
 	    } else {
-		// its an only child; join the parent to the child
-		// if a parent exists.
-		if (parentRef != null && childRef != null && size > 0) {
-		    Node<E> child = childRef.getForUpdate();
-		    TreeNode<E> parent = parentRef.getForUpdate();
-		    parent.setChild(child, size, childrenCount);
-		    child.setParent(parent);
-		} else {
-		    return false;
-		}
+		TreeNode<E> parent = parentRef.getForUpdate();
+		parent.setChildToNull();
 	    }
 	    AppContext.getDataManager().removeObject(this);
 	    return true;
@@ -1301,7 +1300,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    int size = 0;
 
 	    // Create the new sibling
-	    TreeNode<E> newNode = new TreeNode<E>(owner.get(), getParent());
+	    TreeNode<E> newNode =
+		    new TreeNode<E>(owner.get(), getParent(), true);
 
 	    // Iterate through the children and update references
 	    Node<E> newChild = child;
@@ -1438,8 +1438,26 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    if (childrenCount == 0 && size() == 0 && prune()) {
 		parent.decrementChildrenAndSize();
 		return;
+	    } else if (parent.getChildCount() == 1) {
+		pruneIntermediate();
 	    }
 	    parent.decrement();
+	}
+
+	/**
+	 * Removes a {@code TreeNode} that is the only child of a parent. This
+	 * requires that all children are updated of its new parent.
+	 */
+	private void pruneIntermediate() {
+	    TreeNode<E> parent = getParent();
+	    Node<E> child = childRef.getForUpdate();
+	    parent.setChild(child, parent.size(), childrenCount);
+
+	    for (int i = 0; i < childrenCount; i++) {
+		child.setParent(parent);
+		child = child.next();
+	    }
+	    AppContext.getDataManager().removeObject(this);
 	}
 
 	/**
@@ -1507,13 +1525,26 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private ManagedReference<ListNode<E>> current;
 
 	/**
+	 * A reference to the intermediate object in the head pointer
+	 */
+	private ManagedReference<DummyConnector<E>> headDummy;
+
+	/**
+	 * A reference to the intermediate object in the tail pointer
+	 */
+	private ManagedReference<DummyConnector<E>> tailDummy;
+
+	/**
 	 * Constructor for the asynchronous task
 	 * 
 	 * @param root the root node of the entire tree structure
 	 */
-	AsynchronousClearTask(ListNode<E> node) {
-	    assert (node != null);
-	    current = AppContext.getDataManager().createReference(node);
+	AsynchronousClearTask(ScalableList<E> list) {
+	    assert (list != null);
+	    DataManager dm = AppContext.getDataManager();
+	    current = dm.createReference(list.getHead());
+	    headDummy = dm.createReference(list.headRef.get());
+	    tailDummy = dm.createReference(list.tailRef.get());
 	}
 
 	/**
@@ -1521,12 +1552,16 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 */
 	public void run() {
 	    // Perform some work and check if we need to reschedule
-	    AppContext.getDataManager().markForUpdate(this);
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(this);
 
 	    if (doWork()) {
 		AppContext.getTaskManager().scheduleTask(this);
 	    } else {
-		AppContext.getDataManager().removeObject(this);
+		dm.removeObject(headDummy.get());
+		dm.removeObject(tailDummy.get());
+		dm.removeObject(this);
+
 		Runnable r = noteDoneRemoving;
 		if (r != null) {
 		    r.run();
@@ -1549,51 +1584,41 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    AppContext.getDataManager().markForUpdate(currentListNode);
 	    ListNode<E> next;
 	    int count = 0;
+	    int size = currentListNode.size();
 	    E entry = null;
 
 	    // Perform some removals
-	    while (count < MAX_OPERATIONS) {
-		// When currentListNode becomes null, we are done
-		if (currentListNode == null) {
-		    return false;
-		}
-		next = currentListNode.next();
+	    while (size > 0 && currentListNode != null &&
+		    count++ < MAX_OPERATIONS) {
 
 		// Repeatedly remove the head element in the
 		// ListNode as long as one exists.
-		if (currentListNode.size() > 0) {
-		    entry = currentListNode.remove(null, 0);
-		    count++;
+		next = currentListNode.next();
 
-		    // If the entry was an Element object, delete it
-		    // since the Element object is only a wrapper
-		    if (entry instanceof Element) {
-			AppContext.getDataManager().removeObject(entry);
-		    }
-		} else {
-
-		    // If we have reached the end, forcefully
-		    // remove the current node and its ancestors
-		    // because remove() by default will leave a
-		    // basic tree if the list is empty.
-		    if (next == null) {
-			currentListNode.clear();
-		    } else {
-			AppContext.getDataManager().markForUpdate(next);
-		    }
-
-		    // Get the next node since this one is empty.
-		    // We don't need to remove the ListNode as remove()
-		    // has deleted it, or we deleted it above.
+		entry = currentListNode.remove(null, 0);
+		if (--size == 0 && next != null) {
 		    currentListNode = next;
+		    next = next.next();
+		    size = currentListNode.size();
+		}
+
+		if (entry instanceof Element) {
+		    AppContext.getDataManager().removeObject(entry);
 		}
 	    }
 
-	    // If we are leaving this method, then save the
-	    // currentListNode so we can continue when we come back
-	    current =
-		    AppContext.getDataManager().createReference(
-			    currentListNode);
+	    // If we exit and the size is reported to be 0, then we
+	    // call the clear() method to delete the empty tree.
+	    // Otherwise, we will set up to re-execute the task
+	    if (size == 0) {
+		currentListNode.clear();
+		return false;
+
+	    } else {
+		current =
+			AppContext.getDataManager().createReference(
+				currentListNode);
+	    }
 	    return true;
 	}
 
@@ -1767,11 +1792,15 @@ public class ScalableList<E> extends AbstractList<E> implements
 
     /**
      * This class represents an iterator of the contents of the list.
+     * Iterators are not {@code ManagedObjects} by default, but if desired,
+     * they can be wrapped in {@code ManagedSerializable} objects to have
+     * bindings applied to them. This is particularly useful for long
+     * iterations which require that iterative tasks be divided into smaller
+     * ones.
      * 
      * @param <E> the type of element stored in the {@code ScalableList}
      */
-    static class ScalableIterator<E> implements ManagedObject, Serializable,
-	    Iterator<E> {
+    static class ScalableIterator<E> implements Serializable, Iterator<E> {
 
 	/**
 	 * A reference to the {@code ScalableList} which this iterator is
@@ -1892,7 +1921,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
 
-	    AppContext.getDataManager().markForUpdate(this);
 	    List<ManagedReference<ManagedObject>> elements =
 		    currentNode.get().getSubList().getElements();
 
@@ -1947,7 +1975,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private boolean loadNextListNode() {
 	    ListNode<E> next = currentNode.get().next();
 	    if (next != null) {
-		AppContext.getDataManager().markForUpdate(this);
 		currentNode =
 			AppContext.getDataManager().createReference(next);
 		cursor = 0;
@@ -2017,7 +2044,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * Performs the remove and updates the references if necessary
 	 */
 	void doRemove() {
-	    AppContext.getDataManager().markForUpdate(this);
 	    ListNode<E> prev = currentNode.get().prev();
 	    ListNode<E> next = currentNode.get().next();
 	    int size = currentNode.get().size();
@@ -2135,7 +2161,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	private boolean loadPrevListNode() {
 	    ListNode<E> prev = currentNode.get().prev();
 	    if (prev != null) {
-		AppContext.getDataManager().markForUpdate(this);
 		currentNode =
 			AppContext.getDataManager().createReference(prev);
 		return true;
@@ -2222,7 +2247,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    // any changes were made since we last operated.
 	    // Throw a ConcurrentModificationException if so.
 	    checkDataIntegrity();
-	    AppContext.getDataManager().markForUpdate(this);
 
 	    cannotRemoveOrSet = false;
 	    List<ManagedReference<ManagedObject>> elements =
@@ -2268,7 +2292,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		throw new IllegalStateException(
 			"set() must follow next() or previous()");
 	    }
-	    AppContext.getDataManager().markForUpdate(this);
 	    currentNode.get().set(cursor, o);
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
@@ -2288,7 +2311,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    }
 
 	    if (!wasNextCalled) {
-		AppContext.getDataManager().markForUpdate(this);
 		this.doRemove();
 	    } else {
 		super.remove();
@@ -2300,7 +2322,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * {@inheritDoc}
 	 */
 	void doRemove() {
-	    AppContext.getDataManager().markForUpdate(this);
 	    ListNode<E> prev = currentNode.get().prev();
 	    ListNode<E> next = currentNode.get().next();
 	    int size = currentNode.get().size();
@@ -2372,7 +2393,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		cursor = 0;
 	    }
 
-	    AppContext.getDataManager().markForUpdate(this);
 	    cannotRemoveOrSet = true;
 	    listNodeReferenceValue =
 		    currentNode.get().getDataIntegrityValue();
@@ -2635,6 +2655,17 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    parent.clear();
 	}
 
+	public String toString() {
+	    List<ManagedReference<ManagedObject>> list =
+		    getSubList().getElements();
+	    String s = "{";
+	    for (int i = 0; i < list.size(); i++) {
+		s += list.get(i) + ",";
+	    }
+	    s += "}";
+	    return s;
+	}
+
 	/**
 	 * Performs the work of calling the recursive update methods
 	 * 
@@ -2721,7 +2752,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		next().setPrev(prev());
 	    } else if (next() != null) {
 		next().setPrev(null);
-
 		// The clear task will cause the list parameter
 		// to be null because we don't need to be
 		// updating the head; if we did, then we would
@@ -2732,7 +2762,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 		}
 	    } else {
 		prev().setNext(null);
-
 		// The clear task will cause the list parameter
 		// to be null because we don't need to be
 		// updating the head; if we did, then we would
@@ -2744,7 +2773,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	    }
 
 	    linkParentToNextIfNecessary();
-
 	    // This is an empty node, so remove it from Data Store.
 	    AppContext.getDataManager().removeObject(getSubList());
 	    AppContext.getDataManager().removeObject(this);
@@ -2756,8 +2784,6 @@ public class ScalableList<E> extends AbstractList<E> implements
 	 * is a next sibling, the next sibling has the same parent as
 	 * {@code this}, the parent has sufficient children, and if the
 	 * parent was not yet removed.
-	 * 
-	 * @param children the number of children the parent has
 	 */
 	private void linkParentToNextIfNecessary() {
 	    TreeNode<E> parent = getParent();
@@ -2772,6 +2798,8 @@ public class ScalableList<E> extends AbstractList<E> implements
 		parent
 			.setChild(next(), parent.size(), parent
 				.getChildCount());
+	    } else if (children == 0) {
+		parent.setChildToNull();
 	    }
 	}
 
