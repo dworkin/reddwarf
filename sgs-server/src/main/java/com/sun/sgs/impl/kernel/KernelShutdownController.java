@@ -55,6 +55,7 @@ public final class KernelShutdownController {
      * result of a failure reported to the {@code WatchdogService}.
      */
     public void shutdownNode() {
+	// Shutdown services here?
 	kernel.shutdown();
     }
 

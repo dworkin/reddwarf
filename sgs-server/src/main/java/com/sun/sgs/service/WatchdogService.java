@@ -159,8 +159,10 @@ public interface WatchdogService extends Service {
     void reportFailure(String className, FailureLevel severity);
 
     /**
-     * A hook for services to call when there is a known problem that requires
-     * the watchdog to shut down the node.
+     * A hook for servers to call when there is a known problem on a remote node
+     * that requires the watchdog to shut down the node. This method is
+     * called through the {@code WatchdogService} interface when the node is known
+     * to be remote.
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed

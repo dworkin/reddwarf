@@ -113,7 +113,6 @@ public interface WatchdogServer extends Remote {
      * method should be called instead.
      * 
      * @param nodeId the failed node's ID
-     * @return the node corresponding to the {@code nodeId}
      */
-    NodeImpl setNodeAsFailed(long nodeId);
+    void setNodeAsFailed(long nodeId);
 }

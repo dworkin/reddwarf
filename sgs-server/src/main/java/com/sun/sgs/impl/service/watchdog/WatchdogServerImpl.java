@@ -372,6 +372,64 @@ public final class WatchdogServerImpl extends AbstractService implements
     /* -- Implement WatchdogServer -- */
 
     /**
+     * Processes the nodes which have failed by
+     * calling the failure methods
+     * for each node in the collection. They processes
+     * are separated into two for-loops so that a failed
+     * node is not mistakenly chosen as a backup while
+     * this operation is occurring.
+     * 
+     * @param c the collection of failed nodes
+     */
+    void processNodeFailures(Collection<NodeImpl> nodesToFail){
+	for (NodeImpl node : nodesToFail) {
+	    disqualifyAsAlive(node);
+	}
+	for (NodeImpl node : nodesToFail) {
+	    runFailedNodeProcess(node);
+	}
+    }
+    
+    /**
+     * Executes the node failure process by removing the
+     * node from the {@code aliveNodes} map, performing
+     * cleanup, and then setting the node to a failed
+     * state.
+     * 
+     * @param node the node that has failed
+     */
+    void processNodeFailure(NodeImpl node) {
+	disqualifyAsAlive(node);	
+	runFailedNodeProcess(node);
+    }
+    
+    /**
+     * Remove failed nodes from map of "alive" nodes so that a
+     * failed node won't be assigned as a backup. Also, clean
+     * up the host port map entry.
+     * 
+     * @param node the node that has failed
+     */
+    void disqualifyAsAlive(NodeImpl node) {
+	aliveNodes.remove(node.getId());
+	removeHostPortMapEntry(node);
+    }
+    
+    /**
+     * Mark each expired node as failed, assign it a backup,
+     * and update the data store. Add each expired node to the
+     * list of recovering nodes. The node will be removed from
+     * the list and from the data store in the 'recoveredNode'
+     * callback.
+     * 
+     * @param node the node that has failed
+     */
+    void runFailedNodeProcess(NodeImpl node) {
+	setFailed(node);
+	recoveringNodes.put(node.getId(), node);
+    }
+    
+    /**
      * {@inheritDoc}
      */
     public long[] registerNode(final String host, final int port,
@@ -517,10 +575,15 @@ public final class WatchdogServerImpl extends AbstractService implements
 	    throws IOException {
 
 	int count = maxNumberOfAttempts;
-	NodeImpl remoteNode = setNodeAsFailed(nodeId);
+	NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
+	
+	// Run the methods which declare the node as failed
+	processNodeFailure(remoteNode);
 
-	// Try a few times just in case we run into an IOException.
-	// Get the remote node and issue a shutdown
+	// Now that the node is not considered alive, 
+	// try to report the failure to the watchdog
+	// so that the node can be shutdown. Just in case 
+	// we run into an IOException, try a few times.
 	while (--count > 0) {
 	    try {
 		remoteNode.getWatchdogClient().reportFailure(className,
@@ -550,10 +613,9 @@ public final class WatchdogServerImpl extends AbstractService implements
     /**
      * {@inheritDoc}
      */
-    public NodeImpl setNodeAsFailed(long nodeId) {
+    public void setNodeAsFailed(long nodeId) {
 	NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
-	setFailed(remoteNode);
-	return remoteNode;
+	processNodeFailure(remoteNode);
     }
 
     /**
@@ -730,31 +792,13 @@ public final class WatchdogServerImpl extends AbstractService implements
 		    }
 		}
 
+		/**
+		 * Perform the node failure procedure
+		 */
 		if (!expiredNodes.isEmpty()) {
-		    /*
-		     * Remove failed nodes from map of "alive" nodes so that a
-		     * failed node won't be assigned as a backup. Also, clean
-		     * up the host port map entry.
-		     */
-		    for (NodeImpl node : expiredNodes) {
-			aliveNodes.remove(node.getId());
-			removeHostPortMapEntry(node);
-		    }
-
-		    /*
-		     * Mark each expired node as failed, assign it a backup,
-		     * and update the data store. Add each expired node to the
-		     * list of recovering nodes. The node will be removed from
-		     * the list and from the data store in the 'recoveredNode'
-		     * callback.
-		     */
-		    for (NodeImpl node : expiredNodes) {
-			setFailed(node);
-			recoveringNodes.put(node.getId(), node);
-		    }
+		    processNodeFailures(expiredNodes);
 		    statusChangedNodes.addAll(expiredNodes);
 		    expiredNodes.clear();
-
 		}
 
 		/*
