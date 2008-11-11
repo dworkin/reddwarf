@@ -117,7 +117,7 @@ public class DataStoreProfileProducer
         ProfileConsumer consumer =
 	    collector.getConsumer("DataStore");
         ProfileLevel level = ProfileLevel.MAX;
-        ProfileDataType type = ProfileDataType.TASK_AGGREGATE;
+        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
 	createObjectOp = consumer.createOperation("createObject", type, level);
 	markForUpdateOp = 
             consumer.createOperation("markForUpdate", type, level);
@@ -144,10 +144,8 @@ public class DataStoreProfileProducer
 	    consumer.createCounter("writtenBytes", type, level);
 	writtenObjectsCounter =
 	    consumer.createCounter("writtenObjects", type, level);
-	readBytesSample = consumer.createSample(
-	    "readBytes", type, Integer.MAX_VALUE, level);
-	writtenBytesSample = consumer.createSample(
-	    "writtenBytes", type, Integer.MAX_VALUE, level);
+	readBytesSample = consumer.createSample("readBytes", type, level);
+	writtenBytesSample = consumer.createSample("writtenBytes", type, level);
     }
 
     /* -- Implement DataStore -- */

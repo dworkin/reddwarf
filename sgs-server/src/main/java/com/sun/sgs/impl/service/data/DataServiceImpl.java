@@ -456,7 +456,7 @@ public final class DataServiceImpl implements DataService {
             ProfileConsumer consumer =
                 collector.getConsumer("DataService");
             createReferenceOp = consumer.createOperation(
-		"createReference", ProfileDataType.TASK_AGGREGATE,
+		"createReference", ProfileDataType.TASK_AND_AGGREGATE,
                 ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {

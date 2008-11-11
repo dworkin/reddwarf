@@ -46,7 +46,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for profile data that will be run with data of type
- * {@code AGGREGATE} and {@code TASK_AGGREGATE}.
+ * {@code AGGREGATE} and {@code TASK_AND_AGGREGATE}.
  */
 @RunWith(ParameterizedNameRunner.class)
 public class TestProfileDataAggregateImpl {
@@ -56,7 +56,7 @@ public class TestProfileDataAggregateImpl {
     @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(new Object[][] {{ProfileDataType.AGGREGATE}, 
-                                             {ProfileDataType.TASK_AGGREGATE}});
+                                             {ProfileDataType.TASK_AND_AGGREGATE}});
     }
     /** A test server node */
     private SgsTestNode serverNode;  
@@ -189,7 +189,7 @@ public class TestProfileDataAggregateImpl {
         ProfileConsumer cons1 = collector.getConsumer("c1");
         final AggregateProfileSample samp =
                 (AggregateProfileSample) 
-                    cons1.createSample(name, testType, -1, ProfileLevel.MIN);
+                    cons1.createSample(name, testType, ProfileLevel.MIN);
         
         assertEquals(0, samp.getNumSamples());
         for (Long sample : samp.getSamples()) {
@@ -241,7 +241,7 @@ public class TestProfileDataAggregateImpl {
         ProfileConsumer cons1 = collector.getConsumer("c1");
         final AggregateProfileSample samp1 =
                 (AggregateProfileSample) 
-                    cons1.createSample("s1", testType, -1, ProfileLevel.MIN);
+                    cons1.createSample("s1", testType, ProfileLevel.MIN);
         assertEquals(Integer.MAX_VALUE, samp1.getCapacity());
         
         final AggregateProfileSample samp2 =

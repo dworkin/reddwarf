@@ -60,9 +60,9 @@ import static org.junit.Assert.fail;
  * Tests for both the profile consumer and the basic tests for the
  * objects created with the profile consumer factory tests.
  * <p>
- * Tests to be run with types TASK and TASK_AGGREGATE are found in
+ * Tests to be run with types TASK and TASK_AND_AGGREGATE are found in
  * TestProfileDataTaskImpl.java.   Tests to be run with types AGGREGATE
- * and TASK_AGGREGATE are found in TestProfileDataAggregateImpl.java.  Any
+ * and TASK_AND_AGGREGATE are found in TestProfileDataAggregateImpl.java.  Any
  * other specialized profile data tests are collected here.
  */
 @RunWith(NameRunner.class)
@@ -176,6 +176,31 @@ public class TestProfileConsumerImpl {
     }
     
     /* -- Counter tests -- */
+    @Test(expected=NullPointerException.class)
+    public void testCounterTaskBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileCounter c1 = 
+            cons1.createCounter(null, ProfileDataType.TASK, ProfileLevel.MIN);
+    }
+    @Test(expected=NullPointerException.class)
+    public void testCounterAggregateBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileCounter c1 = 
+            cons1.createCounter(null, 
+                                ProfileDataType.AGGREGATE, ProfileLevel.MIN);
+    }
+    @Test(expected=NullPointerException.class)
+    public void testCounterTaskAggregateBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileCounter c1 = 
+            cons1.createCounter(null, 
+                                ProfileDataType.TASK_AND_AGGREGATE, 
+                                ProfileLevel.MIN);
+    }
+    
     @Test
     public void testCounterName() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
@@ -210,10 +235,10 @@ public class TestProfileConsumerImpl {
         name = "bothCounter";
         {
             ProfileCounter counter1 = 
-                cons1.createCounter(name, ProfileDataType.TASK_AGGREGATE, 
+                cons1.createCounter(name, ProfileDataType.TASK_AND_AGGREGATE, 
                                     ProfileLevel.MAX);
             ProfileCounter counter2 = 
-                cons2.createCounter(name, ProfileDataType.TASK_AGGREGATE, 
+                cons2.createCounter(name, ProfileDataType.TASK_AND_AGGREGATE, 
                                     ProfileLevel.MAX);
             assertFalse(counter1.getName().equals(counter2.getName()));
             assertTrue(counter1.getName().contains(name));
@@ -249,7 +274,7 @@ public class TestProfileConsumerImpl {
         try {
             ProfileCounter op3 =
                 cons1.createCounter(name, 
-                                    ProfileDataType.TASK_AGGREGATE, 
+                                    ProfileDataType.TASK_AND_AGGREGATE, 
                                     ProfileLevel.MAX);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
@@ -300,7 +325,7 @@ public class TestProfileConsumerImpl {
         
         ProfileCounter counter2 = 
                 cons1.createCounter("counter2", 
-                                    ProfileDataType.TASK_AGGREGATE, 
+                                    ProfileDataType.TASK_AND_AGGREGATE, 
                                     ProfileLevel.MIN);
         assertTrue(counter2 instanceof TaskProfileCounter);
         assertTrue(counter2 instanceof AggregateProfileCounter);
@@ -384,7 +409,7 @@ public class TestProfileConsumerImpl {
         final AggregateProfileCounter counter = 
                 (AggregateProfileCounter) 
                     cons1.createCounter(name, 
-                                        ProfileDataType.TASK_AGGREGATE, 
+                                        ProfileDataType.TASK_AND_AGGREGATE, 
                                         ProfileLevel.MIN);
         
         // Because the listener is running in a different thread, JUnit
@@ -446,6 +471,31 @@ public class TestProfileConsumerImpl {
     
     
     /* -- Operation tests -- */
+    @Test(expected=NullPointerException.class)
+    public void testOperationTaskBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileOperation o1 = 
+            cons1.createOperation(null, ProfileDataType.TASK, ProfileLevel.MIN);
+    }
+    @Test(expected=NullPointerException.class)
+    public void testOperationAggregateBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileOperation o1 = 
+            cons1.createOperation(null, 
+                                  ProfileDataType.AGGREGATE, ProfileLevel.MIN);
+    }
+    @Test(expected=NullPointerException.class)
+    public void testOperationTaskAggregateBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileOperation o1 = 
+            cons1.createOperation(null, 
+                                  ProfileDataType.TASK_AND_AGGREGATE, 
+                                  ProfileLevel.MIN);
+    }
+    
     @Test
     public void testOperationName() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
@@ -480,10 +530,10 @@ public class TestProfileConsumerImpl {
         name = "bothOp";
         {
             ProfileOperation op1 = 
-                cons1.createOperation(name, ProfileDataType.TASK_AGGREGATE, 
+                cons1.createOperation(name, ProfileDataType.TASK_AND_AGGREGATE, 
                                       ProfileLevel.MAX);
             ProfileOperation op2 = 
-                cons2.createOperation(name, ProfileDataType.TASK_AGGREGATE, 
+                cons2.createOperation(name, ProfileDataType.TASK_AND_AGGREGATE, 
                                       ProfileLevel.MAX);
             assertFalse(op1.getName().equals(op2.getName()));
             assertTrue(op1.getName().contains(name));
@@ -519,7 +569,7 @@ public class TestProfileConsumerImpl {
         try {
             ProfileOperation op3 =
                 cons1.createOperation(name, 
-                                      ProfileDataType.TASK_AGGREGATE, 
+                                      ProfileDataType.TASK_AND_AGGREGATE, 
                                       ProfileLevel.MAX);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
@@ -567,7 +617,7 @@ public class TestProfileConsumerImpl {
         assertTrue(op2 instanceof AggregateProfileOperation);
         
         ProfileOperation op3 = 
-            cons1.createOperation("op3", ProfileDataType.TASK_AGGREGATE, 
+            cons1.createOperation("op3", ProfileDataType.TASK_AND_AGGREGATE, 
                                   ProfileLevel.MAX);
         assertTrue(op3 instanceof TaskProfileOperation);
         assertTrue(op3 instanceof AggregateProfileOperation);
@@ -581,11 +631,11 @@ public class TestProfileConsumerImpl {
         ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileOperation op =
                 cons1.createOperation(opName, 
-                                      ProfileDataType.TASK_AGGREGATE, 
+                                      ProfileDataType.TASK_AND_AGGREGATE, 
                                       ProfileLevel.MIN);
         final ProfileOperation op1 =
                 cons1.createOperation(op1Name, 
-                                      ProfileDataType.TASK_AGGREGATE, 
+                                      ProfileDataType.TASK_AND_AGGREGATE, 
                                       ProfileLevel.MIN);
         final AggregateProfileOperation opAgg = (AggregateProfileOperation) op;
         final AggregateProfileOperation op1Agg = 
@@ -665,6 +715,51 @@ public class TestProfileConsumerImpl {
     }
     
     /* -- Sample tests -- */
+    @Test(expected=NullPointerException.class)
+    public void testSampleTaskBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileSample s1 = 
+            cons1.createSample(null, ProfileDataType.TASK, ProfileLevel.MIN);
+    }
+    @Test(expected=NullPointerException.class)
+    public void testSampleAggregateBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileSample s1 = 
+            cons1.createSample(null, 
+                               ProfileDataType.AGGREGATE, ProfileLevel.MIN);
+    }
+    @Test(expected=NullPointerException.class)
+    public void testSampleTaskAggregateBadName() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileSample s1 = 
+            cons1.createSample(null, 
+                               ProfileDataType.TASK_AND_AGGREGATE, 
+                               ProfileLevel.MIN);
+    }
+    @Test(expected=IllegalArgumentException.class)
+    public void testSampleTaskAggregateZeroCapacity() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileSample s1 = 
+            cons1.createSample("foo", 
+                               ProfileDataType.TASK_AND_AGGREGATE,
+                               0,
+                               ProfileLevel.MIN);
+    }
+    @Test(expected=IllegalArgumentException.class)
+    public void testSampleTaskAggregateNegCapacity() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        ProfileSample s1 = 
+            cons1.createSample("foo", 
+                               ProfileDataType.TASK_AND_AGGREGATE,
+                               -1,
+                               ProfileLevel.MIN);
+    }
+    
     @Test
     public void testSampleName() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
@@ -674,10 +769,10 @@ public class TestProfileConsumerImpl {
         {
             ProfileSample samp1 = 
                 cons1.createSample(name, ProfileDataType.TASK, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
             ProfileSample samp2 = 
                 cons2.createSample(name, ProfileDataType.TASK, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
             assertFalse(samp1.getName().equals(samp2.getName()));
             assertTrue(samp1.getName().contains(name));
             assertTrue(samp2.getName().contains(name));
@@ -687,10 +782,10 @@ public class TestProfileConsumerImpl {
         {
             ProfileSample samp1 = 
                 cons1.createSample(name, ProfileDataType.AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
             ProfileSample samp2 = 
                 cons2.createSample(name, ProfileDataType.AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
             assertFalse(samp1.getName().equals(samp2.getName()));
             assertTrue(samp1.getName().contains(name));
             assertTrue(samp2.getName().contains(name));
@@ -699,11 +794,11 @@ public class TestProfileConsumerImpl {
         name = "bothSample";
         {
             ProfileSample samp1 = 
-                cons1.createSample(name, ProfileDataType.TASK_AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                cons1.createSample(name, ProfileDataType.TASK_AND_AGGREGATE, 
+                                   ProfileLevel.MAX);
             ProfileSample samp2 = 
-                cons2.createSample(name, ProfileDataType.TASK_AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                cons2.createSample(name, ProfileDataType.TASK_AND_AGGREGATE, 
+                                   ProfileLevel.MAX);
             assertFalse(samp1.getName().equals(samp2.getName()));
             assertTrue(samp1.getName().contains(name));
             assertTrue(samp2.getName().contains(name));
@@ -717,27 +812,27 @@ public class TestProfileConsumerImpl {
         ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileSample s1 = 
                 cons1.createSample(name, ProfileDataType.TASK, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
 
         // Try creating with same name and parameters
         ProfileSample s2 =
                 cons1.createSample(name, ProfileDataType.TASK, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
         assertSame(s1, s2);
         
         // Try creating with same name and different parameters
         try {
             ProfileSample s3 =
                 cons1.createSample(name, ProfileDataType.AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                                   ProfileLevel.MAX);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             System.err.println(expected);
         } 
         try {
             ProfileSample s3 =
-                cons1.createSample(name, ProfileDataType.TASK_AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                cons1.createSample(name, ProfileDataType.TASK_AND_AGGREGATE, 
+                                   ProfileLevel.MAX);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             System.err.println(expected);
@@ -745,7 +840,7 @@ public class TestProfileConsumerImpl {
         try {
             ProfileSample s3 =
                 cons1.createSample(name, ProfileDataType.TASK, 
-                                   -1, ProfileLevel.MIN);
+                                   ProfileLevel.MIN);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             System.err.println(expected);
@@ -753,7 +848,7 @@ public class TestProfileConsumerImpl {
         try {
             ProfileSample s3 =
                 cons1.createSample(name, ProfileDataType.TASK, 
-                                   -1, ProfileLevel.MEDIUM);
+                                   ProfileLevel.MEDIUM);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
             System.err.println(expected);
@@ -769,7 +864,7 @@ public class TestProfileConsumerImpl {
         {
             ProfileSample s3 =
                  cons1.createSample(aggName, ProfileDataType.AGGREGATE,
-                                    -1, ProfileLevel.MAX);
+                                    ProfileLevel.MAX);
             try {
                 ProfileSample s4 =
                      cons1.createSample(aggName, ProfileDataType.AGGREGATE,
@@ -783,12 +878,12 @@ public class TestProfileConsumerImpl {
         final String taskAggName = "task aggregate sample";
         {
             ProfileSample s3 =
-                cons1.createSample(taskAggName, ProfileDataType.TASK_AGGREGATE, 
-                                   -1, ProfileLevel.MAX);
+                cons1.createSample(taskAggName, ProfileDataType.TASK_AND_AGGREGATE, 
+                                   ProfileLevel.MAX);
             try {
                 ProfileSample s4 =
                      cons1.createSample(taskAggName, 
-                                        ProfileDataType.TASK_AGGREGATE,
+                                        ProfileDataType.TASK_AND_AGGREGATE,
                                         25, ProfileLevel.MAX);
                 fail("Expected IllegalArgumentException");
             } catch (IllegalArgumentException expected) {
@@ -799,7 +894,7 @@ public class TestProfileConsumerImpl {
         // Try creating with a different name
         ProfileSample s5 =
             cons1.createSample("somethingelse", ProfileDataType.TASK, 
-                               -1, ProfileLevel.MAX);
+                               ProfileLevel.MAX);
         assertNotSame(s1, s5);
     }
     
@@ -810,19 +905,19 @@ public class TestProfileConsumerImpl {
         ProfileConsumer cons1 = collector.getConsumer("c1");
         ProfileSample s1 = 
             cons1.createSample("samples1", ProfileDataType.TASK, 
-                               -1, ProfileLevel.MAX);
+                               ProfileLevel.MAX);
         assertTrue(s1 instanceof TaskProfileSample);
         assertFalse(s1 instanceof AggregateProfileSample);
  
         ProfileSample s2 = 
             cons1.createSample("samples2", ProfileDataType.AGGREGATE, 
-                               -1, ProfileLevel.MAX);
+                               ProfileLevel.MAX);
         assertFalse(s2 instanceof TaskProfileSample);
         assertTrue(s2 instanceof AggregateProfileSample);
         
         ProfileSample s3 = 
-            cons1.createSample("samples3", ProfileDataType.TASK_AGGREGATE, 
-                               -1, ProfileLevel.MAX);
+            cons1.createSample("samples3", ProfileDataType.TASK_AND_AGGREGATE, 
+                               ProfileLevel.MAX);
         assertTrue(s3 instanceof TaskProfileSample);
         assertTrue(s3 instanceof AggregateProfileSample);
     }

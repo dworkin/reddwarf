@@ -51,7 +51,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for profile data that will be run with data of type
- * {@code TASK} and {@code TASK_AGGREGATE}.
+ * {@code TASK} and {@code TASK_AND_AGGREGATE}.
  */
 @RunWith(ParameterizedNameRunner.class)
 public class TestProfileDataTaskImpl {
@@ -62,7 +62,7 @@ public class TestProfileDataTaskImpl {
     @Parameterized.Parameters
     public static Collection data() {
         return Arrays.asList(new Object[][] {{ProfileDataType.TASK}, 
-                                             {ProfileDataType.TASK_AGGREGATE}});
+                                             {ProfileDataType.TASK_AND_AGGREGATE}});
     }
     /** A test server node */
     private SgsTestNode serverNode;  
@@ -766,7 +766,7 @@ public class TestProfileDataTaskImpl {
         ProfileConsumer cons1 = collector.getConsumer("c1");
         // Register a counter to be noted at all profiling levels
         final ProfileSample sample = 
-            cons1.createSample(name, testType, -1, ProfileLevel.MIN);
+            cons1.createSample(name, testType, ProfileLevel.MIN);
 
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -823,7 +823,7 @@ public class TestProfileDataTaskImpl {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("cons1");
         final ProfileSample sample = 
-            cons1.createSample(name, testType, -1, ProfileLevel.MAX);
+            cons1.createSample(name, testType, ProfileLevel.MAX);
         
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.
@@ -885,7 +885,7 @@ public class TestProfileDataTaskImpl {
         ProfileCollector collector = getCollector(serverNode);
         final ProfileConsumer cons1 = collector.getConsumer("c1");
         final ProfileSample sample = 
-            cons1.createSample(name, testType, -1, ProfileLevel.MAX);
+            cons1.createSample(name, testType, ProfileLevel.MAX);
 
         // Because the listener is running in a different thread, JUnit
         // is not able to report the assertions and failures.

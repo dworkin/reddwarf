@@ -40,9 +40,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
- * This simple implementation of <code>ProfileConsumer</code> is paired
- * with a <code>ProfileProducer</code> and reports all data to a
- * backing <code>ProfileCollectorImpl</code>.
+ * This simple implementation of <code>ProfileConsumer</code> reports all 
+ * data to a backing <code>ProfileCollectorImpl</code>.
  */
 class ProfileConsumerImpl implements ProfileConsumer {
     // the fullName of the consumer
@@ -109,7 +108,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     op = new AggregateProfileOperationImpl(fullName, type, 
                                                            minLevel);
                     break;
-                case TASK_AGGREGATE:
+                case TASK_AND_AGGREGATE:
                 default:
                     op = new TaskAggregateProfileOperationImpl(fullName, type, 
                                                                minLevel);
@@ -192,7 +191,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     counter = new AggregateProfileCounterImpl(fullName, type, 
                                                               minLevel);
                     break;
-                case TASK_AGGREGATE:
+                case TASK_AND_AGGREGATE:
                 default:
                     counter = 
                             new TaskAggregateProfileCounterImpl(fullName, type, 
@@ -204,7 +203,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
             return counter;
         }
     }
-
+    
+    /** {@inheritDoc} */
+    public synchronized ProfileSample createSample(String name,
+            ProfileDataType type, ProfileLevel minLevel) {
+        return createSample(name, type, Integer.MAX_VALUE, minLevel);
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -213,6 +218,10 @@ class ProfileConsumerImpl implements ProfileConsumer {
     {
         if (name == null) {
             throw new NullPointerException("Sample name must not be null");
+        }
+        if (capacity <= 0) {
+            throw new IllegalArgumentException(
+                    "Capacity must be greater than zero");
         }
         String fullName = getCanonicalName(name);
         if (samples.containsKey(fullName)) {
@@ -263,7 +272,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                                                              capacity, 
                                                              minLevel);
                     break;
-                case TASK_AGGREGATE:
+                case TASK_AND_AGGREGATE:
                 default:
                     sample = 
                             new TaskAggregateProfileSampleImpl(fullName, type,
@@ -656,7 +665,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
         
         /** {@inheritDoc} */
         public int getCapacity() { 
-            return capacity < 0 ? Integer.MAX_VALUE : capacity; 
+            return capacity; 
         }
         
         private class ExponentialAverage {

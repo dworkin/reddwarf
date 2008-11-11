@@ -79,9 +79,7 @@ public interface AggregateProfileSample extends ProfileSample {
     int getNumSamples();
     
     /**
-     * Returns the maximum number of samples this object can hold.  If more
-     * than {@code Integer.MAX_VALUE} samples can be held, returns
-     * {@code Integer.MAX_VALUE}.
+     * Returns the maximum number of samples this object can hold. 
      * 
      * @return the maximum number of samples
      */

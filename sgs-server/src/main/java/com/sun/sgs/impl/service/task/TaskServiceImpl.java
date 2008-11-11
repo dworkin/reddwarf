@@ -321,7 +321,7 @@ public class TaskServiceImpl
         ProfileConsumer consumer = collector.getConsumer("TaskService");
 
         ProfileLevel level = ProfileLevel.MAX;
-        ProfileDataType type = ProfileDataType.TASK_AGGREGATE;
+        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         scheduleNDTaskOp =
             consumer.createOperation("scheduleNonDurableTask", type, level);
         scheduleNDTaskDelayedOp =
