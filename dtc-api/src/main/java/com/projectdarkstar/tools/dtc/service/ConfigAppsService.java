@@ -114,6 +114,14 @@ public interface ConfigAppsService
     
     /**
      * Add a ClientApp to persistent storage based on the given clientApp.
+     * If the given clientApp's pkgLibrary field is set, 
+     * this method will create a new PkgLibrary if it does not already
+     * exist in the database.  Otherwise, it will set the pkgLibrary
+     * reference to the PkgLibrary in the database with the already 
+     * existing id.  Additionally, this method will <em>always</em>
+     * create a ClientApp object that contains an empty list of
+     * configs.  The configs attribute of the given clientApp will
+     * be ignored if it has any objects in it.
      * 
      * @param clientApp clientApp to add
      * @return id of the newly created ClientApp
