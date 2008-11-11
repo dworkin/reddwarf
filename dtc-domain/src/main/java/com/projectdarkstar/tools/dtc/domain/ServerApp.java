@@ -48,6 +48,8 @@ public class ServerApp implements Serializable
     private Long versionNumber;
     private String name;
     private String description;
+    private String className;
+    private String classPath;
     
     private List<ServerAppConfig> configs;
     private PkgLibrary requiredPkg;
@@ -56,10 +58,14 @@ public class ServerApp implements Serializable
     
     public ServerApp(String name,
                      String description,
+                     String className,
+                     String classPath,
                      PkgLibrary requiredPkg)
     {
         this.setName(name);
         this.setDescription(description);
+        this.setClassName(className);
+        this.setClassPath(classPath);
         this.setRequiredPkg(requiredPkg);
         
         this.setConfigs(new ArrayList<ServerAppConfig>());
@@ -96,6 +102,28 @@ public class ServerApp implements Serializable
     public void setDescription(String description) { this.description = description; }
     
     /**
+     * Returns the main class name of this server application that implements
+     * the AppListener interface in the sgs core.  This should be a fully
+     * qualified class name.
+     * 
+     * @return main class name for the server application
+     */
+    @Column(name = "className", nullable = false)
+    public String getClassName() { return className; }
+    public void setClassName(String className) { this.className = className; }
+    
+    /**
+     * Returns the classpath required to run the server application.
+     * The items in this path are relative to the root of the filesystem
+     * in the {@link #getRequiredPkg required} zip archive.
+     * 
+     * @return classpath required to run the server application
+     */
+    @Column(name = "classPath", nullable = false)
+    public String getClassPath() { return classPath; }
+    public void setClassPath(String classPath) { this.classPath = classPath; }
+    
+    /**
      * Returns a list of server application configurations that can be used
      * to run this server application.
      * 
@@ -127,6 +155,8 @@ public class ServerApp implements Serializable
                 ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
                 ObjectUtils.equals(this.getName(), other.getName()) &&
                 ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getClassName(), other.getClassName()) &&
+                ObjectUtils.equals(this.getClassPath(), other.getClassPath()) &&
                 ObjectUtils.equals(this.getConfigs(), other.getConfigs()) &&
                 ObjectUtils.equals(this.getRequiredPkg(), other.getRequiredPkg());
     }

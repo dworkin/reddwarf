@@ -54,6 +54,8 @@ public class TestExecutionResultServerLog implements Serializable
     
     private String originalServerAppName;
     private String originalServerAppDescription;
+    private String originalServerAppClassName;
+    private String originalServerAppClassPath;
     private PkgLibrary originalServerAppRequiredPkg;
     
     private String originalServerAppConfigName;
@@ -74,6 +76,8 @@ public class TestExecutionResultServerLog implements Serializable
         
         this.setOriginalServerAppName(originalServerAppConfig.getServerApp().getName());
         this.setOriginalServerAppDescription(originalServerAppConfig.getServerApp().getDescription());
+        this.setOriginalServerAppClassName(originalServerAppConfig.getServerApp().getClassName());
+        this.setOriginalServerAppClassPath(originalServerAppConfig.getServerApp().getClassPath());
         this.setOriginalServerAppRequiredPkg(originalServerAppConfig.getServerApp().getRequiredPkg());
         
         this.setOriginalServerAppConfigName(originalServerAppConfig.getName());
@@ -124,6 +128,14 @@ public class TestExecutionResultServerLog implements Serializable
     public String getOriginalServerAppDescription() { return originalServerAppDescription; }
     private void setOriginalServerAppDescription(String originalServerAppDescription) { this.originalServerAppDescription = originalServerAppDescription; }
     
+    @Column(name = "originalServerAppClassName", nullable = false)
+    public String getOriginalServerAppClassName() { return originalServerAppClassName; }
+    private void setOriginalServerAppClassName(String originalServerAppClassName) { this.originalServerAppClassName = originalServerAppClassName; }
+    
+    @Column(name = "originalServerAppClassPath", nullable = false)
+    public String getOriginalServerAppClassPath() { return originalServerAppClassPath; }
+    private void setOriginalServerAppClassPath(String originalServerAppClassPath) { this.originalServerAppClassPath = originalServerAppClassPath; }
+    
     @ManyToOne
     @JoinColumn(name = "originalServerAppRequiredPkg", nullable = false)
     public PkgLibrary getOriginalServerAppRequiredPkg() { return originalServerAppRequiredPkg; }
@@ -168,6 +180,8 @@ public class TestExecutionResultServerLog implements Serializable
                 ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
                 ObjectUtils.equals(this.getOriginalServerAppName(), other.getOriginalServerAppName()) &&
                 ObjectUtils.equals(this.getOriginalServerAppDescription(), other.getOriginalServerAppDescription()) &&
+                ObjectUtils.equals(this.getOriginalServerAppClassName(), other.getOriginalServerAppClassName()) &&
+                ObjectUtils.equals(this.getOriginalServerAppClassPath(), other.getOriginalServerAppClassPath()) &&
                 ObjectUtils.equals(this.getOriginalServerAppRequiredPkg(), other.getOriginalServerAppRequiredPkg()) &&
                 ObjectUtils.equals(this.getOriginalServerAppConfigName(), other.getOriginalServerAppConfigName()) &&
                 ObjectUtils.equals(this.getOriginalServerAppConfigAdditionalCommandLine(), other.getOriginalServerAppConfigAdditionalCommandLine()) &&

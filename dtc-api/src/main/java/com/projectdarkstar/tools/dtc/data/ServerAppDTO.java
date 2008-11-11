@@ -34,6 +34,8 @@ public class ServerAppDTO extends AbstractDTO
     private Long versionNumber;
     private String name;
     private String description;
+    private String className;
+    private String classPath;
     
     private List<ServerAppConfigDTO> configs;
     private PkgLibraryDTO requiredPkg;
@@ -42,6 +44,8 @@ public class ServerAppDTO extends AbstractDTO
                         Long versionNumber,
                         String name,
                         String description,
+                        String className,
+                        String classPath,
                         PkgLibraryDTO requiredPkg)
     {
         this.setId(id);
@@ -49,6 +53,8 @@ public class ServerAppDTO extends AbstractDTO
         
         this.setName(name);
         this.setDescription(description);
+        this.setClassName(className);
+        this.setClassPath(classPath);
         this.setRequiredPkg(requiredPkg);
         
         this.setConfigs(new ArrayList<ServerAppConfigDTO>());
@@ -84,6 +90,34 @@ public class ServerAppDTO extends AbstractDTO
     public void updateDescription(String description)
             throws DTCInvalidDataException {
         this.updateAttribute("description", description);
+    }
+    
+    /**
+     * Returns the main class name of this server application that implements
+     * the AppListener interface in the sgs core.  This should be a fully
+     * qualified class name.
+     * 
+     * @return main class name for the server application
+     */
+    public String getClassName() { return className; }
+    protected void setClassName(String className) { this.className = className; }
+    public void updateClassName(String className)
+            throws DTCInvalidDataException {
+        this.updateAttribute("className", className);
+    }
+    
+    /**
+     * Returns the classpath required to run the server application.
+     * The items in this path are relative to the root of the filesystem
+     * in the {@link #getRequiredPkg required} zip archive.
+     * 
+     * @return classpath required to run the server application
+     */
+    public String getClassPath() { return classPath; }
+    protected void setClassPath(String classPath) { this.classPath = classPath; }
+    public void updateClassPath(String classPath)
+            throws DTCInvalidDataException {
+        this.updateAttribute("classPath", classPath);
     }
     
     /**
@@ -132,6 +166,8 @@ public class ServerAppDTO extends AbstractDTO
                 ObjectUtils.equals(this.getVersionNumber(), other.getVersionNumber()) &&
                 ObjectUtils.equals(this.getName(), other.getName()) &&
                 ObjectUtils.equals(this.getDescription(), other.getDescription()) &&
+                ObjectUtils.equals(this.getClassName(), other.getClassName()) &&
+                ObjectUtils.equals(this.getClassPath(), other.getClassPath()) &&
                 ObjectUtils.equals(this.getConfigs(), other.getConfigs()) &&
                 ObjectUtils.equals(this.getRequiredPkg(), other.getRequiredPkg());
     }
