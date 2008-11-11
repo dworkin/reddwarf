@@ -131,13 +131,7 @@ import com.sun.sgs.app.Task;
  * Therefore, it is highly recommended (and considered good practice) that
  * potentially long iterations be broken up into smaller tasks. This strategy
  * improves the concurrency of the {@code ScalableList} as it reduces the
- * locked elements owned by any one task. In order to make use of a recurring
- * task using non-{@code ManagedObject} iterators, it is necessary to wrap
- * the iterator in a {@code ManagedObject}, like {@code ManagedSerializable},
- * in order to apply a name binding and retrieve it again for the next
- * execution of the task. As mentioned earlier, once the iterator is no longer
- * needed, it will need to be manually disposed since the wrapper causes the
- * iterator to be persisted in the data manager.
+ * locked elements owned by any one task.
  * <p>
  * 
  * @param <E> the type of the elements stored in the {@code ScalableList}
@@ -430,9 +424,12 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
     }
 
     /**
-     * Removes all of the elements from this list. The underlying structure is
-     * detached and replaced with an empty implementation. The structure of
-     * the old list is deleted asynchronously.
+     * Removes all of the elements referred to in the list, but retains a
+     * basic structure that consists of a {@code SubList}, {@code ListNode},
+     * and a {@code TreeNode}, along with {@code DummyConnector}s
+     * representing the head and tail of the list. The call to
+     * {@code removingObject()} is asynchronous, meaning the objects are
+     * deleted from the data manager in a scheduled task.
      */
     public void clear() {
 
@@ -841,6 +838,11 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	// Schedule asynchronous task here
 	// which will delete the list
 	AppContext.getTaskManager().scheduleTask(clearTask);
+
+	// Remove the dummy connectors
+	DataManager dm = AppContext.getDataManager();
+	dm.removeObject(headRef.get());
+	dm.removeObject(tailRef.get());
     }
 
     /*
@@ -1029,6 +1031,9 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * 
 	 * @param list the {@code ScalableList} owner of this structure
 	 * @param parent the intended parent {@code ListNode}
+	 * @param isSplit {@code true} if the {@code TreeNode} is to be
+	 * created due to a {@code split} operation, and {@code false}
+	 * otherwise.
 	 */
 	TreeNode(ScalableList<E> list, TreeNode<E> parent, boolean isSplit) {
 	    this(list);
@@ -1045,6 +1050,35 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		childRef = null;
 	    }
 	    parentRef = createReferenceIfNecessary(parent);
+	}
+
+	/**
+	 * Returns a {@code String} representation of this object.
+	 * 
+	 * @return a {@code String} representation of this object.
+	 */
+	public String toString() {
+	    StringBuilder s = new StringBuilder();
+	    int size = 0;
+	    int children = getChildCount();
+	    Node<E> node = getChild();
+
+	    // Add information for each child
+	    for (int i = 0; i < children; i++) {
+		if (i > 0) {
+		    s.append(";");
+		}
+		s.append(node.toString());
+		node = node.next();
+		size += node.size();
+	    }
+
+	    // Add list metrics
+	    s.append("size: ");
+	    s.append(size);
+	    s.append(", children: ");
+	    s.append(children);
+	    return s.toString();
 	}
 
 	/**
@@ -1197,13 +1231,27 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 
 	/**
 	 * Unlinks itself from the tree without performing a recursive
-	 * deletion. This method re-links references that are dangling as a
-	 * result of this node's removal.
-	 * 
-	 * @return {@code true} if a prune occurred and {@code false}
-	 * otherwise
+	 * deletion. This method is guaranteed to delete itself. This method
+	 * re-links references that are dangling as a result of this node's
+	 * removal. There are four conditions:
+	 * <p>
+	 * The first condition is if the {@code TreeNode} is an intermediate
+	 * node. If so, it is necessary to link the left and right siblings
+	 * together before the node is pruned.
+	 * <p>
+	 * The second condition is if the {@code TreeNode} is the tail node.
+	 * If so, then the previous element's next reference is set to null
+	 * before the node is pruned.
+	 * <p>
+	 * The third condition is if the {@code TreeNode} is the head node. If
+	 * so, then the next element's previous reference is set to null
+	 * before the node is pruned.
+	 * <p>
+	 * The last condition is if the {@code TreeNode} is an only- child. If
+	 * so, then the parent's child reference is set to null before the
+	 * node is pruned.
 	 */
-	boolean prune() {
+	void prune() {
 
 	    // Decide how to perform re-linking of the nodes,
 	    if (prevRef != null) {
@@ -1230,7 +1278,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		parent.setChildToNull();
 	    }
 	    AppContext.getDataManager().removeObject(this);
-	    return true;
 	}
 
 	/**
@@ -1429,13 +1476,18 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    }
 
 	    AppContext.getDataManager().markForUpdate(this);
-
 	    size--;
 	    childrenCount--;
 
-	    // If there are no children and pruning is successful,
-	    // then propagate changes to the parent
-	    if (childrenCount == 0 && size() == 0 && prune()) {
+	    /*
+	     * If there are no children, then prune this node accordingly. If
+	     * the parent has only one child (this), then link the parent to
+	     * the children and prune this node. For both these cases, we
+	     * propagate the decrement of size and children to the parent.
+	     * Otherwise, we only propagate the decrement the size.
+	     */
+	    if (childrenCount == 0 && size() == 0) {
+		prune();
 		parent.decrementChildrenAndSize();
 		return;
 	    } else if (parent.getChildCount() == 1) {
@@ -1525,16 +1577,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	private ManagedReference<ListNode<E>> current;
 
 	/**
-	 * A reference to the intermediate object in the head pointer
-	 */
-	private ManagedReference<DummyConnector<E>> headDummy;
-
-	/**
-	 * A reference to the intermediate object in the tail pointer
-	 */
-	private ManagedReference<DummyConnector<E>> tailDummy;
-
-	/**
 	 * Constructor for the asynchronous task
 	 * 
 	 * @param root the root node of the entire tree structure
@@ -1543,8 +1585,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    assert (list != null);
 	    DataManager dm = AppContext.getDataManager();
 	    current = dm.createReference(list.getHead());
-	    headDummy = dm.createReference(list.headRef.get());
-	    tailDummy = dm.createReference(list.tailRef.get());
 	}
 
 	/**
@@ -1558,8 +1598,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    if (doWork()) {
 		AppContext.getTaskManager().scheduleTask(this);
 	    } else {
-		dm.removeObject(headDummy.get());
-		dm.removeObject(tailDummy.get());
 		dm.removeObject(this);
 
 		Runnable r = noteDoneRemoving;
@@ -1672,6 +1710,15 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    assert (e != null);
 	    AppContext.getDataManager().markForUpdate(this);
 	    value = e;
+	}
+
+	/**
+	 * Returns a {@code String} representation
+	 * 
+	 * @return the value in {@code String} form
+	 */
+	public String toString() {
+	    return value.toString();
 	}
     }
 
@@ -1791,12 +1838,8 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
     }
 
     /**
-     * This class represents an iterator of the contents of the list.
-     * Iterators are not {@code ManagedObjects} by default, but if desired,
-     * they can be wrapped in {@code ManagedSerializable} objects to have
-     * bindings applied to them. This is particularly useful for long
-     * iterations which require that iterative tasks be divided into smaller
-     * ones.
+     * This class represents an iterator of the elements of the
+     * {@code ScalableList}.
      * 
      * @param <E> the type of element stored in the {@code ScalableList}
      */
@@ -2655,15 +2698,14 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	    parent.clear();
 	}
 
+	/**
+	 * A {@code String} representation of the {@code ListNode}.
+	 * 
+	 * @return a {@code String} representing the contents of the
+	 * {@code ListNode}
+	 */
 	public String toString() {
-	    List<ManagedReference<ManagedObject>> list =
-		    getSubList().getElements();
-	    String s = "{";
-	    for (int i = 0; i < list.size(); i++) {
-		s += list.get(i) + ",";
-	    }
-	    s += "}";
-	    return s;
+	    return subListRef.get().toString();
 	}
 
 	/**
@@ -2740,7 +2782,11 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		return;
 	    }
 
-	    // Otherwise, we need to remove the list
+	    // Link the parent to the next child before
+	    // we attempt to remove the current node
+	    linkParentToNextIfNecessary();
+
+	    // Now we need to remove the list
 	    // node and relink accordingly.
 	    // First, we determine the type
 	    // of list node: there are three possibilities:
@@ -2772,7 +2818,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 		}
 	    }
 
-	    linkParentToNextIfNecessary();
 	    // This is an empty node, so remove it from Data Store.
 	    AppContext.getDataManager().removeObject(getSubList());
 	    AppContext.getDataManager().removeObject(this);
@@ -2783,7 +2828,9 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * after a removal has taken place. This will occur as long as there
 	 * is a next sibling, the next sibling has the same parent as
 	 * {@code this}, the parent has sufficient children, and if the
-	 * parent was not yet removed.
+	 * parent was not yet removed. Otherwise, if the parent has no
+	 * children, then there is no child to update the child reference to,
+	 * so we set it to null and prune the node during the propagation.
 	 */
 	private void linkParentToNextIfNecessary() {
 	    TreeNode<E> parent = getParent();
@@ -2954,6 +3001,23 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	SubList(int maxSize, E e) {
 	    this(maxSize);
 	    append(e);
+	}
+
+	/**
+	 * Returns a {@code String} representation of this object.
+	 * 
+	 * @return a {@code String} representation of this object
+	 */
+	public String toString() {
+	    StringBuilder s = new StringBuilder("{");
+	    for (int i = 0; i < contents.size(); i++) {
+		if (i > 0) {
+		    s.append(",");
+		}
+		s.append(contents.get(i).toString());
+	    }
+	    s.append("}");
+	    return s.toString();
 	}
 
 	/**

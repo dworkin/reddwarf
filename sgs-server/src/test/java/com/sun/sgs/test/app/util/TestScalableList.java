@@ -483,14 +483,14 @@ public class TestScalableList extends Assert {
 			.equals(largerBranchingFactor));
 
 		AppContext.getDataManager().removeObject(list);
-		/*
-		 * AppContext.getDataManager().removeObject(
-		 * smallerBranchingFactor);
-		 * AppContext.getDataManager().removeObject(
-		 * largerBranchingFactor);
-		 * AppContext.getDataManager().removeObject(smallerBucketSize);
-		 * AppContext.getDataManager().removeObject(largerBucketSize);
-		 */
+
+		AppContext.getDataManager().removeObject(
+			smallerBranchingFactor);
+		AppContext.getDataManager().removeObject(
+			largerBranchingFactor);
+		AppContext.getDataManager().removeObject(smallerBucketSize);
+		AppContext.getDataManager().removeObject(largerBucketSize);
+
 	    }
 	}, taskOwner);
     }
@@ -1049,22 +1049,43 @@ public class TestScalableList extends Assert {
      * Tests whether a collection of items can be retained
      * 
      * @throws Exception
-     * @Test public void testRetainAll() throws Exception {
-     * txnScheduler.runTask(new TestAbstractKernelRunnable() { public void
-     * run() throws Exception { // test that retainAll returns true if changes
-     * are made ScalableList<String> list = new ScalableList<String>(6, 6);
-     * assertTrue(list.add("A")); assertTrue(list.add("B"));
-     * assertTrue(list.add("C")); assertTrue(list.add("D")); Collection<String>
-     * c = new ArrayList<String>(); c.add("A"); c.add("B");
-     * assertTrue(list.retainAll(c)); assertEquals(2, list.size());
-     * assertEquals("A", list.get(0)); assertEquals("B", list.get(1)); //
-     * check that retainAll returns false if contents // do not change list =
-     * new ScalableList<String>(6, 6); assertTrue(list.add("A"));
-     * assertTrue(list.add("B")); assertTrue(list.add("C"));
-     * assertTrue(list.add("D")); c = new ArrayList<String>(); c.add("B");
-     * c.add("D"); c.add("A"); c.add("C"); assertFalse(list.retainAll(c));
-     * AppContext.getDataManager().removeObject(list); } }, taskOwner); }
      */
+    @Test
+    public void testRetainAll() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() throws Exception {
+		// test that retainAll returns true if changes are made
+		ScalableList<String> list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+
+		Collection<String> c = new ArrayList<String>();
+		c.add("A");
+		c.add("B");
+		assertTrue(list.retainAll(c));
+		assertEquals(2, list.size());
+		assertEquals("A", list.get(0));
+		assertEquals("B", list.get(1));
+
+		// check that retainAll returns false if contents
+		// do not change
+		list = new ScalableList<String>(6, 6);
+		assertTrue(list.add("A"));
+		assertTrue(list.add("B"));
+		assertTrue(list.add("C"));
+		assertTrue(list.add("D"));
+		c = new ArrayList<String>();
+		c.add("B");
+		c.add("D");
+		c.add("A");
+		c.add("C");
+		assertFalse(list.retainAll(c));
+		AppContext.getDataManager().removeObject(list);
+	    }
+	}, taskOwner);
+    }
 
     /**
      * Tests retrieving a sublist from two arbitrary indices
@@ -2066,8 +2087,8 @@ public class TestScalableList extends Assert {
 			String value = Integer.toString(random.nextInt(999));
 
 			// output
-			// System.err.println("operations: " + opList);
-			// System.err.println(" indices: " + indexList);
+			//System.err.println("operations: " + opList);
+			//System.err.println(" indices: " + indexList);
 
 			String listReturned =
 				performRandomOperation(list, operation,
@@ -3266,7 +3287,7 @@ public class TestScalableList extends Assert {
 		}
 
 		Random random = new Random();
-		int startingPoint = 10;// random.nextInt(shadow.size() - 1);
+		int startingPoint = random.nextInt(shadow.size() - 1);
 
 		// place iterators in the middle
 		ListIterator<String> shadowIter =
@@ -3447,10 +3468,99 @@ public class TestScalableList extends Assert {
      */
     @Test
     public void testClearLeavesNoArtifacts() throws Exception {
+	coreClearTest(10);
+    }
+
+    /**
+     * Test removal of an empty list
+     */
+    @Test
+    public void testRemovingObjectOnEmptyList() throws Exception {
+	coreRemovingObjectTest(0);
+    }
+
+    /**
+     * Test removal of a partially filled list
+     */
+    @Test
+    public void testRemovingObject() throws Exception {
+	coreRemovingObjectTest(10);
+    }
+
+    
+    /**
+     * The core of the removingObjects tests
+     * @param elementsToAdd number of elements to add
+     * @throws Exception
+     */
+    private void coreRemovingObjectTest(final int elementsToAdd) throws Exception {
 	int originalCount = getObjectCount();
 	System.err.println("originalCount: " + originalCount);
-	final String name = "list";
+	final String name = "list" + Long.toString(System.currentTimeMillis());
 
+	// create the list
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		ScalableList<Integer> d = new ScalableList<Integer>(3, 3);
+		AppContext.getDataManager().setBinding(name, d);
+	    }
+	}, taskOwner);
+
+	int countAfterCreate = getObjectCount();
+	System.err.println("countAfterCreate: " + countAfterCreate);
+
+	// add some contents
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		ScalableList<Integer> d =
+			uncheckedCast(AppContext.getDataManager().getBinding(
+				name));
+		for (int i = 0; i < elementsToAdd; i++) {
+		    d.add(i);
+		}
+	    }
+	}, taskOwner);
+
+	int countAfterAdds = getObjectCount();
+	System.err.println("countAfterAdds: " + countAfterAdds);
+
+	// remove object
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		DataManager dm = AppContext.getDataManager();
+		ScalableList<Integer> d = uncheckedCast(dm.getBinding(name));
+		dm.removeObject(d);
+		dm.removeBinding(name);
+	    }
+	}, taskOwner);
+
+	Thread.sleep(50 * elementsToAdd);
+	int countAfterDelete = getObjectCount();
+	System.err.println("countAfterDelete: " + countAfterDelete);
+
+	assertEquals(originalCount, countAfterDelete);
+    }
+    
+    
+    /**
+     * Stress test {@code ScalableList}
+     */
+    @Test
+    public void testScalableListStressTest() throws Exception {
+	coreClearTest(100);
+    }
+
+    /**
+     * Method which can be reused to test clearing of a given number of items
+     * 
+     * @param elementsToAdd the number of elements to add
+     */
+    private void coreClearTest(final int elementsToAdd)
+	    throws Exception {
+	final String name =
+		"list" + Long.toString(System.currentTimeMillis());
+
+	// create list
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		ScalableList<Integer> d = new ScalableList<Integer>();
@@ -3461,12 +3571,13 @@ public class TestScalableList extends Assert {
 	int countAfterCreate = getObjectCount();
 	System.err.println("countAfterCreate: " + countAfterCreate);
 
+	// add some objects
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		ScalableList<Integer> d =
 			uncheckedCast(AppContext.getDataManager().getBinding(
 				name));
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < elementsToAdd; i++) {
 		    d.add(i);
 		}
 	    }
@@ -3475,6 +3586,7 @@ public class TestScalableList extends Assert {
 	int countAfterAdds = getObjectCount();
 	System.err.println("countAfterAdds: " + countAfterAdds);
 
+	// clear the list
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		DataManager dm = AppContext.getDataManager();
@@ -3483,13 +3595,15 @@ public class TestScalableList extends Assert {
 	    }
 	}, taskOwner);
 
-	// removal is asynchronous, so wait
-	Thread.sleep(2000);
+	// removal is asynchronous, so wait. When we compare, there should
+	// be as many objects as there were immediately after the list
+	// was created.
+	Thread.sleep(50 * elementsToAdd);
 	int countAfterClear = getObjectCount();
 	System.err.println("countAfterClear: " + countAfterClear);
-
 	assertEquals(countAfterCreate, countAfterClear);
 
+	// delete object
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		DataManager dm = AppContext.getDataManager();
@@ -3499,73 +3613,6 @@ public class TestScalableList extends Assert {
 	    }
 	}, taskOwner);
 
-	Thread.sleep(2000);
-	int countAfterDelete = getObjectCount();
-	System.err.println("countAfterDelete: " + countAfterDelete);
-
-	assertEquals(originalCount, countAfterDelete);
-    }
-
-    /**
-     * Stress test {@code ScalableList}
-     */
-    @Test
-    public void testScalableListStressTest() throws Exception {
-	int originalCount = getObjectCount();
-	System.err.println("originalCount: " + originalCount);
-	final String name = "list2";
-
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		ScalableList<Integer> d = new ScalableList<Integer>(2, 1);
-		AppContext.getDataManager().setBinding(name, d);
-	    }
-	}, taskOwner);
-
-	int countAfterCreate = getObjectCount();
-	System.err.println("countAfterCreate: " + countAfterCreate);
-
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		ScalableList<Integer> d =
-			uncheckedCast(AppContext.getDataManager().getBinding(
-				name));
-		for (int i = 0; i < 100; i++) {
-		    d.add(i);
-		}
-	    }
-	}, taskOwner);
-
-	int countAfterAdds = getObjectCount();
-	System.err.println("countAfterAdds: " + countAfterAdds);
-
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		DataManager dm = AppContext.getDataManager();
-		ScalableList<Integer> d = uncheckedCast(dm.getBinding(name));
-		d.clear();
-	    }
-	}, taskOwner);
-
-	// removal is asynchronous, so wait
-	Thread.sleep(5000);
-	int countAfterClear = getObjectCount();
-	System.err.println("countAfterClear: " + countAfterClear);
-
-	assertEquals(countAfterCreate, countAfterClear);
-
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		DataManager dm = AppContext.getDataManager();
-		ScalableList<Integer> d = uncheckedCast(dm.getBinding(name));
-		dm.removeObject(d);
-	    }
-	}, taskOwner);
-
 	Thread.sleep(1000);
-	int countAfterDelete = getObjectCount();
-	System.err.println("countAfterDelete: " + countAfterDelete);
-
-	assertEquals(originalCount, countAfterDelete);
     }
 }
