@@ -33,7 +33,7 @@ public interface ProfileSample {
     /**
      * Returns the name of this list of samples.
      *
-     * @return the counter's name
+     * @return the sample's name
      */
     String getName();
 

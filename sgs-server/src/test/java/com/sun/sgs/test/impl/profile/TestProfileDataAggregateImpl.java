@@ -51,7 +51,7 @@ import static org.junit.Assert.assertTrue;
 @RunWith(ParameterizedNameRunner.class)
 public class TestProfileDataAggregateImpl {
 
-    private final static String APP_NAME = "TestProfileDataTask";
+    private final static String APP_NAME = "TestProfileDataAggregateTask";
     
     @Parameterized.Parameters
     public static Collection data() {

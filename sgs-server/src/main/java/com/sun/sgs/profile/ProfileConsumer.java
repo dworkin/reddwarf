@@ -128,10 +128,10 @@ public interface ProfileConsumer {
     /**
      * Creates the named sample collection in this consumer.  If a sample has
      * already been created by this consumer with the same {@code name},
-     * {@code type}, {@code minLevel}, and for aggregating sample types,
+     * {@code type}, {@code minLevel}, and, for aggregating sample types,
      * {@code capacity}, it is returned.  
      * <p>
-     * The {@code capacity} paramenter is used for aggregating sample types
+     * The {@code capacity} parameter is used for aggregating sample types
      * only.   A negative value for {@code capacity} indicates an infinite
      * number of samples.  Once the limit of samples has been
      * reached, older samples will be dropped to make room for the

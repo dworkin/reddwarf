@@ -159,14 +159,10 @@ public interface ProfileReport {
     AccessedObjectsDetail getAccessedObjectsDetail();
 
     /**
-     * Returns the number of tasks in the same context as this report's task
-     * that were in the scheduler and ready to run when this report's task
-     * was started. Note that some schedulers may not differentiate between
-     * application contexts, so this value may represent some other ready
-     * count, such as the total number of tasks ready to run across all
-     * contexts.
+     * Returns the number of tasks in the scheduler and ready to run when 
+     * this report's task was started. 
      *
-     * @return the number of ready tasks in the same context
+     * @return the number of ready tasks
      */
     int getReadyCount();
 

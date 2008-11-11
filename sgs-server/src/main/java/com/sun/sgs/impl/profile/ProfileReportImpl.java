@@ -84,8 +84,8 @@ class ProfileReportImpl implements ProfileReport {
     // methods on this class
     private List<String>ops;
 
-    // samples that are aggregated through methods on this class
-    private Map<String, List<Long>> localSamples;
+    // samples that are added through methods on this class
+    private Map<String, List<Long>> taskSamples;
 
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
@@ -110,7 +110,7 @@ class ProfileReportImpl implements ProfileReport {
 
 	taskCounters = null;
         ops = null;
-	localSamples = null;
+	taskSamples = null;
     }
 
     /**
@@ -142,18 +142,18 @@ class ProfileReportImpl implements ProfileReport {
      * @param sampleName the name of the sample
      * @param value the latest value for the sample
      */
-    void addLocalSample(String sampleName, long value) {
+    void addTaskSample(String sampleName, long value) {
 	List<Long> samples;
-        if (localSamples == null) {
-            localSamples = new HashMap<String, List<Long>>();
+        if (taskSamples == null) {
+            taskSamples = new HashMap<String, List<Long>>();
 	    samples = new LinkedList<Long>();
-	    localSamples.put(sampleName, samples);
+	    taskSamples.put(sampleName, samples);
         } else {
-            if (localSamples.containsKey(sampleName)) {
-		samples = localSamples.get(sampleName);
+            if (taskSamples.containsKey(sampleName)) {
+		samples = taskSamples.get(sampleName);
             } else {
 		samples = new LinkedList<Long>();
-		localSamples.put(sampleName, samples);		
+		taskSamples.put(sampleName, samples);		
 	    }
         }
 	samples.add(value);
@@ -267,7 +267,7 @@ class ProfileReportImpl implements ProfileReport {
      * {@inheritDoc}
      */
     public Map<String, List<Long>> getUpdatedTaskSamples() {
-	return (localSamples == null) ? EMPTY_SAMPLE_MAP : localSamples;
+	return (taskSamples == null) ? EMPTY_SAMPLE_MAP : taskSamples;
     }
 
     /**
@@ -318,24 +318,24 @@ class ProfileReportImpl implements ProfileReport {
 	    }
 	}
 
-	if (report.localSamples != null) {
-	    if (localSamples == null) {
-		localSamples = new HashMap<String, List<Long>>();
+	if (report.taskSamples != null) {
+	    if (taskSamples == null) {
+		taskSamples = new HashMap<String, List<Long>>();
 		for (Map.Entry<String, List<Long>> e : 
-			 report.localSamples.entrySet()) 
+			 report.taskSamples.entrySet()) 
                 {
 		    // make a copy of the child task's samples
 		    List<Long> samples = new LinkedList<Long>(e.getValue());
-		    localSamples.put(e.getKey(), samples);
+		    taskSamples.put(e.getKey(), samples);
 		}
 	    } else {
 		for (Map.Entry<String, List<Long>> e : 
-			 report.localSamples.entrySet()) 
+			 report.taskSamples.entrySet()) 
                 {
-		    List<Long> samples = localSamples.get(e.getKey());
+		    List<Long> samples = taskSamples.get(e.getKey());
 		    if (samples == null) {
 			// make a copy of the child task's samples
-			localSamples.put(e.getKey(),
+			taskSamples.put(e.getKey(),
 					 new LinkedList<Long>(e.getValue()));
                     } else {
 			samples.addAll(e.getValue());
@@ -351,11 +351,6 @@ class ProfileReportImpl implements ProfileReport {
 		ops.addAll(report.ops);
 	    }
 	}
-
-	// NOTE: we do not need to update the aggregateSamples and
-	//       aggregateCounters, as this is being collected across
-	//       all tasks, and so by updating we would really be
-	//       double counting the data
 
 	// NOTE: we do not include the the participants information
 	//       since this is specific to a task and not to its
@@ -373,8 +368,8 @@ class ProfileReportImpl implements ProfileReport {
         if (taskCounters != null) {
             taskCounters = Collections.unmodifiableMap(taskCounters);
         }
-        if (localSamples != null) {
-            localSamples = Collections.unmodifiableMap(localSamples);
+        if (taskSamples != null) {
+            taskSamples = Collections.unmodifiableMap(taskSamples);
         }
         
         participants = Collections.unmodifiableSet(participants);

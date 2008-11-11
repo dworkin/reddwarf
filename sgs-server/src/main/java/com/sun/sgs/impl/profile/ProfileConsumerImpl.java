@@ -246,7 +246,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 if (old.getCapacity() != capacity) {
                     throw new IllegalArgumentException(
                             "Sample with name " + name + 
-                            " already created, but with max level of " +  
+                            " already created, but with max capacity of " +  
                             old.getCapacity());
                 }
             }
@@ -346,7 +346,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             extends AbstractProfileData
             implements AggregateProfileOperation 
     {
-        protected final AtomicLong count = new AtomicLong();
+        private final AtomicLong count = new AtomicLong();
         AggregateProfileOperationImpl(String opName, ProfileDataType type,
                                       ProfileLevel minLevel) {
             super(opName, type, minLevel);
@@ -421,9 +421,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     new TaskProfileOperationImpl(opName, type, minLevel);
         }
         
-        void updateCounter() {
-            super.report();
-        }
         /** {@inheritDoc} */
         public void report() {
             super.report();
@@ -692,6 +689,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
             
             void clear() {
+                first = true;
                 last = 0;
                 avg = 0;
             }
@@ -718,7 +716,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             try {
                 ProfileReportImpl profileReport =
                         profileCollector.getCurrentProfileReport();
-                profileReport.addLocalSample(name, value);
+                profileReport.addTaskSample(name, value);
             } catch (EmptyStackException ese) {
                 throw new IllegalStateException("Cannot report sample " +
                                                 "because no task is active");
