@@ -39,8 +39,6 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
     
     private String originalServerAppName;
     private String originalServerAppDescription;
-    private String originalServerAppClassName;
-    private String originalServerAppClassPath;
     private PkgLibraryDTO originalServerAppRequiredPkg;
     
     private String originalServerAppConfigName;
@@ -54,8 +52,6 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
                                            Long versionNumber,
                                            String originalServerAppName,
                                            String originalServerAppDescription,
-                                           String originalServerAppClassName,
-                                           String originalServerAppClassPath,
                                            String originalServerAppConfigName,
                                            String originalServerAppConfigAdditionalCommandLine)
     {
@@ -64,8 +60,6 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
         
         this.setOriginalServerAppName(originalServerAppName);
         this.setOriginalServerAppDescription(originalServerAppDescription);
-        this.setOriginalServerAppClassName(originalServerAppClassName);
-        this.setOriginalServerAppClassPath(originalServerAppClassPath);
         this.setOriginalServerAppRequiredPkg(null);
         
         this.setOriginalServerAppConfigName(originalServerAppConfigName);
@@ -114,12 +108,6 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
     public String getOriginalServerAppDescription() { return originalServerAppDescription; }
     private void setOriginalServerAppDescription(String originalServerAppDescription) { this.originalServerAppDescription = originalServerAppDescription; }
     
-    public String getOriginalServerAppClassName() { return originalServerAppClassName; }
-    private void setOriginalServerAppClassName(String originalServerAppClassName) { this.originalServerAppClassName = originalServerAppClassName; }
-    
-    public String getOriginalServerAppClassPath() { return originalServerAppClassPath; }
-    private void setOriginalServerAppClassPath(String originalServerAppClassPath) { this.originalServerAppClassPath = originalServerAppClassPath; }
-    
     public PkgLibraryDTO getOriginalServerAppRequiredPkg() { return originalServerAppRequiredPkg; }
     private void setOriginalServerAppRequiredPkg(PkgLibraryDTO originalServerAppRequiredPkg) { this.originalServerAppRequiredPkg = originalServerAppRequiredPkg; }
     
@@ -163,8 +151,6 @@ public class TestExecutionResultServerLogDTO extends AbstractDTO
                 ObjectUtils.equals(this.getLogFile(), other.getLogFile()) &&
                 ObjectUtils.equals(this.getOriginalServerAppName(), other.getOriginalServerAppName()) &&
                 ObjectUtils.equals(this.getOriginalServerAppDescription(), other.getOriginalServerAppDescription()) &&
-                ObjectUtils.equals(this.getOriginalServerAppClassName(), other.getOriginalServerAppClassName()) &&
-                ObjectUtils.equals(this.getOriginalServerAppClassPath(), other.getOriginalServerAppClassPath()) &&
                 ObjectUtils.equals(this.getOriginalServerAppRequiredPkg(), other.getOriginalServerAppRequiredPkg()) &&
                 ObjectUtils.equals(this.getOriginalServerAppConfigName(), other.getOriginalServerAppConfigName()) &&
                 ObjectUtils.equals(this.getOriginalServerAppConfigAdditionalCommandLine(), other.getOriginalServerAppConfigAdditionalCommandLine()) &&
