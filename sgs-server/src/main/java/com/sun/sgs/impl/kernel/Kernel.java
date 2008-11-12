@@ -596,7 +596,8 @@ class Kernel {
 			    KernelShutdownController.class);
 
 	    // return a new instance using the four-argument constructor
-	    KernelShutdownController ctrl = new KernelShutdownController(this);
+	    KernelShutdownController ctrl =
+		    new KernelShutdownControllerImpl(this);
 	    return (Service) (serviceConstructor.newInstance(appProperties,
 		    systemRegistry, proxy, ctrl));
 
@@ -860,9 +861,9 @@ class Kernel {
     }
 
     /**
-     * This is an object created by the {@code Kernel} and passed
-     * to the {@code WatchdogService} when it is created. This object allows
-     * the {@code Kernel} to be referenced when a shutdown of the node is
+     * This is an object created by the {@code Kernel} and passed to the
+     * {@code WatchdogService} when it is created. This object allows the
+     * {@code Kernel} to be referenced when a shutdown of the node is
      * necessary, such as when a service on the node has failed or has become
      * inconsistent. While this class is declared with public visibility, it
      * can only be instantiated by the {@code Kernel}.
@@ -875,7 +876,8 @@ class Kernel {
      * assess the severity of the failure and make a decision based on the
      * information.
      */
-    private final class KernelShutdownController {
+    private final class KernelShutdownControllerImpl implements
+	    KernelShutdownController {
 
 	/**
 	 * A reference to the {@code Kernel} used for call-back of the
@@ -884,20 +886,17 @@ class Kernel {
 	private final Kernel kernel;
 
 	/**
-	 * Private constructor called by the {@code Kernel} to
-	 * create an instance of the {@code KernelShutdownController}.
+	 * Private constructor called by the {@code Kernel} to create an
+	 * instance of the {@code KernelShutdownController}.
 	 * 
 	 * @param kernelRef the {@code Kernel} reference
 	 */
-	private KernelShutdownController(Kernel kernel) {
+	private KernelShutdownControllerImpl(Kernel kernel) {
 	    this.kernel = kernel;
 	}
 
 	/**
-	 * This method instructs the {@code Kernel} to shutdown the node, as a
-	 * result of a failure reported to the {@code WatchdogService}. It is
-	 * made public so that services which acquire the object are able to
-	 * issue a shutdown to the otherwise non-visible method.
+	 * {@inheritDoc}
 	 */
 	public void shutdownNode() {
 	    kernel.shutdown();

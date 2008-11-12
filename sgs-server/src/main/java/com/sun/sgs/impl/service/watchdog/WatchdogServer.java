@@ -94,15 +94,18 @@ public interface WatchdogServer extends Remote {
      * shutdown. This notification is a result of a server running into
      * difficulty communicating with a remote node, so the server's watchdog
      * service is responsible for notifying the watchdog server in order to
-     * issue the shutdown.
+     * issue the shutdown. If the method returns {@code false}, then it means
+     * that another thread has already issued the node to shutdown.
      * 
      * @param nodeId the failed node's ID
      * @param className the class issuing the failure
      * @param severity the severity of the failure
      * @param maxNumberOfAttempts the maximum number of attempts to try and
      * resolve an {@code IOException}
+     * @return {@code true} if the node was successfully set to failed, and
+     * {@code false} otherwise
      */
-    void setNodeAsFailed(long nodeId, String className,
+    boolean setNodeAsFailed(long nodeId, String className,
 	    WatchdogService.FailureLevel severity, int maxNumberOfAttempts)
 	    throws IOException;
 
@@ -110,9 +113,21 @@ public interface WatchdogServer extends Remote {
      * Notifies the data store that the node has failed. This method is called
      * if the watchdog service has already dealt with the shutdown procedure.
      * If the node is known to be a remote node, then the three-argument
-     * method should be called instead.
+     * method should be called instead. If the method returns {@code false},
+     * then it means that another thread has already issued the node to
+     * shutdown.
      * 
      * @param nodeId the failed node's ID
+     * @return {@code true} if the node was successfully set to failed, and
+     * {@code false} otherwise
      */
-    void setNodeAsFailed(long nodeId);
+    boolean setNodeAsFailed(long nodeId);
+
+    /**
+     * Removes the {@code nodeId} from the failed list if it is contained, or
+     * does nothing if it is not in the list.
+     * 
+     * @param nodeId the nodeId to remove from the list
+     */
+    void doneReportingNodeFailure(long nodeId);
 }

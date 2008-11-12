@@ -254,11 +254,10 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	logger.log(Level.CONFIG,
 		"Creating WatchdogServiceImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	
+
 	// Setup the KernelShutdownController object
 	shutdownController = ctrl;
 
-	
 	try {
 	    isCoreServerNode =
 		    wrappedProps.getBooleanProperty(START_SERVER_PROPERTY,
@@ -378,7 +377,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	} catch (Exception e) {
 	    logger.logThrow(Level.CONFIG, e,
 		    "Failed to create WatchdogServiceImpl");
-	    
+
 	    // Issue a shutdown
 	    doShutdown();
 	    shutdownController.shutdownNode();
@@ -442,7 +441,8 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
-		setFailedThenNotify(true);
+		// this will call setFailedThenNotify(true)
+		reportFailure(this.getClass().toString(), FailureLevel.MEDIUM);
 		return false;
 	    } else {
 		return true;
@@ -514,42 +514,45 @@ public final class WatchdogServiceImpl extends AbstractService implements
      */
     public void reportFailure(long nodeId, String className,
 	    FailureLevel severity) throws IOException {
-	
+
 	// If the node is shutting down or is not alive, then
 	// we won't do anything
 	if (shuttingDown() || !isAlive) {
 	    return;
 	}
 	
-	// Depending on the severity, decide what action to perform.
-	// In the future, we may want to differentiate the type of
-	// action to perform. For now, default all behavior to the
-	// same action: node shutdown.
+	/*
+	 * Depending on the severity, decide what action to perform. In the
+	 * future, we may want to differentiate the type of action to perform.
+	 * For now, default all behavior to the same action: node shutdown.
+	 */
 	switch (severity) {
 	    case FATAL:
 	    case SEVERE:
 	    case MEDIUM:
 	    case MINOR:
 
-		// Check if the node ID matches this node and that
-		// this node is not the application node; shutdown
-		// this node if so. Otherwise, find the node which
-		// should be shutdown instead
+		/*
+		 * Check if the node ID matches this node and that this node
+		 * is not the application node; shutdown this node if so.
+		 * Otherwise, find the node which should be shutdown instead
+		 */
 		if (nodeId == getLocalNodeId()) {
 		    logger.log(Level.SEVERE, "{0} reported failure",
 			    className);
-		    serverProxy.setNodeAsFailed(nodeId);
-		    setFailedThenNotify(true);
-		    return;
-		}
 
-		// Inform the server to shutdown the remote node.
-		// Note that this call may throw an IOException
-		if (serverProxy != null){
-        		serverProxy.setNodeAsFailed(nodeId, className, severity,
-        			AbstractService.DEFAULT_MAX_IO_ATTEMPTS);
+		    // only fail the local node if we were the
+		    // one who reported it to fail
+		    if (serverProxy.setNodeAsFailed(nodeId)) {
+			setFailedThenNotify(true);
+		    }
+
 		} else {
-		    logger.log(Level.WARNING, "The server proxy is null");
+
+		    // Inform the server to shutdown the remote node.
+		    // Note that this call may throw an IOException
+		    serverProxy.setNodeAsFailed(nodeId, className, severity,
+			    AbstractService.DEFAULT_MAX_IO_ATTEMPTS);
 		}
 	}
     }
@@ -597,10 +600,9 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		boolean renewed = false;
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
-			reportFailure(this.getClass().toString(), 
+			reportFailure(this.getClass().toString(),
 				FailureLevel.MEDIUM);
-			setFailedThenNotify(true);
-			break;
+			return;
 		    }
 		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
@@ -618,7 +620,8 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
-		    setFailedThenNotify(true);
+		    reportFailure(this.getClass().toString(),
+				FailureLevel.MEDIUM);
 		    break;
 		}
 		if (renewed) {
@@ -688,6 +691,9 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
 	// use controller to issue a shutdown
 	shutdownController.shutdownNode();
+
+	// remove the ID from the map
+	serverProxy.doneReportingNodeFailure(getLocalNodeId());
     }
 
     /**
