@@ -33,9 +33,8 @@ import java.util.logging.Logger;
 
 /**
  * An object cache for reusing objects from previous transactions, to help
- * avoid object serialization.  To provide thread concurrency, uses several
- * caches chosen by the low order bits of the object ID.  Within each cache,
- * objects are stored in lists that are the values stored in linked hash maps.
+ * avoid object serialization.  Objects are stored in lists that are the values
+ * stored in linked hash maps.
  */
 final class ObjectCache {
 
@@ -46,23 +45,14 @@ final class ObjectCache {
     /** The number of cache operations between calls to log the hit rate. */
     private static final int LOGGING_INTERVAL = 100000;
 
-    /**
-     * The number of independent sub-caches, for thread concurrency.  Should
-     * be a power of two.
-     */
-    private static final int NUM_SUBCACHES = 1 << 2;
-
-    /** A mask to AND with a value to select one of the sub-caches. */
-    private static final int SUBCACHE_MASK = NUM_SUBCACHES - 1;
-
-    /** The maximum size of the cache. */
-    private final int maxSize;
-
     /** The names of classes whose instances should not be cached. */
     private final Set<String> notClasses;
 
-    /** The sub-caches. */
-    private final Cache[] caches = new Cache[NUM_SUBCACHES];
+    /** The underlying map. */
+    private final Cache map;
+
+    /** Whether the cache is disabled. */
+    private final boolean disabled;
 
     /**
      * The number of cache hits.  Synchronize on this instance when
@@ -90,12 +80,9 @@ final class ObjectCache {
 	    throw new IllegalArgumentException(
 		"The maxSize argument must not be negative");
 	}
-	this.maxSize = maxSize;
+	map = new Cache(maxSize);
 	this.notClasses = notClasses;
-	int maxSubcacheSize = maxSize / NUM_SUBCACHES;
-	for (int i = 0; i < NUM_SUBCACHES; i++) {
-	    caches[i] = new Cache(maxSubcacheSize);
-	}
+	disabled = (maxSize == 0);
     }
 
     /**
@@ -112,7 +99,7 @@ final class ObjectCache {
      *		object is found
      */
     Value get(long oid, byte[] bytes, Context context) {
-	if (maxSize == 0) {
+	if (disabled) {
 	    return null;
 	}
 	boolean logUsage = false;
@@ -127,7 +114,6 @@ final class ObjectCache {
 	if (logUsage && logger.isLoggable(Level.FINE)) {
 	    logger.log(Level.FINE, "Object cache hit rate: {0}", usage);
 	}
-	Cache map = getCache(oid);
 	Key key = new Key(oid, bytes);
 	List<Value> list;
 	synchronized (map) {
@@ -171,12 +157,9 @@ final class ObjectCache {
     void put(long oid, byte[] bytes, ContextWrapper contextWrapper,
 	     ManagedObject object, byte[] unmodifiedBytes)
     {
-	if (maxSize == 0 ||
-	    notClasses.contains(object.getClass().getName()))
-	{
+	if (disabled || notClasses.contains(object.getClass().getName())) {
 	    return;
 	}
-	Cache map = getCache(oid);
 	Key key = new Key(oid, bytes);
 	List<Value> list;
 	synchronized (map) {
@@ -198,16 +181,6 @@ final class ObjectCache {
 	synchronized (list) {
 	    list.add(value);
 	}
-    }
-
-    /**
-     * Returns the cache to use for objects with the specified object ID.
-     *
-     * @param	oid the object ID
-     * @return	the cache
-     */
-    private Cache getCache(long oid) {
-	return caches[((int) oid) & SUBCACHE_MASK];
     }
 
     /**
