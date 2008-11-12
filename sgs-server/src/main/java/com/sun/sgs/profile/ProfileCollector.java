@@ -136,7 +136,9 @@ public interface ProfileCollector {
     
     /**
      * Returns the named {@code ProfileConsumer}, or creates a new one with
-     * that name.
+     * that name.  Note that the name must be unique for a new 
+     * {@code ProfileConsumer} to be created.  Calling {@link #getConsumers}
+     * will return a map keyed by names already used.
      *
      * @param name the unique name of the profile consumer
      *

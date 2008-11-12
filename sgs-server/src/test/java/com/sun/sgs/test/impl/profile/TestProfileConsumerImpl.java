@@ -657,7 +657,7 @@ public class TestProfileConsumerImpl {
                     if (report.getTaskOwner().equals(myOwner)) {
                         try {
                             List<String> ops =
-                                SimpleTestListener.report.getReportedOperations();
+                                report.getReportedOperations();
                             System.err.println("+++");
                             for (String name : ops) {
                                 assertTrue(name.contains(opName) 
@@ -743,21 +743,21 @@ public class TestProfileConsumerImpl {
     public void testSampleTaskAggregateZeroCapacity() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
-        ProfileSample s1 = 
+        AggregateProfileSample s1 = (AggregateProfileSample)
             cons1.createSample("foo", 
                                ProfileDataType.TASK_AND_AGGREGATE,
-                               0,
                                ProfileLevel.MIN);
+        s1.setCapacity(0);
     }
     @Test(expected=IllegalArgumentException.class)
     public void testSampleTaskAggregateNegCapacity() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
-        ProfileSample s1 = 
+        AggregateProfileSample s1 = (AggregateProfileSample)
             cons1.createSample("foo", 
                                ProfileDataType.TASK_AND_AGGREGATE,
-                               -1,
                                ProfileLevel.MIN);
+        s1.setCapacity(-1);
     }
     
     @Test
@@ -856,8 +856,8 @@ public class TestProfileConsumerImpl {
         {
             ProfileSample s3 =
                 cons1.createSample(name, ProfileDataType.TASK, 
-                                   25, ProfileLevel.MAX);
-            assertSame(s1, s3);
+                                   ProfileLevel.MAX);
+            assertSame(s1, s3);   
         }
         
         final String aggName = "aggregateSample";
@@ -865,30 +865,24 @@ public class TestProfileConsumerImpl {
             ProfileSample s3 =
                  cons1.createSample(aggName, ProfileDataType.AGGREGATE,
                                     ProfileLevel.MAX);
-            try {
-                ProfileSample s4 =
-                     cons1.createSample(aggName, ProfileDataType.AGGREGATE,
-                                        75, ProfileLevel.MAX);
-                fail("Expected IllegalArgumentException");
-            } catch (IllegalArgumentException expected) {
-                System.err.println(expected);
-            }
+            
+            AggregateProfileSample s4 = (AggregateProfileSample)
+                 cons1.createSample(aggName, ProfileDataType.AGGREGATE,
+                                    ProfileLevel.MAX);
+            assertSame(s3, s4);
         }
         
         final String taskAggName = "task aggregate sample";
         {
             ProfileSample s3 =
-                cons1.createSample(taskAggName, ProfileDataType.TASK_AND_AGGREGATE, 
+                cons1.createSample(taskAggName, 
+                                   ProfileDataType.TASK_AND_AGGREGATE, 
                                    ProfileLevel.MAX);
-            try {
-                ProfileSample s4 =
-                     cons1.createSample(taskAggName, 
-                                        ProfileDataType.TASK_AND_AGGREGATE,
-                                        25, ProfileLevel.MAX);
-                fail("Expected IllegalArgumentException");
-            } catch (IllegalArgumentException expected) {
-                System.err.println(expected);
-            }
+            ProfileSample s4 =
+                 cons1.createSample(taskAggName, 
+                                    ProfileDataType.TASK_AND_AGGREGATE,
+                                    ProfileLevel.MAX);
+            assertSame(s3, s4);
         }
         
         // Try creating with a different name

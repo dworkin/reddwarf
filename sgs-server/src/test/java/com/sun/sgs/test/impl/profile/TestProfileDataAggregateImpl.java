@@ -242,11 +242,12 @@ public class TestProfileDataAggregateImpl {
         final AggregateProfileSample samp1 =
                 (AggregateProfileSample) 
                     cons1.createSample("s1", testType, ProfileLevel.MIN);
-        assertEquals(Integer.MAX_VALUE, samp1.getCapacity());
+        assertEquals(1000, samp1.getCapacity());
         
         final AggregateProfileSample samp2 =
                 (AggregateProfileSample) 
-                    cons1.createSample("s2", testType, 5, ProfileLevel.MIN);
+                    cons1.createSample("s2", testType, ProfileLevel.MIN);
+        samp2.setCapacity(5);
         assertEquals(5, samp2.getCapacity());
         
         // Add 5 samples, then make sure 6th causes the first to go away

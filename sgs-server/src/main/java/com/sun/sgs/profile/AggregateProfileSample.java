@@ -84,4 +84,17 @@ public interface AggregateProfileSample extends ProfileSample {
      * @return the maximum number of samples
      */
     int getCapacity();
+    
+    /**
+     * Set the maximum number of samples this object can hold.
+     * Once the limit of samples has been reached, older samples will 
+     * be dropped to make room for the newest samples. Dropping samples
+     * due to capacity restrictions has no effect on the other aggregated
+     * statistics.
+     * 
+     * @return the maximum number of samples
+     * 
+     * @throws IllegalArgumentException if the capacity is not positive
+     */
+    void setCapacity(int capacity);
 }

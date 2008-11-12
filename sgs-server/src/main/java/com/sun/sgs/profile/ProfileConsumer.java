@@ -128,11 +128,10 @@ public interface ProfileConsumer {
     /**
      * Creates the named sample collection in this consumer.  If a sample has
      * already been created by this consumer with the same {@code name},
-     * {@code type}, {@code minLevel}, and, for aggregating sample types,
-     * a {@code capacity} of {@code Integer.MAX_VALUE}, it is returned.  
+     * {@code type}, {@code minLevel}, it is returned.  
      * <p>
-     * Aggregating sample types will be given a default capacity of
-     * {@code Integer.MAX_VALUE}.
+     * The default capacity of the created {@code ProfileSample} is 
+     * {@code 1000}.
      *
      * @param name a name or description of the sample collection
      * @param type the type of sample collection to create
@@ -143,41 +142,10 @@ public interface ProfileConsumer {
      * 
      * @throws IllegalArgumentException if a sample collection has already been
      *         created with this {@code name} but a different {@code type}
-     *         {@code minLevel}, or, for aggregating samples, a {@code capacity}
-     *         that is not {@code Integer.MAX_VALUE}
+     *         {@code minLevel}
      */
     ProfileSample createSample(String name, 
                                ProfileDataType type,
-                               ProfileLevel minLevel);
-    
-    /**
-     * Creates the named sample collection in this consumer.  If a sample has
-     * already been created by this consumer with the same {@code name},
-     * {@code type}, {@code minLevel}, and, for aggregating sample types,
-     * {@code capacity}, it is returned.  
-     * <p>
-     * The {@code capacity} parameter is used for aggregating sample types
-     * only.  Once the limit of samples has been reached, older samples will 
-     * be dropped to make room for the newest samples.
-     *
-     * @param name a name or description of the sample collection
-     * @param type the type of sample collection to create
-     * @param capacity the maximum number of samples to keep for aggregating
-     *           sample collections
-     * @param minLevel the minimum level of profiling that must be set to record
-     *              this sample  
-     *
-     * @return a {@code ProfileSample} that collects {@code long} data
-     * 
-     * @throws IllegalArgumentException if {@code capacity} is less than or
-     *          equal to zero
-     * @throws IllegalArgumentException if a sample collection has already been
-     *         created with this {@code name} but a different {@code type}
-     *         {@code minLevel}, or, for aggregating samples, {@code capacity}
-     */
-    ProfileSample createSample(String name, 
-                               ProfileDataType type,
-                               int capacity, 
                                ProfileLevel minLevel);
 
     /**
