@@ -56,7 +56,7 @@ import com.sun.sgs.app.Task;
  * structure will be more than a small number of elements, or if the
  * data structure needs to support concurrent writers for putting and
  * removing.  A standard {@code Deque} or {@code Queue} implementation
- * will likely perform better that an instance of this class if the
+ * will likely perform better than an instance of this class if the
  * number of elements is small, or if the usage instance happens
  * entirely during the lifetime of a task and the instance is never
  * persisted.
@@ -68,14 +68,14 @@ import com.sun.sgs.app.Task;
  * iterator is to return was been removed during a separate task, the
  * iterator <i>will</i> throw a {@code
  * ConcurrentModificationException}.  In this behavior, not supporting
- * concurrent updates incur no performance overhead for mutating
+ * concurrent updates incurs no performance overhead for mutating
  * operations.  Furthermore, multiple iterators will not cause any
  * addtional contention.
  *
  * <p>
  *
  * Most operations run in constant time.  However, there are several
- * key difference in operation cost between this class and other
+ * key differences in operation cost between this class and other
  * {@code Deque} implementations.  The operations {@link
  * ScalableDeque#remove(Object) remove}, {@link
  * ScalableDeque#removeAll(Collection) removeAll}, {@link
@@ -84,7 +84,7 @@ import com.sun.sgs.app.Task;
  * removeLastOccurrence} run in time linear to the number of instances
  * of that object in the deque, not the number of elements in the
  * deque.  In addition, the {@link ScalableDeque#contains(Object)
- * contains} operation is constant time.  Due to the distribute nature
+ * contains} operation is constant time.  Due to the distributed nature
  * of the deque, the {@link ScalableDeque#size() size} operation takes
  * time linear to the size of the deque.  For large deques, this
  * method should not be called, as it would take longer than the time
@@ -121,10 +121,10 @@ import com.sun.sgs.app.Task;
  * This class will mark itself for update as
  * necessary; no additional calls to the {@link DataManager} are
  * necessary when modifying the deque.  Developers should not need to
- * call {@code markForUpdate} or {@code getForUpdate} on an deque
+ * call {@code markForUpdate} or {@code getForUpdate} on a deque
  * instance, as this will eliminate all the concurrency benefits of
  * this class.  However, calling {@code getForUpdate} or {@code
- * markForUpdate} can be used if a operation needs to prevent all
+ * markForUpdate} can be used if an operation needs to prevent all
  * access to the map.  
  *
  * <p>
@@ -135,13 +135,15 @@ import com.sun.sgs.app.Task;
  * Therefore, it is highly recommended (and considered good practice) that
  * potentially long iterations be broken up into smaller tasks. This strategy
  * improves the concurrency of the deque as it reduces the
- * locked elements owned by any one task. In order to make use of a recurring
- * task using non-{@code ManagedObject} iterators, it is necessary to wrap
- * the iterator in a {@code ManagedObject}, like {@code ManagedSerializable},
- * in order to apply a name binding and retrieve it again for the next
- * execution of the task. As mentioned earlier, once the iterator is no longer
- * needed, it will need to be manually disposed since the wrapper causes the
- * iterator to be persisted in the data manager.
+ * locked elements owned by any one task. Iterators belonging to the deque
+ * implement the {@code java.io.Serializable} interface, but not
+ * {@code com.sun.sgs.app.ManagedObject}. Therefore, to persist them in the
+ * data manager, it is necessary to wrap them within another
+ * {@code ManagedObject}. If the iterators are persisted, the 
+ * {@code DataManager.markForUpdate()} (with the wrapper as the argument)
+ * should be called when performing iterator operations like {@code next()}, 
+ * {@code remove()}, etc, so that the iterator's state is flushed to the
+ * data manager.
  *
  *<p>
  *
@@ -470,8 +472,19 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 
     /**
      * {@inheritDoc}
+     * <p>
+     * The iterator implements the {@code java.io.Serializable}
+     * interface but does not implement the 
+     * {@code com.sun.sgs.app.ManagedObject} interface, so
+     * it is not stored in the data manager by default.
+     * <p>
+     * The iterator throws a {@code ConcurrentModificationException}
+     * if either the next element was removed and {@code hasNext()}
+     * was not called before {@code next()}, or if the iterator was 
+     * serialized and the next element was removed before a call
+     * to retrieve the next element is made.
      */
-    public Iterator<E> descendingIterator() {
+    public Iterator<E> descendingIterator() { 
         return new BidirectionalDequeIterator<E>(this, true);
     }
 
@@ -489,7 +502,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     /**
      * {@inheritDoc}
      */
-    @SuppressWarnings("unchecked")
     public boolean equals(Object o) {
         /*
          * IMPLEMENTATION NOTE: The Java general contract for hashCode
@@ -503,7 +515,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         if (o == null || !(o instanceof ScalableDeque)) {
             return false;
         }
-        ScalableDeque d = (ScalableDeque) o;
+        ScalableDeque<E> d = uncheckedCast(o);
         DataManager dm = AppContext.getDataManager();
         return dm.createReference(this).equals(dm.createReference(d));
     }
@@ -586,6 +598,17 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 
     /**
      * {@inheritDoc}
+     * <p>
+     * The iterator implements the {@code java.io.Serializable}
+     * interface but does not implement the 
+     * {@code com.sun.sgs.app.ManagedObject} interface, so
+     * it is not stored in the data manager by default.
+     * <p>
+     * The iterator throws a {@code ConcurrentModificationException}
+     * if either the next element was removed and {@code hasNext()}
+     * was not called before {@code next()}, or if the iterator was 
+     * serialized and the next element was removed before a call
+     * to retrieve the next element is made.
      */
     public Iterator<E> iterator() {
         return new BidirectionalDequeIterator<E>(this, false);
@@ -1476,7 +1499,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
         private final boolean isReverse;
 
         /**
-         * Constructs a new {@code OrderedIterator}.
+         * Constructs a new {@code BidirectionalDequeIterator}.
          *
          * @param deque the deque that will be iterated over
          * @param isReverse whether this iterator should traverse the
@@ -1488,24 +1511,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
             curElement = null;
             this.isReverse = isReverse;
 
-            DataManager dm = AppContext.getDataManager();
-
-            if (isReverse) {
-                // set the value of nextElement to be the last
-                // element in the deque
-                Element<E> tail = deque.tailElement();
-                nextElement = (tail == null) ? null : dm.createReference(tail);
-            } else {
-                // set the value of nextElement to be the first
-                // element in the deque
-                Element<E> head = deque.headElement();
-                nextElement = (head == null) ? null : dm.createReference(head);
-            }
-
-            // mark if the next element was null.	   
             nextElementWasNullOnCreation = nextElement == null;
-            dequeRef = dm.createReference(deque);
-            recheckNextElement = false;
+            dequeRef = AppContext.getDataManager().createReference(deque);
+            checkForNextElementUpdates();
         }
 
         /**
