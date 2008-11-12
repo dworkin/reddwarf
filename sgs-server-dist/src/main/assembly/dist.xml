@@ -61,25 +61,6 @@
       <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
-
-    <!-- Include the mina-core jar in the mina directory -->
-    <dependencySet>
-      <includes>
-        <include>org.apache.mina:mina-core</include>
-      </includes>
-      <outputDirectory>mina-${org.apache.mina.version}</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-    
-    <!-- Include the slf4j jars in the slf4j directory -->
-    <dependencySet>
-      <includes>
-        <include>org.slf4j:slf4j-api</include>
-        <include>org.slf4j:slf4j-jdk14</include>
-      </includes>
-      <outputDirectory>slf4j-${slf4j-api.version}</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
     
     <!-- Unpack the tutorial component -->
     <dependencySet>
@@ -112,18 +93,6 @@
   
   
   <fileSets>
-    
-    <!-- Include the mina license and readme files -->
-    <fileSet>
-      <directory>src/main/etc/mina</directory>
-      <outputDirectory>mina-${org.apache.mina.version}</outputDirectory>
-    </fileSet>
-    
-    <!-- Include the slf4j license and readme files -->
-    <fileSet>
-      <directory>src/main/etc/slf4j</directory>
-      <outputDirectory>slf4j-${slf4j-api.version}</outputDirectory>
-    </fileSet>
     
     <!-- Include the main distribution license and readme files -->
     <fileSet>
