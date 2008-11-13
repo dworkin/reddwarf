@@ -807,6 +807,22 @@ final class ManagedReferenceImpl<T>
 	return object;
     }
 
+    /**
+     * Returns a managed reference wrapper for this reference if there is a
+     * context wrapper in place because deserialization is underway, otherwise
+     * returns this reference.
+     *
+     * @return	a wrapped reference or this reference
+     */
+    ManagedReference<T> maybeCreateWrapper() {
+	ContextWrapper currentWrapper = contextWrapperThread.get();
+	if (currentWrapper != null) {
+	    return new ManagedReferenceWrapper<T>(this, currentWrapper);
+	} else {
+	    return this;
+	}
+    }
+
     /** Validates the values of the context and oid fields. */
     private void validate() {
 	if (context == null) {

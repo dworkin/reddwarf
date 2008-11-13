@@ -301,14 +301,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      */
     private final 
             ManagedReference<ScalableHashMap<Element<E>, Long>> backingMapRef;
-    /**
-     * A transient Java reference to the {@code ScalableHashMap}
-     * refered to by {@link #backingMapRef}.  This field is set by a
-     * task's first access to the backing map.
-     *
-     * @see ScalableDeque#map()
-     */
-    private transient ScalableHashMap<Element<E>, Long> backingMap;
 
     /**
      * Creates a new empty {@code ScalableDeque} that does not support
@@ -328,10 +320,9 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      *        support concurrent iterators
      */
     public ScalableDeque(boolean supportsConcurrentIterators) {
-        backingMap = new ScalableHashMap<Element<E>, Long>();
-
         DataManager dm = AppContext.getDataManager();
-        backingMapRef = dm.createReference(backingMap);
+        backingMapRef = dm.createReference(
+	    new ScalableHashMap<Element<E>, Long>());
 
         // initialize the pointers to the front and end of the deque
         // to null.  However, the reference to these pointers will
@@ -390,10 +381,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
      * @return the backing map.
      */
     private ScalableHashMap<Element<E>, Long> map() {
-        if (backingMap == null) {
-            backingMap = backingMapRef.get();
-        }
-        return backingMap;
+	return backingMapRef.get();
     }
 
     /**
@@ -1122,20 +1110,6 @@ public class ScalableDeque<E> extends AbstractCollection<E>
     private Element<E> tailElement() {
         ManagedReference<Element<E>> tailRef = tailElement.get().get();
         return (tailRef == null) ? null : tailRef.get();
-    }
-
-    /**
-     * Reads in all state for the deque and initializes the transient
-     * {@code backingMap} field to {@code null}
-     */
-    private void readObject(ObjectInputStream s)
-            throws IOException, ClassNotFoundException {
-
-        // read in all the non-transient state
-        s.defaultReadObject();
-
-        // set the state of the transient backing map to null
-        backingMap = null;
     }
 
     /**

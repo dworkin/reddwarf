@@ -22,8 +22,6 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.util.ManagedSerializable;
-import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.Serializable;
 
 /**
@@ -77,14 +75,6 @@ public final class AdaptiveField<T> implements Serializable {
     private ManagedReference<ManagedSerializable<T>> ref;
 
     /**
-     * A local cache of the object if it is being managed by the data store but
-     * has accessed during this transaction, else null.  This allows subsequent
-     * calls to return immediately instead of having to go to the {@code
-     * ManagedReference} cache.
-     */
-    private transient T remoteCache;
-
-    /**
      * Whether the field is currently maintained with a local reference or is
      * being stored in the data store.
      *
@@ -123,7 +113,6 @@ public final class AdaptiveField<T> implements Serializable {
 	if (isLocal) {
 	    local = value;
 	} else {
-	    remoteCache = value;
 	    ref = AppContext.getDataManager().createReference(
 		new ManagedSerializable<T>(value));
 	}
@@ -144,10 +133,7 @@ public final class AdaptiveField<T> implements Serializable {
 	if (isLocal) {
 	    return local;
 	}
-	if (remoteCache == null && ref != null) {
-	    remoteCache = ref.get().get();
-	}
-	return remoteCache;
+	return ref.get().get();
     }
 
     /**
@@ -163,10 +149,7 @@ public final class AdaptiveField<T> implements Serializable {
 	if (isLocal) {
 	    return local;
 	}
-	if (ref != null) {
-	    remoteCache = ref.getForUpdate().get();
-	}
-	return remoteCache;
+	return ref.getForUpdate().get();
     }
 
     /**
@@ -204,7 +187,6 @@ public final class AdaptiveField<T> implements Serializable {
 		local = null;
 	    }
 	    ref = null;
-	    remoteCache = null;
 	    isLocal = true;
 	}
     }
@@ -219,7 +201,6 @@ public final class AdaptiveField<T> implements Serializable {
 	if (isLocal) {
 	    ref = AppContext.getDataManager().
 		createReference(new ManagedSerializable<T>(local));
-	    remoteCache = local;
 	    local = null;
 	    isLocal = false;
 	}
@@ -261,7 +242,6 @@ public final class AdaptiveField<T> implements Serializable {
 		if (ref != null) {
 		    AppContext.getDataManager().removeObject(ref.get());
 		    ref = null;
-		    remoteCache = null;
 		}
 	    }
 	} else {
@@ -297,15 +277,6 @@ public final class AdaptiveField<T> implements Serializable {
 		    ref = null;
 		}
 	    }
-	    remoteCache = value;
 	}
-    }
-
-    /** Make sure that the cached value is cleared. */
-    private void readObject(ObjectInputStream s)
-	throws IOException, ClassNotFoundException {
-
-	s.defaultReadObject();
-	remoteCache = null;
     }
 }

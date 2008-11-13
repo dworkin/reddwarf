@@ -672,7 +672,7 @@ public final class DataServiceImpl implements DataService {
 	try {
 	    checkManagedObject(object);
 	    context = getContext();
-	    ManagedReference<T> result = context.getReference(object);
+	    ManagedReferenceImpl<T> result = context.getReference(object);
 	    // mark that this object has been read locked
 	    oidAccesses.reportObjectAccess(result.getId(), AccessType.READ,
 					   object);
@@ -684,7 +684,7 @@ public final class DataServiceImpl implements DataService {
 		    " returns oid:{2,number,#}",
 		    contextTxnId(context), typeName(object), refId(result));
 	    }
-	    return result;
+	    return result.maybeCreateWrapper();
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
@@ -790,14 +790,14 @@ public final class DataServiceImpl implements DataService {
 	Context context = null;
 	try {
 	    context = getContext();
-	    ManagedReference<?> result = context.getReference(getOid(id));
+	    ManagedReferenceImpl<?> result = context.getReference(getOid(id));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createReferenceForId tid:{0,number,#}," +
 			   " oid:{1,number,#} returns",
 			   contextTxnId(context), id);
 	    }
-	    return result;
+	    return result.maybeCreateWrapper();
 	} catch (RuntimeException e) {
 	    LoggerWrapper exceptionLogger = getExceptionLogger(e);
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {

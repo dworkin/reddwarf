@@ -21,6 +21,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -134,7 +135,7 @@ final class ObjectCache {
 		}
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST,
-			       "ObjectCache.get oid:{0} returns {1}",
+			       "ObjectCache.get oid:{0,number,#} returns {1}",
 			       oid, value);
 		}
 		return value;
@@ -180,6 +181,11 @@ final class ObjectCache {
 	Value value = new Value(contextWrapper, object, unmodifiedBytes);
 	synchronized (list) {
 	    list.add(value);
+	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+		       "ObjectCache.put oid:{0,number,#} {1}",
+		       oid, value);
 	}
     }
 
@@ -333,7 +339,8 @@ final class ObjectCache {
 	 * @return	a string representing this object
 	 */
 	public String toString() {
-	    return "Value[" + contextWrapper + ", " + object + "]";
+	    return "Value[" + contextWrapper + ", " +
+		Objects.fastToString(object) + "]";
 	}
     }
 }
