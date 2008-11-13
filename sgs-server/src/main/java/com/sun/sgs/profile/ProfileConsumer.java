@@ -128,10 +128,7 @@ public interface ProfileConsumer {
     /**
      * Creates the named sample collection in this consumer.  If a sample has
      * already been created by this consumer with the same {@code name},
-     * {@code type}, {@code minLevel}, it is returned.  
-     * <p>
-     * The default capacity of the created {@code ProfileSample} is 
-     * {@code 1000}.
+     * {@code type}, and {@code minLevel}, it is returned.  
      *
      * @param name a name or description of the sample collection
      * @param type the type of sample collection to create
@@ -141,7 +138,7 @@ public interface ProfileConsumer {
      * @return a {@code ProfileSample} that collects {@code long} data
      * 
      * @throws IllegalArgumentException if a sample collection has already been
-     *         created with this {@code name} but a different {@code type}
+     *         created with this {@code name} but a different {@code type} or
      *         {@code minLevel}
      */
     ProfileSample createSample(String name, 

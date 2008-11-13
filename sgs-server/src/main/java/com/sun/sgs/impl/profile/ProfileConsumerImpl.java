@@ -44,6 +44,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * data to a backing <code>ProfileCollectorImpl</code>.
  */
 class ProfileConsumerImpl implements ProfileConsumer {
+    public static final int DEFAULT_SAMPLE_AGGREGATE_CAPACITY = 1000;
+    
     // the fullName of the consumer
     private final String name;
 
@@ -206,6 +208,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
     
     /**
      * {@inheritDoc}
+     * <p>
+     * The default capacity of the created {@code ProfileSample} is 
+     * {@value #DEFAULT_SAMPLE_AGGREGATE_CAPACITY}.
      */
     public synchronized ProfileSample createSample(String name, 
             ProfileDataType type, ProfileLevel minLevel) 
@@ -563,7 +568,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             implements AggregateProfileSample
     {    
         private final LinkedList<Long> samples = new LinkedList<Long>();
-	private int capacity = 1000;       
+	private int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;       
 	
         /** 
          * Smoothing factor for exponential smoothing, between 0 and 1.

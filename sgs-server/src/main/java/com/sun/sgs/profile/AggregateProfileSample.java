@@ -92,8 +92,6 @@ public interface AggregateProfileSample extends ProfileSample {
      * due to capacity restrictions has no effect on the other aggregated
      * statistics.
      * 
-     * @return the maximum number of samples
-     * 
      * @throws IllegalArgumentException if the capacity is not positive
      */
     void setCapacity(int capacity);

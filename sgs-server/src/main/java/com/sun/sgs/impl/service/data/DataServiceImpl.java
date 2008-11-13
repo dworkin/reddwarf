@@ -27,6 +27,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
@@ -453,8 +454,8 @@ public final class DataServiceImpl implements DataService {
             ProfileCollector collector = 
 		systemRegistry.getComponent(ProfileCollector.class);
 	    store = new DataStoreProfileProducer(baseStore, collector);
-            ProfileConsumer consumer =
-                collector.getConsumer("DataService");
+            ProfileConsumer consumer = collector.getConsumer(
+                    ProfileCollectorImpl.CONSUMER_PREFIX + "DataService");
             createReferenceOp = consumer.createOperation(
 		"createReference", ProfileDataType.TASK_AND_AGGREGATE,
                 ProfileLevel.MAX);

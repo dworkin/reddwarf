@@ -31,6 +31,7 @@ import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
@@ -318,7 +319,8 @@ public class TaskServiceImpl
         // create our profiling info
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
-        ProfileConsumer consumer = collector.getConsumer("TaskService");
+        ProfileConsumer consumer = collector.getConsumer(
+                ProfileCollectorImpl.CONSUMER_PREFIX +"TaskService");
 
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
