@@ -51,10 +51,9 @@ public interface ConfigTestsService
      * 
      * @param id id of the TestSuite to update
      * @param updates map of updates to update the TestSuite
-     * @return the new versionNumber attribute of the updated TestSuite
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateTestSuite(Long id,
+    public void updateTestSuite(Long id,
                                 Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -85,10 +84,9 @@ public interface ConfigTestsService
      * 
      * @param id id of the TestSpec to update
      * @param updates map of updates to update the TestSpec
-     * @return the new versionNumber attribute of the updated TestSpec
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateTestSpec(Long id,
+    public void updateTestSpec(Long id,
                                Map<String, Object> updates)
             throws DTCServiceException;
     

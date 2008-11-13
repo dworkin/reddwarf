@@ -76,7 +76,7 @@ public interface ConfigAppsService
      * @return new versionNumber attribute of the updated ServerApp
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateServerApp(Long id,
+    public void updateServerApp(Long id,
                                 Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -90,7 +90,7 @@ public interface ConfigAppsService
      * @return new versionNumber attribute of the updated ServerAppConfig
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateServerAppConfig(Long id,
+    public void updateServerAppConfig(Long id,
                                       Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -147,10 +147,9 @@ public interface ConfigAppsService
      * 
      * @param id id of the ClientApp to update
      * @param updates map of updates to be used to update the ClientApp
-     * @return new versionNumber attribute of the updated ClientApp
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateClientApp(Long id,
+    public void updateClientApp(Long id,
                                 Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -160,10 +159,9 @@ public interface ConfigAppsService
      * 
      * @param id id of the ClientAppConfig to update
      * @param updates map of updates to be used to update the ClientAppConfig
-     * @return new versionNumber attribute of the updated ClientAppConfig
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateClientAppConfig(Long id,
+    public void updateClientAppConfig(Long id,
                                       Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -208,10 +206,9 @@ public interface ConfigAppsService
      * 
      * @param id id of the SystemProbe to update
      * @param updates map of updates to be used to update the SystemProbe
-     * @return new versionNumber attribute of the updated SystemProbe
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateSystemProbe(Long id,
+    public void updateSystemProbe(Long id,
                                   Map<String, Object> updates)
             throws DTCServiceException;
     

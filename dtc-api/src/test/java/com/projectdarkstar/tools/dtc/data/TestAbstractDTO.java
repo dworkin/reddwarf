@@ -169,6 +169,9 @@ public class TestAbstractDTO
         public void setAttribute(Object attribute) { this.attribute = attribute; }
         
         public void validate() throws DTCInvalidDataException {}
+        public Long getId() {
+            return new Long(1);
+        }
     }
     
     public class NoGetterDTO extends AbstractDTO
@@ -181,6 +184,9 @@ public class TestAbstractDTO
         }
         
         public void validate() throws DTCInvalidDataException {}
+        public Long getId() {
+            return new Long(1);
+        }
     }
     
     public class PrivateGetterDTO extends AbstractDTO
@@ -194,6 +200,9 @@ public class TestAbstractDTO
         
         private Object getAttribute() { return attribute; }
         public void validate() throws DTCInvalidDataException {}
+        public Long getId() {
+            return new Long(1);
+        }
     }
     
     public class ExceptionGetterDTO extends AbstractDTO
@@ -209,6 +218,9 @@ public class TestAbstractDTO
         { throw new Exception("error"); }
         
         public void validate() throws DTCInvalidDataException {}
+        public Long getId() {
+            return new Long(1);
+        }
     }
     
 }

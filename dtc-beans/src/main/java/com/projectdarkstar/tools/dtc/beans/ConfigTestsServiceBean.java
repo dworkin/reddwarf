@@ -60,13 +60,13 @@ public class ConfigTestsServiceBean implements ConfigTestsService
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    public Long updateTestSpec(Long id, 
+    public void updateTestSpec(Long id, 
                                Map<String, Object> updates)
             throws DTCServiceException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    public Long updateTestSuite(Long id, 
+    public void updateTestSuite(Long id, 
                                 Map<String, Object> updates)
             throws DTCServiceException {
         throw new UnsupportedOperationException("Not supported yet.");

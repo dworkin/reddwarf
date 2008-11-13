@@ -72,19 +72,19 @@ public class ConfigResourcesServiceBean implements ConfigResourcesService
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    public Long updateHardwareResource(Long id,
+    public void updateHardwareResource(Long id,
                                        Map<String, Object> updates) 
             throws DTCServiceException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    public Long updateHardwareResourceFamily(Long id, 
+    public void updateHardwareResourceFamily(Long id, 
                                              Map<String, Object> updates) 
             throws DTCServiceException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    public Long updatePkgLibrary(Long id,
+    public void updatePkgLibrary(Long id,
                                  Map<String, Object> updates) 
             throws DTCServiceException {
         throw new UnsupportedOperationException("Not supported yet.");

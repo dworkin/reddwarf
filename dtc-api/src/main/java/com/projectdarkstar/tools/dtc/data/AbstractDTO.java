@@ -141,4 +141,6 @@ public abstract class AbstractDTO implements Serializable
      * if validation fails
      */
     public abstract void validate() throws DTCInvalidDataException;
+    
+    public abstract Long getId();
 }

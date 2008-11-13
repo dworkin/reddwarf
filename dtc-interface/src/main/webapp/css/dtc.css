@@ -1,0 +1,48 @@
+#page { 
+  margin: 0px;
+  padding: 0px;
+  width: 100%;
+  font-family: Tahoma, Verdana, Impact, Arial;
+  font-size: small;
+}
+
+#page a {
+  color: #000000;
+  text-decoration: none;
+}
+#page a:link {
+  color: #000000;
+  text-decoration: none;
+}
+#page a:visited {
+  color: #000000;
+  text-decoration: none;
+}
+#page a:active {
+  color: #000000;
+  text-decoration: underline;
+}
+#page a:hover {
+  color: #000000;
+  text-decoration: underline;
+}
+
+#banner {
+  padding: 5px 0px 0px 5px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 0px 0px 3px 0px;
+  font-size: 20px;
+  font-weight: bolder;
+  background-image: url('../images/banner.png');
+  height: 25px;
+}
+
+#crumb { 
+  padding: 5px 0px 10px 5px;
+  
+}
+
+#content { 
+  margin: 5px auto;
+}

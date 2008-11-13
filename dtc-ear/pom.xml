@@ -28,6 +28,12 @@
       <artifactId>dtc-beans</artifactId>
       <version>${version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.tools.dtc</groupId>
+      <artifactId>dtc-interface</artifactId>
+      <type>war</type>
+      <version>${version}</version>
+    </dependency>
   </dependencies>
 
   <build>
@@ -54,6 +60,11 @@
 	      <bundleDir>/</bundleDir>
               <includeInApplicationXml>true</includeInApplicationXml>
             </jarModule>
+	    <webModule>
+	      <groupId>com.projectdarkstar.tools.dtc</groupId>
+	      <artifactId>dtc-interface</artifactId>
+	      <bundleDir>/</bundleDir>
+	    </webModule>
           </modules>
         </configuration>
       </plugin>

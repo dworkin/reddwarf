@@ -63,10 +63,9 @@ public interface ConfigResourcesService
      * 
      * @param id id of the HardwareResource to update
      * @param updates map of updates to use to update the HardwareResource
-     * @return new versionNumber attribute of the updated HardwareResource
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateHardwareResource(Long id,
+    public void updateHardwareResource(Long id,
                                        Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -77,10 +76,9 @@ public interface ConfigResourcesService
      * 
      * @param id id of the HardwareResourceFamily to update
      * @param updates map of updates to use to update the HardwareResourceFamily
-     * @return new versionNumber attribute of the updated HardwareResourceFamily
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updateHardwareResourceFamily(Long id,
+    public void updateHardwareResourceFamily(Long id,
                                              Map<String, Object> updates)
             throws DTCServiceException;
     
@@ -126,10 +124,9 @@ public interface ConfigResourcesService
      * 
      * @param id id of the PkgLibrary to update
      * @param updates map of updates to update the PkgLibrary
-     * @return new versionNumber attribute of the updated PkgLibrary
      * @throws com.projectdarkstar.tools.dtc.service.DTCServiceException
      */
-    public Long updatePkgLibrary(Long id,
+    public void updatePkgLibrary(Long id,
                                  Map<String, Object> updates)
             throws DTCServiceException;
     
