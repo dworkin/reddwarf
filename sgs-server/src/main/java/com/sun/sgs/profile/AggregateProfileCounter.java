@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,26 +19,21 @@
 
 package com.sun.sgs.profile;
 
-
 /**
- * An operation which has occurred.
- * <p>
- * Profile operations are created with calls to {@link 
- * ProfileConsumer#createOperation ProfileConsumer.createOperation}.  An 
- * operations's name includes both the {@code name} supplied to 
- * {@code createOperation} and the value of {@link ProfileConsumer#getName}.
+ * A profile counter which is initially {@code 0}, and increments until it
+ * is explicitly cleared.
  */
-public interface ProfileOperation {
+public interface AggregateProfileCounter extends ProfileCounter {
 
     /**
-     * Returns the name of this operation.
-     *
-     * @return the name
+     * Gets the current counter value.
+     * 
+     * @return the current count value
      */
-    String getName();
-
+    long getCount();
+    
     /**
-     * Tells this operation to report that it is happening. 
+     * Clear the counter, resetting it to {@code 0}.
      */
-    void report();
+    void clearCount();
 }
