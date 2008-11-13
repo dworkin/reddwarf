@@ -455,7 +455,7 @@ public final class DataServiceImpl implements DataService {
 		systemRegistry.getComponent(ProfileCollector.class);
 	    store = new DataStoreProfileProducer(baseStore, collector);
             ProfileConsumer consumer = collector.getConsumer(
-                    ProfileCollectorImpl.CONSUMER_PREFIX + "DataService");
+                    ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataService");
             createReferenceOp = consumer.createOperation(
 		"createReference", ProfileDataType.TASK_AND_AGGREGATE,
                 ProfileLevel.MAX);

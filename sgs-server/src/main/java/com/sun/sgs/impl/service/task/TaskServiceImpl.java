@@ -320,7 +320,7 @@ public class TaskServiceImpl
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
         ProfileConsumer consumer = collector.getConsumer(
-                ProfileCollectorImpl.CONSUMER_PREFIX +"TaskService");
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "TaskService");
 
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
