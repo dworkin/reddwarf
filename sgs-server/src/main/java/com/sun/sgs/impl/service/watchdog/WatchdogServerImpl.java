@@ -202,14 +202,6 @@ public final class WatchdogServerImpl extends AbstractService implements
     private final Random backupChooser = new Random();
 
     /**
-     * A map which contains the failed nodes being processed. the value is not
-     * meaningful since this is a structure used to list and access the IDs
-     * efficiently
-     */
-    private final ConcurrentHashMap<Long, Long> failedNodeList =
-	    new ConcurrentHashMap<Long, Long>();
-
-    /**
      * The thread for checking node expiration times and checking if
      * recovering nodes need backups assigned..
      */
@@ -386,26 +378,47 @@ public final class WatchdogServerImpl extends AbstractService implements
      * while this operation is occurring.
      * 
      * @param c the collection of failed nodes
+     * @return a subset of {@code nodesToFail} that were marked as failed from
+     * this method
      */
-    void processNodeFailures(Collection<NodeImpl> nodesToFail) {
+    Collection<NodeImpl> processNodeFailures(Collection<NodeImpl> nodesToFail) {
+	Collection<NodeImpl> aliveNodesToFail =
+		new ArrayList<NodeImpl>(nodesToFail);
+
+	// Try to declare the nodes as failed unless they have been
+	// reported to be failed already
 	for (NodeImpl node : nodesToFail) {
-	    disqualifyAsAlive(node);
+	    if (disqualifyAsAlive(node)) {
+		aliveNodesToFail.remove(node);
+	    }
 	}
-	for (NodeImpl node : nodesToFail) {
+
+	// Only iterate through the nodes known to still be alive
+	for (NodeImpl node : aliveNodesToFail) {
 	    runFailedNodeProcess(node);
 	}
+	return aliveNodesToFail;
     }
 
     /**
      * Executes the node failure process by removing the node from the
      * {@code aliveNodes} map, performing cleanup, and then setting the node
      * to a failed state.
+     * <p>
+     * Since we are only interested in processing one node as failed, we can
+     * execute the shutdown operations in sequence. Otherwise, if we are
+     * interested in failing a collection of nodes, we will need to call
+     * {@code processNodeFailure(Collection)} so that they are all set to not
+     * alive before the failed process is run (two separate for-loops).
      * 
+     * @see WatchdogServerImpl#processNodeFailure(Collection)
      * @param node the node that has failed
      */
     void processNodeFailure(NodeImpl node) {
-	disqualifyAsAlive(node);
-	runFailedNodeProcess(node);
+	// Does nothing if we weren't able to disqualify it ourselves
+	if (disqualifyAsAlive(node)) {
+	    runFailedNodeProcess(node);
+	}
     }
 
     /**
@@ -413,10 +426,15 @@ public final class WatchdogServerImpl extends AbstractService implements
      * won't be assigned as a backup. Also, clean up the host port map entry.
      * 
      * @param node the node that has failed
+     * @return {@code true} if the node was changed to no longer be alive, and
+     * {@code false} if the node was already marked as failed
      */
-    void disqualifyAsAlive(NodeImpl node) {
-	aliveNodes.remove(node.getId());
-	removeHostPortMapEntry(node);
+    boolean disqualifyAsAlive(NodeImpl node) {
+	if (aliveNodes.remove(node.getId()) != null) {
+	    removeHostPortMapEntry(node);
+	    return true;
+	}
+	return false;
     }
 
     /**
@@ -573,17 +591,17 @@ public final class WatchdogServerImpl extends AbstractService implements
     /**
      * {@inheritDoc}
      */
-    public boolean setNodeAsFailed(long nodeId, String className,
+    public void setNodeAsFailed(long nodeId, String className,
 	    FailureLevel severity, final int maxNumberOfAttempts)
 	    throws IOException {
 
 	// Handle the race condition just in case two different
 	// processes interested in reporting a node failure. If
 	// the node is already being handled, then we do nothing.
-	if (isAlreadyOnFailedList(nodeId)) {
+	if (!aliveNodes.containsKey(nodeId)) {
 	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
-		    "' is already being reported as failed");
-	    return false;
+		    "' is already reported as failed");
+	    return;
 	}
 	int count = maxNumberOfAttempts;
 	NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
@@ -619,48 +637,20 @@ public final class WatchdogServerImpl extends AbstractService implements
 	    logger.log(Level.WARNING, msg);
 	    throw new IOException(msg);
 	}
-	return true;
-    }
-
-    /**
-     * Checks if the node is currently in the process of being reported as
-     * failed. If not, then the method adds the {@code nodeId} to the list.
-     * This class is not responsible for removing it from the list; that is
-     * left to the watchdog service so that no TOCTOU (time-of-check-time-
-     * of-use) errors spring up.
-     * 
-     * @param nodeId the ID of the node to check
-     * @return {@code true} if the nodeId is already on the list, and
-     * {@code false} otherwise
-     */
-    private boolean isAlreadyOnFailedList(long nodeId) {
-	if (!failedNodeList.contains(nodeId)) {
-	    failedNodeList.put(nodeId, nodeId);
-	    return false;
-	}
-	return true;
     }
 
     /**
      * {@inheritDoc}
      */
-    public void doneReportingNodeFailure(long nodeId) {
-	failedNodeList.remove(nodeId);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public boolean setNodeAsFailed(long nodeId) {
+    public void setNodeAsFailed(long nodeId) {
 	// We will only process if it is not being processed already
-	if (isAlreadyOnFailedList(nodeId)) {
+	if (!aliveNodes.containsKey(nodeId)) {
 	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
-		    "' is already being reported as failed");
-	    return false;
+		    "' is already reported as failed");
+	    return;
 	}
 	NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
 	processNodeFailure(remoteNode);
-	return true;
     }
 
     /**
@@ -829,10 +819,19 @@ public final class WatchdogServerImpl extends AbstractService implements
 		synchronized (expirationSet) {
 		    while (!expirationSet.isEmpty()) {
 			NodeImpl node = expirationSet.first();
+
+			// We are done aggregating from the sorted
+			// set once the expiration exceeds "now"
 			if (node.getExpiration() > now) {
 			    break;
 			}
-			expiredNodes.add(node);
+
+			// Only report the node as expired if it
+			// is still alive. Otherwise we assume it
+			// is already being reported as failed.
+			if (aliveNodes.containsKey(node.getId())) {
+			    expiredNodes.add(node);
+			}
 			expirationSet.remove(node);
 		    }
 		}
@@ -841,8 +840,9 @@ public final class WatchdogServerImpl extends AbstractService implements
 		 * Perform the node failure procedure
 		 */
 		if (!expiredNodes.isEmpty()) {
-		    processNodeFailures(expiredNodes);
-		    statusChangedNodes.addAll(expiredNodes);
+		    Collection<NodeImpl> processed =
+			    processNodeFailures(expiredNodes);
+		    statusChangedNodes.addAll(processed);
 		    expiredNodes.clear();
 		}
 

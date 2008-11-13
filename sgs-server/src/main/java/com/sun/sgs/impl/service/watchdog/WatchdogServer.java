@@ -102,10 +102,8 @@ public interface WatchdogServer extends Remote {
      * @param severity the severity of the failure
      * @param maxNumberOfAttempts the maximum number of attempts to try and
      * resolve an {@code IOException}
-     * @return {@code true} if the node was successfully set to failed, and
-     * {@code false} otherwise
      */
-    boolean setNodeAsFailed(long nodeId, String className,
+    void setNodeAsFailed(long nodeId, String className,
 	    WatchdogService.FailureLevel severity, int maxNumberOfAttempts)
 	    throws IOException;
 
@@ -118,16 +116,6 @@ public interface WatchdogServer extends Remote {
      * shutdown.
      * 
      * @param nodeId the failed node's ID
-     * @return {@code true} if the node was successfully set to failed, and
-     * {@code false} otherwise
      */
-    boolean setNodeAsFailed(long nodeId);
-
-    /**
-     * Removes the {@code nodeId} from the failed list if it is contained, or
-     * does nothing if it is not in the list.
-     * 
-     * @param nodeId the nodeId to remove from the list
-     */
-    void doneReportingNodeFailure(long nodeId);
+    void setNodeAsFailed(long nodeId);
 }
