@@ -31,8 +31,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.AbstractCollection;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Map.Entry;
@@ -40,7 +42,8 @@ import java.util.Set;
 
 /**
  * An implementation of a persistent {@code Map} that uses service
- * bindings in the data service to store key/value pairs.
+ * bindings in the data service to store key/value pairs.  This map does
+ * not permit {@code null} keys or values.
  *
  * <p>The {@code keyPrefix} specified during construction is used as a prefix to
  * each binding key the map uses for an entry. A key provided to this map's
@@ -66,7 +69,7 @@ public class BindingKeyedHashMap<K, V>
      *
      * @param	keyPrefix a key prefix
      */
-    BindingKeyedHashMap(String keyPrefix) {
+    public BindingKeyedHashMap(String keyPrefix) {
 	if (keyPrefix == null) {
 	    throw new NullPointerException("null keyPrefix");
 	}
@@ -101,43 +104,92 @@ public class BindingKeyedHashMap<K, V>
 
     /** {@inheritDoc} */
     public V get(Object key) {
+	checkNull("key", key);
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
 	    KeyValuePair<K, V> pair = uncheckedCast(
  		ChannelServiceImpl.getDataService().
 		    getServiceBinding(bindingName));
+	    try {
+		if (!key.equals(pair.getKey())) {
+		    return null;
+		}
+	    } catch (ObjectNotFoundException e) {
+		return null;
+	    }
 	    value = pair.getValue();
 	} catch (NameNotBoundException e) {
-	} catch (ObjectNotFoundException e) {
-	    // TBD: should binding be removed?
 	}
 	return value;
     }
 
     /** {@inheritDoc} */
     public boolean containsKey(Object key) {
-	return get(uncheckedCast(key)) != null;
+	checkNull("key", key);
+	Iterator iter = new KeyIterator(keyPrefix);
+	while (iter.hasNext()) {
+	    try {
+		if (key.equals(iter.next())) {
+		    return true;
+		}
+	    } catch (ObjectNotFoundException e) {
+	    }
+	}
+	return false;
     }
 
     /** {@inheritDoc} */
+    public boolean containsValue(Object value) {
+	checkNull("value", value);
+	Iterator iter = new ValueIterator(keyPrefix);
+	while (iter.hasNext()) {
+	    try {
+		if (value.equals(iter.next())) {
+		    return true;
+		}
+	    } catch (ObjectNotFoundException e) {
+	    }
+	}
+	return false;
+    }
+    
+    /** {@inheritDoc} */
     public V remove(Object key) {
+	checkNull("key", key);
 	DataService dataService = ChannelServiceImpl.getDataService();
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
-	    // Get value and remove key/value pair.
 	    KeyValuePair<K, V> pair = 
 		uncheckedCast(dataService.getServiceBinding(bindingName));
-	    value = pair.getValue();
-	    dataService.removeObject(pair);
+	    Object currentKey = null;
+	    try {
+		currentKey = pair.getKey();
+	    } catch (ObjectNotFoundException e) {
+	    }
+	    // If key matches current key, get value and remove key/value pair.
+	    if (currentKey != null && key.equals(currentKey)) {
+		// TBD: should getting the value catch ONFE?
+		value = pair.getValue();
+		dataService.removeObject(pair);
+		dataService.removeServiceBinding(bindingName);
+	    }
 
 	} catch (NameNotBoundException e) {
-	} catch (ObjectNotFoundException e) {
 	}
-	dataService.removeServiceBinding(bindingName);
 	return value;
     }
+
+    /** {@inheritDoc} */
+    public void clear() {
+	Iterator<K> iter = new KeyIterator<K, V>(keyPrefix);
+	while (iter.hasNext()) {
+	    iter.next();
+	    iter.remove();
+	}
+    }
+
 
     /** {@inheritDoc} */
     public Set<Entry<K, V>> entrySet() {
@@ -178,12 +230,20 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */
 	public int size() {
-	    throw new UnsupportedOperationException("size not supported");
+	    int size = 0;
+	    for (Entry<K, V> entry : this) {
+		size++;
+	    }
+	    return size;
 	}
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    clearInternal(keyPrefix);
+	    Iterator<Entry<K, V>> iter = iterator();
+	    while (iter.hasNext()) {
+		iter.next();
+		iter.remove();
+	    }
 	}
     }
 
@@ -226,24 +286,33 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */
 	public int size() {
-	    throw new UnsupportedOperationException("size not supported");
+	    int size = 0;
+	    for (K key : this) {
+		size++;
+	    }
+	    return size;
 	}
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    clearInternal(keyPrefix);
+	    Iterator<K> iter = iterator();
+	    while (iter.hasNext()) {
+		iter.next();
+		iter.remove();
+	    }
 	}
     }
 
     /** {@inheritDoc) */
     public Collection<V> values() {
-        return new Values<K, V>(this);
+        return new Values<K, V>(keyPrefix);
     }
+    
     /**
      * A serializable {@code Set} for this map's entries.
      */
     private static final class Values<K, V>
-	extends AbstractCollection<V>,
+	extends AbstractCollection<V>
 	implements Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -262,7 +331,7 @@ public class BindingKeyedHashMap<K, V>
 	}
 
 	/** {@inheritDoc} */
-        public Iterator<Entry<K, V>> iterator() {
+        public Iterator<V> iterator() {
             return new ValueIterator<K, V>(keyPrefix);
 	}
 
@@ -273,12 +342,20 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */
 	public int size() {
-	    throw new UnsupportedOperationException("size not supported");
+	    int size = 0;
+	    for (V value : this) {
+		size++;
+	    }
+	    return size;
 	}
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    clearInternal(keyPrefix);
+	    Iterator<V> iter = iterator();
+	    while (iter.hasNext()) {
+		iter.next();
+		iter.remove();
+	    }
 	}
     }
     /**
@@ -465,16 +542,20 @@ public class BindingKeyedHashMap<K, V>
     /* -- Implement Object -- */
     
     /** {@inheritDoc} */
+    /*
     public int hashCode() {
 	return keyPrefix.hashCode();
     }
+    */
 
     /** {@inheritDoc} */
+    /*
     public boolean equals(Object o) {
 	return
 	    o instanceof BindingKeyedHashMap &&
 	    keyPrefix.equals(((BindingKeyedHashMap) o).keyPrefix);
     }
+    */
     
     /* -- Private classes and methods. -- */
 
@@ -524,19 +605,26 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */
 	public int hashCode() {
-	    return getKey().hashCode();
+            return getKey().hashCode() ^ getValue().hashCode();
 	}
 
 	/** {@inheritDoc} */
 	public boolean equals(Object o) {
-	    if (o instanceof KeyValuePair) {
-		KeyValuePair<K, V> pair = uncheckedCast(o);
+	    if (o instanceof Entry) {
+		Entry entry = (Entry) o;
+		Object entryKey = entry.getKey();
+		Object entryValue = entry.getValue();
 		return
-		    getKey().equals(pair.getKey()) &&
-		    getValue().equals(pair.getValue());
+		    entryKey != null && getKey().equals(entryKey) &&
+		    entryValue != null && getValue().equals(entryValue);
 	    } else {
 		return false;
 	    }
+	}
+
+	/** {@inheritDoc} */
+	public String toString() {
+	    return getKey().toString() + "=" + getValue().toString();
 	}
     }
 
@@ -615,19 +703,20 @@ public class BindingKeyedHashMap<K, V>
 	    key.equals(keyPrefix + KEY_STOP);
     }
 
-    private static void clearInternal(String keyPrefix) {
-	// TBD
-    }
-    
     @SuppressWarnings("unchecked")
     private static <T> T uncheckedCast(Object object) {
         return (T) object;
     }
 
-    private static void checkSerializable(String name, Object obj) {
+    private static void checkNull(String name, Object obj) {
 	if (obj == null) {
 	    throw new NullPointerException("null " + name);
-	} else if (!(obj instanceof Serializable)) {
+	}
+    }
+
+    private static void checkSerializable(String name, Object obj) {
+	checkNull(name, obj);
+	if (!(obj instanceof Serializable)) {
 	    throw new IllegalArgumentException(name + " not serializable");
 	}
     }
