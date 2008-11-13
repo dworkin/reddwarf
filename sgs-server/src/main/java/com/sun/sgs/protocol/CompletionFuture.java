@@ -21,11 +21,8 @@ package com.sun.sgs.protocol;
 
 import java.util.concurrent.Future;
 
-public interface CompletionFuture<V> extends Future<V> {
-
-    /**
-     * Notifies this future that the result of the associated operation is
-     * available.
-     */
-    void done();
+/**
+ * A future for the completion of protocol handler operations.
+ */
+public interface CompletionFuture extends Future<Void> {
 }

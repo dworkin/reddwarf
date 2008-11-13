@@ -28,6 +28,7 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
+import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.session.SessionMessageChannel;
 import com.sun.sgs.protocol.session.SessionMessageHandler;
@@ -214,6 +215,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
     /* -- Implement Channel -- */
 
     /** {@inheritDoc} */
+    @Override
     public void close() throws IOException {
         asyncMsgChannel.close();
 	readHandler = new ClosedReadHandler();
@@ -221,6 +223,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
     }
 
     /** {@inheritDoc} */
+    @Override
     public boolean isOpen() {
         return asyncMsgChannel.isOpen();
     }
@@ -310,6 +313,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
             throw new ClosedAsynchronousChannelException();
         }
         
+        @Override
         public void completed(IoFuture<Void, Void> result) {
             throw new AssertionError("should be unreachable");
         }    
@@ -393,6 +397,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
         }
 
 	/** Done writing the first request in the queue. */
+        @Override
         public void completed(IoFuture<Void, Void> result) {
 	    ByteBuffer message;
             synchronized (writeLock) {
@@ -445,6 +450,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
             throw new ClosedAsynchronousChannelException();
         }
 
+        @Override
         public void completed(IoFuture<ByteBuffer, Void> result) {
             throw new AssertionError("should be unreachable");
         }
@@ -483,6 +489,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
         }
 
 	/** Handles the completed read operation. */
+        @Override
         public void completed(IoFuture<ByteBuffer, Void> result) {
             synchronized (readLock) {
                 isReading = false;
@@ -490,15 +497,14 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    handler.disconnect(null);
+                    handler.disconnect();   // ignore future
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "completed read channel:{0} message:{1}",
-                        SimpleSgsProtocolMessageChannel.this,
-			HexDumper.format(message, 0x50));
+                    logger.log(Level.FINEST,
+                               "completed read channel:{0} message:{1}",
+                               SimpleSgsProtocolMessageChannel.this,
+                               HexDumper.format(message, 0x50));
                 }
 
                 byte[] payload = new byte[message.remaining()];
@@ -513,13 +519,12 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 		 * TBD: If we're expecting the channel to close, don't
                  * complain.
 		 */
-
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                handler.disconnect(null);
+                handler.disconnect();   // ignore future
             }
         }
 
@@ -530,10 +535,9 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	    byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
- 		    Level.FINEST,
-		    "processing opcode 0x{0}",
-		    Integer.toHexString(opcode));
+		logger.log(Level.FINEST,
+                           "processing opcode 0x{0}",
+                           Integer.toHexString(opcode));
 	    }
 	    
 	    switch (opcode) {
@@ -544,16 +548,16 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	        if (version != SimpleSgsProtocol.VERSION) {
 	            if (logger.isLoggable(Level.SEVERE)) {
 	                logger.log(Level.SEVERE,
-	                    "got protocol version:{0}, " +
-	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
+	                           "got protocol version:{0}, expected {1}",
+                                   version, SimpleSgsProtocol.VERSION);
 	            }
-		    handler.disconnect(null);
+		    handler.disconnect();   // ignore future
 	            break;
 	        }
 
 		final String name = msg.getString();
 		final String password = msg.getString();
-		handler.loginRequest(name, password, null);
+		handler.loginRequest(name, password);   // ignore future
                 // Resume reading immediately
 		read();
 
@@ -562,9 +566,23 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		handler.sessionMessage(clientMessage, null);
+                CompletionFuture sessionMessageFuture =
+                                handler.sessionMessage(clientMessage);
 
-		// TBD: need to use future and resume reading when notified.
+		// Wait for session message to be processed before
+		// resuming reading.
+		try {
+		    sessionMessageFuture.get();
+		} catch (InterruptedException ignore) {
+		} catch (ExecutionException e) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(Level.FINE, e,
+                                        "Processing session message:{0} " +
+                                        "for protocol:{1} throws",
+                                        HexDumper.format(clientMessage, 0x50),
+                                        SimpleSgsProtocolMessageChannel.this);
+		    }
+		}
 		read();
 
 		break;
@@ -574,17 +592,29 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
 		ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		handler.channelMessage(channelRefId, channelMessage, null);
+                CompletionFuture channelMessageFuture =
+                        handler.channelMessage(channelRefId, channelMessage);
 
-		// TBD: need to use future and resume reading when notified.
-		read();
+		// Wait for channel message to be processed before
+		// resuming reading.
+		try {
+		    channelMessageFuture.get();
+		} catch (InterruptedException ignore) {
+		} catch (ExecutionException e) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.logThrow(Level.FINE, e,
+                                        "Processing channel message:{0} " +
+                                        "for protocol:{1} throws",
+                                        HexDumper.format(channelMessage, 0x50),
+                                        SimpleSgsProtocolMessageChannel.this);
+		    }
+                }
+                read();
 		
 		break;
 
-
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-		handler.logoutRequest(null);
-
+		handler.logoutRequest();    // ignore future
 		// Resume reading immediately
                 read();
 
@@ -592,12 +622,11 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 		
 	    default:
 		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"unknown opcode 0x{0}",
-			Integer.toHexString(opcode));
+		    logger.log(Level.SEVERE,
+			       "unknown opcode 0x{0}",
+			       Integer.toHexString(opcode));
 		}
-		handler.disconnect(null);
+		handler.disconnect();   // ignore future
 		break;
 	    }
 	}

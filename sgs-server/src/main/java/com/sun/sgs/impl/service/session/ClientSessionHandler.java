@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
@@ -347,7 +348,7 @@ class ClientSessionHandler implements SessionMessageHandler {
      *
      * @param   future a completion future
      */
-    private void enqueueCompletionFuture(final CompletionFuture future) {
+    private void enqueueCompletionFuture(final CompletionFutureImpl future) {
         taskQueue.addTask(
             new AbstractKernelRunnable() {
 //          new AbstractKernelRunnable("ScheduleCompletionNotification") {
@@ -753,8 +754,8 @@ class ClientSessionHandler implements SessionMessageHandler {
 
     /** {@inheritDoc} */
     @Override
-    public void loginRequest(final String name, final String password,
-                             CompletionFuture future)
+    public CompletionFuture loginRequest(final String name,
+                                         final String password)
     {
         scheduleNonTransactionalTask(
             new AbstractKernelRunnable() {
@@ -763,26 +764,19 @@ class ClientSessionHandler implements SessionMessageHandler {
                     handleLoginRequest(name, password);
                 } });
         // Enable protocol message channel to read immediately
-        if (future != null) {
-            future.done();
-        }
+        return (new CompletionFutureImpl()).done();
     }
    
 
     /** {@inheritDoc} */
     @Override
-    public void sessionMessage(final ByteBuffer message,
-                               CompletionFuture future)
-    {
+    public CompletionFuture sessionMessage(final ByteBuffer message) {
+        CompletionFutureImpl future = new CompletionFutureImpl();
         if (!loggedIn) {
-            logger.log(
-                Level.WARNING,
-                "session message received before login completed:{0}",
-                this);
-            if (future != null) {
-                future.done();
-            }
-            return;
+            logger.log(Level.WARNING,
+                       "session message received before login completed: {0}",
+                       this);
+            return future.done();
         }
         taskQueue.addTask(
             new AbstractKernelRunnable() {
@@ -801,29 +795,24 @@ class ClientSessionHandler implements SessionMessageHandler {
                     }
                 } }, identity);
 
-        // Wait until processing is complete before notifying future
-        if (future != null) {
-            enqueueCompletionFuture(future);
-        }
+	// Wait until processing is complete before notifying future
+	enqueueCompletionFuture(future);
+	return future;
     }
     
     /** {@inheritDoc} */
     @Override
-    public void channelMessage(final BigInteger channelId,
-                               final ByteBuffer message,
-                               CompletionFuture future)
+    public CompletionFuture channelMessage(final BigInteger channelId,
+                                           final ByteBuffer message)
     {
+        CompletionFutureImpl future = new CompletionFutureImpl();
         if (!loggedIn) {
             logger.log(
                 Level.WARNING,
                 "channel message received before login completed:{0}",
                 this);
-            if (future != null) {
-                future.done();
-            }
-            return;
+            return future.done();
         }
-
         taskQueue.addTask(
             new AbstractKernelRunnable() {
 //          new AbstractKernelRunnable("HandleChannelMessage") {
@@ -843,33 +832,108 @@ class ClientSessionHandler implements SessionMessageHandler {
                     }
                 } }, identity);
 
-        // Wait until processing is complete before notifying future
-        if (future != null) {
-            enqueueCompletionFuture(future);
-        }
+	// Wait until processing is complete before notifying future
+	enqueueCompletionFuture(future);
+	return future;
     }
 
     /** {@inheritDoc} */
     @Override
-    public void logoutRequest(CompletionFuture future) {
+    public CompletionFuture logoutRequest() {
         // TBD: identity may be null. Fix to pass a non-null identity
         // when scheduling the task.
         scheduleHandleDisconnect(isConnected(), false);
 
         // Enable protocol message channel to read immediately
-        if (future != null) {
-            future.done();
-        }
+        return (new CompletionFutureImpl()).done();
     }
 
     /** {@inheritDoc} */
     @Override
-    public void disconnect(CompletionFuture future) {
+    public CompletionFuture disconnect() {
         scheduleHandleDisconnect(false, true);
 
         // TBD: should we wait to notify until client disconnects connection?
-        if (future != null) {
-            future.done();
-        }
+        return (new CompletionFutureImpl()).done();
+    }
+    
+    /**
+     * This future is returned from {@link ProtocolHandler} operations.
+     */
+    private static class CompletionFutureImpl implements CompletionFuture {
+
+	/**
+	 * Indicates whether the operation associated with this future
+	 * is complete.
+	 */
+	private boolean done = false;
+
+	/** Lock for accessing the {@code done} field. */
+	private Object lock = new Object();
+	
+	/** Constructs an instance. */
+	CompletionFutureImpl() {
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public boolean cancel(boolean mayInterruptIfRunning) {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public Void get() {
+	    synchronized (lock) {
+		while (!done) {
+		    try {
+			lock.wait();
+		    } catch (InterruptedException ignore) {
+		    }
+		}
+	    }
+	    return null;
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public Void get(long timeout, TimeUnit unit) {
+	    synchronized (lock) {
+		if (!done) {
+		    try {
+			unit.timedWait(lock, timeout);
+		    } catch (InterruptedException ignore) {
+		    }
+		}
+	    }
+	    return null;
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public boolean isCancelled() {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+        @Override
+	public boolean isDone() {
+	    synchronized (lock) {
+		return done;
+	    }
+	}
+
+	/**
+	 * Indicates that the operation associated with this future
+	 * is complete. Subsequent invocations to {@link #isDone
+	 * isDone} will return {@code true}.
+	 */
+	CompletionFuture done() {
+	    synchronized (lock) {
+		done = true;
+		lock.notifyAll();
+	    }
+	    return this;
+	}
     }
 }
