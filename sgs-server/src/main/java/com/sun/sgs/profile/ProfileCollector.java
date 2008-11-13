@@ -21,6 +21,7 @@ package com.sun.sgs.profile;
 
 import java.util.List;
 import java.util.Map;
+import javax.management.JMException;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -162,4 +163,27 @@ public interface ProfileCollector {
      * @return the map of names to consumers
      */
     Map<String, ProfileConsumer> getConsumers();
+    
+    /**
+     * Register the given MBean with the current VM's platform MBean server,
+     * allowing it to be monitored via JConsole.
+     * 
+     * @param mBean the MBean or MXBean to be registered
+     * @param mBeanName the name under which it should be registered
+     * 
+     * @throws JMException if there were any problems reported
+     *    by the JMX system during registration, including if an object
+     *    has already been registered with the mBeanName
+     */
+    void registerMBean(Object mBean, String mBeanName) throws JMException;
+    
+    /**
+     * Return the object registered under the given name, or {@code null}
+     * if no object has been registered with that name.
+     * 
+     * @param mBeanName the name the object was registered under
+     * @return the object passed into {@link #registerMBean(Object, String)
+     *         registerMBean} with the given {@code mBeanName}
+     */
+    Object getRegisteredMBean(String mBeanName);
 }

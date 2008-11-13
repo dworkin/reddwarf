@@ -243,7 +243,9 @@ public class TestProfileCollectorImpl {
     public void testNoListener() {
         // By default, there is one listener in the system, 
         // the TransactionScheduler
-        assertEquals(1, profileCollector.getListeners().size());
+        
+        // JANE and also the task aggregate listener! For now.
+        assertEquals(2, profileCollector.getListeners().size());
     }
     
     @Test
@@ -252,7 +254,8 @@ public class TestProfileCollectorImpl {
         profileCollector.addListener(test, true);
         List<ProfileListener> listeners = 
                 profileCollector.getListeners();
-        assertEquals(2, listeners.size());
+        //JANE also the task aggregate listener!
+        assertEquals(3, listeners.size());
         assertTrue(listeners.contains(test));
     }
     

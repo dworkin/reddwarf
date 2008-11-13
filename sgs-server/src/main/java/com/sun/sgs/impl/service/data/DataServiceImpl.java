@@ -47,6 +47,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.management.DataServiceMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -61,6 +62,7 @@ import java.math.BigInteger;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Provides an implementation of <code>DataService</code> based on {@link
@@ -459,6 +461,14 @@ public final class DataServiceImpl implements DataService {
             createReferenceOp = consumer.createOperation(
 		"createReference", ProfileDataType.TASK_AND_AGGREGATE,
                 ProfileLevel.MAX);
+            // and register our MBean
+            try {
+                collector.registerMBean(this,
+                    DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
