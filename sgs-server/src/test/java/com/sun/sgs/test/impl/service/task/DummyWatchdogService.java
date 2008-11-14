@@ -143,6 +143,7 @@ public class DummyWatchdogService implements WatchdogService {
     /** A basic, private implementation of Node. */
     private class NodeImpl implements Node {
         private final long nodeId;
+        private ProtocolDescriptor[] descriptors = null;
         NodeImpl(long nodeId) {
             this.nodeId = nodeId;
         }
@@ -161,12 +162,12 @@ public class DummyWatchdogService implements WatchdogService {
 
         @Override
         public ProtocolDescriptor[] getClientListeners() {
-            throw new UnsupportedOperationException("Not supported yet.");
+            return descriptors;
         }
 
         @Override
         public void setClientListener(ProtocolDescriptor[] descriptors) {
-            throw new UnsupportedOperationException("Not supported yet.");
+            this.descriptors = descriptors;
         }
     }
 }
