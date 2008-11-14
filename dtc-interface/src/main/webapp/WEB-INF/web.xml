@@ -6,10 +6,20 @@ javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
     <servlet-name>MainServlet</servlet-name>
     <servlet-class>com.projectdarkstar.tools.dtc.servlets.MainServlet</servlet-class>
   </servlet>
+  <servlet>
+    <servlet-name>ConfigServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.ConfigServlet</servlet-class>
+  </servlet>
+
   <servlet-mapping>
     <servlet-name>MainServlet</servlet-name>
     <url-pattern>/main</url-pattern>
   </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ConfigServlet</servlet-name>
+    <url-pattern>/config/*</url-pattern>
+  </servlet-mapping>
+
   <welcome-file-list>
     <welcome-file>main</welcome-file>
   </welcome-file-list>

@@ -10,14 +10,10 @@
 
     <div id="content">
       <div id="leftContainer">
-	<div class="box">
-	  <div class="boxHeader">
-	    Status
-	  </div>
-	  <div class="boxContent">
-
-	  </div>
-	</div>
+	
+      </div>
+      
+      <div id="rightContainer">
 	<div class="box">
 	  <div class="boxHeader">
 	    Configuration
@@ -28,18 +24,7 @@
 	    <a href="<%= request.getContextPath() %>/config/test-specs">&gt; Test Specifications</a><br/>
 	    <a href="<%= request.getContextPath() %>/config/test-suites">&gt; Test Suites</a><br/>
 	  </div>
-	</div>
-      </div>
-      
-      <div id="rightContainer">
-	<div class="box">
-	  <div class="boxHeader">
-	    Recent Results
-	  </div>
-	  <div class="boxContent">
-
-	  </div>
-	</div>
+	</div>	  
       </div>
     </div>
 

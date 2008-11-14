@@ -7,23 +7,23 @@
 }
 
 #page a {
-  color: #000000;
+  color: #043c86;
   text-decoration: none;
 }
 #page a:link {
-  color: #000000;
+  color: #043c86;
   text-decoration: none;
 }
 #page a:visited {
-  color: #000000;
+  color: #043c86;
   text-decoration: none;
 }
 #page a:active {
-  color: #000000;
+  color: #043c86;
   text-decoration: underline;
 }
 #page a:hover {
-  color: #000000;
+  color: #043c86;
   text-decoration: underline;
 }
 
@@ -38,11 +38,49 @@
   height: 25px;
 }
 
+#banner a a:link a:visited a:active a:hover { 
+  color: #000000;
+  text-decoration: none;
+}
+
 #crumb { 
   padding: 5px 0px 10px 5px;
   
 }
 
 #content { 
-  margin: 5px auto;
+  margin: 5px;
+}
+
+#leftContainer { 
+  float: left;
+  width: 300px;
+  margin: 0px 10px 0px 0px;
+}
+
+#rightContainer { 
+  margin-left: 310px;
+  padding: 0px;
+}
+
+div.box { 
+  border: 1px solid #cccccc;
+  background-color: #ffffff;
+  margin-bottom: 10px;
+}
+
+div.boxHeader {
+  border-bottom: 1px solid #cccccc;
+  background-color: #eeeeee;
+  font-weight: bolder;
+  padding: 5px;
+}
+
+div.boxContent { 
+  padding: 5px;
+}
+
+table { 
+  border-style: none;
+  width: 100%;
 }
