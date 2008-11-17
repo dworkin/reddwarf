@@ -10,7 +10,19 @@
   <groupId>com.projectdarkstar.tools.dtc</groupId>
   <artifactId>dtc-beans</artifactId>
   <name>dtc-beans</name>
-  <packaging>jar</packaging>
+  <packaging>ejb</packaging>
+
+  <build>
+    <plugins>
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-ejb-plugin</artifactId>
+	<configuration>
+	  <ejbVersion>3.0</ejbVersion>
+	</configuration>
+      </plugin>
+    </plugins>
+  </build>
 
   <dependencies>
     <dependency>

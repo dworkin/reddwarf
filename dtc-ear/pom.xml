@@ -26,6 +26,7 @@
     <dependency>
       <groupId>com.projectdarkstar.tools.dtc</groupId>
       <artifactId>dtc-beans</artifactId>
+      <type>ejb</type>
       <version>${version}</version>
     </dependency>
     <dependency>
@@ -51,15 +52,13 @@
             <jarModule>
               <groupId>com.projectdarkstar.tools.dtc</groupId>
               <artifactId>dtc-domain</artifactId>
-	      <bundleDir>/</bundleDir>
-              <includeInApplicationXml>true</includeInApplicationXml>
+	      <bundleDir>lib</bundleDir>
             </jarModule>
-            <jarModule>
+            <ejbModule>
               <groupId>com.projectdarkstar.tools.dtc</groupId>
               <artifactId>dtc-beans</artifactId>
 	      <bundleDir>/</bundleDir>
-              <includeInApplicationXml>true</includeInApplicationXml>
-            </jarModule>
+            </ejbModule>
 	    <webModule>
 	      <groupId>com.projectdarkstar.tools.dtc</groupId>
 	      <artifactId>dtc-interface</artifactId>

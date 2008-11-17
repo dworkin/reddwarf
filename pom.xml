@@ -40,21 +40,6 @@
 	</configuration>
       </plugin>
 
-      <!-- Global manifest generation configuration -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifest>
-	      <addClasspath>true</addClasspath>
-              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
-            </manifest>
-          </archive>
-        </configuration>
-      </plugin>
-
       <!-- Global configuration for running unit tests -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

@@ -19,10 +19,10 @@
 
 package com.projectdarkstar.tools.dtc.domain;
 
+import java.util.Date;
 import java.util.List;
 import java.util.ArrayList;
 import java.io.Serializable;
-import java.sql.Date;
 
 import javax.persistence.Entity;
 import javax.persistence.Table;

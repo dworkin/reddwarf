@@ -230,7 +230,7 @@ public class TestExecutionResult implements Serializable
     
     
     @ManyToMany
-    @OrderBy("hostname")
+    @OrderBy("name")
     @JoinTable(name = "testExecutionResultOriginalServerResources",
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))
@@ -238,7 +238,7 @@ public class TestExecutionResult implements Serializable
     private void setOriginalServerResources(List<HardwareResourceFamily> originalServerResources) { this.originalServerResources = originalServerResources; }
     
     @ManyToMany
-    @OrderBy("hostname")
+    @OrderBy("name")
     @JoinTable(name = "testExecutionResultOriginalClientResources",
                joinColumns = @JoinColumn(name = "testExecutionResultId"),
                inverseJoinColumns = @JoinColumn(name = "hardwareResourceFamilyId"))

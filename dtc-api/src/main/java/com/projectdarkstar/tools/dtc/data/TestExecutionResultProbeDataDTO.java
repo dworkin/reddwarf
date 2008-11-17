@@ -20,7 +20,7 @@
 package com.projectdarkstar.tools.dtc.data;
 
 import com.projectdarkstar.tools.dtc.exceptions.DTCInvalidDataException;
-import java.sql.Date;
+import java.util.Date;
 import org.apache.commons.lang.ObjectUtils;
 
 /**
