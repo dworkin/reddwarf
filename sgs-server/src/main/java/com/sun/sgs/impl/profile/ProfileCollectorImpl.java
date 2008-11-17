@@ -61,6 +61,9 @@ import java.util.logging.Logger;
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
 
+    // the standard prefix for consumer names created by core packages
+    public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
+    
     // the logger for this class
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(ProfileCollectorImpl.
@@ -174,7 +177,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                    "Found consumer {0} already created", name);
             return oldpc;
         } else {
-            logger.log(Level.INFO, "Created consumer for {0}", name);
+            logger.log(Level.INFO, "Created consumer named {0}", name);
             return pc;
         }
     }
@@ -354,7 +357,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("Participants cannot be added " +
                                             "to a non-transactional task");
         }
-        profileReport.participants.add(participantDetail);
+        profileReport.addParticipant(participantDetail);
     }
 
     /**
@@ -378,7 +381,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             throw new IllegalStateException("Object access cannot be added " +
                                             "to a non-transactional task");
         }
-        profileReport.accessedObjectsDetail = detail;
+        profileReport.setAccessedObjectsDetail(detail);
     }
 
     /**
@@ -422,6 +425,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             profileReports.get().peek().merge(profileReport);
         }
 
+        // Note that we're done modifying this report
+        profileReport.finish();
+        
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
     }
@@ -486,14 +492,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                         "  StatQueueNonEmpty=" + percentQueueNotEmpty +
                         "%  ]\n\n";
                      */
-
-                    // make sure that the collections can't be modified by
-                    // a listener
-                    profileReport.ops =
-                        Collections.unmodifiableList(profileReport.ops);
-                    profileReport.participants =
-                        Collections.
-                        unmodifiableSet(profileReport.participants);
 
                     for (ProfileListener listener : listeners.keySet()) {
                         try {
