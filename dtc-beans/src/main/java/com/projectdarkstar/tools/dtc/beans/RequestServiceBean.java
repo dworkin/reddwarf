@@ -46,7 +46,9 @@ public class RequestServiceBean implements RequestService {
     private DataConverter dc;
 
     public List<ServerAppDTO> getServerAppsPage(int pageIndex, int pageSize) {
-        Query query = em.createQuery("FROM ServerApp ORDER BY name");
+        Query query = em.createQuery("SELECT s " +
+                                     "FROM ServerApp s " + 
+                                     "ORDER BY s.name");
         query.setFirstResult(pageIndex);
         query.setMaxResults(pageSize);
         

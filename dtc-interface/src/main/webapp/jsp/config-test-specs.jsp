@@ -16,7 +16,7 @@
       <div id="rightContainer">
 	<div class="box">
 	  <div class="boxHeader">
-	    Server Applications
+	    Test Specifications
 	  </div>
 	  <div class="boxContent">
 

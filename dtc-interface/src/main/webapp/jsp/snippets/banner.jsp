@@ -1,3 +1,3 @@
 <div id="banner">
-  <a href="<%= request.getContextPath() %>">Darkstar Test Cluster</a>
+  Darkstar Test Cluster
 </div>

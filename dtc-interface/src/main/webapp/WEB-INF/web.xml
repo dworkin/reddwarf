@@ -2,26 +2,53 @@
 <web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
 
   <servlet>
-    <servlet-name>UpdateServlet</servlet-name>
-    <servlet-class>com.projectdarkstar.tools.dtc.servlets.UpdateServlet</servlet-class>
+    <servlet-name>MainServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.MainServlet</servlet-class>
   </servlet>
   <servlet>
-    <servlet-name>MasterServlet</servlet-name>
-    <servlet-class>com.projectdarkstar.tools.dtc.servlets.MasterServlet</servlet-class>
+    <servlet-name>ConfigServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.config.ConfigServlet</servlet-class>
+  </servlet>
+  <servlet>
+    <servlet-name>ConfigApplicationsServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.config.ConfigApplicationsServlet</servlet-class>
+  </servlet>
+  <servlet>
+    <servlet-name>ConfigResourcesServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.config.ConfigResourcesServlet</servlet-class>
+  </servlet>
+  <servlet>
+    <servlet-name>ConfigTestSpecificationsServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.config.ConfigTestSpecificationsServlet</servlet-class>
+  </servlet>
+  <servlet>
+    <servlet-name>ConfigTestSuitesServlet</servlet-name>
+    <servlet-class>com.projectdarkstar.tools.dtc.servlets.config.ConfigTestSuitesServlet</servlet-class>
   </servlet>
 
   <servlet-mapping>
-    <servlet-name>UpdateServlet</servlet-name>
-    <url-pattern>/config/applications/server.do</url-pattern>
-    <url-pattern>/config/applications/server-config.do</url-pattern>
-    <url-pattern>/config/applications/client.do</url-pattern>
-    <url-pattern>/config/applications/client-config.do</url-pattern>
-    <url-pattern>/config/applications/probe.do</url-pattern>
+    <servlet-name>MainServlet</servlet-name>
+    <url-pattern>/main</url-pattern>
   </servlet-mapping>
   <servlet-mapping>
-    <servlet-name>MasterServlet</servlet-name>
-    <url-pattern>/main</url-pattern>
-    <url-pattern>/config/*</url-pattern>
+    <servlet-name>ConfigServlet</servlet-name>
+    <url-pattern>/config</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ConfigApplicationsServlet</servlet-name>
+    <url-pattern>/config/applications</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ConfigResourcesServlet</servlet-name>
+    <url-pattern>/config/resources</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ConfigTestSpecificationsServlet</servlet-name>
+    <url-pattern>/config/test-specs</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ConfigTestSuitesServlet</servlet-name>
+    <url-pattern>/config/test-suites</url-pattern>
   </servlet-mapping>
 
   <welcome-file-list>

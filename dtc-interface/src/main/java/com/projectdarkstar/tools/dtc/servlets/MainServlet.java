@@ -29,28 +29,32 @@ import javax.servlet.ServletException;
 import javax.servlet.RequestDispatcher;
 
 /**
- * The master servlet used to servle all http requests to the server for
- * *.do URLs which are intended to be update forms.
+ * Master servlet used to servlet all http requests to the server.
+ * Requests are delegated to ServletActions based on the URL of the
+ * request.
  */
-public class UpdateServlet extends HttpServlet {
+public class MainServlet extends AbstractServlet {
+    
+    private List<String> trail = new ArrayList<String>();
+    
+    protected List<String> getTrail() {
+        return trail;
+    }
+    
+    protected String getView() {
+        return "/jsp/main.jsp";
+    }
+
+    @Override
+    public void init() {
+        getTrail().add("Darkstar Test Cluster");
+        getTrail().add(this.getServletContext().getContextPath());
+    }
 
     @Override
     public void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws IOException, ServletException {
-        doPost(request, response);
-    }
-
-    @Override
-    public void doPost(HttpServletRequest request, HttpServletResponse response) 
-            throws IOException, ServletException {
-        
-        //build breadcrumb trail
-        List<String> trail = new ArrayList<String>();
-        trail.add("Darkstar Test Cluster");
-        trail.add(request.getContextPath());
-        request.setAttribute("trail", trail);
-
-        RequestDispatcher mainJsp = request.getRequestDispatcher("/jsp/main.jsp");
-        mainJsp.forward(request, response);
+        request.setAttribute("trail", getTrail());
+        forward(request, response);
     }
 }
