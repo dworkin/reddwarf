@@ -145,8 +145,10 @@ public class DataStoreProfileProducer
 	    consumer.createCounter("writtenBytes", type, level);
 	writtenObjectsCounter =
 	    consumer.createCounter("writtenObjects", type, level);
-	readBytesSample = consumer.createSample("readBytes", type, level);
-	writtenBytesSample = consumer.createSample("writtenBytes", type, level);
+	readBytesSample = 
+            consumer.createSample("readBytes", ProfileDataType.TASK, level);
+	writtenBytesSample = 
+            consumer.createSample("writtenBytes", ProfileDataType.TASK, level);
     }
 
     /* -- Implement DataStore -- */
