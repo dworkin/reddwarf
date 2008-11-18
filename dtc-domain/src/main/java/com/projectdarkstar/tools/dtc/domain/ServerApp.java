@@ -31,7 +31,9 @@ import javax.persistence.GenerationType;
 import javax.persistence.Column;
 import javax.persistence.OneToMany;
 import javax.persistence.ManyToOne;
+import javax.persistence.ManyToMany;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
@@ -50,6 +52,8 @@ public class ServerApp implements Serializable
     private String name;
     private String description;
     
+    private List<ServerAppTag> tags;
+    
     private List<ServerAppConfig> configs;
     private PkgLibrary requiredPkg;
     
@@ -63,6 +67,7 @@ public class ServerApp implements Serializable
         this.setDescription(description);
         this.setRequiredPkg(requiredPkg);
         
+        this.setTags(new ArrayList<ServerAppTag>());
         this.setConfigs(new ArrayList<ServerAppConfig>());
     }
     
@@ -95,6 +100,20 @@ public class ServerApp implements Serializable
     @Column(name= "description", nullable = false, length = 1024)
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    
+    /**
+     * Returns a list of {@link ServerAppTag} objects that are used
+     * to categorize server apps into groups.
+     * 
+     * @return list of tags for this server app
+     */
+    @ManyToMany
+    @OrderBy("tag")
+    @JoinTable(name = "serverAppTags",
+               joinColumns = @JoinColumn(name = "serverAppId"),
+               inverseJoinColumns = @JoinColumn(name = "serverAppTagId"))
+    public List<ServerAppTag> getTags() { return tags; }
+    public void setTags(List<ServerAppTag> tags) { this.tags = tags; }
     
     /**
      * Returns a list of server application configurations that can be used

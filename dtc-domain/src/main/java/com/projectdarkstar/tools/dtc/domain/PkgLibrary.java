@@ -30,10 +30,8 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Column;
 import javax.persistence.Version;
-import javax.persistence.Lob;
-import javax.persistence.Basic;
-import javax.persistence.FetchType;
 import javax.persistence.ManyToMany;
+import javax.persistence.ManyToOne;
 import javax.persistence.OrderBy;
 import javax.persistence.JoinTable;
 import javax.persistence.JoinColumn;
@@ -53,14 +51,14 @@ public class PkgLibrary implements Serializable
     private Long versionNumber;
     
     private String name;
-    private byte[] file;
+    private BinaryFile file;
     
     private List<PkgLibraryTag> tags;
     
     public PkgLibrary() {}
     
     public PkgLibrary(String name,
-                      byte[] file)
+                      BinaryFile file)
     {
         this.setName(name);
         this.setFile(file);
@@ -95,16 +93,15 @@ public class PkgLibrary implements Serializable
     public void setName(String name) { this.name = name; }
     
     /**
-     * Returns the contents of the actual package library file as an
-     * array of bytes.
+     * Returns the contents of the actual package library file as a
+     * {@link BinaryFile}
      * 
      * @return the package library file
      */
-    @Lob
-    @Basic(fetch = FetchType.LAZY)
-    @Column(name = "file", nullable = false)
-    public byte[] getFile() { return file; }
-    public void setFile(byte[] file) { this.file = file; }
+    @ManyToOne
+    @JoinColumn(name = "file", nullable = false)
+    public BinaryFile getFile() { return file; }
+    public void setFile(BinaryFile file) { this.file = file; }
     
     /**
      * Returns a list of {@link PkgLibraryTag} objects that are used

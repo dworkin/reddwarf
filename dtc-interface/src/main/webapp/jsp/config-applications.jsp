@@ -9,11 +9,7 @@
     <jsp:include page="snippets/crumb.jsp" flush="true"/>
 
     <div id="content">
-      <div id="leftContainer">
-	
-      </div>
-      
-      <div id="rightContainer">
+      <div id="fullContainer">
 	<div class="box">
 	  <div class="boxHeader">
 	    Server Applications
@@ -22,6 +18,22 @@
 
 	  </div>
 	</div>	  
+	<div class="box">
+	  <div class="boxHeader">
+	    Client Applications
+	  </div>
+	  <div class="boxContent">
+
+	  </div>
+	</div>	  
+	<div class="box">
+	  <div class="boxHeader">
+	    System Probes
+	  </div>
+	  <div class="boxContent">
+
+	  </div>
+	</div>
       </div>
     </div>
 

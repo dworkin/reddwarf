@@ -31,7 +31,9 @@ import javax.persistence.GenerationType;
 import javax.persistence.Column;
 import javax.persistence.OneToMany;
 import javax.persistence.ManyToOne;
+import javax.persistence.ManyToMany;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
 import javax.persistence.OrderBy;
 import javax.persistence.Version;
 
@@ -50,6 +52,8 @@ public class ClientApp implements Serializable
     private String name;
     private String description;
     
+    private List<ClientAppTag> tags;
+    
     private List<ClientAppConfig> configs;
     private PkgLibrary requiredPkg;
     
@@ -63,6 +67,7 @@ public class ClientApp implements Serializable
         this.setDescription(description);
         this.setRequiredPkg(requiredPkg);
         
+        this.setTags(new ArrayList<ClientAppTag>());
         this.setConfigs(new ArrayList<ClientAppConfig>());
     }
     
@@ -95,6 +100,20 @@ public class ClientApp implements Serializable
     @Column(name = "description", nullable = false)
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    
+    /**
+     * Returns a list of {@link ClientAppTag} objects that are used
+     * to categorize client apps into groups.
+     * 
+     * @return list of tags for this client app
+     */
+    @ManyToMany
+    @OrderBy("tag")
+    @JoinTable(name = "clientAppTags",
+               joinColumns = @JoinColumn(name = "clientAppId"),
+               inverseJoinColumns = @JoinColumn(name = "clientAppTagId"))
+    public List<ClientAppTag> getTags() { return tags; }
+    public void setTags(List<ClientAppTag> tags) { this.tags = tags; }
 
     /**
      * Returns a list of client application configurations that can be used

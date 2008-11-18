@@ -19,6 +19,8 @@
 
 package com.projectdarkstar.tools.dtc.domain;
 
+import java.util.List;
+import java.util.ArrayList;
 import java.io.Serializable;
 
 import javax.persistence.Entity;
@@ -27,27 +29,30 @@ import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Column;
-import javax.persistence.Lob;
-import javax.persistence.Version;
+import javax.persistence.ManyToMany;
+import javax.persistence.OrderBy;
 
 import org.apache.commons.lang.ObjectUtils;
 
 /**
- * Represents a log file
+ * Represents a tag entity used to categorize {@link ClientApp}
+ * objects.
  */
 @Entity
-@Table(name = "LogFile")
-public class LogFile implements Serializable
+@Table(name = "ClientAppTag")
+public class ClientAppTag implements Serializable
 {
     private Long id;
-    private Long versionNumber;
-    private String log;
+    private String tag;
     
-    public LogFile() {}
+    private List<ClientApp> apps;
     
-    public LogFile(String log)
+    public ClientAppTag() {}
+    
+    public ClientAppTag(String tag)
     {
-        this.setLog(log);
+        this.setTag(tag);
+        this.setApps(new ArrayList<ClientApp>());
     }
     
     /**
@@ -60,35 +65,36 @@ public class LogFile implements Serializable
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     
-    /**
-     * Returns the version number in the data store that this entity represents.
-     * Whenever an update to an object is pushed to the persistent data
-     * store, the version number is incremented.
-     * 
-     * @return version number of the entity
-     */
-    @Version
-    @Column(name = "versionNumber")
-    public Long getVersionNumber() { return versionNumber; }
-    public void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
+    @Column(name = "tag", nullable = false, unique = true)
+    public String getTag() { return tag; }
+    public void setTag(String tag) { this.tag = tag; }
     
-    @Lob
-    @Column(name = "log", nullable = false)
-    public String getLog() { return log; }
-    public void setLog(String log) { this.log = log; }
-
+    /**
+     * Returns the list of {@link ClientApp} objects that are tagged
+     * with this tag.
+     * 
+     * @return client apps tagged with this tag.
+     */
+    @ManyToMany(mappedBy = "tags")
+    @OrderBy("name")
+    public List<ClientApp> getApps() { return apps; }
+    public void setApps(List<ClientApp> apps) { this.apps = apps; }
+    
     public boolean equals(Object o) {
         if(this == o) return true;
-	if(!(o instanceof LogFile) || o == null) return false;
+	if(!(o instanceof ClientAppTag) || o == null) return false;
 
-        LogFile other = (LogFile)o;
+        ClientAppTag other = (ClientAppTag)o;
         return ObjectUtils.equals(this.getId(), other.getId()) &&
-                ObjectUtils.equals(this.getLog(), other.getLog());
+                ObjectUtils.equals(this.getTag(), other.getTag()) &&
+                ObjectUtils.equals(this.getApps(), other.getApps());
     }
     
     public int hashCode() {
         int hash = 7;
         int hashId = 31*hash + ObjectUtils.hashCode(this.getId());
-        return hashId;
+        int hashTag = 31*hash + ObjectUtils.hashCode(this.getTag());
+        return hashId + hashTag;
     }
 }
+

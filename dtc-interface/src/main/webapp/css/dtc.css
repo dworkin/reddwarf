@@ -63,6 +63,10 @@
   padding: 0px;
 }
 
+#fullContainer {
+  padding: 0px;
+}
+
 div.box { 
   border: 1px solid #cccccc;
   background-color: #ffffff;

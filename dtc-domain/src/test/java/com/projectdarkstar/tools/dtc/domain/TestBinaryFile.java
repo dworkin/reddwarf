@@ -21,23 +21,24 @@ package com.projectdarkstar.tools.dtc.domain;
 
 import com.bm.datagen.Generator;
 import com.bm.datagen.annotations.GeneratorType;
-import com.bm.datagen.relation.BeanCollectionGenerator;
 import com.bm.testsuite.junit4.BaseEntityJunit4Fixture;
-import java.util.List;
 
 /**
- * Test the PkgLibraryTag entity
+ * Test the BinaryFile entity
  */
-public class TestPkgLibraryTag extends BaseEntityJunit4Fixture<PkgLibraryTag>
+public class TestBinaryFile extends BaseEntityJunit4Fixture<BinaryFile>
 {
-    public TestPkgLibraryTag() {
-        super(PkgLibraryTag.class, new Generator[]{new LibraryGenerator()});
+    public TestBinaryFile() {
+        super(BinaryFile.class, new Generator[]{new FileGenerator()});
     }
     
-    @GeneratorType(className = List.class, field="libraries")
-    private static final class LibraryGenerator extends BeanCollectionGenerator<PkgLibrary> {
-        private LibraryGenerator() {
-            super(PkgLibrary.class, 10);
+    @GeneratorType(className = byte[].class, field="file")
+    private static final class FileGenerator implements Generator<byte[]> {
+        private final byte[] file = new byte[]{0,1,2,3,4};
+        private FileGenerator() {}
+        public byte[] getValue() {
+            return file;
         }
     }
+
 }

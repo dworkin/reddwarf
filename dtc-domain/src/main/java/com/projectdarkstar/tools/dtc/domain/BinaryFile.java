@@ -33,21 +33,21 @@ import javax.persistence.Version;
 import org.apache.commons.lang.ObjectUtils;
 
 /**
- * Represents a log file
+ * Represents a binary file
  */
 @Entity
-@Table(name = "LogFile")
-public class LogFile implements Serializable
+@Table(name = "BinaryFile")
+public class BinaryFile implements Serializable
 {
     private Long id;
     private Long versionNumber;
-    private String log;
+    private byte[] file;
     
-    public LogFile() {}
+    public BinaryFile() {}
     
-    public LogFile(String log)
+    public BinaryFile(byte[] file)
     {
-        this.setLog(log);
+        this.setFile(file);
     }
     
     /**
@@ -72,18 +72,24 @@ public class LogFile implements Serializable
     public Long getVersionNumber() { return versionNumber; }
     public void setVersionNumber(Long versionNumber) { this.versionNumber = versionNumber; }
     
+    /**
+     * Returns the contents of the actual binary file as an
+     * array of bytes.
+     * 
+     * @return the binary file
+     */
     @Lob
-    @Column(name = "log", nullable = false)
-    public String getLog() { return log; }
-    public void setLog(String log) { this.log = log; }
+    @Column(name = "file", nullable = false)
+    public byte[] getFile() { return file; }
+    public void setFile(byte[] file) { this.file = file; }
 
     public boolean equals(Object o) {
         if(this == o) return true;
-	if(!(o instanceof LogFile) || o == null) return false;
+	if(!(o instanceof BinaryFile) || o == null) return false;
 
-        LogFile other = (LogFile)o;
+        BinaryFile other = (BinaryFile)o;
         return ObjectUtils.equals(this.getId(), other.getId()) &&
-                ObjectUtils.equals(this.getLog(), other.getLog());
+                ObjectUtils.equals(this.getFile(), other.getFile());
     }
     
     public int hashCode() {
