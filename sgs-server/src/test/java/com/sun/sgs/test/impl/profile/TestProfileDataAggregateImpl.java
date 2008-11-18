@@ -261,6 +261,16 @@ public class TestProfileDataAggregateImpl {
         final long[] expectedData = {2, 3, 4, 5, 6};
         samp2.addSample(6);
         testStatistics(samp2, 5, 1, 6, expectedData);
+        
+        final long[] emptyData = {};
+        samp2.clearSamples();
+        samp2.setCapacity(0);
+        for (int i = 0; i < testData.length; i++) {
+            samp2.addSample(testData[i]);
+        }
+        testStatistics(samp2, /*size*/0, /*min*/1, /*max*/5, emptyData);
+        samp2.addSample(6);
+        testStatistics(samp2, 0, 1, 6, emptyData);
    }
    
    private void testStatistics(AggregateProfileSample samp, 

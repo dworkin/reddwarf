@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data.store;
 import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.profile.AggregateProfileCounter;
 import com.sun.sgs.profile.AggregateProfileOperation;
+import com.sun.sgs.profile.AggregateProfileSample;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -134,9 +135,13 @@ public class DataStoreStats implements DataStoreStatsMXBean {
 	writtenObjectsCounter =
 	    consumer.createCounter("writtenObjects", type, level);
 	readBytesSample = 
-            consumer.createSample("readBytes", ProfileDataType.TASK, level);
+            consumer.createSample("readBytes", type, level);
 	writtenBytesSample = 
-            consumer.createSample("writtenBytes", ProfileDataType.TASK, level);
+            consumer.createSample("writtenBytes", type, level);
+        // Don't hold on to samples for these values.  There will be lots
+        // of them, and we're generally only interested in the statistics.
+        ((AggregateProfileSample) readBytesSample).setCapacity(0);
+        ((AggregateProfileSample) writtenBytesSample).setCapacity(0);
         
         // Set up JMX stuff.  Register MXBean with platform.
         // Or is this really handled by the  DataService???

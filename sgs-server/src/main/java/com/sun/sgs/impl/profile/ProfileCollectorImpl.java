@@ -114,6 +114,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     
     // The MBeans registered for this node.
     private ConcurrentMap<String, Object> registeredMBeans;
+    
+    // The statistics MBean for tasks
+    private final TaskAggregateStats taskStats;
 
     /**
      * Creates an instance of {@code ProfileCollectorImpl}.
@@ -144,8 +147,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         // all services that are started after us.
         TaskAggregate taskAgg = new TaskAggregate();
         addListener(taskAgg, true);
+        taskStats = new TaskAggregateStats(this,
+                CORE_CONSUMER_PREFIX + "TaskAggregateStats");
         try {
             registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
+            registerMBean(taskStats, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME + "stats");
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
@@ -220,11 +226,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
         ProfileConsumerImpl oldpc = consumers.putIfAbsent(name, pc);
         if (oldpc != null) {
-            logger.log(Level.INFO, 
+            logger.log(Level.FINE, 
                    "Found consumer {0} already created", name);
             return oldpc;
         } else {
-            logger.log(Level.INFO, "Created consumer named {0}", name);
+            logger.log(Level.FINE, "Created consumer named {0}", name);
             return pc;
         }
     }
@@ -386,6 +392,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         profileReports.get().push(new ProfileReportImpl(task, owner,
                                                         scheduledStartTime,
                                                         readyCount));
+        taskStats.numTasks.incrementCount();
+        taskStats.readyCount.addSample(readyCount);
+        taskStats.numReadyTasks.incrementCount(readyCount);
     }
 
     /**
@@ -408,6 +417,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         profileReport.transactionId = txnId;
+        taskStats.numTransactionalTasks.incrementCount();
     }
 
     /**
@@ -489,9 +499,13 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         // collect the final details about the report
-        profileReport.runningTime = stopTime - profileReport.actualStartTime;
+        boolean successful = t == null;
+        long runtime = stopTime - profileReport.actualStartTime;
+        long lagtime = profileReport.actualStartTime -
+                           profileReport.scheduledStartTime;
+        profileReport.runningTime = runtime;
         profileReport.tryCount = tryCount;
-        profileReport.succeeded = t == null;
+        profileReport.succeeded = successful;
         profileReport.throwable = t;
         
         // if this was a nested report, then merge all of the collected
@@ -505,6 +519,15 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
+        
+        // Update the task aggregate data 
+        if (!successful) {
+            taskStats.numFailedTasks.incrementCount();
+        }
+        taskStats.runtime.addSample(runtime);
+//        taskStats.failureRate.addSample(
+//            taskStats.getFailedTaskCount() / taskStats.getTaskCount());
+        taskStats.lagTime.addSample(lagtime);
     }
 
     /**

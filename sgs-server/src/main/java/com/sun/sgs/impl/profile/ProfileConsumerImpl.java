@@ -32,6 +32,7 @@ import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.profile.TaskProfileSample;
 import java.beans.PropertyChangeEvent;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
 import java.util.List;
@@ -596,10 +597,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
             
             synchronized (this) {
-                if (samples.size() == capacity) {
-                    samples.removeFirst(); // remove oldest
+                if (capacity > 0) {
+                    if (samples.size() == capacity) {
+                        samples.removeFirst(); // remove oldest
+                    }
+                    samples.add(value);
                 }
-                samples.add(value);
                 // Update the statistics
                 if (value > maxSampleValue) {
                     maxSampleValue = value;
@@ -652,8 +655,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         
         /** {@inheritDoc} */
         public void setCapacity(int capacity) {
-            if (capacity <= 0) {
-                throw new IllegalArgumentException("capacity must be positive");
+            if (capacity < 0) {
+                throw new
+                    IllegalArgumentException("capacity must not be negative");
             }
             this.capacity = capacity; 
         }

@@ -91,8 +91,11 @@ public interface AggregateProfileSample extends ProfileSample {
      * be dropped to make room for the newest samples. Dropping samples
      * due to capacity restrictions has no effect on the other aggregated
      * statistics.
+     * <p>
+     * A limit of {code 0} indicates that no samples should be held,
+     * but the statistics should be gathered.
      * 
-     * @throws IllegalArgumentException if the capacity is not positive
+     * @throws IllegalArgumentException if the capacity is negative
      */
     void setCapacity(int capacity);
 }
