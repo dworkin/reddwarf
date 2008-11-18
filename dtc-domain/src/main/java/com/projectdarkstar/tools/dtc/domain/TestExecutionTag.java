@@ -46,6 +46,8 @@ public class TestExecutionTag implements Serializable
     
     private List<TestExecution> executions;
     
+    public TestExecutionTag() {}
+    
     public TestExecutionTag(String tag)
     {
         this.setTag(tag);
