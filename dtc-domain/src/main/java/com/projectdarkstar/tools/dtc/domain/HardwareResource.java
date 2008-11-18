@@ -28,6 +28,7 @@ import javax.persistence.Entity;
 import javax.persistence.Table;
 import javax.persistence.Id;
 import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
 import javax.persistence.Column;
 import javax.persistence.JoinColumn;
 import javax.persistence.Temporal;
@@ -78,7 +79,7 @@ public class HardwareResource implements Serializable
      * @return id of the entity
      */
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     

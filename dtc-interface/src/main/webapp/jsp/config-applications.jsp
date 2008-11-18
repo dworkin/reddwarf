@@ -16,7 +16,7 @@
       <div id="rightContainer">
 	<div class="box">
 	  <div class="boxHeader">
-	    Configuration
+	    Server Applications
 	  </div>
 	  <div class="boxContent">
 	    <a href="<%= request.getContextPath() %>/config/applications">&gt; Applications</a><br/>
