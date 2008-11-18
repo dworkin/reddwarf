@@ -133,8 +133,10 @@ public class DataStoreStats implements DataStoreStatsMXBean {
 	    consumer.createCounter("writtenBytes", type, level);
 	writtenObjectsCounter =
 	    consumer.createCounter("writtenObjects", type, level);
-	readBytesSample = consumer.createSample("readBytes", type, level);
-	writtenBytesSample = consumer.createSample("writtenBytes", type, level);
+	readBytesSample = 
+            consumer.createSample("readBytes", ProfileDataType.TASK, level);
+	writtenBytesSample = 
+            consumer.createSample("writtenBytes", ProfileDataType.TASK, level);
         
         // Set up JMX stuff.  Register MXBean with platform.
         // Or is this really handled by the  DataService???
