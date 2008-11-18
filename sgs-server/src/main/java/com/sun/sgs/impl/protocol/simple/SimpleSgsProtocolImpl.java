@@ -22,19 +22,21 @@ package com.sun.sgs.impl.protocol.simple;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.protocol.ProtocolDescriptorImpl;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
-import com.sun.sgs.protocol.MessageHandler;
 import com.sun.sgs.protocol.Protocol;
 import com.sun.sgs.protocol.ProtocolConnectionHandler;
 import com.sun.sgs.protocol.ProtocolDescriptor;
-import com.sun.sgs.protocol.session.SessionMessageHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
@@ -93,7 +95,19 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
 
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
+    
+    /** The transaction scheduler. */
+    final TransactionScheduler transactionScheduler;
 
+    /** The node mapping service. */
+    final NodeMappingService nodeMapService;
+    
+    /** The identity manager. */
+    final IdentityCoordinator identityManager;
+    
+    /** The local node's ID. */
+    final long localNodeId;
+    
     /** The task owner. */
     private final Identity taskOwner;
 
@@ -102,9 +116,9 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
 
     private final Transport transport;
     
-    private final ProtocolConnectionHandler connectionHandler;
+    final ProtocolConnectionHandler connectionHandler;
     
-    private final ProtocolDescriptor protocolDesc;
+    final ProtocolDescriptor protocolDesc;
     
     /**
      * Constructs an instance with the specified {@code properties},
@@ -138,7 +152,13 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
 		assert SimpleSgsProtocolImpl.txnProxy == txnProxy;
 	    }
 	}
-	
+        identityManager =
+		systemRegistry.getComponent(IdentityCoordinator.class);
+        transactionScheduler =
+	    systemRegistry.getComponent(TransactionScheduler.class);
+        nodeMapService = txnProxy.getService(NodeMappingService.class);
+        localNodeId = txnProxy.getService(WatchdogService.class).getLocalNodeId();
+
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
             readBufferSize = wrappedProps.getIntProperty(
@@ -181,21 +201,30 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 throw new RuntimeException(e);
 	}
     }
+    
+    /* -- Implement Protocol -- */
+    
+    /** {@inheritDoc} */
+    @Override
+    public ProtocolDescriptor getDescriptor() {
+        return protocolDesc;
+    }
 
+    /** {@inheritDoc} */
+    @Override
+    public void shutdown() {
+        transport.shutdown();
+    }
+    
+    /* -- Implement ConnectionHandler -- */
+    
     /** {@inheritDoc} */
     @Override
     public void newConnection(AsynchronousByteChannel byteChannel,
                               TransportDescriptor descriptor)
         throws Exception
     {
-        SimpleSgsProtocolMessageChannel msgChannel =
-                new SimpleSgsProtocolMessageChannel(byteChannel,
-                                                    this,
-                                                    readBufferSize);
-        MessageHandler msgHandler =
-                    connectionHandler.newConnection(msgChannel, protocolDesc);
-        assert msgHandler instanceof SessionMessageHandler;
-        msgChannel.setHandler((SessionMessageHandler)msgHandler);
+        new SimpleSgsProtocolMessageChannel(byteChannel, this, readBufferSize);
     }
 
     /**
@@ -207,15 +236,15 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
         taskScheduler.scheduleTask(task, taskOwner);
     }
 
-    /** {@inheritDoc} */
-    @Override
-    public ProtocolDescriptor getDescriptor() {
-        return protocolDesc;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void shutdown() {
-        transport.shutdown();
+    /**
+     * Runs the specified {@code task} immediately, in a transaction.
+     */
+    void runTransactionalTask(KernelRunnable task, Identity ownerIdentity)
+	throws Exception
+    {
+	if (ownerIdentity == null) {
+	    throw new NullPointerException("Owner identity cannot be null");
+	}
+	transactionScheduler.runTask(task, ownerIdentity);
     }
 }

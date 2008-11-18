@@ -19,8 +19,8 @@
 
 package com.sun.sgs.protocol.session;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.protocol.MessageChannel;
-import com.sun.sgs.protocol.ProtocolDescriptor;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
@@ -29,14 +29,8 @@ import java.nio.ByteBuffer;
  */
 public interface SessionMessageChannel extends MessageChannel {
 
-    /**
-     * Notifies the associated client that it should redirect its login
-     * redirect message.
-     *
-     * @param newListener descripotor to reidrect to 
-     */
-    void loginRedirect(ProtocolDescriptor newListener);
-
+    Identity identity();
+    
     /**
      * Notifies the associated client that the previous login attempt was
      * successful, and the client is assigned the given {@code sessionId}.
@@ -57,7 +51,7 @@ public interface SessionMessageChannel extends MessageChannel {
      * @param	throwable an exception that occurred while processing the
      *		login request, or {@code null}
      */
-    void loginFailure(String reason, Throwable throwable);
+    void loginFailure(String reason);
 
     /**
      * Sends the associated client the specified {@code message}.

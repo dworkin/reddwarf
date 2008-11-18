@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -26,6 +28,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -48,6 +51,7 @@ import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.Protocol;
 import com.sun.sgs.protocol.ProtocolConnectionHandler;
 import com.sun.sgs.protocol.ProtocolFactory;
+import com.sun.sgs.protocol.channel.ChannelMessageChannel;
 import com.sun.sgs.protocol.session.SessionMessageChannel;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -580,7 +584,7 @@ public final class ClientSessionServiceImpl
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void addLoginResult(
+    private void addLoginResult(
 	ClientSessionImpl session, boolean success, Throwable throwable)
     {
 	Context context = checkContext();
@@ -617,16 +621,184 @@ public final class ClientSessionServiceImpl
     public MessageHandler newConnection(MessageChannel msgChannel,
                                         ProtocolDescriptor descriptor)
         throws Exception
-    {
-        assert msgChannel instanceof SessionMessageChannel;
-        
-        logger.log(Level.FINER, "new connection on {0}", msgChannel);
+    {        
+        if (msgChannel instanceof SessionMessageChannel) {
+            SessionMessageChannel sessionChannel = (SessionMessageChannel)msgChannel;
+            if (logger.isLoggable(Level.FINE))
+                logger.log(Level.FINER, "new connection on {0}", msgChannel);
+            
+            ClientSessionHandler handler =
+                    new ClientSessionHandler(this,
+                                             dataService,
+                                             sessionChannel,
+                                             descriptor);
+            final Identity identity = sessionChannel.identity();
+            final BigInteger sessionRefId = handler.getSessionRefId();
+            // throws exception on failure
+            validateUserLogin(identity, handler);
+            handlers.put(sessionRefId, handler);
+            scheduleTask(new LoginTask(identity, sessionRefId), identity);
+            return handler;
+            
+//        } else if (msgChannel instanceof ChannelMessageChannel) {
+//            logger.log(Level.FINER, "new secondary connection on {0}",
+//                       msgChannel);
+//
+//            return new SecondaryChannelHandler(this,
+//                                               (ChannelMessageChannel)msgChannel,
+//                                               descriptor);
+        } else
+            throw new RuntimeException("unknown connection type");
+    }
 
-        /* The handler will call addHandler if login succeeds */
-        return new ClientSessionHandler(this,
-                                        dataService,
-                                        (SessionMessageChannel)msgChannel,
-                                        descriptor);
+    /**
+     * Validates the {@code identity} of the user logging in and returns
+     * {@code true} if the login is allowed to proceed, and {@code false}
+     * if the login is denied.
+     *
+     * <p>A user with the specified {@code identity} is allowed to log in
+     * if one of the following conditions holds:
+     *
+     * <ul>
+     * <li>the {@code identity} is not currently logged in, or
+     * <li>the {@code identity} is logged in, and the {@code
+     * com.sun.sgs.impl.service.session.allow.new.login} property is
+     * set to {@code true}.
+     * </ul>
+     * In the latter case (new login allowed), the existing user session logged
+     * in with {@code identity} is forcibly disconnected.
+     *
+     * <p>If this method returns {@code true}, the {@link #removeUserLogin}
+     * method must be invoked when the user with the specified {@code
+     * identity} is disconnected.
+     *
+     * @param	identity the user identity
+     * @param	handler the client session handler
+     * @return	{@code true} if the user is allowed to log in with the
+     * specified {@code identity}, otherwise returns {@code false}
+     */
+    private void validateUserLogin(Identity identity, ClientSessionHandler handler)
+        throws Exception
+    {
+	ClientSessionHandler previousHandler =
+	    loggedInIdentityMap.putIfAbsent(identity, handler);
+	if (previousHandler == null) {
+	    // No user logged in with the same idenity; allow login.
+	    return;
+	} else if (!allowNewLogin) {
+	    // Same user logged in; new login not allowed, so deny login.
+	    throw new Exception("Duplicate user login not allowed");
+	} else if (!previousHandler.loginHandled()) {
+	    // Same user logged in; can't preempt user in the
+	    // process of logging in; deny login.
+	    throw new Exception("Duplicate user");
+	} else {
+	    if (loggedInIdentityMap.replace(
+		    identity, previousHandler, handler)) {
+		// Disconnect current user; allow new login.
+		previousHandler.handleDisconnect(false, true);
+	    } else {
+		// Another same user login beat this one; deny login.	
+                throw new Exception("Duplicate user");
+	    }
+	}
+    }
+    /**
+     * This is a transactional task to notify the application's
+     * {@code AppListener} that this session has logged in.
+     */
+    private class LoginTask extends AbstractKernelRunnable {
+
+        final Identity identity;
+        final BigInteger sessionRefId;
+        
+        LoginTask(Identity identity, BigInteger sessionRefId) {
+            this.identity = identity;
+            this.sessionRefId = sessionRefId;
+        }
+	/**
+	 * Invokes the {@code AppListener}'s {@code loggedIn}
+	 * callback, which returns a client session listener.  If the
+	 * returned listener is serializable, then this method does
+	 * the following:
+	 *
+	 * a) queues the appropriate acknowledgment to be
+	 * sent when this transaction commits, and
+	 * b) schedules a task (on transaction commit) to call
+	 * {@code notifyLoggedIn} on the identity.
+	 *
+	 * If the client session needs to be disconnected (if {@code
+	 * loggedIn} returns a non-serializable listener (including
+	 * {@code null}), or throws a non-retryable {@code
+	 * RuntimeException}, then this method submits a
+	 * non-transactional task to disconnect the client session.
+	 * If {@code loggedIn} throws a retryable {@code
+	 * RuntimeException}, then that exception is thrown to the
+	 * caller.
+	 */
+	public void run() {
+	    AppListener appListener =
+		(AppListener) dataService.getServiceBinding(
+		    StandardProperties.APP_LISTENER);
+	    logger.log(
+		Level.FINEST,
+		"invoking AppListener.loggedIn session:{0}", identity);
+
+	    ClientSessionListener returnedListener = null;
+	    RuntimeException ex = null;
+
+	    ClientSessionImpl sessionImpl =
+		ClientSessionImpl.getSession(dataService, sessionRefId);
+	    try {
+		returnedListener =
+		    appListener.loggedIn(sessionImpl.getWrappedClientSession());
+	    } catch (RuntimeException e) {
+		ex = e;
+	    }
+		
+	    if (returnedListener instanceof Serializable) {
+		logger.log(
+		    Level.FINEST,
+		    "AppListener.loggedIn returned {0}", returnedListener);
+
+		sessionImpl.putClientSessionListener(
+		    dataService, returnedListener);
+
+		addLoginResult(sessionImpl, true, null);
+		
+		final Identity thisIdentity = identity;
+		scheduleTaskOnCommit(
+		    new AbstractKernelRunnable() {
+			public void run() {
+			    logger.log(
+			        Level.FINE,
+				"calling notifyLoggedIn on identity:{0}",
+				thisIdentity);
+			    // notify that this identity logged in,
+			    // whether or not this session is connected at
+			    // the time of notification.
+			    thisIdentity.notifyLoggedIn();
+			} });
+		
+	    } else {
+		if (ex == null) {
+		    logger.log(
+		        Level.WARNING,
+			"AppListener.loggedIn returned non-serializable " +
+			"ClientSessionListener:{0}", returnedListener);
+		} else if (!isRetryableException(ex)) {
+		    logger.logThrow(
+			Level.WARNING, ex,
+			"Invoking loggedIn on AppListener:{0} with " +
+			"session: {1} throws",
+			appListener, ClientSessionServiceImpl.this);
+		} else {
+		    throw ex;
+		}
+		addLoginResult(sessionImpl, false, ex);
+		sessionImpl.disconnect();
+	    }
+	}
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -910,7 +1082,7 @@ public final class ClientSessionServiceImpl
 		    if (loginSuccess) {
 			handler.loginSuccess();
 		    } else {
-			handler.loginFailure("login refused", loginException);
+			handler.loginFailure(loginException.getMessage());
 			return;
 		    }
 		}
@@ -1103,58 +1275,6 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Validates the {@code identity} of the user logging in and returns
-     * {@code true} if the login is allowed to proceed, and {@code false}
-     * if the login is denied.
-     *
-     * <p>A user with the specified {@code identity} is allowed to log in
-     * if one of the following conditions holds:
-     *
-     * <ul>
-     * <li>the {@code identity} is not currently logged in, or
-     * <li>the {@code identity} is logged in, and the {@code
-     * com.sun.sgs.impl.service.session.allow.new.login} property is
-     * set to {@code true}.
-     * </ul>
-     * In the latter case (new login allowed), the existing user session logged
-     * in with {@code identity} is forcibly disconnected.
-     *
-     * <p>If this method returns {@code true}, the {@link #removeUserLogin}
-     * method must be invoked when the user with the specified {@code
-     * identity} is disconnected.
-     *
-     * @param	identity the user identity
-     * @param	handler the client session handler
-     * @return	{@code true} if the user is allowed to log in with the
-     * specified {@code identity}, otherwise returns {@code false}
-     */
-    boolean validateUserLogin(Identity identity, ClientSessionHandler handler) {
-	ClientSessionHandler previousHandler =
-	    loggedInIdentityMap.putIfAbsent(identity, handler);
-	if (previousHandler == null) {
-	    // No user logged in with the same idenity; allow login.
-	    return true;
-	} else if (!allowNewLogin) {
-	    // Same user logged in; new login not allowed, so deny login.
-	    return false;
-	} else if (!previousHandler.loginHandled()) {
-	    // Same user logged in; can't preempt user in the
-	    // process of logging in; deny login.
-	    return false;
-	} else {
-	    if (loggedInIdentityMap.replace(
-		    identity, previousHandler, handler)) {
-		// Disconnect current user; allow new login.
-		previousHandler.handleDisconnect(false, true);
-		return true;
-	    } else {
-		// Another same user login beat this one; deny login.	
-		return false;
-	    }
-	}
-    }
-
-    /**
      * Notifies this service that the specified {@code identity} is no
      * longer logged in using the specified {@code handler} so that
      * internal bookkeeping can be adjusted accordingly.
@@ -1164,16 +1284,6 @@ public final class ClientSessionServiceImpl
      */
     boolean removeUserLogin(Identity identity, ClientSessionHandler handler) {
 	return loggedInIdentityMap.remove(identity, handler);
-    }
-    
-    /**
-     * Adds the handler for the specified session to the internal
-     * session handler map.  This method is invoked by the handler once the
-     * client has successfully logged in.
-     */
-    void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
-        assert handler != null;
-	handlers.put(sessionRefId, handler);
     }
     
     /**

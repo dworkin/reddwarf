@@ -41,21 +41,6 @@ import java.nio.ByteBuffer;
 public interface SessionMessageHandler extends MessageHandler {
 
     /**
-     * Processes a login request with the specified {@code name}, and
-     * {@code password}.
-     *
-     * <p>When this handler has completed processing the login request, it
-     * uses the returned future to notify the caller that the request has
-     * been processed.
-     *
-     * @param	name a user name
-     * @param	password a password
-     * @return	future a future to be notified when the request has been
-     *		processed
-     */
-    CompletionFuture loginRequest(String name, String password);
-
-    /**
      * Processes a message sent by the associated client.
      *
      * <p>When this handler has completed processing the session message,

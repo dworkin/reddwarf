@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -33,6 +35,7 @@ import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.session.SessionMessageChannel;
 import com.sun.sgs.protocol.session.SessionMessageHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -43,6 +46,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.security.auth.login.LoginException;
 
 /**
  * A wrapper channel that reads and writes complete messages by framing
@@ -58,11 +62,14 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
     static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(SimpleSgsProtocolMessageChannel.class.getName()));
 
+    /** Message for indicating login/authentication failure. */
+    private static final String LOGIN_REFUSED_REASON = "Login refused";
+    
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...).
      */
-    final AsynchronousMessageChannel asyncMsgChannel;
+    private final AsynchronousMessageChannel asyncMsgChannel;
 
     /** This message channel's protocol impl. */
     final SimpleSgsProtocolImpl protocolImpl;
@@ -76,6 +83,12 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
     /** A lock for {@code loggedIn} and {@code messageQueue} fields. */
     private Object lock = new Object();
 
+    /** The identity for this channel. */
+    private volatile Identity authenticatedIdentity = null;
+    
+    /** The protocol message handler. Set after a sucessful login. */
+    private volatile SessionMessageHandler sessionHandler;
+    
     /** Indicates whether the client's login ack has been sent. */
     private boolean loginHandled = false;
 
@@ -91,18 +104,16 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
      * @param	readBufferSize the number of bytes in the read buffer
      */
     SimpleSgsProtocolMessageChannel(AsynchronousByteChannel byteChannel,
-                                           SimpleSgsProtocolImpl protocolImpl,
-                                           int readBufferSize)
+                                    SimpleSgsProtocolImpl protocolImpl,
+                                    int readBufferSize)
     {
 	// The read buffer size lower bound is enforced by the protocol factory
 	assert readBufferSize >= PREFIX_LENGTH;
 	this.asyncMsgChannel =
 	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
 	this.protocolImpl = protocolImpl;
-    }
 
-    void setHandler(SessionMessageHandler handler) {
-        readHandler = new ConnectedReadHandler(handler);
+        readHandler = new ConnectedReadHandler();
         
         /*
 	 * TBD: It might be a good idea to implement high- and low-water marks
@@ -112,11 +123,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	scheduleReadOnReadHandler();
     }
     
-    /* -- Implement ProtocolMessageChannel -- */
-
-    /** {@inheritDoc} */
-    @Override
-    public void loginRedirect(ProtocolDescriptor newListener) {
+    private void loginRedirect(ProtocolDescriptor newListener) {
         TransportDescriptor transportDesc = newListener.getTransport();
 	int hostStringSize = MessageBuffer.getSize(transportDesc.getHostName());
 	MessageBuffer buf = new MessageBuffer(1 + hostStringSize + 4);
@@ -127,6 +134,15 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	flushMessageQueue();
     }
 
+    /* -- Implement SessionMessageChannel -- */
+
+    /** {@inheritDoc} */
+    @Override
+    public Identity identity() {
+        assert authenticatedIdentity != null;
+        return authenticatedIdentity;
+    }
+    
     /** {@inheritDoc} */
     @Override
     public void loginSuccess(BigInteger sessionId) {
@@ -144,11 +160,11 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 
     /** {@inheritDoc} */
     @Override
-    public void loginFailure(String reason, Throwable throwable) {
+    public void loginFailure(String reason) {
         int stringSize = MessageBuffer.getSize(reason);
         MessageBuffer buf = new MessageBuffer(1 + stringSize);
         buf.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
-            putString("login refused");
+            putString(reason);
         writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
     }
@@ -210,6 +226,9 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	buf.put(SimpleSgsProtocol.LOGOUT_SUCCESS).
 	    flip();
 	writeToWriteHandler(buf);
+//        try {
+//            close();
+//        } catch (IOException ignore) { }
     }
     
     /* -- Implement Channel -- */
@@ -427,7 +446,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 				    SimpleSgsProtocolMessageChannel.this,
 				    HexDumper.format(message, 0x50));
                 }
-//		handler.disconnect(null);
+		disconnect();
             }
         }
     }
@@ -458,9 +477,6 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 
     /** A completion handler for reading from the session's channel. */
     private class ConnectedReadHandler extends ReadHandler {
-
-        /** The protocol message handler. */
-        final SessionMessageHandler handler;
     
 	/** The lock for accessing the {@code isReading} field. The locks
 	 * {@code lock} and {@code readLock} should only be acquired in
@@ -472,9 +488,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
         private boolean isReading = false;
 
 	/** Creates an instance of this class. */
-        ConnectedReadHandler(SessionMessageHandler handler) {
-            this.handler = handler;
-        }
+        ConnectedReadHandler() { }
 
 	/** Reads a message from the connection. */
         @Override
@@ -497,7 +511,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    handler.disconnect();   // ignore future
+                    disconnect();
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -524,7 +538,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                handler.disconnect();   // ignore future
+                disconnect();
             }
         }
 
@@ -544,6 +558,14 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
+                if (sessionHandler != null) {
+                    logger.log(Level.WARNING,
+                               "received LOGIN_REQUEST after login - ignoring:{0}",
+                               this);
+                    
+                    read();
+                    break;
+                }
 	        byte version = msg.getByte();
 	        if (version != SimpleSgsProtocol.VERSION) {
 	            if (logger.isLoggable(Level.SEVERE)) {
@@ -551,73 +573,111 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 	                           "got protocol version:{0}, expected {1}",
                                    version, SimpleSgsProtocol.VERSION);
 	            }
-		    handler.disconnect();   // ignore future
+                    // If version is bad, can't send login failure message
+                    // back to client (not talking same language) so just close.
+                    try {
+                        close();
+                    } catch (IOException ignore) {}
 	            break;
 	        }
 
 		final String name = msg.getString();
 		final String password = msg.getString();
-		handler.loginRequest(name, password);   // ignore future
-                // Resume reading immediately
+                protocolImpl.scheduleNonTransactionalTask(
+                    new AbstractKernelRunnable() {
+        //          new AbstractKernelRunnable("HandleLoginRequest") {
+                        public void run() {
+                            handleLoginRequest(name, password);
+                } });
+                // Resume reading immediately - TODO - really?
 		read();
 
 		break;
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		ByteBuffer clientMessage =
-		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-                CompletionFuture sessionMessageFuture =
-                                handler.sessionMessage(clientMessage);
+                if (sessionHandler != null) {
+                    ByteBuffer clientMessage =
+                        ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
+                    CompletionFuture sessionMessageFuture =
+                                sessionHandler.sessionMessage(clientMessage);
 
-		// Wait for session message to be processed before
-		// resuming reading.
-		try {
-		    sessionMessageFuture.get();
-		} catch (InterruptedException ignore) {
-		} catch (ExecutionException e) {
-		    if (logger.isLoggable(Level.FINE)) {
-			logger.logThrow(Level.FINE, e,
-                                        "Processing session message:{0} " +
-                                        "for protocol:{1} throws",
-                                        HexDumper.format(clientMessage, 0x50),
-                                        SimpleSgsProtocolMessageChannel.this);
-		    }
-		}
+                    // Wait for session message to be processed before
+                    // resuming reading.
+                    try {
+                        sessionMessageFuture.get();
+                    } catch (InterruptedException ignore) {
+                    } catch (ExecutionException e) {
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.logThrow(Level.FINE, e,
+                                            "Processing session message:{0} " +
+                                            "for protocol:{1} throws",
+                                            HexDumper.format(clientMessage, 0x50),
+                                            SimpleSgsProtocolMessageChannel.this);
+                        }
+                    }
+                } else
+                    logger.log(Level.WARNING,
+                               "session message received before login completed: {0}",
+                               this);
 		read();
 
 		break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-		BigInteger channelRefId =
-		    new BigInteger(1, msg.getBytes(msg.getShort()));
-		ByteBuffer channelMessage =
-		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-                CompletionFuture channelMessageFuture =
-                        handler.channelMessage(channelRefId, channelMessage);
+                if (sessionHandler != null) {
+                    BigInteger channelRefId =
+                        new BigInteger(1, msg.getBytes(msg.getShort()));
+                    ByteBuffer channelMessage =
+                        ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
+                    CompletionFuture channelMessageFuture =
+                            sessionHandler.channelMessage(channelRefId,
+                                                          channelMessage);
 
-		// Wait for channel message to be processed before
-		// resuming reading.
-		try {
-		    channelMessageFuture.get();
-		} catch (InterruptedException ignore) {
-		} catch (ExecutionException e) {
-		    if (logger.isLoggable(Level.FINE)) {
-			logger.logThrow(Level.FINE, e,
-                                        "Processing channel message:{0} " +
-                                        "for protocol:{1} throws",
-                                        HexDumper.format(channelMessage, 0x50),
-                                        SimpleSgsProtocolMessageChannel.this);
-		    }
-                }
+                    // Wait for channel message to be processed before
+                    // resuming reading.
+                    try {
+                        channelMessageFuture.get();
+                    } catch (InterruptedException ignore) {
+                    } catch (ExecutionException e) {
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.logThrow(Level.FINE, e,
+                                            "Processing channel message:{0} " +
+                                            "for protocol:{1} throws",
+                                            HexDumper.format(channelMessage, 0x50),
+                                            SimpleSgsProtocolMessageChannel.this);
+                        }
+                    }
+                } else
+                    logger.log(Level.WARNING,
+                               "channel message received before login completed:{0}",
+                               this);
                 read();
 		
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-		handler.logoutRequest();    // ignore future
-		// Resume reading immediately
-                read();
-
+		if (sessionHandler != null) {
+                    CompletionFuture logoutFuture =
+                            sessionHandler.logoutRequest();
+                    try {
+                        logoutFuture.get();
+                    } catch (InterruptedException ignore) {
+                    } catch (ExecutionException e) {
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.logThrow(Level.FINE, e,
+                                            "Processing LOGOUT_REQUEST message: " +
+                                            "for protocol:{0} throws",
+                                            SimpleSgsProtocolMessageChannel.this);
+                        }
+                    }
+//                    logoutSuccess();
+                } else {
+                    logger.log(Level.WARNING,
+                               "logout message received before login completed:{0}",
+                               this);
+                    // Resume reading immediately
+                    read();
+                }
 		break;
 		
 	    default:
@@ -626,9 +686,181 @@ public class SimpleSgsProtocolMessageChannel implements SessionMessageChannel {
 			       "unknown opcode 0x{0}",
 			       Integer.toHexString(opcode));
 		}
-		handler.disconnect();   // ignore future
+		disconnect();
 		break;
 	    }
+	}
+    }
+    
+    /**
+     * Disconnect from the client. If a session handler is present call that
+     * (which will eventually get back here), otherwise just close the
+     * channel.
+     */
+    private void disconnect() {
+        if (sessionHandler != null)
+            sessionHandler.disconnect();    // ignore future
+        else
+            try {
+                close();
+            } catch (IOException e) {
+                logger.logThrow(Level.FINEST,
+                                e, "close failed during disconnect");
+            }
+    }
+    
+    /**
+     * Handles a login request for the specified {@code name} and
+     * {@code password}, scheduling the appropriate response to be
+     * sent to the client (either logout success, login failure, or
+     * login redirect).
+     */
+    private void handleLoginRequest(String name, String password) {
+        logger.log(Level.FINEST,
+                   "handling login request for name:{0}", name);
+        try {
+            /*
+             * Authenticate identity.
+             */
+            authenticatedIdentity = //authenticate(name, password);
+                protocolImpl.identityManager.authenticateIdentity(
+                        new NamePasswordCredentials(name,
+                                                    password.toCharArray()));
+        } catch (Exception e) {
+            logger.logThrow(Level.FINEST, e,
+                            "login authentication failed for name:{0}", name);
+            // don't send exception message, may have too much info
+            sendLoginFailureAndClose("login authentication failed");
+            return;
+        }
+
+        Node node;
+        try {
+            /*
+             * Get node assignment.
+             */
+            protocolImpl.nodeMapService.assignNode(SimpleSgsProtocolMessageChannel.class,
+                                                   authenticatedIdentity);
+            GetNodeTask getNodeTask = new GetNodeTask(authenticatedIdentity);		
+            protocolImpl.runTransactionalTask(getNodeTask,
+                                              authenticatedIdentity);
+            node = getNodeTask.getNode();
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
+                           name, node);
+            }
+
+        } catch (Exception e) {
+            logger.logThrow(Level.WARNING, e,
+                            "getting node assignment for identity:{0} throws",
+                            name);
+            sendLoginFailureAndClose(e.getMessage());
+            return;
+        }
+
+        long assignedNodeId = node.getId();
+        if (assignedNodeId == protocolImpl.localNodeId) {
+            /*
+             * Login to this node.
+             */
+            try {
+                sessionHandler = //protocolImpl.localLogin(this);
+                        (SessionMessageHandler)protocolImpl.connectionHandler.
+                                newConnection(this, protocolImpl.protocolDesc);
+
+            } catch (Exception e) {
+                sendLoginFailureAndClose(e.getMessage());
+            }
+
+        } else {
+            /*
+             * Redirect login to assigned (non-local) node.
+             */
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE,
+                           "redirecting login for identity:{0} " +
+                           "from nodeId:{1} to node:{2}",
+                           name, protocolImpl.localNodeId, node);
+            }
+            ProtocolDescriptor[] descriptors = node.getClientListeners();
+            for (ProtocolDescriptor descriptor : descriptors) {
+                if (descriptor.isCompatibleWith(protocolImpl.protocolDesc)) {
+                    final ProtocolDescriptor newListener = descriptor;
+                    // TBD: identity may be null. Fix to pass a non-null
+                    // identity when scheduling the task.
+
+                    protocolImpl.scheduleNonTransactionalTask(
+                        new AbstractKernelRunnable() {
+        //              new AbstractKernelRunnable("SendLoginRedirectMessage") {
+                            public void run() {
+                                loginRedirect(newListener);
+                                try {
+                                    close();
+                                } catch (IOException ignore) {}
+                            } });
+                    return;
+                }
+            }
+            logger.log(Level.SEVERE,
+                       "redirect node {0} does not support a compatable protocol" +
+                       node);
+            sendLoginFailureAndClose("Failed to find redirect node");
+        }
+    }
+
+//    /**
+//     * Authenticates the specified username and password, throwing
+//     * LoginException if authentication fails.
+//     */
+//    private Identity authenticate(String username, String password)
+//	throws LoginException
+//    {
+//	return protocolImpl.identityManager.authenticateIdentity(
+//	    new NamePasswordCredentials(username, password.toCharArray()));
+//    }
+    
+    /**
+     * Sends a login failure message to the client and closes the client
+     * channel. Should only be called on login failure, before a session
+     * handler is set.
+     *
+     * @param   reason the reason the login failed, or {@code null}
+     */
+    private void sendLoginFailureAndClose(final String reason) {
+        assert sessionHandler == null;
+        // TBD: identity may be null. Fix to pass a non-null identity
+        // when scheduling the task.
+        protocolImpl.scheduleNonTransactionalTask(
+            new AbstractKernelRunnable() {
+//            new AbstractKernelRunnable("SendLoginFailureMessage") {
+                public void run() {
+//                        loginFailure(LOGIN_REFUSED_REASON, throwable);
+                        loginFailure(reason);
+                    try {
+                        close();
+                    } catch (IOException ignore) {}
+                } });
+    }
+    
+    /**
+     * This is a transactional task to obtain the node assignment for
+     * a given identity.
+     */
+    private class GetNodeTask extends AbstractKernelRunnable {
+
+	private final Identity authenticatedIdentity;
+	private volatile Node node = null;
+
+	GetNodeTask(Identity authenticatedIdentity) {
+	    this.authenticatedIdentity = authenticatedIdentity;
+	}
+
+	public void run() throws Exception {
+	    node = protocolImpl.nodeMapService.getNode(authenticatedIdentity);
+	}
+
+	Node getNode() {
+	    return node;
 	}
     }
 }
