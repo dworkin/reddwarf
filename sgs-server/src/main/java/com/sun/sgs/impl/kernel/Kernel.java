@@ -534,8 +534,16 @@ class Kernel {
      */
     private void setupServiceNoManager(String className,
 	    StartupKernelContext startupContext) throws Exception {
+	
 	Class<?> serviceClass = Class.forName(className);
-	Service service = createService(serviceClass);
+	Service service;
+	
+	// Check if we are dealing with the watchdog service
+	if (isWatchdogService(serviceClass)) {
+	    service = createWatchdogService(serviceClass);
+	} else {
+	    service = createService(serviceClass);
+	}	
 	startupContext.addService(service);
     }
 
@@ -577,19 +585,36 @@ class Kernel {
 	startupContext.addManager(manager);
     }
 
+    
     /**
-     * Private helper that creates an instance of a <code>service</code>
-     * with no manager, based on fully qualified class names.
+     * Checks if the class parameter corresponds to the watchdog service
+     * @param serviceClass the service to check
+     * @return {@code true} if the class represents the watchdog service,
+     * and {@code false} otherwise
      */
-    private Service createService(Class<?> serviceClass) throws Exception {
+    private boolean isWatchdogService(Class<?> serviceClass) {
+	String watchdogServiceProperty = appProperties.getProperty(
+		StandardProperties.WATCHDOG_SERVICE);
+	if (watchdogServiceProperty == null) { 
+	    System.err.println("returned false");
+	    return false;
+	}
+	int index = watchdogServiceProperty.lastIndexOf(".");
+	String watchdogServiceClassName = watchdogServiceProperty.
+		substring(index).toUpperCase();
+	
+	return serviceClass.getName().toUpperCase().contains(
+		watchdogServiceClassName);
+    }
+    
+    /**
+     * Private helper that creates an instance of the <code>WatchdogService</code>
+     * with no manager, based on the fully qualified class name.
+     */
+    private Service createWatchdogService(Class<?> serviceClass) throws Exception {
 	Constructor<?> serviceConstructor;
-
-	// If the service is the watchdog, then attach a special
-	// object that enables call-back for node shutdown.
-	// Otherwise, construct the service as usual.
-	if (serviceClass.equals(appProperties
-		.getProperty(StandardProperties.WATCHDOG_SERVICE))) {
-
+	    
+	    System.err.println(" --- found watchdog service! ");
 	    serviceConstructor =
 		    serviceClass.getConstructor(Properties.class,
 			    ComponentRegistry.class, TransactionProxy.class,
@@ -598,7 +623,32 @@ class Kernel {
 	    // return a new instance using the four-argument constructor
 	    KernelShutdownController ctrl =
 		    new KernelShutdownControllerImpl(this);
-	    return (Service) (serviceConstructor.newInstance(appProperties,
+ 	    return (Service) (serviceConstructor.newInstance(appProperties,
+		    systemRegistry, proxy, ctrl));
+    }
+    
+    
+    /**
+     * Private helper that creates an instance of a <code>service</code>
+     * with no manager, based on fully qualified class names.
+     */
+    private Service createService(Class<?> serviceClass) throws Exception {
+	Constructor<?> serviceConstructor;
+	    
+	// If the service is the watchdog, then attach a special
+	// object that enables call-back for node shutdown.
+	// Otherwise, construct the service as usual.
+	if (isWatchdogService(serviceClass)) {
+	    System.err.println(" --- found watchdog service! ");
+	    serviceConstructor =
+		    serviceClass.getConstructor(Properties.class,
+			    ComponentRegistry.class, TransactionProxy.class,
+			    KernelShutdownController.class);
+
+	    // return a new instance using the four-argument constructor
+	    KernelShutdownController ctrl =
+		    new KernelShutdownControllerImpl(this);
+ 	    return (Service) (serviceConstructor.newInstance(appProperties,
 		    systemRegistry, proxy, ctrl));
 
 	} else {

@@ -251,6 +251,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    KernelShutdownController ctrl) throws Exception {
 
 	super(properties, systemRegistry, txnProxy, logger);
+	
 	logger.log(Level.CONFIG,
 		"Creating WatchdogServiceImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -287,7 +288,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
 	    String clientHost =
 		    wrappedProps.getProperty(CLIENT_HOST_PROPERTY, localHost);
-
+	    
 	    // If we're running on a full stack (the usual case), or a
 	    // partial stack that includes the client session service,
 	    // insist that a valid port number be specfied.
@@ -304,7 +305,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    } else {
 		appPort = -1;
 	    }
-
+	    
 	    /*
 	     * Check service version.
 	     */
@@ -324,6 +325,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    String host;
 	    int serverPort;
 	    if (isCoreServerNode) {
+		System.err.println("---- core server node");
 		serverImpl =
 			new WatchdogServerImpl(properties, systemRegistry,
 				txnProxy, clientHost, appPort, clientProxy,
@@ -331,6 +333,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
+		System.err.println("---- not core server node");
 		host =
 			wrappedProps.getProperty(HOST_PROPERTY, wrappedProps
 				.getProperty(StandardProperties.SERVER_HOST));
@@ -342,7 +345,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 			wrappedProps.getIntProperty(SERVER_PORT_PROPERTY,
 				DEFAULT_SERVER_PORT, 1, 65535);
 	    }
-
+	    
 	    Registry rmiRegistry =
 		    LocateRegistry.getRegistry(host, serverPort);
 	    serverProxy =
@@ -375,6 +378,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    }
 
 	} catch (Exception e) {
+	    System.err.println("-- FAILED! " + e.getLocalizedMessage());
 	    logger.logThrow(Level.CONFIG, e,
 		    "Failed to create WatchdogServiceImpl");
 
@@ -442,6 +446,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
+		System.err.println("... called from isLocalNodeAlive()");
 		reportFailure(this.getClass().toString(), FailureLevel.MEDIUM);
 		return false;
 	    } else {
@@ -499,11 +504,16 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
     /**
      * {@inheritDoc}
+     * <p>
+     * This method is designed to be called locally without any need to supply
+     * the node's own ID. Therefore, it is equivalent to the call
+     * {@code reportFailure(getLocalNodeId(), className, severity)}.
      */
     public void reportFailure(String className, FailureLevel severity) {
 	try {
 	    reportFailure(getLocalNodeId(), className, severity);
 	} catch (IOException ioe) {
+	    System.err.println("...service:");
 	    logger.log(Level.WARNING, "Unexpected exception thrown:" +
 		    ioe.getLocalizedMessage());
 	}
@@ -597,6 +607,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		boolean renewed = false;
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
+			System.err.println("... called from RenewThread.run()");
 			reportFailure(this.getClass().toString(),
 				FailureLevel.MEDIUM);
 			return;
@@ -798,6 +809,21 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    setFailedThenNotify(true);
 	}
 
+    }
+
+    /**
+     * Implements the WatchdogClient that receives callbacks from the
+     * WatchdogServer.
+     */
+    private final class ComponentWatchdogClientImpl implements
+	    ComponentWatchdogClient {
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void reportComponentFailure(String name, FailureLevel severity) {
+	    reportFailure(name, severity);
+	}
     }
 
     /**

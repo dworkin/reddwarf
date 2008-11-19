@@ -19,6 +19,26 @@
 
 package com.sun.sgs.test.impl.service.watchdog;
 
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
+
+import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.net.BindException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import junit.framework.TestCase;
+
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -34,27 +54,9 @@ import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import com.sun.sgs.test.impl.service.nodemap.EvilProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import java.io.File;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.net.BindException;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import junit.framework.TestCase;
 
 public class TestWatchdogServiceImpl extends TestCase {
     /** The name of the WatchdogServerImpl class. */
@@ -117,9 +119,9 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     protected void setUp(Properties props, boolean clean) throws Exception {
-	
         serverNode = new SgsTestNode("TestWatchdogServiceImpl", 
 				     null, null, props, clean);
+        System.err.println("instantiated server node");
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
@@ -180,7 +182,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             watchdog = new WatchdogServiceImpl(
 		SgsTestNode.getDefaultProperties(
 		    "TestWatchdogServiceImpl", null, null),
-		systemRegistry, txnProxy);  
+		systemRegistry, txnProxy, null);  
             WatchdogServerImpl server = watchdog.getServer();
             System.err.println("watchdog server: " + server);
             server.shutdown();
@@ -192,7 +194,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorNullProperties() throws Exception {
         WatchdogServiceImpl watchdog = null;
 	try {
-	    watchdog = new WatchdogServiceImpl(null, systemRegistry, txnProxy);
+	    watchdog = new WatchdogServiceImpl(null, systemRegistry, txnProxy, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -204,7 +206,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorNullRegistry() throws Exception {
         WatchdogServiceImpl watchdog = null;
 	try {
-	    watchdog = new WatchdogServiceImpl(serviceProps, null, txnProxy);
+	    watchdog = new WatchdogServiceImpl(serviceProps, null, txnProxy, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -217,7 +219,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	try {
 	    watchdog =
-                    new WatchdogServiceImpl(serviceProps, systemRegistry, null);
+                    new WatchdogServiceImpl(serviceProps, systemRegistry, null, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -232,7 +234,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_PORT, "20000",
             WatchdogServerPropertyPrefix + ".port", "0");
         try {
-            new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+            new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException e) {
             System.err.println(e);
@@ -245,7 +247,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
 	    WatchdogServerPropertyPrefix + ".port", "0");
 	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -263,7 +265,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
         try {
             WatchdogServiceImpl watchdog =
-                new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+                new WatchdogServiceImpl(props, systemRegistry, txnProxy, null);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException e) {
             System.err.println(e);
@@ -278,7 +280,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
 	    watchdog = 
-                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -295,7 +297,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
 	    watchdog =
-                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -316,7 +318,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
 	try {
 	    watchdog =
-                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -338,7 +340,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		Integer.toString(Integer.MAX_VALUE));
 	try {
 	    watchdog =
-                new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
 	} catch (IllegalArgumentException e) {
 	    fail("Unexpected IllegalArgumentException");
 	} finally {
@@ -372,7 +374,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    new WatchdogServiceImpl(
 		SgsTestNode.getDefaultProperties(
 		    "TestWatchdogServiceImpl", null, null),
-		systemRegistry, txnProxy);  
+		systemRegistry, txnProxy, null);  
 	watchdog.shutdown();
     }
 
@@ -385,7 +387,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		}}, taskOwner);
 
 	try {
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy, null);  
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
@@ -401,7 +403,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		}}, taskOwner);
 
 	try {
-	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy);  
+	    new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy, null);  
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
@@ -424,7 +426,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy, null);
 	try {
 	    id = watchdog.getLocalNodeId();
 	    if (id != 2) {
@@ -440,7 +442,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    new WatchdogServiceImpl(
 		SgsTestNode.getDefaultProperties(
 		    "TestWatchdogServiceImpl", null, null),
-		systemRegistry, txnProxy);
+		systemRegistry, txnProxy, null);
 	watchdog.shutdown();
 	try {
 	    watchdog.getLocalNodeId();
@@ -471,7 +473,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy, null);
 	try {
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -504,7 +506,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy);
+	    systemRegistry, txnProxy, null);
 	watchdog.shutdown();
 	try {
 	    watchdog.isLocalNodeAlive();
@@ -544,7 +546,7 @@ public class TestWatchdogServiceImpl extends TestCase {
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy, null);
 	try {
 	    if (! watchdog.isLocalNodeAliveNonTransactional()) {
 		fail("Expected watchdog.isLocalNodeAliveNonTransactional() " +
@@ -569,7 +571,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy);
+	    systemRegistry, txnProxy, null);
 	watchdog.shutdown();
 	try {
 	    watchdog.isLocalNodeAliveNonTransactional();
@@ -626,7 +628,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy);
+	    systemRegistry, txnProxy, null);
 	watchdog.shutdown();
 
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -680,7 +682,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy);
+	    systemRegistry, txnProxy, null);
 	watchdog.shutdown();
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -721,7 +723,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy);
+	    systemRegistry, txnProxy, null);
 	watchdog.shutdown();
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -830,7 +832,7 @@ public class TestWatchdogServiceImpl extends TestCase {
                 props.put(StandardProperties.APP_PORT,
                           Integer.toString(SgsTestNode.getNextAppPort()));
 		WatchdogServiceImpl watchdog =
-		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+		    new WatchdogServiceImpl(props, systemRegistry, txnProxy, null);
 		DummyNodeListener listener = new DummyNodeListener();
 		watchdog.addNodeListener(listener);
 		watchdogMap.put(watchdog, listener);
@@ -868,7 +870,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	WatchdogServiceImpl watchdog = new WatchdogServiceImpl(
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null),
-	    systemRegistry, txnProxy);
+	    systemRegistry, txnProxy, null);
 	watchdog.shutdown();
 	try {
 	    watchdog.addRecoveryListener(new DummyRecoveryListener());
@@ -1262,6 +1264,149 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
+    /* --- test shutdown procedures --- */
+    
+    /** Creates node properties with a db directory based on the app name. */
+    private Properties getPropsForShutdownTests(String appName)
+	throws Exception
+    {
+        String dir = System.getProperty("java.io.tmpdir") +
+            File.separator + appName + ".db";
+        Properties props =
+	    SgsTestNode.getDefaultProperties(appName, null, null);
+        props.setProperty(
+            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+            dir);
+        props.setProperty(
+                StandardProperties.WATCHDOG_SERVICE,
+                WatchdogServiceImpl.class.getName());
+        
+        System.err.println("::"+props.getProperty(StandardProperties.WATCHDOG_SERVICE));
+        return props;
+    }
+    
+    /** 
+     * Check that a node can report a failure and become
+     * shutdown
+     */
+    public void testReportFailure() throws Exception {
+        final String appName = "TestReportFailure";
+        SgsTestNode node = null;
+        try {
+            node = new SgsTestNode(appName, null,
+                                   getPropsForShutdownTests(appName), true);
+            Properties props = node.getServiceProperties();
+            System.err.println("node properties are " + props);
+            
+            WatchdogService wdsvc = node.getWatchdogService();
+            wdsvc.reportFailure(node.getNodeId(), 
+        	    this.getName(), WatchdogService.FailureLevel.FATAL);
+            
+            // Node should be shut down since we reported a failure
+            try {
+        	wdsvc.isLocalNodeAlive();
+        	fail("Expected IllegalStateException");
+            } catch (IllegalStateException ise) {
+        	// expected
+            } catch (Exception e) {
+        	fail ("Not expecting exception: " + e.getLocalizedMessage());  
+            }
+            
+        } finally {
+            if (node != null) {
+                node.shutdown(true);
+            }
+        }
+    }
+    
+    
+    /** Check that a node can report a failure and become
+     * shutdown
+     */
+    public void testFailureDueToNoRenewal() throws Exception {
+        final String appName = "testFailureDueToNoRenewal";
+
+        // Make a watchdog service with a very small renew interval;
+        // this should cause the renew process to cause a shutdown
+        WatchdogServiceImpl watchdog = null;
+	Properties properties = createProperties(
+	    StandardProperties.APP_NAME, appName,
+            StandardProperties.APP_PORT, "20000",
+	    WatchdogServerPropertyPrefix + ".start", "true",
+	    WatchdogServerPropertyPrefix + ".port", "0",
+	    WatchdogServerPropertyPrefix + ".renew.interval", "100");
+	try {
+	    watchdog =
+                new WatchdogServiceImpl(properties, systemRegistry, txnProxy, null);
+	} catch (IllegalArgumentException e) {
+	    fail("Unexpected IllegalArgumentException: " + e.getLocalizedMessage());
+	} finally {
+            if (watchdog != null) watchdog.shutdown();
+        }
+	
+	// wait for the renew thread to fail, and check if
+	// the node is alive. Since the renew should fail,
+	// checking if it is alive should throw an IllegalStateException
+	Thread.sleep(1000);
+	try {
+	    watchdog.isLocalNodeAlive();
+	    fail("Expecting IllegalStateException");
+	} catch (IllegalStateException ise) {
+	    // Expected
+	} catch (Exception e) {
+	    fail("Not expecting Exception:" + e.getLocalizedMessage());
+	}
+	
+    }
+    
+    
+    /** 
+     * Check that a node can report a failure and become
+     * shutdown
+     */
+    public void testReportRemoteFailure() throws Exception {
+        final String appName = "TestReportRemoteFailure_node";
+        final String appName2 = "TestReportRemoteFailure_node2";
+        SgsTestNode node = null;
+        SgsTestNode node2 = null;
+        try {
+            node = new SgsTestNode(appName, null,
+                                   getPropsForApplication(appName), true);
+            Properties props = node.getServiceProperties();
+            System.err.println("node properties are " + props);
+            
+            // instantiate the second node
+            node2 = new SgsTestNode(appName2, null,
+                    getPropsForApplication(appName2), true);
+            props = node2.getServiceProperties();
+            System.err.println("node properties are " + props);
+            WatchdogService node2WatchdogService = node2.getWatchdogService();
+            
+            // report that the second node failed
+            WatchdogService nodeWatchdogService = node.getWatchdogService();
+            nodeWatchdogService.reportFailure(node2.getNodeId(), 
+        	    this.getName(), WatchdogService.FailureLevel.FATAL);
+            
+            // This node should be unaffected
+            assertTrue(nodeWatchdogService.isLocalNodeAlive());
+            // The other node should have failed
+            try {
+        	node2WatchdogService.isLocalNodeAlive();
+        	fail("Expected IllegalStateException");
+            } catch (IllegalStateException ise) {
+        	// expected
+            } catch (Exception e) {
+        	fail ("Not expecting exception: " + e.getLocalizedMessage());  
+            }
+            
+        } finally {
+            if (node != null) {
+                node.shutdown(true);
+            }
+        }
+    }
+    
+    
     /** Creates node properties with a db directory based on the app name. */
     private Properties getPropsForApplication(String appName)
 	throws Exception
@@ -1289,7 +1434,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
 	WatchdogServiceImpl watchdog = 
-	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
+	    new WatchdogServiceImpl(props, systemRegistry, txnProxy, null);
 	watchdog.addRecoveryListener(listener);
 	watchdog.ready();
 	System.err.println("Created node (" + watchdog.getLocalNodeId() + ")");

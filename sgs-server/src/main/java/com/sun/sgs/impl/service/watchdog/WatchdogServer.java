@@ -94,8 +94,7 @@ public interface WatchdogServer extends Remote {
      * shutdown. This notification is a result of a server running into
      * difficulty communicating with a remote node, so the server's watchdog
      * service is responsible for notifying the watchdog server in order to
-     * issue the shutdown. If the method returns {@code false}, then it means
-     * that another thread has already issued the node to shutdown.
+     * issue the shutdown.
      * 
      * @param nodeId the failed node's ID
      * @param className the class issuing the failure
@@ -109,13 +108,14 @@ public interface WatchdogServer extends Remote {
 
     /**
      * Notifies the data store that the node has failed. This method is called
-     * if the watchdog service has already dealt with the shutdown procedure.
-     * If the node is known to be a remote node, then the three-argument
-     * method should be called instead. If the method returns {@code false},
-     * then it means that another thread has already issued the node to
-     * shutdown.
+     * if the watchdog service is aware that the node corresponding to
+     * {@code nodeId} is its own node.
+     * <p>
+     * Conversely, if the node is known to be a remote node, then the
+     * three-argument method should be called instead.
      * 
      * @param nodeId the failed node's ID
+     * @throws
      */
-    void setNodeAsFailed(long nodeId);
+    void setNodeAsFailed(long nodeId) throws IOException;
 }

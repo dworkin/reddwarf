@@ -425,7 +425,10 @@ public class SgsTestNode {
 	    StandardProperties.APP_LISTENER,
 	        (listenerClass != null ?
 		 listenerClass.getName() :
-		 StandardProperties.APP_LISTENER_NONE)
+		 StandardProperties.APP_LISTENER_NONE),
+
+		 StandardProperties.WATCHDOG_SERVICE,
+		                WatchdogServiceImpl.class.getName()
         );
 
         return retProps;

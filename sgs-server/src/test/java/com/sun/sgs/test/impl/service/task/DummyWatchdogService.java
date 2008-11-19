@@ -27,6 +27,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.RecoveryListener;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
 
@@ -157,4 +158,14 @@ public class DummyWatchdogService implements WatchdogService {
         }
     }
 
+    public void reportFailure(String className, FailureLevel severity) {
+	// Don't do anything for now
+    }
+
+    public void reportFailure(long nodeId, String className,
+	    FailureLevel severity) throws IOException {
+	// Don't do anything for now
+    }
+
+    
 }

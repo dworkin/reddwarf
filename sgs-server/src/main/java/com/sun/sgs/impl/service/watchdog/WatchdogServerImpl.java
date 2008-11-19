@@ -226,6 +226,7 @@ public final class WatchdogServerImpl extends AbstractService implements
 	    String host, int port, WatchdogClient client, boolean fullStack)
 	    throws Exception {
 	super(properties, systemRegistry, txnProxy, logger);
+	
 	logger.log(Level.CONFIG,
 		"Creating WatchdogServerImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -246,7 +247,7 @@ public final class WatchdogServerImpl extends AbstractService implements
 		checkServiceVersion(VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
 	    }
 	}, taskOwner);
-
+	
 	int requestedPort =
 		wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT, 0,
 			65535);
@@ -284,15 +285,16 @@ public final class WatchdogServerImpl extends AbstractService implements
 	// register our local id
 	long[] values = registerNode(host, port, client);
 	localNodeId = values[0];
-
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
+	
 	this.port =
 		exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
 	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
-
+	
 	checkExpirationThread.start();
+	System.err.println("-- server: done");
     }
 
     /** Calls NodeImpl.markAllNodesFailed. */
@@ -424,12 +426,18 @@ public final class WatchdogServerImpl extends AbstractService implements
     /**
      * Remove failed nodes from map of "alive" nodes so that a failed node
      * won't be assigned as a backup. Also, clean up the host port map entry.
+     * It should be noted that nodes that are removed from the set of
+     * {@code aliveNodes} are never added back.
      * 
      * @param node the node that has failed
      * @return {@code true} if the node was changed to no longer be alive, and
-     * {@code false} if the node was already marked as failed
+     * {@code false} if the node was already marked as failed and not in the
+     * {@code aliveNodes} map
      */
     boolean disqualifyAsAlive(NodeImpl node) {
+
+	// only proceed if we have just removed the node, not if
+	// the node had already been removed
 	if (aliveNodes.remove(node.getId()) != null) {
 	    removeHostPortMapEntry(node);
 	    return true;
@@ -438,8 +446,8 @@ public final class WatchdogServerImpl extends AbstractService implements
     }
 
     /**
-     * Mark each expired node as failed, assign it a backup, and update the
-     * data store. Add each expired node to the list of recovering nodes. The
+     * Mark the node as failed, assign it a backup, and update the
+     * data store. Add the node to the list of recovering nodes. The
      * node will be removed from the list and from the data store in the
      * 'recoveredNode' callback.
      * 
@@ -622,6 +630,7 @@ public final class WatchdogServerImpl extends AbstractService implements
 		// Try again
 
 	    } catch (Exception e) {
+		System.err.println("...SERVER:");
 		logger.log(Level.WARNING, "Unexpected exception thrown: {0}" +
 			e.getLocalizedMessage(), nodeId);
 	    }
@@ -642,7 +651,7 @@ public final class WatchdogServerImpl extends AbstractService implements
     /**
      * {@inheritDoc}
      */
-    public void setNodeAsFailed(long nodeId) {
+    public void setNodeAsFailed(long nodeId) throws IOException {
 	// We will only process if it is not being processed already
 	if (!aliveNodes.containsKey(nodeId)) {
 	    logger.log(Level.FINEST, "Node with ID '" + nodeId +

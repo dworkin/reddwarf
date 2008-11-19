@@ -19,23 +19,26 @@
 
 package com.sun.sgs.test.impl.util;
 
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.Properties;
+import java.util.logging.Logger;
+
+import junit.framework.TestCase;
+
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-
-import java.io.IOException;
-import java.util.Properties;
-import java.util.logging.Logger;
-import junit.framework.TestCase;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 /** Test the AbstractService class. */
 public class TestAbstractService extends TestCase {
@@ -243,6 +246,62 @@ public class TestAbstractService extends TestCase {
 	assertEquals(ioTask.runCount, 1);
     }
 
+    
+    
+    public void testReportingLocalFailure() throws Exception {
+	final DummyServiceFailureReporter service = 
+	    new DummyServiceFailureReporter(serviceProps, 
+		    serverNode.getSystemRegistry(),
+			serverNode.getProxy(), logger);
+	
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	public void run() {
+	    // Report a failure on ourselves and check
+	    // that we are not alive
+	    service.reportLocalFailure();
+	    assertFalse(service.isAlive());
+	}}, taskOwner);
+    }
+    
+    private static class DummyServiceFailureReporter extends 
+    AbstractService {
+
+	/*-- empty declarations; not needed for the test --*/
+	protected void doReady() { }
+	protected void doShutdown() { }
+	protected void handleServiceVersionMismatch(Version oldVersion,
+		Version currentVersion) { }
+	/*-- begin custom implementation --*/
+	
+	public DummyServiceFailureReporter(
+        	    Properties properties,
+        	    ComponentRegistry systemRegistry,
+        	    TransactionProxy txnProxy,
+        	    LoggerWrapper logger)
+        {
+	    super(properties, systemRegistry, txnProxy, logger);
+        }
+	
+	public boolean isAlive() {
+	    // get the watchdog service to check if the
+	    // node is alive
+	    WatchdogService svc = txnProxy.getService(WatchdogService.class);
+	    return svc.isLocalNodeAlive();
+	}
+	
+	public void reportLocalFailure() {
+	    super.notifyWatchdogOfFailure(
+		    WatchdogService.FailureLevel.FATAL);
+	}
+	
+	public void reportRemoteFailure(long nodeId) throws IOException {
+	    super.notifyWatchdogOfRemoteFailure(nodeId,
+		    WatchdogService.FailureLevel.FATAL);
+	}
+	
+    }
+    
+    
     private static class MyRuntimeException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
     }
