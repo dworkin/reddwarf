@@ -376,8 +376,8 @@ final class ManagedReferenceImpl<T>
 	    case EMPTY:
 		byte[] bytes =
 		    context.store.getObject(context.txn, oid, false);
-		ObjectCache.Value value = context.service.objectCache.get(
-		    oid, bytes, context);
+		ObjectCache.Value value =
+		    context.service.objectCache.get(oid, bytes, context);
 		if (value != null) {
 		    originalBytes = bytes;
 		    object = value.object;
@@ -500,7 +500,7 @@ final class ManagedReferenceImpl<T>
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
-	    context.oidAccesses.setObjectDescription(getId(), result);	    
+	    context.oidAccesses.setObjectDescription(getId(), result);
 	    return result;
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
@@ -645,7 +645,7 @@ final class ManagedReferenceImpl<T>
 	case NOT_MODIFIED:
 	    if (object == null) {
 		throw new AssertionError("NOT_MODIFIED with no object");
- 	    } else if (unmodifiedBytes != null)
+	    } else if (unmodifiedBytes != null)
 	    {
 		throw new AssertionError("NOT_MODIFIED with unmodifiedBytes");
 	    } else if (originalBytes == null) {
@@ -690,7 +690,7 @@ final class ManagedReferenceImpl<T>
 	    // loop will add them to the list of write accesses
 	    for (long oid : info.getOids()) {
 		context.oidAccesses.
-		    reportObjectAccess(context.txn.originalTxn, 
+		    reportObjectAccess(context.txn.originalTxn,
 				       BigInteger.valueOf(oid),
 				       AccessType.WRITE);
 	    }
@@ -747,12 +747,12 @@ final class ManagedReferenceImpl<T>
 	    if (!Arrays.equals(modified, unmodifiedBytes)) {
 		result = modified;
 		context.oidAccesses.
-		    reportObjectAccess(context.txn.originalTxn, 
+		    reportObjectAccess(context.txn.originalTxn,
 				       BigInteger.valueOf(oid),
 				       AccessType.WRITE,
 				       "object was not explicitly " +
 				       "marked for update: " +
-                                       object.getClass());
+				       object.getClass());
 		if (debugDetectLogger.isLoggable(Level.FINEST)) {
 		    debugDetectLogger.log(
 			Level.FINEST,
@@ -767,8 +767,8 @@ final class ManagedReferenceImpl<T>
 	    context.refs.unregisterObject(object);
 	    break;
 	case NOT_MODIFIED:
- 	    context.service.objectCache.put(
- 		oid, originalBytes, contextWrapper, object, null);
+	    context.service.objectCache.put(
+		oid, originalBytes, contextWrapper, object, null);
 	    context.refs.unregisterObject(object);
 	    break;
 	case REMOVED_FETCHED:
@@ -838,9 +838,7 @@ final class ManagedReferenceImpl<T>
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	if (contextWrapper == null) {
-	    contextWrapper = new ContextWrapper(context);
-	}
+	contextWrapper = new ContextWrapper(context);
 	try {
 	    contextWrapperThread.set(contextWrapper);
 	    Object obj = SerialUtil.deserialize(data, context.classSerial);
