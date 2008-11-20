@@ -158,7 +158,13 @@ final class ObjectCache {
     void put(long oid, byte[] bytes, ContextWrapper contextWrapper,
 	     ManagedObject object, byte[] unmodifiedBytes)
     {
-	if (disabled || notClasses.contains(object.getClass().getName())) {
+	if (disabled) {
+	    return;
+	}
+	Class<?> objectClass = object.getClass();
+	if (objectClass.isAnnotationPresent(NoObjectCaching.class) ||
+	    notClasses.contains(objectClass.getName()))
+	{
 	    return;
 	}
 	Key key = new Key(oid, bytes);

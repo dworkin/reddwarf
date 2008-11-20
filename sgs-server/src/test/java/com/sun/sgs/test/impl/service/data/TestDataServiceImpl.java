@@ -31,6 +31,7 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.NoObjectCaching;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -67,6 +68,7 @@ import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -284,6 +286,39 @@ public class TestDataServiceImpl{
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
+    }
+
+    @Test
+    public void testConstructorObjectCacheSize() throws Exception {
+        Properties props =
+            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "gorp");
+	try {
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "-1");
+	try {
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	/*
+	 * Use a different data store directory so we don't conflict with the
+	 * one used by the DataService in the SgsTestNode.
+	 */
+	props.setProperty(DataStoreImpl.DIRECTORY_PROPERTY, createDirectory());
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	DataServiceImpl dataService =
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
+	dataService.shutdown();
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "2000");
+	dataService =
+	    createDataServiceImpl(props, componentRegistry, txnProxy);
+	dataService.shutdown();
     }
 
     /**
@@ -3884,6 +3919,117 @@ public class TestDataServiceImpl{
 	} catch (ObjectIOException e) {
 	    System.err.println(e);
 	}
+    }
+
+    @Test
+    public void testBadObjectCaching() throws Exception {
+	testBadObjectCaching(new BadCaching(), true);
+    }
+
+    @Test
+    public void testBadObjectCachingDisabledCaching() throws Exception {
+        Properties props =
+            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	serverNodeRestart(props, false);
+	testBadObjectCaching(new BadCaching(), false);
+    }
+
+    @Test
+    public void testBadObjectCachingDisabledCachingClass() throws Exception {
+        Properties props =
+	    SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_NOT_CLASSES_PROPERTY,
+			  "foo," + BadCaching.class.getName() + ",bar");
+	serverNodeRestart(props, false);
+	testBadObjectCaching(new BadCaching(), false);
+	testBadObjectCaching(new BadCachingSubclass(), true);
+    }
+
+    @Test
+    public void testBadObjectCachingDisabledCachingAttribute()
+	throws Exception
+    {
+	testBadObjectCaching(new BadCachingNotCached(), false);
+	testBadObjectCaching(new BadCachingNotCachedSubclass(), false);
+    }
+
+    /**
+     * Test whether accessing {@code badCaching} a second time throws {@code
+     * TransactionAbortedException}.
+     */
+    private void testBadObjectCaching(final BadCaching badCaching,
+				      boolean shouldThrow)
+	throws Exception
+    {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		badCaching.init();
+		service.setBinding("badCaching", badCaching);
+	    }
+	}, taskOwner);
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		BadCaching badCaching =
+		    (BadCaching) service.getBinding("badCaching");
+		badCaching.getTrans();
+	    }
+	}, taskOwner);
+	final AtomicReference<TransactionNotActiveException> exception =
+	    new AtomicReference<TransactionNotActiveException>();
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		BadCaching badCaching =
+		    (BadCaching) service.getBinding("badCaching");
+		try {
+		    badCaching.getTrans();
+		} catch (TransactionNotActiveException e) {
+		    exception.set(e);
+		}
+	    }
+	}, taskOwner);
+	if (shouldThrow) {
+	    assertNotNull("Expected TransactionNotActiveException",
+			  exception.get());
+	    System.err.println(exception.get());
+	} else {
+	    assertNull("Did not expect exception", exception.get());
+	}
+    }
+
+    /**
+     * Define a managed object that shouldn't work properly when cached because
+     * it retains a transient field.
+     */
+    private static class BadCaching extends DummyManagedObject {
+	private static final long serialVersionUID = 1;
+	private transient DummyManagedObject trans;
+	void init() {
+	    DummyManagedObject next = new DummyManagedObject();
+	    setNext(next);
+	    next.setNext(new DummyManagedObject());
+	}
+	DummyManagedObject getTrans() {
+	    if (trans == null) {
+		trans = getNext();
+	    }
+	    return trans.getNext();
+	}
+    }
+
+    private static class BadCachingSubclass extends BadCaching {
+	private static final long serialVersionUID = 1;
+    }
+
+    @NoObjectCaching
+    private static class BadCachingNotCached extends BadCaching {
+	private static final long serialVersionUID = 1;
+    }
+
+    private static class BadCachingNotCachedSubclass
+	extends BadCachingNotCached
+    {
+	private static final long serialVersionUID = 1;
     }
 
     /* -- App and service binding methods -- */
