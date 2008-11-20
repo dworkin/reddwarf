@@ -38,8 +38,9 @@ import java.io.Reader;
  */
 public class SubstitutionProperties extends Properties {
     
-    private static String START_KEY = "${";
-    private static String END_KEY = "}";
+    private static final long serialVersionUID = 1L;
+    private static final String START_KEY = "${";
+    private static final String END_KEY = "}";
     
     /**
      * Creates an empty property list with no defaults.
@@ -53,7 +54,7 @@ public class SubstitutionProperties extends Properties {
      * When initialized with this constructor, any properties in the
      * default backing that contain substitutable values (i.e. ${PROPNAME})
      * are replaced and set with their interpolated value in the new
-     * <code>SubstitutionProperties</code> object.
+     * {@code SubstitutionProperties} object.
      * 
      * @param p default properties
      */
@@ -63,6 +64,17 @@ public class SubstitutionProperties extends Properties {
     }
     
 
+    /**
+     * Load properties from an {@code InputStream}.  The properties are loaded
+     * by calling {@code super.load(inStream);}  Additionally, the loaded
+     * properties are filtered and any properties that contain substitutable 
+     * variables (i.e. ${PROPNAME}) are replaced and set with their
+     * interpolated value.
+     * 
+     * @param inStream the input stream to load the properties from
+     * @throws IOException if an error occurred while reading from the stream
+     * @see java.util.Properties#load(java.io.InputStream) 
+     */
     @Override
     public void load(InputStream inStream) 
             throws IOException {
@@ -70,6 +82,17 @@ public class SubstitutionProperties extends Properties {
         replaceAll();
     }
     
+    /**
+     * Load properties from a {@code Reader}.  The properties are loaded
+     * by calling {@code super.load(reader);}  Additionally, the loaded
+     * properties are filtered and any properties that contain substitutable 
+     * variables (i.e. ${PROPNAME}) are replaced and set with their
+     * interpolated value.
+     * 
+     * @param reader the reader to load the properties from
+     * @throws IOException if an error occurred while reading from the reader
+     * @see java.util.Properties#load(java.io.Reader) 
+     */
     @Override
     public void load(Reader reader) 
             throws IOException {
@@ -77,6 +100,18 @@ public class SubstitutionProperties extends Properties {
         replaceAll();
     }
     
+    /**
+     * Load properties from an XML file specified by the given 
+     * {@code InputStream}.  The properties are loaded
+     * by calling {@code super.loadFromXML(inStream);}  Additionally, the loaded
+     * properties are filtered and any properties that contain substitutable 
+     * variables (i.e. ${PROPNAME}) are replaced and set with their
+     * interpolated value.
+     * 
+     * @param inStream the input stream to load the properties from
+     * @throws IOException if an error occurred while reading from the stream
+     * @see java.util.Properties#loadFromXML(java.io.InputStream) 
+     */
     @Override
     public void loadFromXML(InputStream inStream) 
             throws IOException {
@@ -84,11 +119,25 @@ public class SubstitutionProperties extends Properties {
         replaceAll();
     }
     
+    /**
+     * Sets the given property by calling the 
+     * {@code super.setProperty(name, value)} method.  Additionally, the
+     * property is filtered and if it contains subtitutable variables
+     * (i.e. ${PROPNAME}), they are replaced and set with their interpolated
+     * value.
+     * 
+     * @param name the name of the property
+     * @param value the value of the property
+     * @return the previous value of the property, or {@code null} if it was
+     *         not set
+     * @see java.util.Properties#setProperty(java.lang.String, java.lang.String)
+     */
     @Override
     public Object setProperty(String name, String value) {
+        String prev = super.getProperty(name);
         super.setProperty(name, value);
         replace(name, new HashSet<String>());
-        return super.getProperty(name);
+        return prev;
     }
     
     /**
@@ -99,7 +148,7 @@ public class SubstitutionProperties extends Properties {
      */
     private void replaceAll() {
         Set<String> properties = super.stringPropertyNames();
-        for(String p : properties) {
+        for (String p : properties) {
             replace(p, new HashSet<String>());
         }
     }
@@ -116,12 +165,12 @@ public class SubstitutionProperties extends Properties {
      *                               for substitution '${' but not a closing
      *                               key '}'
      */
-    private String replace(String propName, Set<String> beingInterpolated) 
-            throws IllegalStateException {
+    private String replace(String propName, Set<String> beingInterpolated) {
         beingInterpolated.add(propName);
         String propValue = super.getProperty(propName);
-        if(propValue == null || propValue.equals(""))
+        if (propValue == null || propValue.equals("")) {
             return "";
+        }
         
         //walk through the value, building a new string and replacing
         //properties as we go
@@ -131,14 +180,18 @@ public class SubstitutionProperties extends Properties {
                 startIndex = propValue.indexOf(START_KEY, currentIndex)) {
             newValue.append(propValue.substring(currentIndex, startIndex));
             currentIndex = propValue.indexOf(END_KEY, startIndex);
-            if(currentIndex != -1) {
-                String subPropName = propValue.substring(startIndex+2, currentIndex++);
-                if(beingInterpolated.contains(subPropName))
-                    throw new IllegalStateException("loop detected when interpolating property : "+propName);
+            if (currentIndex != -1) {
+                String subPropName = propValue.substring(startIndex + 2, 
+                                                         currentIndex++);
+                if (beingInterpolated.contains(subPropName)) {
+                    throw new IllegalStateException(
+                            "loop detected when interpolating property : " + 
+                            propName);
+                }
                 newValue.append(replace(subPropName, beingInterpolated));
+            } else {
+                throw new IllegalStateException(propName + " : " + propValue);
             }
-            else
-                throw new IllegalStateException(propName + " : "+propValue);
         }
         newValue.append(propValue.substring(currentIndex, propValue.length()));
         

@@ -24,23 +24,30 @@ import java.io.File;
 /**
  * Defines environment variables used by the bootstrapper
  * to locate and configure the necessary environment pieces
- * to launch a Project Darkstar Server
+ * to launch a Project Darkstar Server.
  */
-public class BootEnvironment {
+public final class BootEnvironment {
     
     /**
-     * Default location of the bootstrapper jar relative to the {@code SGS_HOME}
+     * This class should not be instantiated.
+     */
+    private BootEnvironment() {
+        
+    }
+    
+    /**
+     * Default location of the bootstrapper jar relative to {@code SGS_HOME}.
      */
     public static final String SGS_JAR = "bin/sgs-boot.jar";
     
     /**
      * Name of the properties file to locate and retrieve properties
-     * for the environment
+     * for the environment.
      */
     public static final String SGS_BOOT = "sgs-boot.properties";
 
     /**
-     * Denotes the installation directory for the Project Darkstar server
+     * Denotes the installation directory for the Project Darkstar server.
      */
     public static final String SGS_HOME = "SGS_HOME";
     
@@ -74,40 +81,51 @@ public class BootEnvironment {
     
     /**
      * The location of the Berkeley DB natives to include as part
-     * of the {@code java.library.path}
+     * of the {@code java.library.path}.
      */
     public static final String BDB_NATIVES = "BDB_NATIVES";
     
     /**
      * A custom set of native library directories to include as part of the
-     * {@code java.library.path}
+     * {@code java.library.path}.
      */
     public static final String CUSTOM_NATIVES = "CUSTOM_NATIVES";
     
     /**
-     * A custom set of additional jar files to include on the classpath
+     * A custom set of additional jar files to include on the classpath.
      */
     public static final String CUSTOM_CLASSPATH_ADD = "CUSTOM_CLASSPATH_ADD";
     
     /**
-     * Location of the JDK to use when booting up the Kernel
+     * Location of the JDK to use when booting up the Kernel.
      */
     public static final String JAVA_HOME = "JAVA_HOME";
     
     /**
-     * Command line arguments for the JVM
+     * Command line arguments for the JVM.
      */
     public static final String JAVA_OPTS = "JAVA_OPTS";
     
-    
+    /**
+     * The default value for the {@code SGS_DEPLOY} property.
+     */
     public static final String DEFAULT_SGS_DEPLOY = 
             "${SGS_HOME}" + File.separator + "deploy";
+    /**
+     * The default value for the {@code SGS_PROPERTIES} property.
+     */
     public static final String DEFAULT_SGS_PROPERTIES = 
             "${SGS_HOME}" + File.separator + "conf" + File.separator +
             "sgs-server.properties";
+    /**
+     * The default value for the {@code SGS_LOGGING} property.
+     */
     public static final String DEFAULT_SGS_LOGGING = 
             "${SGS_HOME}" + File.separator + "conf" + File.separator +
             "sgs-logging.properties";
+    /**
+     * The default value for the {@code BDB_TYPE} property.
+     */
     public static final String DEFAULT_BDB_TYPE = "db";
     /**
      * The standard location to look for application properties config
@@ -117,24 +135,24 @@ public class BootEnvironment {
             "META-INF/app.properties";
     
     
-    public static final String DEFAULT_BDB_ROOT = 
+    static final String DEFAULT_BDB_ROOT = 
             "${SGS_HOME}" + File.separator + "natives";
-    public static final String DEFAULT_BDB_LINUX_X86 = 
+    static final String DEFAULT_BDB_LINUX_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "linux-x86";
-    public static final String DEFAULT_BDB_LINUX_X86_64 = 
+    static final String DEFAULT_BDB_LINUX_X86_64 = 
             DEFAULT_BDB_ROOT + File.separator + "linux-x86_64";
-    public static final String DEFAULT_BDB_MACOSX_X86 =
+    static final String DEFAULT_BDB_MACOSX_X86 =
             DEFAULT_BDB_ROOT + File.separator + "macosx-x86";
-    public static final String DEFAULT_BDB_MACOSX_PPC = 
+    static final String DEFAULT_BDB_MACOSX_PPC = 
             DEFAULT_BDB_ROOT + File.separator + "macosx-ppc";
-    public static final String DEFAULT_BDB_SOLARIS_SPARC = 
+    static final String DEFAULT_BDB_SOLARIS_SPARC = 
             DEFAULT_BDB_ROOT + File.separator + "solaris-sparc";
-    public static final String DEFAULT_BDB_SOLARIS_X86 = 
+    static final String DEFAULT_BDB_SOLARIS_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "solaris-x86";
-    public static final String DEFAULT_BDB_WIN32_X86 = 
+    static final String DEFAULT_BDB_WIN32_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "win32-x86";
     
     
-    public static final String KERNEL_CLASS = "com.sun.sgs.impl.kernel.Kernel";
+    static final String KERNEL_CLASS = "com.sun.sgs.impl.kernel.Kernel";
     
 }

@@ -29,7 +29,7 @@ import java.util.logging.Level;
 
 /**
  * Reads output stream from a process and writes it to the
- * given stream
+ * given stream.
  */
 public class ProcessOutputReader implements Runnable {
     
@@ -39,11 +39,22 @@ public class ProcessOutputReader implements Runnable {
     private Process p;
     private PrintStream output;
     
+    /**
+     * Constructs a new {@code ProcessOutputReader}.
+     * 
+     * @param p the process to read from
+     * @param output the output stream to write to
+     */
     public ProcessOutputReader(Process p, PrintStream output) {
         this.p = p;
         this.output = output;
     }
     
+    /**
+     * Reads the output from the {@code Process} associated with this object
+     * and outputs the results to the {@code PrintStream} associated with
+     * this object.
+     */
     @Override
     public void run() {
         InputStream processOutput = p.getInputStream();
@@ -54,7 +65,7 @@ public class ProcessOutputReader implements Runnable {
             while ((line = processReader.readLine()) != null) {
                 output.println(line);
             }
-        } catch(IOException e) {
+        } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to read process output", e);
             p.destroy();
         }
