@@ -95,7 +95,7 @@ public class SubstitutionProperties extends Properties {
      * Walks through each of the properties and replaces any instances
      * of ${PROPNAME} with the value of PROPNAME if it exists.  If such
      * a string is found in a property and and the property to lookup does
-     * not exist, it is replaced with the empty string. <p>
+     * not exist, it is replaced with the empty string.
      */
     private void replaceAll() {
         Set<String> properties = super.stringPropertyNames();

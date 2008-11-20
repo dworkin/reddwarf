@@ -29,7 +29,7 @@ import java.io.File;
 public class BootEnvironment {
     
     /**
-     * Default location of the bootstrapper jar relative to the SGS_HOME
+     * Default location of the bootstrapper jar relative to the {@code SGS_HOME}
      */
     public static final String SGS_JAR = "bin/sgs-boot.jar";
     
@@ -46,16 +46,13 @@ public class BootEnvironment {
     
     /**
      * The directory where deployed applications should place jar files
-     * and application properties files.  This directory is relative to
-     * {@link SGS_HOME}
+     * and application properties files.
      */
     public static final String SGS_DEPLOY = "SGS_DEPLOY";
     
     /**
      * The properties file used to configure the Project Darkstar kernel.
-     * This file should be combined with the application's properties
-     * file and fed to the Project Darkstar Kernel.  It's location is
-     * relative to the {@link SGS_HOME}
+     * This file should be fed to the Project Darkstar Kernel.
      */
     public static final String SGS_PROPERTIES = "SGS_PROPERTIES";
     
@@ -70,10 +67,27 @@ public class BootEnvironment {
     public static final String SGS_LOGFILE = "SGS_LOGFILE";
     
     /**
+     * A toggle used to specify which flavor of Berkeley DB is to be
+     * used by the application.
+     */
+    public static final String BDB_TYPE = "BDB_TYPE";
+    
+    /**
      * The location of the Berkeley DB natives to include as part
-     * of the java.library.path
+     * of the {@code java.library.path}
      */
     public static final String BDB_NATIVES = "BDB_NATIVES";
+    
+    /**
+     * A custom set of native library directories to include as part of the
+     * {@code java.library.path}
+     */
+    public static final String CUSTOM_NATIVES = "CUSTOM_NATIVES";
+    
+    /**
+     * A custom set of additional jar files to include on the classpath
+     */
+    public static final String CUSTOM_CLASSPATH_ADD = "CUSTOM_CLASSPATH_ADD";
     
     /**
      * Location of the JDK to use when booting up the Kernel
@@ -94,9 +108,10 @@ public class BootEnvironment {
     public static final String DEFAULT_SGS_LOGGING = 
             "${SGS_HOME}" + File.separator + "conf" + File.separator +
             "sgs-logging.properties";
+    public static final String DEFAULT_BDB_TYPE = "db";
     /**
      * The standard location to look for application properties config
-     * file in jars from the SGS_DEPLOY directory.
+     * file in jars from the {@code SGS_DEPLOY} directory.
      */
     public static final String DEFAULT_APP_PROPERTIES = 
             "META-INF/app.properties";

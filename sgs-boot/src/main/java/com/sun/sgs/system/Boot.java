@@ -100,6 +100,10 @@ public class Boot {
             properties.setProperty(BootEnvironment.SGS_PROPERTIES,
                                    BootEnvironment.DEFAULT_SGS_PROPERTIES);
         }
+        if(properties.getProperty(BootEnvironment.BDB_TYPE) == null) {
+            properties.setProperty(BootEnvironment.BDB_TYPE,
+                                   BootEnvironment.DEFAULT_BDB_TYPE);
+        }
         
         //autodetect BDB libraries if necessary
         if(properties.getProperty(BootEnvironment.BDB_NATIVES) == null) {
@@ -143,15 +147,13 @@ public class Boot {
         //get the java options
         String javaOpts = properties.getProperty(BootEnvironment.JAVA_OPTS, "");
         
-        //build the classpath
-        String classpath = bootClassPath(properties);
-
         //build the full execute path
         String execute = javaCmd + 
-                " -cp " + classpath +
+                " -cp " + bootClassPath(properties) +
+                " -Djava.library.path=" + bootNativePath(properties) +
                 " -Djava.util.logging.config.file=" + properties.getProperty(BootEnvironment.SGS_LOGGING) +
-                " -Djava.library.path=" + properties.getProperty(BootEnvironment.BDB_NATIVES) +
                 " " + javaOpts +
+                " " + bootCommandLineProps(properties) +
                 " " + BootEnvironment.KERNEL_CLASS +
                 " " + properties.getProperty(BootEnvironment.SGS_PROPERTIES);
         List<String> executeCmd = Arrays.asList(execute.split("\\s+"));
@@ -193,9 +195,23 @@ public class Boot {
     /**
      * Constructs a classpath to be used when running the Project Darkstar
      * kernel.  The classpath consists of any jar files that live directly
-     * in the $SGS_HOME/lib
+     * in the {@code $SGS_HOME/lib}
      * directory.  It also recursively includes jar files from the
-     * $SGS_DEPLOY directory.
+     * {@code $SGS_DEPLOY} directory. <p>
+     * 
+     * Additionally, files included in the path from the {@code $SGS_HOME/lib}
+     * directory are filtered based on the value of {@code $BDB_TYPE}.
+     * <ul>
+     * <li>If the value of {@code $BDB_TYPE} is equal to {@code db}, any jar
+     * files in {@code $SGS_HOME/lib} that begin with "je-" are excluded 
+     * from the path.</li>
+     * <li>If the value of {@code $BDB_TYPE} is equal to {@code je}, any jar
+     * files in {@code $SGS_HOME/lib} that begin with "db-" are excluded
+     * from the path.</li>
+     * <li>If the value of {@code $BDB_TYPE} is equal to anything else, any jar
+     * files in {@code SGS_HOME/lib} that being with "db-" OR "je-" are
+     * excluded from the path.</li>
+     * </ul>
      * 
      * @param env environment with SGS_HOME set
      * @return classpath to use to run the kernel
@@ -210,12 +226,23 @@ public class Boot {
         File sgsHomeDir = new File(sgsHome);
         if(!sgsHomeDir.isDirectory())
             return "";
-        StringBuffer buf = new StringBuffer();        
+        StringBuffer buf = new StringBuffer();
+        
+        //determine BDB_TYPE
+        String bdbType = env.getProperty(BootEnvironment.BDB_TYPE);
+        String filter = "^(db-|je-).*";
+        if("db".equals(bdbType)) {
+            filter = "^(je-).*";
+        } else if("je".equals(bdbType)) {
+            filter = "^(db-).*";
+        }
 
-        //add jars from SGS_HOME/sgs-server
+        //add jars from SGS_HOME/lib, excluding the filtered bdb jar(s)
         File sgsLibDir = new File(sgsHome + File.separator + "lib");
         for (File sgsJar : sgsLibDir.listFiles()) {
-            if(sgsJar.isFile() && sgsJar.getName().endsWith(".jar")) {
+            logger.log(Level.WARNING, sgsJar.getName());
+            if(sgsJar.isFile() && sgsJar.getName().endsWith(".jar") &&
+                    !sgsJar.getName().matches(filter)) {
                 if(buf.length() != 0)
                     buf.append(File.pathSeparator + sgsJar.getAbsolutePath());
                 else
@@ -243,13 +270,93 @@ public class Boot {
             System.exit(1);
         }
         for (File jar : jars) {
-            if (buf.length() != 0)
+            if (buf.length() != 0) {
                 buf.append(File.pathSeparator + jar.getAbsolutePath());
-            else
+            } else {
                 buf.append(jar.getAbsolutePath());
+            }
+        }
+        
+        //include the additional classpath if specified
+        String addPath = env.getProperty(BootEnvironment.CUSTOM_CLASSPATH_ADD);
+        if(addPath != null) {
+            if (buf.length() != 0) {
+                buf.append(File.pathSeparator + addPath);
+            } else {
+                buf.append(addPath);
+            }
         }
         
         return buf.toString();
+    }
+    
+    /**
+     * Constructs a path to be used as the {@code java.library.path}
+     * when running the Project Darkstar kernel.  The path combines the string 
+     * specified by the {@code $BDB_NATIVES } property with the string specified
+     * by the {@code $CUSTOM_NATIVES} property.  Additionally, if the
+     * {@code BDB_TYPE} property is not set to {@code db}, only
+     * the {@code $CUSTOM_NATIVES} property is used for the path.
+     * 
+     * @param env the environment
+     * @return path to use as the {@code java.library.path} in the kernel
+     */
+    private static String bootNativePath(Properties env) {
+        String type = env.getProperty(BootEnvironment.BDB_TYPE);
+        String bdb = env.getProperty(BootEnvironment.BDB_NATIVES);
+        String custom = env.getProperty(BootEnvironment.CUSTOM_NATIVES);
+        StringBuffer buf = new StringBuffer();
+        
+        if(type.equals("db")) {
+            buf.append(bdb);
+            if(custom != null && !custom.equals("")) {
+                buf.append(File.pathSeparator + custom);
+            }
+        } else {
+            if(custom != null && !custom.equals("")) {
+                buf.append(custom);
+            }
+        }
+        
+        return buf.toString();
+    }
+    
+    /**
+     * Constructs a set of additional command line properties that are to
+     * be used when running the Project Darkstar kernel.  Specifically, this
+     * method specifies a value for the property
+     * {@code com.sun.sgs.impl.service.data.store.db.environment.class} in
+     * order to specify the bdb flavor that is being used.  It is dependent
+     * on the value of the {@code $BDB_TYPE} environment property.
+     * 
+     * <ul>
+     * <li>If the value of {@code $BDB_TYPE} is equal to {@code db}, then
+     * {@code com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment} is
+     * used.</li>
+     * <li>If the value of {@code $BDB_TYPE} is equal to {@code je}, then
+     * {@code com.sun.sgs.impl.service.data.store.db.je.JeEnvironment} is
+     * used.</li>
+     * <li>If the value of {@code BDB_TYPE} is equal to anything else, no
+     * value is specified.</li>
+     * </ul>
+     * 
+     * @param env the environment
+     * @return additional set of properties to be passed to the command line
+     */
+    private static String bootCommandLineProps(Properties env) {
+        String type = env.getProperty(BootEnvironment.BDB_TYPE);
+        String line = 
+                "-Dcom.sun.sgs.impl.service.data.store.db.environment.class";
+        
+        if(type.equals("db")) {
+            return line + "=" +
+                    "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
+        } else if(type.equals("je")) {
+            return line + "=" +
+                    "com.sun.sgs.impl.service.data.store.db.je.JeEnvironment";
+        } else {
+            return "";
+        }
     }
     
     /**
