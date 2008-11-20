@@ -24,8 +24,8 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TaskLocalReference;
 import com.sun.sgs.app.TransactionAbortedException;
-import com.sun.sgs.app.TransientReference;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -126,8 +126,8 @@ import java.util.logging.Logger;
  *	instances should not be cached.  Multiple names should be separated by
  *	commas.  Applications can add class names to this list to prevent
  *	caching of classes that have unsafe usage of transient fields &emdash;
- *	ones that have not been updated to use {@link TransientReference}
- *	instances. <p>
+ *	in particular, ones that have not been updated to use {@link
+ *	TaskLocalReference} instances. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS_PROPERTY}
  *	</b></code><br>
@@ -700,7 +700,7 @@ public final class DataServiceImpl implements DataService {
     /**
      * {@inheritDoc}
      */
-    public <T> TransientReference<T> createTransientReference(T object) {
+    public <T> TaskLocalReference<T> createTaskLocalReference(T object) {
 	Context context = null;
 	try {
 	    if (object == null) {
@@ -708,11 +708,11 @@ public final class DataServiceImpl implements DataService {
 		    "The object argument must not be null");
 	    }
 	    context = getContext();
-	    TransientReference<T> result =
-		new TransientReferenceImpl<T>(object, context);
+	    TaskLocalReference<T> result =
+		new TaskLocalReferenceImpl<T>(object, context);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
-			   "createTransientReference tid:{0,number,#}," +
+			   "createTaskLocalReference tid:{0,number,#}," +
 			   " type:{1} returns",
 			   contextTxnId(context), typeName(object));
 	    }
@@ -722,7 +722,7 @@ public final class DataServiceImpl implements DataService {
 	    if (exceptionLogger.isLoggable(Level.FINEST)) {
 		exceptionLogger.logThrow(
 		    Level.FINEST, e,
-		    "createTransientReference tid:{0,number,#}, type:{1}" +
+		    "createTaskLocalReference tid:{0,number,#}, type:{1}" +
 		    " throws",
 		    contextTxnId(context), typeName(object));
 	    }
@@ -730,9 +730,9 @@ public final class DataServiceImpl implements DataService {
 	}
     }
 
-    /** Implement {@code TransientReference}. */
-    private static class TransientReferenceImpl<T>
-	implements TransientReference<T>
+    /** Implement {@code TaskLocalReferenceImpl}. */
+    private static class TaskLocalReferenceImpl<T>
+	implements TaskLocalReference<T>
     {
 	/** The associated object. */
 	private final T object;
@@ -746,7 +746,7 @@ public final class DataServiceImpl implements DataService {
 	 * @param	object the associated object
 	 * @param	context the current context
 	 */
-	TransientReferenceImpl(T object, Context context) {
+	TaskLocalReferenceImpl(T object, Context context) {
 	    this.object = object;
 	    this.context = context;
 	}
@@ -758,7 +758,7 @@ public final class DataServiceImpl implements DataService {
 
 	/** {@inheritDoc} */
 	public String toString() {
-	    return "TransientReferenceImpl<" + typeName(object) + ">@" +
+	    return "TaskLocalReferenceImpl<" + typeName(object) + ">#" +
 		Integer.toHexString(System.identityHashCode(this));
 	}
     }

@@ -22,15 +22,15 @@ package com.sun.sgs.app;
 /**
  * Represents a reference to an object that is only valid within the same run
  * of the task in which it was created, otherwise returning {@code null}.
- * Transient references should not be serializable.  Applications should also
- * insure that a single transient reference is not shared by multiple managed
- * objects.
+ * Task-local references should not be serializable.  Applications should also
+ * insure that a single task local reference instance is not shared by multiple
+ * managed objects.
  *
  * @param	<T> the type of the referenced object
- * @see		DataManager#createTransientReference
- *		DataManager.createTransientReference 
+ * @see		DataManager#createTaskLocalReference
+ *		DataManager.createTaskLocalReference 
  */
-public interface TransientReference<T> {
+public interface TaskLocalReference<T> {
 
     /**
      * Returns the object associated with this reference, or {@code null} if

@@ -26,8 +26,8 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.TaskLocalReference;
 import com.sun.sgs.app.TaskManager;
-import com.sun.sgs.app.TransientReference;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -2218,10 +2218,10 @@ public class ScalableHashMap<K, V>
 	private int rootModifications;
 
 	/**
-	 * A transient reference to the leaf containing the next entry, or
+	 * A task-local reference to the leaf containing the next entry, or
 	 * null if not computed.
 	 */
-        private transient TransientReference<ScalableHashMap<K, V>>
+        private transient TaskLocalReference<ScalableHashMap<K, V>>
 	    nextLeafRef = null;
 
 	/**
@@ -2283,7 +2283,7 @@ public class ScalableHashMap<K, V>
 	    }
 	    nextLeafModifications = nextLeaf.modifications;
 	    nextLeafRef =
-		AppContext.getDataManager().createTransientReference(nextLeaf);
+		AppContext.getDataManager().createTaskLocalReference(nextLeaf);
 	}
 
 	/** Returns the current leaf. */

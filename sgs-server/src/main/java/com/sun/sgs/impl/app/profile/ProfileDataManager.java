@@ -22,7 +22,7 @@ package com.sun.sgs.impl.app.profile;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.TransientReference;
+import com.sun.sgs.app.TaskLocalReference;
 
 
 /**
@@ -95,8 +95,8 @@ public class ProfileDataManager implements DataManager {
     /**
      * {@inheritDoc}
      */
-    public <T> TransientReference<T> createTransientReference(T object) {
-	return backingManager.createTransientReference(object);
+    public <T> TaskLocalReference<T> createTaskLocalReference(T object) {
+	return backingManager.createTaskLocalReference(object);
     }
 
 }
