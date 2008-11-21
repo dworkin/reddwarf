@@ -19,47 +19,18 @@
 
 package com.sun.sgs.test.app.util;
 
-import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.util.ManagedSerializable;
-import com.sun.sgs.app.util.ScalableDeque;
+import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 
-import com.sun.sgs.auth.Identity;
-
-import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.NameRunner;
-import com.sun.sgs.test.util.SgsTestNode;
-import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
+import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
-
-import java.util.Map.Entry;
-
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
 
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -67,10 +38,18 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
-
-import static com.sun.sgs.test.util.UtilReflection.getConstructor;
-import static com.sun.sgs.test.util.UtilReflection.getMethod;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.util.ScalableDeque;
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.DataService;
+import com.sun.sgs.test.util.NameRunner;
+import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
 /**
  * Test the {@link ScalableDeque} class.
@@ -82,10 +61,8 @@ public class TestScalableDeque extends Assert {
     private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
     private static DataService dataService;
-
-    /** A fixed random number generator for use in the test. */
-    private static final Random RANDOM = new Random(1337);
-
+    
+    
     /**
      * Test management.
      */
@@ -103,7 +80,41 @@ public class TestScalableDeque extends Assert {
 	serverNode.shutdown(true);
     }
 
-
+    /*
+     * Test remove deque.
+     */
+    @Test public void testRemoveScalableDeque() throws Exception {
+	int originalCount = getObjectCount();
+	System.err.println("originalCount: " + originalCount);
+	final String name = "queue";
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() {
+		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
+		    for (int i = 0; i < 10; ++i) {
+			d.add(i);
+		    }
+		    AppContext.getDataManager().setBinding(name, d);
+		}
+	    }, taskOwner);
+	int countAfterCreate = getObjectCount();
+	System.err.println("countAfterCreate: " + countAfterCreate);
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() {
+		    DataManager dm = AppContext.getDataManager();
+		    ScalableDeque<Integer> d = 
+			uncheckedCast(dm.getBinding(name));
+		    dm.removeObject(d);
+		}
+	    }, taskOwner);
+	// removal is asynchronous, so wait
+	Thread.sleep(2000);
+	int countAfterRemove = getObjectCount();
+	System.err.println("countAfterRemove: " + countAfterRemove);
+	assertEquals(originalCount, countAfterRemove);
+    }
+    
     
     /*
      * Test constructors
@@ -114,25 +125,6 @@ public class TestScalableDeque extends Assert {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    ScalableDeque<Integer> deque = new ScalableDeque<Integer>();
-		}
-	    }, taskOwner);
-    }
-
-
-    @Test public void testOneArgConstructorTrue() throws Exception {
-	txnScheduler.runTask(
-	    new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-		    new ScalableDeque<Integer>(true);
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testOneArgConstructorFalse() throws Exception {
-	txnScheduler.runTask(
-	    new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-		    new ScalableDeque<Integer>(false);
 		}
 	    }, taskOwner);
     }
@@ -1398,7 +1390,7 @@ public class TestScalableDeque extends Assert {
      * Test serializability
      */
 
-    @Test public void testDequeSeriazable() throws Exception {
+    @Test public void testDequeSerializable() throws Exception {
 	final String name = "test-deque";
 
 	txnScheduler.runTask(
@@ -1431,7 +1423,7 @@ public class TestScalableDeque extends Assert {
 
     }
 
-    @Test public void testIteratorSeriazable() throws Exception {
+    @Test public void testIteratorSerializable() throws Exception {
 	final String name = "test-iterator";
 
 	txnScheduler.runTask(
@@ -1441,29 +1433,33 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    for (int i = 0; i < 10; ++i) 
 			d.add(i);
-		    AppContext.getDataManager().setBinding(name, d.iterator());
+		    ManagedSerializable<Iterator<Integer>> iter = 
+			new ManagedSerializable<Iterator<Integer>>(
+				d.iterator());
+		    AppContext.getDataManager().setBinding(name, iter);
 		}
 	    }, taskOwner);
 
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    
-		    Iterator<Integer> it = 
+		    ManagedSerializable<Iterator<Integer>> iter = 
 			uncheckedCast(AppContext.
-				      getDataManager().getBinding(name));
+			      getDataManager().getBinding(name));
+		    Iterator<Integer> it = iter.get();
 
 		    int i = 0;
 		    while (it.hasNext())
 			assertEquals(i++, (int) it.next());
 		    assertEquals(10, i);
 
+		    AppContext.getDataManager().removeObject(iter);
 		    AppContext.getDataManager().removeBinding(name);
 		}
 	    }, taskOwner);
     }
 
-    @Test public void testIteratorSeriazableWithRemovals() throws Exception {
+    @Test public void testIteratorSerializableWithRemovals() throws Exception {
 	final String name = "test-iterator";
 	final String name2 = "test-deque";
 
@@ -1475,7 +1471,10 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    for (int i = 0; i < 10; ++i) 
 			d.add(i);
-		    AppContext.getDataManager().setBinding(name, d.iterator());
+		    
+		    ManagedSerializable<Iterator<Integer>> iter =
+			new ManagedSerializable<Iterator<Integer>>(d.iterator());
+		    AppContext.getDataManager().setBinding(name, iter);
 		    AppContext.getDataManager().setBinding(name2, d);
 		}
 	    }, taskOwner);
@@ -1498,11 +1497,11 @@ public class TestScalableDeque extends Assert {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    
-		    Iterator<Integer> it = 
+		    ManagedSerializable<Iterator<Integer>> iter =
 			uncheckedCast(AppContext.
 				      getDataManager().getBinding(name));
-
+		    Iterator<Integer> it = iter.get();
+			
 		    int i = 0;
 		    while (it.hasNext()) {
 			assertEquals(i, (int) it.next());
@@ -1510,69 +1509,15 @@ public class TestScalableDeque extends Assert {
 		    }
 		    assertEquals(10, i);
 
+		    AppContext.getDataManager().removeObject(iter);
 		    AppContext.getDataManager().removeBinding(name);
 		    AppContext.getDataManager().removeBinding(name2);
 		}
 	    }, taskOwner);
     }
 
-    @Test public void testConcurrentIteratorSeriazableWithRemovalOfNextElements() 
-	throws Exception {
-
-	final String name = "test-iterator";
-	final String name2 = "test-deque";
-
-	// create the deque
-	txnScheduler.runTask(
-	    new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-
-		    ScalableDeque<Integer> d = new ScalableDeque<Integer>(true);
-		    for (int i = 0; i < 10; ++i) 
-			d.add(i);
-		    AppContext.getDataManager().setBinding(name, d.iterator());
-		    AppContext.getDataManager().setBinding(name2, d);
-		}
-	    }, taskOwner);
-
-	// remove the iterator's first 5 elements while the
-	// iterator is serialized
-	txnScheduler.runTask(
-	    new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-
-		    ScalableDeque<Integer> d = 
-			uncheckedCast(AppContext.
-                                      getDataManager().getBinding(name2));
-		    for (int i = 0; i < 5; i++) 
-			d.remove(i);		    
-		}
-	    }, taskOwner);
-
-
-	// load the iterator back
-	txnScheduler.runTask(
-	    new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-		    
-		    Iterator<Integer> it = 
-			uncheckedCast(AppContext.
-				      getDataManager().getBinding(name));
-
-		    int i = 5;
-		    while (it.hasNext()) {
-			assertEquals(i, (int) it.next());
-			i ++;
-		    }
-		    assertEquals(10, i);
-
-		    AppContext.getDataManager().removeBinding(name);
-		    AppContext.getDataManager().removeBinding(name2);
-		}
-	    }, taskOwner);
-    }
-
-    @Test public void testNonConcurrentIteratorSeriazableWithRemovalOfNextElements() 
+    
+    @Test public void testNonConcurrentIteratorSerializableWithRemovalOfNextElements() 
 	throws Exception {
 
 	final String name = "test-iterator";
@@ -1586,7 +1531,11 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    for (int i = 0; i < 10; ++i) 
 			d.add(i);
-		    AppContext.getDataManager().setBinding(name, d.iterator());
+		    
+		    ManagedSerializable<Iterator<Integer>> iter = 
+			new ManagedSerializable<Iterator<Integer>>(
+				d.iterator());
+		    AppContext.getDataManager().setBinding(name, iter);
 		    AppContext.getDataManager().setBinding(name2, d);
 		}
 	    }, taskOwner);
@@ -1610,11 +1559,11 @@ public class TestScalableDeque extends Assert {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    
-		    Iterator<Integer> it = 
+		    ManagedSerializable<Iterator<Integer>> iter =
 			uncheckedCast(AppContext.
 				      getDataManager().getBinding(name));
-
+		    Iterator<Integer> it = iter.get();
+		    
 		    try {
 			it.next();
 			fail("expected ConcurrentModificationException"); 
@@ -1644,10 +1593,15 @@ public class TestScalableDeque extends Assert {
 		    ScalableDeque<Integer> d = new ScalableDeque<Integer>();
 		    for (int i = 0; i < 10; ++i) 
 			d.add(i);
+		    
 		    Iterator<Integer> it = d.iterator();
+		    
 		    // advance the iterator forward one set
-		    it.next();		    
-		    AppContext.getDataManager().setBinding(name, it);
+		    it.next();
+		    ManagedSerializable<Iterator<Integer>> iter = 
+			new ManagedSerializable<Iterator<Integer>>(it);
+		    
+		    AppContext.getDataManager().setBinding(name, iter);
 		    AppContext.getDataManager().setBinding(name2, d);
 		}
 	    }, taskOwner);
@@ -1672,23 +1626,61 @@ public class TestScalableDeque extends Assert {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    
-		    Iterator<Integer> it = 
+		    ManagedSerializable<Iterator<Integer>> iter = 
 			uncheckedCast(AppContext.
 				      getDataManager().getBinding(name));
-
+		    Iterator<Integer> it = iter.get();		    
+		    
 		    // now try to remove the already-removed element
 		    // from the iterator
 		    it.remove();
 		    
 		    // the above call shouldn't throw an object not
 		    // found exception
+		    
+		    AppContext.getDataManager().removeObject(iter);
 		}
 	    }, taskOwner);
     }
 
 
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
 
+	volatile int count = 0;
+	
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+                // NOTE: this count is used at the end of the test to make sure
+                // that no objects were leaked in stressing the structure but
+                // any given service (e.g., the task service) may accumulate
+                // managed objects, so a more general way to exclude these from
+                // the count would be nice but for now the specific types that
+                // are accumulated get excluded from the count
+		ManagedReference<?> ref = dataService.createReferenceForId(next);
+                String name = ref.get().getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+		    System.err.println(count + ": " + name);
+                    count++;
+		}
+                last = next;
+	    }
+	}
+    }
 
     private static Properties createProps(String appName) throws Exception {
         Properties props = SgsTestNode.getDefaultProperties(appName, null, 
