@@ -233,12 +233,6 @@ public final class DataServiceImpl implements DataService {
     /** Synchronize on this object when accessing the contextMap field. */
     private static final Object contextMapLock = new Object();
 
-    /** The proxy for notifying of object accesses */
-    private final AccessReporter<BigInteger> oidAccesses;
-
-    /** The proxy for notifying of bound name accesses */
-    private final AccessReporter<String> boundNameAccesses;
-
     /**
      * The transaction context map, or null if configure has not been called.
      */
@@ -246,6 +240,15 @@ public final class DataServiceImpl implements DataService {
 
     /** The name of this application. */
     private final String appName;
+
+    /** The transaction proxy. */
+    private final TransactionProxy txnProxy;
+
+    /** The proxy for notifying of object accesses */
+    private final AccessReporter<BigInteger> oidAccesses;
+
+    /** The proxy for notifying of bound name accesses */
+    private final AccessReporter<String> boundNameAccesses;
 
     /** Scheduler supplied to the data store. */
     private final Scheduler scheduler;
@@ -452,6 +455,7 @@ public final class DataServiceImpl implements DataService {
 		throw new NullPointerException(
 		    "The txnProxy argument must not be null");
 	    }
+	    this.txnProxy = txnProxy;
 
 	    // notify the AccessCoordinator that the DataService is a
 	    // source of contention for ManagedObjects and name
@@ -709,7 +713,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    context = getContext();
 	    TaskLocalReference<T> result =
-		new TaskLocalReferenceImpl<T>(object, context);
+		new TaskLocalReferenceImpl<T>(object, context, txnProxy);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "createTaskLocalReference tid:{0,number,#}," +
@@ -740,20 +744,30 @@ public final class DataServiceImpl implements DataService {
 	/** The context when this instance was created. */
 	private final Context context;
 
+	/** The transaction proxy for obtaining the current transaction. */
+	private final TransactionProxy txnProxy;
+
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	object the associated object
 	 * @param	context the current context
+	 * @param	txnProxy the transaction proxy
 	 */
-	TaskLocalReferenceImpl(T object, Context context) {
+	TaskLocalReferenceImpl(
+	    T object, Context context, TransactionProxy txnProxy)
+	{
 	    this.object = object;
 	    this.context = context;
+	    this.txnProxy = txnProxy;
 	}
 
 	/** {@inheritDoc} */
 	public T get() {
-	    return context.equals(getContextNoJoin()) ? object : null;
+	    context.checkState();
+	    Transaction thisTxn = context.getTransaction();
+	    Transaction currentTxn = txnProxy.getCurrentTransaction();
+	    return thisTxn.equals(currentTxn) ? object : null;
 	}
 
 	/** {@inheritDoc} */

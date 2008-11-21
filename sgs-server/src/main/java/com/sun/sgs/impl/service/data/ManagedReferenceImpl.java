@@ -307,23 +307,8 @@ final class ManagedReferenceImpl<T>
     void markForUpdate() {
 	switch (state) {
 	case EMPTY:
-	    /*
-	     * Presumably this object is being marked for update because it
-	     * will be modified, so fetch the object now.
-	     */
-	    byte[] bytes = context.store.getObject(
-		context.txn, oid, !context.optimisticWriteLocks());
-	    ObjectCache.Value value =
-		context.service.objectCache.get(oid, bytes, context);
-	    if (value != null) {
-		object = value.object;
-		contextWrapper = value.contextWrapper;
-	    } else {
-		object = deserialize(bytes);
-	    }
-	    context.refs.registerObject(this);
-	    state = State.MODIFIED;
-	    break;
+	    throw new AssertionError("DataManager.markForUpdate should not" +
+				     " be called on an empty object");
 	case MAYBE_MODIFIED:
 	    if (!context.optimisticWriteLocks()) {
 		context.store.markForUpdate(context.txn, oid);

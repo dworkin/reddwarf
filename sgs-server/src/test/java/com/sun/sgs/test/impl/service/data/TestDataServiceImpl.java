@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TaskLocalReference;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -37,6 +38,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
@@ -44,13 +46,13 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.PackageReadResolve;
-import com.sun.sgs.test.util.PrivateReadResolve;
-import com.sun.sgs.test.util.ProtectedReadResolve;
-import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PackageWriteReplace;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
+import com.sun.sgs.test.util.PrivateReadResolve;
 import com.sun.sgs.test.util.PrivateWriteReplace;
+import com.sun.sgs.test.util.ProtectedReadResolve;
 import com.sun.sgs.test.util.ProtectedWriteReplace;
+import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PublicWriteReplace;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
@@ -64,17 +66,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.IdentityHashMap;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import static org.junit.Assert.*;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
@@ -2247,6 +2249,153 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
+    /* -- Test createTaskLocalReference -- */
+
+    @Test
+    public void testCreateTaskLocalReferenceNull() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		try {
+		    service.createTaskLocalReference(null);
+		    fail("Expected NullPointerException");
+		} catch (NullPointerException e) {
+		    System.err.println(e);
+		}
+	    }
+	}, taskOwner);
+    }
+
+    @Test
+    public void testCreateTaskLocalReferenceSuccess() throws Exception {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		service.createTaskLocalReference(new Object());
+		service.createTaskLocalReference(new Integer(3));
+		service.createTaskLocalReference(new DummyManagedObject());
+	    }
+	}, taskOwner);
+    }
+
+    /* -- Unusual states -- */
+    private final Action createTaskLocalReference = new Action() {
+	void run() { service.createTaskLocalReference(dummy); }
+    };
+    @Test 
+    public void testCreateTaskLocalReferenceAborting() throws Exception {
+	testAborting(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferenceAborted() throws Exception {
+	testAborted(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferencePreparing() throws Exception {
+	testPreparing(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferenceCommitting() throws Exception {
+	testCommitting(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferenceCommitted() throws Exception {
+	testCommitted(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferenceShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferenceShuttingDownNewTxn()
+	throws Exception
+    {
+	testShuttingDownNewTxn(createTaskLocalReference);
+    }
+    @Test 
+    public void testCreateTaskLocalReferenceShutdown() throws Exception {
+	testShutdown(createTaskLocalReference);
+    }
+
+    /* -- Test TaskLocalReference.get -- */
+
+    @Test
+    public void testGetTaskLocalReferenceGeneral() throws Exception {
+	final Object object = new Object();
+	final TaskLocalReference[] ref = { null };
+	KernelRunnable runnable =
+	    new TestAbstractKernelRunnable() {
+		private int count;
+		public void run() {
+		    count++;
+		    if (count == 1) {
+			ref[0] = service.createTaskLocalReference(object);
+			assertSame(object, ref[0].get());
+			assertSame(object, ref[0].get());
+		    } else {
+			assertNull(ref[0].get());
+			assertNull(ref[0].get());
+		    }
+		}
+	    };
+	txnScheduler.runTask(runnable, taskOwner);
+	txnScheduler.runTask(runnable, taskOwner);
+	try {
+	    ref[0].get();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		assertNull(ref[0].get());
+	    }
+	}, taskOwner);
+    }
+
+    /* -- Unusual states -- */
+    private final Action getTaskLocalReference = new Action() {
+	private TaskLocalReference<?> ref;
+	void setUp() { ref = service.createTaskLocalReference(dummy); }
+	void run() { ref.get(); }
+    };
+    @Test
+    public void testGetTaskLocalReferenceAborting() throws Exception {
+	testAborting(getTaskLocalReference);
+    }
+    @Test
+    public void testGetTaskLocalReferenceAborted() throws Exception {
+	testAborted(getTaskLocalReference);
+    }
+    @Test
+    public void testGetTaskLocalReferencePreparing() throws Exception {
+	testPreparing(getTaskLocalReference);
+    }
+    @Test
+    public void testGetTaskLocalReferenceCommitting() throws Exception {
+	testCommitting(getTaskLocalReference);
+    }
+    @Test
+    public void testGetTaskLocalReferenceCommitted() throws Exception {
+	testCommitted(getTaskLocalReference);
+    }
+    @Test
+    public void testGetTaskLocalReferenceShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(getTaskLocalReference);
+    }
+    @Test
+    public void testGetTaskLocalReferenceShuttingDownNewTxn()
+	throws Exception
+    {
+	testShuttingDownNewTxn(getTaskLocalReference, false);
+    }
+    @Test
+    public void testGetTaskLocalReferenceShutdown() throws Exception {
+	testShutdown(getTaskLocalReference);
+    }
+
     /* -- Test createReferenceForId -- */
 
     @Test 
@@ -3452,6 +3601,331 @@ public class TestDataServiceImpl{
         }}, taskOwner);
     }
 
+    /* -- Test object caching -- */
+
+    @Test
+    public void testObjectCaching() throws Exception {
+	testObjectCaching(new BadCaching(), true, true);
+    }
+
+    @Test
+    public void testObjectCachingNoDetect() throws Exception {
+        Properties props =
+            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(
+	    DataServiceImpl.DETECT_MODIFICATIONS_PROPERTY, "false");
+	serverNodeRestart(props, false);
+	testObjectCaching(new BadCaching(), true, true);
+    }
+
+    @Test
+    public void testObjectCachingDisabledCaching() throws Exception {
+        Properties props =
+            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
+	serverNodeRestart(props, false);
+	testObjectCaching(new BadCaching(), false, false);
+    }
+
+    @Test
+    public void testObjectCachingDisabledCachingClass() throws Exception {
+        Properties props =
+	    SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(DataServiceImpl.OBJECT_CACHE_NOT_CLASSES_PROPERTY,
+			  "foo," + BadCaching.class.getName() + ",bar");
+	serverNodeRestart(props, false);
+	testObjectCaching(new BadCaching(), false, false);
+	testObjectCaching(new BadCachingSubclass(), true, true);
+    }
+
+    @Test
+    public void testObjectCachingDisabledCachingAttribute() throws Exception {
+	testObjectCaching(new BadCachingNotCached(), false, false);
+	testObjectCaching(new BadCachingNotCachedSubclass(), false, false);
+    }
+
+    @Test
+    public void testObjectCachingTaskLocalReference() throws Exception {
+	testObjectCaching(new GoodCaching(), true, false);
+    }
+
+    @Test
+    public void testObjectCachingTaskLocalReferenceNoDetect()
+	throws Exception
+    {
+        Properties props =
+            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(
+	    DataServiceImpl.DETECT_MODIFICATIONS_PROPERTY, "false");
+	serverNodeRestart(props, false);
+	testObjectCaching(new GoodCaching(), true, false);
+    }
+
+    @Test
+    public void testObjectCachingNoCaching() throws Exception {
+	testObjectCaching(new NoCaching(), true, false);
+    }
+
+    @Test
+    public void testObjectCachingNoCachingNoDetect() throws Exception {
+        Properties props =
+            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+	props.setProperty(
+	    DataServiceImpl.DETECT_MODIFICATIONS_PROPERTY, "false");
+	serverNodeRestart(props, false);
+	testObjectCaching(new NoCaching(), true, false);
+    }
+
+    /**
+     * Tests caching of the specified object.
+     *
+     * @param	initialCheckCaching the object to test
+     * @param	shouldCache whether the object should be cached
+     * @param	shouldThrow whether calling {@code check} on the cached object
+     *		should throw {@code TransactionAbortedException}
+     */
+    private void testObjectCaching(final CheckCaching initialCheckCaching,
+				   final boolean shouldCache,
+				   final boolean shouldThrow)
+	throws Exception
+    {
+	/* Use an identity hash map to create an identity-based set */
+	final IdentityHashMap<Object, Object> notCached =
+	    new IdentityHashMap<Object, Object>();
+	notCached.put(initialCheckCaching, initialCheckCaching);
+	/* Initialize object and store in binding */
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		initialCheckCaching.init();
+		service.setBinding("checkCaching", initialCheckCaching);
+	    }
+	}, taskOwner);
+	/* Read binding -- not cached yet -- and modify object */
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		CheckCaching checkCaching =
+		    (CheckCaching) service.getBinding("checkCaching");
+		assertFalse(notCached.containsKey(checkCaching));
+		notCached.put(checkCaching, checkCaching);
+		checkCaching.check();
+		checkCaching.modify();
+	    }
+	}, taskOwner);
+	final Object[] cached = { null };
+	/* Read binding -- still not cached because it was modified */
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		CheckCaching checkCaching =
+		    (CheckCaching) service.getBinding("checkCaching");
+		assertFalse(notCached.containsKey(checkCaching));
+		cached[0] = checkCaching;
+		checkCaching.check();
+	    }
+	}, taskOwner);
+	/* Read binding -- cached now -- store in reference */
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    private int count;
+	    public void run() {
+		/* Track retries and don't expect caching if there is one */
+		count++;
+		CheckCaching checkCaching =
+		    (CheckCaching) service.getBinding("checkCaching");
+		try {
+		    checkCaching.check();
+		    if (shouldThrow && count == 1) {
+			fail("Expected TransactionNotActiveException");
+		    } else if (shouldCache && count == 1) {
+			assertSame(cached[0], checkCaching);
+		    }
+		} catch (TransactionNotActiveException e) {
+		    if (shouldThrow) {
+			System.err.println(e);
+		    } else {
+			fail("Unexpected exception: " + e);
+		    }
+		}
+		cached[0] = checkCaching;
+		service.setBinding("holder", new Holder(checkCaching));
+	    }
+	}, taskOwner);
+	/* Get reference -- cached */
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    private int count;
+	    public void run() {
+		count++;
+		Holder holder = (Holder) service.getBinding("holder");
+		CheckCaching checkCaching = (CheckCaching) holder.get();
+		try {
+		    checkCaching.check();
+		    if (shouldThrow && count == 1) {
+			fail("Expected TransactionNotActiveException");
+		    } else if (shouldCache && count == 1) {
+			assertSame(cached[0], checkCaching);
+		    }
+		} catch (TransactionNotActiveException e) {
+		    if (shouldThrow) {
+			System.err.println(e);
+		    } else {
+			fail("Unexpected exception: " + e);
+		    }
+		}
+		cached[0] = checkCaching;
+	    }
+	}, taskOwner);
+	/* Get reference for update -- cached */
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    private int count;
+	    public void run() {
+		count++;
+		Holder holder = (Holder) service.getBinding("holder");
+		CheckCaching checkCaching =
+		    (CheckCaching) holder.getForUpdate();
+		try {
+		    checkCaching.check();
+		    if (shouldThrow && count == 1) {
+			fail("Expected TransactionNotActiveException");
+		    } else if (shouldCache && count == 1) {
+			assertSame(cached[0], checkCaching);
+		    }
+		} catch (TransactionNotActiveException e) {
+		    if (shouldThrow) {
+			System.err.println(e);
+		    } else {
+			fail("Unexpected exception: " + e);
+		    }
+		}
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * Defines an interface for testing caching.  The {@code init} method is be
+     * called during the transaction when the object is stored in the data
+     * service.  The {@code check} method is called in subsequent transactions.
+     * The {@code modify} method is called to modify the object.
+     */
+    interface CheckCaching {
+	void init();
+	void check();
+	void modify();
+    }
+
+    /**
+     * Define a managed object that shouldn't work properly when cached because
+     * it retains a transient field.
+     */
+    private static class BadCaching extends DummyManagedObject
+	implements CheckCaching
+    {
+	private static final long serialVersionUID = 1;
+	private transient DummyManagedObject trans;
+	private int x;
+	public void init() {
+	    DummyManagedObject next = new DummyManagedObject();
+	    setNext(next);
+	    next.setNext(new DummyManagedObject());
+	}
+	public void check() {
+	    if (trans == null) {
+		trans = getNext();
+	    }
+	    trans.getNext();
+	}
+	public void modify() {
+	    service.markForUpdate(this);
+	    x++;
+	}
+    }
+
+    private static class BadCachingSubclass extends BadCaching {
+	private static final long serialVersionUID = 1;
+    }
+
+    @NoObjectCaching
+    private static class BadCachingNotCached extends BadCaching {
+	private static final long serialVersionUID = 1;
+    }
+
+    private static class BadCachingNotCachedSubclass
+	extends BadCachingNotCached
+    {
+	private static final long serialVersionUID = 1;
+    }
+
+    private static class GoodCaching extends DummyManagedObject
+	implements CheckCaching
+    {
+	private static final long serialVersionUID = 1;
+	private transient TaskLocalReference<DummyManagedObject> trans;
+	private int x;
+	public void init() {
+	    DummyManagedObject next = new DummyManagedObject();
+	    setNext(next);
+	    next.setNext(new DummyManagedObject());
+	}
+	public void check() {
+	    if (trans == null || trans.get() == null) {
+		trans = service.createTaskLocalReference(getNext());
+	    }
+	    trans.get().getNext();
+	}
+	public void modify() {
+	    service.markForUpdate(this);
+	    x++;
+	}
+    }
+
+    private static class NoCaching
+	implements CheckCaching, ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	private transient ManagedReference<DummyManagedObject> nextRef;
+	private transient int deserializedCount;
+	private int x;
+	public void init() {
+	    DummyManagedObject next = new DummyManagedObject();
+	    nextRef = service.createReference(next);
+	    next.setNext(new DummyManagedObject());
+	}
+	public void check() {
+	    nextRef.get().getNext();
+	}
+	public void modify() {
+	    service.markForUpdate(this);
+	    x++;
+	}
+	@SuppressWarnings("unchecked")
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	    deserializedCount = in.readInt() + 1;
+	    nextRef = (ManagedReference) in.readObject();
+	}
+	private void writeObject(ObjectOutputStream out)
+	    throws IOException
+	{
+	    out.defaultWriteObject();
+	    out.writeInt(deserializedCount);
+	    out.writeObject(nextRef);
+	}
+    }
+
+    /** A managed object that holds a managed reference. */
+    private static class Holder implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	private final ManagedReference<ManagedObject> ref;
+	Holder(Object object) {
+	    ref = service.createReference((ManagedObject) object);
+	}
+	ManagedObject get() {
+	    return ref.get();
+	}
+	ManagedObject getForUpdate() {
+	    return ref.getForUpdate();
+	}
+    }
+
     /* -- Other tests -- */
 
     @Test 
@@ -3921,117 +4395,6 @@ public class TestDataServiceImpl{
 	}
     }
 
-    @Test
-    public void testBadObjectCaching() throws Exception {
-	testBadObjectCaching(new BadCaching(), true);
-    }
-
-    @Test
-    public void testBadObjectCachingDisabledCaching() throws Exception {
-        Properties props =
-            SgsTestNode.getDefaultProperties(APP_NAME, null, null);
-	props.setProperty(DataServiceImpl.OBJECT_CACHE_SIZE_PROPERTY, "0");
-	serverNodeRestart(props, false);
-	testBadObjectCaching(new BadCaching(), false);
-    }
-
-    @Test
-    public void testBadObjectCachingDisabledCachingClass() throws Exception {
-        Properties props =
-	    SgsTestNode.getDefaultProperties(APP_NAME, null, null);
-	props.setProperty(DataServiceImpl.OBJECT_CACHE_NOT_CLASSES_PROPERTY,
-			  "foo," + BadCaching.class.getName() + ",bar");
-	serverNodeRestart(props, false);
-	testBadObjectCaching(new BadCaching(), false);
-	testBadObjectCaching(new BadCachingSubclass(), true);
-    }
-
-    @Test
-    public void testBadObjectCachingDisabledCachingAttribute()
-	throws Exception
-    {
-	testBadObjectCaching(new BadCachingNotCached(), false);
-	testBadObjectCaching(new BadCachingNotCachedSubclass(), false);
-    }
-
-    /**
-     * Test whether accessing {@code badCaching} a second time throws {@code
-     * TransactionAbortedException}.
-     */
-    private void testBadObjectCaching(final BadCaching badCaching,
-				      boolean shouldThrow)
-	throws Exception
-    {
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		badCaching.init();
-		service.setBinding("badCaching", badCaching);
-	    }
-	}, taskOwner);
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		BadCaching badCaching =
-		    (BadCaching) service.getBinding("badCaching");
-		badCaching.getTrans();
-	    }
-	}, taskOwner);
-	final AtomicReference<TransactionNotActiveException> exception =
-	    new AtomicReference<TransactionNotActiveException>();
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() {
-		BadCaching badCaching =
-		    (BadCaching) service.getBinding("badCaching");
-		try {
-		    badCaching.getTrans();
-		} catch (TransactionNotActiveException e) {
-		    exception.set(e);
-		}
-	    }
-	}, taskOwner);
-	if (shouldThrow) {
-	    assertNotNull("Expected TransactionNotActiveException",
-			  exception.get());
-	    System.err.println(exception.get());
-	} else {
-	    assertNull("Did not expect exception", exception.get());
-	}
-    }
-
-    /**
-     * Define a managed object that shouldn't work properly when cached because
-     * it retains a transient field.
-     */
-    private static class BadCaching extends DummyManagedObject {
-	private static final long serialVersionUID = 1;
-	private transient DummyManagedObject trans;
-	void init() {
-	    DummyManagedObject next = new DummyManagedObject();
-	    setNext(next);
-	    next.setNext(new DummyManagedObject());
-	}
-	DummyManagedObject getTrans() {
-	    if (trans == null) {
-		trans = getNext();
-	    }
-	    return trans.getNext();
-	}
-    }
-
-    private static class BadCachingSubclass extends BadCaching {
-	private static final long serialVersionUID = 1;
-    }
-
-    @NoObjectCaching
-    private static class BadCachingNotCached extends BadCaching {
-	private static final long serialVersionUID = 1;
-    }
-
-    private static class BadCachingNotCachedSubclass
-	extends BadCachingNotCached
-    {
-	private static final long serialVersionUID = 1;
-    }
-
     /* -- App and service binding methods -- */
 
     ManagedObject getBinding(boolean app, DataService service, String name) {
@@ -4368,7 +4731,18 @@ public class TestDataServiceImpl{
     }
 
     /** Tests running the action with a new transaction while shutting down. */
-    private void testShuttingDownNewTxn(final Action action) throws Exception {
+    private void testShuttingDownNewTxn(Action action) throws Exception {
+	testShuttingDownNewTxn(action, true);
+    }
+
+    /**
+     * Tests running the action with a new transaction while shutting down, and
+     * permits specifying whether the action should fail.
+     */
+    private void testShuttingDownNewTxn(
+	final Action action, final boolean shouldFail)
+	throws Exception
+    {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
         class ShutdownTask extends TestAbstractKernelRunnable {
@@ -4383,16 +4757,24 @@ public class TestDataServiceImpl{
                 threadAction = new ThreadAction<Void>() {
                     protected Void action() {
                         try {
-                            txnScheduler.runTask(new TestAbstractKernelRunnable() {
-                                public void run() {
-                                    try {
-                                        action.run();
-                                        fail("Expected IllegalStateException");
-                                    } catch (IllegalStateException e) {
-                                        assertEquals("Service is shutting down",
-                                                     e.getMessage());
-                                    }
-                            }}, taskOwner);
+                            txnScheduler.runTask(
+				new TestAbstractKernelRunnable() {
+				    public void run() {
+					try {
+					    action.run();
+					    if (shouldFail) {
+						fail("Expected" +
+						     " IllegalStateException");
+					    }
+					} catch (IllegalStateException e) {
+					    if (!shouldFail) {
+						throw e;
+					    }
+					    assertEquals(
+						"Service is shutting down",
+						e.getMessage());
+					}
+				    }}, taskOwner);
                         } catch (Exception e) {
                             fail("Unexpected exception " + e);
                         }
