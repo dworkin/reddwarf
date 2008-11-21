@@ -1,0 +1,5 @@
+============
+ Legal Text
+============
+
+Legal text should be inserted within the embedded resource file, com.dsinstaller.resources.Legalese.txt

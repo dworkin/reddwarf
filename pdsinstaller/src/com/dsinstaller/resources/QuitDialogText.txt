@@ -1,0 +1,2 @@
+Exit
+Are you sure you want to exit the installer?
