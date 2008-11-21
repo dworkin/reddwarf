@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.ManagedObject;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
@@ -34,5 +35,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @Target(ElementType.TYPE)
-@Retention(value=RetentionPolicy.RUNTIME)
+@Retention(value = RetentionPolicy.RUNTIME)
 public @interface NoObjectCaching { }

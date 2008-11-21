@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.data;
 
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ObjectStreamException;
@@ -144,7 +143,7 @@ final class ManagedReferenceWrapper<T>
      * @return	a string representing this object.
      */
     public String toString() {
-	return "ManagedReferenceWrapper@" +
+	return "ManagedReferenceWrapper#" +
 	    Integer.toHexString(System.identityHashCode(this)) +
 	    "[oid:" + oid + "]";
     }
@@ -160,20 +159,6 @@ final class ManagedReferenceWrapper<T>
 	    return new ManagedReferenceImpl<Object>(
 		contextWrapper.getContext(), oid);
 	}
-    }
-
-    /**
-     * Sets the context wrapper.
-     *
-     * @param	contextWrapper the contextWrapper
-     */
-    private void setContextWrapper(ContextWrapper contextWrapper) {
-	if (contextWrapper == null) {
-	    throw new NullPointerException(
-		"The contextWrapper must not be null");
-	}
-	this.contextWrapper = contextWrapper;
-	impl = null;
     }
 
     /**

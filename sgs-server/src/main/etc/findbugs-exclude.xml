@@ -112,6 +112,13 @@
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"/>
   </Match>
 
+  <!-- This appears to be an implicit cast, and should be safe. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$ContextMap"/>
+    <Method name="checkContext"/>
+    <Bug pattern="BC_UNCONFIRMED_CAST"/>
+  </Match>
+
   <!-- Intentionally falling through switch cases. -->
   <Match>
     <Class name="com.sun.sgs.impl.service.data.ManagedReferenceImpl"/>
@@ -120,6 +127,12 @@
       <Method name="removeObject"/>
     </Or>
     <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
+  </Match>
+
+  <!-- This class has a writeReplace method, so it is never deserialized. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.ManagedReferenceWrapper"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
   </Match>
 
   <!-- Package com.sun.sgs.impl.service.data.store -->
@@ -139,6 +152,16 @@
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+
+  <!-- Unused methods intended for testing -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl"/>
+    <Or>
+      <Method name="getObjectRaw"/>
+      <Method name="nextObjectIdRaw"/>
+      <Method name="setObjectRaw"/>
+    </Or>
   </Match>
 
   <!-- Packages com.sun.sgs.impl.service.data.store.{bdb,je} -->

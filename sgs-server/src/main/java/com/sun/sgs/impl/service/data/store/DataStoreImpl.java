@@ -49,9 +49,11 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.Serializable;
 import java.security.DigestException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -595,7 +597,7 @@ public class DataStoreImpl
 	 * Synchronize on the FreeObjectIds instance when accessing this field.
 	 */
 	private final Queue<ObjectIdInfo> freeObjectIdInfo =
-	    new PriorityQueue<ObjectIdInfo>();
+	    new PriorityQueue<ObjectIdInfo>(11, new ObjectIdInfoCompareLast());
 
 	/**
 	 * The set of object IDs of placeholders for allocation blocks that are
@@ -677,9 +679,8 @@ public class DataStoreImpl
     }
 
     /** Stores information about object IDs available for allocation. */
-    private static final class ObjectIdInfo
-	implements Comparable<ObjectIdInfo>
-    {
+    private static final class ObjectIdInfo {
+
 	/** The first object ID in this block. */
 	private final long firstObjectId;
 
@@ -709,11 +710,6 @@ public class DataStoreImpl
 	    nextObjectId = firstObjectId;
 	    this.lastObjectId = lastObjectId;
 	    abortNextObjectId = nextObjectId;
-	}
-
-	/** Implement Comparable<ObjectIdInfo>, ordered by object ID. */
-	public int compareTo(ObjectIdInfo other) {
-	    return Long.signum(lastObjectId - other.lastObjectId);
 	}
 
 	/**
@@ -751,6 +747,17 @@ public class DataStoreImpl
 	/** Returns the last object ID in this block. */
 	long last() {
 	    return lastObjectId;
+	}
+    }
+
+    /** Compares ObjectIdInfo instances by their last object ID. */
+    private static final class ObjectIdInfoCompareLast
+	implements Comparator<ObjectIdInfo>, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	ObjectIdInfoCompareLast() { }
+ 	public int compare(ObjectIdInfo x, ObjectIdInfo y) {
+ 	    return Long.signum(x.last() - y.last());
 	}
     }
 

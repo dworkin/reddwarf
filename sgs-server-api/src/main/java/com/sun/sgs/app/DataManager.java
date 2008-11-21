@@ -224,9 +224,9 @@ public interface DataManager {
      *
      * <pre>
      * public class RememberPosition implements ManagedObject, Serializable {
-     *     private final ManagedReference<Item> head;
+     *     private final ManagedReference&lt;Item&gt; head;
      *     private int position = -1;
-     *     private transient TaskLocalReference<Item> last;
+     *     private transient TaskLocalReference&lt;Item&gt; last;
      *     public RememberPosition(Item head) {
      *         this.head = AppContext.getDataManager().createReference(head);
      *     }
@@ -238,7 +238,8 @@ public interface DataManager {
      *         }
      *         position = p;
      *         last = (result == null) ? null
-     *             : AppContext.getDataManager().createTaskLocalReference(result);
+     *             : AppContext.getDataManager().createTaskLocalReference(
+     *                   result);
      *         return result;
      *     }
      *     public Item last() {

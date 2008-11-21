@@ -463,9 +463,9 @@ public final class DataServiceImpl implements DataService {
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
 	    oidAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME+":objects", BigInteger.class);
+		registerAccessSource(CLASSNAME + ":objects", BigInteger.class);
 	    boundNameAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME+":bound-names", String.class);
+		registerAccessSource(CLASSNAME + ":bound-names", String.class);
 
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
@@ -957,7 +957,8 @@ public final class DataServiceImpl implements DataService {
 	    /*
 	     * Incomplete implementation left for future reference:
 	     *
-	     * String nextBoundName = nextBoundNameInternal(name, serviceBinding);
+	     * String nextBoundName =
+	     *     nextBoundNameInternal(name, serviceBinding);
 	     * if (nextBoundName == null) {
  	     *     boundNameAccesses.
 	     *         reportObjectAccess(END_OF_NAMESPACE, AccessType.WRITE);

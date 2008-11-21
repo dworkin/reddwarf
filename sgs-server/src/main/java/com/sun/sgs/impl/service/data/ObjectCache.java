@@ -201,6 +201,7 @@ final class ObjectCache {
      * {@code maxSize} entries.
      */
     private static class Cache extends LinkedHashMap<Key, List<Value>> {
+	private static final long serialVersionUID = 1;
 
 	/** The maximum number of entries in this cache. */
 	private final int maxSize;
@@ -270,9 +271,9 @@ final class ObjectCache {
 	     * bytes using the algorithm in Arrays.hashCode(byte[]).
 	     */
 	    int h = (int) (oid >> 32) + (int) oid + bytes.length;
-	    int l = Math.max(h, 16);
-	    for (byte element : bytes) {
-		h = (31 * h) + element;
+	    int max = Math.max(bytes.length, 16);
+	    for (int i = 0; i < max; i++) {
+		h = (31 * h) + bytes[i];
 	    }
 	    hashCode = h;
 	}
