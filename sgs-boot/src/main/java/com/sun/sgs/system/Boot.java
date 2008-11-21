@@ -132,8 +132,8 @@ public final class Boot {
                 " -Djava.library.path=" + bootNativePath(properties) +
                 " -Djava.util.logging.config.file=" + 
                 properties.getProperty(BootEnvironment.SGS_LOGGING) +
-                " " + javaOpts +
                 " " + bootCommandLineProps(properties) +
+                " " + javaOpts +
                 " " + BootEnvironment.KERNEL_CLASS +
                 " " + properties.getProperty(BootEnvironment.SGS_PROPERTIES);
         List<String> executeCmd = Arrays.asList(execute.split("\\s+"));
