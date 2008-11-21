@@ -19,6 +19,8 @@
 
 package com.sun.sgs.test.impl.service.channel;
 
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedSerializable;
@@ -35,6 +37,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -71,6 +74,7 @@ public class TestBindingKeyedHashMap extends TestCase {
      */
 
    protected void setUp() throws Exception {
+	System.err.println("Testcase: " + getName());
 	serverNode = new SgsTestNode("TestBindingKeyedHashMap", null,
 				     createProps("TestBindingKeyedHashMap"));
         txnScheduler = serverNode.getSystemRegistry().
@@ -2265,12 +2269,12 @@ public class TestBindingKeyedHashMap extends TestCase {
 		    Map<Foo,Foo> test = new BindingKeyedHashMap<Foo,Foo>(NAME);
 		    Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
-		    for (int i = 0; i < 5; i++) {
+		    for (int i = 0; i < 64; i++) {
 			test.put(new Foo(i), new Foo(i));
 			control.put(new Foo(i), new Foo(i));
 			assertEquals(control, test);
 		    }
-		    for (int i = 0; i < 5; i++) {
+		    for (int i = 0; i < 64; i++) {
 			test.put(new Bar(i), new Foo(i));
 			control.put(new Bar(i), new Foo(i));
 			assertEquals(control, test);
@@ -2829,6 +2833,33 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    }, taskOwner);
     }
 
+    public void testRemoveHashMap() throws Exception {
+	int initialCount = getObjectCount();
+	System.err.println("initialCount: " + initialCount);
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() throws Exception {
+		    BindingKeyedHashMap<Integer,Integer> test =
+			new BindingKeyedHashMap<Integer,Integer>(NAME);
+		    for (int i =0; i < 10; i++) {
+			test.put(i, i);
+		    }
+		    AppContext.getDataManager().setBinding(NAME, test);
+		} },
+	    taskOwner);
+	int countAfterCreation = getObjectCount();
+	System.err.println("countAfterCreation: " + countAfterCreation);
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() throws Exception {
+		    DataManager dm = AppContext.getDataManager();
+		    ManagedObject obj = dm.getBinding(NAME);
+		    dm.removeObject(obj);
+		} },
+	    taskOwner);
+	assertEquals(initialCount, getObjectCount());
+    }
+
     /*
      * Utility routines.
      */
@@ -2956,6 +2987,43 @@ public class TestBindingKeyedHashMap extends TestCase {
 
 	public int hashCode() {
 	    return 0;
+	}
+    }
+
+    private int getObjectCount() throws Exception {
+	GetObjectCountTask task = new GetObjectCountTask();
+	txnScheduler.runTask(task, taskOwner);
+	return task.count;
+    }
+    
+    private class GetObjectCountTask extends TestAbstractKernelRunnable {
+
+	volatile int count = 0;
+	
+	GetObjectCountTask() {
+	}
+
+	public void run() {
+	    count = 0;
+	    BigInteger last = null;
+	    while (true) {
+		BigInteger next = dataService.nextObjectId(last);
+		if (next == null) {
+		    break;
+		}
+                // NOTE: this count is used at the end of the test to make sure
+                // that no objects were leaked in stressing the structure but
+                // any given service (e.g., the task service) may accumulate
+                // managed objects, so a more general way to exclude these from
+                // the count would be nice but for now the specific types that
+                // are accumulated get excluded from the count
+                String name = dataService.createReferenceForId(next).get().
+		    getClass().getName();
+                if (!name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+                    count++;
+		}
+                last = next;
+	    }
 	}
     }
 }

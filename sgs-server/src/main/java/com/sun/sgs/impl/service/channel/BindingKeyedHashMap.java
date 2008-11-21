@@ -74,8 +74,9 @@ public class BindingKeyedHashMap<K, V>
 	    throw new NullPointerException("null keyPrefix");
 	}
 	this.keyPrefix = keyPrefix + ".";
-	ChannelServiceImpl.getDataService().setBinding(
-	    keyPrefix + KEY_STOP, new ManagedNothingness());
+	ChannelServiceImpl.getDataService().setServiceBinding(
+	    getBindingName(KEY_STOP), new KeyValuePair(KEY_STOP, null));
+	// TBD: have "key start" too?
     }
 
     /* -- Override AbstractMap methods -- */
@@ -170,7 +171,8 @@ public class BindingKeyedHashMap<K, V>
 	    }
 	    // If key matches current key, get value and remove key/value pair.
 	    if (currentKey != null && key.equals(currentKey)) {
-		// TBD: should getting the value catch ONFE?
+		// TBD: should this catching ONFE?  If not, how does the
+		// binding get removed if the value has been removed?
 		value = pair.getValue();
 		dataService.removeObject(pair);
 		dataService.removeServiceBinding(bindingName);
@@ -534,29 +536,17 @@ public class BindingKeyedHashMap<K, V>
 
     /** {@inheritDoc} */
     public void removingObject() {
-	// remove stopper too.
-	// TBD
-	throw new AssertionError("not yet implemented");
+	/*
+	 * Clear map and remove key stop.
+	 */
+	clear();
+	DataService dataService = ChannelServiceImpl.getDataService();
+	String keyName = getBindingName(KEY_STOP);
+	ManagedObject keyStop = dataService.getServiceBinding(keyName);
+	dataService.removeObject(keyStop);
+	dataService.removeServiceBinding(keyName);
     }
 
-    /* -- Implement Object -- */
-    
-    /** {@inheritDoc} */
-    /*
-    public int hashCode() {
-	return keyPrefix.hashCode();
-    }
-    */
-
-    /** {@inheritDoc} */
-    /*
-    public boolean equals(Object o) {
-	return
-	    o instanceof BindingKeyedHashMap &&
-	    keyPrefix.equals(((BindingKeyedHashMap) o).keyPrefix);
-    }
-    */
-    
     /* -- Private classes and methods. -- */
 
     /**
@@ -581,6 +571,7 @@ public class BindingKeyedHashMap<K, V>
 	 * @param value a value
 	 */
 	KeyValuePair(K key, V value) {
+	    checkNull("key", key);
 	    k = new Wrapper<K>(key);
 	    v = new Wrapper<V>(value);
 	}
@@ -640,24 +631,21 @@ public class BindingKeyedHashMap<K, V>
 	private T obj = null;
 
 	Wrapper(T obj) {
-	    if (obj == null) {
-		throw new NullPointerException("null obj");
-	    } else if (!(obj instanceof Serializable)) {
-		throw new IllegalArgumentException("obj not serializable");
-	    }
 	    set(obj);
 	}
 
 	T get() {
-	    if (obj != null) {
-		return obj;
+	    if (ref != null) {
+		return  ref.get();
 	    } else {
-		obj = ref.get();
 		return obj;
 	    }
 	}
 
 	void set(T obj) {
+	    if (obj != null && !(obj instanceof Serializable)) {
+		throw new IllegalArgumentException("obj not serializable");
+	    }
 	    if (obj instanceof ManagedObject) {
 		ref = uncheckedCast(AppContext.getDataManager().
 				    createReference((ManagedObject) obj));
@@ -720,19 +708,4 @@ public class BindingKeyedHashMap<K, V>
 	    throw new IllegalArgumentException(name + " not serializable");
 	}
     }
-    
-    /**
-     * Instances of this class are used as a stopper for iterating over the values
-     * in a {@code BindingKeyedHashMap}.
-     */
-    private static class ManagedNothingness
-	implements ManagedObject, Serializable
-    {
-	/** The serialVersionUID for this class. */
-	private static final long serialVersionUID = 1L;
-
-	public ManagedNothingness() {
-	}
-    }
-
 }
