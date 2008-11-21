@@ -68,6 +68,14 @@ public class ProcessOutputReader implements Runnable {
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to read process output", e);
             p.destroy();
+        } finally {
+            try {
+                if (processReader != null) {
+                    processReader.close();
+                }
+            } catch (IOException ignore) {
+                
+            }
         }
     }
 

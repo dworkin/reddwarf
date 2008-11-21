@@ -84,9 +84,6 @@
         <artifactId>findbugs-maven-plugin</artifactId>
 	<configuration>
 	  <effort>Max</effort>
-	  <excludeFilterFile>
-	    ${basedir}/src/main/etc/findbugs-exclude.xml
-	  </excludeFilterFile>
 	  <threshold>Low</threshold>
 	  <xmlOutput>true</xmlOutput>
 	  <findbugsXmlOutput>true</findbugsXmlOutput>

@@ -80,7 +80,7 @@ public final class Boot {
                 sgsBoot = new File(args[0]).toURI().toURL();
             }
             properties.load(sgsBoot.openStream());
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to load initial configuration", e);
             throw e;
         }
@@ -103,7 +103,7 @@ public final class Boot {
                 //is interpolated correctly in any other variables
                 try {
                     properties.load(sgsBoot.openStream());
-                } catch (Exception e) {
+                } catch (IOException e) {
                     logger.log(Level.SEVERE, 
                                "Unable to load initial configuration", e);
                     throw e;
@@ -149,6 +149,15 @@ public final class Boot {
         String logFile = properties.getProperty(BootEnvironment.SGS_LOGFILE);
         if (logFile != null) {
             try {
+                //attempt to create any necessary parent directories
+                //for the log file
+                File log = new File(logFile);
+                File parentDir = log.getParentFile();
+                if (parentDir != null && !parentDir.exists()) {
+                    parentDir.mkdirs();
+                }
+                
+                //create a stream for the log file
                 output = new PrintStream(new FileOutputStream(logFile), true);
                 logger.log(Level.INFO, "Redirecting log output to: " + logFile);
             } catch (FileNotFoundException e) {
@@ -169,6 +178,8 @@ public final class Boot {
             throw e;
         } catch (InterruptedException i) {
             logger.log(Level.WARNING, "Thread interrupted", i);
+        } finally {
+            output.close();
         }
     }
     
