@@ -271,7 +271,7 @@ final class ObjectCache {
 	     * bytes using the algorithm in Arrays.hashCode(byte[]).
 	     */
 	    int h = (int) (oid >> 32) + (int) oid + bytes.length;
-	    int max = Math.max(bytes.length, 16);
+	    int max = Math.min(bytes.length, 16);
 	    for (int i = 0; i < max; i++) {
 		h = (31 * h) + bytes[i];
 	    }
