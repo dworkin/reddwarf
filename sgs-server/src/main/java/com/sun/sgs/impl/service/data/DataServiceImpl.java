@@ -127,9 +127,9 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The fully qualified names of classes whose
  *	instances should not be cached.  Multiple names should be separated by
  *	commas.  Applications can add class names to this list to prevent
- *	caching of classes that have unsafe usage of transient fields &emdash;
- *	in particular, ones that have not been updated to use {@link
- *	TaskLocalReference} instances. <p>
+ *	caching of classes that, for example, have unsafe usage of transient
+ *	fields.  Note that classes can also be given the {@link
+ *	NoObjectCaching} attribute to prevent them from being cached. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS_PROPERTY}
  *	</b></code><br>

@@ -971,7 +971,7 @@ public class ScalableDeque<E> extends AbstractCollection<E>
 
         // Remove the ManagedSerializable objects as well
         DataManager dm = AppContext.getDataManager();
-        dm.removeObject(backingMap);
+        dm.removeObject(backingMapRef.get());
         dm.removeObject(headElement.get());
         dm.removeObject(headCounter.get());
         dm.removeObject(tailElement.get());

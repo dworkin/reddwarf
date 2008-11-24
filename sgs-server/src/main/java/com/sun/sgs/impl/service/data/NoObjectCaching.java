@@ -28,8 +28,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * An annotation used to mark classes that implement {@link ManagedObject} and
- * whose instances should not be cached.  This annotation is inherited by
+ * An annotation that tells {@link DataServiceImpl} that instances of classes
+ * with this annotation should not be cached.  This annotation is inherited by
  * subclasses.
  */
 @Documented

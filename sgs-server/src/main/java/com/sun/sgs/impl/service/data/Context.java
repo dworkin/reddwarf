@@ -375,7 +375,7 @@ final class Context extends TransactionContext {
      * @return	a string representing this object.
      */
     public String toString() {
-	return "Context@" + Integer.toHexString(System.identityHashCode(this));
+	return "Context@" + Integer.toHexString(hashCode());
     }
 
     /**

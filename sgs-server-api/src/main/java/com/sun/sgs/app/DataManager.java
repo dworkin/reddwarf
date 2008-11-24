@@ -197,16 +197,14 @@ public interface DataManager {
     <T> ManagedReference<T> createReference(T object);
 
     /**
-     * Creates a task-local reference to an object, which maintains a reference
-     * to the specified object for use within the same run of the current task.
-     * The resulting reference will return the argument provided to this method
-     * if called from within the same run of the current task, and otherwise
+     * Creates a task-local reference, which maintains a reference to the
+     * specified object for use within the same run of the current task.  The
+     * resulting reference will return the argument provided to this method if
+     * called from within the same run of the current task, and otherwise
      * return {@code null}.  The object returned by this method is not
      * serializable; applications should insure that it does not appear in the
      * serialized form of a managed object, typically by only storing it in
-     * transient fields.  Applications should also insure that a single
-     * task-local reference instance is not shared by multiple managed objects.
-     * <p>
+     * transient fields.  <p>
      *
      * Applications can use task-local references to cache persistent objects
      * for repeated use from within a single task, avoiding the need to

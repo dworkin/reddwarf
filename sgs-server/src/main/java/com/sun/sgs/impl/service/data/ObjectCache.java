@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
@@ -34,8 +35,56 @@ import java.util.logging.Logger;
 
 /**
  * An object cache for reusing objects from previous transactions, to help
- * avoid object serialization.  Objects are stored in lists that are the values
- * stored in linked hash maps.
+ * avoid the cost of object serialization. <p>
+ *
+ * The object cache holds recently used objects, keyed by the bytes used to
+ * create the object.  The object cache itself does not remove the need for the
+ * data service to continue to read data from the underlying data store &mdash;
+ * it is not a data cache &mdash; but it does permit reusing available objects
+ * previously created for the same data. <p>
+ *
+ * Objects saved in the cache should only be used by a single transaction at a
+ * time.  This restriction prevents an object from being modified by two tasks
+ * at once, as well as the possibility of navigating from an object used by one
+ * task to one currently being used by another task. <p>
+ *
+ * Only objects that have been obtained by deserialization should be cached.
+ * This restriction insures that cached objects do not share any non-managed
+ * objects with other cached objects.  Using deserialized objects avoids
+ * sharing because each serialized object contains the full object graph.  The
+ * result is that, after an object is modified in one task, it cannot be cached
+ * until it is first successfully read by another task. <p>
+ *
+ * To allow objects to be reused in new transactions while still permitting the
+ * data service to safely detect access to objects used in another transaction,
+ * managed references are wrapped in an indirection object &mdash; a {@link
+ * ManagedReferenceWrapper} &mdash; that delegates to an associated {@link
+ * ManagedReferenceImpl}.  Each time a cached object is put into use for a new
+ * transaction, the old {@code ManagedReferenceImpl} object needs to be
+ * replaced with a reference appropriate to the new transaction. <p>
+ *
+ * Switching reference implementation objects efficiently is accomplished
+ * through a wrapper around the context object that references use to represent
+ * the current transaction &mdash; a {@link ContextWrapper}.  During
+ * deserialization, each {@code ManagedReferenceWrapper} object within the
+ * object graph for a managed object is created using the same {@code
+ * ContextWrapper} object.  When a cached object is used for a new transaction,
+ * the implementation modifies the {@code ContextWrapper} for the cached object
+ * to refer to the context for the new transaction.  This scheme avoids the
+ * need to update each reference separately; updating the {@code
+ * ContextWrapper} has the effect of decaching all of the references. <p>
+ *
+ * Object caching means that there are cases where a managed objects is used in
+ * a new transaction without being serialized or deserialized since its last
+ * use.  Applications can use {@link TaskLocalReference} instances, created
+ * using {@link DataManager#createTaskLocalReference
+ * DataManager.createTaskLocalReference}, to help decache transient fields. <p>
+ *
+ * The object cache itself stores objects in lists that are the values stored
+ * in linked hash maps.  The lists permit the cache to store multiple objects
+ * associated with the same bytes, to permit the cache to supply objects for
+ * simultaneous use in different transactions.  The linked hash map uses access
+ * ordering to insure that old items are removed from the cache.
  */
 final class ObjectCache {
 
@@ -44,7 +93,9 @@ final class ObjectCache {
 	new LoggerWrapper(Logger.getLogger(ObjectCache.class.getName()));
 
     /** The number of cache operations between calls to log the hit rate. */
-    private static final int LOGGING_INTERVAL = 100000;
+    private static final int LOGGING_INTERVAL =
+	Integer.getInteger(ObjectCache.class.getName() + ".logging.interval",
+			   100000);
 
     /** The names of classes whose instances should not be cached. */
     private final Set<String> notClasses;
@@ -59,13 +110,13 @@ final class ObjectCache {
      * The number of cache hits.  Synchronize on this instance when
      * accessing.
      */
-    private int success;
+    private int hits;
 
     /**
      * The total number of cache requests.  Synchronize on this instance when
      * accessing.
      */
-    private int total;
+    private int accesses;
 
     /**
      * Creates an instance of this class.  Specifying a maximum size of {@code
@@ -104,16 +155,20 @@ final class ObjectCache {
 	    return null;
 	}
 	boolean logUsage = false;
-	double usage = 0;
+	double hitRatio = 0;
+	double flushRatio = 0;
 	synchronized (this) {
-	    if (total % LOGGING_INTERVAL == (LOGGING_INTERVAL - 1)) {
+	    if (accesses % LOGGING_INTERVAL == (LOGGING_INTERVAL - 1)) {
 		logUsage = true;
-		usage = success / (double) total;
+		hitRatio = hits / (double) accesses;
+		flushRatio = map.flushes / (double) accesses;
 	    }
-	    total++;
+	    accesses++;
 	}
 	if (logUsage && logger.isLoggable(Level.FINE)) {
-	    logger.log(Level.FINE, "Object cache hit rate: {0}", usage);
+	    logger.log(Level.FINE,
+		       "Object cache hit ratio: {0}, flush ratio: {1}",
+		       hitRatio, flushRatio);
 	}
 	Key key = new Key(oid, bytes);
 	List<Value> list;
@@ -131,7 +186,7 @@ final class ObjectCache {
 	    if (value != null) {
 		value.contextWrapper.setContext(context);
 		synchronized (this) {
-		    success++;
+		    hits++;
 		}
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST,
@@ -209,6 +264,9 @@ final class ObjectCache {
 	/** The number of entries in this cache. */
 	private int size;
 
+	/** The number of old items flushed from the cache. */
+	int flushes;
+
 	/** Creates an instance of this class. */
 	Cache(int maxSize) {
 	    super(16, 0.75f, true);
@@ -229,6 +287,7 @@ final class ObjectCache {
 	protected boolean removeEldestEntry(Entry<Key, List<Value>> eldest) {
 	    if (size > maxSize) {
 		size -= eldest.getValue().size();
+		flushes++;
 		return true;
 	    } else {
 		return false;

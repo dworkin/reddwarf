@@ -565,7 +565,7 @@ final class ManagedReferenceImpl<T>
     /* -- Object methods -- */
 
     public String toString() {
-	return "ManagedReferenceImpl@" +
+	return "ManagedReferenceImpl#" +
 	    Integer.toHexString(System.identityHashCode(this)) +
 	    "[oid:" + oid + ", state:" + state + "]";
     }
