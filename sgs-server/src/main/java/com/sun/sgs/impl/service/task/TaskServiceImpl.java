@@ -31,6 +31,7 @@ import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
@@ -46,6 +47,7 @@ import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
 
 import com.sun.sgs.service.Node;
@@ -317,19 +319,21 @@ public class TaskServiceImpl
         // create our profiling info
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
-        ProfileConsumer consumer = collector.getConsumer(getName());
+        ProfileConsumer consumer = collector.getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "TaskService");
 
         ProfileLevel level = ProfileLevel.MAX;
+        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         scheduleNDTaskOp =
-            consumer.registerOperation("scheduleNonDurableTask", level);
+            consumer.createOperation("scheduleNonDurableTask", type, level);
         scheduleNDTaskDelayedOp =
-            consumer.registerOperation("scheduleNonDurableTaskDelayed", 
-                                       level);
-        scheduleTaskOp = consumer.registerOperation("scheduleTask", level);
+            consumer.createOperation("scheduleNonDurableTaskDelayed", 
+                                     type, level);
+        scheduleTaskOp = consumer.createOperation("scheduleTask", type, level);
         scheduleTaskDelayedOp =
-            consumer.registerOperation("scheduleDelayedTask", level);
+            consumer.createOperation("scheduleDelayedTask", type, level);
         scheduleTaskPeriodicOp =
-            consumer.registerOperation("schedulePeriodicTask", level);
+            consumer.createOperation("schedulePeriodicTask", type, level);
 
         // finally, create a timer for delaying the status votes and get
         // the delay used in submitting status votes

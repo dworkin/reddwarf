@@ -27,6 +27,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
@@ -49,6 +50,7 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
@@ -452,10 +454,11 @@ public final class DataServiceImpl implements DataService {
             ProfileCollector collector = 
 		systemRegistry.getComponent(ProfileCollector.class);
 	    store = new DataStoreProfileProducer(baseStore, collector);
-            ProfileConsumer consumer =
-                collector.getConsumer(getClass().getName());
-            createReferenceOp = consumer.registerOperation(
-		"createReference", ProfileLevel.MAX);
+            ProfileConsumer consumer = collector.getConsumer(
+                    ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataService");
+            createReferenceOp = consumer.createOperation(
+		"createReference", ProfileDataType.TASK_AND_AGGREGATE,
+                ProfileLevel.MAX);
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {

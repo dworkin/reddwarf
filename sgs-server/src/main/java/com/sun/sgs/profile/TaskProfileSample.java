@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,26 +19,20 @@
 
 package com.sun.sgs.profile;
 
-
 /**
- * An operation which has occurred.
+ * A profile sample which provides information to {@link ProfileReport}s.
  * <p>
- * Profile operations are created with calls to {@link 
- * ProfileConsumer#createOperation ProfileConsumer.createOperation}.  An 
- * operations's name includes both the {@code name} supplied to 
- * {@code createOperation} and the value of {@link ProfileConsumer#getName}.
+ * If data is added to the sample during a given task, the {@code ProfileReport}
+ * for that task will include the changes made, and exclude changes made while
+ * running other tasks.
  */
-public interface ProfileOperation {
+public interface TaskProfileSample extends ProfileSample {
 
-    /**
-     * Returns the name of this operation.
-     *
-     * @return the name
+    /** 
+     * {@inheritDoc}
+     * 
+     * @throws IllegalStateException if this is called outside the scope
+     *                               of a task run through the scheduler
      */
-    String getName();
-
-    /**
-     * Tells this operation to report that it is happening. 
-     */
-    void report();
+    void addSample(long value);
 }
