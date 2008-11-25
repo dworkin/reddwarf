@@ -40,6 +40,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
 {
     final AggregateProfileCounter numTasks;
     final AggregateProfileCounter numTransactionalTasks;
+//    final AggregateProfileCounter numSuccessfulTasks;
     final AggregateProfileCounter numFailedTasks;
     final AggregateProfileCounter numReadyTasks;
     
@@ -48,15 +49,10 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     /* task runtimes */
     final AggregateProfileSample runtime;
     /* failed tasks / all tasks  JANE ? */
-    final AggregateProfileSample failureRate;
+//    final AggregateProfileSample failureRate;
     /* task lag time JANE ? */
     final AggregateProfileSample lagTime;
     
-//    private AtomicLong numTasks = new AtomicLong();
-//    private AtomicLong numReadyTasks = new AtomicLong();
-//    private AtomicLong numTransactionalTasks = new AtomicLong();
-//    private AtomicLong numFailedTasks = new AtomicLong();
-//    private AtomicLong maxRuntime = new AtomicLong();
     /** 
      * Smoothing factor for exponential smoothing, between 0 and 1.
      * A value closer to one provides less smoothing of the data, and
@@ -65,30 +61,26 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
      */
     // JANE?
     private float smoothingFactor = (float) 0.9;
-//    /** Exponential moving average of task runtimes */
-//    private ExponentialAverage taskRuntime = new ExponentialAverage();
-//    /** Exponential moving average of failed tasks/ all tasks */
-//    private ExponentialAverage taskFailure = new ExponentialAverage();
-//    /** Exponential moving average of task ready counts */
-//    private ExponentialAverage taskReadyCount = new ExponentialAverage();
-//    /** Exponential moving average of task lag time */
-//    private ExponentialAverage taskLagTime = new ExponentialAverage();
-//    /** Exponential moving average of task latency */
-//    private ExponentialAverage taskLatency = new ExponentialAverage();
-//
+
     private long seqNumber = 1;
     
     TaskAggregateStats(ProfileCollector collector, String name) {
-        ProfileConsumer consumer =
-            collector.getConsumer(name);
+        ProfileConsumer consumer = collector.getConsumer(name);
 
         ProfileLevel level = ProfileLevel.MIN;
+        // These statistics are reported to the profile reports
+        // directly, with the ProfileCollector.
+        // They should not be reported as TASK_AND_AGGREGATE because,
+        // for nested tasks, we don't want to merge their values into
+        // the parent's value.
         ProfileDataType type = ProfileDataType.AGGREGATE;
         
         numTasks = (AggregateProfileCounter)
                 consumer.createCounter("numTasks", type, level);
         numTransactionalTasks = (AggregateProfileCounter)
                 consumer.createCounter("numTransactionalTasks", type, level);
+//        numSuccessfulTasks = (AggregateProfileCounter)
+//                consumer.createCounter("numSuccessfulTasks", type, level);
         numFailedTasks = (AggregateProfileCounter)
                 consumer.createCounter("numFailedTasks", type, level);
         numReadyTasks = (AggregateProfileCounter)
@@ -97,10 +89,16 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
                 consumer.createSample("readyCount", type, level);
         runtime = (AggregateProfileSample)
                 consumer.createSample("runtime", type, level);
-        failureRate = (AggregateProfileSample)
-                consumer.createSample("failureRate", type, level);
+//        failureRate = (AggregateProfileSample)
+//                consumer.createSample("failureRate", type, level);
         lagTime = (AggregateProfileSample)
                 consumer.createSample("lagTime", type, level);
+        // Don't actually save any of our sample values.  We expect
+        // a great number of them to be generated.
+        readyCount.setCapacity(0);
+        runtime.setCapacity(0);
+//        failureRate.setCapacity(0);
+        lagTime.setCapacity(0);
     }
     /** {@inheritDoc} */
     public void notifyTaskQueue() {
@@ -110,6 +108,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
                                  System.currentTimeMillis(),
                                  seqNumber++));
     }
+    
     /*
      * Implement NotificationEmitter.
      */
@@ -167,8 +166,8 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     /** {@inheritDoc} */
     public double getTaskFailureAvg() {
 //        return failureRate.getAverage();
-        System.out.println("failed task count is " + getFailedTaskCount());
-        System.out.println("total task count is " +  getTaskCount());
+//        System.out.println("failed task count is " + getFailedTaskCount());
+//        System.out.println("total task count is " +  getTaskCount());
         return (getFailedTaskCount() * 100) / (double) getTaskCount();
     }
 

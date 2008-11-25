@@ -32,11 +32,13 @@ import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.profile.TaskProfileSample;
 import java.beans.PropertyChangeEvent;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -568,7 +570,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
             extends AbstractProfileData 
             implements AggregateProfileSample
     {    
-        private final LinkedList<Long> samples = new LinkedList<Long>();
+//        private final LinkedList<Long> samples = new LinkedList<Long>();
+//        private final LinkedBlockingDeque<Long> samples =
+//                new LinkedBlockingDeque<Long>();
+        private final Queue<Long> samples =
+                new ConcurrentLinkedQueue<Long>();
+        private final AtomicInteger roughSize = new AtomicInteger();
 	private int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;       
 	
         /** 
@@ -596,10 +603,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 return;
             }
             
-            synchronized (this) {
+//            synchronized (this) {
                 if (capacity > 0) {
                     if (samples.size() == capacity) {
-                        samples.removeFirst(); // remove oldest
+                        samples.remove(); // remove oldest
+                    } else {
+                        roughSize.incrementAndGet();
                     }
                     samples.add(value);
                 }
@@ -610,9 +619,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 if (value < minSampleValue) {
                     minSampleValue = value;
                 }
+            synchronized (this) {
                 avgSampleValue.update(value);
             }
-
         }
         
         /** {@inheritDoc} */
@@ -621,13 +630,15 @@ class ProfileConsumerImpl implements ProfileConsumer {
          }
          
          /** {@inheritDoc} */
-         public synchronized int getNumSamples() {
-             return samples.size();
+         public int getNumSamples() {
+//             return samples.size();
+             return roughSize.intValue();
          }
          
          /** {@inheritDoc} */
          public synchronized void clearSamples() {
              samples.clear();
+             roughSize.set(0);
              avgSampleValue.clear();
              maxSampleValue = Long.MIN_VALUE;
              minSampleValue = Long.MAX_VALUE;

@@ -69,6 +69,7 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.LogManager;
+import javax.management.JMException;
 
 /**
  * This is the core class for the server. It is the first class that is
@@ -250,6 +251,16 @@ class Kernel {
             // system registry, as some listeners use those components.
             loadProfileListeners(profileCollector);
 
+            // create the configuration MBean and register it
+            ConfigManager config =
+                new ConfigManager(appProperties, transactionCoordinator);
+            try {
+                profileCollector.registerMBean(config, 
+                                           ConfigManager.CONFIG_MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            
             if (logger.isLoggable(Level.INFO)) {
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
                         Version.getVersion());

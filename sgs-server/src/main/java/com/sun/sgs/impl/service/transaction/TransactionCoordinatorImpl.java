@@ -163,4 +163,9 @@ public final class TransactionCoordinatorImpl
                                              collectorHandle);
 	}
     }
+    
+    /** {@inheritDoc} **/
+    public long getTransactionTimeout() {
+        return boundedTimeout;
+    }
 }

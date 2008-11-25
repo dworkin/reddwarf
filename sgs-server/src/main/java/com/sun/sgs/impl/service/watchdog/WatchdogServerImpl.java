@@ -27,7 +27,9 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.management.NodeInfo;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,6 +48,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * The {@link WatchdogServer} implementation. <p>
@@ -292,8 +295,22 @@ public final class WatchdogServerImpl
 	}
  
         // register our local id
-        long[] values = registerNode(host, port, client);
+        int JMXPort = wrappedProps.getIntProperty(
+                    "com.sun.management.jmxremote.port", -1);
+        long[] values = registerNode(host, port, client, JMXPort);
         localNodeId = values[0];
+        
+        // Create the node manager MBean and register it
+        ProfileCollector collector = 
+            systemRegistry.getComponent(ProfileCollector.class);
+        NodeManager nodeMgr = new NodeManager(this);
+
+        // and register our MBean
+        try {
+            collector.registerMBean(nodeMgr,NodeManager.NODES_MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
         
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	this.port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
@@ -387,7 +404,8 @@ public final class WatchdogServerImpl
      */
     public long[] registerNode(final String host, 
                                final int port, 
-                               WatchdogClient client)
+                               WatchdogClient client,
+                               int JMXPort)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
@@ -888,5 +906,33 @@ public final class WatchdogServerImpl
 		    notifyNode.getId());
 	    }
 	}
+    }
+    
+    // Management support
+    NodeInfo[] getAllNodeInfo() {
+        final Set<NodeInfo> nodes = new HashSet<NodeInfo> ();
+        try {
+            transactionScheduler.runTask(
+                new AbstractKernelRunnable("GetNodeInfo") {
+                    public void run() {
+                        Iterator<Node> iter = NodeImpl.getNodes(dataService);
+                        while (iter.hasNext()) {
+                            NodeImpl node = (NodeImpl) iter.next();
+                            NodeInfo info = new NodeInfo(
+                                    node.getHostName(),
+                                    node.getPort(),
+                                    node.getId(),
+                                    node.isAlive(),
+                                    node.getBackupId(),
+                                    -1 //JANE must figure out jmx port
+                                    );
+                            nodes.add(info);
+                        }
+		}
+            },  taskOwner);
+        } catch (Exception e) {
+            //??  How do we deal with exceptions and mbeans?
+        }
+        return nodes.toArray(new NodeInfo[0]);
     }
 }

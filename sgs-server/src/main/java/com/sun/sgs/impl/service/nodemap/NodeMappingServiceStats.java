@@ -31,7 +31,7 @@ import com.sun.sgs.profile.ProfileOperation;
  * The Statistics MBean object for the node mapping service.
  * 
  */
-public class NodeMappingServiceStats implements NodeMappingServiceMXBean {
+class NodeMappingServiceStats implements NodeMappingServiceMXBean {
 
     final AggregateProfileOperation addNodeMappingListenerOp;
     final ProfileOperation assignNodeOp;

@@ -50,6 +50,7 @@ public interface WatchdogServer extends Remote {
      * @param	host  a host name
      * @param   port  a port number
      * @param	client a watchdog client
+     * @param   JMXPort the port JMX is listening on
      *
      * @return 	an array containing two {@code long} values consisting of
      *		a unique node ID and a renew interval (in milliseconds)
@@ -59,7 +60,8 @@ public interface WatchdogServer extends Remote {
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long[] registerNode(String host, int port, WatchdogClient client)
+    long[] registerNode(String host, int port, WatchdogClient client, 
+                        int JMXPort)
 	throws NodeRegistrationFailedException, IOException;
 
     /**

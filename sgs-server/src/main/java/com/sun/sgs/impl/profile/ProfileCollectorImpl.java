@@ -392,9 +392,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         profileReports.get().push(new ProfileReportImpl(task, owner,
                                                         scheduledStartTime,
                                                         readyCount));
-        taskStats.numTasks.incrementCount();
-        taskStats.readyCount.addSample(readyCount);
-        taskStats.numReadyTasks.incrementCount(readyCount);
+//        taskStats.numTasks.incrementCount();
+//        taskStats.readyCount.addSample(readyCount);
+//        taskStats.numReadyTasks.incrementCount(readyCount);
     }
 
     /**
@@ -499,12 +499,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         // collect the final details about the report
-        boolean successful = t == null;
-        long runtime = stopTime - profileReport.actualStartTime;
-        long lagtime = profileReport.actualStartTime -
-                           profileReport.scheduledStartTime;
+        long runtime = stopTime - profileReport.actualStartTime;    
         profileReport.runningTime = runtime;
         profileReport.tryCount = tryCount;
+        boolean successful = t == null;
         profileReport.succeeded = successful;
         profileReport.throwable = t;
         
@@ -521,13 +519,23 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         queue.offer(profileReport);
         
         // Update the task aggregate data 
-        if (!successful) {
+        // JANE probably want to encapsulate this neatly
+        taskStats.numTasks.incrementCount();
+        taskStats.readyCount.addSample(profileReport.readyCount);
+        taskStats.numReadyTasks.incrementCount(profileReport.readyCount);
+        if (successful) {
+            taskStats.runtime.addSample(runtime);
+            long lagtime = profileReport.actualStartTime -
+                           profileReport.scheduledStartTime;
+            taskStats.lagTime.addSample(lagtime);
+        } else {
             taskStats.numFailedTasks.incrementCount();
         }
-        taskStats.runtime.addSample(runtime);
-//        taskStats.failureRate.addSample(
-//            taskStats.getFailedTaskCount() / taskStats.getTaskCount());
-        taskStats.lagTime.addSample(lagtime);
+//        taskStats.runtime.addSample(runtime);
+////        taskStats.failureRate.addSample(
+//////            taskStats.getFailedTaskCount() / taskStats.getTaskCount());
+////            (taskStats.getFailedTaskCount() * 100) / taskStats.getTaskCount());
+//        taskStats.lagTime.addSample(lagtime);
     }
 
     /**

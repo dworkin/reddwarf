@@ -36,7 +36,7 @@ import com.sun.sgs.profile.ProfileSample;
  * 
  */
 
-public class DataStoreStats implements DataStoreStatsMXBean {  
+class DataStoreStats implements DataStoreStatsMXBean {  
 
     /* -- Profile operations for the DataStore API -- */
 
@@ -216,32 +216,32 @@ public class DataStoreStats implements DataStoreStatsMXBean {
 
     /** {@inheritDoc} */
     public long getRemoveBindingCount() {
-        return ((AggregateProfileCounter) removeBindingOp).getCount();
+        return ((AggregateProfileOperation) removeBindingOp).getCount();
     }
 
     /** {@inheritDoc} */
     public long getNextBoundNameCount() {
-        return ((AggregateProfileCounter) nextBoundNameOp).getCount();
+        return ((AggregateProfileOperation) nextBoundNameOp).getCount();
     }
 
     /** {@inheritDoc} */
     public long getRemoveObjectCount() {
-        return ((AggregateProfileCounter) removeObjectOp).getCount();
+        return ((AggregateProfileOperation) removeObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
     public long getSetBindingCount() {
-        return ((AggregateProfileCounter) setBindingOp).getCount();
+        return ((AggregateProfileOperation) setBindingOp).getCount();
     }
 
     /** {@inheritDoc} */
     public long getSetObjectCount() {
-        return ((AggregateProfileCounter) setObjectOp).getCount();
+        return ((AggregateProfileOperation) setObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
     public long getSetObjectsCount() {
-        return ((AggregateProfileCounter) setObjectsOp).getCount();
+        return ((AggregateProfileOperation) setObjectsOp).getCount();
     }
 
 }

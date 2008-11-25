@@ -31,7 +31,7 @@ import com.sun.sgs.profile.ProfileOperation;
  *
  * The Statistics MBean object for the task service.
  */
-public class TaskServiceStats implements TaskServiceMXBean {
+class TaskServiceStats implements TaskServiceMXBean {
 
     // the profiled operations
     final ProfileOperation scheduleNDTaskOp;
