@@ -321,12 +321,11 @@
 	<!--   <property name="format" value="\s+$"/> -->
 	<!--   <property name="message" value="Line has trailing spaces."/> -->
 	<!-- </module> -->
-        <module name="TodoComment">
-	    <!-- DARKSTAR: Don't consider TODO: comments to be warnings.
-		 It's useful to see these in the checkstyle output, but
-		 they should be considered informational only -->
-	    <property name="severity" value="info"/>	  
-	</module>
+	<!-- DARKSTAR: Don't flag TODO: comments.  Our Hudson build
+	     infrastructure can't distinguish particular levels of
+	     Checkstyle notifications as not errors, so just disable
+	     these, which should not be considered errors. -->
+        <!-- <module name="TodoComment"/> -->
         <module name="UpperEll"/>
 
     </module>
