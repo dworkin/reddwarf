@@ -67,7 +67,7 @@ public class NodeInfo implements Serializable {
     public long getBackup() {
         return backup;
     }
-    public int getJmxPort() {
+    public int getJMXPort() {
         return jmxPort;
     }
     @Override

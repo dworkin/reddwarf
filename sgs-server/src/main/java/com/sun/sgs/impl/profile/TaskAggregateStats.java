@@ -32,8 +32,8 @@ import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
 
 /**
- *
- * 
+ * The central location to aggregate information on tasks run through the
+ * system.
  */
 public class TaskAggregateStats extends NotificationBroadcasterSupport
         implements TaskAggregateMXBean
@@ -189,7 +189,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
 
     /** {@inheritDoc} */
     public double getQueueSize() {
-        return numReadyTasks.getCount() / numTasks.getCount();
+        return numReadyTasks.getCount() / (double) numTasks.getCount();
     }
 
     /** {@inheritDoc} */

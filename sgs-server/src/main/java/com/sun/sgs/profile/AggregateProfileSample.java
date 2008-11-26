@@ -95,6 +95,7 @@ public interface AggregateProfileSample extends ProfileSample {
      * A limit of {code 0} indicates that no samples should be held,
      * but the statistics should be gathered.
      * 
+     * @param capacity the maximum number of samples this object can hold
      * @throws IllegalArgumentException if the capacity is negative
      */
     void setCapacity(int capacity);

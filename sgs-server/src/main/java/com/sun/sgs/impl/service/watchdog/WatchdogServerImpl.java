@@ -295,9 +295,9 @@ public final class WatchdogServerImpl
 	}
  
         // register our local id
-        int JMXPort = wrappedProps.getIntProperty(
+        int jmxPort = wrappedProps.getIntProperty(
                     "com.sun.management.jmxremote.port", -1);
-        long[] values = registerNode(host, port, client, JMXPort);
+        long[] values = registerNode(host, port, client, jmxPort);
         localNodeId = values[0];
         
         // Create the node manager MBean and register it
@@ -405,7 +405,7 @@ public final class WatchdogServerImpl
     public long[] registerNode(final String host, 
                                final int port, 
                                WatchdogClient client,
-                               int JMXPort)
+                               int jmxPort)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
@@ -910,7 +910,7 @@ public final class WatchdogServerImpl
     
     // Management support
     NodeInfo[] getAllNodeInfo() {
-        final Set<NodeInfo> nodes = new HashSet<NodeInfo> ();
+        final Set<NodeInfo> nodes = new HashSet<NodeInfo>();
         try {
             transactionScheduler.runTask(
                 new AbstractKernelRunnable("GetNodeInfo") {
@@ -931,8 +931,10 @@ public final class WatchdogServerImpl
 		}
             },  taskOwner);
         } catch (Exception e) {
-            //??  How do we deal with exceptions and mbeans?
+            logger.logThrow(Level.INFO, e,
+                    "Could not retrieve node information");
+            return new NodeInfo[0];
         }
-        return nodes.toArray(new NodeInfo[0]);
+        return nodes.toArray(new NodeInfo[nodes.size()]);
     }
 }

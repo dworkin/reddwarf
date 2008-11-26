@@ -667,8 +667,8 @@ class ProfileConsumerImpl implements ProfileConsumer {
         /** {@inheritDoc} */
         public void setCapacity(int capacity) {
             if (capacity < 0) {
-                throw new
-                    IllegalArgumentException("capacity must not be negative");
+                throw new IllegalArgumentException(
+                                        "capacity must not be negative");
             }
             this.capacity = capacity; 
         }

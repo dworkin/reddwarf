@@ -70,7 +70,7 @@ import javax.management.ObjectName;
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
 
-    // the standard prefix for consumer names created by core packages
+    /** The standard prefix for consumer names created by core packages. */
     public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
     
     // the logger for this class
@@ -151,7 +151,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                 CORE_CONSUMER_PREFIX + "TaskAggregateStats");
         try {
             registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
-            registerMBean(taskStats, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME + "stats");
+            registerMBean(taskStats, 
+                    TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME + "Stats");
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
@@ -534,7 +535,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 //        taskStats.runtime.addSample(runtime);
 ////        taskStats.failureRate.addSample(
 //////            taskStats.getFailedTaskCount() / taskStats.getTaskCount());
-////            (taskStats.getFailedTaskCount() * 100) / taskStats.getTaskCount());
+////        (taskStats.getFailedTaskCount() * 100) / taskStats.getTaskCount());
 //        taskStats.lagTime.addSample(lagtime);
     }
 

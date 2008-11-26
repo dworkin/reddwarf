@@ -347,10 +347,10 @@ public final class WatchdogServiceImpl
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                int JMXPort = wrappedProps.getIntProperty(
+                int jmxPort = wrappedProps.getIntProperty(
                     "com.sun.management.jmxremote.port", -1);
                 long[] values = serverProxy.registerNode(clientHost, appPort, 
-                                                         clientProxy, JMXPort);
+                                                         clientProxy, jmxPort);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
                     throw new IllegalArgumentException(
