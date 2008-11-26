@@ -5,9 +5,9 @@
   
   <dependencySets>
 
-    <!-- Include the sgs-boot bootstrapper -->
     <dependencySet>
-      <outputDirectory></outputDirectory>
+      <outputDirectory>bin</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
 
   </dependencySets>

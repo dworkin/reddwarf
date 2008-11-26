@@ -8,35 +8,39 @@
 
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sun.sgs.tests</groupId>
-  <artifactId>boot-acceptance</artifactId>
-  <name>SGS Boot Acceptance Tests</name>
+  <artifactId>boot-acceptance-dist</artifactId>
+  <name>SGS Boot Acceptance Tests Distribution</name>
+  <packaging>pom</packaging>
   <description />
   
   <build>
     <plugins>
 
-      <!-- Make executable -->
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
+        <artifactId>maven-assembly-plugin</artifactId>
         <configuration>
-          <archive>
-            <manifest>
-	      <mainClass>com.sun.sgs.tests.boot.BootAcceptance</mainClass>
-	      <addClasspath>true</addClasspath>
-            </manifest>
-          </archive>
+          <descriptors>
+            <descriptor>src/main/assembly/dist.xml</descriptor>
+          </descriptors>
         </configuration>
+	<executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>attached</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
-      
+
     </plugins>
   </build>
 
   <dependencies>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.5</version>
+      <groupId>com.sun.sgs.tests</groupId>
+      <artifactId>boot-acceptance</artifactId>
+      <version>${version}</version>
     </dependency>
   </dependencies>
 </project>
