@@ -1,0 +1,15 @@
+<assembly>
+  <formats>
+    <format>zip</format>
+  </formats>
+  
+  <dependencySets>
+
+    <!-- Include the sgs-boot bootstrapper -->
+    <dependencySet>
+      <outputDirectory></outputDirectory>
+    </dependencySet>
+
+  </dependencySets>
+
+</assembly>
