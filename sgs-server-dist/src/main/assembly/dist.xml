@@ -45,7 +45,7 @@
 	<include>com.projectdarkstar.server:sgs-tutorial-server-dist:zip</include>
       </includes>
       <unpack>true</unpack>
-      <outputDirectory>.</outputDirectory>
+      <outputDirectory></outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
     
@@ -79,7 +79,7 @@
         <exclude>NOTICE.txt</exclude>
         <exclude>license/NOTICE-gpl</exclude>
       </excludes>
-      <outputDirectory>.</outputDirectory>
+      <outputDirectory></outputDirectory>
     </fileSet>
 
     <!-- Filter the README and NOTICE files to replace parameters -->
@@ -91,7 +91,7 @@
         <include>license/NOTICE-gpl</include>
       </includes>
       <filtered>true</filtered>
-      <outputDirectory>.</outputDirectory>
+      <outputDirectory></outputDirectory>
     </fileSet>
 
     <!-- Include all of the Berkeley DB binaries except for the Windows
