@@ -37,9 +37,104 @@ public interface DataServiceMXBean {
     
     /**
      * Returns the number of times 
-     * {@link DataService#createReference(Object) createReference} 
+     * {@link DataService#createReference createReference} 
      * has been called.
      * @return the number of times {@code createReference} has been called
      */
-    long getCreateReferenceCount();
+    long getCreateReferenceCalls();
+    /**
+     * Returns the number of times 
+     * {@link DataService#getBinding getBinding} 
+     * has been called.
+     * @return the number of times {@code getBinding} has been called
+     */
+    long getGetBindingCalls();
+        
+    /**
+     * Returns the number of times 
+     * {@link DataService#markForUpdate markForUpdate} 
+     * has been called.
+     * @return the number of times {@code markForUpdate} has been called
+     */
+    long getMarkForUpdateCalls();
+            
+    /**
+     * Returns the number of times 
+     * {@link DataService#nextBoundName nextBoundName} 
+     * has been called.
+     * @return the number of times {@code nextBoundName} has been called
+     */
+    long getNextBoundNameCalls();
+    
+    /**
+     * Returns the number of times 
+     * {@link DataService#removeBinding removeBinding} 
+     * has been called.
+     * @return the number of times {@code removeBinding} has been called
+     */
+    long getRemoveBindingCalls();
+        
+    /**
+     * Returns the number of times 
+     * {@link DataService#removeObject removeObject} 
+     * has been called.
+     * @return the number of times {@code removeObject} has been called
+     */
+    long getRemoveObjectCalls();
+       
+    /**
+     * Returns the number of times 
+     * {@link DataService#setBinding setBinding} 
+     * has been called.
+     * @return the number of times {@code setBinding} has been called
+     */
+    long getSetBindingCalls();
+  
+    /**
+     * Returns the number of times 
+     * {@link DataService#createReferenceForId createReferenceForId} 
+     * has been called.
+     * @return the number of times {@code createReferenceForId} has been called
+     */
+    long getCreateReferenceForIdCalls();
+        
+    /**
+     * Returns the number of times 
+     * {@link DataService#getServiceBinding getServiceBinding} 
+     * has been called.
+     * @return the number of times {@code getServiceBinding} has been called
+     */
+    long getGetServiceBindingCalls();
+            
+    /**
+     * Returns the number of times 
+     * {@link DataService#nextObjectId nextObjectId} 
+     * has been called.
+     * @return the number of times {@code nextObjectId} has been called
+     */
+    long getNextObjectIdCalls();
+                
+    /**
+     * Returns the number of times 
+     * {@link DataService#nextServiceBoundName nextServiceBoundName} 
+     * has been called.
+     * @return the number of times {@code nextServiceBoundName} has been called
+     */
+    long getNextServiceBoundNameCalls();
+                    
+    /**
+     * Returns the number of times 
+     * {@link DataService#removeServiceBinding removeServiceBinding} 
+     * has been called.
+     * @return the number of times {@code removeServiceBinding} has been called
+     */
+    long getRemoveServiceBindingCalls();
+                        
+    /**
+     * Returns the number of times 
+     * {@link DataService#setServiceBinding setServiceBinding} 
+     * has been called.
+     * @return the number of times {@code setServiceBinding} has been called
+     */
+    long getSetServiceBindingCalls();
 }

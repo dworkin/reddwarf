@@ -61,9 +61,12 @@ class NodeImpl
     /** The host name, or {@code null}. */
     private final String host;
     
-    /** The port, or {@code null}. */
+    /** The port, or {@code -1}. */
     private final int port;
 
+    /** The port JMX can listen on, or {@code -1}. */
+    private final int jmxPort;
+    
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
     
@@ -92,10 +95,14 @@ class NodeImpl
      * @param 	nodeId a node ID
      * @param 	hostName a host name
      * @param   port     a port
+     * @param   jmxPort  the port JMX is listening on for the node, 
+     *                   or {@code -1}
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, int port, WatchdogClient client) {
-        this (nodeId, hostName, port, client, true, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int port, int jmxPort, 
+             WatchdogClient client) 
+    {
+        this (nodeId, hostName, port, jmxPort, client, true, INVALID_ID);
     }
 
     /**
@@ -110,7 +117,7 @@ class NodeImpl
      * @param	isAlive if {@code true}, this node is considered alive
      */
     NodeImpl(long nodeId, String hostName, int port, boolean isAlive) {
-	this(nodeId, hostName, port, null, isAlive, INVALID_ID);
+	this(nodeId, hostName, port, -1, null, isAlive, INVALID_ID);
     }
 	
     /**
@@ -129,7 +136,7 @@ class NodeImpl
     NodeImpl(long nodeId, String hostName, int port, 
              boolean isAlive, long backupId) 
     {
-        this(nodeId, hostName, port, null, isAlive, backupId);
+        this(nodeId, hostName, port, -1, null, isAlive, backupId);
     }
     
     /**
@@ -139,13 +146,14 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
+     * @param   port     a port, or {@code -1}
+     * @param   jmxPort  the port JMX is listening on, or {@code -1}
      * @param	client   a watchdog client
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    private NodeImpl(long nodeId, String hostName, int port, 
+    private NodeImpl(long nodeId, String hostName, int port, int jmxPort,
                      WatchdogClient client, boolean isAlive, long backupId) 
     {
         this.id = nodeId;
@@ -155,6 +163,7 @@ class NodeImpl
         this.client = client;
         this.isAlive = isAlive;
         this.backupId = backupId;
+        this.jmxPort = jmxPort;
     }
 
     /* -- Implement Node -- */
@@ -356,6 +365,16 @@ class NodeImpl
 	return nodeImpl;
     }
 
+     /**
+      * Returns the port used for remote JMX monitoring, or {@code -1}
+      * if only local monitoring is allowed.
+      * 
+      * @return the port used for remote JMX monitoring of this node
+      */
+    int getJMXPort() {
+        return jmxPort;
+    }
+     
     /**
      * Removes the node with the specified {@code nodeId} and its
      * binding from the specified {@code dataService}.  If the binding

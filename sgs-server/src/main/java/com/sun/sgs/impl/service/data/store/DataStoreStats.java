@@ -155,42 +155,42 @@ class DataStoreStats implements DataStoreStatsMXBean {
     // Use Atomic...
     
     /** {@inheritDoc} */
-    public long getGetBindingCount() {
+    public long getGetBindingCalls() {
         return ((AggregateProfileOperation) getBindingOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getClassIdCount() {
+    public long getClassIdCalls() {
         return ((AggregateProfileOperation) getClassIdOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getClassInfoCount() {
+    public long getClassInfoCalls() {
         return ((AggregateProfileOperation) getClassInfoOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getCreateObjectCount() {
+    public long getCreateObjectCalls() {
         return ((AggregateProfileOperation) createObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getMarkForUpdateCount() {
+    public long getMarkForUpdateCalls() {
         return ((AggregateProfileOperation) markForUpdateOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getNextObjectIdCount() {
+    public long getNextObjectIdCalls() {
         return ((AggregateProfileOperation) nextObjectIdOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getObjectCount() {
+    public long getObjectCalls() {
         return ((AggregateProfileOperation) getObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getObjectForUpdateCount() {
+    public long getObjectForUpdateCalls() {
         return ((AggregateProfileOperation) getObjectForUpdateOp).getCount();
     }
 
@@ -215,32 +215,32 @@ class DataStoreStats implements DataStoreStatsMXBean {
     }
 
     /** {@inheritDoc} */
-    public long getRemoveBindingCount() {
+    public long getRemoveBindingCalls() {
         return ((AggregateProfileOperation) removeBindingOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getNextBoundNameCount() {
+    public long getNextBoundNameCalls() {
         return ((AggregateProfileOperation) nextBoundNameOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getRemoveObjectCount() {
+    public long getRemoveObjectCalls() {
         return ((AggregateProfileOperation) removeObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getSetBindingCount() {
+    public long getSetBindingCalls() {
         return ((AggregateProfileOperation) setBindingOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getSetObjectCount() {
+    public long getSetObjectCalls() {
         return ((AggregateProfileOperation) setObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getSetObjectsCount() {
+    public long getSetObjectsCalls() {
         return ((AggregateProfileOperation) setObjectsOp).getCount();
     }
 

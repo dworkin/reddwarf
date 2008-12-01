@@ -20,10 +20,10 @@
 package com.sun.sgs.management;
 
 /**
- *  A management interface to find the nodes in the system
+ *  A management interface to find the nodes in the system.
  */
 public interface NodesMXBean {
-
+    /** The name for uniquely identifying this MBean. */
     String NODES_MXBEAN_NAME = "com.sun.sgs:type=Nodes";
     
     /** 

@@ -23,6 +23,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
@@ -49,6 +50,7 @@ import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -85,6 +87,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Manages client sessions. <p>
@@ -280,6 +283,9 @@ public final class ClientSessionServiceImpl
      */
     final boolean allowNewLogin;
 
+    /** Our JMX exposed statistics. */
+    final ClientSessionServiceStats serviceStats;
+
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -289,7 +295,7 @@ public final class ClientSessionServiceImpl
      * @throws Exception if a problem occurs when creating the service
      */
     public ClientSessionServiceImpl(Properties properties,
-				    ComponentRegistry systemRegistry,
+                                    ComponentRegistry systemRegistry,
 				    TransactionProxy txnProxy)
 	throws Exception
     {
@@ -429,6 +435,17 @@ public final class ClientSessionServiceImpl
 		    taskOwner, System.currentTimeMillis(),
 		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
 	    monitorDisconnectingSessionsTaskHandle.start();
+            
+            /* Create our service profiling info and register our MBean */
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new ClientSessionServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats,
+                    ClientSessionServiceStats.SESSION_SERVICE_MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -587,6 +604,7 @@ public final class ClientSessionServiceImpl
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
+        serviceStats.registerSessionDisconnectListenerOp.report();
         sessionDisconnectListeners.add(listener);
     }
     
@@ -594,6 +612,7 @@ public final class ClientSessionServiceImpl
     public void sendProtocolMessageNonTransactional(
 	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
     {
+        serviceStats.sendProtocolMessageNonTransactionalOp.report();
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
 	 * If a local handler exists, forward message to local handler

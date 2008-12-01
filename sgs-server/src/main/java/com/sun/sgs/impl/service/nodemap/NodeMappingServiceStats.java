@@ -61,27 +61,27 @@ class NodeMappingServiceStats implements NodeMappingServiceMXBean {
     }
     
     /** {@inheritDoc} */
-    public long getAddNodeMappingListenerCount() {
+    public long getAddNodeMappingListenerCalls() {
         return addNodeMappingListenerOp.getCount();
     }
 
     /** {@inheritDoc} */
-    public long getAssignNodeCount() {
+    public long getAssignNodeCalls() {
         return ((AggregateProfileOperation) assignNodeOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getGetIdentitiesCount() {
+    public long getGetIdentitiesCalls() {
         return ((AggregateProfileOperation) getIdentitiesOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getGetNodeCount() {
+    public long getGetNodeCalls() {
         return ((AggregateProfileOperation) getNodeOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getSetStatusCount() {
+    public long getSetStatusCalls() {
         return ((AggregateProfileOperation) setStatusOp).getCount();
     }
 

@@ -31,7 +31,6 @@ import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
@@ -310,13 +309,10 @@ public class TaskServiceImpl
             throw new IllegalStateException("Handoff Period property must " +
                                             "be non-negative");
 
-        // create our profiling info
+        // create our profiling info and register our MBean
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
-        serviceStats = new TaskServiceStats(collector, 
-                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "TaskService");
-
-        // and register our MBean
+        serviceStats = new TaskServiceStats(collector);
         try {
             collector.registerMBean(serviceStats,
                 TaskServiceStats.TASK_SERVICE_MXBEAN_NAME);

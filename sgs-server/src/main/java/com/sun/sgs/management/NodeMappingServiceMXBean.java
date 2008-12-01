@@ -40,41 +40,42 @@ public interface NodeMappingServiceMXBean {
     
     /**
      * Returns the number of times 
-     * {@link NodeMappingService#addNodeMappingListener(NodeMappingListener) 
-     * addNodeMappingListener} has been called.
+     * {@link NodeMappingService#addNodeMappingListener addNodeMappingListener}
+     * has been called.
+     * 
      * @return the number of times {@code addNodeMappingListener} 
      *         has been called
      */
-    long getAddNodeMappingListenerCount();
+    long getAddNodeMappingListenerCalls();
     
     /**
      * Returns the number of times 
-     * {@link NodeMappingService#assignNode(Class, Identity) assignNode} 
-     * has been called.
+     * {@link NodeMappingService#assignNode assignNode} has been called.
+     * 
      * @return the number of times {@code assignNode} has been called
      */
-    long getAssignNodeCount();
+    long getAssignNodeCalls();
     
     /**
      * Returns the number of times 
-     * {@link NodeMappingService#getIdentities(long) getIdentities} 
-     * has been called.
+     * {@link NodeMappingService#getIdentities getIdentities} has been called.
+     * 
      * @return the number of times {@code getIdentities} has been called
      */
-    long getGetIdentitiesCount();
+    long getGetIdentitiesCalls();
     
     /**
      * Returns the number of times 
-     * {@link NodeMappingService#getNode(Identity) getNode} has been called.
+     * {@link NodeMappingService#getNode getNode} has been called.
      * @return the number of times {@code getNode} has been called
      */
-    long getGetNodeCount();
+    long getGetNodeCalls();
     
     /**
      * Returns the number of times 
-     * {@link NodeMappingService#setStatus(Class, Identity, boolean) 
-     * setStatus} has been called.
+     * {@link NodeMappingService#setStatus setStatus} has been called.
+     * 
      * @return the number of times {@code setStatus} has been called
      */
-    long getSetStatusCount();
+    long getSetStatusCalls();
 }

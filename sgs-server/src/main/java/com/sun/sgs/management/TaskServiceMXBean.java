@@ -43,7 +43,7 @@ public interface TaskServiceMXBean {
      * @return the number of times {@code scheduleNonDurableTask} 
      *         has been called
      */
-    long getScheduleNonDurableTaskCount();
+    long getScheduleNonDurableTaskCalls();
     
     /**
      * Returns the number of times 
@@ -52,14 +52,14 @@ public interface TaskServiceMXBean {
      * @return the number of times {@code scheduleNonDurableTask} 
      *         has been called with a delay
      */
-    long getScheduleNonDurableTaskDelayedCount();
+    long getScheduleNonDurableTaskDelayedCalls();
     
     /**
      * Returns the number of times 
      * {@link TaskService#scheduleTask(Task) scheduleTask} has been called.
      * @return the number of times {@code scheduleTask} has been called
      */
-    long getScheduleTaskCount();
+    long getScheduleTaskCalls();
     
     /**
      * Returns the number of times 
@@ -68,7 +68,7 @@ public interface TaskServiceMXBean {
      * @return the number of times {@code scheduleTask} has been called
      *         with a delay.
      */
-    long getScheuldeDelayedTaskCount();
+    long getScheduleDelayedTaskCalls();
     
     /**
      * Returns the number of times
@@ -76,5 +76,5 @@ public interface TaskServiceMXBean {
      * schedulePeriodicTask} has been called.
      * @return the number of times {@code schedulPeriodicTask} has been called
      */
-    long getSchedulePeriodicTaskCount();
+    long getSchedulePeriodicTaskCalls();
 }

@@ -20,13 +20,13 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
-import com.sun.sgs.management.ConfigManagerMXBean;
+import com.sun.sgs.management.ConfigMXBean;
 import java.util.Properties;
 
 /**
  * The configuration manager for this node.
  */
-class ConfigManager implements ConfigManagerMXBean {
+class ConfigManager implements ConfigMXBean {
 
     private final String nodeType;
     
@@ -61,8 +61,8 @@ class ConfigManager implements ConfigManagerMXBean {
         appPort = (port == null) ? -1 : Integer.parseInt(port);
         appListener = props.getProperty(StandardProperties.APP_LISTENER);
         serverHost = props.getProperty(StandardProperties.SERVER_HOST, "none");
-        jmxPort = Integer.valueOf(
-            props.getProperty("com.sun.management.jmxremote.port", "-1"));
+        String jmx = props.getProperty("com.sun.management.jmxremote.port");
+        jmxPort = (jmx == null) ? -1 : Integer.parseInt(jmx);
         txnTimeout = coord.getTransactionTimeout();
     }
 

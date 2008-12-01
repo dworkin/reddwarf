@@ -28,6 +28,7 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.management.NodeInfo;
+import com.sun.sgs.management.NodesMXBean;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
@@ -304,10 +305,8 @@ public final class WatchdogServerImpl
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
         NodeManager nodeMgr = new NodeManager(this);
-
-        // and register our MBean
         try {
-            collector.registerMBean(nodeMgr,NodeManager.NODES_MXBEAN_NAME);
+            collector.registerMBean(nodeMgr, NodeManager.NODES_MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
@@ -435,7 +434,8 @@ public final class WatchdogServerImpl
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, host, port, client);
+	    final NodeImpl node = 
+                    new NodeImpl(nodeId, host, port, jmxPort, client);
 	    assert !aliveNodes.containsKey(nodeId);
 	          
             synchronized (aliveNodeHostPortMap) {
@@ -924,7 +924,7 @@ public final class WatchdogServerImpl
                                     node.getId(),
                                     node.isAlive(),
                                     node.getBackupId(),
-                                    -1 //JANE must figure out jmx port
+                                    node.getJMXPort()
                                     );
                             nodes.add(info);
                         }
@@ -936,5 +936,27 @@ public final class WatchdogServerImpl
             return new NodeInfo[0];
         }
         return nodes.toArray(new NodeInfo[nodes.size()]);
+    }
+    
+    /**
+     * Private class for JMX information.
+     */
+    static class NodeManager implements NodesMXBean {
+
+        /** The watchdog server we'll use to get the node info. */
+        private WatchdogServerImpl watchdog;
+
+        /**
+         * Create an instance of the manager.
+         * @param watchdog  the watchdog server
+         */
+        NodeManager(WatchdogServerImpl watchdog) {
+            this.watchdog = watchdog;
+        }
+
+        /** {@inheritDoc} */
+        public NodeInfo[] getNodes() {
+            return watchdog.getAllNodeInfo();
+        }
     }
 }

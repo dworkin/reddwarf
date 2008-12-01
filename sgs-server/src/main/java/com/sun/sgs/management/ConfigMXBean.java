@@ -30,48 +30,67 @@ package com.sun.sgs.management;
  * {@value #CONFIG_MXBEAN_NAME}.
  * 
  */
-public interface ConfigManagerMXBean {
+public interface ConfigMXBean {
+    /** The name for uniquely identifying this MBean. */
     String CONFIG_MXBEAN_NAME = "com.sun.sgs:type=Config";
 
     /**
-     * Get type of this Darkstar Node
+     * Return the type of this node, one of {@code singleNode}, 
+     * {@code coreServerNode}, or {@code appNode}.
+     * 
+     * @return the node type
+     * 
      */
     String getNodeType();
 
     /**
-     * Get application name
+     * Returns the application name.
+     * @return the application name
      */
     String getAppName();
 
     /**
-     * Get application root directory
+     * Returns the application root directory name.
+     * 
+     * @return the application root directory name
      */
     String getAppRoot();
 
     /**
-     * Get class name of appListener
+     * Returns the application listener class name.
+     * 
+     * @return the class name of the application listener
      */
     String getAppListener();
 
     /**
-     * Get TCP port for client connections
+     * Returns the TCP port for client connections.
+     * FIXME:  update for new protocol
+     * 
+     * @return the TCP port for application client connections
      */
     int getAppPort();
    
     /** 
-     * Get server host property, valid for application nodes
+     * Returns the server host property.
+     * 
+     * @return the server host property, which is valid for application nodes
+     *         only
      */
     String getServerHostName();
 
     /**
-     * Get JMX listening port. A value of {@code -1} means the
-     * node is enabled for local monitoring only.
+     * Returns the JMX remote listening port.
+     * 
+     * @return the port JMX is listening on for remote connections, or 
+     *         {@code -1} if no remote JMX connections are supported
      */
     int getJMXPort();
     
     /**
-     * Get transaction timeout, in milliseconds
+     * Returns the transaction timeout, in milliseconds.
+     * 
+     * @return the transaction timeout, in milliseconds
      */
     long getTxnTimeout();
-
 }

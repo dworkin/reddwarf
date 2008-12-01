@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.task;
 
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.management.TaskServiceMXBean;
 import com.sun.sgs.profile.AggregateProfileOperation;
 import com.sun.sgs.profile.ProfileCollector;
@@ -40,8 +41,10 @@ class TaskServiceStats implements TaskServiceMXBean {
     final ProfileOperation scheduleTaskDelayedOp;
     final ProfileOperation scheduleTaskPeriodicOp;
     
-    TaskServiceStats(ProfileCollector collector, String name) {
-        ProfileConsumer consumer = collector.getConsumer(name);
+    TaskServiceStats(ProfileCollector collector) {
+        ProfileConsumer consumer = 
+            collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
+                                  "TaskService");
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         
@@ -59,27 +62,27 @@ class TaskServiceStats implements TaskServiceMXBean {
     }
     
     /** {@inheritDoc} */
-    public long getScheduleNonDurableTaskCount() {
+    public long getScheduleNonDurableTaskCalls() {
         return ((AggregateProfileOperation) scheduleNDTaskOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getScheduleNonDurableTaskDelayedCount() {
+    public long getScheduleNonDurableTaskDelayedCalls() {
         return ((AggregateProfileOperation) scheduleNDTaskDelayedOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getSchedulePeriodicTaskCount() {
+    public long getSchedulePeriodicTaskCalls() {
         return ((AggregateProfileOperation) scheduleTaskOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getScheduleTaskCount() {
+    public long getScheduleTaskCalls() {
         return ((AggregateProfileOperation) scheduleTaskDelayedOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getScheuldeDelayedTaskCount() {
+    public long getScheduleDelayedTaskCalls() {
         return ((AggregateProfileOperation) scheduleTaskPeriodicOp).getCount();
     }
 

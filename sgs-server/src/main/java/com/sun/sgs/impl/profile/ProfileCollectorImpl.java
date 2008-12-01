@@ -28,6 +28,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.management.ProfileControllerMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -68,7 +69,9 @@ import javax.management.ObjectName;
  * kernel to collect and report profiling data. It uses a single thread to
  * consume and report profiling data.
  */
-public final class ProfileCollectorImpl implements ProfileCollector {
+public final class ProfileCollectorImpl 
+        implements ProfileCollector, ProfileControllerMXBean 
+{
 
     /** The standard prefix for consumer names created by core packages. */
     public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
@@ -153,6 +156,8 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
             registerMBean(taskStats, 
                     TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME + "Stats");
+            registerMBean(this,
+                    ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
@@ -337,6 +342,26 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     /** {@inheritDoc} */
     public Object getRegisteredMBean(String mBeanName) {
         return registeredMBeans.get(mBeanName);
+    }
+
+    /* -- Other JMX methods -- */
+    
+    /** {@inheritDoc} */
+    public String[] getProfileConsumers() {
+        Set<String> keys = getConsumers().keySet();
+        return keys.toArray(new String[keys.size()]);
+    }
+    
+    /** {@inheritDoc} */
+    public ProfileLevel getConsumerLevel(String consumer) {
+        ProfileConsumer cons = getConsumer(consumer);
+        return cons.getProfileLevel();
+    }
+
+    /** {@inheritDoc} */
+    public void setConsumerLevel(String consumer, ProfileLevel level) {
+        ProfileConsumer cons = getConsumer(consumer);
+        cons.setProfileLevel(level);
     }
 
     /* -- Methods to support ProfileCollectorHandle -- */

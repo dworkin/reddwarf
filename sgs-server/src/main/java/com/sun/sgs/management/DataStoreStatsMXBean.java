@@ -38,15 +38,13 @@ public interface DataStoreStatsMXBean
     String DATA_STORE_STATS_MXBEAN_NAME = 
             "com.sun.sgs.service:type=DataStoreStats";
 
-    // JANE names?
-
     /**
      * Returns the number of times 
      * {@link DataStoreImpl#createObject(Transaction) createObject} 
      * has been called.
      * @return the number of times {@code createObject} has been called
      */
-    long getCreateObjectCount();
+    long getCreateObjectCalls();
     
     /**
      * Returns the number of times
@@ -55,7 +53,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getBinding} has been called
      */
-    long getGetBindingCount();
+    long getGetBindingCalls();
         
     /**
      * Returns the number of times
@@ -64,7 +62,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getClassId} has been called
      */
-    long getClassIdCount();
+    long getClassIdCalls();
     
     /**
      * Returns the number of times
@@ -73,7 +71,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getClassInfo} has been called
      */
-    long getClassInfoCount();
+    long getClassInfoCalls();
     
     /**
      * Returns the number of times
@@ -82,7 +80,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getObject} has been called
      */
-    long getObjectCount();
+    long getObjectCalls();
     
     /**
      * Returns the number of times
@@ -91,7 +89,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getObject} has been called
      */
-    long getObjectForUpdateCount();
+    long getObjectForUpdateCalls();
     
     /**
      * Returns the number of times
@@ -100,7 +98,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code markForUpdate} has been called
      */
-    long getMarkForUpdateCount();
+    long getMarkForUpdateCalls();
 
     /**
      * Returns the number of times
@@ -109,7 +107,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code nextBoundName} has been called
      */
-    long getNextBoundNameCount();
+    long getNextBoundNameCalls();
 
     /**
      * Returns the number of times
@@ -118,7 +116,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code nextObjectId} has been called
      */
-    long getNextObjectIdCount();
+    long getNextObjectIdCalls();
     
     /**
      * Returns the number of times
@@ -127,7 +125,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code removeBinding} has been called
      */
-    long getRemoveBindingCount();
+    long getRemoveBindingCalls();
 
     /**
      * Returns the number of times
@@ -136,7 +134,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code removeObject} has been called
      */
-    long getRemoveObjectCount();
+    long getRemoveObjectCalls();
     
     /**
      * Returns the number of times
@@ -145,7 +143,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code setBinding} has been called
      */
-    long getSetBindingCount();
+    long getSetBindingCalls();
 
     /**
      * Returns the number of times
@@ -154,7 +152,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code setObject} has been called
      */
-    long getSetObjectCount();
+    long getSetObjectCalls();
     
     /**
      * Returns the number of times
@@ -163,9 +161,8 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code setObjects} has been called
      */
-    long getSetObjectsCount();
+    long getSetObjectsCalls();
 
-    
     /**
      * Returns the total number of bytes read from the data store.
      * @return the total number of bytes read from the data store
@@ -188,9 +185,6 @@ public interface DataStoreStatsMXBean
      * @return the total number of objects read written to data store
      */
     long getWrittenObjectsCount();
-    
-    // JANE samples?
-    
 
 //
 //    /**
