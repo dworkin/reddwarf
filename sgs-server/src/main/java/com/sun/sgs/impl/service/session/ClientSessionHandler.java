@@ -116,25 +116,26 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @param	sessionService the ClientSessionService instance
      * @param	dataService the DataService instance
-     * @param	sessionConnection the connection associated with this handler
+     * @param	connection the connection associated with this handler
+     * @param protocolDesc the protocol descriptor for the connection
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
 			 DataService dataService,
-			 SessionProtocolConnection messageChannel,
+			 SessionProtocolConnection connection,
                          ProtocolDescriptor protocolDesc)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
 	} else if (dataService == null) {
 	    throw new NullPointerException("null dataService");
-	} else if (messageChannel == null) {
+	} else if (connection == null) {
 	    throw new NullPointerException("null messageChannel");
 	} else if (protocolDesc == null) {
             throw new NullPointerException("null protocolDesc");
         }
 	this.sessionService = sessionService;
         this.dataService = dataService;
-	this.sessionConnection = messageChannel;
+	this.sessionConnection = connection;
         this.protocolDesc = protocolDesc;
 
 	if (logger.isLoggable(Level.FINEST)) {

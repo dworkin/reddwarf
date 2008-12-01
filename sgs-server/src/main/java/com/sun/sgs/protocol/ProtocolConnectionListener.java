@@ -25,8 +25,7 @@ package com.sun.sgs.protocol;
  * {@link ProtocolFactory#newProtocol ProtocolFactory.newProtocol} when
  * creating a protocol.
  * When a new connection is received by the protocol,
- * {@link #newConnection newConnection} is invoked with the new message channel
- * for that connection.
+ * {@link #newConnection newConnection} is invoked with the new connection.
  * 
  * @see ProtocolFactory
  */
@@ -35,12 +34,12 @@ public interface ProtocolConnectionListener {
     /**
      * Notify the handler that a new connection has been initiated. If an
      * exception is thrown the connection will be refused.
-     * @param channel for sending protocol messages
+     * @param connection for sending protocol messages
      * @param descriptor of the protocol on which the connection is made
      * @return handler to receive protocol messages
      * @throws Exception if the connection is to be refused
      */
-    ProtocolHandler newConnection(ProtocolConnection channel,
-                                 ProtocolDescriptor descriptor)
+    ProtocolHandler newConnection(ProtocolConnection connection,
+                                  ProtocolDescriptor descriptor)
         throws Exception;
 }

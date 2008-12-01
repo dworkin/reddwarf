@@ -611,18 +611,18 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     @Override
-    public ProtocolHandler newConnection(ProtocolConnection msgChannel,
-                                        ProtocolDescriptor descriptor)
+    public ProtocolHandler newConnection(ProtocolConnection connection,
+                                         ProtocolDescriptor descriptor)
         throws Exception
     {
-        assert msgChannel instanceof SessionProtocolConnection;
+        assert connection instanceof SessionProtocolConnection;
         
-        logger.log(Level.FINER, "new connection on {0}", msgChannel);
+        logger.log(Level.FINER, "new connection on {0}", connection);
 
         /* The handler will call addHandler if login succeeds */
         return new ClientSessionHandler(this,
                                         dataService,
-                                        (SessionProtocolConnection)msgChannel,
+                                        (SessionProtocolConnection)connection,
                                         descriptor);
     }
 

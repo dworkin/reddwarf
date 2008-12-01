@@ -151,7 +151,7 @@ public class SimpleSgsProtocolConnection implements SessionProtocolConnection {
         int stringSize = MessageBuffer.getSize(reason);
         MessageBuffer buf = new MessageBuffer(1 + stringSize);
         buf.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
-            putString("login refused");
+            putString(reason);
         writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
     }
