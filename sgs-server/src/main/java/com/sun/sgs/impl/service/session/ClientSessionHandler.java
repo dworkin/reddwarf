@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -42,7 +41,6 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.security.auth.login.LoginException;
 
 /**
  * Handles sending/receiving messages to/from a client session and
@@ -360,30 +358,17 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
     	
     /**
-     * Handles a login request for the specified {@code name} and
-     * {@code password}, scheduling the appropriate response to be
+     * Handles a login request for the specified {@code authenticatedIdentity},
+     * scheduling the appropriate response to be
      * sent to the client (either logout success, login failure, or
      * login redirect).
      */
-    private void handleLoginRequest(String name, String password) {
+    private void handleLoginRequest(Identity authenticatedIdentity) {
 
         logger.log(
             Level.FINEST, 
-            "handling login request for name:{0}", name);
-
-        /*
-         * Authenticate identity.
-         */
-        final Identity authenticatedIdentity;
-        try {
-            authenticatedIdentity = authenticate(name, password);
-        } catch (Exception e) {
-            logger.logThrow(
-                Level.FINEST, e,
-                "login authentication failed for name:{0}", name);
-            sendLoginFailureAndDisconnect(e);
-            return;
-        }
+            "handling login request for name:{0}",
+            authenticatedIdentity.getName());
 
         Node node;
         try {
@@ -399,13 +384,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
             node = getNodeTask.getNode();
             if (logger.isLoggable(Level.FINE)) {
                 logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
-                           name, node);
+                           authenticatedIdentity.getName(), node);
             }
 
         } catch (Exception e) {
             logger.logThrow(
                 Level.WARNING, e,
-                "getting node assignment for identity:{0} throws", name);
+                "getting node assignment for identity:{0} throws",
+                authenticatedIdentity.getName());
             sendLoginFailureAndDisconnect(e);
             return;
         }
@@ -437,7 +423,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
             } catch (Exception e) {
                 logger.logThrow(
                     Level.WARNING, e,
-                    "Storing ClientSession for identity:{0} throws", name);
+                    "Storing ClientSession for identity:{0} throws",
+                    authenticatedIdentity.getName());
                 sendLoginFailureAndDisconnect(e);
                 return;
             }
@@ -454,7 +441,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
                     Level.FINE,
                     "redirecting login for identity:{0} " +
                     "from nodeId:{1} to node:{2}",
-                    name, sessionService.getLocalNodeId(), node);
+                    authenticatedIdentity.getName(),
+                    sessionService.getLocalNodeId(), node);
             }
             ProtocolDescriptor[] descriptors = node.getClientListeners();
             for (ProtocolDescriptor descriptor : descriptors) {
@@ -595,17 +583,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    currentState = state;
 	}
 	return currentState;
-    }
-
-    /**
-     * Authenticates the specified username and password, throwing
-     * LoginException if authentication fails.
-     */
-    private Identity authenticate(String username, String password)
-	throws LoginException
-    {
-	return sessionService.identityManager.authenticateIdentity(
-	    new NamePasswordCredentials(username, password.toCharArray()));
     }
 
     /**
@@ -764,19 +741,18 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
 
-    /* -- Implement ProtocolMessageHandler -- */
+    /* -- Implement SessionProtocolHandler -- */
 
     /** {@inheritDoc} */
     @Override
-    public CompletionFuture loginRequest(final String name,
-                                         final String password)
+    public CompletionFuture loginRequest(final Identity authenticatedIdentity)
     {
         scheduleNonTransactionalTask(
           new AbstractKernelRunnable("HandleLoginRequest") {
                 public void run() {
-                    handleLoginRequest(name, password);
+                    handleLoginRequest(authenticatedIdentity);
                 } });
-        // Enable protocol message channel to read immediately
+        // Enable connection to read immediately
         return (new CompletionFutureImpl()).done();
     }
    

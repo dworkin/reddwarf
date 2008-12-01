@@ -26,7 +26,6 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -109,12 +108,12 @@ import java.util.logging.Logger;
  *	{@value #PROTOCOL_PROPERTIES_BASE}.n
  *	</b></code><br>
  *	<i>Default:</i> Required property(s). There needs to be a numbered
- * property speciied for each protocol class name specified in
+ * property specified for each protocol class name specified in
  * {@value #PROTOCOL_LIST_PROPERTY}.<br>
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies a colon ":" separated list of name value pairs which
- * are intrepreted as properites which are passed to the protocol factory.<p>
+ * are interpreted as properties which are passed to the protocol factory.<p>
  * 
  * </dl> <p>
  */
@@ -142,7 +141,7 @@ public final class ClientSessionServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
     
-    /** The transport(s) to use for incomming client connections. */
+    /** The transport(s) to use for incoming client connections. */
     public static final String PROTOCOL_LIST_PROPERTY =
         PKG_NAME + ".protocols";
     
@@ -230,9 +229,6 @@ public final class ClientSessionServiceImpl
 
     /** The channel service. */
     private volatile ChannelServiceImpl channelService;
-    
-    /** The identity manager. */
-    final IdentityCoordinator identityManager;
     
     /** Protocol factory */
     private final ProtocolFactory protocolFactory;
@@ -357,8 +353,6 @@ public final class ClientSessionServiceImpl
 	    /*
 	     * Get services and check service version.
 	     */
-	    identityManager =
-		systemRegistry.getComponent(IdentityCoordinator.class);
             protocolFactory = systemRegistry.getComponent(ProtocolFactory.class);
 	    flushContextsThread.start();
 	    contextFactory = new ContextFactory(txnProxy);

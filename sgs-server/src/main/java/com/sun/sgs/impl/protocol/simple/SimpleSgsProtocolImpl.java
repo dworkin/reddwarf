@@ -22,6 +22,7 @@ package com.sun.sgs.impl.protocol.simple;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.protocol.ProtocolDescriptorImpl;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -91,6 +92,9 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
     /** The transaction proxy, or null if configure has not been called. */    
     private static volatile TransactionProxy txnProxy = null;
 
+    /** The identity manager. */
+    final IdentityCoordinator identityManager;
+    
     /** The task scheduler. */
     private final TaskScheduler taskScheduler;
 
@@ -145,6 +149,8 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
 	    
+            identityManager =
+		systemRegistry.getComponent(IdentityCoordinator.class);
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	    taskOwner = txnProxy.getCurrentOwner();
 	    
@@ -188,8 +194,8 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                               TransportDescriptor descriptor)
         throws Exception
     {
-        SimpleSgsProtocolMessageChannel msgChannel =
-                new SimpleSgsProtocolMessageChannel(byteChannel,
+        SimpleSgsProtocolConnection msgChannel =
+                new SimpleSgsProtocolConnection(byteChannel,
                                                     this,
                                                     readBufferSize);
         ProtocolHandler msgHandler =

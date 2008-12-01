@@ -19,6 +19,8 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -43,20 +45,21 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.security.auth.login.LoginException;
 
 /**
  * A wrapper channel that reads and writes complete messages by framing
  * messages with a 2-byte message length, and masking (and re-issuing) partial
  * I/O operations.  Also enforces a fixed buffer size when reading.
  */
-public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnection {
+public class SimpleSgsProtocolConnection implements SessionProtocolConnection {
     
     /** The number of bytes used to represent the message length. */
     public static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(SimpleSgsProtocolMessageChannel.class.getName()));
+	Logger.getLogger(SimpleSgsProtocolConnection.class.getName()));
 
     /**
      * The underlying channel (possibly another layer of abstraction,
@@ -90,7 +93,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
      * @param	protocolImpl protocol impl
      * @param	readBufferSize the number of bytes in the read buffer
      */
-    SimpleSgsProtocolMessageChannel(AsynchronousByteChannel byteChannel,
+    SimpleSgsProtocolConnection(AsynchronousByteChannel byteChannel,
                                            SimpleSgsProtocolImpl protocolImpl,
                                            int readBufferSize)
     {
@@ -356,7 +359,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST,
 			   "write channel:{0} message:{1} first:{2}",
-                           SimpleSgsProtocolMessageChannel.this,
+                           SimpleSgsProtocolConnection.this,
 			   HexDumper.format(message, 0x50), first);
             }
             if (first) {
@@ -381,7 +384,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
                 logger.log(
 		    Level.FINEST,
 		    "processQueue channel:{0} size:{1,number,#} head={2}",
-		    SimpleSgsProtocolMessageChannel.this, pendingWrites.size(),
+		    SimpleSgsProtocolConnection.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
             }
             try {
@@ -389,7 +392,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
             } catch (RuntimeException e) {
                 logger.logThrow(Level.SEVERE, e,
 				"{0} processing message {1}",
-				SimpleSgsProtocolMessageChannel.this,
+				SimpleSgsProtocolConnection.this,
 				HexDumper.format(message, 0x50));
                 throw e;
             }
@@ -408,7 +411,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
 		resetMessage.reset();
                 logger.log(Level.FINEST,
 			   "completed write session:{0} message:{1}",
-			   SimpleSgsProtocolMessageChannel.this,
+			   SimpleSgsProtocolConnection.this,
 			   HexDumper.format(resetMessage, 0x50));
             }
             try {
@@ -423,7 +426,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(Level.FINE, e,
 				    "write session:{0} message:{1} throws",
-				    SimpleSgsProtocolMessageChannel.this,
+				    SimpleSgsProtocolConnection.this,
 				    HexDumper.format(message, 0x50));
                 }
 //		handler.disconnect(null);
@@ -502,7 +505,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(Level.FINEST,
                                "completed read channel:{0} message:{1}",
-                               SimpleSgsProtocolMessageChannel.this,
+                               SimpleSgsProtocolConnection.this,
                                HexDumper.format(message, 0x50));
                 }
 
@@ -554,12 +557,21 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
 	            break;
 	        }
 
-		final String name = msg.getString();
+		final String username = msg.getString();
 		final String password = msg.getString();
-		handler.loginRequest(name, password);   // ignore future
-                // Resume reading immediately
-		read();
-
+                try {
+                    final Identity authenticatedIdentity =
+                        protocolImpl.identityManager.authenticateIdentity(
+                           new NamePasswordCredentials(username,
+                                                       password.toCharArray()));
+                    handler.loginRequest(authenticatedIdentity);// ignore future
+                    
+                    // Resume reading immediately
+                    read();
+                } catch (LoginException le) {
+                    loginFailure("authentication failed", le);
+                    handler.disconnect();   // ignore future
+                }
 		break;
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
@@ -579,7 +591,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
                                         "Processing session message:{0} " +
                                         "for protocol:{1} throws",
                                         HexDumper.format(clientMessage, 0x50),
-                                        SimpleSgsProtocolMessageChannel.this);
+                                        SimpleSgsProtocolConnection.this);
 		    }
 		}
 		read();
@@ -605,7 +617,7 @@ public class SimpleSgsProtocolMessageChannel implements SessionProtocolConnectio
                                         "Processing channel message:{0} " +
                                         "for protocol:{1} throws",
                                         HexDumper.format(channelMessage, 0x50),
-                                        SimpleSgsProtocolMessageChannel.this);
+                                        SimpleSgsProtocolConnection.this);
 		    }
                 }
                 read();
