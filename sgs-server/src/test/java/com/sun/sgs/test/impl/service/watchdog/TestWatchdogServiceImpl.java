@@ -40,6 +40,7 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.BindException;
+import java.rmi.server.ExportException;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 import java.util.ArrayList;
@@ -1121,7 +1122,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         SgsTestNode node = null;
         try {
             node = new SgsTestNode(serverNode, null, props);
-            fail("Expected IllegalArgumentException");
+            fail("Expected ExportException");
         } catch (InvocationTargetException e) {
             System.err.println(e);
             Throwable target = e.getTargetException();
@@ -1132,8 +1133,8 @@ public class TestWatchdogServiceImpl extends TestCase {
                 System.err.println("unwrapping target exception");
                 target = ((InvocationTargetException) target).getTargetException();
             }
-            if (!(target instanceof IllegalArgumentException)) {
-                fail("Expected IllegalArgumentException");
+            if (!(target instanceof ExportException)) {
+                fail("Expected ExportException, got " + target);
             }
         } finally {
             if (node != null) {
@@ -1163,9 +1164,10 @@ public class TestWatchdogServiceImpl extends TestCase {
             System.err.println(e);
             Throwable target = e.getTargetException();
             // We wrap our exceptions a bit in the kernel....
-            while (target instanceof InvocationTargetException) {
+            while ((target instanceof InvocationTargetException) ||
+                   (target instanceof RuntimeException)) {
                 System.err.println("unwrapping target exception");
-                target = ((InvocationTargetException) target).getTargetException();
+                target = target.getCause();
             }
             if (!(target instanceof BindException)) {
                 fail("Expected BindException, got " + target);
