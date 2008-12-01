@@ -355,4 +355,37 @@ public class PropertiesWrapper {
 		e);
 	}
     }
+    
+    /**
+     * Parse a property containing property value pairs. The specified property
+     * is parsed as a ":" separated list, with each pair of elements treated as
+     * a property key and value. Each pair is added to a properties object by
+     * calling {@link Properties#setProperty Properties.setProperty}. The
+     * resulting properties object is returned.
+     * @param name the property name
+     * @return a {@code Properties} object
+     * @throws IllegalArgumentException if {@code name} is {@code null},
+     * or the property is not found,
+     * or the embedded property list is malformed.
+     */
+    public Properties getEmbeddedProperties(String name)
+            throws IllegalArgumentException
+    {
+        if (name == null)
+            throw new IllegalArgumentException("name can not be null");
+        final String arg = getProperty(name);
+        if (arg == null)
+            throw new IllegalArgumentException(
+                    "The " + name + " property must be specified");
+        final String[] propAndValue = arg.split(":");
+        if ((propAndValue.length % 2) != 0)
+            throw new IllegalArgumentException(
+                    "Missmatch propery value pair: " + arg);
+        final Properties prop = new Properties();
+        for (int i = 0; i < propAndValue.length;) {
+            prop.setProperty(propAndValue[i], propAndValue[i+1]);
+            i += 2;
+        }
+        return prop;
+    }
 }	
