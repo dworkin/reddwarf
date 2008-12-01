@@ -239,6 +239,10 @@ class Kernel {
             taskScheduler.setContext(ctx);
 
             // collect the shared system components into a registry
+            systemRegistry.addComponent(new TransportFactoryImpl(appProperties));
+            systemRegistry.addComponent(new ProtocolFactoryImpl(appProperties,
+                                                                systemRegistry,
+                                                                proxy));
             systemRegistry.addComponent(accessCoordinator);
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);
@@ -793,18 +797,6 @@ class Kernel {
             throw new IllegalArgumentException("Missing required property " +
                        StandardProperties.APP_LISTENER +
                        "for application: " + appName);
-        }
-        
-        if (!StandardProperties.APP_LISTENER_NONE.equals(
-		appProperties.getProperty(StandardProperties.APP_LISTENER)) &&
-	    appProperties.getProperty(StandardProperties.APP_PORT) == null)
-	{
-            logger.log(Level.SEVERE, "Missing required property " +
-                       StandardProperties.APP_PORT + " for application: " +
-                       appName);
-            throw new IllegalArgumentException("Missing required property " +
-                       StandardProperties.APP_PORT + " for application: " +
-                       appName);
         }
     }
     

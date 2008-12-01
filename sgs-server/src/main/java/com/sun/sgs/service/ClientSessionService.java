@@ -21,6 +21,7 @@ package com.sun.sgs.service;
 
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.protocol.session.SessionProtocolConnection;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
@@ -43,20 +44,23 @@ public interface ClientSessionService extends Service {
         ClientSessionDisconnectListener listener);
 
     /**
-     * Sends the specified protocol {@code message} to the <i>local</i>
-     * client session with the specified {@code sessionRefId}. If the
-     * specified client session is not connected to the local node, the
-     * message is dropped.  This method is non-transactional, and therefore
-     * this message send cannot be aborted.
+     * Returns a session message handler with the specified {@code
+     * delivery} requirement for the <i>local</i> client session with the
+     * specified {@code sessionRefId}. If the specified client session is
+     * not connected to the local node, an {@code IllegalArgumentException}
+     * is thrown.  If there is no {@link SessionProtocolConnection} with the
+     * given {@code delivery} requirement for the specified client session,
+     * an {@code UnsupportedDeliveryException} is thrown.
      *
      * <p> The {@code sessionRefId} is the ID obtained by invoking {@link
      * ManagedReference#getId getId} on a {@link ManagedReference} to the
      * associated {@code ClientSession}.
      *
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
-     * @param	message a complete protocol message
      * @param	delivery a delivery requirement
+     * @return the {@code SessionProtocolConnection} associated with the
+     * specified session
      */
-    void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, ByteBuffer message, Delivery delivery);
+    SessionProtocolConnection getProtocolMessageChannel(
+	BigInteger sessionRefId, Delivery delivery);
 }

@@ -38,7 +38,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import java.io.IOException;
@@ -93,6 +93,9 @@ public class ClientSessionImpl
 
     /** The identity for this session. */
     private final Identity identity;
+    
+    /** The underlying transport for this session. */
+    private final ProtocolDescriptor protocolDesc;
 
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
@@ -125,7 +128,8 @@ public class ClientSessionImpl
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
-		      Identity identity)
+		      Identity identity,
+                      ProtocolDescriptor protocolDesc)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
@@ -135,6 +139,7 @@ public class ClientSessionImpl
 	}
 	this.sessionService = sessionService;
 	this.identity = identity;
+        this.protocolDesc = protocolDesc;
 	this.nodeId = sessionService.getLocalNodeId();
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
@@ -154,6 +159,7 @@ public class ClientSessionImpl
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */
+    @Override
     public String getName() {
 	if (!isConnected()) {
 	    throw new IllegalStateException("client session is not connected");
@@ -163,6 +169,7 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
+    @Override
     public boolean isConnected() {
 	return connected;
     }
@@ -171,15 +178,12 @@ public class ClientSessionImpl
      *
      * Enqueues a send event to this client session's event queue for servicing.
      */
+    @Override
     public ClientSession send(ByteBuffer message) {
 	try {
-            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
-                throw new IllegalArgumentException(
-                    "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
-            } else if (!isConnected()) {
+            if (!isConnected())
 		throw new IllegalStateException("client session not connected");
-	    }
+
             /*
              * TBD: Possible optimization: if we have passed our own special
              * buffer to the app, we can detect that here and possibly avoid a
@@ -187,11 +191,9 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
-            buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
-		put(message.asReadOnlyBuffer()).
-		flip();
-	    addEvent(new SendEvent(buf.array()));
+            byte[] msgBytes = new byte[message.remaining()];
+	    message.asReadOnlyBuffer().get(msgBytes);
+	    addEvent(new SendEvent(msgBytes));
 
 	    return getWrappedClientSession();
 
@@ -325,6 +327,10 @@ public class ClientSessionImpl
 	return wrappedSessionRef.get();
     }
 
+    public boolean canSupport(Delivery required) {
+        return protocolDesc.canSupport(required);
+    }
+    
     /**
      * Invokes the {@code disconnected} callback on this session's {@code
      * ClientSessionListener} (if present and {@code notify} is
@@ -727,8 +733,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.sendProtocolMessage(
-		sessionImpl, ByteBuffer.wrap(message), Delivery.RELIABLE);
+            sessionImpl.sessionService.addSessionMessage(sessionImpl, message);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -754,7 +759,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.disconnect(sessionImpl);
+            sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

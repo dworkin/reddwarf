@@ -29,11 +29,13 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
@@ -253,9 +255,17 @@ public class SgsTestNode {
         sessionService = getService(ClientSessionService.class);
         channelService = getService(ChannelServiceImpl.class);
 
+        // If an app node, pick the first transport and test against that
 	if (sessionService != null) {
-	    appPort =
-		((ClientSessionServiceImpl) sessionService).getListenPort();
+            systemRegistry.getComponent(TransactionScheduler.class).runTask(
+                new TestAbstractKernelRunnable() {
+		    public void run() {
+                        long localNodeId = watchdogService.getLocalNodeId();
+                        Node node = watchdogService.getNode(localNodeId);
+                        ProtocolDescriptor[] desc = node.getClientListeners();
+                        appPort = desc[0].getTransport().getListeningPort();
+                    } },
+                    txnProxy.getCurrentOwner());
 	}
     }
 
@@ -399,9 +409,17 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             StandardProperties.APP_NAME, appName,
-            StandardProperties.APP_PORT, Integer.toString(getNextAppPort()),
+            // APP_NODE just needs a unique number, so getNextUniquePort will do
+            StandardProperties.APP_NODE, Integer.toString(getNextUniquePort()),
             StandardProperties.SERVER_START, startServer,
             StandardProperties.SERVER_HOST, "localhost",
+            "com.sun.sgs.impl.service.session.protocols",
+                "com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl",
+            "com.sun.sgs.impl.service.session.protocol.properties.0",
+                "com.sun.sgs.impl.protocol.simple.transport:" +
+                    "com.sun.sgs.impl.transport.tcp.TCP:" +
+                "com.sun.sgs.impl.transport.tcp.listen.port:" +
+                    String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.port", 
@@ -439,17 +457,10 @@ public class SgsTestNode {
     }
 
     /**
-     * Returns the bound app port.
+     * Returns a bound app port.
      */
     public int getAppPort() {
 	return appPort;
-    }
-    
-    /**
-     * Returns a unique port number.
-     */
-    public static int getNextAppPort() {
-        return getNextUniquePort();
     }
     
     /**

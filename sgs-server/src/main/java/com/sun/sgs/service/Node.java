@@ -19,6 +19,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.protocol.ProtocolDescriptor;
+
 /**
  * An abstraction for node information, used in conjunction
  * with the {@link WatchdogService} and {@link NodeListener}s.
@@ -38,13 +40,6 @@ public interface Node {
      * @return	this node's hostname
      */
     String getHostName();
-
-    /**
-     * Returns this node's port.
-     * 
-     * @return this node's port
-     */
-    int getPort();
     
     /**
      * Returns {@code true} if the node is known to be alive, and
@@ -55,4 +50,22 @@ public interface Node {
      * 		otherwise
      */
     boolean isAlive();
+    
+    /**
+     * Returns the set of transports descriptors that respresent the
+     * transports listening for client connections on this
+     * node. {@code null} is returned if this is not an application node.
+     * 
+     * @return the set of transport descriptors or {@code null}
+     */
+    ProtocolDescriptor[] getClientListeners();
+    
+    /**
+     * Sets the set of transports listening for client connections on this node.
+     * The specified set will override the value from a previous call.
+     * 
+     * @param descriptors set of transport descriptors
+     */
+    void setClientListener(ProtocolDescriptor[] descriptors);
+
 }

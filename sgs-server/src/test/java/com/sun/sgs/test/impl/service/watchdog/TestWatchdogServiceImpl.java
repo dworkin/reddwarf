@@ -123,8 +123,8 @@ public class TestWatchdogServiceImpl extends TestCase {
         txnProxy = serverNode.getProxy();
         systemRegistry = serverNode.getSystemRegistry();
         serviceProps = serverNode.getServiceProperties();
-        serviceProps.setProperty(StandardProperties.APP_PORT, 
-                Integer.toString(SgsTestNode.getNextAppPort()));
+        serviceProps.setProperty(StandardProperties.APP_NODE, 
+                Integer.toString(SgsTestNode.getNextUniquePort()));
         renewTime = Integer.valueOf(
             serviceProps.getProperty(
                 "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
@@ -229,7 +229,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     public void testConstructorNoAppName() throws Exception {
         WatchdogServiceImpl watchdog = null;
         Properties properties = createProperties(
-            StandardProperties.APP_PORT, "20000",
+            StandardProperties.APP_NODE, "20000",
             WatchdogServerPropertyPrefix + ".port", "0");
         try {
             new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
@@ -239,26 +239,13 @@ public class TestWatchdogServiceImpl extends TestCase {
         }
     }
 
-    public void testConstructorNoAppPort() throws Exception {
-        WatchdogServiceImpl watchdog = null;
-	Properties properties = createProperties(
-            StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".port", "0");
-	try {
-	    new WatchdogServiceImpl(properties, systemRegistry, txnProxy);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
     public void testConstructorAppButNoServerHost() throws Exception {
         // Server start is false but we didn't specify a server host
         int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+            StandardProperties.APP_NODE, 
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
         try {
@@ -274,7 +261,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "20000",
+            StandardProperties.APP_NODE, "20000",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(-1));
 	try {
 	    watchdog = 
@@ -291,7 +278,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "20000",
+            StandardProperties.APP_NODE, "20000",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(65536));
 	try {
 	    watchdog =
@@ -310,7 +297,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "20000",
+            StandardProperties.APP_NODE, "20000",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
@@ -331,7 +318,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, "20000",
+            StandardProperties.APP_NODE, "20000",
 	    WatchdogServerPropertyPrefix + ".start", "true",
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval",
@@ -418,8 +405,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+            StandardProperties.APP_NODE, 
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
@@ -465,8 +452,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+            StandardProperties.APP_NODE, 
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
@@ -534,8 +521,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+            StandardProperties.APP_NODE, 
+                Integer.toString(SgsTestNode.getNextUniquePort()),
 	    "com.sun.sgs.impl.service.nodemap.client.port",
 	        String.valueOf(SgsTestNode.getNextUniquePort()),
 	    "com.sun.sgs.impl.service.watchdog.client.port",
@@ -827,8 +814,8 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	try {
 	    for (int i = 0; i < 5; i++) {
-                props.put(StandardProperties.APP_PORT,
-                          Integer.toString(SgsTestNode.getNextAppPort()));
+                props.put(StandardProperties.APP_NODE,
+                          Integer.toString(SgsTestNode.getNextUniquePort()));
 		WatchdogServiceImpl watchdog =
 		    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 		DummyNodeListener listener = new DummyNodeListener();
@@ -1168,8 +1155,8 @@ public class TestWatchdogServiceImpl extends TestCase {
             // server.  We expect to see a socket BindException rather
             // than an IllegalArgumentException.
  	    Properties props1 = getPropsForApplication(appName + "1");
- 	    props1.setProperty(StandardProperties.APP_PORT,
- 			       props.getProperty(StandardProperties.APP_PORT));
+ 	    props1.setProperty("com.sun.sgs.impl.service.session.protocol.properties.0",
+ 			       props.getProperty("com.sun.sgs.impl.service.session.protocol.properties.0"));
 	    node1 = new SgsTestNode(appName, null, props1, true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {
@@ -1282,8 +1269,8 @@ public class TestWatchdogServiceImpl extends TestCase {
     {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            StandardProperties.APP_PORT, 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+            StandardProperties.APP_NODE, 
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             WatchdogServerPropertyPrefix + ".start", "false",
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port",
