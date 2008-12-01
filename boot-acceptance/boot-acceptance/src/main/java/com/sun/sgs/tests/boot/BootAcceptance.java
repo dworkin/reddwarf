@@ -25,6 +25,8 @@ import java.util.zip.ZipFile;
 import java.io.File;
 
 import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
 import org.junit.Before;
 import org.junit.After;
 import org.junit.Assert;
@@ -41,6 +43,8 @@ public class BootAcceptance {
     private static File distribution;
     
     private File testDirectory;
+    private File installationDirectory;
+    private Process server;
 
     /**
      * Main-line method that initiates the suite of tests against the given
@@ -55,7 +59,7 @@ public class BootAcceptance {
         }
         BootAcceptance.distribution = new File(args[0]);
         
-        JUnitCore.runClasses(BootAcceptance.class);
+        new JUnitCore().main(BootAcceptance.class.getName());
     }
     
     /**
@@ -78,6 +82,11 @@ public class BootAcceptance {
         Assert.assertTrue(d.mkdirs());
         this.testDirectory = d;
         Util.unzip(new ZipFile(distribution), testDirectory);
+        
+        File[] files = testDirectory.listFiles();
+        Assert.assertEquals(files.length, 1);
+        this.installationDirectory = files[0];
+        Assert.assertTrue(installationDirectory.isDirectory());
     }
     
     
@@ -87,12 +96,19 @@ public class BootAcceptance {
      */
     @After
     public void removeTestDirectory() throws Exception {
-        Assert.assertTrue(testDirectory.delete());
+        if(server != null) {
+            server.destroy();
+        }
+        Assert.assertTrue(Util.deleteDirectory(testDirectory));
     }
     
-    @Test
-    public void test() {
-        
+    @Test(timeout=5000)
+    public void testHelloWorldDefault() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        this.server = Util.bootPDS(installationDirectory, "");
+        Assert.assertTrue(Util.expectLines(server, 
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
     }
     
 }
