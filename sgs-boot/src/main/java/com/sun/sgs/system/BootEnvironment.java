@@ -97,6 +97,11 @@ public final class BootEnvironment {
     public static final String CUSTOM_CLASSPATH_ADD = "CUSTOM_CLASSPATH_ADD";
     
     /**
+     * Port to listen for SHUTDOWN command.
+     */
+    public static final String SHUTDOWN_PORT = "SHUTDOWN_PORT";
+    
+    /**
      * Location of the JDK to use when booting up the Kernel.
      */
     public static final String JAVA_HOME = "JAVA_HOME";
@@ -133,6 +138,10 @@ public final class BootEnvironment {
      */
     public static final String DEFAULT_APP_PROPERTIES = 
             "META-INF/app.properties";
+    /**
+     * The default value for the {@code DEFAULT_SHUTDOWN_PORT} property.
+     */
+    public static final String DEFAULT_SHUTDOWN_PORT = "1138";
     
     
     static final String DEFAULT_BDB_ROOT = 

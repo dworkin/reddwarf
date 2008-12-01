@@ -165,12 +165,19 @@ public final class Boot {
                 throw e;
             }
         }
+        
+        //initiate the shutdown handler
+        ShutdownHandler shutdownHandler = new ShutdownHandler(
+                Integer.valueOf(
+                properties.getProperty(BootEnvironment.SHUTDOWN_PORT)));
 
         //run the process
         try {
             Process p = pb.start();
             Thread t = new Thread(new ProcessOutputReader(p, output));
             t.start();
+            shutdownHandler.setProcess(p);
+            new Thread(shutdownHandler).start();
             t.join();
             p.waitFor();
         } catch (IOException e) {
@@ -208,6 +215,10 @@ public final class Boot {
         if (properties.getProperty(BootEnvironment.BDB_TYPE) == null) {
             properties.setProperty(BootEnvironment.BDB_TYPE,
                                    BootEnvironment.DEFAULT_BDB_TYPE);
+        }
+        if(properties.getProperty(BootEnvironment.SHUTDOWN_PORT) == null) {
+            properties.setProperty(BootEnvironment.SHUTDOWN_PORT,
+                                   BootEnvironment.DEFAULT_SHUTDOWN_PORT);
         }
         
         //autodetect BDB libraries if necessary
