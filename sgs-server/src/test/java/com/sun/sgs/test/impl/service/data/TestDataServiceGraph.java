@@ -32,6 +32,7 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.Properties;
 import java.util.Random;
@@ -140,8 +141,8 @@ public class TestDataServiceGraph {
     private static class Element implements Comparable<Element>, Serializable {
 	private static final long serialVersionUID = 1;
 	private final int key;
-	private String value;
-	Element(int key, String value) {
+	private Value value;
+	Element(int key, Value value) {
 	    this.key = key;
 	    this.value = value;
 	}
@@ -155,8 +156,26 @@ public class TestDataServiceGraph {
 	public int hashCode() {
 	    return key;
 	}
-	void setValue(String newValue) {
+	void setValue(Value newValue) {
 	    value = newValue;
+	}
+    }
+
+    /** A serializable value to store within an element. */
+    private static class Value implements Serializable {
+	private static final long serialVersionUID = 1;
+	private final int x;
+	private final int y;
+	private transient int z;
+	private final String s;
+	Value() {
+	    x = random.nextInt();
+	    y = random.nextInt();
+	    z = random.nextInt();
+	    s = randomString();
+	}
+	private void readObject(ObjectInputStream in) {
+	    z = random.nextInt();
 	}
     }
 
@@ -186,7 +205,7 @@ public class TestDataServiceGraph {
 		    TreeElementTask.createTasks();
 		    return;
 		}
-		Element element = new Element(key, randomString());
+		Element element = new Element(key, new Value());
 		if (tree == null) {
 		    tree = new Tree<Element>(element);
 		    dataManager.setBinding("tree", tree);
@@ -265,15 +284,15 @@ public class TestDataServiceGraph {
 		    (Tree<Element>) dataManager.getBinding("tree");
 		if (random.nextBoolean()) {
 		    Element existing =
-			tree.find(new Element(missingKey(), ""), false);
+			tree.find(new Element(missingKey(), null), false);
 		    assertNull(existing);
 		} else {
 		    boolean forUpdate = random.nextInt(numReads) == 0;
 		    Element element =
-			tree.find(new Element(presentKey(), ""), forUpdate);
+			tree.find(new Element(presentKey(), null), forUpdate);
 		    assertNotNull(element);
 		    if (forUpdate) {
-			element.setValue(randomString());
+			element.setValue(new Value());
 		    }
 		}
 		remaining--;
