@@ -24,6 +24,8 @@ import java.util.zip.ZipEntry;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Arrays;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.io.File;
 import java.io.InputStream;
 import java.io.BufferedInputStream;
@@ -126,7 +128,7 @@ class Util {
      * @param targetDirectory
      * @throws java.io.IOException
      */
-    public static void copyFile(URL source, File targetFile) 
+    public static void copyURLToFile(URL source, File targetFile) 
             throws IOException {
         InputStream is = null;
         OutputStream os = null;
@@ -230,19 +232,28 @@ class Util {
     }
     
     /**
-     * Boots up the PDS installed in the given directory.
+     * Boots up the PDS installed in the given directory.  PDS is booted
+     * with the given logging file passed as the java.util.logging.config.file
+     * configuration parameter on the command line if logging is not null.
      * 
      * @param directory the directory of the PDS
+     * @param logging the logging configuration file or null
      * @param args command line arguments passed to the bootloader
      * @return the PDS {@code Process}
      */
-    public static Process bootPDS(File directory, String args) 
+    public static Process bootPDS(File directory, File logging, String args) 
             throws IOException {
         File bootloader = new File(directory, "bin/sgs-boot.jar");
         Assert.assertTrue(bootloader.exists());
 
-        String command = "java -jar " + bootloader.getAbsolutePath() + 
-                " " + args;
+        String logParam = "";
+        if(logging != null) {
+            logParam = "-Djava.util.logging.config.file=" + 
+                    logging.getAbsolutePath();
+        }
+
+        String command = "java -jar " + logParam + " " + 
+                bootloader.getAbsolutePath() + " " + args;
         List<String> commandList = Arrays.asList(command.split("\\s+"));
         
         ProcessBuilder pb = new ProcessBuilder(commandList);
@@ -332,7 +343,7 @@ class Util {
     }
     
     /**
-     * Parse the output of the process, only returning when each of the
+     * Parse the output of the process, only returning true when each of the
      * lines of output have been seen.
      * 
      * @param p
@@ -344,11 +355,47 @@ class Util {
         BufferedReader processReader = new BufferedReader(
                 new InputStreamReader(processOutput));
         
-        return expectLines(processReader, lines);
+        return expect(processReader, false, lines);
     }
     
     /**
-     * Parse the output of the file, only returning when each of the
+     * Parse the output of the process, only returning true when each of the
+     * given regular expressions have been matched against the process output
+     * in order.
+     * 
+     * @param p
+     * @param lines
+     */
+    public static boolean expectMatches(Process p, String... lines) 
+            throws IOException {
+        InputStream processOutput = p.getInputStream();
+        BufferedReader processReader = new BufferedReader(
+                new InputStreamReader(processOutput));
+        
+        return expect(processReader, true, lines);
+    }
+    
+    /**
+     * Parse the output of the process.  Return true only if one of the
+     * lines of output of the process matches the match parameter but the
+     * same line does NOT match the noMatch parameter.
+     * 
+     * @param p
+     * @param lines
+     */
+    public static boolean expectMatchNoMatch(Process p,
+                                             String match,
+                                             String noMatch)
+            throws IOException {
+        InputStream processOutput = p.getInputStream();
+        BufferedReader processReader = new BufferedReader(
+                new InputStreamReader(processOutput));
+        
+        return expectMatchNoMatch(processReader, match, noMatch);
+    }
+    
+    /**
+     * Parse the output of the file, only returning true when each of the
      * lines of output have been seen.
      * 
      * @param f
@@ -360,17 +407,49 @@ class Util {
         BufferedReader fileReader = new BufferedReader(
                 new InputStreamReader(fileOutput));
         
-        return expectLines(fileReader, lines);
+        return expect(fileReader, false, lines);
     }
     
-    private static boolean expectLines(BufferedReader reader, String... lines) 
+    /**
+     * Parse the output of the file, only returning true when each of the
+     * given regular expressions have been matched against the file output
+     * in order.
+     * 
+     * @param f
+     * @param lines
+     */
+    public static boolean expectMatches(File f, String... lines) 
+            throws IOException {
+        InputStream fileOutput = new FileInputStream(f);
+        BufferedReader fileReader = new BufferedReader(
+                new InputStreamReader(fileOutput));
+        
+        return expect(fileReader, true, lines);
+    }
+    
+    private static boolean expect(BufferedReader reader, 
+                                       boolean regexp,
+                                       String... lines)
             throws IOException {
         String line = null;
+        
+        Pattern[] patterns = new Pattern[lines.length];
+        if(regexp) {
+            for(int i = 0; i < lines.length; i++) {
+                patterns[i] = Pattern.compile(lines[i]);
+            }
+        }
+        
         try {
             int lineNumber = 0;
             while (lineNumber < lines.length && 
                     ((line = reader.readLine()) != null)) {
-                if(line.indexOf(lines[lineNumber]) != -1) {
+                if(regexp) {
+                    Matcher m = patterns[lineNumber].matcher(line);
+                    if(m.find()) {
+                        lineNumber++;
+                    }
+                } else if (!regexp && line.indexOf(lines[lineNumber]) != -1) {
                     lineNumber++;
                 }
             }
@@ -391,6 +470,36 @@ class Util {
         }
     }
     
+    
+    private static boolean expectMatchNoMatch(BufferedReader reader,
+                                              String match,
+                                              String noMatch)
+            throws IOException {
+        String line = null;
+        
+        Pattern patternMatch = Pattern.compile(match);
+        Pattern patternNoMatch = Pattern.compile(noMatch);
+        
+        try {
+            while (((line = reader.readLine()) != null)) {
+                Matcher m = patternMatch.matcher(line);
+                Matcher nm = patternNoMatch.matcher(line);
+                if (m.find() && !nm.find()) {
+                    return true;
+                }
+            }
+            
+            return false;
+        } finally {
+            try {
+                if (reader != null) {
+                    reader.close();
+                }
+            } catch (IOException ignore) {
+                
+            }
+        }
+    }
     
     /**
      * Utility to ensure all streams for the {@code Process} are closed as

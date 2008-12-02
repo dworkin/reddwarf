@@ -45,6 +45,7 @@ public class BootAcceptance {
     private static final String SGS_PROPERTIES = "alt-server.properties";
     private static final String SGS_LOGGING = "alt-logging.properties";
     private static final String SGS_LOGFILE = "alt.log";
+    private static final String CONFIG_LOGGING = "config.logging";
     private static File distribution;
     
     private File testDirectory;
@@ -59,6 +60,7 @@ public class BootAcceptance {
     private File alternateSGS_PROPERTIES;
     private File alternateSGS_LOGGING;
     private File alternateSGS_LOGFILE;
+    private File configLogging;
 
     /**
      * Main-line method that initiates the suite of tests against the given
@@ -139,6 +141,13 @@ public class BootAcceptance {
         this.alternateSGS_LOGFILE = new File(alternateDirectory,
                                              BootAcceptance.SGS_LOGFILE);
         
+        //copy config logging file
+        this.configLogging = new File(alternateDirectory,
+                                      BootAcceptance.CONFIG_LOGGING);
+        URL configConfig = this.getClass().getResource(
+                "config-logging.properties");
+        Assert.assertNotNull(configConfig);
+        Util.copyURLToFile(configConfig, configLogging);
     }
     
     
@@ -164,7 +173,7 @@ public class BootAcceptance {
     @Test(timeout=5000)
     public void testEmptyDeploy() throws Exception {
         this.config = "";
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         Assert.assertTrue(
                 Util.expectLines(server,
                                  "WARNING: No application jar found with a" +
@@ -187,7 +196,7 @@ public class BootAcceptance {
     public void testHelloWorldDefault() throws Exception {
         Util.loadTutorial(installationDirectory);
         this.config = "";
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         Assert.assertTrue(Util.expectLines(server, 
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
@@ -199,11 +208,11 @@ public class BootAcceptance {
         URL bootConfig = this.getClass().getResource(
                 "customSGS_DEPLOY.properties");
         Assert.assertNotNull(bootConfig);
-        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
         Util.clearSGS_BOOT(installationDirectory);
         
         this.config = alternateSGS_BOOT.getAbsolutePath();
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         Assert.assertTrue(Util.expectLines(server, 
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
@@ -215,12 +224,12 @@ public class BootAcceptance {
         URL bootConfig = this.getClass().getResource(
                 "customSGS_PROPERTIES.properties");
         Assert.assertNotNull(bootConfig);
-        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
         Util.clearSGS_BOOT(installationDirectory);
         Util.clearSGS_PROPERTIES(installationDirectory);
         
         this.config = alternateSGS_BOOT.getAbsolutePath();
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         Assert.assertTrue(Util.expectLines(server, 
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
@@ -232,12 +241,12 @@ public class BootAcceptance {
         URL bootConfig = this.getClass().getResource(
                 "customSGS_LOGGING.properties");
         Assert.assertNotNull(bootConfig);
-        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
         Util.clearSGS_BOOT(installationDirectory);
         Util.clearSGS_LOGGING(installationDirectory);
         
         this.config = alternateSGS_BOOT.getAbsolutePath();
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         Assert.assertTrue(Util.expectLines(server, 
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
@@ -249,11 +258,11 @@ public class BootAcceptance {
         URL bootConfig = this.getClass().getResource(
                 "customALL_CONF.properties");
         Assert.assertNotNull(bootConfig);
-        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
         Util.clearALL_CONF(installationDirectory);
         
         this.config = alternateSGS_BOOT.getAbsolutePath();
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         Assert.assertTrue(Util.expectLines(server, 
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
@@ -265,15 +274,347 @@ public class BootAcceptance {
         URL bootConfig = this.getClass().getResource(
                 "customSGS_LOGFILE.properties");
         Assert.assertNotNull(bootConfig);
-        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
         Util.clearSGS_BOOT(installationDirectory);
         
         this.config = alternateSGS_BOOT.getAbsolutePath();
-        this.server = Util.bootPDS(installationDirectory, config);
+        this.server = Util.bootPDS(installationDirectory, null, config);
         //give server time to boot
         Thread.sleep(2000);
         Assert.assertTrue(this.alternateSGS_LOGFILE.exists());
         Assert.assertTrue(Util.expectLines(this.alternateSGS_LOGFILE,
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPEDefault() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPEDefault.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder exp = new StringBuilder();
+        exp.append("-cp .*lib.db-.*\\.jar");
+        exp.append(".*");
+        exp.append("\\-Djava\\.library\\.path=.*natives");
+        exp.append(".*");
+        exp.append("\\Q-Dcom.sun.sgs.impl.service.data.store.db.environment.class=");
+        exp.append("com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment\\E");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             exp.toString(),
+                                             "The Kernel is ready",
+                                             "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPEDefaultNoJe() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPEDefault.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //verify the je jar is not included in the classpath
+        Assert.assertTrue(Util.expectMatchNoMatch(server,
+                                                  "-cp .*lib.db-.*\\.jar",
+                                                  "-cp .*lib.je-.*\\.jar"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPEDb() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPEDb.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder exp = new StringBuilder();
+        exp.append("-cp .*lib.db-.*\\.jar");
+        exp.append(".*");
+        exp.append("\\-Djava\\.library\\.path=.*natives");
+        exp.append(".*");
+        exp.append("\\Q-Dcom.sun.sgs.impl.service.data.store.db.environment.class=");
+        exp.append("com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment\\E");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             exp.toString(),
+                                             "The Kernel is ready",
+                                             "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPEDbNoJe() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPEDb.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //verify the je jar is not included in the classpath
+        Assert.assertTrue(Util.expectMatchNoMatch(server,
+                                                  "-cp .*lib.db-.*\\.jar",
+                                                  "-cp .*lib.je-.*\\.jar"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPEJe() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPEJe.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder exp = new StringBuilder();
+        exp.append("-cp .*lib.je-.*\\.jar");
+        exp.append(".*");
+        exp.append("\\-Djava\\.library\\.path= ");
+        exp.append(".*");
+        exp.append("\\Q-Dcom.sun.sgs.impl.service.data.store.db.environment.class=");
+        exp.append("com.sun.sgs.impl.service.data.store.db.je.JeEnvironment\\E");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             exp.toString(),
+                                             "The Kernel is ready",
+                                             "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPEJeNoDb() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPEJe.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //verify the db jar is not included in the classpath
+        Assert.assertTrue(Util.expectMatchNoMatch(server,
+                                                  "-cp .*lib.je-.*\\.jar",
+                                                  "-cp .*lib.db-.*\\.jar"));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPECustom() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPECustom.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("-cp .*custom.jar");
+        match.append(".*");
+        match.append("\\-Djava\\.library\\.path= ");
+        StringBuilder noMatch = new StringBuilder();
+        noMatch.append("\\Q-Dcom.sun.sgs.impl.service.data.store.db.environment.class\\E");
+        Assert.assertTrue(Util.expectMatchNoMatch(server,
+                                                  match.toString(),
+                                                  noMatch.toString()));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPECustomNoDb() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPECustom.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("-cp .*custom.jar");
+        match.append(".*");
+        match.append("\\-Djava\\.library\\.path= ");
+        StringBuilder noMatch = new StringBuilder();
+        noMatch.append("-cp .*lib.db-.*\\.jar");
+        Assert.assertTrue(Util.expectMatchNoMatch(server,
+                                                  match.toString(),
+                                                  noMatch.toString()));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_TYPECustomNoJe() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_TYPECustom.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("-cp .*custom.jar");
+        match.append(".*");
+        match.append("\\-Djava\\.library\\.path= ");
+        StringBuilder noMatch = new StringBuilder();
+        noMatch.append("-cp .*lib.je-.*\\.jar");
+        Assert.assertTrue(Util.expectMatchNoMatch(server,
+                                                  match.toString(),
+                                                  noMatch.toString()));
+    }
+    
+    @Test(timeout=5000)
+    public void testCUSTOM_NATIVESDb() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "CUSTOM_NATIVESDb.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("-cp .*lib.db-.*\\.jar");
+        match.append(".*");
+        match.append("\\-Djava\\.library\\.path=.*natives.*customDirectory ");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             match.toString(),
+                                             "The Kernel is ready",
+                                             "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCUSTOM_NATIVESJe() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "CUSTOM_NATIVESJe.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("-cp .*lib.je-.*\\.jar");
+        match.append(".*");
+        match.append("\\-Djava\\.library\\.path=customDirectory ");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             match.toString(),
+                                             "The Kernel is ready",
+                                             "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCUSTOM_NATIVESCustom() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "CUSTOM_NATIVESCustom.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("\\-Djava\\.library\\.path=customDirectory ");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             match.toString()));
+    }
+    
+    @Test(timeout=5000)
+    public void testBDB_NATIVES() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "BDB_NATIVES.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        //match the regular expression to verify components of the 
+        //execute path
+        StringBuilder match = new StringBuilder();
+        match.append("-cp .*lib.db-.*\\.jar");
+        match.append(".*");
+        match.append("\\-Djava\\.library\\.path=bdbDirectory ");
+        Assert.assertTrue(Util.expectMatches(server,
+                                             match.toString()));
+    }
+    
+    @Test(timeout=5000)
+    public void testCustomJAVA_OPTS() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "customJAVA_OPTS.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        Assert.assertTrue(Util.expectLines(server,
+                                           "-server -DmyProperty=test -Xmx768M",
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }
