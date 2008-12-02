@@ -23,10 +23,9 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 import java.util.zip.ZipFile;
 import java.io.File;
+import java.net.URL;
 
 import org.junit.runner.JUnitCore;
-import org.junit.runner.Result;
-import org.junit.runner.notification.Failure;
 import org.junit.Before;
 import org.junit.After;
 import org.junit.Assert;
@@ -40,11 +39,26 @@ public class BootAcceptance {
     private static final Logger logger =Logger.getLogger(
             BootAcceptance.class.getName());
     private static final String TEST_DIR = "bootAcceptance";
+    private static final String ALTERNATE_DIR = "bootAlternate";
+    private static final String SGS_BOOT = "alt-boot.properties";
+    private static final String SGS_DEPLOY = "alt-deploy";
+    private static final String SGS_PROPERTIES = "alt-server.properties";
+    private static final String SGS_LOGGING = "alt-logging.properties";
+    private static final String SGS_LOGFILE = "alt.log";
     private static File distribution;
     
     private File testDirectory;
     private File installationDirectory;
     private Process server;
+    private Process stopper;
+    private String config;
+    
+    private File alternateDirectory;
+    private File alternateSGS_BOOT;
+    private File alternateSGS_DEPLOY;
+    private File alternateSGS_PROPERTIES;
+    private File alternateSGS_LOGGING;
+    private File alternateSGS_LOGFILE;
 
     /**
      * Main-line method that initiates the suite of tests against the given
@@ -73,20 +87,58 @@ public class BootAcceptance {
             tempDir += File.separator;
         }
 
+        //setup test directory
         File d  = new File(tempDir + BootAcceptance.TEST_DIR);
         if(d.exists()) {
             Assert.fail("Unable to create test directory " + 
                         "that already exists : " + d);
         }
-        
         Assert.assertTrue(d.mkdirs());
         this.testDirectory = d;
-        Util.unzip(new ZipFile(distribution), testDirectory);
         
+        //unzip installation into test directory
+        Util.unzip(new ZipFile(distribution), testDirectory);
         File[] files = testDirectory.listFiles();
         Assert.assertEquals(files.length, 1);
         this.installationDirectory = files[0];
         Assert.assertTrue(installationDirectory.isDirectory());
+
+        //setup alternate directory
+        File a = new File(installationDirectory, BootAcceptance.ALTERNATE_DIR);
+        if(a.exists()) {
+            Assert.fail("Unable to create alternate home directory " + 
+                        "that already exists : " + a);
+        }
+        
+        Assert.assertTrue(a.mkdirs());
+        this.alternateDirectory = a;
+        
+        alternateSGS_DEPLOY = new File(alternateDirectory, 
+                                       BootAcceptance.SGS_DEPLOY);
+        Assert.assertTrue(alternateSGS_DEPLOY.mkdirs());
+
+        this.alternateSGS_BOOT = new File(alternateDirectory,
+                                          BootAcceptance.SGS_BOOT);
+        Assert.assertFalse(alternateSGS_BOOT.exists());
+        
+        //copy sgs-server.properties to alternate location
+        File actualSGS_PROPERTIES = new File(installationDirectory,
+                                             "conf/sgs-server.properties");
+        this.alternateSGS_PROPERTIES = new File(alternateDirectory,
+                                                BootAcceptance.SGS_PROPERTIES);
+        Util.copyFileToFile(actualSGS_PROPERTIES, alternateSGS_PROPERTIES);
+        
+        //copy sgs-logging.properties to alternate location
+        File actualSGS_LOGGING = new File(installationDirectory,
+                                          "conf/sgs-logging.properties");
+        this.alternateSGS_LOGGING = new File(alternateDirectory,
+                                             BootAcceptance.SGS_LOGGING);
+        Util.copyFileToFile(actualSGS_LOGGING, alternateSGS_LOGGING);
+        
+        //specify location of logfile
+        this.alternateSGS_LOGFILE = new File(alternateDirectory,
+                                             BootAcceptance.SGS_LOGFILE);
+        
     }
     
     
@@ -97,16 +149,131 @@ public class BootAcceptance {
     @After
     public void removeTestDirectory() throws Exception {
         if(server != null) {
-            server.destroy();
+            Util.destroyProcess(stopper);
+            stopper = Util.shutdownPDS(installationDirectory, config);
         }
+        Util.destroyProcess(stopper);
+        Util.destroyProcess(server);
+        this.config = null;
+        this.server = null;
+        this.stopper = null;
         Assert.assertTrue(Util.deleteDirectory(testDirectory));
+        Assert.assertTrue(Util.deleteDirectory(alternateDirectory));
+    }
+    
+    @Test(timeout=5000)
+    public void testEmptyDeploy() throws Exception {
+        this.config = "";
+        this.server = Util.bootPDS(installationDirectory, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "WARNING: No application jar found with a" +
+                                 " META-INF/app.properties configuration file",
+                                 "SEVERE: Missing required property" +
+                                 " com.sun.sgs.app.name"));
+        
+        //ensure that the process has exited
+        try {
+            //give the process time to complete
+            Thread.sleep(500);
+            this.server.exitValue();
+            Util.destroyProcess(server);
+        } catch (IllegalThreadStateException e) {
+            Assert.fail("Server process has not exited but should have");
+        }
     }
     
     @Test(timeout=5000)
     public void testHelloWorldDefault() throws Exception {
         Util.loadTutorial(installationDirectory);
-        this.server = Util.bootPDS(installationDirectory, "");
+        this.config = "";
+        this.server = Util.bootPDS(installationDirectory, config);
         Assert.assertTrue(Util.expectLines(server, 
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCustomSGS_DEPLOY() throws Exception {
+        Util.loadTutorial(installationDirectory, alternateSGS_DEPLOY);
+        URL bootConfig = this.getClass().getResource(
+                "customSGS_DEPLOY.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, config);
+        Assert.assertTrue(Util.expectLines(server, 
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCustomSGS_PROPERTIES() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "customSGS_PROPERTIES.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        Util.clearSGS_PROPERTIES(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, config);
+        Assert.assertTrue(Util.expectLines(server, 
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCustomSGS_LOGGING() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "customSGS_LOGGING.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        Util.clearSGS_LOGGING(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, config);
+        Assert.assertTrue(Util.expectLines(server, 
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCustomALL_CONF() throws Exception {
+        Util.loadTutorial(installationDirectory, alternateSGS_DEPLOY);
+        URL bootConfig = this.getClass().getResource(
+                "customALL_CONF.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.clearALL_CONF(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, config);
+        Assert.assertTrue(Util.expectLines(server, 
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testCustomSGS_LOGFILE() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "customSGS_LOGFILE.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, config);
+        //give server time to boot
+        Thread.sleep(2000);
+        Assert.assertTrue(this.alternateSGS_LOGFILE.exists());
+        Assert.assertTrue(Util.expectLines(this.alternateSGS_LOGFILE,
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }

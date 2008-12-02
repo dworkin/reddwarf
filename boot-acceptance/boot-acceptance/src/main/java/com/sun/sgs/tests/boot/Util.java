@@ -34,6 +34,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
+import java.io.Closeable;
+import java.net.URL;
 
 import org.junit.Assert;
 
@@ -62,13 +64,39 @@ class Util {
     }
     
     /**
+     * Copies the source file to the destination file.
+     * 
+     * @param source
+     * @param destination
+     * @throws java.io.IOException
+     */
+    public static void copyFileToFile(File source, File destination) 
+            throws IOException {
+        Assert.assertTrue(source.exists());
+        Assert.assertTrue(source.isFile());
+        Assert.assertFalse(destination.exists());
+        
+        InputStream is = null;
+        OutputStream os = null;
+        try {
+            is = new BufferedInputStream(new FileInputStream(source));
+            os = new BufferedOutputStream(new FileOutputStream(destination));
+            copy(is, os);
+        } finally {
+            os.flush();
+            os.close();
+            is.close();
+        }
+    }
+    
+    /**
      * Copies the source file to the target directory.
      * 
      * @param source
      * @param targetDirectory
      * @throws java.io.IOException
      */
-    public static void copyFile(File source, File targetDirectory) 
+    public static void copyFileToDirectory(File source, File targetDirectory) 
             throws IOException {
         Assert.assertTrue(source.exists());
         Assert.assertTrue(source.isFile());
@@ -92,14 +120,40 @@ class Util {
     }
     
     /**
+     * Copies the source URL to the target file
+     * 
+     * @param source
+     * @param targetDirectory
+     * @throws java.io.IOException
+     */
+    public static void copyFile(URL source, File targetFile) 
+            throws IOException {
+        InputStream is = null;
+        OutputStream os = null;
+        try {
+            is = new BufferedInputStream(source.openStream());
+            os = new BufferedOutputStream(new FileOutputStream(targetFile));
+            copy(is, os);
+        } finally {
+            os.flush();
+            os.close();
+            is.close();
+        }
+    }
+    
+    /**
      * Recursively deletes the specified directory.
      * @param directory
      * @return
      */
     public static boolean deleteDirectory(File directory) {
+        if(!directory.exists()) {
+            //already deleted
+            return true;
+        }
+        
         Assert.assertTrue(directory.exists());
         Assert.assertTrue(directory.isDirectory());
-        
         for(File f : directory.listFiles()) {
             if(f.isDirectory()) {
                 deleteDirectory(f);
@@ -156,7 +210,23 @@ class Util {
         File tutorial = new File(directory, "tutorial/tutorial.jar");
         File deploy = new File(directory, "deploy");
         
-        copyFile(tutorial, deploy);
+        copyFileToDirectory(tutorial, deploy);
+    }
+    
+    /**
+     * Loads the tutorial into the PDS by copying the tutorial.jar
+     * file from the tutorial directory into the alternate deploy directory.
+     * This assumes that the given directory argument is the top level
+     * installation directory of PDS.
+     * 
+     * @param directory installation directory of PDS
+     * @param deploy the deploy directory to copy the tutorial to
+     */
+    public static void loadTutorial(File directory, File deploy) 
+            throws IOException {
+        File tutorial = new File(directory, "tutorial/tutorial.jar");
+        
+        copyFileToDirectory(tutorial, deploy);
     }
     
     /**
@@ -182,21 +252,124 @@ class Util {
     }
     
     /**
+     * Shuts down the PDS running in the given directory 
+     * from the given configuration.  The 
+     * configuration is either the filename given in the command arguments,
+     * or the default configuration if no filename is given.
+     * 
+     * @param args command line arguments to pass to the stopper
+     * @return the PDS stopper {@code Process}
+     */
+    public static Process shutdownPDS(File directory, String args) 
+            throws Exception {
+        File stopper = new File(directory, "bin/sgs-stop.jar");
+        Assert.assertTrue(stopper.exists());
+        
+        String command = "java -jar " + stopper.getAbsolutePath() +
+                " " + args;
+        List<String> commandList = Arrays.asList(command.split("\\s+"));
+        
+        ProcessBuilder pb = new ProcessBuilder(commandList);
+        pb.redirectErrorStream(true);
+        
+        Process p = pb.start();
+        
+        //give time for process to shutdown
+        Thread.sleep(500);
+        return p;
+    }
+    
+    /**
+     * Removes the sgs-boot.properties file from the default installation
+     * to ensure that it is not used.
+     * 
+     * @param directory installation directory
+     * @throws java.lang.Exception
+     */
+    public static void clearSGS_BOOT(File directory) throws Exception {
+        File f = new File(directory, "conf/sgs-boot.properties");
+        Assert.assertTrue(f.exists());
+        Assert.assertTrue(f.delete());
+    }
+    
+    /**
+     * Removes the sgs-server.properties file from the default installation
+     * to ensure that it is not used.
+     * 
+     * @param directory installation directory
+     * @throws java.lang.Exception
+     */
+    public static void clearSGS_PROPERTIES(File directory) throws Exception {
+        File f = new File(directory, "conf/sgs-server.properties");
+        Assert.assertTrue(f.exists());
+        Assert.assertTrue(f.delete());
+    }
+    
+    /**
+     * Removes the sgs-logging.properties file from the default installation
+     * to ensure that it is not used.
+     * 
+     * @param directory installation directory
+     * @throws java.lang.Exception
+     */
+    public static void clearSGS_LOGGING(File directory) throws Exception {
+        File f = new File(directory, "conf/sgs-logging.properties");
+        Assert.assertTrue(f.exists());
+        Assert.assertTrue(f.delete());
+    }
+    
+    /**
+     * Removes all conf files from the default installation
+     * to ensure that they are not used.
+     * 
+     * @param directory installation directory
+     * @throws java.lang.Exception
+     */
+    public static void clearALL_CONF(File directory) throws Exception {
+        clearSGS_BOOT(directory);
+        clearSGS_PROPERTIES(directory);
+        clearSGS_LOGGING(directory);
+    }
+    
+    /**
      * Parse the output of the process, only returning when each of the
      * lines of output have been seen.
      * 
      * @param p
      * @param lines
      */
-    public static boolean expectLines(Process p, String... lines) {
+    public static boolean expectLines(Process p, String... lines) 
+            throws IOException {
         InputStream processOutput = p.getInputStream();
         BufferedReader processReader = new BufferedReader(
                 new InputStreamReader(processOutput));
+        
+        return expectLines(processReader, lines);
+    }
+    
+    /**
+     * Parse the output of the file, only returning when each of the
+     * lines of output have been seen.
+     * 
+     * @param f
+     * @param lines
+     */
+    public static boolean expectLines(File f, String... lines) 
+            throws IOException {
+        InputStream fileOutput = new FileInputStream(f);
+        BufferedReader fileReader = new BufferedReader(
+                new InputStreamReader(fileOutput));
+        
+        return expectLines(fileReader, lines);
+    }
+    
+    private static boolean expectLines(BufferedReader reader, String... lines) 
+            throws IOException {
         String line = null;
         try {
             int lineNumber = 0;
-            while (((line = processReader.readLine()) != null) &&
-                    lineNumber < lines.length) {
+            while (lineNumber < lines.length && 
+                    ((line = reader.readLine()) != null)) {
                 if(line.indexOf(lines[lineNumber]) != -1) {
                     lineNumber++;
                 }
@@ -207,17 +380,43 @@ class Util {
             } else {
                 return false;
             }
-        } catch (IOException e) {
-            return false;
         } finally {
-            p.destroy();
             try {
-                if (processReader != null) {
-                    processReader.close();
+                if (reader != null) {
+                    reader.close();
                 }
             } catch (IOException ignore) {
                 
             }
+        }
+    }
+    
+    
+    /**
+     * Utility to ensure all streams for the {@code Process} are closed as
+     * well as destroy the process if it is still active.
+     * 
+     * @param p the {@code Process} to destroy
+     */
+    public static void destroyProcess(Process p) {
+        if (p != null) {
+            Util.close(p.getErrorStream());
+            Util.close(p.getInputStream());
+            Util.close(p.getOutputStream());
+            p.destroy();
+        }
+    }
+    
+    /**
+     * Utility method to close a {@code Closeable} object.
+     * 
+     * @param c the {@code Closeable} to close
+     */
+    public static void close(Closeable c) {
+        try {
+            c.close();
+        } catch (IOException e) {
+            
         }
     }
 }
