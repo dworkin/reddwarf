@@ -235,7 +235,7 @@ final class BootEnvironment {
                 }
             }
         }
-        logger.log(Level.CONFIG, "SGS_HOME set to " + sgsHome);
+        logger.log(Level.CONFIG, "SGS_HOME = " + sgsHome);
         
         //load defaults for missing properties
         configureDefaultProperties(properties);

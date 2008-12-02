@@ -19,10 +19,8 @@
 
 package com.sun.sgs.system;
 
-import java.io.PrintStream;
+import java.io.OutputStream;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -37,7 +35,7 @@ class ProcessOutputReader implements Runnable {
             Logger.getLogger(ProcessOutputReader.class.getName());
     
     private Process p;
-    private PrintStream output;
+    private OutputStream output;
     
     /**
      * Constructs a new {@code ProcessOutputReader}.
@@ -45,38 +43,29 @@ class ProcessOutputReader implements Runnable {
      * @param p the process to read from
      * @param output the output stream to write to
      */
-    public ProcessOutputReader(Process p, PrintStream output) {
+    public ProcessOutputReader(Process p, OutputStream output) {
         this.p = p;
         this.output = output;
     }
     
     /**
      * Reads the output from the {@code Process} associated with this object
-     * and outputs the results to the {@code PrintStream} associated with
+     * and outputs the results to the {@code OutputStream} associated with
      * this object.
      */
     @Override
     public void run() {
         InputStream processOutput = p.getInputStream();
-        BufferedReader processReader = new BufferedReader(
-                new InputStreamReader(processOutput));
-        String line = null;
+        byte[] buf = new byte[1024];
+        int count;
         try {
-            while ((line = processReader.readLine()) != null) {
-                output.println(line);
+            while ((count = processOutput.read(buf)) != -1) {
+                output.write(buf, 0, count);
+                output.flush();
             }
         } catch (IOException e) {
-            logger.log(Level.FINEST, "Process closed", e);
-            p.destroy();
-        } finally {
-            try {
-                if (processReader != null) {
-                    processReader.close();
-                }
-            } catch (IOException ignore) {
-                
-            }
-        }
+            logger.log(Level.FINEST, "Process output closed", e);
+        } 
     }
 
 }

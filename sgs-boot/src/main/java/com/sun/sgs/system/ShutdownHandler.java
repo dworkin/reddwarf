@@ -91,14 +91,26 @@ class ShutdownHandler implements Runnable {
             ShutdownHandler.close(p.getErrorStream());
             p.destroy();
         }
+        p = null;
         
+        close();
+    }
+    
+    /**
+     * Close the incoming socket and any already connected sessions.
+     */
+    synchronized void close() {
         //shutdown the incoming server socket
-        ShutdownHandler.close(listen);
+        if(listen != null) {
+            ShutdownHandler.close(listen);
+        }
+        listen = null;
         
         //shutdown any other connected sessions
         for (SocketListener connection : currentListeners) {
             connection.close();
         }
+        currentListeners.clear();
     }
 
     /**
@@ -124,7 +136,10 @@ class ShutdownHandler implements Runnable {
                 currentListeners.add(handle);
                 new Thread(handle).start();
             } catch (IOException e) {
+                logger.log(Level.FINEST, 
+                           "Shutdown socket server closed", e);
                 ShutdownHandler.close(listen);
+                break;
             }
         }
     }

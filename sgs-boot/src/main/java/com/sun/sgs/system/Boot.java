@@ -97,6 +97,7 @@ public final class Boot {
                 " " + javaOpts +
                 " " + BootEnvironment.KERNEL_CLASS +
                 " " + properties.getProperty(BootEnvironment.SGS_PROPERTIES);
+        logger.log(Level.CONFIG, "Execute path = " + execute);
         List<String> executeCmd = Arrays.asList(execute.split("\\s+"));
         
         //build the process
@@ -135,11 +136,11 @@ public final class Boot {
         //run the process
         try {
             Process p = pb.start();
-            Thread t = new Thread(new ProcessOutputReader(p, output));
-            t.start();
+            new Thread(new ProcessOutputReader(p, output)).start();
             shutdownHandler.setProcess(p);
             new Thread(shutdownHandler).start();
             p.waitFor();
+            shutdownHandler.close();
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to start process", e);
             throw e;
@@ -148,9 +149,6 @@ public final class Boot {
         } finally {
             output.close();
         }
-        
-        //terminate the process
-        System.exit(0);
     }
     
     /**
