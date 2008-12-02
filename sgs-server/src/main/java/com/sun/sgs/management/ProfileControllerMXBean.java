@@ -22,7 +22,9 @@ package com.sun.sgs.management;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 
 /**
- * The management information for this node's configuration.
+ * The management information for this node's profiling data.  The profiling
+ * levels for each of the individual profile consumers can be modified through 
+ * this interface.
  * <p>
  * An instance implementing this MBean can be obtained from the from the 
  * {@link java.lang.management.ManagementFactory.html#getPlatformMBeanServer() 
@@ -35,6 +37,8 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 public interface ProfileControllerMXBean {
     /** The name for uniquely identifying this MBean. */
     String PROFILE_MXBEAN_NAME = "com.sun.sgs:type=ProfileController";
+    
+    // Maybe add a way to add/remove listeners?
     
     /**
      * Get the default profile level for all newly created consumers.

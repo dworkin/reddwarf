@@ -91,16 +91,6 @@ class DataStoreStats implements DataStoreStatsMXBean {
      *     objects and register the MBean with JMX
      */
     public DataStoreStats(ProfileCollector collector, String name) {
-        // NOTE
-        // Set up profiling stuff.  Can this be done statically?
-        // What if I have a new ProfileStats (probably a bad name) object
-        // that can be registered with the ProfileConsumer, and has to 
-        // provide a getOperations method?  This is almost the same thing
-        // that we have today (but backwards, if you will), but will need
-        // profile* objects to be able to be instantiated, and they will
-        // be in a state where they cannot operation until registered.
-        // Or we could instantiate them with a ProfileConsumer, but it's
-        // hard to see the advantage of that.
         ProfileConsumer consumer = collector.getConsumer(name);
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
@@ -138,21 +128,7 @@ class DataStoreStats implements DataStoreStatsMXBean {
             consumer.createSample("readBytes", type, level);
 	writtenBytesSample = 
             consumer.createSample("writtenBytes", type, level);
-        // Don't hold on to samples for these values.  There will be lots
-        // of them, and we're generally only interested in the statistics.
-        ((AggregateProfileSample) readBytesSample).setCapacity(0);
-        ((AggregateProfileSample) writtenBytesSample).setCapacity(0);
-        
-        // Set up JMX stuff.  Register MXBean with platform.
-        // Or is this really handled by the  DataService???
-        //   Will we always require a 1-1 ProfileConsumer/JMX registration?
     }
-    
-    
-    // NOTE_   for non task profiling stuff, just add allow listeners
-    // to get at MXBeans directly?  Might need task (unsync) and non-task
-    // versions, to reduce synch?  But register one big JMX bean w/ platform.
-    // Use Atomic...
     
     /** {@inheritDoc} */
     public long getGetBindingCalls() {
@@ -244,6 +220,45 @@ class DataStoreStats implements DataStoreStatsMXBean {
         return ((AggregateProfileOperation) setObjectsOp).getCount();
     }
 
+    /** {@inheritDoc} */
+    public double getAvgReadBytesSample() {
+        return ((AggregateProfileSample) readBytesSample).getAverage();
+    }
+
+    /** {@inheritDoc} */
+    public double getAvgWrittenBytesSample() {
+        return ((AggregateProfileSample) writtenBytesSample).getAverage();
+    }
+
+    /** {@inheritDoc} */
+    public long getMaxReadBytesSample() {
+        return ((AggregateProfileSample) readBytesSample).getMaxSample();
+    }
+
+    /** {@inheritDoc} */
+    public long getMaxWrittenBytesSample() {
+        return ((AggregateProfileSample) writtenBytesSample).getMaxSample();
+    }
+
+    /** {@inheritDoc} */
+    public long getMinReadBytesSample() {
+        return ((AggregateProfileSample) readBytesSample).getMinSample();
+    }
+
+    /** {@inheritDoc} */
+    public long getMinWrittenBytesSample() {
+        return ((AggregateProfileSample) writtenBytesSample).getMinSample();
+    }
+
+    /** {@inheritDoc} */
+    public double getSmoothingFactor() {
+        return ((AggregateProfileSample) readBytesSample).getSmoothingFactor();
+    }
+
+    /** {@inheritDoc} */
+    public void setSmoothingFactor(double smooth) {
+        ((AggregateProfileSample) readBytesSample).setSmoothingFactor(smooth);
+        ((AggregateProfileSample) writtenBytesSample).
+                                                   setSmoothingFactor(smooth);
+    }
 }
-
-

@@ -36,6 +36,9 @@ public interface ClientSessionServiceMXBean {
     String SESSION_SERVICE_MXBEAN_NAME = 
             "com.sun.sgs.service:type=ClientSessionService";
     
+    // Maybe add number of active clients in the system, number
+    // of connects/disconnects?
+    
     /**
      * Returns the number of times {@link 
      * ClientSessionService#registerSessionDisconnectListener 

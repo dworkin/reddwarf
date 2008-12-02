@@ -910,7 +910,7 @@ public class TestProfileConsumerImpl {
     
     @Test
     public void testTaskAggregateSampleZeroCapacity() throws Exception {
-        final List<Long> expected = new LinkedList();
+        final List<Long> expected = new LinkedList<Long>();
         expected.add(Long.valueOf(5));
         expected.add(Long.valueOf(-1));
         expected.add(Long.valueOf(2));

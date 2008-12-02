@@ -93,12 +93,6 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
 //                consumer.createSample("failureRate", type, level);
         lagTime = (AggregateProfileSample)
                 consumer.createSample("lagTime", type, level);
-        // Don't actually save any of our sample values.  We expect
-        // a great number of them to be generated.
-        readyCount.setCapacity(0);
-        runtime.setCapacity(0);
-//        failureRate.setCapacity(0);
-        lagTime.setCapacity(0);
     }
     /** {@inheritDoc} */
     public void notifyTaskQueue() {

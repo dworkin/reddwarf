@@ -24,27 +24,26 @@ import com.sun.sgs.management.ConfigMXBean;
 import java.util.Properties;
 
 /**
- * The configuration manager for this node.
+ * The configuration manager for this node.  This object is immutable
+ * and contains various configuration values used when this node was
+ * started up.
  */
 class ConfigManager implements ConfigMXBean {
 
     private final String nodeType;
-    
     private final String appName;
-    
     private final String appRoot;
-    
     private final String appListener;
-    
     private final int appPort;
-    
     private final String serverHost;
-    
     private final int jmxPort;
-    
     private long txnTimeout;
 
-
+    /** 
+     * Create a config manager instance.
+     * @param props  properties
+     * @param coord  transaction coordinator
+     */
     public ConfigManager(Properties props, TransactionCoordinator coord) {
         String type = props.getProperty(StandardProperties.NODE_TYPE);
         if (type == null) {
@@ -61,6 +60,7 @@ class ConfigManager implements ConfigMXBean {
         appPort = (port == null) ? -1 : Integer.parseInt(port);
         appListener = props.getProperty(StandardProperties.APP_LISTENER);
         serverHost = props.getProperty(StandardProperties.SERVER_HOST, "none");
+        // Optional property
         String jmx = props.getProperty("com.sun.management.jmxremote.port");
         jmxPort = (jmx == null) ? -1 : Integer.parseInt(jmx);
         txnTimeout = coord.getTransactionTimeout();

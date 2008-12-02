@@ -31,7 +31,7 @@ import com.sun.sgs.profile.ProfileOperation;
 /**
  * The Statistics MBean object for the data service.
  */
-public class DataServiceStats implements DataServiceMXBean {
+class DataServiceStats implements DataServiceMXBean {
 
     // the profiled operations
     final ProfileOperation createRefOp;

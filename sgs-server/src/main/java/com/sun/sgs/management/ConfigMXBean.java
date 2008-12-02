@@ -20,7 +20,7 @@
 package com.sun.sgs.management;
 
 /**
- * The management information for this node's configuration.
+ * The immutable management information for this node's configuration.
  * <p>
  * An instance implementing this MBean can be obtained from the from the 
  * {@link java.lang.management.ManagementFactory.html#getPlatformMBeanServer() 
@@ -33,7 +33,9 @@ package com.sun.sgs.management;
 public interface ConfigMXBean {
     /** The name for uniquely identifying this MBean. */
     String CONFIG_MXBEAN_NAME = "com.sun.sgs:type=Config";
-
+    
+    // Maybe combine this object with the NodeInfo data?
+    
     /**
      * Return the type of this node, one of {@code singleNode}, 
      * {@code coreServerNode}, or {@code appNode}.

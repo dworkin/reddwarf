@@ -31,7 +31,7 @@ import com.sun.sgs.profile.ProfileOperation;
 /**
  * The Statistics MBean object for the channel service.
  */
-public class ChannelServiceStats implements ChannelServiceMXBean {
+class ChannelServiceStats implements ChannelServiceMXBean {
 
     final ProfileOperation createChannelOp;
     final ProfileOperation getChannelOp;

@@ -20,7 +20,8 @@
 package com.sun.sgs.management;
 
 /**
- *  A management interface to find the nodes in the system.
+ *  A management interface for all the nodes in the system, available
+ *  only from the core server node.
  */
 public interface NodesMXBean {
     /** The name for uniquely identifying this MBean. */

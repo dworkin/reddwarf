@@ -1,0 +1,105 @@
+/*
+ * Copyright 2008 Sun Microsystems, Inc.
+ *
+ * This file is part of Project Darkstar Server.
+ *
+ * Project Darkstar Server is free software: you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation and
+ * distributed hereunder to you.
+ *
+ * Project Darkstar Server is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package com.sun.sgs.management;
+
+import com.sun.sgs.service.WatchdogService;
+
+/**
+ * The management interface for the watchdog service.
+ * <p>
+ * An instance implementing this MBean can be obtained from the from the 
+ * {@link java.lang.management.ManagementFactory.html#getPlatformMBeanServer() 
+ * getPlatformMBeanServer} method.
+ * <p>
+ * The {@code ObjectName} for uniquely identifying this MBean is
+ * {@value #WATCHDOG_SERVICE_MXBEAN_NAME}.
+ * 
+ */
+public interface WatchdogServiceMXBean {
+    /** The name for uniquely identifying this MBean. */
+    String WATCHDOG_SERVICE_MXBEAN_NAME = 
+            "com.sun.sgs.service:type=WatchdogService";
+    
+    /**
+     * Returns the number of times {@link WatchdogService#addNodeListener 
+     * addNodeListener} has been called.
+     * 
+     * @return the number of times {@code addNodeListener} has been called
+     */
+    long getAddNodeListenerCalls();
+        
+    /**
+     * Returns the number of times {@link WatchdogService#addRecoveryListener 
+     * addRecoveryListener} has been called.
+     * 
+     * @return the number of times {@code addRecoveryListener} has been called
+     */
+    long getAddRecoveryListenerCalls();
+        
+    /**
+     * Returns the number of times {@link WatchdogService#getBackup 
+     * getBackup} has been called.
+     * 
+     * @return the number of times {@code getBackup} has been called
+     */
+    long getGetBackupCalls();
+        
+    /**
+     * Returns the number of times {@link WatchdogService#getLocalNodeId 
+     * getLocalNodeId} has been called.
+     * 
+     * @return the number of times {@code getLocalNodeId} has been called
+     */
+    long getGetLocalNodeIdCalls();
+        
+    /**
+     * Returns the number of times {@link WatchdogService#getNode 
+     * getNode} has been called.
+     * 
+     * @return the number of times {@code getNode} has been called
+     */
+    long getGetNodeCalls();
+        
+    /**
+     * Returns the number of times {@link WatchdogService#getNodes 
+     * getNodes} has been called.
+     * 
+     * @return the number of times {@code getNodes} has been called
+     */
+    long getGetNodesCalls();
+        
+    /**
+     * Returns the number of times {@link WatchdogService#isLocalNodeAlive 
+     * isLocalNodeAlive} has been called.
+     * 
+     * @return the number of times {@code isLocalNodeAlive} has been called
+     */
+    long getIsLocalNodeAliveCalls();
+        
+    /**
+     * Returns the number of times 
+     * {@link WatchdogService#isLocalNodeAliveNonTransactional 
+     * isLocalNodeAliveNonTransactional} has been called.
+     * 
+     * @return the number of times {@code isLocalNodeAliveNonTransactional} 
+     *         has been called
+     */
+    long getIsLocalNodeAliveNonTransactionalCalls();
+}

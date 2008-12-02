@@ -24,7 +24,6 @@ import java.io.Serializable;
 
 /**
  *  Management information about a single node.
- * 
  */
 public class NodeInfo implements Serializable {
     /** The serialVersionUID of this class. */
@@ -37,9 +36,13 @@ public class NodeInfo implements Serializable {
     private long backup;
     private int jmxPort;
     
-    // TODO: an enum to say what sort of node this is?
+    // Maybe combine this with the ConfigMXBean?
+    //
     // some sort of health metric:  red, yellow, green?
     // whether it is recovering something (and what?)
+    // coordinator for any channels?
+    // time booted/time failed?
+    // method to shut down the node?
     
     /**
      * Creates a NodeInfo object.

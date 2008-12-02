@@ -31,7 +31,7 @@ import com.sun.sgs.profile.ProfileOperation;
 /**
  * The Statistics MBean object for the client session service.
  */
-public class ClientSessionServiceStats implements ClientSessionServiceMXBean {
+class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
     final ProfileOperation registerSessionDisconnectListenerOp;
     final ProfileOperation sendProtocolMessageNonTransactionalOp;

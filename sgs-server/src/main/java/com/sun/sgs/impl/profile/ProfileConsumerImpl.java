@@ -47,7 +47,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * data to a backing <code>ProfileCollectorImpl</code>.
  */
 class ProfileConsumerImpl implements ProfileConsumer {
-    public static final int DEFAULT_SAMPLE_AGGREGATE_CAPACITY = 1000;
+    /** The default aggregate sample capacity. */
+    public static final int DEFAULT_SAMPLE_AGGREGATE_CAPACITY = 0;
+    /** 
+     * The default aggregate sample smoothing capacity, for calculating
+     * the exponential weighted average of the samples.
+     */
+    public static final double DEFAULT_SAMPLE_AGGREGATE_SMOOTHING = 0.7;
     
     // the fullName of the consumer
     private final String name;
@@ -213,7 +219,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * {@inheritDoc}
      * <p>
      * The default capacity of the created {@code ProfileSample} is 
-     * {@value #DEFAULT_SAMPLE_AGGREGATE_CAPACITY}.
+     * {@value #DEFAULT_SAMPLE_AGGREGATE_CAPACITY} and can be modified
+     * by calling {@link AggregateProfileSample#setCapacity}.
+     * <p>
+     * These samples use an exponential weighted average to calculate
+     * their averages.  The default smoothing factor for the aggregate sample
+     * is {@value #DEFAULT_SAMPLE_AGGREGATE_SMOOTHING} and can be modified
+     * by calling {@link AggregateProfileSample#setSmoothingFactor}.
      */
     public synchronized ProfileSample createSample(String name, 
             ProfileDataType type, ProfileLevel minLevel) 
@@ -569,22 +581,12 @@ class ProfileConsumerImpl implements ProfileConsumer {
     private class AggregateProfileSampleImpl
             extends AbstractProfileData 
             implements AggregateProfileSample
-    {    
-//        private final LinkedList<Long> samples = new LinkedList<Long>();
-//        private final LinkedBlockingDeque<Long> samples =
-//                new LinkedBlockingDeque<Long>();
+    {
         private final Queue<Long> samples =
                 new ConcurrentLinkedQueue<Long>();
         private final AtomicInteger roughSize = new AtomicInteger();
 	private int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;       
-	
-        /** 
-         * Smoothing factor for exponential smoothing, between 0 and 1.
-         * A value closer to one provides less smoothing of the data, and
-         * more weight to recent data;  a value closer to zero provides more
-         * smoothing but is less responsive to recent changes.
-         */
-        private float smoothingFactor = (float) 0.7;
+        private double smoothingFactor = DEFAULT_SAMPLE_AGGREGATE_SMOOTHING;
         private long minSampleValue = Long.MAX_VALUE;
         private long maxSampleValue = Long.MIN_VALUE;
         private final ExponentialAverage avgSampleValue = 
@@ -603,15 +605,16 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 return;
             }
             
-//            synchronized (this) {
-                if (capacity > 0) {
-                    if (samples.size() == capacity) {
-                        samples.remove(); // remove oldest
-                    } else {
-                        roughSize.incrementAndGet();
-                    }
-                    samples.add(value);
+            if (capacity > 0) {
+                if (samples.size() == capacity) {
+                    samples.remove(); // remove oldest
+                } else {
+                    roughSize.incrementAndGet();
                 }
+                samples.add(value);
+            }
+            
+            synchronized (this) {
                 // Update the statistics
                 if (value > maxSampleValue) {
                     maxSampleValue = value;
@@ -619,7 +622,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 if (value < minSampleValue) {
                     minSampleValue = value;
                 }
-            synchronized (this) {
+            
                 avgSampleValue.update(value);
             }
         }
@@ -631,7 +634,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
          
          /** {@inheritDoc} */
          public int getNumSamples() {
-//             return samples.size();
              return roughSize.intValue();
          }
          
@@ -673,6 +675,21 @@ class ProfileConsumerImpl implements ProfileConsumer {
             this.capacity = capacity; 
         }
         
+        /** {@inheritDoc} */
+        public void setSmoothingFactor(double smooth) {
+            if (smooth < 0.0 || smooth > 1.0) {
+                throw new IllegalArgumentException(
+                        "Smoothing factor must be between 0 and 100, was " 
+                      + smooth);
+            }
+            smoothingFactor = smooth;
+        }
+        
+        /** {@inheritDoc} */
+        public double getSmoothingFactor() {
+            return smoothingFactor;
+        }
+        
         private class ExponentialAverage {
             private boolean first = true;
             private double last;
@@ -699,7 +716,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     avg = (sample - last) * smoothingFactor + last;
                 }
                 last = avg;
-//                System.out.println("avg: " + avg);
             }
             
             void clear() {

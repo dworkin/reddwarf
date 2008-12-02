@@ -33,10 +33,11 @@ import com.sun.sgs.service.NodeMappingService;
  * 
  */
 public interface NodeMappingServiceMXBean {
-
     /** The name for uniquely identifying this MBean. */
     String NODEMAP_SERVICE_MXBEAN_NAME = 
                                 "com.sun.sgs.service:type=NodeMappingService";
+    // Maybe add number of active identities on this node? 
+    //   (don't know how to capture that)
     
     /**
      * Returns the number of times 

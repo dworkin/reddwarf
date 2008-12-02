@@ -20,6 +20,7 @@
 package com.sun.sgs.management;
 
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.profile.AggregateProfileSample;
 
 /**
  * The management interface for data store information.
@@ -180,24 +181,66 @@ public interface DataStoreStatsMXBean
      * @return the total number of bytes read written to data store
      */
     long getWrittenBytesCount();
+    
     /**
      * Returns the total number of objects read written to data store.
      * @return the total number of objects read written to data store
      */
     long getWrittenObjectsCount();
 
-//
-//    /**
-//     * Records a list of the number of bytes read by calls to the getObject
-//     * method.
-//     */
-//    private final ProfileSample readBytesSample;
-//
-//    /**
-//     * Records a list of the number of bytes written by calls to the setObject
-//     * and setObjects methods.
-//     */
-//    private final ProfileSample writtenBytesSample;
+    /**
+     * Returns the smoothing factor in effect for the data store aggregate
+     * statistics.
+     * @return the smoothing factor
+     */
+    double getSmoothingFactor();
+    
+    /**
+     * Sets the smoothing factor in effect for the data store aggregate
+     * statistics.
+     * @see AggregateProfileSample#setSmoothingFactor
+     * @param smooth the smoothing factor
+     */
+    void setSmoothingFactor(double smooth);
+    
+    /**
+     * Returns the maximum written byte sample value.
+     * @return the maximum written byte sample value
+     */
+    long getMaxWrittenBytesSample();
+    
+    /**
+     * Returns the mimimum written byte sample value.
+     * @return the mimimum written byte sample value
+     */
+    long getMinWrittenBytesSample();
+    
+    /**
+     * Returns the average written byte sample value, smoothed with the
+     * smoothing factor.
+     * @return the average written byte sample value.
+     */
+    double getAvgWrittenBytesSample();
+    
+    /**
+     * Returns the maximum read byte sample value.
+     * @return the maximum read byte sample value
+     */
+    long getMaxReadBytesSample();
+    
+    /**
+     * Returns the mimimum read byte sample value.
+     * @return the mimimum read byte sample value
+     */
+    long getMinReadBytesSample();
+    
+    /**
+     * Returns the average read byte sample value, smoothed with the
+     * smoothing factor.
+     * @return the average read byte sample value.
+     */
+    double getAvgReadBytesSample();
+
 }
 
 

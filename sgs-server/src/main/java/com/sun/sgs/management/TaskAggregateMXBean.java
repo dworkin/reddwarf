@@ -32,8 +32,7 @@ package com.sun.sgs.management;
  */
 public interface TaskAggregateMXBean {
     /** The name for uniquely identifying this MBean. */
-    String TASK_AGGREGATE_MXBEAN_NAME = 
-                                "com.sun.sgs.service:type=TaskAggregate";
+    String TASK_AGGREGATE_MXBEAN_NAME = "com.sun.sgs:type=TaskAggregate";
     /**
      * Returns the total number of tasks run.
      * @return the total number of tasks run

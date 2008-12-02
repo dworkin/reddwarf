@@ -72,7 +72,8 @@ public interface AggregateProfileSample extends ProfileSample {
     long getMinSample();
     
     /**
-     * Returns the number of samples added.
+     * Returns the number of samples added, which will be a value between
+     * {@code 0} and the current {@code capacity}.
      * 
      * @return the number of samples added
      */
@@ -92,11 +93,31 @@ public interface AggregateProfileSample extends ProfileSample {
      * due to capacity restrictions has no effect on the other aggregated
      * statistics.
      * <p>
-     * A limit of {code 0} indicates that no samples should be held,
+     * A limit of {@code 0} indicates that no samples should be held,
      * but the statistics should be gathered.
      * 
      * @param capacity the maximum number of samples this object can hold
      * @throws IllegalArgumentException if the capacity is negative
      */
     void setCapacity(int capacity);
+    
+    /**
+     * Set the smoothing factor used for calculating the average of the
+     * added samples.  The smoothing factor must be a value between 
+     * {@code 0.0} and {@code 1.0}, inclusive.
+     * <p>
+     * A value closer to {@code 1.0} provides less smoothing of the data, 
+     * and more weight to recent data;  a value closer to {@code 0.0} provides
+     * more smoothing but is less responsive to recent changes.
+     *
+     * @param smooth the smoothing factor
+     */
+    void setSmoothingFactor(double smooth);
+    
+    /**
+     * The current smoothing factor in effect for calculating the average
+     * of the added samples.
+     * @return the current smoothing factor
+     */
+    double getSmoothingFactor();
 }
