@@ -20,7 +20,8 @@
 package com.sun.sgs.system;
 
 import java.io.File;
-import java.io.PrintStream;
+import java.io.OutputStream;
+import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.FileNotFoundException;
@@ -107,7 +108,7 @@ public final class Boot {
         pb.redirectErrorStream(true);
         
         //get the output stream
-        PrintStream output = System.out;
+        OutputStream output = System.out;
         String logFile = properties.getProperty(BootEnvironment.SGS_LOGFILE);
         if (logFile != null) {
             try {
@@ -120,7 +121,8 @@ public final class Boot {
                 }
                 
                 //create a stream for the log file
-                output = new PrintStream(new FileOutputStream(logFile), true);
+                output = new BufferedOutputStream(
+                        new FileOutputStream(logFile));
                 logger.log(Level.INFO, "Redirecting log output to: " + logFile);
             } catch (FileNotFoundException e) {
                 logger.log(Level.SEVERE, "Unable to open log file", e);
@@ -136,11 +138,10 @@ public final class Boot {
         //run the process
         try {
             Process p = pb.start();
-            new Thread(new ProcessOutputReader(p, output)).start();
+            new Thread(new StreamPipe(p.getInputStream(), output)).start();
             shutdownHandler.setProcess(p);
             new Thread(shutdownHandler).start();
             p.waitFor();
-            shutdownHandler.close();
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to start process", e);
             throw e;
@@ -148,6 +149,7 @@ public final class Boot {
             logger.log(Level.WARNING, "Thread interrupted", i);
         } finally {
             output.close();
+            shutdownHandler.close();
         }
     }
     

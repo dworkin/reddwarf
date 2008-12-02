@@ -35,7 +35,7 @@ import java.util.logging.Level;
  * This class is a simple socket server that waits for incoming connections
  * on localhost on the given port number.  Any incoming connections spawn
  * a new thread and will initiate a clean shutdown of the Project Darkstar
- * server if a {@link BootEnviroment#SHUTDOWN_COMMAND} command is sent.
+ * server if a {@link BootEnviroment#SHUTDOWN_COMMAND} command is received.
  */
 class ShutdownHandler implements Runnable {
     
@@ -101,10 +101,9 @@ class ShutdownHandler implements Runnable {
      */
     synchronized void close() {
         //shutdown the incoming server socket
-        if(listen != null) {
+        if (!listen.isClosed()) {
             ShutdownHandler.close(listen);
         }
-        listen = null;
         
         //shutdown any other connected sessions
         for (SocketListener connection : currentListeners) {
