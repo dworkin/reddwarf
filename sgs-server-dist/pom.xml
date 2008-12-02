@@ -28,6 +28,10 @@
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-stop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server</artifactId>
     </dependency>
     <dependency>

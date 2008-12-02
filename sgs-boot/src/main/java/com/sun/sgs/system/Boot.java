@@ -19,7 +19,6 @@
 
 package com.sun.sgs.system;
 
-import java.net.URL;
 import java.io.File;
 import java.io.PrintStream;
 import java.io.FileOutputStream;
@@ -70,50 +69,12 @@ public final class Boot {
         }
         
         //load properties from configuration file
-        SubstitutionProperties properties = new SubstitutionProperties();
-        URL sgsBoot = null;
-        try {
-            if (args.length == 0) {
-                sgsBoot = ClassLoader.getSystemClassLoader().
-                        getResource(BootEnvironment.SGS_BOOT);
-            } else {
-                sgsBoot = new File(args[0]).toURI().toURL();
-            }
-            properties.load(sgsBoot.openStream());
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Unable to load initial configuration", e);
-            throw e;
+        SubstitutionProperties properties = null;
+        if (args.length == 0) {
+            properties = BootEnvironment.loadProperties(null);
+        } else {
+            properties = BootEnvironment.loadProperties(args[0]);
         }
-        
-        //determine SGS_HOME
-        String sgsHome = properties.getProperty(BootEnvironment.SGS_HOME);
-        if (sgsHome == null) {
-            properties.clear();
-            URL jarLocation = Boot.class.getProtectionDomain().getCodeSource().
-                    getLocation();
-            String jarPath = jarLocation.getPath();
-            int jarFileIndex = jarPath.indexOf(BootEnvironment.SGS_JAR);
-            if (jarFileIndex == -1) {
-                logger.log(Level.SEVERE, "Unable to determine SGS_HOME");
-                throw new IllegalStateException("Unable to determine SGS_HOME");
-            } else {
-                sgsHome = jarPath.substring(0, jarFileIndex - 1);
-                properties.setProperty(BootEnvironment.SGS_HOME, sgsHome);
-                //reload the properties so that the value for SGS_HOME
-                //is interpolated correctly in any other variables
-                try {
-                    properties.load(sgsBoot.openStream());
-                } catch (IOException e) {
-                    logger.log(Level.SEVERE, 
-                               "Unable to load initial configuration", e);
-                    throw e;
-                }
-            }
-        }
-        logger.log(Level.CONFIG, "SGS_HOME set to " + sgsHome);
-        
-        //load defaults for missing properties
-        configureDefaultProperties(properties);
         
         //get the java executable
         String javaCmd = "java";
@@ -178,7 +139,6 @@ public final class Boot {
             t.start();
             shutdownHandler.setProcess(p);
             new Thread(shutdownHandler).start();
-            t.join();
             p.waitFor();
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to start process", e);
@@ -188,71 +148,9 @@ public final class Boot {
         } finally {
             output.close();
         }
-    }
-    
-    /**
-     * Loads default values for the given set of properties if any
-     * required properties are missing.
-     * 
-     * @param properties the set of boot configuration properties
-     */
-    private static void configureDefaultProperties(
-            SubstitutionProperties properties) {
         
-        //load defaults for any missing properties
-        if (properties.getProperty(BootEnvironment.SGS_DEPLOY) == null) {
-            properties.setProperty(BootEnvironment.SGS_DEPLOY,
-                                   BootEnvironment.DEFAULT_SGS_DEPLOY);
-        }
-        if (properties.getProperty(BootEnvironment.SGS_LOGGING) == null) {
-            properties.setProperty(BootEnvironment.SGS_LOGGING,
-                                   BootEnvironment.DEFAULT_SGS_LOGGING);
-        }
-        if (properties.getProperty(BootEnvironment.SGS_PROPERTIES) == null) {
-            properties.setProperty(BootEnvironment.SGS_PROPERTIES,
-                                   BootEnvironment.DEFAULT_SGS_PROPERTIES);
-        }
-        if (properties.getProperty(BootEnvironment.BDB_TYPE) == null) {
-            properties.setProperty(BootEnvironment.BDB_TYPE,
-                                   BootEnvironment.DEFAULT_BDB_TYPE);
-        }
-        if(properties.getProperty(BootEnvironment.SHUTDOWN_PORT) == null) {
-            properties.setProperty(BootEnvironment.SHUTDOWN_PORT,
-                                   BootEnvironment.DEFAULT_SHUTDOWN_PORT);
-        }
-        
-        //autodetect BDB libraries if necessary
-        if (properties.getProperty(BootEnvironment.BDB_NATIVES) == null) {
-            String family = System.getProperty("os.family");
-            String name = System.getProperty("os.name");
-            String arch = System.getProperty("os.arch");
-
-            String bdb = null;
-            if (name.equals("Linux") && arch.equals("i386")) {
-                bdb = BootEnvironment.DEFAULT_BDB_LINUX_X86;
-            } else if (name.equals("Linux") &&
-                    (arch.equals("x86_64") || arch.equals("amd64"))) {
-                bdb = BootEnvironment.DEFAULT_BDB_LINUX_X86_64;
-            } else if (family.equals("mac") &&
-                    (arch.equals("i386") || arch.equals("x86_64"))) {
-                bdb = BootEnvironment.DEFAULT_BDB_MACOSX_X86;
-            } else if (family.equals("mac") && arch.equals("ppc")) {
-                bdb = BootEnvironment.DEFAULT_BDB_MACOSX_PPC;
-            } else if (name.equals("SunOS") && arch.equals("sparc")) {
-                bdb = BootEnvironment.DEFAULT_BDB_SOLARIS_SPARC;
-            } else if (name.equals("SunOS") && arch.equals("x86")) {
-                bdb = BootEnvironment.DEFAULT_BDB_SOLARIS_X86;
-            } else if (family.equals("windows")) {
-                bdb = BootEnvironment.DEFAULT_BDB_WIN32_X86;
-            } else {
-                logger.log(Level.SEVERE, "Unsupported platform: \n" +
-                           "Family: " + family + "\n" +
-                           "Name: " + name + "\n" +
-                           "Arch: " + arch);
-                throw new IllegalStateException("Unsupported platform");
-            }
-            properties.setProperty(BootEnvironment.BDB_NATIVES, bdb);
-        }
+        //terminate the process
+        System.exit(0);
     }
     
     /**

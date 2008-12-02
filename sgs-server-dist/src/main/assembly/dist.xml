@@ -9,6 +9,7 @@
     <dependencySet>
       <includes>
         <include>com.projectdarkstar.server:sgs-boot</include>
+	<include>com.projectdarkstar.server:sgs-stop</include>
       </includes>
       <outputDirectory>bin</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>

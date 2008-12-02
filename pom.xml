@@ -35,6 +35,7 @@
 
   <modules>
     <module>sgs-boot</module>
+    <module>sgs-stop</module>
     <module>sgs-server</module>
     <module>sgs-server-api</module>
     <module>sgs-server-dist</module>
@@ -107,6 +108,11 @@
       <dependency>
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-boot</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-stop</artifactId>
 	<version>${sgs.version}</version>
       </dependency>
       <dependency>

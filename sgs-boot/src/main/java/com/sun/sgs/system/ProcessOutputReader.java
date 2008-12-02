@@ -31,7 +31,7 @@ import java.util.logging.Level;
  * Reads output stream from a process and writes it to the
  * given stream.
  */
-public class ProcessOutputReader implements Runnable {
+class ProcessOutputReader implements Runnable {
     
     private static final Logger logger = 
             Logger.getLogger(ProcessOutputReader.class.getName());
@@ -66,7 +66,7 @@ public class ProcessOutputReader implements Runnable {
                 output.println(line);
             }
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "Unable to read process output", e);
+            logger.log(Level.FINEST, "Process closed", e);
             p.destroy();
         } finally {
             try {

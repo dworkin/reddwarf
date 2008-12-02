@@ -25,27 +25,30 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.InetAddress;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
 /**
- * Monitors a specific port for incoming connections.
+ * This class is a simple socket server that waits for incoming connections
+ * on localhost on the given port number.  Any incoming connections spawn
+ * a new thread and will initiate a clean shutdown of the Project Darkstar
+ * server if a {@link BootEnviroment#SHUTDOWN_COMMAND} command is sent.
  */
-public class ShutdownHandler implements Runnable {
+class ShutdownHandler implements Runnable {
     
     private static final Logger logger = 
             Logger.getLogger(ShutdownHandler.class.getName());
-    private static final String SHUTDOWN = "SHUTDOWN";
     
     private Process p;
     private ServerSocket listen;
     private Set<SocketListener> currentListeners;
     
     /**
-     * Constructs a new {@code ShutdownHandlerListener} that will
-     * wait for incoming connections on the given port
+     * Constructs a new {@code ShutdownHandler} that will
+     * wait for incoming connections on localhost on the given port
      * 
      * @param p the child process to destroy upon shutdown
      * @param port the port number to listen on
@@ -54,7 +57,7 @@ public class ShutdownHandler implements Runnable {
             throws IOException {
         this.currentListeners = new HashSet<SocketListener>();
         try {
-            listen = new ServerSocket(port);
+            listen = new ServerSocket(port, -1, InetAddress.getLocalHost());
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to listen on port : " + port, e);
             throw e;
@@ -63,7 +66,7 @@ public class ShutdownHandler implements Runnable {
     
     /**
      * Set the {@code Process} that this handler will destroy upon
-     * receiving a {@link ShutdownHandler#SHUTDOWN} command.
+     * receiving a {@link BootEnvironment#SHUTDOWN_COMMAND} command.
      * 
      * @param p the {@code Process} to destroy
      */
@@ -73,7 +76,8 @@ public class ShutdownHandler implements Runnable {
     
     /**
      * This method should be called upon receiving a
-     * {@link ShutdownHandler#SHUTDOWN} command from a connected {@code Socket}.
+     * {@link BootEnvironment#SHUTDOWN_COMMNAD} command from a connected 
+     * {@code Socket}.
      * This method destroys the {@code Process} set via the 
      * {@link #setProcess(java.lang.Process)} method, closes the incoming
      * {@code ServerSocket} that is listening for incoming shutdown connections,
@@ -92,7 +96,7 @@ public class ShutdownHandler implements Runnable {
         ShutdownHandler.close(listen);
         
         //shutdown any other connected sessions
-        for(SocketListener connection : currentListeners) {
+        for (SocketListener connection : currentListeners) {
             connection.close();
         }
     }
@@ -106,14 +110,14 @@ public class ShutdownHandler implements Runnable {
      */
     @Override
     public void run() {
-        synchronized(this) {
-            if(p == null) {
+        synchronized (this) {
+            if (p == null) {
                 throw new IllegalStateException("ShutdownHandler cannot be " +
                         "started before Process is set");
             }
         }
         
-        while(true) {
+        while (true) {
             try {
                 Socket incoming = listen.accept();
                 SocketListener handle = new SocketListener(incoming);
@@ -125,13 +129,29 @@ public class ShutdownHandler implements Runnable {
         }
     }
     
+    /**
+     * A simple listener that monitors an connected {@code Socket} for a
+     * {@link BootEnvironment#SHUTDOWN_COMMAND} command.
+     */
     private class SocketListener implements Runnable {
         private Socket socket;
 
+        /**
+         * Creates a new {@code SocketListener} for the given {@code Socket}.
+         * 
+         * @param socket the connected {@code Socket}
+         */
         public SocketListener(Socket socket) {
             this.socket = socket;
         }
 
+        /**
+         * Monitors the connected socket for a 
+         * {@link BootEnvironment#SHUTDOWN_COMMAND} command.
+         * If the command is received, this method closes the socket
+         * server and initiates a complete shutdown of the Project Darkstar
+         * server.
+         */
         @Override
         public void run() {
             BufferedReader in = null;
@@ -140,14 +160,14 @@ public class ShutdownHandler implements Runnable {
                         new InputStreamReader(socket.getInputStream()));
                 String inputLine = "";
                 while ((inputLine = in.readLine()) != null) {
-                    if (inputLine.equals(SHUTDOWN)) {
+                    if (inputLine.equals(BootEnvironment.SHUTDOWN_COMMAND)) {
                         shutdown();
                         break;
                     }
                 }
             } catch (IOException e) {
-                logger.log(Level.WARNING, 
-                           "Unable to read from incoming socket", e);
+                logger.log(Level.FINEST, 
+                           "Shutdown socket closed", e);
             } finally {
                 currentListeners.remove(this);
                 ShutdownHandler.close(in);
@@ -155,6 +175,9 @@ public class ShutdownHandler implements Runnable {
             }
         }
         
+        /**
+         * Closes this thread's open {@link Socket}.
+         */
         public void close() {
             ShutdownHandler.close(socket);
         }
