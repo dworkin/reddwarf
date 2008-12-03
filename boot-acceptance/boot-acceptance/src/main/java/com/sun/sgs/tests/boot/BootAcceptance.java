@@ -46,6 +46,9 @@ public class BootAcceptance {
     private static final String SGS_LOGGING = "alt-logging.properties";
     private static final String SGS_LOGFILE = "alt.log";
     private static final String CONFIG_LOGGING = "config.logging";
+    private static final int TIMEOUT = 10000;
+    private static final int SMALL_PAUSE = 1000;
+    private static final int LARGE_PAUSE = 5000;
     private static File distribution;
     
     private File testDirectory;
@@ -168,6 +171,7 @@ public class BootAcceptance {
         if(server != null) {
             Util.destroyProcess(stopper);
             stopper = Util.shutdownPDS(installationDirectory, config);
+            stopper.waitFor();
         }
         Util.destroyProcess(stopper);
         Util.destroyProcess(server);
@@ -185,7 +189,7 @@ public class BootAcceptance {
     /**
      * Verify proper behavior with an empty deploy directory
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testEmptyDeploy() throws Exception {
         this.config = "";
         this.server = Util.bootPDS(installationDirectory, null, config);
@@ -199,7 +203,7 @@ public class BootAcceptance {
         //ensure that the process has exited
         try {
             //give the process time to complete
-            Thread.sleep(500);
+            Thread.sleep(SMALL_PAUSE);
             this.server.exitValue();
             Util.destroyProcess(server);
         } catch (IllegalThreadStateException e) {
@@ -210,7 +214,7 @@ public class BootAcceptance {
     /**
      * Default tutorial copied into the deploy directory
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testHelloWorldDefault() throws Exception {
         Util.loadTutorial(installationDirectory);
         this.config = "";
@@ -223,7 +227,7 @@ public class BootAcceptance {
     /**
      * Test using a custom sgs-boot properties with custom SGS_DEPLOY directory
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCustomSGS_DEPLOY() throws Exception {
         Util.loadTutorial(installationDirectory, alternateSGS_DEPLOY);
         URL bootConfig = this.getClass().getResource(
@@ -234,7 +238,7 @@ public class BootAcceptance {
         
         this.config = alternateSGS_BOOT.getAbsolutePath();
         this.server = Util.bootPDS(installationDirectory, null, config);
-        Assert.assertTrue(Util.expectLines(server, 
+        Assert.assertTrue(Util.expectLines(server,
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }
@@ -242,7 +246,7 @@ public class BootAcceptance {
     /**
      * Test using custom sgs-boot properties with custom SGS_PROEPERTIES file
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCustomSGS_PROPERTIES() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -262,7 +266,7 @@ public class BootAcceptance {
     /**
      * Test using custom sgs-boot properties with custom SGS_LOGGING file
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCustomSGS_LOGGING() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -283,7 +287,7 @@ public class BootAcceptance {
      * Test using custom sgs-boot properties with a custom
      * SGS_DEPLOY directory, SGS_PROPERTIES file, and SGS_LOGGING file
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCustomALL_CONF() throws Exception {
         Util.loadTutorial(installationDirectory, alternateSGS_DEPLOY);
         URL bootConfig = this.getClass().getResource(
@@ -302,7 +306,7 @@ public class BootAcceptance {
     /**
      * Test with a configured SGS_LOGFILE to redirect output
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCustomSGS_LOGFILE() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -314,7 +318,7 @@ public class BootAcceptance {
         this.config = alternateSGS_BOOT.getAbsolutePath();
         this.server = Util.bootPDS(installationDirectory, null, config);
         //give server time to boot
-        Thread.sleep(2000);
+        Thread.sleep(LARGE_PAUSE);
         Assert.assertTrue(this.alternateSGS_LOGFILE.exists());
         Assert.assertTrue(Util.expectLines(this.alternateSGS_LOGFILE,
                                            "The Kernel is ready",
@@ -324,7 +328,7 @@ public class BootAcceptance {
     /**
      * Verify correct behavior with default BDB_TYPE (none specified)
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPEDefault() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -356,7 +360,7 @@ public class BootAcceptance {
      * Verify default BDB_TYPE does NOT include the BDB-JE jar file on
      * the classpath
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPEDefaultNoJe() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -378,7 +382,7 @@ public class BootAcceptance {
     /**
      * Verify correct behavior with BDB_TYPE set to db
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPEDb() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -410,7 +414,7 @@ public class BootAcceptance {
      * Verify db BDB_TYPE does NOT include the BDB-JE jar file on
      * the classpath
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPEDbNoJe() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -432,7 +436,7 @@ public class BootAcceptance {
     /**
      * Verify correct behavior with BDB_TYPE set to je
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPEJe() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -464,7 +468,7 @@ public class BootAcceptance {
      * Verify je BDB_TYPE does NOT include the BDB jar file on
      * the classpath
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPEJeNoDb() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -486,7 +490,7 @@ public class BootAcceptance {
     /**
      * Verify correct behavior with BDB_TYPE set to custom
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPECustom() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -516,7 +520,7 @@ public class BootAcceptance {
      * Verify custom BDB_TYPE does NOT include the BDB jar file on
      * the classpath
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPECustomNoDb() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -546,7 +550,7 @@ public class BootAcceptance {
      * Verify custom BDB_TYPE does NOT include the BDB-JE jar file on
      * the classpath
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_TYPECustomNoJe() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -576,7 +580,7 @@ public class BootAcceptance {
      * Verify CUSTOM_NATIVES are property included in the java.library.path
      * when the BDB_TYPE is set to db
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCUSTOM_NATIVESDb() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -605,7 +609,7 @@ public class BootAcceptance {
      * Verify CUSTOM_NATIVES are property included in the java.library.path
      * when the BDB_TYPE is set to je
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCUSTOM_NATIVESJe() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -634,7 +638,7 @@ public class BootAcceptance {
      * Verify CUSTOM_NATIVES are property included in the java.library.path
      * when the BDB_TYPE is set to custom
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCUSTOM_NATIVESCustom() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -659,7 +663,7 @@ public class BootAcceptance {
      * Verify a custom set of specified BDB_NATIVES are included in the
      * java.library.path properly
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testBDB_NATIVES() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -685,7 +689,7 @@ public class BootAcceptance {
     /**
      * Verify that custom JAVA_OPTS are included on the executed process
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testCustomJAVA_OPTS() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
@@ -707,7 +711,7 @@ public class BootAcceptance {
     /**
      * Verify that a ~/.sgs.properties file is used when it exists
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testPropertiesHomeDirectory() throws Exception {
         if(this.homeConfig.exists()) {
             Assert.fail("Can't run test, file already exists : " +
@@ -734,7 +738,7 @@ public class BootAcceptance {
      * Verify that properties in the ~/.sgs.properties file override
      * properties in the SGS_PROPERTIES file
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testPropertiesHomeOverrides() throws Exception {
         if(this.homeConfig.exists()) {
             Assert.fail("Can't run test, file already exists : " +
@@ -781,7 +785,7 @@ public class BootAcceptance {
      * Verify that properties given on the command line override those
      * given in ~/.sgs.properties file
      */
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testPropertiesCommandOverrides() throws Exception {
         if(this.homeConfig.exists()) {
             Assert.fail("Can't run test, file already exists : " +
@@ -813,7 +817,7 @@ public class BootAcceptance {
                                  "HelloEcho: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloChannels() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -826,7 +830,7 @@ public class BootAcceptance {
                                  "HelloChannels: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloEcho() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -839,7 +843,7 @@ public class BootAcceptance {
                                  "HelloEcho: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloLogger() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -852,7 +856,7 @@ public class BootAcceptance {
                                  "HelloLogger: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloPersistence() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -865,7 +869,7 @@ public class BootAcceptance {
                                  "HelloPersistence: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloPersistence2() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -878,7 +882,7 @@ public class BootAcceptance {
                                  "HelloPersistence2: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloPersistence3() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -891,7 +895,7 @@ public class BootAcceptance {
                                  "HelloPersistence3: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloTimer() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -904,7 +908,7 @@ public class BootAcceptance {
                                  "HelloTimer: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloUser() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -917,7 +921,7 @@ public class BootAcceptance {
                                  "HelloUser: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloUser2() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -930,7 +934,7 @@ public class BootAcceptance {
                                  "HelloUser2: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialHelloWorld() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
@@ -943,7 +947,7 @@ public class BootAcceptance {
                                  "HelloWorld: application is ready"));
     }
     
-    @Test(timeout=5000)
+    @Test(timeout=TIMEOUT)
     public void testTutorialSwordWorld() throws Exception {
         Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
