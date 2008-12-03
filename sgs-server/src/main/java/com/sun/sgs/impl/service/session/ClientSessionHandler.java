@@ -23,9 +23,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -33,7 +31,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.ChannelProtocol;
 import com.sun.sgs.protocol.SessionProtocol;
@@ -45,14 +42,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.security.auth.login.LoginException;
 
 /**
  * Handles sending/receiving messages to/from a client session and
@@ -508,17 +500,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    currentState = state;
 	}
 	return currentState;
-    }
-
-    /**
-     * Authenticates the specified username and password, throwing
-     * LoginException if authentication fails.
-     */
-    private Identity authenticate(String username, String password)
-	throws LoginException
-    {
-	return sessionService.identityManager.authenticateIdentity(
-	    new NamePasswordCredentials(username, password.toCharArray()));
     }
 
     /**
