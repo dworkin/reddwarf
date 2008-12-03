@@ -509,10 +509,10 @@ class Util {
      */
     public static void destroyProcess(Process p) {
         if (p != null) {
+            p.destroy();
             Util.close(p.getErrorStream());
             Util.close(p.getInputStream());
             Util.close(p.getOutputStream());
-            p.destroy();
         }
     }
     

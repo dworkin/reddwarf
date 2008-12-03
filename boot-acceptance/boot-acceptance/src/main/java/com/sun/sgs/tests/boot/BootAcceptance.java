@@ -26,6 +26,7 @@ import java.io.File;
 import java.net.URL;
 
 import org.junit.runner.JUnitCore;
+import org.junit.BeforeClass;
 import org.junit.Before;
 import org.junit.After;
 import org.junit.Assert;
@@ -82,6 +83,23 @@ public class BootAcceptance {
         BootAcceptance.distribution = new File(args[0]);
         
         new JUnitCore().main(BootAcceptance.class.getName());
+    }
+    
+    /**
+     * Scrub any old temporary test directory that was previously run
+     * and aborted unusually
+     */
+    @BeforeClass
+    public static void scrubOldDirectory() {
+        String tempDir = System.getProperty("java.io.tmpdir");
+        if(!tempDir.endsWith(File.separator)) {
+            tempDir += File.separator;
+        }
+        
+        File d  = new File(tempDir + BootAcceptance.TEST_DIR);
+        if(d.exists() && d.isDirectory()) {
+            Util.deleteDirectory(d);
+        }
     }
     
     /**
@@ -206,6 +224,7 @@ public class BootAcceptance {
             Thread.sleep(SMALL_PAUSE);
             this.server.exitValue();
             Util.destroyProcess(server);
+            this.server = null;
         } catch (IllegalThreadStateException e) {
             Assert.fail("Server process has not exited but should have");
         }
@@ -703,7 +722,7 @@ public class BootAcceptance {
                                    configLogging, config);
         
         Assert.assertTrue(Util.expectLines(server,
-                                           "-server -DmyProperty=test -Xmx768M",
+                                           "-DmyProperty=test -Xmx768M",
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }
