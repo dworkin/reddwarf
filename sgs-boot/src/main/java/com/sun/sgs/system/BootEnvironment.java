@@ -276,9 +276,9 @@ final class BootEnvironment {
         
         //autodetect BDB libraries if necessary
         if (properties.getProperty(BootEnvironment.BDB_NATIVES) == null) {
-            String family = System.getProperty("os.family");
             String name = System.getProperty("os.name");
             String arch = System.getProperty("os.arch");
+            String version = System.getProperty("os.version");
 
             String bdb = null;
             if ("Linux".equals(name) && "i386".equals(arch)) {
@@ -286,22 +286,20 @@ final class BootEnvironment {
             } else if ("Linux".equals(name) &&
                     ("x86_64".equals(arch) || "amd64".equals(arch))) {
                 bdb = BootEnvironment.DEFAULT_BDB_LINUX_X86_64;
-            } else if ("mac".equals(family) &&
+            } else if ("Mac OS X".equals(name) &&
                     ("i386".equals(arch) || "x86_64".equals(arch))) {
                 bdb = BootEnvironment.DEFAULT_BDB_MACOSX_X86;
-            } else if ("mac".equals(family) && "ppc".equals(arch)) {
-                bdb = BootEnvironment.DEFAULT_BDB_MACOSX_PPC;
             } else if ("SunOS".equals(name) && "sparc".equals(arch)) {
                 bdb = BootEnvironment.DEFAULT_BDB_SOLARIS_SPARC;
             } else if ("SunOS".equals(name) && "x86".equals(arch)) {
                 bdb = BootEnvironment.DEFAULT_BDB_SOLARIS_X86;
-            } else if ("windows".equals(family)) {
+            } else if (name != null && name.startsWith("Windows")) {
                 bdb = BootEnvironment.DEFAULT_BDB_WIN32_X86;
             } else {
                 logger.log(Level.SEVERE, "Unsupported platform: \n" +
-                           "Family: " + family + "\n" +
-                           "Name: " + name + "\n" +
-                           "Arch: " + arch);
+                           "Name    : " + name + "\n" +
+                           "Arch    : " + arch + "\n" +
+                           "Version : " + version);
                 throw new IllegalStateException("Unsupported platform");
             }
             properties.setProperty(BootEnvironment.BDB_NATIVES, bdb);

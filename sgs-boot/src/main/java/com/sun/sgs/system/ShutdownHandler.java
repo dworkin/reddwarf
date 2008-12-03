@@ -86,10 +86,10 @@ class ShutdownHandler implements Runnable {
     private synchronized void shutdown() {
         //destroy the SGS process
         if (p != null) {
+            p.destroy();
             ShutdownHandler.close(p.getOutputStream());
             ShutdownHandler.close(p.getInputStream());
             ShutdownHandler.close(p.getErrorStream());
-            p.destroy();
         }
         p = null;
         
@@ -176,6 +176,9 @@ class ShutdownHandler implements Runnable {
                 String inputLine = "";
                 while ((inputLine = in.readLine()) != null) {
                     if (inputLine.equals(BootEnvironment.SHUTDOWN_COMMAND)) {
+                        logger.log(Level.FINE, 
+                                   BootEnvironment.SHUTDOWN_COMMAND + 
+                                   " received, shutting down...");
                         shutdown();
                         break;
                     }
