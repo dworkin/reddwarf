@@ -281,21 +281,21 @@ final class BootEnvironment {
             String arch = System.getProperty("os.arch");
 
             String bdb = null;
-            if (name.equals("Linux") && arch.equals("i386")) {
+            if ("Linux".equals(name) && "i386".equals(arch)) {
                 bdb = BootEnvironment.DEFAULT_BDB_LINUX_X86;
-            } else if (name.equals("Linux") &&
-                    (arch.equals("x86_64") || arch.equals("amd64"))) {
+            } else if ("Linux".equals(name) &&
+                    ("x86_64".equals(arch) || "amd64".equals(arch))) {
                 bdb = BootEnvironment.DEFAULT_BDB_LINUX_X86_64;
-            } else if (family.equals("mac") &&
-                    (arch.equals("i386") || arch.equals("x86_64"))) {
+            } else if ("mac".equals(family) &&
+                    ("i386".equals(arch) || "x86_64".equals(arch))) {
                 bdb = BootEnvironment.DEFAULT_BDB_MACOSX_X86;
-            } else if (family.equals("mac") && arch.equals("ppc")) {
+            } else if ("mac".equals(family) && "ppc".equals(arch)) {
                 bdb = BootEnvironment.DEFAULT_BDB_MACOSX_PPC;
-            } else if (name.equals("SunOS") && arch.equals("sparc")) {
+            } else if ("SunOS".equals(name) && "sparc".equals(arch)) {
                 bdb = BootEnvironment.DEFAULT_BDB_SOLARIS_SPARC;
-            } else if (name.equals("SunOS") && arch.equals("x86")) {
+            } else if ("SunOS".equals(name) && "x86".equals(arch)) {
                 bdb = BootEnvironment.DEFAULT_BDB_SOLARIS_X86;
-            } else if (family.equals("windows")) {
+            } else if ("windows".equals(family)) {
                 bdb = BootEnvironment.DEFAULT_BDB_WIN32_X86;
             } else {
                 logger.log(Level.SEVERE, "Unsupported platform: \n" +
