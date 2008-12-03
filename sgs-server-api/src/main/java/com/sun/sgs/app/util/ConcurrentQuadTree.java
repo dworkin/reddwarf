@@ -82,26 +82,9 @@ import com.sun.sgs.app.ObjectNotFoundException;
 public class ConcurrentQuadTree<T> {
 
     public static void main(String[] args) {
-	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(3, 1, 0, 0, 10, 10);
-	tree.add(1, 1, "A");
-	tree.add(4, 4, "B");
-	tree.add(7, 7, "C");
-	tree.add(7, 7, "C");
-	Iterator<String> iter = tree.iterator();
-	int i=0;
-	while (iter.hasNext()) {
-	    if (++i == 2){
-		iter.remove();
-	    }
-	    iter.next();
-	}
-	iter = tree.iterator();
-	while (iter.hasNext()) {
-	    System.out.println(iter.next());
-	}
 	
     }
-    
+
     /**
      * An enumeration corresponding to fields and methods pertaining to
      * Cartesian coordinates. These are useful for when pairs of coordinates
@@ -109,10 +92,14 @@ public class ConcurrentQuadTree<T> {
      * information
      */
     public static enum Coordinate {
-	X_MIN, // Minimum x-value of the pair of coordinates
-	X_MAX, // Maximum x-value of the pair of coordinates
-	Y_MIN, // Minimum y-value of the pair of coordinates
-	Y_MAX; // Maximum y-value of the pair of coordinates
+	/** Minimum x-value of the pair of coordinates */
+	X_MIN,
+	/** Maximum x-value of the pair of coordinates */
+	X_MAX,
+	/** Minimum y-value of the pair of coordinates */
+	Y_MIN,
+	/** Maximum y-value of the pair of coordinates */
+	Y_MAX; 
 
 	/*
 	 * Integer equivalents for the Coordinate enumeration. It is important
@@ -145,7 +132,7 @@ public class ConcurrentQuadTree<T> {
 		    return -1;
 	    }
 	}
-    }
+    } // end Coordinate enum
 
     /**
      * Default maximum depth of a quadtree. A depth of 5 should provide a
@@ -166,11 +153,11 @@ public class ConcurrentQuadTree<T> {
     /** The root element of the quadtree */
     private Node<T> root;
 
-
     /**
-     * Five-argument constructor which defines a maximum bucket size and
-     * a pair of x,y coordinates denoting the bounding envelope. The
-     * maximum tree depth is set to {@code DEFAULT_MAX_DEPTH} = 5.
+     * Five-argument constructor which defines a maximum bucket size and a
+     * pair of x,y coordinates denoting the bounding envelope. The maximum
+     * tree depth is set to {@code DEFAULT_MAX_DEPTH} = 5.
+     * 
      * @param bucketSize the maximum capacity of a leaf node
      * @param x1 the x-coordinate of the first point defining the tree's
      * envelope
@@ -181,11 +168,11 @@ public class ConcurrentQuadTree<T> {
      * @param y2 the x-coordinate of the second point defining the tree's
      * envelope
      */
-    public ConcurrentQuadTree(int bucketSize, double x1, double y1, double x2,
-	    double y2) {
+    public ConcurrentQuadTree(int bucketSize, double x1, double y1,
+	    double x2, double y2) {
 	this(DEFAULT_MAX_DEPTH, bucketSize, x1, y1, x2, y2);
     }
-    
+
     /**
      * The six-argument constructor which defines a quadtree with a depth
      * supplied as a parameter. The area corresponding to this instance is
@@ -205,11 +192,15 @@ public class ConcurrentQuadTree<T> {
      * @param y2 the x-coordinate of the second point defining the tree's
      * envelope
      */
-    public ConcurrentQuadTree(int maxDepth, int bucketSize, double x1, double y1, double x2,
-	    double y2) {
+    public ConcurrentQuadTree(int maxDepth, int bucketSize, double x1,
+	    double y1, double x2, double y2) {
 	if (maxDepth < 0) {
 	    throw new IllegalArgumentException(
 		    "Maximum depth cannot be negative");
+	}
+	if (bucketSize < 0) {
+	    throw new IllegalArgumentException(
+		    "Bucket size cannot be negative");
 	}
 	this.maxDepth = maxDepth;
 	envelope = new Envelope(new Point(x1, y1), new Point(x2, y2));
@@ -253,8 +244,6 @@ public class ConcurrentQuadTree<T> {
 	return leaf.add(point, element, true);
     }
 
-    
-
     /**
      * Removes an element from the quadtree corresponding to the provided
      * coordinate.
@@ -269,7 +258,6 @@ public class ConcurrentQuadTree<T> {
 	Node<T> leaf = Node.getLeafNode(root, point);
 	return leaf.remove(point);
     }
-
 
     /**
      * Replaces the element at the given coordinate with the given parameter.
@@ -286,7 +274,6 @@ public class ConcurrentQuadTree<T> {
 	return leaf.setValue(point, element);
     }
 
-
     /**
      * Returns the number of elements stored within this data structure
      * 
@@ -298,7 +285,7 @@ public class ConcurrentQuadTree<T> {
 
     /**
      * Returns the element with the given Cartesian parameters. If the
-     * paramters do not correspond to a stored element, then {@code null} is
+     * parameters do not correspond to a stored element, then {@code null} is
      * returned.
      * 
      * @param x the x-coordinate of the arbitrary point
@@ -313,7 +300,6 @@ public class ConcurrentQuadTree<T> {
 	return (entry == null ? null : entry.getValue());
     }
 
-    
     /**
      * Returns the integer coordinate represented by the bound supplied as the
      * parameter. In other words, if the call {@code getEnvelopeBound(X_MIN)}
@@ -332,7 +318,7 @@ public class ConcurrentQuadTree<T> {
 	    case X_MAX:
 		return coords[Coordinate.toInt(Coordinate.X_MAX)];
 	    case X_MIN:
-		return coords[Coordinate.toInt(Coordinate.Y_MIN)];
+		return coords[Coordinate.toInt(Coordinate.X_MIN)];
 	    case Y_MAX:
 		return coords[Coordinate.toInt(Coordinate.Y_MAX)];
 	    case Y_MIN:
@@ -341,8 +327,6 @@ public class ConcurrentQuadTree<T> {
 		return Double.NaN;
 	}
     }
-
-  
 
     /**
      * Returns an iterator for the elements which are contained within the the
@@ -357,15 +341,14 @@ public class ConcurrentQuadTree<T> {
      * @return an iterator which can traverse over the entries within the
      * coordinates representing the envelope
      */
-    public Iterator<T> envelopeIterator(double x1, double y1, double x2, double y2) {
+    public Iterator<T> envelopeIterator(double x1, double y1, double x2,
+	    double y2) {
 	Point corner1 = new Point(x1, y1);
 	Point corner2 = new Point(x2, y2);
 	Envelope envelope = new Envelope(corner1, corner2);
-	
+
 	return new ElementIterator<T>(root, envelope);
     }
-
-    
 
     /**
      * Asynchronously clears the tree and replaces it with an empty
@@ -386,8 +369,9 @@ public class ConcurrentQuadTree<T> {
 	return new ElementIterator<T>(root, envelope);
     }
 
-    // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    // ;;;;;;;;;;;;;;   Nested Class Definitions   ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     /**
      * An iterator which walks through the entries stored in the quadtree.
@@ -405,24 +389,32 @@ public class ConcurrentQuadTree<T> {
 	private int dataIntegrityValue;
 	private boolean canRemove;
 	private Node<T> current;
+	private Node<T> next;
 	private Entry<T> entry;
-	private Entry<T> next;
+	private Entry<T> nextEntry;
 	private Iterator<Entry<T>> entryIterator;
 	private boolean isFullyContained;
 
-	
 	ElementIterator(Node<T> root) {
 	    this(root, null);
 	}
-	
+
 	ElementIterator(Node<T> root, Envelope envelope) {
 	    this.envelope = envelope;
-	    canRemove = false;
+
 	    current = getFirstLeafNode(root);
+	    if (current == null) {
+		current = root;
+		entryIterator = null;
+	    } else {
+		entryIterator = current.getValues().iterator();
+	    }
 	    dataIntegrityValue = current.getDataIntegrityValue();
-	    entryIterator = current.getValues().iterator();
-	    next = prepareNextElement();
+	    next = current;
+	    nextEntry = prepareNextElement();
+
 	    isFullyContained = false;
+	    canRemove = false;
 	    entry = null;
 	}
 
@@ -453,39 +445,58 @@ public class ConcurrentQuadTree<T> {
 	 * @return <tt>true</tt> if the iterator has more elements.
 	 */
 	public boolean hasNext() {
-	    return (next != null);
+	    return (nextEntry != null);
 	}
 
-	
+	/**
+	 * Fetches the next entry to be returned while also updating the
+	 * {@code next} reference to the node containing the next entry.
+	 * 
+	 * @return the next entry to be examined, or {@code null} if none
+	 * exists
+	 */
 	private Entry<T> prepareNextElement() {
 	    // Try to find the next qualified entry in the current list
 	    Entry<T> anEntry = iterateToNextQualifiedElement();
 	    if (anEntry != null) {
 		return anEntry;
 	    }
-	    
+
 	    /*
 	     * If we didn't find an entry (it was null), locate the next node
 	     * which is at least partially contained by the iterator's
 	     * envelope and iterate through it. If it has no valid entries,
 	     * keep searching until we run out of nodes.
 	     */
-	    current = getNextNodePossiblyContainingEntries(current);
-	    while (current != null) {
-		entryIterator = current.getValues().iterator();
+	    next = getNextNodePossiblyContainingEntries(current);
+	    while (next != null) {
+		entryIterator = next.getValues().iterator();
 		anEntry = iterateToNextQualifiedElement();
 		if (anEntry != null) {
 		    return anEntry;
 		}
-		current = getNextNodePossiblyContainingEntries(current);
+		next = getNextNodePossiblyContainingEntries(next);
 	    }
 	    return null;
 	}
+
 	
-	
+	/**
+	 * Moves the iterator's cursor to the next qualified entry; that is,
+	 * the next entry which is contained within the iterator's envelope.
+	 * If there is no envelope specified, then the next entry in the list
+	 * is returned.
+	 * 
+	 * @return the next entry located in the specified envelope (if an
+	 * envelope is defined) or {@code null} if no next qualified entry
+	 * exists
+	 */
 	private Entry<T> iterateToNextQualifiedElement() {
+	    if (entryIterator == null) {
+		return null;
+	    }
 	    Entry<T> ent;
-	    
+
 	    while (entryIterator.hasNext()) {
 		ent = entryIterator.next();
 		if (isFullyContained || envelope.contains(ent.coordinate)) {
@@ -494,8 +505,7 @@ public class ConcurrentQuadTree<T> {
 	    }
 	    return null;
 	}
-	
-	
+
 	/**
 	 * Returns the next element in the iteration.
 	 * 
@@ -515,13 +525,14 @@ public class ConcurrentQuadTree<T> {
 	    // a subsequent Iterator.remove()
 	    canRemove = true;
 
-	    // fetch the next element
-	    entry = next;
-	    next = prepareNextElement();
+	    // fetch the next element and adjust the
+	    // references accordingly.
+	    entry = nextEntry;
+	    current = next;
+	    nextEntry = prepareNextElement();
+	    dataIntegrityValue = current.getDataIntegrityValue();
 	    return entry.getValue();
 	}
-	
-	
 
 	/**
 	 * Retrieves the first non-null leaf node in a tree, rooted by
@@ -532,14 +543,13 @@ public class ConcurrentQuadTree<T> {
 	 * @param node the root of the tree or subtree
 	 * @return the first child with a non-{@code null} value, or
 	 * {@code null} if the child is a leaf but is null
-	 * @throws IllegalStateException if no leaf node with a non-null value
-	 * exists
 	 */
 	private Node<T> getFirstLeafNode(Node<T> node) {
 	    // If the given node is a leaf with values, we are done
 	    if (node.isLeaf()) {
+		Envelope env = node.getEnvelope();
 		if (node.getValues() != null &&
-			envelope.getContainment(node.getEnvelope()) != 
+			envelope.getContainment(env) != 
 			    Envelope.Containment.NONE) {
 		    return node;
 		} else {
@@ -556,27 +566,19 @@ public class ConcurrentQuadTree<T> {
 		    return leaf;
 		}
 	    }
-
 	    return null;
-	    /*
-	    // We shouldn't get here: every subtree must have at least
-	    // one leaf with a value, otherwise the subtree should not exist.
-	    throw new IllegalStateException(
-		    "The subtree does not have a leaf "
-			    + "with a populated value");
-			    */
 	}
 
-	
 	/**
-	 * Given the current node, return the next node in succession
-	 * (using a depth-first search) which has entries
-	 * @param current the current node being examined
+	 * Given the current node, return the next node in succession (using a
+	 * depth-first search) which has entries
+	 * 
+	 * @param node the current node being examined
 	 * @return the next node containing entries
 	 */
-	private Node<T> getNextNodePossiblyContainingEntries(Node<T> current) {
-	    Node<T> parent = current.getParent();
-	    
+	private Node<T> getNextNodePossiblyContainingEntries(Node<T> node) {
+	    Node<T> parent = node.getParent();
+
 	    // End condition: we reached the root; there is no next leaf node
 	    if (parent == null) {
 		return null;
@@ -584,29 +586,32 @@ public class ConcurrentQuadTree<T> {
 
 	    // Try and fetch siblings. If they are not leaves, then
 	    // try to retrieve their children
-	    Node.Quadrant quadrant =
-		    Node.Quadrant.next(current.getQuadrant());
+	    Node.Quadrant quadrant = Node.Quadrant.next(node.getQuadrant());
 	    while (quadrant != null) {
 		Node<T> child = parent.getChild(quadrant);
+		Envelope childEnv = child.getEnvelope();
 		
-		// Skip over nodes not contained by a defined envelope
-		if (envelope != null &&
-			envelope.getContainment(child.getEnvelope()) == 
+		// Skip over nodes whose envelopes do not intersect
+		// the iterator's defined envelope
+		if (envelope == null ||
+			envelope != null &&
+			envelope.getContainment(childEnv) != 
 			    Envelope.Containment.NONE) {
-		    continue;
-		}
-		
-		// Dig deeper if child is not a leaf,
-		// or if it is a leaf with stored entries,
-		// return it. Otherwise, keep searching this level.
-		if (!child.isLeaf()) {
-		    return getFirstLeafNode(child);
 
-		} else if (child.getValues() != null) {
-		    return child;
+		    isFullyContained =
+			    (envelope.getContainment(childEnv) == 
+				Envelope.Containment.FULL);
 
+		    // Dig deeper if child is not a leaf,
+		    // or if it is a leaf with stored entries,
+		    // return it. Otherwise, keep searching this level.
+		    if (!child.isLeaf()) {
+			return getFirstLeafNode(child);
+		    } else if (child.getValues() != null) {
+			return child;
+		    }
 		}
-		// continue checking successive siblings
+		// get the next quadrant
 		quadrant = Node.Quadrant.next(quadrant);
 	    }
 	    // propagate towards the root
@@ -643,9 +648,9 @@ public class ConcurrentQuadTree<T> {
 
     /**
      * A region, defined by two {@code Points}, which represents the area
-     * belonging to a certain object. The two {@code Point}s representing
-     * the envelope are Cartesian points which correspond to corner points of
-     * an imaginary box. Each x and y coordinate for both points represent the
+     * belonging to a certain object. The two {@code Point}s representing the
+     * envelope are Cartesian points which correspond to corner points of an
+     * imaginary box. Each x and y coordinate for both points represent the
      * bounds of this box, and therefore, the bounds of the {@code Envelope}.
      * For simplicity, the {@code Envelope}'s edges are only allowed to be
      * parallel or perpendicular to the Cartesian axes, meaning the
@@ -653,17 +658,17 @@ public class ConcurrentQuadTree<T> {
      * coincide with them.
      */
     static class Envelope {
-	
+
 	/**
-	 * Specifies the degree of containment of another object, usually
-	 * a {@code Point} or another {@code Envelope}.
+	 * Specifies the degree of containment of another object, usually a
+	 * {@code Point} or another {@code Envelope}.
 	 */
 	static enum Containment {
-	    NONE,	// no containment in the envelope
-	    PARTIAL,	// partial containment
-	    FULL;	// full containment
+	    NONE, // no containment in the envelope
+	    PARTIAL, // partial containment
+	    FULL; // full containment
 	}
-	
+
 	/** An array of two points to represent the envelope area */
 	final Point[] bounds;
 
@@ -681,7 +686,7 @@ public class ConcurrentQuadTree<T> {
 	    sb.append(")>");
 	    return sb.toString();
 	}
-	
+
 	/**
 	 * Constructs a new {@code Envelope} given two points representing
 	 * diagonal corners
@@ -778,16 +783,29 @@ public class ConcurrentQuadTree<T> {
 	Containment getContainment(Envelope anotherEnvelope) {
 	    double[] coords = organizeCoordinates(this);
 	    double[] arg = organizeCoordinates(anotherEnvelope);
-	    
-	    // Increment every time we have a coordinate contained in the bounds
+
+	    // Increment every time we have a coordinate contained in the
+	    // bounds
 	    // of "this" envelope
 	    byte totalX = 0;
 	    byte totalY = 0;
-	    totalX += (coords[Coordinate.iX_MIN] <= arg[Coordinate.iX_MIN] ? 1 : 0);
-	    totalX += (coords[Coordinate.iX_MAX] >= arg[Coordinate.iX_MAX] ? 1 : 0);
-	    totalY += (coords[Coordinate.iY_MIN] <= arg[Coordinate.iY_MIN] ? 1 : 0);
-	    totalY += (coords[Coordinate.iY_MAX] >= arg[Coordinate.iY_MAX] ? 1 : 0);
-	    
+	    totalX +=
+		    (isContained(arg[Coordinate.iX_MIN],
+			    coords[Coordinate.iX_MIN],
+			    coords[Coordinate.iX_MAX]) ? 1 : 0);
+	    totalX +=
+		    (isContained(arg[Coordinate.iX_MAX],
+			    coords[Coordinate.iX_MIN],
+			    coords[Coordinate.iX_MAX]) ? 1 : 0);
+	    totalY +=
+		    (isContained(arg[Coordinate.iY_MIN],
+			    coords[Coordinate.iY_MIN],
+			    coords[Coordinate.iY_MAX]) ? 1 : 0);
+	    totalY +=
+		    (isContained(arg[Coordinate.iY_MAX],
+			    coords[Coordinate.iY_MIN],
+			    coords[Coordinate.iY_MAX]) ? 1 : 0);
+
 	    /*
 	     * For total containment, all points should be contained. For
 	     * partial containment, at least one X and Y coordinate need to be
@@ -804,6 +822,21 @@ public class ConcurrentQuadTree<T> {
 	}
 
 	/**
+	 * Determines if the parameter {@code arg} is contained between the
+	 * two bounds.
+	 * 
+	 * @param arg the argument to check for containment
+	 * @param bound1 one of the coordinate bounds
+	 * @param bound2 another coordinate bound
+	 * @return {@code true} if the parameter is contained, and
+	 * {@code false} otherwise
+	 */
+	private boolean isContained(double arg, double bound1, double bound2) {
+	    return (Math.min(bound1, bound2) <= arg && Math.max(bound1,
+		    bound2) >= arg);
+	}
+
+	/**
 	 * Checks to see if this {@code Envelope} instance contains the
 	 * {@code Point} supplied as the parameter.
 	 * 
@@ -814,7 +847,8 @@ public class ConcurrentQuadTree<T> {
 	boolean contains(Point point) {
 	    // Since a point cannot be partially contained, if it is not
 	    // contained, return false; otherwise return true;
-	    if (getContainment(new Envelope(point, point)) == Containment.NONE) {
+	    Envelope envelope = new Envelope(point, point);
+	    if (getContainment(envelope) == Containment.NONE) {
 		return false;
 	    }
 	    return true;
@@ -828,12 +862,14 @@ public class ConcurrentQuadTree<T> {
 	 * @return the {@code Point} representing the middle
 	 */
 	private static Point calculateMiddle(Envelope envelope) {
-	    double[] coords = organizeCoordinates(envelope);
+	    double[] d = organizeCoordinates(envelope);
 	    return new Point(
-		    coords[Coordinate.iX_MIN] +
-			    ((coords[Coordinate.iX_MAX] - coords[Coordinate.iX_MIN]) / 2),
-		    coords[Coordinate.iY_MIN] +
-			    ((coords[Coordinate.iY_MAX] - coords[Coordinate.iY_MIN]) / 2));
+		    d[Coordinate.iX_MIN] +
+			    ((d[Coordinate.iX_MAX] - 
+				    d[Coordinate.iX_MIN]) / 2),
+		    d[Coordinate.iY_MIN] +
+			    ((d[Coordinate.iY_MAX] - 
+				    d[Coordinate.iY_MIN]) / 2));
 	}
     }
 
@@ -854,27 +890,28 @@ public class ConcurrentQuadTree<T> {
 	    coordinate = coord;
 	    this.value = value;
 	}
-	
+
 	/**
-	 * Sets the value of the entry, in the event it
-	 * is changed during a {@code set()} operation.
-	 * @param value the new value, which must not be
-	 * {@code null}
+	 * Sets the value of the entry, in the event it is changed during a
+	 * {@code set()} operation.
+	 * 
+	 * @param value the new value, which must not be {@code null}
 	 */
 	void setValue(T value) {
 	    assert (value != null) : "Value cannot be null";
 	    this.value = value;
 	}
-	
+
 	/**
 	 * Returns the value of the entry which cannot be {@code null}.
+	 * 
 	 * @return the value of the entry
 	 */
 	T getValue() {
 	    return value;
 	}
-	
-	public String toString(){
+
+	public String toString() {
 	    return value.toString();
 	}
     }
@@ -905,17 +942,19 @@ public class ConcurrentQuadTree<T> {
 	    this.x = round(x);
 	    this.y = round(y);
 	}
-	
+
 	/**
 	 * Returns the x-coordinate
+	 * 
 	 * @return the x-coordinate
 	 */
 	public double getX() {
 	    return x;
 	}
-	
+
 	/**
 	 * Returns the y-coordinate
+	 * 
 	 * @return the y-coordinate
 	 */
 	public double getY() {
@@ -955,8 +994,7 @@ public class ConcurrentQuadTree<T> {
 	    Point param = (Point) obj;
 	    return (this.x == param.x) && (this.y == param.y);
 	}
-	
-	
+
 	public String toString() {
 	    StringBuilder sb = new StringBuilder();
 	    sb.append("(");
@@ -1108,7 +1146,7 @@ public class ConcurrentQuadTree<T> {
 
 	/** the maximum capacity of a leaf */
 	private final int bucketSize;
-	
+
 	/**
 	 * the integrity value used by the iterators to check for a
 	 * {@code ConcurrentModificationException}
@@ -1207,24 +1245,25 @@ public class ConcurrentQuadTree<T> {
 	    }
 	    return node;
 	}
-	
-	
+
 	/**
 	 * Checks whether there exists an entry in the list with the same
 	 * coordinate as the given point.
+	 * 
 	 * @param <T> the type of the elements stored in the list
 	 * @param point the coordinate to check
 	 * @param entries the list of elements
 	 * @return {@code true} if there is an {@code Entry} with the same
 	 * coordinate, and {@code false} otherwise
 	 */
-	private static <T> boolean contains(Point point, List<Entry<T>> entries) {
+	private static <T> boolean contains(Point point,
+		List<Entry<T>> entries) {
 	    if (entries == null || entries.size() == 0) {
 		return false;
 	    }
 	    Entry<T> entry;
 	    Iterator<Entry<T>> iter = entries.iterator();
-	    
+
 	    // Iterate through all the entries checking for the instance
 	    while (iter.hasNext()) {
 		entry = iter.next();
@@ -1234,18 +1273,17 @@ public class ConcurrentQuadTree<T> {
 	    }
 	    return false;
 	}
-	
-	
+
 	public String toString() {
 	    if (isLeaf()) {
 		if (values != null) {
 		    return values.toString();
-		} 
+		}
 		return null;
 	    }
 	    StringBuilder sb = new StringBuilder("[");
-	    for (int i=0 ; i<numChildren ; i++) {
-		if (i > 0 ) {
+	    for (int i = 0; i < numChildren; i++) {
+		if (i > 0) {
 		    sb.append(", ");
 		}
 		sb.append(children[i].toString());
@@ -1277,23 +1315,20 @@ public class ConcurrentQuadTree<T> {
 	 * 
 	 * @param quadrant the quadrant of the parent to retrieve
 	 * @return the child corresponding to the given quadrant
-	 * @throws IndexOutOfBoundsException if the index is out of
-	 * bounds
+	 * @throws IndexOutOfBoundsException if the index is out of bounds
 	 */
 	Node<T> getChild(Quadrant quadrant) {
 	    assert (!isLeaf()) : "The node is a leaf node";
 	    int index = Quadrant.toInt(quadrant);
 	    return children[index];
 	}
-	
-	
+
 	/**
 	 * Returns the child corresponding to the given index
 	 * 
 	 * @param quadrant the quadrant of the parent to retrieve
 	 * @return the child corresponding to the given quadrant
-	 * @throws IndexOutOfBoundsException if the index is out of
-	 * bounds
+	 * @throws IndexOutOfBoundsException if the index is out of bounds
 	 */
 	Node<T> getChild(int index) {
 	    assert (!isLeaf()) : "The node is a leaf node";
@@ -1308,10 +1343,10 @@ public class ConcurrentQuadTree<T> {
 	Envelope getEnvelope() {
 	    return envelope;
 	}
-	
-	
+
 	/**
 	 * Attempts to retrieve the entry at the given coordinate.
+	 * 
 	 * @param point the {@code point} to examine for an entry
 	 * @return the value at the given coordinate, or {@code null} if none
 	 * exist
@@ -1324,7 +1359,7 @@ public class ConcurrentQuadTree<T> {
 	    Entry<T> entry = null;
 	    while (iter.hasNext()) {
 		entry = iter.next();
-		
+
 		// Break if we found a matching coordinate
 		if (entry.coordinate.equals(point)) {
 		    return entry;
@@ -1371,10 +1406,10 @@ public class ConcurrentQuadTree<T> {
 	    // If this is a root node with no children, obtain the size
 	    // of the element list
 	    if (children == null) {
-		return (values == null? 0 : values.size());
+		return (values == null ? 0 : values.size());
 	    }
 
-	    // Otherwise, the root node has children. Therefore, aggregate 
+	    // Otherwise, the root node has children. Therefore, aggregate
 	    // the values of the children to improve concurrency
 	    int totalSize = 0;
 	    for (int i = 0; i < numChildren; i++) {
@@ -1396,7 +1431,7 @@ public class ConcurrentQuadTree<T> {
 		}
 		return;
 	    }
-	    
+
 	    // Remove each child from the data store
 	    if (--size == 0) {
 		convertToLeafNode();
@@ -1411,7 +1446,7 @@ public class ConcurrentQuadTree<T> {
 	    children = null;
 	    myQuadrant = null;
 	}
-	
+
 	/**
 	 * Walk up the tree, incrementing the parent's count value
 	 */
@@ -1453,7 +1488,6 @@ public class ConcurrentQuadTree<T> {
 	    return values;
 	}
 
-
 	/**
 	 * Attempts to set the value to the given {@code CoordinatePair}.
 	 * This will throw an {@code IllegalStateException} if called when
@@ -1466,7 +1500,7 @@ public class ConcurrentQuadTree<T> {
 	 */
 	T setValue(Point coord, T value) throws IllegalStateException {
 	    assert (value != null) : "Value cannot be null";
-	    
+
 	    if (!isLeaf()) {
 		throw new IllegalStateException("The node is not a leaf node");
 	    }
@@ -1479,8 +1513,6 @@ public class ConcurrentQuadTree<T> {
 	    return null;
 	}
 
-	
-	
 	/**
 	 * Determines if this node is a leaf node.
 	 * 
@@ -1496,8 +1528,8 @@ public class ConcurrentQuadTree<T> {
 	 * {@code add(entry.coordinate, entry.value);}.
 	 * 
 	 * @param entry the entry to add to the quadtree
-	 * @param propagate {@code true} if the size should be propagated
-	 * to the root, and {@code false} otherwise
+	 * @param propagate {@code true} if the size should be propagated to
+	 * the root, and {@code false} otherwise
 	 * @return {@code true} if the element was successfully added, and
 	 * {@code false} otherwise
 	 */
@@ -1512,8 +1544,8 @@ public class ConcurrentQuadTree<T> {
 	 * 
 	 * @param point the coordinate to add the element
 	 * @param element the element to add
-	 * @param propagate {@code true} if the size should be propagated
-	 * to the root, and {@code false} otherwise
+	 * @param propagate {@code true} if the size should be propagated to
+	 * the root, and {@code false} otherwise
 	 * @return {@code true} if the element was successfully added, and
 	 * {@code false} otherwise
 	 */
@@ -1529,14 +1561,14 @@ public class ConcurrentQuadTree<T> {
 		assert (values.size() == 0) : "Size was not zero for Node.add()";
 		values = new ArrayList<Entry<T>>(bucketSize);
 		append(newEntry, propagate);
-		
+
 	    } else if (size() < bucketSize) {
 		// TODO: do we want to allow duplicate entries?
 		if (contains(point, values)) {
 		    return false;
 		}
 		append(newEntry, propagate);
-		
+
 	    } else {
 		// Check if we reached the maximum depth of the tree.
 		// If so, we cannot split since it will increase tree depth.
@@ -1548,7 +1580,6 @@ public class ConcurrentQuadTree<T> {
 	    return true;
 	}
 
-	
 	/**
 	 * extract the old value and clear; it no longer should have a value
 	 * since this node will soon have children
@@ -1561,7 +1592,7 @@ public class ConcurrentQuadTree<T> {
 	 */
 	private boolean splitThenAdd(Point point, T element) {
 	    size = values.size();
-	    
+
 	    int quadrant;
 	    List<Entry<T>> existingValues = values;
 	    initializeNewChildren();
@@ -1582,13 +1613,13 @@ public class ConcurrentQuadTree<T> {
 	    quadrant = Quadrant.determineQuadrantAsInt(envelope, point);
 	    return children[quadrant].add(point, element, true);
 	}
-	
-	
+
 	/**
 	 * Appends the entry to the leaf node's list
+	 * 
 	 * @param entry the new entry to append
-	 * @param propagate {@code true} if the size should be propagated
-	 * to the root, and {@code false} otherwise
+	 * @param propagate {@code true} if the size should be propagated to
+	 * the root, and {@code false} otherwise
 	 */
 	private void append(Entry<T> entry, boolean propagate) {
 	    assert (isLeaf()) : "The node is not a leaf";
@@ -1596,12 +1627,12 @@ public class ConcurrentQuadTree<T> {
 	    values.add(entry);
 	    size++;
 	    dataIntegrityValue++;
-	    
+
 	    if (propagate && parent != null) {
 		parent.incrementSize();
 	    }
 	}
-	
+
 	/**
 	 * Initializes the children so that new elements can be added. This
 	 * process sets the value of the current node to {@code null} in
@@ -1615,20 +1646,25 @@ public class ConcurrentQuadTree<T> {
 	    children = new Node[numChildren];
 
 	    // Initialize each direction separately
-	    children[Quadrant.iNE] = new Node<T>(this, Quadrant.NE, bucketSize);
-	    children[Quadrant.iNW] = new Node<T>(this, Quadrant.NW, bucketSize);
-	    children[Quadrant.iSE] = new Node<T>(this, Quadrant.SE, bucketSize);
-	    children[Quadrant.iSW] = new Node<T>(this, Quadrant.SW, bucketSize);
+	    children[Quadrant.iNE] =
+		    new Node<T>(this, Quadrant.NE, bucketSize);
+	    children[Quadrant.iNW] =
+		    new Node<T>(this, Quadrant.NW, bucketSize);
+	    children[Quadrant.iSE] =
+		    new Node<T>(this, Quadrant.SE, bucketSize);
+	    children[Quadrant.iSW] =
+		    new Node<T>(this, Quadrant.SW, bucketSize);
 	}
 
-	
 	/**
-	 * Removes the entry located at the supplied index. This method is intended
-	 * to be called from the iterator so that a traversal through the list is 
-	 * not performed.
+	 * Removes the entry located at the supplied index. This method is
+	 * intended to be called from the iterator so that a traversal through
+	 * the list is not performed.
+	 * 
 	 * @param index the index of the entry in the list
 	 * @return the removed element which cannot be {@code null}
-	 * @throws IndexOutOfBoundsException if the supplied index is out of bounds
+	 * @throws IndexOutOfBoundsException if the supplied index is out of
+	 * bounds
 	 */
 	T iteratorRemove(int index) {
 	    Entry<T> old = values.remove(index);
@@ -1636,8 +1672,7 @@ public class ConcurrentQuadTree<T> {
 	    doRemoveWork();
 	    return old.getValue();
 	}
-	
-	
+
 	/**
 	 * Decrements the size and propagates the changes up
 	 */
@@ -1651,8 +1686,7 @@ public class ConcurrentQuadTree<T> {
 		parent.decrementSize();
 	    }
 	}
-	
-	
+
 	/**
 	 * Removes the element from the tree if it exists.
 	 * 
@@ -1667,18 +1701,18 @@ public class ConcurrentQuadTree<T> {
 	    if (values == null || children != null) {
 		return null;
 	    }
-	    
+
 	    Iterator<Entry<T>> iter = values.iterator();
 	    Entry<T> entry;
 	    while (iter.hasNext()) {
 		entry = iter.next();
-		
+
 		// If one of the elements has the same coordinate,
 		// then we will remove it
 		if (entry.coordinate.equals(coordinate)) {
 		    T removed = entry.value;
 		    iter.remove();
-		    
+
 		    dataIntegrityValue++;
 		    doRemoveWork();
 		    return removed;

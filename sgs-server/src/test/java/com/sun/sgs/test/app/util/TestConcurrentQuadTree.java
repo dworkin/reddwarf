@@ -1,5 +1,9 @@
 package com.sun.sgs.test.app.util;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Random;
 
 import junit.framework.TestCase;
@@ -12,43 +16,35 @@ public class TestConcurrentQuadTree extends TestCase {
 
     protected void setUp() throws Exception {
 	System.out.println("Testcase: " + getName());
-	quadtree = new ConcurrentQuadTree<String>();
+	quadtree = new ConcurrentQuadTree<String>(1, 0, 0, 100, 100);
     }
 
-    public void testConstructorNoArgs() {
-	ConcurrentQuadTree<String> tree;
-	try {
-	    tree = new ConcurrentQuadTree<String>();
-	} catch (Exception e) {
-	    fail("Not expecting an exception: " + e.getLocalizedMessage());
-	}
-    }
 
-    public void testConstructorOneArg() {
+    public void testConstructorFourArgs() {
 	ConcurrentQuadTree<String> tree;
 	try {
-	    tree = new ConcurrentQuadTree<String>(1);
+	    tree = new ConcurrentQuadTree<String>(1, 0, 0, 100, 100);
 	} catch (Exception e) {
 	    fail("Not expecting an exception: " + e.getLocalizedMessage());
 	}
 	try {
-	    tree = new ConcurrentQuadTree<String>(100);
+	    tree = new ConcurrentQuadTree<String>(1, 0, 0, 0, 0);
 	} catch (Exception e) {
 	    fail("Not expecting an exception: " + e.getLocalizedMessage());
 	}
 	try {
-	    tree = new ConcurrentQuadTree<String>(0);
+	    tree = new ConcurrentQuadTree<String>(1, 0, 0, -1, -1);
 	} catch (Exception e) {
 	    fail("Not expecting an exception: " + e.getLocalizedMessage());
 	}
 	try {
-	    tree = new ConcurrentQuadTree<String>(-1);
+	    tree = new ConcurrentQuadTree<String>(-1, 0, 0, 0, 0);
 	    fail("Expecting an IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    // Expected
 	}
 	try {
-	    tree = new ConcurrentQuadTree<String>(-100);
+	    tree = new ConcurrentQuadTree<String>(-100, 0, 1, 2, 3);
 	    fail("Expecting an IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    // Expected
@@ -98,7 +94,7 @@ public class TestConcurrentQuadTree extends TestCase {
     }
 
     private ConcurrentQuadTree<String> makeEmptyTree(int maxDepth) {
-	return new ConcurrentQuadTree<String>(maxDepth, 0, 0, 100, 100);
+	return new ConcurrentQuadTree<String>(maxDepth, 1, 0, 0, 100, 100);
     }
 
     public void testAdd() {
@@ -108,17 +104,41 @@ public class TestConcurrentQuadTree extends TestCase {
 	// testing adding elements out of bounds. Recall
 	// that makeEmptyTree(int) constructs a tree comprising the
 	// coordinate region (0,0) to (100,100)
-	assertFalse(tree.add(0, -1, "A"));
+	try {
+	    assertFalse(tree.add(0, -1, "A"));
+	    fail("Expecting IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
+	}
 	assertTrue(tree.isEmpty());
-	assertFalse(tree.add(-1, 0, "A"));
+	try {
+	    assertFalse(tree.add(-1, 0, "A"));
+	    fail("Expecting IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
+	}
 	assertTrue(tree.isEmpty());
-	assertFalse(tree.add(-1, -1, "A"));
+	try {
+	    assertFalse(tree.add(-1, -1, "A"));
+	    fail("Expecting IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
+	}
 	assertTrue(tree.isEmpty());
-	assertFalse(tree.add(101, 100, "A"));
+	try {
+	    assertFalse(tree.add(101, 100, "A"));
+	    fail("Expecting IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
+	}
 	assertTrue(tree.isEmpty());
-	assertFalse(tree.add(100, 101, "A"));
+	try {
+	    assertFalse(tree.add(100, 101, "A"));
+	    fail("Expecting IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
+	}
 	assertTrue(tree.isEmpty());
-	assertFalse(tree.add(101, 101, "A"));
+	try {
+	    assertFalse(tree.add(101, 101, "A"));
+	    fail("Expecting IllegalArgumentException");
+	} catch (IllegalArgumentException iae) {
+	}
 	assertTrue(tree.isEmpty());
 
 	// start adding legal entries
@@ -276,9 +296,9 @@ public class TestConcurrentQuadTree extends TestCase {
 
 	// add elements to the list, while keeping track of what they were
 	for (int i = 0; i < timesToRun; i++) {
-	    x = Math.abs(random.nextDouble() % 100.00);
-	    y = Math.abs(random.nextDouble() % 100.00);
-	    element = random.nextDouble() % 10000;
+	    x = Math.abs(random.nextDouble() * 100);
+	    y = Math.abs(random.nextDouble() * 100);
+	    element = random.nextInt(99999);
 	    values[i][TestContainer.X] = x;
 	    values[i][TestContainer.Y] = y;
 	    values[i][TestContainer.VALUE] = element;
@@ -353,7 +373,14 @@ public class TestConcurrentQuadTree extends TestCase {
 
 	assertTrue(tree.isEmpty());
     }
-
+    
+    
+    /**
+     * The {@code TestContainer} inner class is a simple object which stores a
+     * quadtree and a {@code double} array. The {@code double} array holds
+     * onto the coordinates and values of the entries in the tree for
+     * verification purposes
+     */
     private static class TestContainer {
 	static final int X = 0;
 	static final int Y = 1;
@@ -386,7 +413,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	    String old =
 		    tree.set(values[i][TestContainer.X],
 			    values[i][TestContainer.Y], Integer.toString(i));
-	    assertEquals(values[i][TestContainer.VALUE], old);
+	    assertEquals(Double.toString(values[i][TestContainer.VALUE]), old);
 	    assertEquals(sizeBefore, tree.size());
 	}
     }
@@ -440,17 +467,6 @@ public class TestConcurrentQuadTree extends TestCase {
 	assertEquals(null, s);
 	assertTrue(tree.isEmpty());
 	assertEquals(sizeBefore, tree.size());
-
-	// add element and then set it to null. This should
-	// effectively remove the element
-	final String entry = "newlyAdded";
-	tree.add(1, 1, entry);
-	assertEquals(++sizeBefore, tree.size());
-	assertFalse(tree.isEmpty());
-	s = tree.set(1, 1, null);
-	assertEquals(entry, s);
-	assertEquals(--sizeBefore, tree.size());
-	assertTrue(tree.isEmpty());
     }
 
     private void getUsingRandomEntries(int maxDepth, int iterations) {
@@ -461,7 +477,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	for (int i = 0; i < iterations; i++) {
 	    double x = values[i][TestContainer.X];
 	    double y = values[i][TestContainer.Y];
-	    assertEquals(values[i][TestContainer.VALUE], tree.get(x, y));
+	    assertEquals(Double.toString(values[i][TestContainer.VALUE]), tree.get(x, y));
 	}
     }
 
@@ -497,115 +513,64 @@ public class TestConcurrentQuadTree extends TestCase {
 	getUsingRandomEntries(3, 100);
     }
 
-    /* -- test getting using object, returning coords -- */
-
-    public void getCoordsUsingDuplicatedEntries_treeDepth0() {
-	ConcurrentQuadTree<String> tree = makeEmptyTree(0);
-	final String s = "A";
-	final double xy = 1;
-	assertTrue(tree.add(xy, xy, s));
-	ConcurrentQuadTree.Point[] point = tree.get(s);
-
-	assertEquals(1, point.length);
-	assertEquals(xy, point[0].getX());
-	assertEquals(xy, point[0].getY());
-    }
-
-    public void getCoordsUsingDuplicatedEntries_treeDepth1() {
-	ConcurrentQuadTree<String> tree = makeEmptyTree(1);
-	final String s = "A";
-	final double xy1 = 1;
-	final double xy2 = 75;
-	assertTrue(tree.add(xy1, xy1, s));
-	assertTrue(tree.add(xy2, xy2, s));
-	ConcurrentQuadTree.Point[] point = tree.get(s);
-
-	assertEquals(2, point.length);
-	assertTrue(point[0].getX() == xy1 || point[1].getX() == xy1);
-	assertTrue(point[0].getY() == xy1 || point[1].getY() == xy1);
-	assertTrue(point[0].getX() == xy2 || point[1].getX() == xy2);
-	assertTrue(point[0].getY() == xy2 || point[1].getY() == xy2);
-    }
-
-    public void getCoordsUsingDuplicatedEntries_treeDepth2() {
-	ConcurrentQuadTree<String> tree = makeEmptyTree(1);
-	final String s = "A";
-	final double xy1 = 1; // SW quadrant
-	final double xy3 = 30; // SW quadrant
-	final double xy2 = 75; // NE quadrant
-
-	assertTrue(tree.add(xy1, xy1, s));
-	assertTrue(tree.add(xy2, xy2, s));
-	assertTrue(tree.add(xy2, xy2, s));
-	ConcurrentQuadTree.Point[] point = tree.get(s);
-
-	assertEquals(3, point.length);
-	assertTrue(point[0].getX() == xy1 || point[1].getX() == xy2 ||
-		point[2].getX() == xy1);
-	assertTrue(point[0].getY() == xy1 || point[1].getY() == xy2 ||
-		point[2].getY() == xy1);
-	assertTrue(point[0].getX() == xy2 || point[1].getX() == xy2 ||
-		point[2].getX() == xy2);
-	assertTrue(point[0].getY() == xy2 || point[1].getY() == xy2 ||
-		point[2].getY() == xy2);
-	assertTrue(point[0].getX() == xy3 || point[1].getX() == xy2 ||
-		point[2].getX() == xy3);
-	assertTrue(point[0].getY() == xy3 || point[1].getY() == xy2 ||
-		point[2].getY() == xy3);
-    }
     
     
-    public void testGetReturnsCorrectNumberOfEntries_Random() {
-	ConcurrentQuadTree<String> tree = makeEmptyTree(5);
-	final String s = "A";
-	
-	// Perform this test a few times
-	for (int i=0 ; i<10 ; i++) {
-	    int count = 0;
-	    int numberOfTimesToAdd = random.nextInt(10);
-	    
-	    for (int j=0 ; j < numberOfTimesToAdd ; j++) {
-		if (tree.add(random.nextInt(100), random.nextInt(100), s)) {
-		    count++;
-		}
-	    }
-	    // check that the count equals the number of times the
-	    // element was successfully added
-	    assertEquals(count, tree.get(s).length);
-	}
-    }
     
-    
-    public void testGetAll_TreeDepth0() {
+    public void testEnvelopeIterator_TreeDepth0() {
 	ConcurrentQuadTree<String> tree = makeEmptyTree(0);
 	tree.add(50, 50, "A");
 	assertFalse(tree.isEmpty());
 	
-	// these should work
-	assertEquals(1, tree.getAll(0, 0, 100, 100).length);
-	assertEquals(1, tree.getAll(0, 0, 50, 50).length);
-	assertEquals(1, tree.getAll(50, 50, 100, 100).length);
-	assertEquals(1, tree.getAll(50, 50, 50, 50).length);
-	// these should fail
-	assertEquals(0, tree.getAll(51, 51, 100, 100).length);
-	assertEquals(0, tree.getAll(0, 0, 49, 49).length);
+	Iterator<String> iter = tree.envelopeIterator(0, 0, 100, 100);
+	int i=0;
+	while (iter.hasNext()) {
+	    i++;
+	    iter.next();
+	}
+	assertEquals(1, tree.size());
+	assertEquals(tree.size(), i);
     }
     
-    public void testGetAll_TreeDepth1() {
+    public void testEnvelopeIterator_TreeDepth1() {
 	ConcurrentQuadTree<String> tree = makeEmptyTree(1);
-	tree.add(25, 25, "A");	// SW Quadrant
-	tree.add(75, 75, "B");	// NE Quadrant
-	tree.add(25, 75, "C"); 	// NW Quadrant
+	tree.add(25, 25, "A");
+	tree.add(49, 51, "B");
+	tree.add(51, 49, "C");
+	tree.add(50, 50, "D");
 	assertFalse(tree.isEmpty());
+	assertEquals(4, tree.size());
 	
-	// these should work
-	assertEquals(3, tree.getAll(0, 0, 100, 100).length);
-	assertEquals(1, tree.getAll(0, 0, 50, 50).length);
-	assertEquals(1, tree.getAll(50, 50, 100, 100).length);
-	assertEquals(0, tree.getAll(50, 50, 50, 50).length);
-	// these should fail
-	assertEquals(0, tree.getAll(0, 26, 100, 74).length);
-	assertEquals(0, tree.getAll(26, 0, 74, 100).length);
+	Iterator<String> iter = tree.envelopeIterator(0, 0, 50, 50);
+	int i=0;
+	while (iter.hasNext()) {
+	    i++;
+	    String s = iter.next();
+	    assertTrue(s.equals("A") || s.equals("D"));
+	}
+	// only "A" and "D" should be the only ones that exist
+	assertEquals(2, i);
+    }
+    
+    
+    public void testEnvelopeIterator_TreeDepth2() {
+	ConcurrentQuadTree<String> tree = makeEmptyTree(2);
+	tree.add(25, 25, "A");
+	tree.add(49, 51, "B");
+	tree.add(51, 49, "C");
+	tree.add(50, 50, "D");
+	tree.add(5, 5, "E");
+	assertFalse(tree.isEmpty());
+	assertEquals(5, tree.size());
+	
+	Iterator<String> iter = tree.envelopeIterator(0, 0, 50, 50);
+	int i=0;
+	while (iter.hasNext()) {
+	    i++;
+	    String s = iter.next();
+	    assertTrue(s.equals("A") || s.equals("D") || s.equals("E"));
+	}
+	// only "A", "D", "E" should be in this envelope
+	assertEquals(3, i);
     }
     
     
@@ -616,10 +581,159 @@ public class TestConcurrentQuadTree extends TestCase {
 	double y2 = random.nextInt() % 100;
 	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(0, x1, y1, x2, y2);
 	
-	assertEquals((x1 < x2 ? x1 : x2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.X_MIN));
-	assertEquals((x1 > x2 ? x1 : x2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.X_MAX));
-	assertEquals((y1 < y2 ? y1 : y2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.Y_MIN));
-	assertEquals((y1 > y2 ? y1 : y2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.Y_MAX));
-	
+	assertEquals(Math.min(x1, x2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.X_MIN));
+	assertEquals(Math.max(x1, x2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.X_MAX));
+	assertEquals(Math.min(y1, y2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.Y_MIN));
+	assertEquals(Math.max(y1, y2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.Y_MAX));
     }
+    
+    /*--------------- test iterator operations ----------------------*/
+    
+    public void testIteratorHasNext() {
+	Iterator<String> iter;
+	
+	// try an empty tree
+	ConcurrentQuadTree<String> tree = makeEmptyTree(5);
+	iter = tree.iterator();
+	assertFalse(iter.hasNext());
+	
+	// try with one element
+	tree = makeEmptyTree(5);
+	tree.add(1, 1, "A");
+	iter = tree.iterator();
+	assertTrue(iter.hasNext());
+	iter.next();
+	assertFalse(iter.hasNext());
+    }
+    
+    
+    public void testIteratorHasNextWithRandomElements() {
+	final int MAX = 10;
+	ConcurrentQuadTree<String> tree;
+	Iterator<String> iter;
+	
+	for (int i=0 ; i<5 ; i++) {
+	    int count = 0;
+	    int numElements = random.nextInt(MAX);
+	    TestContainer container = addToTree(MAX, numElements);
+	    tree = container.getTree();
+	    iter = tree.iterator();
+	    
+	    while (iter.hasNext() || count > MAX) {
+		count++;
+		iter.next();
+	    }
+	    assertEquals(numElements, count);
+	}
+    }
+    
+    public void testIteratorNext() {
+	// test with an empty tree
+	ConcurrentQuadTree<String> tree = makeEmptyTree(5);
+	Iterator<String> iter = tree.iterator();
+	try {
+	    iter.next();
+	    fail ("Expecting NoSuchElementException");
+	} catch (NoSuchElementException nsee) {
+	}
+	
+	// try with one element
+	final String s = "A";
+	tree = makeEmptyTree(5);
+	tree.add(1, 1, s);
+	iter = tree.iterator();
+	assertEquals(s, iter.next());
+	try {
+	    iter.next();
+	    fail ("Expecting NoSuchElementException");
+	} catch (NoSuchElementException nsee) {
+	}
+    }
+    
+    
+    public void testIteratorNextWithRandomElements() {
+	final int MAX = 10;
+	ConcurrentQuadTree<String> tree;
+	List<String> shadow;
+	Iterator<String> iter;
+	
+	for (int i=0 ; i<5 ; i++) {
+	    shadow = new ArrayList<String>();
+	    tree = makeEmptyTree(10);
+	    int count = 0;
+	    int numElements = random.nextInt(MAX);
+	    
+	    // add elements randomly to the tree
+	    for (int j=0 ; j<numElements ; j++) {
+		String val = Integer.toString(j);
+		shadow.add(val);
+		tree.add(random.nextInt(100), random.nextInt(100), val);
+	    }
+	    iter = tree.iterator();
+	    
+	    // check that we can remove all items we get from the iterator
+	    while (iter.hasNext() || count > MAX) {
+		count++;
+		String s = iter.next();
+		assertTrue(shadow.remove(s));
+	    }
+	    // check that the shadow list is empty; we should have removed
+	    // all its elements
+	    assertTrue(shadow.isEmpty());
+	}
+    }
+    
+    
+    public void testIteratorRemove() {
+	// test with an empty tree
+	ConcurrentQuadTree<String> tree = makeEmptyTree(5);
+	Iterator<String> iter = tree.iterator();
+	try {
+	    iter.remove();
+	    fail ("Expecting IllegalStateException");
+	} catch (IllegalStateException ise) {
+	}
+	
+	// test removing having not called next()
+	tree = makeEmptyTree(5);
+	tree.add(1, 1, "A");
+	iter = tree.iterator();
+	try {
+	    iter.remove();
+	    fail ("Expecting IllegalStateException");
+	} catch (IllegalStateException ise) {
+	}
+	
+	// test removing after calling next()
+	tree = makeEmptyTree(5);
+	tree.add(1, 1, "A");
+	iter = tree.iterator();
+	assertTrue(iter.hasNext());
+	iter.next();
+	iter.remove();
+	assertFalse(iter.hasNext());
+	assertTrue(tree.isEmpty());
+	
+	// test successive removes
+	tree = makeEmptyTree(5);
+	tree.add(1, 1, "A");
+	tree.add(99, 99, "B");
+	iter = tree.iterator();
+	assertTrue(iter.hasNext());
+	iter.next();
+	iter.remove();
+	try {
+	    iter.remove();
+	    fail ("Expecting IllegalStateException");
+	} catch (IllegalStateException ise) {
+	}
+	iter.next();
+	iter.remove();
+	assertFalse(iter.hasNext());
+	assertTrue(tree.isEmpty());
+    }
+    
+    /*--------------- test some boundary cases ----------------------*/
+    
+    
 }
