@@ -61,6 +61,9 @@ public class BootAcceptance {
     private File alternateSGS_LOGGING;
     private File alternateSGS_LOGFILE;
     private File configLogging;
+    
+    private File homeConfig;
+    private boolean removeHomeConfig;
 
     /**
      * Main-line method that initiates the suite of tests against the given
@@ -148,6 +151,11 @@ public class BootAcceptance {
                 "config-logging.properties");
         Assert.assertNotNull(configConfig);
         Util.copyURLToFile(configConfig, configLogging);
+        
+        this.homeConfig = new File(System.getProperty("user.home") +                            
+                                   File.separator +
+                                   ".sgs.properties");
+        this.removeHomeConfig = false;
     }
     
     
@@ -168,8 +176,15 @@ public class BootAcceptance {
         this.stopper = null;
         Assert.assertTrue(Util.deleteDirectory(testDirectory));
         Assert.assertTrue(Util.deleteDirectory(alternateDirectory));
+        
+        if(this.removeHomeConfig) {
+            this.homeConfig.delete();
+        }
     }
     
+    /**
+     * Verify proper behavior with an empty deploy directory
+     */
     @Test(timeout=5000)
     public void testEmptyDeploy() throws Exception {
         this.config = "";
@@ -192,6 +207,9 @@ public class BootAcceptance {
         }
     }
     
+    /**
+     * Default tutorial copied into the deploy directory
+     */
     @Test(timeout=5000)
     public void testHelloWorldDefault() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -202,6 +220,9 @@ public class BootAcceptance {
                                            "HelloWorld: application is ready"));
     }
     
+    /**
+     * Test using a custom sgs-boot properties with custom SGS_DEPLOY directory
+     */
     @Test(timeout=5000)
     public void testCustomSGS_DEPLOY() throws Exception {
         Util.loadTutorial(installationDirectory, alternateSGS_DEPLOY);
@@ -218,6 +239,9 @@ public class BootAcceptance {
                                            "HelloWorld: application is ready"));
     }
     
+    /**
+     * Test using custom sgs-boot properties with custom SGS_PROEPERTIES file
+     */
     @Test(timeout=5000)
     public void testCustomSGS_PROPERTIES() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -235,6 +259,9 @@ public class BootAcceptance {
                                            "HelloWorld: application is ready"));
     }
     
+    /**
+     * Test using custom sgs-boot properties with custom SGS_LOGGING file
+     */
     @Test(timeout=5000)
     public void testCustomSGS_LOGGING() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -252,6 +279,10 @@ public class BootAcceptance {
                                            "HelloWorld: application is ready"));
     }
     
+    /**
+     * Test using custom sgs-boot properties with a custom
+     * SGS_DEPLOY directory, SGS_PROPERTIES file, and SGS_LOGGING file
+     */
     @Test(timeout=5000)
     public void testCustomALL_CONF() throws Exception {
         Util.loadTutorial(installationDirectory, alternateSGS_DEPLOY);
@@ -268,6 +299,9 @@ public class BootAcceptance {
                                            "HelloWorld: application is ready"));
     }
     
+    /**
+     * Test with a configured SGS_LOGFILE to redirect output
+     */
     @Test(timeout=5000)
     public void testCustomSGS_LOGFILE() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -287,6 +321,9 @@ public class BootAcceptance {
                                            "HelloWorld: application is ready"));
     }
     
+    /**
+     * Verify correct behavior with default BDB_TYPE (none specified)
+     */
     @Test(timeout=5000)
     public void testBDB_TYPEDefault() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -315,6 +352,10 @@ public class BootAcceptance {
                                              "HelloWorld: application is ready"));
     }
     
+    /**
+     * Verify default BDB_TYPE does NOT include the BDB-JE jar file on
+     * the classpath
+     */
     @Test(timeout=5000)
     public void testBDB_TYPEDefaultNoJe() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -334,6 +375,9 @@ public class BootAcceptance {
                                                   "-cp .*lib.je-.*\\.jar"));
     }
     
+    /**
+     * Verify correct behavior with BDB_TYPE set to db
+     */
     @Test(timeout=5000)
     public void testBDB_TYPEDb() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -362,6 +406,10 @@ public class BootAcceptance {
                                              "HelloWorld: application is ready"));
     }
     
+    /**
+     * Verify db BDB_TYPE does NOT include the BDB-JE jar file on
+     * the classpath
+     */
     @Test(timeout=5000)
     public void testBDB_TYPEDbNoJe() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -381,6 +429,9 @@ public class BootAcceptance {
                                                   "-cp .*lib.je-.*\\.jar"));
     }
     
+    /**
+     * Verify correct behavior with BDB_TYPE set to je
+     */
     @Test(timeout=5000)
     public void testBDB_TYPEJe() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -409,6 +460,10 @@ public class BootAcceptance {
                                              "HelloWorld: application is ready"));
     }
     
+    /**
+     * Verify je BDB_TYPE does NOT include the BDB jar file on
+     * the classpath
+     */
     @Test(timeout=5000)
     public void testBDB_TYPEJeNoDb() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -428,6 +483,9 @@ public class BootAcceptance {
                                                   "-cp .*lib.db-.*\\.jar"));
     }
     
+    /**
+     * Verify correct behavior with BDB_TYPE set to custom
+     */
     @Test(timeout=5000)
     public void testBDB_TYPECustom() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -454,6 +512,10 @@ public class BootAcceptance {
                                                   noMatch.toString()));
     }
     
+    /**
+     * Verify custom BDB_TYPE does NOT include the BDB jar file on
+     * the classpath
+     */
     @Test(timeout=5000)
     public void testBDB_TYPECustomNoDb() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -480,6 +542,10 @@ public class BootAcceptance {
                                                   noMatch.toString()));
     }
     
+    /**
+     * Verify custom BDB_TYPE does NOT include the BDB-JE jar file on
+     * the classpath
+     */
     @Test(timeout=5000)
     public void testBDB_TYPECustomNoJe() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -506,6 +572,10 @@ public class BootAcceptance {
                                                   noMatch.toString()));
     }
     
+    /**
+     * Verify CUSTOM_NATIVES are property included in the java.library.path
+     * when the BDB_TYPE is set to db
+     */
     @Test(timeout=5000)
     public void testCUSTOM_NATIVESDb() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -531,6 +601,10 @@ public class BootAcceptance {
                                              "HelloWorld: application is ready"));
     }
     
+    /**
+     * Verify CUSTOM_NATIVES are property included in the java.library.path
+     * when the BDB_TYPE is set to je
+     */
     @Test(timeout=5000)
     public void testCUSTOM_NATIVESJe() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -556,6 +630,10 @@ public class BootAcceptance {
                                              "HelloWorld: application is ready"));
     }
     
+    /**
+     * Verify CUSTOM_NATIVES are property included in the java.library.path
+     * when the BDB_TYPE is set to custom
+     */
     @Test(timeout=5000)
     public void testCUSTOM_NATIVESCustom() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -577,6 +655,10 @@ public class BootAcceptance {
                                              match.toString()));
     }
     
+    /**
+     * Verify a custom set of specified BDB_NATIVES are included in the
+     * java.library.path properly
+     */
     @Test(timeout=5000)
     public void testBDB_NATIVES() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -600,6 +682,9 @@ public class BootAcceptance {
                                              match.toString()));
     }
     
+    /**
+     * Verify that custom JAVA_OPTS are included on the executed process
+     */
     @Test(timeout=5000)
     public void testCustomJAVA_OPTS() throws Exception {
         Util.loadTutorial(installationDirectory);
@@ -618,5 +703,258 @@ public class BootAcceptance {
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }
+    
+    /**
+     * Verify that a ~/.sgs.properties file is used when it exists
+     */
+    @Test(timeout=5000)
+    public void testPropertiesHomeDirectory() throws Exception {
+        if(this.homeConfig.exists()) {
+            Assert.fail("Can't run test, file already exists : " +
+                        this.homeConfig.getAbsolutePath());
+        }
+        
+        //copy the ~/.sgs.properties file into position
+        this.removeHomeConfig = true;
+        Util.loadTutorial(installationDirectory);
+        URL sgsConfig = this.getClass().getResource(
+                "propertiesHome.sgs.properties");
+        Assert.assertNotNull(sgsConfig);
+        Util.copyURLToFile(sgsConfig, this.homeConfig);
+        
+        this.config = "";
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloLogger: application is ready"));
+    }
+    
+    /**
+     * Verify that properties in the ~/.sgs.properties file override
+     * properties in the SGS_PROPERTIES file
+     */
+    @Test(timeout=5000)
+    public void testPropertiesHomeOverrides() throws Exception {
+        if(this.homeConfig.exists()) {
+            Assert.fail("Can't run test, file already exists : " +
+                        this.homeConfig.getAbsolutePath());
+        }
+        
+        //copy the ~/.sgs.properties file into position
+        this.removeHomeConfig = true;
+        Util.loadTutorial(installationDirectory);
+        URL sgsConfig = this.getClass().getResource(
+                "propertiesHome.sgs.properties");
+        Assert.assertNotNull(sgsConfig);
+        Util.copyURLToFile(sgsConfig, this.homeConfig);
+        
+        //copy the sgs-server.properties file into position
+        File boot = new File(this.alternateDirectory,
+                             ".sgs-server.properties.boot");
+        URL sgsServerConfig = this.getClass().getResource(
+                "propertiesHome.sgs-server.properties.boot");
+        Assert.assertNotNull(sgsServerConfig);
+        Util.copyURLToFile(sgsServerConfig, boot);
+        
+        //copy the SGS_PROPERTIES file referenced into position
+        URL sgsServerActConfig = this.getClass().getResource(
+                "propertiesHome.sgs-server.properties");
+        Assert.assertNotNull(sgsServerActConfig);
+        Util.copyURLToFile(sgsServerActConfig,
+                           new File(this.alternateDirectory, 
+                                    ".sgs-server.properties"));
+        
+        Util.clearSGS_BOOT(installationDirectory);
+        Util.clearSGS_PROPERTIES(installationDirectory);
+        
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloLogger: application is ready"));
+    }
+    
+    /**
+     * Verify that properties given on the command line override those
+     * given in ~/.sgs.properties file
+     */
+    @Test(timeout=5000)
+    public void testPropertiesCommandOverrides() throws Exception {
+        if(this.homeConfig.exists()) {
+            Assert.fail("Can't run test, file already exists : " +
+                        this.homeConfig.getAbsolutePath());
+        }
+        
+        //copy the ~/.sgs.properties file into position
+        this.removeHomeConfig = true;
+        Util.loadTutorial(installationDirectory);
+        URL sgsConfig = this.getClass().getResource(
+                "propertiesHome.sgs.properties");
+        Assert.assertNotNull(sgsConfig);
+        Util.copyURLToFile(sgsConfig, this.homeConfig);
+        
+        //copy the boot file into position which contains overriding JAVA_OPTS
+        File boot = new File(this.alternateDirectory,
+                             ".sgs-server.properties.boot");
+        URL sgsServerConfig = this.getClass().getResource(
+                "propertiesCommand.sgs-server.properties.boot");
+        Assert.assertNotNull(sgsServerConfig);
+        Util.copyURLToFile(sgsServerConfig, boot);
+        
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloEcho: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloChannels() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloChannels.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloChannels: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloEcho() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloEcho.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloEcho: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloLogger() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloLogger.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloLogger: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloPersistence() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloPersistence.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloPersistence: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloPersistence2() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloPersistence2.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloPersistence2: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloPersistence3() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloPersistence3.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloPersistence3: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloTimer() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloTimer.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloTimer: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloUser() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloUser.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloUser: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloUser2() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloUser2.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloUser2: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialHelloWorld() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/HelloWorld.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "HelloWorld: application is ready"));
+    }
+    
+    @Test(timeout=5000)
+    public void testTutorialSwordWorld() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        File boot = new File(installationDirectory, 
+                             "tutorial/conf/SwordWorld.boot");
+        this.config = boot.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, null, config);
+        Assert.assertTrue(
+                Util.expectLines(server,
+                                 "The Kernel is ready",
+                                 "SwordWorld: application is ready"));
+    }
+    
     
 }

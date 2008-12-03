@@ -528,4 +528,23 @@ class Util {
             
         }
     }
+    
+    
+    /**
+     * Utility method used for debugging purposes.
+     * Pulls all data from the input stream and dumps it to
+     * standard error.
+     * @param is
+     */
+    public static void dumpStream(InputStream is) {
+        byte[] buf = new byte[2048];
+        int count;
+        try {
+            while ((count = is.read(buf)) != -1) {
+                System.err.write(buf, 0, count);
+                System.err.flush();
+            }
+        } catch (IOException e) {
+        }
+    }
 }
