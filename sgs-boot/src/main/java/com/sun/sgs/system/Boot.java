@@ -55,7 +55,7 @@ public final class Boot {
      * the required components to startup an application in a Project
      * Darkstar container.  If no argument is given on the command line, 
      * the filename is assumed to be at the location specified by the system 
-     * resource {@link BootEnvironment.SGS_BOOT}.
+     * resource {@link BootEnvironment#SGS_BOOT}.
      * <p>
      * The properties included in the configuration file must conform to
      * the rules allowed by {@link SubstitutionProperties}.

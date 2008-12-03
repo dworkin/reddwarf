@@ -44,11 +44,16 @@ public final class Stop {
      * <p>
      * If a single argument is given on the command line, the value of
      * the argument is assumed to be a filename.  This file is used to 
-     * specify a set of configuration properties required in order to locate
-     * the required components to startup an application in a Project
-     * Darkstar container.  If no argument is given on the command line, 
-     * the filename is assumed to be at the location specified by the system 
-     * resource {@link BootEnvironment.SGS_BOOT}.
+     * specify a set of configuration properties that were used to startup
+     * the running Project Darkstar Server.  If no argument is given on the 
+     * command line, the filename is assumed to be at the location specified 
+     * by the system resource {@link BootEnvironment#SGS_BOOT}.
+     * <p>
+     * A shutdown command is sent to the running Project Darkstar Server
+     * by connecting to localhost on the port specified by the 
+     * {@link BootEnvironment#SHUTDOWN_PORT} property in the configuration.
+     * A {@link BootEnvironment#SHUTDOWN_COMMAND} command is sent over
+     * the connected port.
      * 
      * @param args optional filename of configuration file
      * @throws Exception if there is a problem

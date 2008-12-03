@@ -48,7 +48,7 @@ class ShutdownHandler implements Runnable {
     
     /**
      * Constructs a new {@code ShutdownHandler} that will
-     * wait for incoming connections on localhost on the given port
+     * open a {@link ServerSocket} on localhost on the given port
      * 
      * @param p the child process to destroy upon shutdown
      * @param port the port number to listen on
@@ -113,8 +113,9 @@ class ShutdownHandler implements Runnable {
     }
 
     /**
-     * Opens a {@code ServerSocket} on this {@code ShutdownHandler}'s port and
-     * waits for incoming connections.
+     * Waits for incoming connections on this {@code ShutdownHandler}'s 
+     * open {@code ServerSocket} and spawns a new {@link SocketListener} thread
+     * for each incoming connection.
      * 
      * @throws IllegalStateException if no {@code Process} has been set via
      *         the {@link #setProcess(java.lang.Process)} method.
@@ -144,7 +145,7 @@ class ShutdownHandler implements Runnable {
     }
     
     /**
-     * A simple listener that monitors an connected {@code Socket} for a
+     * A simple listener that monitors a connected {@code Socket} for a
      * {@link BootEnvironment#SHUTDOWN_COMMAND} command.
      */
     private class SocketListener implements Runnable {
