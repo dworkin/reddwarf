@@ -22,7 +22,7 @@ package com.sun.sgs.service;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.protocol.ChannelProtocol;
-import com.sun.sgs.protocol.Protocol;
+import com.sun.sgs.protocol.SessionProtocol;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -57,7 +57,7 @@ public interface ClientSessionService extends Service {
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
      * @return	a protocol, or {@code null}
      */
-    Protocol getProtocol(BigInteger sessionRefId);
+    SessionProtocol getSessionProtocol(BigInteger sessionRefId);
 
     /**
      * Returns a channel protocol with the specified {@code delivery}

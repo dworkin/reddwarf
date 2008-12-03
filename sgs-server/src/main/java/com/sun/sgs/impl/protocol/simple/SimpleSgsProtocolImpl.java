@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
-import com.sun.sgs.impl.nio.DelegatingCompletionHandler;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -29,23 +29,21 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
-import com.sun.sgs.nio.channels.WritePendingException;
 import com.sun.sgs.protocol.CompletionFuture;
-import com.sun.sgs.protocol.Protocol;
-import com.sun.sgs.protocol.ProtocolHandler;
+import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.Node;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -56,25 +54,31 @@ import java.util.logging.Logger;
  * message length, and masking (and re-issuing) partial I/O operations.  Also
  * enforces a fixed buffer size when reading.
  */
-public class SimpleSgsProtocolImpl implements Protocol {
+public class SimpleSgsProtocolImpl implements SessionProtocol, Channel {
     /** The number of bytes used to represent the message length. */
     public static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
-    static final LoggerWrapper logger = new LoggerWrapper(
+    private static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(SimpleSgsProtocolImpl.class.getName()));
 
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...).
      */
-    final AsynchronousMessageChannel asyncMsgChannel;
+    private final AsynchronousMessageChannel asyncMsgChannel;
 
     /** The protocol handler. */
-    final ProtocolHandler protocolHandler;
+    private volatile SessionProtocolHandler protocolHandler;
 
-    /** This message channel's protocol factory. */
-    final SimpleSgsProtocolFactory protocolFactory;
+    /** This protocol's acceptor. */
+    private final SimpleSgsProtocolAcceptor acceptor;
+
+    /** The protocol listener. */
+    private final ProtocolListener listener;
+
+    /** The identity. */
+    private volatile Identity identity;
 
     /** The completion handler for reading from the I/O channel. */
     private volatile ReadHandler readHandler = new ConnectedReadHandler();
@@ -92,25 +96,25 @@ public class SimpleSgsProtocolImpl implements Protocol {
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
     /**
-     * Creates a new instance of this class with the given byte channel},
-     * protocol handler, protocol factory, and read buffer size.
-     * 
-     * @param	byteChannel a byte channel
-     * @param	handler a protocol handler
-     * @param	protocolFactory a protocol factory
-     * @param	readBufferSize the number of bytes in the read buffer
+     * Creates a new instance of this class.
+     *
+     * @param	listener a protocol listener
+     * @param	acceptor the {@code SimpleSgsProtocol} acceptor
+     * @param	byteChannel a byte channel for the underlying connection
+     * @param	readBufferSize the read buffer size
      */
-    public SimpleSgsProtocolImpl(
-	AsynchronousByteChannel byteChannel, ProtocolHandler handler,
-	SimpleSgsProtocolFactory protocolFactory, int readBufferSize)
+    public SimpleSgsProtocolImpl(ProtocolListener listener,
+				 SimpleSgsProtocolAcceptor acceptor,
+				 AsynchronousByteChannel byteChannel,
+				 int readBufferSize)
     {
-	// The read buffer size lower bound is enforced by the protocol factory
+	// The read buffer size lower bound is enforced by the protocol acceptor
 	assert readBufferSize >= PREFIX_LENGTH;
 	this.asyncMsgChannel =
 	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
-	this.protocolFactory = protocolFactory;
-	this.protocolHandler = handler;
-	
+	this.listener = listener;
+	this.acceptor = acceptor;
+
 	/*
 	 * TBD: It might be a good idea to implement high- and low-water marks
 	 * for the buffers, so they don't go into hysteresis when they get
@@ -119,15 +123,16 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	scheduleReadOnReadHandler();
     }
 
-    /* -- Implement ProtocolMessageChannel -- */
+    /* -- Implement SessionProtocol -- */
 
     /** {@inheritDoc} */
-    public void loginRedirect(String host, int port) {
+    public void loginRedirect(Node node) {
+	String host = node.getHostName();
 	int hostStringSize = MessageBuffer.getSize(host);
 	MessageBuffer buf = new MessageBuffer(1 + hostStringSize + 4);
         buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
             putString(host).
-            putInt(port);
+            putInt(node.getPort());
 	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
     }
@@ -148,10 +153,10 @@ public class SimpleSgsProtocolImpl implements Protocol {
 
     /** {@inheritDoc} */
     public void loginFailure(String reason, Throwable throwable) {
-        int stringSize = MessageBuffer.getSize(reason);
-        MessageBuffer buf = new MessageBuffer(1 + stringSize);
+        MessageBuffer buf =
+	    new MessageBuffer(1 + MessageBuffer.getSize(reason));
         buf.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
-            putString("login refused");
+            putString(reason);
         writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
     }
@@ -230,7 +235,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
      * Schedules an asynchronous task to resume reading.
      */
     private void scheduleReadOnReadHandler() {
-	protocolFactory.scheduleNonTransactionalTask(
+	acceptor.scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
 		public void run() {
 		    logger.log(
@@ -288,6 +293,21 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	    messageQueue.clear();
 	}
     }
+
+    /**
+     * Method to disconnect the connection.
+     */
+    private void disconnect() {
+	if (protocolHandler != null) {
+	    protocolHandler.disconnect();
+	} else {
+	    try {
+		close();
+	    } catch (IOException ignore) {
+	    }
+	}
+    }
+    
     /* -- I/O completion handlers -- */
 
     /** A completion handler for writing to a connection. */
@@ -415,7 +435,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
 				    SimpleSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
-		protocolHandler.disconnect();
+		disconnect();
             }
         }
     }
@@ -478,7 +498,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    protocolHandler.disconnect();
+		    disconnect();
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -507,7 +527,7 @@ public class SimpleSgsProtocolImpl implements Protocol {
                         Level.FINE, e,
                         "Read completion exception {0}", asyncMsgChannel);
                 }
-                protocolHandler.disconnect();
+                disconnect();
             }
         }
 
@@ -535,13 +555,28 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-		    protocolHandler.disconnect();
+		    disconnect();
 	            break;
 	        }
 
 		final String name = msg.getString();
 		final String password = msg.getString();
-		protocolHandler.loginRequest(name, password);
+
+		try {
+		    identity = acceptor.authenticate(name, password);
+		} catch (Exception e) {
+		    logger.logThrow(
+			Level.FINEST, e,
+			"login authentication failed for name:{0}", name);
+		    loginFailure("login failed", e);
+		    
+		    break;
+		}
+		    
+		protocolHandler =
+		    listener.newProtocol(identity, SimpleSgsProtocolImpl.this);
+		protocolHandler.loginRequest();
+		
                 // Resume reading immediately
 		read();
 
@@ -550,6 +585,18 @@ public class SimpleSgsProtocolImpl implements Protocol {
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
+		if (protocolHandler == null) {
+		    // ignore message before authentication
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE,
+			    "Dropping early session message:{0} " +
+			    "for protocol:{1}",
+			    HexDumper.format(clientMessage, 0x50),
+			    SimpleSgsProtocolImpl.this);
+		    }
+		    return;
+		}
 		CompletionFuture sessionMessageFuture =
 		    protocolHandler.sessionMessage(clientMessage);
 
@@ -577,6 +624,18 @@ public class SimpleSgsProtocolImpl implements Protocol {
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
 		ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
+		if (protocolHandler == null) {
+		    // ignore message before authentication
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE,
+			    "Dropping early channel message:{0} " +
+			    "for protocol:{1}",
+			    HexDumper.format(channelMessage, 0x50),
+			    SimpleSgsProtocolImpl.this);
+		    }
+		    return;
+		}
 		CompletionFuture channelMessageFuture =
 		    protocolHandler.channelMessage(
 			channelRefId, channelMessage);
@@ -602,6 +661,13 @@ public class SimpleSgsProtocolImpl implements Protocol {
 
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
+		if (protocolHandler == null) {
+		    try {
+			close();
+		    } catch (IOException ignore) {
+		    }
+		    return;
+		}
 		protocolHandler.logoutRequest();
 
 		// Resume reading immediately

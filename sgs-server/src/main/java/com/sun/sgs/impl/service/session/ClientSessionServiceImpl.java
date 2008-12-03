@@ -26,9 +26,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolFactory;
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -44,15 +42,12 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
-import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
-import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 import com.sun.sgs.protocol.ChannelProtocol;
-import com.sun.sgs.protocol.Protocol;
-import com.sun.sgs.protocol.ProtocolFactory;
+import com.sun.sgs.protocol.ChannelProtocolHandler;
+import com.sun.sgs.protocol.ProtocolAcceptor;
+import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -66,6 +61,8 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -80,13 +77,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -126,27 +119,12 @@ public final class ClientSessionServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
     
-    /**
-     * The server listen address property.
-     * This is the host interface we are listening on. Default is listen
-     * on all interfaces.
-     */
-    private static final String LISTEN_HOST_PROPERTY =
-        PKG_NAME + ".listen.address";
-    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
 
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
-
-    /** The name of the acceptor backlog property. */
-    private static final String ACCEPTOR_BACKLOG_PROPERTY =
-        PKG_NAME + ".acceptor.backlog";
-
-    /** The default acceptor backlog (&lt;= 0 means default). */
-    private static final int DEFAULT_ACCEPTOR_BACKLOG = 0;
 
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
@@ -175,29 +153,22 @@ public final class ClientSessionServiceImpl
      */
     private static final long DEFAULT_DISCONNECT_DELAY = 1000;
 
+    /** The protocol acceptor property name. */
+    private static final String PROTOCOL_ACCEPTOR_PROPERTY =
+	PKG_NAME + "protocol.acceptor";
+
+    /** The default protocol acceptor class. */
+    private static final String DEFAULT_PROTOCOL_ACCEPTOR =
+	SimpleSgsProtocolAcceptor.class.getName();
+
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
 
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
     private final long disconnectDelay;
 
-    /** The port for accepting connections. */
-    private final int appPort;
-
     /** The local node's ID. */
     private final long localNodeId;
-
-    /** The async channel group for this service. */
-    private final AsynchronousChannelGroup asyncChannelGroup;
-
-    /** The acceptor for listening for new connections. */
-    private final AsynchronousServerSocketChannel acceptor;
-
-    /** The protocol factory. */
-    private final ProtocolFactory protocolFactory;
-
-    /** The currently-active accept operation, or {@code null} if none. */
-    volatile IoFuture<?, ?> acceptFuture;
 
     /** The registered session disconnect listeners. */
     private final Set<ClientSessionDisconnectListener>
@@ -235,9 +206,6 @@ public final class ClientSessionServiceImpl
     /** The channel service. */
     private volatile ChannelServiceImpl channelService;
     
-    /** The identity manager. */
-    final IdentityCoordinator identityManager;
-
     /** The exporter for the ClientSessionServer. */
     private final Exporter<ClientSessionServer> exporter;
 
@@ -246,6 +214,12 @@ public final class ClientSessionServiceImpl
 	
     /** The proxy for the ClientSessionServer. */
     private final ClientSessionServer serverProxy;
+
+    /** The protocol listener. */
+    private final ProtocolListener protocolListener;
+
+    /** The protocol acceptor. */
+    private final ProtocolAcceptor protocolAcceptor;
 
     /** The map of logged in {@code ClientSessionHandler}s, keyed by
      *  identity.
@@ -299,9 +273,6 @@ public final class ClientSessionServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-            appPort = wrappedProps.getRequiredIntProperty(
-                StandardProperties.APP_PORT, 1, 65535);
-
 	    /*
 	     * Get the property for controlling session event processing
 	     * and connection disconnection.
@@ -318,10 +289,6 @@ public final class ClientSessionServiceImpl
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
-	    // TBD: make the protocol factory configurable
-	    protocolFactory = new SimpleSgsProtocolFactory(
-		properties, systemRegistry, txnProxy);
-	    
 	    /*
 	     * Export the ClientSessionServer.
 	     */
@@ -349,8 +316,6 @@ public final class ClientSessionServiceImpl
 	    /*
 	     * Get services and check service version.
 	     */
-	    identityManager =
-		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
@@ -359,8 +324,7 @@ public final class ClientSessionServiceImpl
 	    localNodeId = watchdogService.getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
-	    int acceptorBacklog = wrappedProps.getIntProperty(
-	                ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
+	    
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
@@ -382,43 +346,26 @@ public final class ClientSessionServiceImpl
 		taskOwner);
 
 	    /*
-	     * Listen for incoming client connections. If no host address
-             * is supplied, default to listen on all interfaces.
+	     * Create the protocol acceptor.
 	     */
-            String hostAddress = properties.getProperty(LISTEN_HOST_PROPERTY);
-            InetSocketAddress listenAddress =
-                hostAddress == null ?
-		new InetSocketAddress(appPort) :
-		new InetSocketAddress(hostAddress, appPort);
-            AsynchronousChannelProvider provider =
-                // TODO fetch from config
-                AsynchronousChannelProvider.provider();
-            asyncChannelGroup =
-                // TODO fetch from config
-                provider.openAsynchronousChannelGroup(
-                    Executors.newCachedThreadPool());
-            acceptor =
-                provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
+	    protocolListener = new ProtocolListenerImpl();
+	    String acceptorClassName = wrappedProps.getProperty(
+		PROTOCOL_ACCEPTOR_PROPERTY, DEFAULT_PROTOCOL_ACCEPTOR);
+	    Class<?> acceptorClass =
+		Class.forName(acceptorClassName);
+	    Constructor<?> acceptorConstr =
+		acceptorClass.getConstructor(
+		    Properties.class, ComponentRegistry.class,
+		    TransactionProxy.class, ProtocolListener.class);
 	    try {
-                acceptor.bind(listenAddress, acceptorBacklog);
-		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(
-			Level.CONFIG, "bound to port:{0,number,#}",
-			getListenPort());
-		}
-	    } catch (Exception e) {
-		logger.logThrow(Level.WARNING, e,
-                                "acceptor failed to listen on {0}",
-                                listenAddress);
-		try {
-		    acceptor.close();
-                } catch (IOException ioe) {
-                    logger.logThrow(Level.WARNING, ioe,
-                        "problem closing acceptor");
-                }
-		throw e;
+		protocolAcceptor = (ProtocolAcceptor)
+		    acceptorConstr.newInstance(
+ 		    	properties, systemRegistry, txnProxy,
+			protocolListener);
+	    } catch (InvocationTargetException ite) {
+		throw (Exception) ite.getCause();
 	    }
-
+	    
 	    /*
 	     * Set up recurring task to monitor disconnecting client sessions.
 	     */
@@ -452,66 +399,21 @@ public final class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    public void doReady() {
+    public void doReady() throws Exception {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
-        acceptFuture = acceptor.accept(new AcceptorListener());
-        try {
-            if (logger.isLoggable(Level.CONFIG)) {
-                logger.log(
-                    Level.CONFIG, "listening on {0}",
-                    acceptor.getLocalAddress());
-            }
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe.getMessage(), ioe);
-        }
+	protocolAcceptor.ready();
     }
 
     /** {@inheritDoc} */
     public void doShutdown() {
-	final IoFuture<?, ?> future = acceptFuture;
-	acceptFuture = null;
-	if (future != null) {
-	    future.cancel(true);
+	if (protocolAcceptor != null) {
+	    protocolAcceptor.shutdown();
 	}
-
-	if (acceptor != null) {
-	    try {
-		acceptor.close();
-            } catch (IOException e) {
-                logger.logThrow(Level.FINEST, e, "closing acceptor throws");
-                // swallow exception
-            } 
-	}
-
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
 	}
 	handlers.clear();
 	
-	if (asyncChannelGroup != null) {
-	    asyncChannelGroup.shutdown();
-	    boolean groupShutdownCompleted = false;
-	    try {
-		groupShutdownCompleted =
-		    asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS);
-	    } catch (InterruptedException e) {
-		logger.logThrow(Level.FINEST, e,
-				"shutdown acceptor interrupted");
-		Thread.currentThread().interrupt();
-	    }
-	    if (!groupShutdownCompleted) {
-		logger.log(Level.WARNING, "forcing async group shutdown");
-		try {
-		    asyncChannelGroup.shutdownNow();
-		} catch (IOException e) {
-		    logger.logThrow(Level.FINEST, e,
-				    "shutdown acceptor throws");
-		    // swallow exception
-		}
-	    }
-	}
-	logger.log(Level.FINEST, "acceptor shutdown");
-
 	if (exporter != null) {
 	    try {
 		exporter.unexport();
@@ -545,7 +447,12 @@ public final class ClientSessionServiceImpl
      * @throws IOException if an IO problem occurs
      */
     public int getListenPort() throws IOException {
-        return ((InetSocketAddress) acceptor.getLocalAddress()).getPort();
+	if (protocolAcceptor instanceof SimpleSgsProtocolAcceptor) {
+	    return ((SimpleSgsProtocolAcceptor) protocolAcceptor).
+		getListenPort();
+	} else {
+	    throw new IOException("unable to obtain listen port");
+	}
     }
 
     /**
@@ -590,9 +497,9 @@ public final class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    public Protocol getProtocol(BigInteger sessionRefId) {
+    public SessionProtocol getSessionProtocol(BigInteger sessionRefId) {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
-	return handler != null ? handler.getProtocol() : null;
+	return handler != null ? handler.getSessionProtocol() : null;
     }
 
     /** {@inheritDoc} */
@@ -605,6 +512,32 @@ public final class ClientSessionServiceImpl
 	    handler != null ?
 	    handler.getChannelProtocol(delivery, bestAvailable) :
 	    null;
+    }
+
+    /* -- Implement ProtocolListener -- */
+
+    private class ProtocolListenerImpl implements ProtocolListener {
+
+	/** {@inheritDoc} */
+	public SessionProtocolHandler newProtocol(
+	    Identity identity, SessionProtocol protocol)
+	{
+	    return new ClientSessionHandler(
+		ClientSessionServiceImpl.this, dataService, protocol, identity);
+	    
+	}
+	
+	/** {@inheritDoc} */
+	public ChannelProtocolHandler newProtocol(
+	    BigInteger sessionId, ChannelProtocol protocol)
+	{
+	    ClientSessionHandler handler = handlers.get(sessionId);
+	    if (handler == null) {
+		throw new IllegalArgumentException("sessionId not active");
+	    } else {
+		return handler;
+	    }
+	}
     }
     
     /* -- Package access methods for adding commit actions -- */
@@ -629,11 +562,11 @@ public final class ClientSessionServiceImpl
      * Records the login result in the current context for delivery to the
      * specified client {@code session} when the context commits.  If
      * {@code success} is {@code false}, a {@link
-     * Protocol#loginFailure loginFailure} message will be
+     * SessionProtocol#loginFailure loginFailure} message will be
      * sent and no subsequent session messages will be forwarded to the
      * session, even if they have been enqueued during the current
      * transaction.  If success if {@code true}, then a {@link
-     * Protocol#loginSuccess loginSuccess}
+     * SessionProtocol#loginSuccess loginSuccess}
      *
      * <p>When the transaction commits, the login acknowledgment message is
      * delivered to the client session first, and if {@code success} is
@@ -676,50 +609,6 @@ public final class ClientSessionServiceImpl
      */
     int getWriteBufferSize() {
         return writeBufferSize;
-    }
-
-    /** A completion handler for accepting connections. */
-    private class AcceptorListener
-        implements CompletionHandler<AsynchronousSocketChannel, Void>
-    {
-
-	/** Handle new connection or report failure. */
-        public void completed(
-	    IoFuture<AsynchronousSocketChannel, Void> result)
-        {
-            try {
-                try {
-                    AsynchronousSocketChannel socketChannel = result.getNow();
-                    logger.log(Level.FINER, "Accepted {0}", socketChannel);
-
-		    /* The handler will call addHandler if login succeeds */
-		    new ClientSessionHandler(
- 			ClientSessionServiceImpl.this, dataService,
-			protocolFactory, socketChannel);
-
-                    // Resume accepting connections
-                    acceptFuture = acceptor.accept(this);
-
-                } catch (ExecutionException e) {
-                    throw (e.getCause() == null) ? e : e.getCause();
-                }
-            } catch (CancellationException e) {               
-                logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
-                //ignore
-            } catch (Throwable e) {
-                SocketAddress addr = null;
-                try {
-                    addr = acceptor.getLocalAddress();
-                } catch (IOException ioe) {
-                    // ignore
-                }
-
-                logger.logThrow(
-		    Level.SEVERE, e, "acceptor error on {0}", addr);
-
-                // TBD: take other actions, such as restarting acceptor?
-            }
-	}
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -1007,7 +896,7 @@ public final class ClientSessionServiceImpl
 			return;
 		    }
 		}
-		Protocol protocol = handler.getProtocol();
+		SessionProtocol protocol = handler.getSessionProtocol();
 		if (protocol != null) {
 		    for (byte[] message : messages) {
 			protocol.sessionMessage(ByteBuffer.wrap(message));
@@ -1486,3 +1375,4 @@ public final class ClientSessionServiceImpl
 	}
     }
 }
+

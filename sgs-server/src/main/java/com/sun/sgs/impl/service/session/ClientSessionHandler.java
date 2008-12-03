@@ -36,9 +36,8 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.ChannelProtocol;
-import com.sun.sgs.protocol.Protocol;
-import com.sun.sgs.protocol.ProtocolFactory;
-import com.sun.sgs.protocol.ProtocolHandler;
+import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.UnsupportedDeliveryException;
@@ -59,7 +58,7 @@ import javax.security.auth.login.LoginException;
  * Handles sending/receiving messages to/from a client session and
  * disconnecting a client session.
  */
-class ClientSessionHandler implements ProtocolHandler {
+class ClientSessionHandler implements SessionProtocolHandler {
 
     /** Connection state. */
     private static enum State {
@@ -88,13 +87,13 @@ class ClientSessionHandler implements ProtocolHandler {
     private final DataService dataService;
 
     /** The I/O channel for sending messages to the client. */
-    private final Protocol protocol;
+    private final SessionProtocol protocol;
 
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
-    private volatile Identity identity;
+    private final Identity identity;
 
     /** The login status. */
     private volatile boolean loggedIn;
@@ -126,21 +125,17 @@ class ClientSessionHandler implements ProtocolHandler {
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
 			 DataService dataService,
-			 ProtocolFactory protocolFactory,
-			 AsynchronousByteChannel byteChannel)
+			 SessionProtocol sessionProtocol,
+			 Identity identity)
     {
-	if (sessionService == null) {
-	    throw new NullPointerException("null sessionService");
-	} else if (dataService == null) {
-	    throw new NullPointerException("null dataService");
-	} else if (protocolFactory == null) {
-	    throw new NullPointerException("null protocolFactory");
-	} else if (byteChannel == null) {
-	    throw new NullPointerException("null byteChannel");
-	}
+	checkNull("sessionService", sessionService);
+	checkNull("dataService", dataService);
+	checkNull("sessionProtocol", sessionProtocol);
+	checkNull("identity", identity);
 	this.sessionService = sessionService;
         this.dataService = dataService;
-	this.protocol = protocolFactory.newProtocol(byteChannel, this);
+	this.protocol = sessionProtocol;
+	this.identity = identity;
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -149,16 +144,14 @@ class ClientSessionHandler implements ProtocolHandler {
 	}
     }
 
-    /* -- Implement ProtocolHandler -- */
+    /* -- Implement SessionProtocolHandler -- */
     
     /** {@inheritDoc} */
-    public CompletionFuture loginRequest(final String name,
-					 final String password)
-    {
+    public CompletionFuture loginRequest() {
 	scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("HandleLoginRequest") {
 		public void run() {
-		    handleLoginRequest(name, password);
+		    handleLoginRequest(identity);
 		} });
 	// Enable protocol message channel to read immediately
 	return (new CompletionFutureImpl()).done();
@@ -234,8 +227,6 @@ class ClientSessionHandler implements ProtocolHandler {
 
     /** {@inheritDoc} */
     public CompletionFuture logoutRequest() {
-	// TBD: identity may be null. Fix to pass a non-null identity
-	// when scheduling the task.
 	scheduleHandleDisconnect(isConnected(), false);
 
 	// Enable protocol message channel to read immediately
@@ -281,7 +272,7 @@ class ClientSessionHandler implements ProtocolHandler {
      *
      * @return	a protocol
      */
-    Protocol getProtocol() {
+    SessionProtocol getSessionProtocol() {
 	return protocol;
     }
 
@@ -319,11 +310,11 @@ class ClientSessionHandler implements ProtocolHandler {
      * <li> submitting a transactional task to call the 'disconnected'
      *    callback on the listener for this session.
      *
-     * <li> notifying the identity (if non-null) that the session has
+     * <li> notifying the identity that the session has
      *    logged out.
      *
-     * <li> notifying the node mapping service that the identity (if
-     *    non-null) is no longer active.
+     * <li> notifying the node mapping service that the identity is no
+     *	  longer active. 
      * </ol>
      *
      * <p>Note:if {@code graceful} is {@code true}, then {@code
@@ -356,20 +347,17 @@ class ClientSessionHandler implements ProtocolHandler {
 	    sessionService.removeHandler(sessionRefId);
 	}
 	
-	if (identity != null) {
-	    // TBD: Due to the scheduler's behavior, this notification
-	    // may happen out of order with respect to the
-	    // 'notifyLoggedIn' callback.  Also, this notification may
-	    // also happen even though 'notifyLoggedIn' was not invoked.
-	    // Are these behaviors okay?  -- ann (3/19/07)
-	    final Identity thisIdentity = identity;
-	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
-		    public void run() {
-			thisIdentity.notifyLoggedOut();
-		    } });
-	    if (sessionService.removeUserLogin(identity, this)) {
-		deactivateIdentity(identity);
-	    }
+	// TBD: Due to the scheduler's behavior, this notification
+	// may happen out of order with respect to the
+	// 'notifyLoggedIn' callback.  Also, this notification may
+	// also happen even though 'notifyLoggedIn' was not invoked.
+	// Are these behaviors okay?  -- ann (3/19/07)
+	scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
+		public void run() {
+		    identity.notifyLoggedOut();
+		} });
+	if (sessionService.removeUserLogin(identity, this)) {
+	    deactivateIdentity();
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
@@ -496,18 +484,18 @@ class ClientSessionHandler implements ProtocolHandler {
      * the identity as inactive.  This method is invoked when a login is
      * redirected and also when a this client session is disconnected.
      */
-    private void deactivateIdentity(Identity inactiveIdentity) {
+    private void deactivateIdentity() {
 	try {
 	    /*
 	     * Set identity's status for this class to 'false'.
 	     */
 	    sessionService.nodeMapService.setStatus(
-		ClientSessionHandler.class, inactiveIdentity, false);
+		ClientSessionHandler.class, identity, false);
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.WARNING, e,
 		"setting status for identity:{0} throws",
-		inactiveIdentity.getName());
+		identity.getName());
 	}
     }
     
@@ -541,47 +529,31 @@ class ClientSessionHandler implements ProtocolHandler {
      * @param	name a user name
      * @param	password a password
      */
-    private void handleLoginRequest(String name, String password) {
+    private void handleLoginRequest(Identity identity) {
 
 	logger.log(
 	    Level.FINEST, 
-	    "handling login request for name:{0}", name);
-
-	/*
-	 * Authenticate identity.
-	 */
-	final Identity authenticatedIdentity;
-	try {
-	    authenticatedIdentity = authenticate(name, password);
-	} catch (Exception e) {
-	    logger.logThrow(
-		Level.FINEST, e,
-		"login authentication failed for name:{0}", name);
-	    sendLoginFailureAndDisconnect(e);
-	    return;
-	}
-
-	Node node;
+	    "handling login request for identity:{0}", identity);
+	
+	final Node node;
 	try {
 	    /*
 	     * Get node assignment.
 	     */
 	    sessionService.nodeMapService.assignNode(
-		ClientSessionHandler.class, authenticatedIdentity);
-	    GetNodeTask getNodeTask =
-		new GetNodeTask(authenticatedIdentity);		
-	    sessionService.runTransactionalTask(
-	        getNodeTask, authenticatedIdentity);
+		ClientSessionHandler.class, identity);
+	    GetNodeTask getNodeTask = new GetNodeTask(identity);		
+	    sessionService.runTransactionalTask(getNodeTask, identity);
 	    node = getNodeTask.getNode();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
-			   name, node);
+			   identity, node);
 	    }
 	    
 	} catch (Exception e) {
 	    logger.logThrow(
 	        Level.WARNING, e,
-		"getting node assignment for identity:{0} throws", name);
+		"getting node assignment for identity:{0} throws", identity);
 	    sendLoginFailureAndDisconnect(e);
 	    return;
 	}
@@ -598,13 +570,12 @@ class ClientSessionHandler implements ProtocolHandler {
 	     * login (call the AppListener.loggedIn method).
 	     */
 	    if (!sessionService.validateUserLogin(
-		    authenticatedIdentity, ClientSessionHandler.this))
+		    identity, ClientSessionHandler.this))
 	    {
 		// This login request is not allowed to proceed.
 		sendLoginFailureAndDisconnect(null);
 		return;
 	    }
-	    identity = authenticatedIdentity;
 	    taskQueue = sessionService.createTaskQueue();
 	    CreateClientSessionTask createTask =
 		new CreateClientSessionTask();
@@ -613,7 +584,7 @@ class ClientSessionHandler implements ProtocolHandler {
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "Storing ClientSession for identity:{0} throws", name);
+		    "Storing ClientSession for identity:{0} throws", identity);
 		sendLoginFailureAndDisconnect(e);
 		return;
 	    }
@@ -630,16 +601,14 @@ class ClientSessionHandler implements ProtocolHandler {
 		    Level.FINE,
 		    "redirecting login for identity:{0} " +
 		    "from nodeId:{1} to node:{2}",
-		    name, sessionService.getLocalNodeId(), node);
+		    identity, sessionService.getLocalNodeId(), node);
 	    }
 	    // TBD: identity may be null. Fix to pass a non-null identity
 	    // when scheduling the task.
-	    final String host = node.getHostName();
-	    final int port = node.getPort();
 	    scheduleNonTransactionalTask(
 	        new AbstractKernelRunnable("SendLoginRedirectMessage") {
 		    public void run() {
-			loginRedirect(host, port);
+			loginRedirect(node);
 			handleDisconnect(false, false);
 		    } });
 	}
@@ -650,13 +619,12 @@ class ClientSessionHandler implements ProtocolHandler {
      * {@code port} to the client, and sets local state indicating that
      * the login request has been handled.
      *
-     * @param	host a redirect host
-     * @param	port a redirect port
+     * @param	node a node
      */
-    private void loginRedirect(String host, int port) {
+    private void loginRedirect(Node node) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    protocol.loginRedirect(host, port);
+	    protocol.loginRedirect(node);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -882,7 +850,8 @@ class ClientSessionHandler implements ProtocolHandler {
     }
 
     /**
-     * This future is returned from {@link ProtocolHandler} operations.
+     * This future is returned from {@link SessionProtocolHandler}
+     * operations.
      */
     private static class CompletionFutureImpl implements CompletionFuture {
 
@@ -953,6 +922,12 @@ class ClientSessionHandler implements ProtocolHandler {
 		lock.notifyAll();
 	    }
 	    return this;
+	}
+    }
+
+    private static void checkNull(String varName, Object var) {
+	if (var == null) {
+	    throw new NullPointerException("null " + varName);
 	}
     }
 }

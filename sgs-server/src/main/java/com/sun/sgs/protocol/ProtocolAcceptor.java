@@ -19,33 +19,40 @@
 
 package com.sun.sgs.protocol;
 
-import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.service.Service;
 
 /**
- * A factory for creating {@link Protocol} instances for sending protcol
- * messages to and receiving protocol messages from a client.  A {@code
- * ProtocolFactory} must have a constructor that takes the following
+ * A service for accepting incoming connections for a given protocol. A
+ * {@code ProtocolAcceptor} must have a constructor that takes the following
  * arguments:
  *
  * <ul>
  * <li>{@link java.util.Properties}</li>
  * <li>{@link com.sun.sgs.kernel.ComponentRegistry}</li>
  * <li>{@link com.sun.sgs.service.TransactionProxy}</li>
+ * <li>{@link com.sun.sgs.protocol.ProtocolListener}</li>
  * </ul>
+ *
+ * When an incoming connection with a given identity is established with
+ * this protocol acceptor, the protocol acceptor should invoke the provided
+ * listener's {@link ProtocolListener#newConnection
+ * ProtocolListener.newConnection} method passing the protocol connection
+ * and associated identity.
  */
-public interface ProtocolFactory extends Service {
+public interface ProtocolAcceptor extends Service {
 
     /**
-     * Creates a new protocol instance with the specified underlying byte
-     * {@code channel}.  Incoming messages should be dispatched to the
-     * specified protocol {@code handler} as appropriate.
+     * {@inheritDoc}
      *
-     * @param	channel a byte channel
-     * @param	handler a protocol handler
-     * @return	a protocol
+     * This method begins accepting connections.
      */
-    Protocol newProtocol(
-	AsynchronousByteChannel channel, ProtocolHandler handler);
+    void ready() throws Exception;
 
+    /**
+     * {@inheritDoc}
+     *
+     * This method shuts down any pending accept operation as well as the
+     * acceptor itself.
+     */
+    boolean shutdown();
 }

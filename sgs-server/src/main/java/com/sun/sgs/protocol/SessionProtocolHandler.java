@@ -36,22 +36,20 @@ import java.nio.ByteBuffer;
  * <p>TBD: should reconnection be handled a this layer or transparently by
  * the transport layer?
  */
-public interface ProtocolHandler extends ChannelProtocolHandler {
+public interface SessionProtocolHandler extends ChannelProtocolHandler {
 
     /**
-     * Processes a login request with the specified {@code name}, and
-     * {@code password}.
+     * Processes a login request for the identity associated with this
+     * handler.
      *
      * <p>When this handler has completed processing the login request, it
      * invokes the returned future's {@link CompletionFuture#done done}
      * method to notify the caller that the request has been processed.
      *
-     * @param	name a user name
-     * @param	password a password
      * @return	future a future to be notified when the request has been
      *		processed
      */
-    CompletionFuture loginRequest(String name, String password);
+    CompletionFuture loginRequest();
 
     /**
      * Processes a message sent by the associated client.

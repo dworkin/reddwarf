@@ -19,6 +19,7 @@
 
 package com.sun.sgs.protocol;
 
+import com.sun.sgs.service.Node;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
@@ -40,17 +41,17 @@ import java.nio.ByteBuffer;
  * managed by the transport layer could handle the reconnection under the
  * covers?
  */
-public interface Protocol extends ChannelProtocol {
+public interface SessionProtocol extends ChannelProtocol {
+
 
     /**
      * Notifies the associated client that it should redirect its login
-     * redirect message to the specified {@code host} and {@code port}.
+     * to the specified {@code node}.
      *
-     * @param	host a redirect host
-     * @param	port a redirect port
+     * @param	node a node to redirect the login
      */
-    void loginRedirect(String host, int port);
-
+    void loginRedirect(Node node);
+    
     /**
      * Notifies the associated client that the previous login attempt was
      * successful, and the client is assigned the given {@code sessionId}.
@@ -84,4 +85,8 @@ public interface Protocol extends ChannelProtocol {
      * Notifies the associated client that it has successfully logged out.
      */
     void logoutSuccess();
+
+    /*
+    void disconnect(DisconnectReason reason);
+    */
 }
