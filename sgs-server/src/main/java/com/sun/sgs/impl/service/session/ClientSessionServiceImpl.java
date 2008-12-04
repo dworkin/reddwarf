@@ -525,8 +525,8 @@ public final class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     @Override
-    public SessionProtocolConnection getProtocolMessageChannel(BigInteger sessionRefId,
-                                                           Delivery delivery)
+    public SessionProtocolConnection
+            getSessionConnection(BigInteger sessionRefId)
     {
         ClientSessionHandler handler = handlers.get(sessionRefId);
                 

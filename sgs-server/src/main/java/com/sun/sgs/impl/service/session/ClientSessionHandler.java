@@ -371,7 +371,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
             "handling login request for name:{0}",
             authenticatedIdentity.getName());
 
-        Node node;
+        final Node node;
         try {
             /*
              * Get node assignment.
@@ -445,26 +445,26 @@ class ClientSessionHandler implements SessionProtocolHandler {
                     authenticatedIdentity.getName(),
                     sessionService.getLocalNodeId(), node);
             }
-            ProtocolDescriptor[] descriptors = node.getClientListeners();
-            for (ProtocolDescriptor descriptor : descriptors) {
-                if (descriptor.isCompatibleWith(protocolDesc)) {
-                    final ProtocolDescriptor newListener = descriptor;
+//            ProtocolDescriptor[] descriptors = node.getClientListeners();
+//            for (ProtocolDescriptor descriptor : descriptors) {
+//                if (descriptor.isCompatibleWith(protocolDesc)) {
+//                    final ProtocolDescriptor newListener = descriptor;
                     // TBD: identity may be null. Fix to pass a non-null identity
                     // when scheduling the task.
 
                     scheduleNonTransactionalTask(
                       new AbstractKernelRunnable("SendLoginRedirectMessage") {
                             public void run() {
-                                loginRedirect(newListener);
+                                loginRedirect(node);
                                 handleDisconnect(false, false);
                             } });
-                    return;
-                }
-            }
-            logger.log(Level.SEVERE,
-                       "redirect node {0} does not support a compatable transport" +
-                       node);
-            sendLoginFailureAndDisconnect(null);
+//                    return;
+//                }
+//            }
+//            logger.log(Level.SEVERE,
+//                       "redirect node {0} does not support a compatable transport" +
+//                       node);
+//            sendLoginFailureAndDisconnect(null);
         }
     }
         
@@ -476,10 +476,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * @param   host a redirect host
      * @param   port a redirect port
      */
-    private void loginRedirect(ProtocolDescriptor newListener) {
+    private void loginRedirect(Node node) {
         synchronized (lock) {
             checkConnectedState();
-            sessionConnection.loginRedirect(newListener);
+            sessionConnection.loginRedirect(node);
             state = State.LOGIN_HANDLED;
         }
     }

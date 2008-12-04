@@ -1671,7 +1671,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     * Verfiy that the sending session (if any) is a member of this
 	     * channel.
 	     */
-	    ChannelImpl channel = eventQueue.getChannel();
+	    final ChannelImpl channel = eventQueue.getChannel();
 	    if (senderId != null) {
 		ClientSession sender =
 		    (ClientSession) getObjectForId(new BigInteger(1, senderId));
@@ -1693,7 +1693,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
 			    if (server != null) {
-				server.send(channelIdBytes, message);
+				server.send(channelIdBytes, message,
+                                            channel.delivery);
 			    }
 			} },
 		    nodeId);

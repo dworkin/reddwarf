@@ -504,22 +504,18 @@ public final class ChannelServiceImpl
 		}
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
-                        SessionProtocolConnection msgChannel =
-                            sessionService.getProtocolMessageChannel(
-                                                            sessionRefId,
-                                                            Delivery.RELIABLE);
-                        if (msgChannel != null)
-                            msgChannel.channelJoin(name, channelRefId);
+                        SessionProtocolConnection sessionConnection =
+                            sessionService.getSessionConnection(sessionRefId);
+                        if (sessionConnection != null)
+                            sessionConnection.channelJoin(name, channelRefId);
 		    }
 		}
 		if (leavers != null) {
 		    for (BigInteger sessionRefId : leavers) {
-                        SessionProtocolConnection msgChannel =
-                            sessionService.getProtocolMessageChannel(
-                                                            sessionRefId,
-                                                            Delivery.RELIABLE);
-                        if (msgChannel != null)
-                            msgChannel.channelLeave(channelRefId);
+                        SessionProtocolConnection sessionConnection =
+                            sessionService.getSessionConnection(sessionRefId);
+                        if (sessionConnection != null)
+                            sessionConnection.channelLeave(channelRefId);
 		    }
 		}
 
@@ -549,10 +545,9 @@ public final class ChannelServiceImpl
 		BigInteger channelRefId = new BigInteger(1, channelId);
                 BigInteger sessionRefId = new BigInteger(1, sessionId);
 
-                SessionProtocolConnection msgChannel =
-                    sessionService.getProtocolMessageChannel(sessionRefId,
-                                                             Delivery.RELIABLE);
-                if (msgChannel == null) {
+                SessionProtocolConnection sessionConnection =
+                    sessionService.getSessionConnection(sessionRefId);
+                if (sessionConnection == null) {
                     if (logger.isLoggable(Level.FINEST)) {
                         logger.log(Level.FINEST,
                                    "join channelId {0} failed, " +
@@ -591,8 +586,7 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
-		// Send channel join message.
-                msgChannel.channelJoin(name, channelRefId);
+                sessionConnection.channelJoin(name, channelRefId);
 
 	    } finally {
 		callFinished();
@@ -635,11 +629,10 @@ public final class ChannelServiceImpl
 		}
 
 		// Send channel leave message.
-                SessionProtocolConnection msgChannel =
-                        sessionService.getProtocolMessageChannel(
-                                             sessionRefId, Delivery.RELIABLE);
-                if (msgChannel != null)
-                    msgChannel.channelLeave(channelRefId);
+                SessionProtocolConnection sessionConnection =
+                        sessionService.getSessionConnection(sessionRefId);
+                if (sessionConnection != null)
+                    sessionConnection.channelLeave(channelRefId);
                 
 	    } finally {
 		callFinished();
@@ -665,11 +658,11 @@ public final class ChannelServiceImpl
 		localMembers = localChannelMembersMap.remove(channelRefId);
 		if (localMembers != null) {
 		    for (BigInteger sessionRefId : localMembers) {
-                        SessionProtocolConnection msgChannel =
-                                sessionService.getProtocolMessageChannel(
-                                             sessionRefId, Delivery.RELIABLE);
-                        if (msgChannel != null)
-                            msgChannel.channelLeave(channelRefId);
+                        SessionProtocolConnection sessionConnection =
+                                sessionService.getSessionConnection(
+                                                                sessionRefId);
+                        if (sessionConnection != null)
+                            sessionConnection.channelLeave(channelRefId);
 		    }
 		}
 		
@@ -687,7 +680,7 @@ public final class ChannelServiceImpl
 	 * messages to a given channel.
 	 */
         @Override
-	public void send(byte[] channelId, byte[] message) {
+	public void send(byte[] channelId, byte[] message, Delivery delivery) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -712,18 +705,18 @@ public final class ChannelServiceImpl
 		}
 		
 		for (BigInteger sessionRefId : localMembers) {
-                    SessionProtocolConnection msgChannel =
-                        sessionService.getProtocolMessageChannel(
-                                            sessionRefId, Delivery.RELIABLE);
-                    if (msgChannel == null) {
+                    SessionProtocolConnection sessionConnection =
+                        sessionService.getSessionConnection(sessionRefId);
+                    if (sessionConnection == null) {
                         if (logger.isLoggable(Level.FINEST))
                             logger.log(
                                 Level.FINEST,
                                 "Discarding message for unknown session: {0}",
                                 sessionRefId);
                     } else
-                        msgChannel.channelMessage(channelRefId,
-                                                  ByteBuffer.wrap(message));
+                        sessionConnection.channelMessage(channelRefId,
+                                                       ByteBuffer.wrap(message),
+                                                       delivery);
 		}
 	    } finally {
 		callFinished();

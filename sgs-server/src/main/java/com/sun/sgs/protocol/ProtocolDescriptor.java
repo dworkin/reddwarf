@@ -19,7 +19,6 @@
 
 package com.sun.sgs.protocol;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 
@@ -30,30 +29,10 @@ import java.io.Serializable;
 public interface ProtocolDescriptor {
     
     /**
-     * Get the protocol type.
-     * @return the protocol type.
-     */
-    String getType();
-    
-    /**
-     * Get supported delivery guarantees for the protocol.
-     * @return the supported delivery guarantees for the protocol
-     */
-    Delivery[] getSupportedDelivery();
-    
-    /**
-     * Check if the protocol supports the requested delivery guarantee.
-     * @param required the required delivery guarantee
-     * @return {@code true} if the protocol supports the {@code required}
-     * delivery guarantee, and {@code false} otherwise
-     */
-    boolean canSupport(Delivery required);
-    
-    /**
      * Return the descriptor for the transport being used by this protocol.
      * @return the transport descriptor
      */
-    TransportDescriptor getTransport();
+    TransportDescriptor getTransport();     // Hack for testing
     
     /**
      * Check if the specified protocol is compatible with the protocol this

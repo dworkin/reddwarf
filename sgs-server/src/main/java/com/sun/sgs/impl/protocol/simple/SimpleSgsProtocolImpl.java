@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.protocol.simple;
 
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.impl.protocol.ProtocolDescriptorImpl;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -34,7 +33,6 @@ import com.sun.sgs.protocol.Protocol;
 import com.sun.sgs.protocol.ProtocolConnectionListener;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.session.SessionProtocolHandler;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
@@ -63,10 +61,11 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	{@value #TRANSPORT_CLASS_NAME_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> Required property.<br>
+ *	<i>Default:</i> {@value #DEFAULT_TRANSPORT}<br>
  *
  * <dd style="padding-top: .5em"> 
- *	Specifies the class name of the transport to use.<p>
+ *	Specifies the class name of the transport. If specified, the
+ *      resulting transport must support {@code Delivery.RELIABLE}<p>
  * 
  * </dl> <p>
  */
@@ -85,6 +84,10 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
 
     public static final String TRANSPORT_CLASS_NAME_PROPERTY =
         PKG_NAME + ".transport";
+    
+    /** The default transport */
+    public static final String DEFAULT_TRANSPORT =
+        "com.sun.sgs.impl.transport.tcp.TCP";
             
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
     public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
@@ -124,7 +127,7 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                                  ProtocolConnectionListener connectionHandler)
     {
 	logger.log(Level.CONFIG,
-		   "Creating SimpleSgsProtcolFactory properties:{0}",
+		   "Creating SimpleSgsProtocolImpl with properties:{0}",
 		   properties);
 	
 	if (properties == null) {
@@ -158,10 +161,8 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 systemRegistry.getComponent(TransportFactory.class);
             
             String transportClassName =
-                    wrappedProps.getProperty(TRANSPORT_CLASS_NAME_PROPERTY);
-            if (transportClassName == null)
-                throw new IllegalArgumentException(
-                        "a transport must be specified");
+                    wrappedProps.getProperty(TRANSPORT_CLASS_NAME_PROPERTY,
+                                             DEFAULT_TRANSPORT);
             
             transport = transportFactory.startTransport(transportClassName,
                                                         properties,
@@ -172,8 +173,8 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 throw new IllegalArgumentException(
                         "transport must support RELIABLE delivery");
             }
-            protocolDesc = new ProtocolDescriptorImpl(SimpleSgsProtocol.TYPE,
-                                                      transport.getDescriptor());
+            protocolDesc =
+                    new SimpleSgsProtocolDescriptor(transport.getDescriptor());
             this.connectionHandler = connectionHandler;
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -187,6 +188,8 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 throw new RuntimeException(e);
 	}
     }
+
+    /* -- implement ConnectionHandler -- */
 
     /** {@inheritDoc} */
     @Override

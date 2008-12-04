@@ -19,8 +19,9 @@
 
 package com.sun.sgs.protocol.session;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.protocol.ProtocolConnection;
-import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.service.Node;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
@@ -30,12 +31,11 @@ import java.nio.ByteBuffer;
 public interface SessionProtocolConnection extends ProtocolConnection {
 
     /**
-     * Notifies the associated client that it should redirect its login
-     * redirect message.
+     * Notifies the associated client that it should redirect its login.
      *
-     * @param newListener descriptor to redirect to 
+     * @param node node to redirect to 
      */
-    void loginRedirect(ProtocolDescriptor newListener);
+    void loginRedirect(Node node);
 
     /**
      * Notifies the associated client that the previous login attempt was
@@ -90,7 +90,9 @@ public interface SessionProtocolConnection extends ProtocolConnection {
      * @param	channelId a channel ID
      * @param	message a channel message
      */
-    void channelMessage(BigInteger channelId, ByteBuffer message);
+    void channelMessage(BigInteger channelId,
+                        ByteBuffer message,
+                        Delivery delivery);
 
     /**
      * Notifies the associated client that it has successfully logged out.

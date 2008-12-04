@@ -327,9 +327,9 @@ public class ClientSessionImpl
 	return wrappedSessionRef.get();
     }
 
-    public boolean canSupport(Delivery required) {
-        return protocolDesc.canSupport(required);
-    }
+//    public boolean canSupport(Delivery required) {
+//        return protocolDesc.canSupport(required);
+//    }
     
     /**
      * Invokes the {@code disconnected} callback on this session's {@code

@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -35,6 +36,7 @@ import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.session.SessionProtocolConnection;
 import com.sun.sgs.protocol.session.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -119,8 +121,22 @@ public class SimpleSgsProtocolConnection implements SessionProtocolConnection {
 
     /** {@inheritDoc} */
     @Override
-    public void loginRedirect(ProtocolDescriptor newListener) {
-        TransportDescriptor transportDesc = newListener.getTransport();
+    public void loginRedirect(Node node) {
+        ProtocolDescriptor[] descriptors = node.getClientListeners();
+        for (ProtocolDescriptor descriptor : descriptors) {
+            if (protocolImpl.getDescriptor().isCompatibleWith(descriptor)) {
+                loginRedirect((SimpleSgsProtocolDescriptor)descriptor);
+                return;
+            }
+        }
+        loginFailure("redirect failed", null);
+        logger.log(Level.SEVERE,
+                   "redirect node {0} does not support a compatable transport",
+                   node);
+    }
+
+    private void loginRedirect(SimpleSgsProtocolDescriptor newListener) {
+        TransportDescriptor transportDesc = newListener.transportDesc;
 	int hostStringSize = MessageBuffer.getSize(transportDesc.getHostName());
 	MessageBuffer buf = new MessageBuffer(1 + hostStringSize + 4);
         buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
@@ -191,9 +207,16 @@ public class SimpleSgsProtocolConnection implements SessionProtocolConnection {
 	writeOrEnqueueIfLoginNotHandled(buf);
     }
 
-    /** {@inheritDoc} */
+    /***
+     * {@inheritDoc}
+     * The {@code delivery} parameter is ignored. This protocol only supports
+     * reliable delivery.
+     */
     @Override
-    public void channelMessage(BigInteger channelId, ByteBuffer message) {
+    public void channelMessage(BigInteger channelId,
+                               ByteBuffer message,
+                               Delivery delivery)
+    {
 	byte[] channelIdBytes = channelId.toByteArray();
 	ByteBuffer buf =
 	    ByteBuffer.allocate(3 + channelIdBytes.length +
