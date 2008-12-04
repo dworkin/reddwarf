@@ -30,52 +30,61 @@ import java.util.NoSuchElementException;
 import com.sun.sgs.app.ObjectNotFoundException;
 
 /**
- * The {@code ConcurrentQuadTree} is a data structure which organizes
- * Cartesian coordinate pairs (or {@code Point}s) in a two-dimensional
- * rectangular region. More specifically, the data structure divides existing
- * regions into smaller regions in order to allot one region for each
- * {@code Point}. The notion of a quadtree means that each subdivision
- * results in an existing region dividing into four smaller, equally-sized
- * regions. Therefore, each {@code Point} inserted into the
- * {@code ConcurrentQuadTree} will have a region it and only it resides in. A
- * quadtree enables a two-dimensional space to efficiently hold onto a certain
- * number of {@code Point}s using a relatively simple and low-cost scheme.
+ * The {@code ConcurrentQuadTree} is a data structure which organizes a
+ * defined type and its Cartesian position in a rectangular, two-dimensional
+ * region. More specifically, the data structure subdivides existing regions
+ * into four, equally-sized regions in order to allot one region for a desired
+ * number of elements. Therefore, each {@code Point} inserted into the
+ * {@code ConcurrentQuadTree} will be located in a region containing no more
+ * than the specified number of elements for each leaf node. This parameter is
+ * defined in the constructor of the quadtree, and is referred to as the
+ * {@code bucketSize}. A quadtree enables a two-dimensional space to
+ * efficiently hold onto a certain number of {@code Point}s using a
+ * relatively simple and low-cost scheme. The quadtree does not support null
+ * elements; that is, calling {@code add(x, y, null)} is not permitted.
  * <p>
- * This type of organization is best interpreted as a tree whereby upper level
- * nodes correspond to regions which contain smaller regions. This means that
- * the regions that contain {@code Point}s are leaf nodes. The depth of leaf
- * nodes depends on the maximum depth of the tree provided during
- * instantiation: a large depth limit allows for more entries and for them to
- * exist within very small regions, whereas a smaller depth limit can support
- * fewer entries but they exist in larger regions. The depth limit should be
- * proportional to the number of entries which need to be stored and the
- * minimum region size you wish to support.
+ * This type of organization is best interpreted as a tree whereby "deeper"
+ * nodes correspond to smaller regions. Elements can only exist at the leaf
+ * nodes; if a node overflows its bucket size, then it splits into smaller
+ * regions and the elements are reallocated. The depth of leaf nodes depends
+ * on the maximum depth of the tree provided during instantiation: a large
+ * depth limit allows for more entries and for them to exist within very small
+ * regions, whereas a smaller depth limit can support fewer entries but they
+ * exist in larger regions. The depth limit should be proportional to the
+ * number of entries which need to be stored and the minimum region size you
+ * wish to support. If not specified (by using the five-argument constructor),
+ * the quadtree will have a default maximum depth of 5. Therefore, any element
+ * additions that would require the tree to grow deeper would not be applied
+ * to the quadtree.
  * <p>
- * The {@code ConcurrentQuadTree} is backed with a {@code ConcurrentHashMap}
- * instance so that some inline operations can occur with better performance.
- * These operations include lookups in the tree for an add, remove, set, and
- * get methods. Overall, many of the methods occur in logarithmic time because
- * the tree has to be walked in order to locate the correct region to
- * manipulate. This is not often very costly because the quadtree has a
- * tendency to grow horizontally, especially if values are spaced far enough
- * apart and if the tree has a shallow depth limit. If no depth limit is
- * explicitly set, the default value is 5.
+ * Overall, many of the methods occur in logarithmic time because the tree has
+ * to be walked in order to locate the correct region to manipulate. This is
+ * not often very costly because the quadtree has a tendency to grow
+ * horizontally, especially if values are spaced far enough apart and if the
+ * tree has a shallow depth.
  * <p>
  * To allow for concurrency, this data structure does not propagate changes
- * from the leaf node to the root element. Instead, the propagation stops at
- * the first level so that operations can simultaneously take place in any of
- * the four quadrants of the root without contention. Since the tree does not
- * grow upwards, nodes that have been created maintain their tree depth
- * permanently until they are removed. A tree depth of 0 corresponds to the
- * depth of the root node, with each subsequent level incrementing the depth.
- * Nodes are removed when there are no children containing inserted values.
- * This measure is taken to improve the performance of walking the tree and
- * reduce memory requirements.
+ * from the leaf node all the way to the root node. Instead, the propagation
+ * stops at the level below the root (depth of 1, whereas the root is depth 0)
+ * so that operations can simultaneously take place in any of the four
+ * quadrants of the root without contention. Since the tree does not grow
+ * upwards, nodes that have been created maintain their tree depth permanently
+ * unless they are removed. As mentioned above, a tree depth of 0 corresponds
+ * to a single node (the root), without any children. Each subsequent level
+ * increments the depth. Nodes are removed when there are no children
+ * containing elements. By definition, this also means that the size of the
+ * node and all its children are 0. This measure is taken to improve the
+ * performance of walking the tree in the future and reduces memory
+ * requirements.
  * <p>
  * Iteration of the tree is achieved by assembling a {@code Set} of the
  * entries in the {@code ConcurrentHashMap} and iterating through them.
- * Therefore, the order of elements in the iteration is not necessarily the
- * same for each iterator constructed.
+ * Therefore, the order of elements in the iteration is not guaranteed to be
+ * the same for each iterator constructed. An iterator scheme is used to
+ * retrieve all elements in a particular sub-region (also known as an
+ * {@code boundingBox}) of the tree. Since there may be many elements in the tree, this
+ * approach removes the need to walk through the tree to collect and return
+ * all elements in an otherwise lengthy process.
  * 
  * @param <T> the type the quadtree is to hold
  */
@@ -105,7 +114,7 @@ public class ConcurrentQuadTree<T> {
 	 * Integer equivalents for the Coordinate enumeration. It is important
 	 * for these values to be consecutive integers starting at 0 so that
 	 * they can be used as indices for any arrays harnessing pairs of
-	 * coordinates like the Envelope class
+	 * coordinates like the BoundingBox class
 	 */
 	static final int iX_MIN = 0;
 	static final int iX_MAX = 1;
@@ -148,25 +157,25 @@ public class ConcurrentQuadTree<T> {
      * An object consisting of two corners that comprise the box representing
      * the sample space
      */
-    private final Envelope envelope;
+    private final BoundingBox boundingBox;
 
     /** The root element of the quadtree */
     private Node<T> root;
 
     /**
      * Five-argument constructor which defines a maximum bucket size and a
-     * pair of x,y coordinates denoting the bounding envelope. The maximum
+     * pair of x,y coordinates denoting the bounding box. The maximum
      * tree depth is set to {@code DEFAULT_MAX_DEPTH} = 5.
      * 
      * @param bucketSize the maximum capacity of a leaf node
      * @param x1 the x-coordinate of the first point defining the tree's
-     * envelope
+     * bounding box
      * @param y1 the y-coordinate of the first point defining the tree's
-     * envelope
+     * bounding box
      * @param x2 the x-coordinate of the second point defining the tree's
-     * envelope
+     * bounding box
      * @param y2 the x-coordinate of the second point defining the tree's
-     * envelope
+     * bounding box
      */
     public ConcurrentQuadTree(int bucketSize, double x1, double y1,
 	    double x2, double y2) {
@@ -178,19 +187,19 @@ public class ConcurrentQuadTree<T> {
      * supplied as a parameter. The area corresponding to this instance is
      * defined by the supplied coordinates whereby ({@code x1}, {@code y1})
      * represent the first {@code Point} and ({@code x2}, {@code y2})
-     * represents the second {@code Point} of the defining {@code Envelope}.
+     * represents the second {@code Point} of the defining {@code BoundingBox}.
      * 
      * @param maxDepth the maximum depth the tree is permitted to grow; this
      * value cannot be negative
      * @param bucketSize the maximum capacity of a leaf node
      * @param x1 the x-coordinate of the first point defining the tree's
-     * envelope
+     * bounding box
      * @param y1 the y-coordinate of the first point defining the tree's
-     * envelope
+     * bounding box
      * @param x2 the x-coordinate of the second point defining the tree's
-     * envelope
+     * bounding box
      * @param y2 the x-coordinate of the second point defining the tree's
-     * envelope
+     * bounding box
      */
     public ConcurrentQuadTree(int maxDepth, int bucketSize, double x1,
 	    double y1, double x2, double y2) {
@@ -203,8 +212,8 @@ public class ConcurrentQuadTree<T> {
 		    "Bucket size cannot be negative");
 	}
 	this.maxDepth = maxDepth;
-	envelope = new Envelope(new Point(x1, y1), new Point(x2, y2));
-	root = new Node<T>(envelope, maxDepth, bucketSize);
+	boundingBox = new BoundingBox(new Point(x1, y1), new Point(x2, y2));
+	root = new Node<T>(boundingBox, maxDepth, bucketSize);
     }
 
     /**
@@ -218,8 +227,8 @@ public class ConcurrentQuadTree<T> {
 
     /**
      * Adds the element to the quadtree given the coordinate values. The
-     * element will be added as long as a vacant region exists in the quadtree
-     * at the specified location, or if the tree is permitted to grow deeper.
+     * element will be added as long as the quadrant can support it, or if the
+     * tree is permitted to grow deeper.
      * 
      * @param x the x-coordinate of the element
      * @param y the y-coordinate of the element
@@ -227,17 +236,17 @@ public class ConcurrentQuadTree<T> {
      * @return {@code true} if the element was added, and {@code false}
      * otherwise
      * @throws IllegalArgumentException if the coordinates are not contained
-     * within the envelope defined by the quadtree
+     * within the bounding box defined by the quadtree
      */
     public boolean add(double x, double y, T element) {
 	// Check to see that the node is within bounds since
 	// the returned quadrant could be null if the point is
 	// out of bounds
 	Point point = new Point(x, y);
-	Object quadrant = Node.Quadrant.determineQuadrant(envelope, point);
+	Object quadrant = Node.Quadrant.determineQuadrant(boundingBox, point);
 	if (!(quadrant instanceof Node.Quadrant)) {
 	    throw new IllegalArgumentException(
-		    "The coordinates are not contained within the envelope");
+		    "The coordinates are not contained within the bounding box");
 	}
 
 	Node<T> leaf = Node.getLeafNode(root, point);
@@ -282,6 +291,8 @@ public class ConcurrentQuadTree<T> {
     public int size() {
 	return root.size();
     }
+    
+    
 
     /**
      * Returns the element with the given Cartesian parameters. If the
@@ -302,17 +313,17 @@ public class ConcurrentQuadTree<T> {
 
     /**
      * Returns the integer coordinate represented by the bound supplied as the
-     * parameter. In other words, if the call {@code getEnvelopeBound(X_MIN)}
-     * is made on the quadtree whose envelope consists of the corner
+     * parameter. In other words, if the call {@code getBoundingBoxEdge(X_MIN)}
+     * is made on the quadtree whose bounding box consists of the corner
      * coordinate pair of {@code (0,10) & (90, 100)}, then the value returned
      * is {@code 0}; the minimum x-coordinate of the two corners.
      * 
-     * @param direction the direction of interest for the envelope
-     * @return a double value representing the envelope border for the given
+     * @param direction the direction of interest for the bounding box
+     * @return a double value representing the bounding box border for the given
      * direction, or {@code NaN} if the direction is invalid
      */
-    public double getDirectionalEnvelopeBound(Coordinate direction) {
-	double[] coords = Envelope.organizeCoordinates(this.envelope);
+    public double getDirectionalBoundingBoxEdge(Coordinate direction) {
+	double[] coords = BoundingBox.organizeCoordinates(this.boundingBox);
 
 	switch (direction) {
 	    case X_MAX:
@@ -330,25 +341,47 @@ public class ConcurrentQuadTree<T> {
 
     /**
      * Returns an iterator for the elements which are contained within the the
-     * envelope created by the two given coordinates. The elements which can
+     * bounding box created by the two given coordinates. The elements which can
      * be iterated are in no particular order, and there may not be any
-     * elements to iterate over
+     * elements to iterate over (empty iterator).
      * 
      * @param x1 the x-coordinate of the first corner
      * @param y1 the y-coordinate of the first corner
      * @param x2 the x-coordinate of the second corner
      * @param y2 the y-coordinate of the second corner
      * @return an iterator which can traverse over the entries within the
-     * coordinates representing the envelope
+     * coordinates representing the bounding box
      */
-    public Iterator<T> envelopeIterator(double x1, double y1, double x2,
+    public Iterator<T> boundingBoxIterator(double x1, double y1, double x2,
 	    double y2) {
 	Point corner1 = new Point(x1, y1);
 	Point corner2 = new Point(x2, y2);
-	Envelope envelope = new Envelope(corner1, corner2);
+	BoundingBox box = new BoundingBox(corner1, corner2);
 
-	return new ElementIterator<T>(root, envelope);
+	return new ElementIterator<T>(root, box);
     }
+    
+    
+    /**
+     * Returns an iterator for the elements which are contained within the the
+     * bounding circle created by the x-y coordinates and the radius. The
+     * iterated elements are in no particular order, and there may not be any
+     * elements to iterate over (empty iterator).
+     * 
+     * @param x the x-coordinate of the circular region
+     * @param y the y-coordinate of the circular region
+     * @param radius the radius of the circular region, which cannot be
+     * negative
+     * @return an iterator which can traverse over the entries within the
+     * coordinates representing the circular region
+     */
+    public Iterator<T> boundingCircleIterator(double x, double y, double radius) {
+	Point center = new Point(x, y);
+	BoundingCircle circle = new BoundingCircle(center, radius);
+	
+	return new ElementIterator<T>(root, circle);
+    }
+    
 
     /**
      * Asynchronously clears the tree and replaces it with an empty
@@ -366,7 +399,7 @@ public class ConcurrentQuadTree<T> {
      * @return an {@code Iterator} over all the elements in the map
      */
     public Iterator<T> iterator() {
-	return new ElementIterator<T>(root, envelope);
+	return new ElementIterator<T>(root, boundingBox);
     }
 
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -385,22 +418,69 @@ public class ConcurrentQuadTree<T> {
      */
     static class ElementIterator<T> implements Iterator<T>, Serializable {
 	private static final long serialVersionUID = 1L;
-	private final Envelope envelope;
+	
+	/** A region specific to this iterator */
+	private final Region region;
+	
+	/** The data integrity value of the node examined */
 	private int dataIntegrityValue;
+	
+	/** Whether the iterator is permitted to process a {@code remove} */
 	private boolean canRemove;
+	
+	/** The current node being examined */
 	private Node<T> current;
+	
+	/**
+	 * The next node to be examined. This can be equal to {@code current}
+	 * if the next entry is located in the same node.
+	 */
 	private Node<T> next;
+	
+	/**
+	 * The current entry (the last entry returned from a call to
+	 * {@code next})
+	 */
 	private Entry<T> entry;
+	
+	/**
+	 * The next entry (the entry to be returned from a future call to
+	 * {@code next})
+	 */
 	private Entry<T> nextEntry;
+	
+	/** An iterator over the elements belonging to a node */
 	private Iterator<Entry<T>> entryIterator;
+	
+	/**
+	 * A flag denoting whether the current node is fully contained by the
+	 * iterator's region. If {@code true}, this flag removes the need to
+	 * check each entry for containment
+	 */
 	private boolean isFullyContained;
 
+	/**
+	 * One-argument constructor which assumes there is no bounding box
+	 * associated with the iterator.
+	 * @param root the root node of the quadtree, used to locate
+	 * the first child
+	 */
 	ElementIterator(Node<T> root) {
 	    this(root, null);
 	}
 
-	ElementIterator(Node<T> root, Envelope envelope) {
-	    this.envelope = envelope;
+	/**
+	 * Two-argument constructor which permits specification of a bounding
+	 * box specific to the iterator
+	 * 
+	 * @param root the root node of the quadtree, used to locate the first
+	 * child
+	 * @param region the region which specifies the qualified entries that
+	 * this iterator is to iterate over; a value of {@code null} means
+	 * all entries are valid (no bounding box)
+	 */
+	ElementIterator(Node<T> root, Region region) {
+	    this.region = region;
 
 	    current = getFirstLeafNode(root);
 	    if (current == null) {
@@ -412,8 +492,8 @@ public class ConcurrentQuadTree<T> {
 	    dataIntegrityValue = current.getDataIntegrityValue();
 	    next = current;
 	    nextEntry = prepareNextElement();
-
-	    isFullyContained = false;
+	    
+	    isFullyContained = (region == null);
 	    canRemove = false;
 	    entry = null;
 	}
@@ -423,7 +503,8 @@ public class ConcurrentQuadTree<T> {
 	 * serialized. If so, a {@code ConcurrentModificationException} is
 	 * thrown
 	 * 
-	 * @throws ConcurrentModificationException
+	 * @throws ConcurrentModificationException if the node had been
+	 * modified while this iterator was serialized
 	 */
 	private void checkDataIntegrity()
 		throws ConcurrentModificationException {
@@ -465,7 +546,7 @@ public class ConcurrentQuadTree<T> {
 	    /*
 	     * If we didn't find an entry (it was null), locate the next node
 	     * which is at least partially contained by the iterator's
-	     * envelope and iterate through it. If it has no valid entries,
+	     * bounding box and iterate through it. If it has no valid entries,
 	     * keep searching until we run out of nodes.
 	     */
 	    next = getNextNodePossiblyContainingEntries(current);
@@ -483,12 +564,12 @@ public class ConcurrentQuadTree<T> {
 	
 	/**
 	 * Moves the iterator's cursor to the next qualified entry; that is,
-	 * the next entry which is contained within the iterator's envelope.
-	 * If there is no envelope specified, then the next entry in the list
+	 * the next entry which is contained within the iterator's bounding box.
+	 * If there is no bounding box specified, then the next entry in the list
 	 * is returned.
 	 * 
-	 * @return the next entry located in the specified envelope (if an
-	 * envelope is defined) or {@code null} if no next qualified entry
+	 * @return the next entry located in the specified bounding box (if an
+	 * bounding box is defined) or {@code null} if no next qualified entry
 	 * exists
 	 */
 	private Entry<T> iterateToNextQualifiedElement() {
@@ -499,7 +580,7 @@ public class ConcurrentQuadTree<T> {
 
 	    while (entryIterator.hasNext()) {
 		ent = entryIterator.next();
-		if (isFullyContained || envelope.contains(ent.coordinate)) {
+		if (isFullyContained || region.contains(ent.coordinate)) {
 		    return ent;
 		}
 	    }
@@ -537,7 +618,7 @@ public class ConcurrentQuadTree<T> {
 	/**
 	 * Retrieves the first non-null leaf node in a tree, rooted by
 	 * {@code node}, which is either fully contained or partially
-	 * contained by the defined envelope. If there is no node that has a
+	 * contained by the defined bounding box. If there is no node that has a
 	 * value in the tree, then {@code null} is returned.
 	 * 
 	 * @param node the root of the tree or subtree
@@ -547,10 +628,10 @@ public class ConcurrentQuadTree<T> {
 	private Node<T> getFirstLeafNode(Node<T> node) {
 	    // If the given node is a leaf with values, we are done
 	    if (node.isLeaf()) {
-		Envelope env = node.getEnvelope();
+		BoundingBox box = node.getBoundingBox();
 		if (node.getValues() != null &&
-			envelope.getContainment(env) != 
-			    Envelope.Containment.NONE) {
+			region.getContainment(box) != 
+			    BoundingBox.Containment.NONE) {
 		    return node;
 		} else {
 		    return null;
@@ -589,18 +670,18 @@ public class ConcurrentQuadTree<T> {
 	    Node.Quadrant quadrant = Node.Quadrant.next(node.getQuadrant());
 	    while (quadrant != null) {
 		Node<T> child = parent.getChild(quadrant);
-		Envelope childEnv = child.getEnvelope();
+		BoundingBox box = child.getBoundingBox();
 		
-		// Skip over nodes whose envelopes do not intersect
-		// the iterator's defined envelope
-		if (envelope == null ||
-			envelope != null &&
-			envelope.getContainment(childEnv) != 
-			    Envelope.Containment.NONE) {
+		// Skip over nodes whose bounding boxes do not intersect
+		// the iterator's defined bounding box
+		if (region == null ||
+			region != null &&
+			region.getContainment(box) != 
+			    BoundingBox.Containment.NONE) {
 
 		    isFullyContained =
-			    (envelope.getContainment(childEnv) == 
-				Envelope.Containment.FULL);
+			    (region.getContainment(box) == 
+				BoundingBox.Containment.FULL);
 
 		    // Dig deeper if child is not a leaf,
 		    // or if it is a leaf with stored entries,
@@ -643,33 +724,76 @@ public class ConcurrentQuadTree<T> {
 	    current.remove(entry.coordinate);
 	    dataIntegrityValue = current.getDataIntegrityValue();
 	}
-
     }
 
+    
+    /**
+     * A region specifies an area which can be used as a bounding perimeter
+     * for the quadtree. These are useful when considering an area of
+     * interest, such as trying to retrieve a subset of entries within a
+     * defined area.
+     */
+    static interface Region {
+	
+	/**
+	 * Specifies the degree of containment of another object, usually a
+	 * {@code Point} or another {@code BoundingBox}. This is used primarily
+	 * when comparing two bounding boxes with one another.
+	 */
+	static enum Containment {
+	    /** Denotes no containment in the bounding box (disjoint) */
+	    NONE,
+	    /**
+	     * Denotes partial containment (or an intersection) of the
+	     * bounding box
+	     */
+	    PARTIAL,
+	    /** Denotes total containment (or domination) of the bounding box */
+	    FULL;
+	}
+	
+	/**
+	 * Checks to see if this {@code Region} instance contains the
+	 * {@code Point} supplied as the parameter.
+	 * 
+	 * @param point the {@code Point} for which to check containment
+	 * @return {@code true} if the {@code Point} lies within or on the
+	 * {@code Region} border, and {@code false} otherwise
+	 */
+	boolean contains(Point point);
+	
+	
+	/**
+	 * Checks to see if this {@code Region} instance contains the
+	 * {@code BoundingBox} supplied as the parameter. Containment is
+	 * {@code true} if the argument is either fully contained or if the
+	 * {@code Region}s share common boundaries.
+	 * 
+	 * @param box the {@code BoundingBox} for which to check containment
+	 * @return {@code Containment.FULL} if all corners are contained in
+	 * the bounding box (inclusive), {@code Containment.PARTIAL} if some
+	 * corners are contained or if there is an intersection of some kind,
+	 * and {@code Containment.NONE} if there is no intersection or
+	 * containment
+	 */
+	Containment getContainment(BoundingBox box);
+    }
+    
     /**
      * A region, defined by two {@code Points}, which represents the area
      * belonging to a certain object. The two {@code Point}s representing the
-     * envelope are Cartesian points which correspond to corner points of an
+     * bounding box are Cartesian points which correspond to corner points of an
      * imaginary box. Each x and y coordinate for both points represent the
-     * bounds of this box, and therefore, the bounds of the {@code Envelope}.
-     * For simplicity, the {@code Envelope}'s edges are only allowed to be
+     * bounds of this box, and therefore, the bounds of the {@code BoundingBox}.
+     * For simplicity, the {@code BoundingBox}'s edges are only allowed to be
      * parallel or perpendicular to the Cartesian axes, meaning the
-     * {@code Envelope} edges either intersect the axes at right angles or
+     * {@code BoundingBox} edges either intersect the axes at right angles or
      * coincide with them.
      */
-    static class Envelope {
+    static class BoundingBox implements Region {
+	public static final byte TOTAL_CORNERS = 4;
 
-	/**
-	 * Specifies the degree of containment of another object, usually a
-	 * {@code Point} or another {@code Envelope}.
-	 */
-	static enum Containment {
-	    NONE, // no containment in the envelope
-	    PARTIAL, // partial containment
-	    FULL; // full containment
-	}
-
-	/** An array of two points to represent the envelope area */
+	/** An array of two points to represent the bounding box area */
 	final Point[] bounds;
 
 	public String toString() {
@@ -688,13 +812,13 @@ public class ConcurrentQuadTree<T> {
 	}
 
 	/**
-	 * Constructs a new {@code Envelope} given two points representing
+	 * Constructs a new {@code BoundingBox} given two points representing
 	 * diagonal corners
 	 * 
-	 * @param a one of the corners of the {@code Envelope}
-	 * @param b the other (diagonal) corner of the {@code Envelope}
+	 * @param a one of the corners of the {@code BoundingBox}
+	 * @param b the other (diagonal) corner of the {@code BoundingBox}
 	 */
-	Envelope(Point a, Point b) {
+	BoundingBox(Point a, Point b) {
 	    bounds = new Point[] { a, b };
 	}
 
@@ -702,18 +826,18 @@ public class ConcurrentQuadTree<T> {
 	 * Creates the bounds given the parent's bounds and our intended
 	 * quadrant
 	 * 
-	 * @param parentEnvelope the parent's envelope
+	 * @param parentBoundingBox the parent's bounding box
 	 * @param quadrant the quadrant to determine
 	 * @return the bounds for this node
 	 */
-	static Envelope createBounds(Envelope parentEnvelope,
+	static BoundingBox createBounds(BoundingBox parentBoundingBox,
 		Node.Quadrant quadrant) {
 	    // get the individual coordinates
-	    double[] coords = organizeCoordinates(parentEnvelope);
+	    double[] coords = organizeCoordinates(parentBoundingBox);
 
 	    // Create the middle of the region, which is guaranteed to be a
 	    // corner of the node's bounds. Time to find the other corner
-	    Point middle = calculateMiddle(parentEnvelope);
+	    Point middle = calculateMiddle(parentBoundingBox);
 
 	    Point corner;
 	    switch (quadrant) {
@@ -738,7 +862,7 @@ public class ConcurrentQuadTree<T> {
 			    new Point(coords[Coordinate.iX_MAX],
 				    coords[Coordinate.iY_MIN]);
 	    }
-	    return new Envelope(middle, corner);
+	    return new BoundingBox(middle, corner);
 	}
 
 	/**
@@ -747,12 +871,12 @@ public class ConcurrentQuadTree<T> {
 	 * accessed using the fields {@code X_MIN}, {@code X_MAX},
 	 * {@code Y_MIN}, or {@code Y_MAX} as array indices.
 	 * 
-	 * @param envelope the region, represented as an array of two
+	 * @param bounding box the region, represented as an array of two
 	 * {@code Points}
 	 * @return an array which contains individual coordinates
 	 */
-	private static double[] organizeCoordinates(Envelope envelope) {
-	    Point[] bounds = envelope.bounds;
+	 static double[] organizeCoordinates(BoundingBox box) {
+	    Point[] bounds = box.bounds;
 
 	    double xMin = Math.min(bounds[0].x, bounds[1].x);
 	    double yMin = Math.min(bounds[0].y, bounds[1].y);
@@ -768,25 +892,15 @@ public class ConcurrentQuadTree<T> {
 	}
 
 	/**
-	 * Checks to see if this {@code Envelope} instance contains the
-	 * {@code Envelope} supplied as the parameter. Containment is
-	 * {@code true} if the argument is either fully contained or if the
-	 * {@code Envelope}s share common boundaries.
-	 * 
-	 * @param anotherEnvelope the {@code Envelope} for which to check
-	 * containment
-	 * @return {@code Containment.FULL} if all corners are contained in
-	 * the envelope (inclusive), {@code Containment.PARTIAL} if some
-	 * corners are contained but not all, and {@code Containment.NONE} if
-	 * none are contained
+	 * {@inheritDoc}
 	 */
-	Containment getContainment(Envelope anotherEnvelope) {
+	public Containment getContainment(BoundingBox anotherBoundingBox) {
 	    double[] coords = organizeCoordinates(this);
-	    double[] arg = organizeCoordinates(anotherEnvelope);
+	    double[] arg = organizeCoordinates(anotherBoundingBox);
 
 	    // Increment every time we have a coordinate contained in the
 	    // bounds
-	    // of "this" envelope
+	    // of "this" bounding box
 	    byte totalX = 0;
 	    byte totalY = 0;
 	    totalX +=
@@ -837,18 +951,13 @@ public class ConcurrentQuadTree<T> {
 	}
 
 	/**
-	 * Checks to see if this {@code Envelope} instance contains the
-	 * {@code Point} supplied as the parameter.
-	 * 
-	 * @param point the {@code Point} for which to check containment
-	 * @return {@code true} if the {@code Point} lies within or on the
-	 * {@code Envelope} border, and {@code false} otherwise
+	 * {@inheritDoc}
 	 */
-	boolean contains(Point point) {
+	public boolean contains(Point point) {
 	    // Since a point cannot be partially contained, if it is not
 	    // contained, return false; otherwise return true;
-	    Envelope envelope = new Envelope(point, point);
-	    if (getContainment(envelope) == Containment.NONE) {
+	    BoundingBox box = new BoundingBox(point, point);
+	    if (getContainment(box) == Containment.NONE) {
 		return false;
 	    }
 	    return true;
@@ -857,12 +966,12 @@ public class ConcurrentQuadTree<T> {
 	/**
 	 * Returns a Point representing the middle of the region
 	 * 
-	 * @param envelope the corner points specifying the region to find the
-	 * middle of
+	 * @param box the corner points specifying the region for which to
+	 * find the middle
 	 * @return the {@code Point} representing the middle
 	 */
-	private static Point calculateMiddle(Envelope envelope) {
-	    double[] d = organizeCoordinates(envelope);
+	static Point calculateMiddle(BoundingBox box) {
+	    double[] d = organizeCoordinates(box);
 	    return new Point(
 		    d[Coordinate.iX_MIN] +
 			    ((d[Coordinate.iX_MAX] - 
@@ -873,6 +982,124 @@ public class ConcurrentQuadTree<T> {
 	}
     }
 
+    
+    /**
+     * A region, defined by one {@code Point} (the center) and a radius, which
+     * represents an area of the environment. The {@code Point} representing
+     * the circle's center is a Cartesian point. This class is useful for
+     * representing a viewable region extending from a central observer, like
+     * a character.
+     */
+    static class BoundingCircle implements Region {
+	/** The center of the bounding circle */
+	private final Point center;
+	
+	/** The radius of the bounding circle */
+	private final double radius;
+	
+	/**
+	 * Two-argument constructor to create a bounding circle region. 
+	 * @param center the intended center of the circle 
+	 * @param radius the radius of the circle, which cannot be negative
+	 * @throws IllegalArgumentException if the radius is negative
+	 */
+	BoundingCircle(Point center, double radius) {
+	    if (radius < 0) {
+		throw new IllegalArgumentException(
+			"The radius cannot be negative");
+	    }
+	    this.center = center;
+	    this.radius = radius;
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 */
+	public boolean contains(Point point) {
+	    return (Point.getDistance(center, point) <= radius);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public Containment getContainment(BoundingBox box) {
+
+	    // First, get all corners and see if any are contained
+	    // in the circle
+	    double[] coords = BoundingBox.organizeCoordinates(box);
+	    Point[] corners =
+		    new Point[] {
+			    new Point(coords[Coordinate.iX_MAX],
+				    coords[Coordinate.iY_MAX]),
+			    new Point(coords[Coordinate.iX_MIN],
+				    coords[Coordinate.iY_MIN]),
+			    new Point(coords[Coordinate.iX_MIN],
+				    coords[Coordinate.iY_MAX]),
+			    new Point(coords[Coordinate.iX_MAX],
+				    coords[Coordinate.iY_MIN]) };
+
+	    // Tally all contained corners and check our totals
+	    byte cornerTally = 0;
+	    for (int i = 0; i < corners.length; i++) {
+		cornerTally += (contains(corners[i]) ? 1 : 0);
+	    }
+	    /*
+	     * Either all corners are contained (full containment), none are
+	     * contained (which doesn't conclude anything yet), or some are
+	     * contained (partial intersection).
+	     */
+	    switch (cornerTally) {
+		case BoundingBox.TOTAL_CORNERS:
+		    return Containment.FULL;
+		case 0:
+		    break;
+		default:
+		    return Containment.PARTIAL;
+	    }
+
+	    /*
+	     * If we get this far and the center is contained in the box, then
+	     * we can conclude the circle intersects the box partially
+	     */
+	    if (box.contains(center)) {
+		return Containment.PARTIAL;
+	    }
+
+	    // Otherwise, for a subtle edge intersection
+	    return (isIntersectingEdge(box) ? Containment.PARTIAL
+		    : Containment.NONE);
+	}
+    
+   
+	/**
+	 * Determines if the bounding circle intersects an edge
+	 * of the bounding box argument
+	 * @param box the box for which to check intersection
+	 * @return {@code true} if this intersects the {@code box},
+	 * and {@code false} otherwise
+	 */
+	private boolean isIntersectingEdge(BoundingBox box) {
+	    Point boxCenter = BoundingBox.calculateMiddle(box);
+	    
+	    // Decompose the center-to-center distance into x and y components
+	    double centerDistanceX = Math.abs(center.getX() - boxCenter.getX());
+	    double centerDistanceY = Math.abs(center.getY() - boxCenter.getY());
+
+	    // Get the box's "radii"
+	    double boxRadiusX = Math.abs(boxCenter.getX() - box.bounds[0].getX());
+	    double boxRadiusY = Math.abs(boxCenter.getY() - box.bounds[0].getY());
+
+	    // The two intersect if the distance between the centers
+	    // is less than the radius + perpendicular box "radius"
+	    if (centerDistanceX <= radius + boxRadiusX ||
+		    centerDistanceY <= radius + boxRadiusY) {
+		return true;
+	    }
+	    return false;
+	}
+    }
+    
+    
     /**
      * Represents an entry in the quadtree by maintaining a reference to the
      * stored object and its coordinates in the form of a {@code Point}
@@ -885,6 +1112,14 @@ public class ConcurrentQuadTree<T> {
 	/** The value of the element */
 	private T value;
 
+	/**
+	 * Two-argument constructor which creates an entry given a coordinate
+	 * and value. The value must not be {@code null}.
+	 * 
+	 * @param coord the coordinate of the new entry
+	 * @param value the value of the new entry, which cannot be
+	 * {@code null}
+	 */
 	Entry(Point coord, T value) {
 	    assert (value != null) : "Value cannot be null";
 	    coordinate = coord;
@@ -962,15 +1197,11 @@ public class ConcurrentQuadTree<T> {
 	}
 
 	/**
-	 * Rounds the parameter to three decimal spaces. If the first
-	 * non-significant digit is 5 or greater, then the least-significant
-	 * bit is rounded up. Otherwise, it is left unchanged. For example,
-	 * the values 2.3455, 2.3456, 2.3457, 2.3458, and 2.3459 all round to
-	 * 2.346, while the values 2.3450, 2.3451, 2.3452, 2.3453, and 2.3454
-	 * all truncate to 2.345.
+	 * Rounds the parameter to a reasonable number of decimal spaces.
+	 * For now, the number of decimal spaces is set at 8.
 	 * 
 	 * @param value the value to round
-	 * @return the rounded value, to three decimal spaces
+	 * @return the rounded value, to eight decimal spaces
 	 */
 	private static double round(double value) {
 	    DecimalFormat df = new DecimalFormat(DEFAULT_DECIMAL_FORMAT);
@@ -1004,6 +1235,19 @@ public class ConcurrentQuadTree<T> {
 	    sb.append(")");
 	    return sb.toString();
 	}
+	
+	/**
+	 * Calculates the distance between two points using the
+	 * Pythagorean Theorem
+	 * @param a a point
+	 * @param b the other point
+	 * @return the (non-rounded) distance between the two points
+	 */
+	static double getDistance(Point a, Point b) {
+	    double deltaX = Math.abs(a.getX() - b.getX());
+	    double deltaY = Math.abs(a.getY() - b.getY());
+	    return Math.sqrt(Math.pow(deltaX, 2) + Math.pow(deltaY, 2));
+	}
     }
 
     /**
@@ -1016,10 +1260,26 @@ public class ConcurrentQuadTree<T> {
     static class Node<T> {
 	/** Enumeration representing the different quadrants for each node */
 	public static enum Quadrant {
-	    NW, // Top-left corner
-	    NE, // Top-right corner
-	    SW, // Bottom-left corner
-	    SE; // Bottom-right corner
+	    /**
+	     * Corresponds to the North-West quadrant (top-left, if "north" is
+	     * "up")
+	     */
+	    NW,
+	    /**
+	     * Corresponds to the North-East quadrant (top-right, if "north"
+	     * is "up")
+	     */
+	    NE,
+	    /**
+	     * Corresponds to the South-West quadrant (bottom-left, if "north"
+	     * is "up")
+	     */
+	    SW,
+	    /**
+	     * Corresponds to the South-East quadrant (bottom-right, if
+	     * "north" is "up")
+	     */
+	    SE;
 
 	    // Integer counterparts
 	    private static final int iNW = 0;
@@ -1089,13 +1349,13 @@ public class ConcurrentQuadTree<T> {
 	    /**
 	     * Returns the quadrant of the bounds that the point lies within.
 	     * 
-	     * @param envelope the area encompassing the quadrants
+	     * @param box the area encompassing the quadrants
 	     * @param point the point to check
 	     * @return the quadrant the point lies within, or {@code null} if
 	     * the point is out of bounds
 	     */
-	    static Quadrant determineQuadrant(Envelope envelope, Point point) {
-		double[] coords = Envelope.organizeCoordinates(envelope);
+	    static Quadrant determineQuadrant(BoundingBox box, Point point) {
+		double[] coords = BoundingBox.organizeCoordinates(box);
 
 		// check if it is out of bounds
 		if (point.x < coords[Coordinate.iX_MIN] ||
@@ -1106,7 +1366,7 @@ public class ConcurrentQuadTree<T> {
 		}
 
 		// otherwise, try to locate its quadrant
-		Point middle = Envelope.calculateMiddle(envelope);
+		Point middle = BoundingBox.calculateMiddle(box);
 		if (point.x < middle.x) {
 		    if (point.y < middle.y) {
 			return SW;
@@ -1125,12 +1385,12 @@ public class ConcurrentQuadTree<T> {
 	    /**
 	     * Returns an integer representation of the quadrant of interest.
 	     * 
-	     * @param envelope the area encompassing the quadrants
+	     * @param box the area encompassing the quadrants
 	     * @param point the point to search for
 	     * @return the quadrant, or -1 if the point is out of bounds
 	     */
-	    static int determineQuadrantAsInt(Envelope envelope, Point point) {
-		return toInt(determineQuadrant(envelope, point));
+	    static int determineQuadrantAsInt(BoundingBox box, Point point) {
+		return toInt(determineQuadrant(box, point));
 	    }
 	} // end Quadrant
 
@@ -1166,7 +1426,7 @@ public class ConcurrentQuadTree<T> {
 	 * the area (determined by two corner points) representing the node's
 	 * bounds
 	 */
-	private final Envelope envelope;
+	private final BoundingBox boundingBox;
 
 	/** the quadrant this node belongs to */
 	private Quadrant myQuadrant;
@@ -1184,13 +1444,13 @@ public class ConcurrentQuadTree<T> {
 	 * Constructor to be used when instantiating the root. If children
 	 * need to be instantiated, call the four-argument constructor.
 	 * 
-	 * @param envelope the region corresponding to this node's envelope
+	 * @param box the region corresponding to this node's bounding box
 	 * @param maxDepth the maximum depth of the entire quadtree, which
 	 * will subsequently be handed to any children constructed
 	 * @param bucketSize the maximum capacity of a leaf node
 	 */
-	Node(Envelope envelope, int maxDepth, int bucketSize) {
-	    this.envelope = envelope;
+	Node(BoundingBox box, int maxDepth, int bucketSize) {
+	    this.boundingBox = box;
 	    this.parent = null;
 	    this.maxDepth = maxDepth;
 	    this.bucketSize = bucketSize;
@@ -1214,7 +1474,7 @@ public class ConcurrentQuadTree<T> {
 	 */
 	Node(Node<T> parent, Quadrant quadrant, int bucketSize) {
 	    assert (quadrant != null) : "The quadrant cannot be null";
-	    envelope = Envelope.createBounds(parent.getEnvelope(), quadrant);
+	    boundingBox = BoundingBox.createBounds(parent.getBoundingBox(), quadrant);
 
 	    this.parent = parent;
 	    this.depth = parent.depth + 1;
@@ -1239,7 +1499,7 @@ public class ConcurrentQuadTree<T> {
 	static <T> Node<T> getLeafNode(Node<T> node, Point point) {
 	    if (!node.isLeaf()) {
 		Quadrant q =
-			Node.Quadrant.determineQuadrant(node.getEnvelope(),
+			Node.Quadrant.determineQuadrant(node.getBoundingBox(),
 				point);
 		return getLeafNode(node.getChild(q), point);
 	    }
@@ -1326,7 +1586,7 @@ public class ConcurrentQuadTree<T> {
 	/**
 	 * Returns the child corresponding to the given index
 	 * 
-	 * @param quadrant the quadrant of the parent to retrieve
+	 * @param index the index of the child
 	 * @return the child corresponding to the given quadrant
 	 * @throws IndexOutOfBoundsException if the index is out of bounds
 	 */
@@ -1340,8 +1600,8 @@ public class ConcurrentQuadTree<T> {
 	 * 
 	 * @return the corner points of the region corresponding to this node
 	 */
-	Envelope getEnvelope() {
-	    return envelope;
+	BoundingBox getBoundingBox() {
+	    return boundingBox;
 	}
 
 	/**
@@ -1378,7 +1638,7 @@ public class ConcurrentQuadTree<T> {
 	 * the bounds of the sample space
 	 */
 	void isPointWithinBounds(double x, double y) {
-	    Point[] bounds = envelope.bounds;
+	    Point[] bounds = boundingBox.bounds;
 
 	    if (x < Math.min(bounds[0].x, bounds[1].x) ||
 		    x > Math.max(bounds[0].x, bounds[1].x) ||
@@ -1554,22 +1814,14 @@ public class ConcurrentQuadTree<T> {
 
 	    /*
 	     * If there aren't any values yet, a new list is instantiated. If
-	     * there already is a list, only add if it doesn't already exist.
-	     * Otherwise if we are at capacity, perform a split.
+	     * we are at capacity, perform a split and try adding again.
+	     * Otherwise, append normally.
 	     */
 	    if (values == null) {
 		assert (values.size() == 0) : "Size was not zero for Node.add()";
 		values = new ArrayList<Entry<T>>(bucketSize);
-		append(newEntry, propagate);
 
-	    } else if (size() < bucketSize) {
-		// TODO: do we want to allow duplicate entries?
-		if (contains(point, values)) {
-		    return false;
-		}
-		append(newEntry, propagate);
-
-	    } else {
+	    } else if (size() == bucketSize){
 		// Check if we reached the maximum depth of the tree.
 		// If so, we cannot split since it will increase tree depth.
 		if (depth == maxDepth) {
@@ -1577,6 +1829,7 @@ public class ConcurrentQuadTree<T> {
 		}
 		return splitThenAdd(point, element);
 	    }
+	    append(newEntry, propagate);
 	    return true;
 	}
 
@@ -1604,13 +1857,13 @@ public class ConcurrentQuadTree<T> {
 		Entry<T> entry = existingValues.get(i);
 
 		quadrant =
-			Quadrant.determineQuadrantAsInt(envelope,
+			Quadrant.determineQuadrantAsInt(boundingBox,
 				entry.coordinate);
 		children[quadrant].add(entry, false);
 	    }
 
 	    // add in the new value, making sure to propagate
-	    quadrant = Quadrant.determineQuadrantAsInt(envelope, point);
+	    quadrant = Quadrant.determineQuadrantAsInt(boundingBox, point);
 	    return children[quadrant].add(point, element, true);
 	}
 
@@ -1637,8 +1890,6 @@ public class ConcurrentQuadTree<T> {
 	 * Initializes the children so that new elements can be added. This
 	 * process sets the value of the current node to {@code null} in
 	 * anticipation of new children to be instantiated.
-	 * 
-	 * @return an initialized {@code Node} array fit to store children
 	 */
 	@SuppressWarnings("unchecked")
 	void initializeNewChildren() {

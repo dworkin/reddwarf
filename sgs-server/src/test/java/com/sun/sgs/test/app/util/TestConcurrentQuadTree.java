@@ -375,6 +375,53 @@ public class TestConcurrentQuadTree extends TestCase {
     }
     
     
+    public void testAddingAtSamePoint() {
+	// Create a tree with a bucket size larger than 1
+	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(5, 5, 0, 0, 100, 100);
+	assertTrue(tree.isEmpty());
+	int size = 0;
+	assertTrue(tree.add(1, 1, "A"));
+	size++;
+	assertTrue(tree.add(1, 1, "B"));
+	size++;
+	assertTrue(tree.add(1, 1, "C"));
+	size++;
+	
+	assertEquals(size, tree.size());
+	assertTrue(tree.add(99, 99, "D"));
+	size++;
+	assertTrue(tree.add(99, 99, "E"));
+	size++;
+	assertTrue(tree.add(99, 99, "F"));
+	size++;
+	assertEquals(size, tree.size());
+    }
+    
+    
+    public void testRemovingAtSamePoint() {
+	final int bucketSize = 5;
+	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(bucketSize, 5, 0, 0, 100, 100);
+	assertTrue(tree.isEmpty());
+	List<String> shadow = new ArrayList<String>();
+	
+	// add to the tree and shadow
+	for (int i=0 ; i<bucketSize ; i++) {
+	    String s = Integer.toString(i);
+	    tree.add(1, 1, s);
+	    shadow.add(s);
+	}
+	assertEquals(shadow.size(), tree.size());
+	
+	// remove from the tree and shadow list
+	String val;
+	while ((val = tree.remove(1, 1)) != null) {
+	    shadow.remove(val);
+	}
+	assertEquals(shadow.size(), tree.size());
+	assertEquals(shadow.isEmpty(), tree.isEmpty());
+    }
+    
+    
     /**
      * The {@code TestContainer} inner class is a simple object which stores a
      * quadtree and a {@code double} array. The {@code double} array holds
@@ -521,7 +568,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	tree.add(50, 50, "A");
 	assertFalse(tree.isEmpty());
 	
-	Iterator<String> iter = tree.envelopeIterator(0, 0, 100, 100);
+	Iterator<String> iter = tree.boundingBoxIterator(0, 0, 100, 100);
 	int i=0;
 	while (iter.hasNext()) {
 	    i++;
@@ -540,7 +587,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	assertFalse(tree.isEmpty());
 	assertEquals(4, tree.size());
 	
-	Iterator<String> iter = tree.envelopeIterator(0, 0, 50, 50);
+	Iterator<String> iter = tree.boundingBoxIterator(0, 0, 50, 50);
 	int i=0;
 	while (iter.hasNext()) {
 	    i++;
@@ -562,7 +609,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	assertFalse(tree.isEmpty());
 	assertEquals(5, tree.size());
 	
-	Iterator<String> iter = tree.envelopeIterator(0, 0, 50, 50);
+	Iterator<String> iter = tree.boundingBoxIterator(0, 0, 50, 50);
 	int i=0;
 	while (iter.hasNext()) {
 	    i++;
@@ -581,10 +628,10 @@ public class TestConcurrentQuadTree extends TestCase {
 	double y2 = random.nextInt() % 100;
 	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(0, x1, y1, x2, y2);
 	
-	assertEquals(Math.min(x1, x2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.X_MIN));
-	assertEquals(Math.max(x1, x2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.X_MAX));
-	assertEquals(Math.min(y1, y2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.Y_MIN));
-	assertEquals(Math.max(y1, y2), tree.getDirectionalEnvelopeBound(ConcurrentQuadTree.Coordinate.Y_MAX));
+	assertEquals(Math.min(x1, x2), tree.getDirectionalBoundingBoxEdge(ConcurrentQuadTree.Coordinate.X_MIN));
+	assertEquals(Math.max(x1, x2), tree.getDirectionalBoundingBoxEdge(ConcurrentQuadTree.Coordinate.X_MAX));
+	assertEquals(Math.min(y1, y2), tree.getDirectionalBoundingBoxEdge(ConcurrentQuadTree.Coordinate.Y_MIN));
+	assertEquals(Math.max(y1, y2), tree.getDirectionalBoundingBoxEdge(ConcurrentQuadTree.Coordinate.Y_MAX));
     }
     
     /*--------------- test iterator operations ----------------------*/
