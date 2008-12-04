@@ -41,15 +41,15 @@ public interface ProtocolListener {
     
     /**
      * Notifies this listener that an incoming channel {@code protocol} for
-     * the specified {@code sessionRefId} as been established, and returns a
+     * the specified {@code sessionId} as been established, and returns a
      * handler for processing incoming messages received by the protocol.
      *
-     * @param	sessionRefId a session ID
+     * @param	sessionId a session ID
      * @param	protocol a channel protocol
      * @return	a protocol handler for processing incoming messages
      */
     ChannelProtocolHandler newProtocol(
-	BigInteger sessionRefId, ChannelProtocol protocol);
+	BigInteger sessionId, ChannelProtocol protocol);
 					
 
     
