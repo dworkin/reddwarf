@@ -22,6 +22,7 @@ package com.sun.sgs.system;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.net.URISyntaxException;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
@@ -47,7 +48,8 @@ final class BootEnvironment {
     /**
      * Default location of the bootstrapper jar relative to {@code SGS_HOME}.
      */
-    public static final String SGS_JAR = "bin/sgs-boot.jar";
+    public static final String SGS_JAR = 
+            "bin" + File.separator + "sgs-boot.jar";
     
     /**
      * Name of the properties file to locate and retrieve properties
@@ -192,7 +194,7 @@ final class BootEnvironment {
      *         configuration parameters in the file
      */
     public static SubstitutionProperties loadProperties(String filename) 
-            throws IOException {
+            throws IOException, URISyntaxException {
         
         //load properties from configuration file
         SubstitutionProperties properties = new SubstitutionProperties();
@@ -216,7 +218,10 @@ final class BootEnvironment {
             properties.clear();
             URL jarLocation = BootEnvironment.class.
                     getProtectionDomain().getCodeSource().getLocation();
-            String jarPath = jarLocation.getPath();
+            
+            //get a File from the URL to convert URL escaped characters
+            File jarFile = new File(jarLocation.toURI());
+            String jarPath = jarFile.getPath();
             int jarFileIndex = jarPath.indexOf(BootEnvironment.SGS_JAR);
             if (jarFileIndex == -1) {
                 logger.log(Level.SEVERE, "Unable to determine SGS_HOME");

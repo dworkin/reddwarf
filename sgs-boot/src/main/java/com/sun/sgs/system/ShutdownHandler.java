@@ -62,6 +62,14 @@ class ShutdownHandler implements Runnable {
             logger.log(Level.SEVERE, "Unable to listen on port : " + port, e);
             throw e;
         }
+        
+        //add shutdown hook to handle shutting down the subprocess when
+        //receiving a Ctrl-C
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                ShutdownHandler.this.shutdown();
+            }
+        });
     }
     
     /**
@@ -84,6 +92,8 @@ class ShutdownHandler implements Runnable {
      * and closes any already connected {@code Socket} objects.
      */
     private synchronized void shutdown() {
+        logger.log(Level.FINE, "Shutting down...");
+        
         //destroy the SGS process
         if (p != null) {
             p.destroy();
@@ -176,9 +186,6 @@ class ShutdownHandler implements Runnable {
                 String inputLine = "";
                 while ((inputLine = in.readLine()) != null) {
                     if (inputLine.equals(BootEnvironment.SHUTDOWN_COMMAND)) {
-                        logger.log(Level.FINE, 
-                                   BootEnvironment.SHUTDOWN_COMMAND + 
-                                   " received, shutting down...");
                         shutdown();
                         break;
                     }

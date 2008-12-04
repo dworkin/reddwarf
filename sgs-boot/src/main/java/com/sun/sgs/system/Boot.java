@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.jar.JarFile;
+import java.util.Scanner;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 /**
  * Bootstraps and launches a Project Darkstar server.
@@ -88,18 +91,21 @@ public final class Boot {
         //get the java options
         String javaOpts = properties.getProperty(BootEnvironment.JAVA_OPTS, "");
         
-        //build the full execute path
-        String execute = javaCmd + 
-                " -cp " + bootClassPath(properties) +
-                " -Djava.library.path=" + bootNativePath(properties) +
-                " -Djava.util.logging.config.file=" + 
-                properties.getProperty(BootEnvironment.SGS_LOGGING) +
-                " " + bootCommandLineProps(properties) +
-                " " + javaOpts +
-                " " + BootEnvironment.KERNEL_CLASS +
-                " " + properties.getProperty(BootEnvironment.SGS_PROPERTIES);
-        logger.log(Level.CONFIG, "Execute path = " + execute);
-        List<String> executeCmd = Arrays.asList(execute.split("\\s+"));
+        //build the command
+        List<String> executeCmd = new ArrayList<String>();
+        executeCmd.add(javaCmd);
+        executeCmd.add("-classpath");
+        executeCmd.add(bootClassPath(properties));
+        executeCmd.add("-Djava.library.path=" + bootNativePath(properties));
+        executeCmd.add("-Djava.util.logging.config.file=" + 
+                       properties.getProperty(BootEnvironment.SGS_LOGGING));
+        executeCmd.add(bootCommandLineProps(properties));
+        for(String j : bootJavaOpts(properties)) {
+            executeCmd.add(j);
+        }
+        executeCmd.add(BootEnvironment.KERNEL_CLASS);
+        executeCmd.add(properties.getProperty(BootEnvironment.SGS_PROPERTIES));
+        logger.log(Level.CONFIG, "Execute path = " + executeCmd);
         
         //build the process
         ProcessBuilder pb = new ProcessBuilder(executeCmd);
@@ -130,7 +136,8 @@ public final class Boot {
             }
         }
         
-        //initiate the shutdown handler
+        //initiate the shutdown handler first so that any problems
+        //opening the socket server happen before the subprocess starts
         ShutdownHandler shutdownHandler = new ShutdownHandler(
                 Integer.valueOf(
                 properties.getProperty(BootEnvironment.SHUTDOWN_PORT)));
@@ -324,6 +331,44 @@ public final class Boot {
         } else {
             return "";
         }
+    }
+    
+    /**
+     * Splits the {@code $JAVA_OPTS} configuration property into a list
+     * of {@code String} objects consumable by a {@link ProcessBuilder}.
+     * <p>
+     * The split operation will break down the property specified by
+     * {@code $JAVA_OPTS} into tokens delimited by whitespace.  Additionally,
+     * quoted strings that include whitespace will be treated as a single token.
+     * 
+     * @param env the environment
+     * @return a list of {@code String} objects that represent the individual
+     *         components of the {@code JAVA_OPTS} configuration property
+     * @throws IllegalArgumentException if the {@code JAVA_OPTS} configuration
+     *         property has an invalid format
+     */
+    private static List<String> bootJavaOpts(Properties env) 
+            throws IllegalArgumentException {
+        String javaOpts = env.getProperty(BootEnvironment.JAVA_OPTS, "");
+        
+        Scanner s = new Scanner(javaOpts);
+        List<String> realTokens = new ArrayList<String>();
+        while(s.hasNext()) {
+            if(s.hasNext("\\\".*")) {
+                String nextToken = s.findInLine("\\\".*?\\\"");
+                if(nextToken == null) {
+                    throw new IllegalArgumentException(
+                            "Invalid " + BootEnvironment.JAVA_OPTS + " format");
+                } else {
+                    realTokens.add(
+                            nextToken.substring(1, nextToken.length() - 1));
+                }
+            } else {
+                realTokens.add(s.next());
+            }
+        }
+        
+        return realTokens;
     }
     
     /**
