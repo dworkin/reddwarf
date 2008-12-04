@@ -42,8 +42,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.ChannelProtocol;
-import com.sun.sgs.protocol.ChannelProtocolHandler;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
@@ -499,19 +497,8 @@ public final class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public SessionProtocol getSessionProtocol(BigInteger sessionRefId) {
 	ClientSessionHandler handler = handlers.get(sessionRefId);
+	
 	return handler != null ? handler.getSessionProtocol() : null;
-    }
-
-    /** {@inheritDoc} */
-    public ChannelProtocol getChannelProtocol(BigInteger sessionRefId,
-				       Delivery delivery,
-				       boolean bestAvailable)
-    {
-	ClientSessionHandler handler = handlers.get(sessionRefId);
-	return
-	    handler != null ?
-	    handler.getChannelProtocol(delivery, bestAvailable) :
-	    null;
     }
 
     /* -- Implement ProtocolListener -- */
@@ -519,7 +506,7 @@ public final class ClientSessionServiceImpl
     private class ProtocolListenerImpl implements ProtocolListener {
 
 	/** {@inheritDoc} */
-	public SessionProtocolHandler newProtocol(
+	public SessionProtocolHandler newConnection(
 	    Identity identity, SessionProtocol protocol)
 	{
 	    return new ClientSessionHandler(
@@ -527,17 +514,6 @@ public final class ClientSessionServiceImpl
 	    
 	}
 	
-	/** {@inheritDoc} */
-	public ChannelProtocolHandler newProtocol(
-	    BigInteger sessionId, ChannelProtocol protocol)
-	{
-	    ClientSessionHandler handler = handlers.get(sessionId);
-	    if (handler == null) {
-		throw new IllegalArgumentException("sessionId not active");
-	    } else {
-		return handler;
-	    }
-	}
     }
     
     /* -- Package access methods for adding commit actions -- */

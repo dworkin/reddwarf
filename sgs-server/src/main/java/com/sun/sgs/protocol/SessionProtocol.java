@@ -19,60 +19,24 @@
 
 package com.sun.sgs.protocol;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.service.Node;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 
 /**
- * A protocol for sending session messages and reliable channel messages to
- * a client.  A {@code Protocol} is created by the {@link
- * ProtocolFactory#newProtocol ProtocolFactory.newProtocol} method.
+ * A protocol for sending session messages and channel messages to
+ * a client.
  *
- * <p>Note: If a protocol specification (implemented by a given {@code
- * ProtocolMessageChannel}) requires that a login acknowledgment be
- * delivered to the client before any other protocol messages, the protocol
- * must implement this requirement.  It is possible that a caller may
- * request that other messages be sent before a login acknowledgment, and
- * if the protocol requires, these messages should be enqueued until the
- * login acknowledgment has been sent to the client.
- * 
- * <p>TBD: should reconnection be handled a this layer or transparently by
- * the transport layer?   Perhaps the {@code AsynchronousByteChannel}
- * managed by the transport layer could handle the reconnection under the
- * covers?
+ * <p>Note: If a protocol specification requires that a login
+ * acknowledgment be delivered to the client before any other protocol
+ * messages, the protocol must implement this requirement.  It is possible
+ * that a caller may request that other messages be sent before a login
+ * acknowledgment, and if the protocol requires, these messages should be
+ * enqueued until the login acknowledgment has been sent to the client.
  */
-public interface SessionProtocol extends ChannelProtocol {
-
-
-    /**
-     * Notifies the associated client that it should redirect its login
-     * to the specified {@code node}.
-     *
-     * @param	node a node to redirect the login
-     */
-    void loginRedirect(Node node);
-    
-    /**
-     * Notifies the associated client that the previous login attempt was
-     * successful, and the client is assigned the given {@code sessionId}.
-     *
-     * @param	sessionId a session ID
-     */
-    void loginSuccess(BigInteger sessionId);
-
-    /**
-     * Notifies the associated client that the previous login attempt was
-     * unsuccessful for the specified {@code reason}.  The specified {@code
-     * throwable}, if non-{@code null} is an exception that occurred while
-     * processing the login request.  The message channel should be careful
-     * not to reveal to the associated client sensitive data that may be
-     * present in the specified {@code throwable}.
-     *
-     * @param	reason a reason why the login was unsuccessful
-     * @param	throwable an exception that occurred while processing the
-     *		login request, or {@code null}
-     */
-    void loginFailure(String reason, Throwable throwable);
+public interface SessionProtocol extends Channel {
 
     /**
      * Sends the associated client the specified {@code message}.
@@ -80,11 +44,36 @@ public interface SessionProtocol extends ChannelProtocol {
      * @param	message a message
      */
     void sessionMessage(ByteBuffer message);
+    
+    /**
+     * Notifies the associated client that it is joined to the channel
+     * with the specified {@code name} and {@code channelId}.
+     *
+     * @param	name a channel name
+     * @param	channelId channelId
+     */
+    void channelJoin(String name, BigInteger channelId);
 
     /**
-     * Notifies the associated client that it has successfully logged out.
+     * Notifies the associated client that it is no longer a member of
+     * the channel with the specified {@code channelId}.
+     *
+     * @param	channelId a channel ID
+     *
      */
-    void logoutSuccess();
+    void channelLeave(BigInteger channelId);
+
+    /**
+     * Notifies the associated client that the specified {@code message}
+     * is sent on the channel with the specified {@code channelId} and {@code
+     * delivery} requirement.
+     *
+     * @param	channelId a channel ID
+     * @param	message a channel message
+     * @param	delivery a delivery requirement
+     */
+    void channelMessage(
+	BigInteger channelId, ByteBuffer message, Delivery delivery);
 
     /*
     void disconnect(DisconnectReason reason);

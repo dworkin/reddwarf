@@ -43,7 +43,7 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.ChannelProtocol;
+import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -498,9 +498,8 @@ public final class ChannelServiceImpl
 		}
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
-			ChannelProtocol protocol =
-			    sessionService.getChannelProtocol(
- 				sessionRefId, Delivery.RELIABLE, false);
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
 			    protocol.channelJoin(name, channelRefId);
 			}
@@ -508,9 +507,8 @@ public final class ChannelServiceImpl
 		}
 		if (leavers != null) {
 		    for (BigInteger sessionRefId : leavers) {
-			ChannelProtocol protocol =
-			    sessionService.getChannelProtocol(
-				sessionRefId, Delivery.RELIABLE, false);
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
 			    protocol.channelLeave(channelRefId);
 			}
@@ -569,9 +567,8 @@ public final class ChannelServiceImpl
 		channelSet.add(channelRefId);
 
 		// Send CHANNEL_JOIN protocol message.
-		ChannelProtocol protocol =
-		    sessionService.getChannelProtocol(
-			sessionRefId, Delivery.RELIABLE, false);
+		SessionProtocol protocol =
+		    sessionService.getSessionProtocol(sessionRefId);
 		if (protocol != null) {
 		    protocol.channelJoin(name, channelRefId);
 		}
@@ -616,9 +613,8 @@ public final class ChannelServiceImpl
 		}
 
 		// Send CHANNEL_LEAVE protocol message.
-		ChannelProtocol protocol =
-		    sessionService.getChannelProtocol(
- 			sessionRefId, Delivery.RELIABLE, false);
+		SessionProtocol protocol =
+		    sessionService.getSessionProtocol(sessionRefId);
 		if (protocol != null) {
 		    protocol.channelLeave(channelRefId);
 		}
@@ -646,9 +642,8 @@ public final class ChannelServiceImpl
 		localMembers = localChannelMembersMap.remove(channelRefId);
 		if (localMembers != null) {
 		    for (BigInteger sessionRefId : localMembers) {
-			ChannelProtocol protocol =
-			    sessionService.getChannelProtocol(
-				sessionRefId, Delivery.RELIABLE, false);
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
 			    protocol.channelLeave(channelRefId);
 			}
@@ -693,12 +688,12 @@ public final class ChannelServiceImpl
 		}
 
 		for (BigInteger sessionRefId : localMembers) {
-		    ChannelProtocol protocol =
-			sessionService.getChannelProtocol(
-			    sessionRefId, Delivery.RELIABLE, false);
+		    SessionProtocol protocol =
+			sessionService.getSessionProtocol(sessionRefId);
 		    if (protocol != null) {
 			protocol.channelMessage(
-			    channelRefId, ByteBuffer.wrap(message));
+			    channelRefId, ByteBuffer.wrap(message),
+			    Delivery.RELIABLE);
 		    }
 		}
 

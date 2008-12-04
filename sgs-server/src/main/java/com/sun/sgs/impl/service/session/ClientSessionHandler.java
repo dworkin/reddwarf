@@ -32,7 +32,9 @@ import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.CompletionFuture;
-import com.sun.sgs.protocol.ChannelProtocol;
+import com.sun.sgs.protocol.LoginCompletionFuture;
+import com.sun.sgs.protocol.LoginFailureException;
+import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
@@ -42,7 +44,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -98,6 +102,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /** The connection state. */
     private State state = State.CONNECTED;
 
+    private LoginCompletionFutureImpl loginCompletionFuture =
+	new LoginCompletionFutureImpl();
+
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
@@ -139,14 +146,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /* -- Implement SessionProtocolHandler -- */
     
     /** {@inheritDoc} */
-    public CompletionFuture loginRequest() {
+    public LoginCompletionFuture loginRequest() {
 	scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("HandleLoginRequest") {
 		public void run() {
-		    handleLoginRequest(identity);
+		    handleLoginRequest();
 		} });
-	// Enable protocol message channel to read immediately
-	return (new CompletionFutureImpl()).done();
+	return loginCompletionFuture;
     }
     
 
@@ -269,26 +275,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Returns the channel protocol for the associated client session.
-     *
-     * @param	delivery a delivery requirement
-     * @param	bestAvailable if {@code true} and the exact delivery
-     *		requirement can't be satisfied, then the best protocol that
-     *		meets the delivery requirement is returned
-     * @return	a channel protocol matching the specified delivery
-     *		requirement, or if {@code bestAvailable} is {@code true}
-     * @throws	UnsupportedDeliveryException if there is no {@code
-     *		ChannelProtocol} with the given {@code delivery} requirement
-     */
-    ChannelProtocol getChannelProtocol(Delivery delivery, boolean bestAvailable)
-    {
-	if (delivery != Delivery.RELIABLE && !bestAvailable) {
-	    throw new UnsupportedDeliveryException(delivery.toString());
-	}
-	return protocol;
-    }
-
-    /**
      * Handles a disconnect request (if not already handled) by doing
      * the following: <ol>
      *
@@ -358,7 +344,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		// TBD: does anything special need to be done here?
 		// Bypass sendProtocolMessage method which prevents sending
 		// messages to disconnecting sessions.
-		protocol.logoutSuccess();
+		//protocol.logoutSuccess();
 	    }
 
 	    if (closeConnection) {
@@ -503,14 +489,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Handles a login request for the specified {@code name} and {@code
-     * password}, scheduling the appropriate response to be sent to the client
-     * (either a login success, failure, or redirect acknowledgment.
-     *
-     * @param	name a user name
-     * @param	password a password
+     * Handles a login request, notifying the specified {@code future} when
+     * the request is completed.
      */
-    private void handleLoginRequest(Identity identity) {
+    private void handleLoginRequest() {
 
 	logger.log(
 	    Level.FINEST, 
@@ -602,10 +584,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @param	node a node
      */
-    private void loginRedirect(Node node) {
+    private void loginRedirect( Node node) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    protocol.loginRedirect(node);
+	    loginCompletionFuture.loginRedirect(node);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -619,7 +601,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	synchronized (lock) {
 	    checkConnectedState();
 	    loggedIn = true;
-	    protocol.loginSuccess(sessionRefId);
+	    loginCompletionFuture.loginSuccess(sessionRefId);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -636,7 +618,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     void loginFailure(String reason, Throwable throwable) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    protocol.loginFailure(reason, throwable);
+	    loginCompletionFuture.loginFailure(reason, throwable);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -855,26 +837,25 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	/** {@inheritDoc} */
-	public Void get() {
+	public Void get() throws InterruptedException {
 	    synchronized (lock) {
 		while (!done) {
-		    try {
-			lock.wait();
-		    } catch (InterruptedException ignore) {
-		    }
+		    lock.wait();
 		}
 	    }
 	    return null;
 	}
 
 	/** {@inheritDoc} */
-	public Void get(long timeout, TimeUnit unit) {
+	public Void get(long timeout, TimeUnit unit)
+	    throws InterruptedException, TimeoutException
+	{
 	    synchronized (lock) {
 		if (!done) {
-		    try {
-			unit.timedWait(lock, timeout);
-		    } catch (InterruptedException ignore) {
-		    }
+		    unit.timedWait(lock, timeout);
+		}
+		if (!done) {
+		    throw new TimeoutException();
 		}
 	    }
 	    return null;
@@ -906,6 +887,117 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
 
+    /**
+     * This future is returned from {@link SessionProtocolHandler}
+     * operations.
+     */
+    private class LoginCompletionFutureImpl implements LoginCompletionFuture {
+
+	/** Lock for accessing this object's fields. */
+	private Object lock = new Object();
+	
+	/**
+	 * Indicates whether the operation associated with this future
+	 * is complete.
+	 */
+	private boolean done = false;
+
+	/** A session ID, or {@code null}. */
+	private BigInteger sessionId = null;
+
+	/** An exception cause, or {@code null}. */
+	private Throwable exceptionCause = null;
+
+	/** Constructs an instance. */
+	LoginCompletionFutureImpl() {
+	}
+
+	/** {@inheritDoc} */
+	public boolean cancel(boolean mayInterruptIfRunning) {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public BigInteger get()
+	    throws InterruptedException, ExecutionException
+	{
+	    synchronized (lock) {
+		while (!done) {
+		    lock.wait();
+		}
+		if (sessionId != null) {
+		    return sessionId;
+		} else {
+		    throw new ExecutionException(exceptionCause);
+		}
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public BigInteger get(long timeout, TimeUnit unit)
+	    throws InterruptedException, ExecutionException, TimeoutException
+	{
+	    synchronized (lock) {
+		if (!done) {
+		    unit.timedWait(lock, timeout);
+		}
+		if (!done) {
+		    throw new TimeoutException();
+		} else if (sessionId != null) {
+		    return sessionId;
+		} else {
+		    throw new ExecutionException(exceptionCause);
+		}
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public boolean isCancelled() {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public boolean isDone() {
+	    synchronized (lock) {
+		return done;
+	    }
+	}
+
+	/**
+	 * Indicates that the operation associated with this future
+	 * is complete. Subsequent invocations to {@link #isDone
+	 * isDone} will return {@code true}.
+	 */
+	void loginSuccess(BigInteger sessionId) {
+	    if (sessionId == null) {
+		throw new NullPointerException("null sessionId");
+	    }
+	    synchronized (lock) {
+		this.sessionId = sessionId;
+		done = true;
+		lock.notifyAll();
+	    }
+	}
+
+	void loginRedirect(Node node) {
+	    if (node == null) {
+		throw new NullPointerException("null node");
+	    }
+	    synchronized (lock) {
+		exceptionCause = new LoginRedirectException(node);
+		done = true;
+		lock.notifyAll();
+	    }
+	}
+	void loginFailure(String reason, Throwable throwable) {
+	    synchronized (lock) {
+		exceptionCause = new LoginFailureException(reason, throwable);
+		done = true;
+		lock.notifyAll();
+	    }
+	}
+    }
+    
     private static void checkNull(String varName, Object var) {
 	if (var == null) {
 	    throw new NullPointerException("null " + varName);

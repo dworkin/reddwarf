@@ -28,29 +28,15 @@ import java.math.BigInteger;
 public interface ProtocolListener {
 
     /**
-     * Notifies this listener that an incoming session {@code protocol} for
-     * the specified {@code identity} as been established, and returns a
-     * handler for processing incoming messages received by the protocol.
+     * Notifies this listener that an incoming connection with the
+     * specified {@code identity} and {@code protocol} as been established,
+     * and returns a handler for processing incoming requests received by
+     * the protocol.
      *
      * @param	identity an identity
      * @param	protocol a session protocol
-     * @return	a protocol handler for processing incoming messages
+     * @return	a protocol handler for processing incoming requests
      */
-    SessionProtocolHandler newProtocol(
+    SessionProtocolHandler newConnection(
 	Identity identity, SessionProtocol protocol);
-    
-    /**
-     * Notifies this listener that an incoming channel {@code protocol} for
-     * the specified {@code sessionId} as been established, and returns a
-     * handler for processing incoming messages received by the protocol.
-     *
-     * @param	sessionId a session ID
-     * @param	protocol a channel protocol
-     * @return	a protocol handler for processing incoming messages
-     */
-    ChannelProtocolHandler newProtocol(
-	BigInteger sessionId, ChannelProtocol protocol);
-					
-
-    
 }

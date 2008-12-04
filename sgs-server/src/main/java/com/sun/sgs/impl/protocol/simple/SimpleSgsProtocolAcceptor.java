@@ -332,7 +332,7 @@ public class SimpleSgsProtocolAcceptor
 		    
 		    /*
 		     * The protocol will call the ProtocolListener's
-		     * newProtocol method if the authentication succeeds.
+		     * newConnection method if the authentication succeeds.
 		     */
 		    new SimpleSgsProtocolImpl(
 			protocolListener,

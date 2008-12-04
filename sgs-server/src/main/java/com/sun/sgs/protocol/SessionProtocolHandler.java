@@ -21,71 +21,73 @@ package com.sun.sgs.protocol;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
 
 /**
  * A handler for session and channel protocol messages for an associated
  * client session.
  *
- * Each operation has a {@code CompletionFuture} argument that, if
- * non-null, must be notified when the corresponding operation has been
- * processed.  A caller may require notification of operation completion
- * so that it can perform some throttling, for example only resuming
- * reading when a protocol message has been processed by the handler, or
- * controlling the number of clients connected at any given time.
- *
- * <p>TBD: should reconnection be handled a this layer or transparently by
- * the transport layer?
+ * Each operation returns a {@code Future} that contains the result of the
+ * request, or, if there is no associated result, simply indicates when the
+ * request has been processed .  A caller may need to know when an
+ * operation has completed so that it can throttle incoming messages (for
+ * example only resuming reading when the handler completes processing a
+ * request), and/or can control the number of clients connected at any given
+ * time.
  */
-public interface SessionProtocolHandler extends ChannelProtocolHandler {
+public interface SessionProtocolHandler {
 
     /**
      * Processes a login request for the identity associated with this
-     * handler.
+     * handler and returns a future for the result, a session ID.
+     * If the login request is processed successfully, then invoking the
+     * {@link LoginCompletionFuture#get get} method on the returned future
+     * returns the session ID for the associated session's login.  If the
+     * login was unsuccessful, the {@code get} method throws {@link
+     * ExecutionException} which contains a <i>cause</i> that indicates why
+     * the login failed.
      *
-     * <p>When this handler has completed processing the login request, it
-     * invokes the returned future's {@link CompletionFuture#done done}
-     * method to notify the caller that the request has been processed.
-     *
-     * @return	future a future to be notified when the request has been
-     *		processed
+     * @return	future a future for the result
      */
-    CompletionFuture loginRequest();
+    LoginCompletionFuture loginRequest();
 
     /**
-     * Processes a message sent by the associated client.
-     *
-     * <p>When this handler has completed processing the session message,
-     * it invokes the returned future's {@link CompletionFuture#done done}
-     * method to notify the caller that the request has been processed.
+     * Processes a message sent by the associated client and returns a
+     * future for determining when this handler has completed processing
+     * the session message.
      *
      * @param	message a message
-     * @return	future a future to be notified when the request has been
-     *		processed
+     * @return	future a future for the result
      */
     CompletionFuture sessionMessage(ByteBuffer message);
 
     /**
-     * Processes a logout request from the associated client.
+     * Processes a channel message sent by the associated client on the
+     * channel with the specified {@code channelId}, and returns a future
+     * for determining when this handler has completed processing the
+     * channel message.
      *
-     * <p>When this handler has completed processing the logout request,
-     * it invokes the returned future's {@link CompletionFuture#done done}
-     * method to notify the caller that the request has been processed.
+     * @param	channelId a channel ID
+     * @param	message a message
+     * @return	future a future for the result
+     */
+    CompletionFuture channelMessage(BigInteger channelId, ByteBuffer message);
+    
+    /**
+     * Processes a logout request from the associated client and returns a
+     * future for determining when this handler has completed processing
+     * the logout request.
      *
-     * @return	future a future to be notified when the request has been
-     *		processed
+     * @return	future a future for the result
      */
     CompletionFuture logoutRequest();
 
     /**
-     * Processes disconnection request.  This method is used to indicate
-     * that a non-graceful disconnect from the client has occurred.
+     * Notifies this handler that a non-graceful client disconnection has
+     * occurred, and returns a future for determining when the handler has
+     * completed processing the disconnection.
      *
-     * <p>When this handler has completed processing the disconnection,
-     * it invokes the returned future's {@link CompletionFuture#done done}
-     * method to notify the caller that the request has been processed.
-     *
-     * @return	future a future to be notified when the request has been
-     *		processed
+     * @return	future a future for the result
      */
     CompletionFuture disconnect();
 }
