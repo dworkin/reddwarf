@@ -39,7 +39,7 @@ public class BootAcceptance {
     
     private static final Logger logger =Logger.getLogger(
             BootAcceptance.class.getName());
-    private static final String TEST_DIR = "bootAcceptance";
+    private static final String TEST_DIR = "boot Acceptance";
     private static final String ALTERNATE_DIR = "bootAlternate";
     private static final String SGS_BOOT = "alt-boot.properties";
     private static final String SGS_DEPLOY = "alt-deploy";
@@ -363,7 +363,7 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder exp = new StringBuilder();
-        exp.append("-cp .*lib.db-.*\\.jar");
+        exp.append("-classpath.*lib.db-.*\\.jar");
         exp.append(".*");
         exp.append("\\-Djava\\.library\\.path=.*natives");
         exp.append(".*");
@@ -394,8 +394,8 @@ public class BootAcceptance {
         
         //verify the je jar is not included in the classpath
         Assert.assertTrue(Util.expectMatchNoMatch(server,
-                                                  "-cp .*lib.db-.*\\.jar",
-                                                  "-cp .*lib.je-.*\\.jar"));
+                                                  "-classpath.*lib.db-.*\\.jar",
+                                                  "-classpath.*lib.je-.*\\.jar"));
     }
     
     /**
@@ -417,7 +417,7 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder exp = new StringBuilder();
-        exp.append("-cp .*lib.db-.*\\.jar");
+        exp.append("-classpath.*lib.db-.*\\.jar");
         exp.append(".*");
         exp.append("\\-Djava\\.library\\.path=.*natives");
         exp.append(".*");
@@ -448,8 +448,8 @@ public class BootAcceptance {
         
         //verify the je jar is not included in the classpath
         Assert.assertTrue(Util.expectMatchNoMatch(server,
-                                                  "-cp .*lib.db-.*\\.jar",
-                                                  "-cp .*lib.je-.*\\.jar"));
+                                                  "-classpath.*lib.db-.*\\.jar",
+                                                  "-classpath.*lib.je-.*\\.jar"));
     }
     
     /**
@@ -471,9 +471,9 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder exp = new StringBuilder();
-        exp.append("-cp .*lib.je-.*\\.jar");
+        exp.append("-classpath.*lib.je-.*\\.jar");
         exp.append(".*");
-        exp.append("\\-Djava\\.library\\.path= ");
+        exp.append("\\-Djava\\.library\\.path=,");
         exp.append(".*");
         exp.append("\\Q-Dcom.sun.sgs.impl.service.data.store.db.environment.class=");
         exp.append("com.sun.sgs.impl.service.data.store.db.je.JeEnvironment\\E");
@@ -502,8 +502,8 @@ public class BootAcceptance {
         
         //verify the db jar is not included in the classpath
         Assert.assertTrue(Util.expectMatchNoMatch(server,
-                                                  "-cp .*lib.je-.*\\.jar",
-                                                  "-cp .*lib.db-.*\\.jar"));
+                                                  "-classpath.*lib.je-.*\\.jar",
+                                                  "-classpath.*lib.db-.*\\.jar"));
     }
     
     /**
@@ -525,9 +525,9 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("-cp .*custom.jar");
+        match.append("-classpath.*custom.jar");
         match.append(".*");
-        match.append("\\-Djava\\.library\\.path= ");
+        match.append("\\-Djava\\.library\\.path=,");
         StringBuilder noMatch = new StringBuilder();
         noMatch.append("\\Q-Dcom.sun.sgs.impl.service.data.store.db.environment.class\\E");
         Assert.assertTrue(Util.expectMatchNoMatch(server,
@@ -555,11 +555,11 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("-cp .*custom.jar");
+        match.append("-classpath.*custom.jar");
         match.append(".*");
-        match.append("\\-Djava\\.library\\.path= ");
+        match.append("\\-Djava\\.library\\.path=,");
         StringBuilder noMatch = new StringBuilder();
-        noMatch.append("-cp .*lib.db-.*\\.jar");
+        noMatch.append("-classpath.*lib.db-.*\\.jar");
         Assert.assertTrue(Util.expectMatchNoMatch(server,
                                                   match.toString(),
                                                   noMatch.toString()));
@@ -585,11 +585,11 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("-cp .*custom.jar");
+        match.append("-classpath.*custom.jar");
         match.append(".*");
-        match.append("\\-Djava\\.library\\.path= ");
+        match.append("\\-Djava\\.library\\.path=,");
         StringBuilder noMatch = new StringBuilder();
-        noMatch.append("-cp .*lib.je-.*\\.jar");
+        noMatch.append("-classpath.*lib.je-.*\\.jar");
         Assert.assertTrue(Util.expectMatchNoMatch(server,
                                                   match.toString(),
                                                   noMatch.toString()));
@@ -615,9 +615,9 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("-cp .*lib.db-.*\\.jar");
+        match.append("-classpath.*lib.db-.*\\.jar");
         match.append(".*");
-        match.append("\\-Djava\\.library\\.path=.*natives.*customDirectory ");
+        match.append("\\-Djava\\.library\\.path=.*natives.*customDirectory");
         Assert.assertTrue(Util.expectMatches(server,
                                              match.toString(),
                                              "The Kernel is ready",
@@ -644,9 +644,9 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("-cp .*lib.je-.*\\.jar");
+        match.append("-classpath.*lib.je-.*\\.jar");
         match.append(".*");
-        match.append("\\-Djava\\.library\\.path=customDirectory ");
+        match.append("\\-Djava\\.library\\.path=customDirectory");
         Assert.assertTrue(Util.expectMatches(server,
                                              match.toString(),
                                              "The Kernel is ready",
@@ -673,7 +673,7 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("\\-Djava\\.library\\.path=customDirectory ");
+        match.append("\\-Djava\\.library\\.path=customDirectory");
         Assert.assertTrue(Util.expectMatches(server,
                                              match.toString()));
     }
@@ -698,9 +698,9 @@ public class BootAcceptance {
         //match the regular expression to verify components of the 
         //execute path
         StringBuilder match = new StringBuilder();
-        match.append("-cp .*lib.db-.*\\.jar");
+        match.append("-classpath.*lib.db-.*\\.jar");
         match.append(".*");
-        match.append("\\-Djava\\.library\\.path=bdbDirectory ");
+        match.append("\\-Djava\\.library\\.path=bdbDirectory");
         Assert.assertTrue(Util.expectMatches(server,
                                              match.toString()));
     }
@@ -722,7 +722,32 @@ public class BootAcceptance {
                                    configLogging, config);
         
         Assert.assertTrue(Util.expectLines(server,
-                                           "-DmyProperty=test -Xmx768M",
+                                           "-DmyProperty=test, -Xmx768M",
+                                           "The Kernel is ready",
+                                           "HelloWorld: application is ready"));
+    }
+    
+    /**
+     * Verify that custom quoted JAVA_OPTS are included on the executed process
+     */
+    @Test(timeout=TIMEOUT)
+    public void testCustomJAVA_OPTSQuoted() throws Exception {
+        Util.loadTutorial(installationDirectory);
+        URL bootConfig = this.getClass().getResource(
+                "customJAVA_OPTSQuoted.properties");
+        Assert.assertNotNull(bootConfig);
+        Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
+        Util.clearSGS_BOOT(installationDirectory);
+        
+        this.config = alternateSGS_BOOT.getAbsolutePath();
+        this.server = Util.bootPDS(installationDirectory, 
+                                   configLogging, config);
+        
+        Assert.assertTrue(Util.expectLines(server,
+                                           "-DmyProperty=test, " +
+                                           "-DmyOtherProperty=test test, " +
+                                           "-Xmx768M, " +
+                                           "-XX:+AggressiveOpts,",
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }

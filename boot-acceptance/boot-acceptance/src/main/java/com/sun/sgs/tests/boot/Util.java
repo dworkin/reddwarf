@@ -24,6 +24,7 @@ import java.util.zip.ZipEntry;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.io.File;
@@ -252,9 +253,13 @@ class Util {
                     logging.getAbsolutePath();
         }
 
-        String command = "java -jar " + logParam + " " + 
-                bootloader.getAbsolutePath() + " " + args;
-        List<String> commandList = Arrays.asList(command.split("\\s+"));
+        List<String> commandList = new ArrayList<String>();
+        commandList.add("java");
+        commandList.add("-jar");
+        if(!logParam.equals(""))
+            commandList.add(logParam);
+        commandList.add(bootloader.getAbsolutePath());
+        commandList.add(args);
         
         ProcessBuilder pb = new ProcessBuilder(commandList);
         pb.redirectErrorStream(true);
@@ -276,9 +281,11 @@ class Util {
         File stopper = new File(directory, "bin/sgs-stop.jar");
         Assert.assertTrue(stopper.exists());
         
-        String command = "java -jar " + stopper.getAbsolutePath() +
-                " " + args;
-        List<String> commandList = Arrays.asList(command.split("\\s+"));
+        List<String> commandList = new ArrayList<String>();
+        commandList.add("java");
+        commandList.add("-jar");
+        commandList.add(stopper.getAbsolutePath());
+        commandList.add(args);
         
         ProcessBuilder pb = new ProcessBuilder(commandList);
         pb.redirectErrorStream(true);
