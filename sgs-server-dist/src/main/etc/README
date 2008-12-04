@@ -24,8 +24,8 @@ CONTENTS
 This distribution contains the following subdirectories:
 
 - bin
-  The bootstrap JAR file used to bootup a Project Darkstar Server
-  and the application deployed into it
+  The bootstrap JAR files used to bootup and shutdown a 
+  Project Darkstar Server and the application deployed into it
 
 - conf
   Configuration files used to configure the runtime state of
@@ -72,8 +72,7 @@ platforms.
 
 REQUIRED LIBRARIES
 
-The Project Darkstar server depends on several additional libraries,
-which must be installed.
+The Project Darkstar server depends on several additional libraries.
 
 This distribution requires Berkeley DB version ${bdb.version}, which may be
 bundled with this distribution, or else can be obtained and compiled
@@ -93,6 +92,11 @@ The Project Darkstar server can be started up using the executable bootstrapper 
 file in the bin directory.
 
   java -jar bin/sgs-boot.jar
+
+The Project Darkstar server can be shutdown using the executable stopper JAR
+file in the bin directory.
+
+  java -jar bin/sgs-stop.jar
 
 Project Darkstar is an application container in which applications (or games)
 can be deployed.  By default, any jar files that are placed into the

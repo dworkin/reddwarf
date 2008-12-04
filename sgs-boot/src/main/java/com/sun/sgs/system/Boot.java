@@ -29,12 +29,9 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.List;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.jar.JarFile;
 import java.util.Scanner;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 
 /**
  * Bootstraps and launches a Project Darkstar server.
@@ -88,9 +85,6 @@ public final class Boot {
                     File.separator + "bin" + File.separator + javaCmd;
         }
         
-        //get the java options
-        String javaOpts = properties.getProperty(BootEnvironment.JAVA_OPTS, "");
-        
         //build the command
         List<String> executeCmd = new ArrayList<String>();
         executeCmd.add(javaCmd);
@@ -100,7 +94,7 @@ public final class Boot {
         executeCmd.add("-Djava.util.logging.config.file=" + 
                        properties.getProperty(BootEnvironment.SGS_LOGGING));
         executeCmd.add(bootCommandLineProps(properties));
-        for(String j : bootJavaOpts(properties)) {
+        for (String j : bootJavaOpts(properties)) {
             executeCmd.add(j);
         }
         executeCmd.add(BootEnvironment.KERNEL_CLASS);
@@ -347,16 +341,15 @@ public final class Boot {
      * @throws IllegalArgumentException if the {@code JAVA_OPTS} configuration
      *         property has an invalid format
      */
-    private static List<String> bootJavaOpts(Properties env) 
-            throws IllegalArgumentException {
+    private static List<String> bootJavaOpts(Properties env) {
         String javaOpts = env.getProperty(BootEnvironment.JAVA_OPTS, "");
         
         Scanner s = new Scanner(javaOpts);
         List<String> realTokens = new ArrayList<String>();
-        while(s.hasNext()) {
-            if(s.hasNext("\\\".*")) {
+        while (s.hasNext()) {
+            if (s.hasNext("\\\".*")) {
                 String nextToken = s.findInLine("\\\".*?\\\"");
-                if(nextToken == null) {
+                if (nextToken == null) {
                     throw new IllegalArgumentException(
                             "Invalid " + BootEnvironment.JAVA_OPTS + " format");
                 } else {
