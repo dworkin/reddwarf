@@ -66,6 +66,13 @@ public interface ConfigMXBean {
     String getAppListener();
 
     /**
+     * Returns the host this node is running on.
+     *
+     * @return the host this node is running on
+     */
+    String getHostName();
+    
+    /**
      * Returns the TCP port for client connections.
      * FIXME:  update for new protocol
      * 

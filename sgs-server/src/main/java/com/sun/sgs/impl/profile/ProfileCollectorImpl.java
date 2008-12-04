@@ -29,6 +29,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.management.ProfileControllerMXBean;
+
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -39,6 +40,7 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 import java.beans.PropertyChangeEvent;
 
 import java.lang.management.ManagementFactory;
+
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
@@ -56,6 +58,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.management.InstanceNotFoundException;
 import javax.management.JMException;
 import javax.management.MBeanRegistrationException;
@@ -69,10 +72,7 @@ import javax.management.ObjectName;
  * kernel to collect and report profiling data. It uses a single thread to
  * consume and report profiling data.
  */
-public final class ProfileCollectorImpl 
-        implements ProfileCollector, ProfileControllerMXBean 
-{
-
+public final class ProfileCollectorImpl implements ProfileCollector { 
     /** The standard prefix for consumer names created by core packages. */
     public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
     
@@ -156,7 +156,7 @@ public final class ProfileCollectorImpl
             registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
             registerMBean(taskStats, 
                     TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME + "Stats");
-            registerMBean(this,
+            registerMBean(new ProfileController(this),
                     ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
@@ -342,26 +342,6 @@ public final class ProfileCollectorImpl
     /** {@inheritDoc} */
     public Object getRegisteredMBean(String mBeanName) {
         return registeredMBeans.get(mBeanName);
-    }
-
-    /* -- Other JMX methods -- */
-    
-    /** {@inheritDoc} */
-    public String[] getProfileConsumers() {
-        Set<String> keys = getConsumers().keySet();
-        return keys.toArray(new String[keys.size()]);
-    }
-    
-    /** {@inheritDoc} */
-    public ProfileLevel getConsumerLevel(String consumer) {
-        ProfileConsumer cons = getConsumer(consumer);
-        return cons.getProfileLevel();
-    }
-
-    /** {@inheritDoc} */
-    public void setConsumerLevel(String consumer, ProfileLevel level) {
-        ProfileConsumer cons = getConsumer(consumer);
-        cons.setProfileLevel(level);
     }
 
     /* -- Methods to support ProfileCollectorHandle -- */

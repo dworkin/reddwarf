@@ -41,9 +41,9 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
                                   "ClientSessionService");
         ProfileLevel level = ProfileLevel.MEDIUM;
-        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
+        // Both of the operations are non-transactional
+        ProfileDataType type = ProfileDataType.AGGREGATE;
         
-        // Manager operations
         registerSessionDisconnectListenerOp =
             consumer.createOperation("registerSessionDisconnectListener", 
                                      type, level);

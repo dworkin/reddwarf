@@ -27,6 +27,9 @@ public interface NodesMXBean {
     /** The name for uniquely identifying this MBean. */
     String NODES_MXBEAN_NAME = "com.sun.sgs:type=Nodes";
     
+    // Maybe add method to shut down node?  Need Rob's node shutdown
+    // work to tell the watchdog we need the node shut down.
+    
     /** 
      * Information about the nodes in the system.
      * @return information about the nodes in the system

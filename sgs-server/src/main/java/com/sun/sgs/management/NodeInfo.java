@@ -54,7 +54,7 @@ public class NodeInfo implements Serializable {
      * @param backup the backup node for this node
      * @param jmxPort the port for JMX remote connections
      */
-    @ConstructorProperties({"host", "port", "id", "live", "backup", "jmxPort" })
+    @ConstructorProperties({"host", "port", "id", "live", "backup", "JMXPort" })
     public NodeInfo(String host, int port, long id, boolean live, long backup, 
                     int jmxPort) 
     {

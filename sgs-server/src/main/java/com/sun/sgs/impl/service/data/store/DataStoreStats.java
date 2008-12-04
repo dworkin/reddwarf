@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store;
 
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.profile.AggregateProfileCounter;
 import com.sun.sgs.profile.AggregateProfileOperation;
@@ -90,8 +91,10 @@ class DataStoreStats implements DataStoreStatsMXBean {
      * @param collector the profile collector used to create profiling
      *     objects and register the MBean with JMX
      */
-    public DataStoreStats(ProfileCollector collector, String name) {
-        ProfileConsumer consumer = collector.getConsumer(name);
+    public DataStoreStats(ProfileCollector collector) {
+        ProfileConsumer consumer = 
+            collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX 
+                                  + "DataStore");
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         
@@ -117,6 +120,8 @@ class DataStoreStats implements DataStoreStatsMXBean {
             consumer.createOperation("getClassInfo", type, level);
 	nextObjectIdOp =
             consumer.createOperation("nextObjectIdOp", type, level);
+        
+        // Counters
 	readBytesCounter = consumer.createCounter("readBytes", type, level);
 	readObjectsCounter =
 	    consumer.createCounter("readObjects", type, level);
@@ -124,6 +129,8 @@ class DataStoreStats implements DataStoreStatsMXBean {
 	    consumer.createCounter("writtenBytes", type, level);
 	writtenObjectsCounter =
 	    consumer.createCounter("writtenObjects", type, level);
+        
+        // Samples
 	readBytesSample = 
             consumer.createSample("readBytes", type, level);
 	writtenBytesSample = 

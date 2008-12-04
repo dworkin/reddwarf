@@ -23,7 +23,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -499,14 +498,10 @@ public class NodeMappingServiceImpl
                        ", clientPort:" + clientPort + 
                        ", fullStack:" + fullStack + "]";
             
-            // create our profiling info
+            // create our profiling info and register our MBean
             ProfileCollector collector =
                 systemRegistry.getComponent(ProfileCollector.class);
-            serviceStats = new NodeMappingServiceStats(collector, 
-                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
-                "NodeMappingService");
-
-            // and register our MBean
+            serviceStats = new NodeMappingServiceStats(collector);
             try {
                 collector.registerMBean(serviceStats,
                     NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);

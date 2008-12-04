@@ -21,7 +21,11 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.management.ConfigMXBean;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * The configuration manager for this node.  This object is immutable
@@ -34,6 +38,7 @@ class ConfigManager implements ConfigMXBean {
     private final String appName;
     private final String appRoot;
     private final String appListener;
+    private final String hostName;
     private final int appPort;
     private final String serverHost;
     private final int jmxPort;
@@ -64,6 +69,13 @@ class ConfigManager implements ConfigMXBean {
         String jmx = props.getProperty("com.sun.management.jmxremote.port");
         jmxPort = (jmx == null) ? -1 : Integer.parseInt(jmx);
         txnTimeout = coord.getTransactionTimeout();
+        String name;
+        try {
+            name = InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException ex) {
+            name = "unknown";
+        }
+        hostName = name;
     }
 
     /** {@inheritDoc} */
@@ -86,6 +98,11 @@ class ConfigManager implements ConfigMXBean {
         return appListener;
     }
 
+    /** {@inheritDoc} */
+    public String getHostName() {
+        return hostName;
+    }
+    
     /** {@inheritDoc} */
     public int getAppPort() {
         return appPort;

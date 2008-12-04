@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.nodemap;
 
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.management.NodeMappingServiceMXBean;
 import com.sun.sgs.profile.AggregateProfileOperation;
 import com.sun.sgs.profile.ProfileCollector;
@@ -39,13 +40,15 @@ class NodeMappingServiceStats implements NodeMappingServiceMXBean {
     final ProfileOperation getNodeOp;
     final ProfileOperation setStatusOp;
     
-    NodeMappingServiceStats(ProfileCollector collector, String name) {
+    NodeMappingServiceStats(ProfileCollector collector) {
         ProfileConsumer consumer =
-            collector.getConsumer(name);
+            collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
+                                  "NodeMappingService");
 
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
-        // JANE these two coudl really be the same type, right?
+        // These two methods are never called in a transaction, no need to
+        // report them to tasks.
         addNodeMappingListenerOp = (AggregateProfileOperation)
             consumer.createOperation("addNodeMappingListener", 
                                        ProfileDataType.AGGREGATE, level);

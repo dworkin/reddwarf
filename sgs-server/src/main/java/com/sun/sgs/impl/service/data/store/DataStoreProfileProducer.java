@@ -80,9 +80,7 @@ public class DataStoreProfileProducer
 	this.dataStore = dataStore;
 	participant = (TransactionParticipant) dataStore;
 
-        stats = new DataStoreStats(collector,
-                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataStore");
-
+        stats = new DataStoreStats(collector);
         try {
             collector.registerMBean(stats,
                 DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
