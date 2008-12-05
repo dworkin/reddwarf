@@ -26,9 +26,16 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
+import com.sun.sgs.app.Task;
 
 /**
- *
+ * A scalable implementation of a simple integer counter.  This class
+ * supports multiple concurrent write operations with minimal contention.
+ * This includes calls to {@link #add(int)}, {@link #increment()}, and
+ * {@link #decrement()}.  However, any read operation, such as a call to
+ * {@link #get()}, made simultaneously with a write operation will always
+ * cause contention.  Therefore, this class is best suited for scenarios
+ * where frequent writes but infrequent reads are required.
  */
 public class ScalableCounter extends Number 
         implements Serializable, ManagedObjectRemoval {
@@ -46,16 +53,43 @@ public class ScalableCounter extends Number
      */
     private static final Random random = new Random();
     
+    /**
+     * Array of {@code InternalCounter} objects that when combined, 
+     * represent the actual value of this {@code ScalableCounter}.
+     */
     private final ManagedReference<InternalCounter>[] counters;
     
+    /**
+     * Creates a new {@code ScalableCounter} with an initial value of
+     * {@code 0} and the number of {@code InternalCounter}s set to
+     * {@value #DEFAULT_NUM_COUNTERS}.
+     */
     public ScalableCounter() {
         this(0, DEFAULT_NUM_COUNTERS);
     }
 
+    /**
+     * Creates a new {@code ScalableCounter} with a configurable initial value
+     * and the number of {@code InternalCounter}s set to
+     * {@value #DEFAULT_NUM_COUNTERS}.
+     * 
+     * @param initialValue the initial value of the {@code ScalableCounter}
+     */
     public ScalableCounter(int initialValue) {
         this(initialValue, DEFAULT_NUM_COUNTERS);
     }
     
+    /**
+     * Creates a new {@code ScalableCounter} with a configurable initial value
+     * and a configurable number of {@code InternalCounter}s.  Typically,
+     * a larger number of {@code InternalCounter} objects is desired when
+     * the ratio of writes to reads of the {@code ScalableCounter} is extremely
+     * high.
+     * 
+     * @param initialValue the initial value of the {@code ScalableCounter}
+     * @param numCounters the number of {@code InternalCounter} objects to use
+     *        to track the value of the counter
+     */
     public ScalableCounter(int initialValue, int numCounters) {
         if(numCounters < 1) {
             throw new IllegalArgumentException(
@@ -71,33 +105,40 @@ public class ScalableCounter extends Number
         }
     }
     
+    /**
+     * Adds the given value to this {@code ScalableCounter}.
+     * 
+     * @param value the value to add to the counter
+     */
     public void add(int value) {
         int counterIndex = random.nextInt(counters.length);
         counters[counterIndex].getForUpdate().add(value);
     }
     
+    /**
+     * Increments the value of this {@code ScalableCounter} by {@code 1}.
+     */
     public void increment() {
-        int counterIndex = random.nextInt(counters.length);
-        counters[counterIndex].getForUpdate().increment();
+        add(1);
     }
     
+    /**
+     * Decrements the value of this {@code ScalableCounter} by {@code 1}.
+     */
     public void decrement() {
-        int counterIndex = random.nextInt(counters.length);
-        counters[counterIndex].getForUpdate().decrement();
+        add(-1);
     }
-
-    @Override
-    public double doubleValue() {
-        return (double)intValue();
-    }
-
-    @Override
-    public float floatValue() {
-        return (float)intValue();
-    }
-
-    @Override
-    public int intValue() {
+    
+    /**
+     * Returns the value of this {@code ScalableCounter}.  This operation
+     * (and other read operations like it)
+     * should be used sparingly in the presence of multiple concurrent
+     * modification operations including calls to {@link #add(int)},
+     * {@link #increment()}, and {@link #decrement()}.
+     * 
+     * @return the value of this {@code ScalableCounter}
+     */
+    public int get() {
         int value = 0;
         for(ManagedReference<InternalCounter> c : counters) {
             value += c.get().getValue();
@@ -106,36 +147,115 @@ public class ScalableCounter extends Number
         return value;
     }
 
+    /**
+     * Returns the value of this {@code ScalableCounter} as a {@code double}.
+     * 
+     * @return the value of this {@code ScalableCounter} as a {@code double}.
+     */
     @Override
-    public long longValue() {
-        return (long)intValue();
+    public double doubleValue() {
+        return (double)get();
     }
 
+    /**
+     * Returns the value of this {@code ScalableCounter} as a {@code float}.
+     * 
+     * @return the value of this {@code ScalableCounter} as a {@code float}.
+     */
+    @Override
+    public float floatValue() {
+        return (float)get();
+    }
+
+    /**
+     * Returns the value of this {@code ScalableCounter} as a {@code int}.
+     * 
+     * @return the value of this {@code ScalableCounter} as a {@code int}.
+     */
+    @Override
+    public int intValue() {
+        return get();
+    }
+
+    /**
+     * Returns the value of this {@code ScalableCounter} as a {@code long}.
+     * 
+     * @return the value of this {@code ScalableCounter} as a {@code long}.
+     */
+    @Override
+    public long longValue() {
+        return (long)get();
+    }
+
+    /**
+     * Schedules this {@code ScalableCounter}'s array of {@code InternalCounter}
+     * objects for asynchronous removal.
+     */
     @Override
     public void removingObject() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        AppContext.getTaskManager().scheduleTask(
+                new RemoveInternalCountersTask());
     }
     
-    
-    private class InternalCounter implements Serializable, ManagedObject {
+    /**
+     * Helper {@code Task} to asyncronously remove the {@code InternalCounter}
+     * objects associated with this {@code ScalableCounter}.
+     */
+    private class RemoveInternalCountersTask
+            implements Task, Serializable {
+        
+        @Override
+        public void run() throws Exception {
+            for (int i = 0; i < ScalableCounter.this.counters.length; i++) {
+                AppContext.getDataManager().removeObject(counters[i].get());
+            }
+        }
+        
+    }
+
+    /**
+     * Represents a simple integer counter.
+     */
+    private static class InternalCounter 
+            implements Serializable, ManagedObject {
+        
+        /**
+         * The value of the counter
+         */
         private int counter;
         
+        /**
+         * Creates an {@code InternalCounter} with an initial 
+         * value of {@code 0}.
+         */
         public InternalCounter() {
             this(0);
         }
+        
+        /**
+         * Creates an {@code InternalCounter} with a configurable initial
+         * value.
+         * 
+         * @param initialValue the initial value of the {@code InternalCounter}
+         */
         public InternalCounter(int initialValue) {
             this.counter = initialValue;
         }
         
+        /**
+         * Adds an integer value to this {@code InternalCounter}.
+         * 
+         * @param value the value to add to the counter
+         */
         public void add(int value) {
             this.counter += value;
         }
-        public void increment() {
-            this.counter++;
-        }
-        public void decrement() {
-            this.counter--;
-        }
+        
+        /**
+         * Retrieves the value of this counter.
+         * 
+         * @return the value of the counter
+         */
         public int getValue() {
             return counter;
         }
