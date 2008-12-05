@@ -19,6 +19,8 @@
 
 package com.sun.sgs.protocol;
 
+import com.sun.sgs.protocol.session.ProtocolConnectionListener;
+import com.sun.sgs.protocol.session.Protocol;
 import java.util.Properties;
 
 /**

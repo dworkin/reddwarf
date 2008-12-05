@@ -38,7 +38,7 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.session.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import java.io.IOException;

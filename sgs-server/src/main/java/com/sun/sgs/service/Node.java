@@ -19,7 +19,7 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.session.ProtocolDescriptor;
 
 /**
  * An abstraction for node information, used in conjunction

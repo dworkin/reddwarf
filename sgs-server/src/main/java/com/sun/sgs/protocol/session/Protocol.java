@@ -17,12 +17,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.protocol;
-
-import java.util.concurrent.Future;
+package com.sun.sgs.protocol.session;
 
 /**
- * A future for the completion of protocol handler operations.
+ * A protocol.
  */
-public interface CompletionFuture extends Future<Void> {
+public interface Protocol {
+
+    void ready() throws Exception;
+    
+    /**
+     * Returns the descriptor for this protocol. Multiple calls to this
+     * method may return the same object.
+     * 
+     * @return the descriptor for this protocol
+     */
+    ProtocolDescriptor getDescriptor();
+    
+    /**
+     * Shutdown the protocol. The actions of this method are implementation
+     * dependent, but typically involve closing open network connections,
+     * releasing system resources, etc.. All shutdown activity is
+     * synchronous with this call.
+     */
+    void shutdown();
 }

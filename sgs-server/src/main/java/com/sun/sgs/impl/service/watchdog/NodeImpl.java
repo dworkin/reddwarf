@@ -23,7 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
-import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.session.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.Serializable;

@@ -20,7 +20,7 @@
 package com.sun.sgs.transport;
 
 /**
- * I/O transport. A tranport object handles incoming connection request for
+ * I/O transport. A transport object handles incoming connection request for
  * a specific transport type.
  * 
  * @see ConnectionHandler
@@ -36,18 +36,19 @@ public interface Transport {
      */
     TransportDescriptor getDescriptor();
     
-//    /**
-//     * Start the transport. If {@code start} has been call, subsequent
-//     * calls will have no affect. If {@link #shutdown} has been called this
-//     * method will throw an {@code IllegalStateException}.
-//     */
-//    void start();
+    /**
+     * Start the transport. If {@code start} has been call, subsequent
+     * calls will have no affect. If {@link #shutdown} has been called this
+     * method will throw an {@code IllegalStateException}.
+     */
+    void start();
     
     /**
      * Shutdown the transport. The actions of this method are implementation
      * dependent, but typically involve closing open network connections,
      * releasing system resources, etc.. All shutdown activity is
-     * synchronous with this call.
+     * synchronous with this call. Once this method is called, subsequent
+     * calls to {@code shutdown} will have no affect.
      */
     void shutdown();
 }

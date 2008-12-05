@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
-import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.session.ProtocolDescriptor;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 

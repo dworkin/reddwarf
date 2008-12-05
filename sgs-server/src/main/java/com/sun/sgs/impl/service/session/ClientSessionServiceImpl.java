@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
@@ -41,13 +40,12 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.ProtocolConnection;
-import com.sun.sgs.protocol.ProtocolHandler;
-import com.sun.sgs.protocol.ProtocolDescriptor;
-import com.sun.sgs.protocol.Protocol;
-import com.sun.sgs.protocol.ProtocolConnectionListener;
+import com.sun.sgs.protocol.session.ProtocolDescriptor;
+import com.sun.sgs.protocol.session.Protocol;
+import com.sun.sgs.protocol.session.ProtocolConnectionListener;
 import com.sun.sgs.protocol.ProtocolFactory;
 import com.sun.sgs.protocol.session.SessionProtocolConnection;
+import com.sun.sgs.protocol.session.SessionProtocolHandler;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -392,6 +390,30 @@ public final class ClientSessionServiceImpl
 		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
 	    monitorDisconnectingSessionsTaskHandle.start();
 
+            // Temporary until we resolve the configuration issue
+            int i = 0;
+            for (String protocolClassName : protocolList.split(":")) {
+                protocols.add(
+                        protocolFactory.newProtocol(protocolClassName,
+                                                    wrappedProps.getEmbeddedProperties(PROTOCOL_PROPERTIES_BASE + i++),
+                                                    this));
+            }
+            final ProtocolDescriptor[] descriptors =
+                                    new ProtocolDescriptor[protocols.size()];
+            i = 0;
+            for (Protocol protocol : protocols) {
+                descriptors[i++] = protocol.getDescriptor();
+            }
+
+            transactionScheduler.runTask(
+                new AbstractKernelRunnable("UpdateNode") {
+		    public void run() {
+                        Node node =
+                                watchdogService.getNodeForUpdate(localNodeId);
+                        assert node != null;
+                        node.setClientListener(descriptors);
+                    } },
+                    taskOwner);
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -420,27 +442,9 @@ public final class ClientSessionServiceImpl
     public void doReady() {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
         try {
-            int i = 0;
-            for (String protocolClassName : protocolList.split(":")) {
-                protocols.add(
-                        protocolFactory.newProtocol(protocolClassName,
-                                                    wrappedProps.getEmbeddedProperties(PROTOCOL_PROPERTIES_BASE + i++),
-                                                    this));
+            for (Protocol protocol : protocols) {
+                protocol.ready();
             }
-            final ProtocolDescriptor[] descriptors =
-                                    new ProtocolDescriptor[protocols.size()];
-            i = 0;
-            for (Protocol protocol : protocols)
-                descriptors[i++] = protocol.getDescriptor();
-
-            transactionScheduler.runTask(
-                new AbstractKernelRunnable("UpdateNode") {
-		    public void run() {
-                        Node node = watchdogService.getNodeForUpdate(localNodeId);
-                        assert node != null;
-                        node.setClientListener(descriptors);
-                    } },
-                    taskOwner);
         } catch (Exception ex) {
             throw new RuntimeException(ex.getMessage(), ex);
         }
@@ -611,8 +615,9 @@ public final class ClientSessionServiceImpl
     
     /** {@inheritDoc} */
     @Override
-    public ProtocolHandler newConnection(ProtocolConnection connection,
-                                         ProtocolDescriptor descriptor)
+    public SessionProtocolHandler newConnection(
+                                        SessionProtocolConnection connection,
+                                        ProtocolDescriptor descriptor)
         throws Exception
     {
         assert connection instanceof SessionProtocolConnection;

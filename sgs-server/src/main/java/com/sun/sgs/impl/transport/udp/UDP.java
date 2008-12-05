@@ -111,7 +111,7 @@ public class UDP implements Transport {
     private final AsynchronousDatagramChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
-    volatile IoFuture<?, ?> acceptFuture;
+    volatile IoFuture<?, ?> acceptFuture = null;
 
     private final ConnectionHandler handler;
     
@@ -156,7 +156,8 @@ public class UDP implements Transport {
                 provider.openAsynchronousChannelGroup(
                     Executors.newCachedThreadPool());
             acceptor =
-                provider.openAsynchronousDatagramChannel(null, asyncChannelGroup);
+                    provider.openAsynchronousDatagramChannel(null,
+                                                             asyncChannelGroup);
 	    try {
                 acceptor.bind(listenAddress);
 		if (logger.isLoggable(Level.CONFIG)) {
@@ -183,32 +184,38 @@ public class UDP implements Transport {
 	    shutdown();
 	    throw e;
 	}
-        receive(new AcceptorListener());
-        try {
-            if (logger.isLoggable(Level.CONFIG)) {
-                logger.log(
-                    Level.CONFIG, "listening on {0}",
-                    acceptor.getLocalAddress());
-            }
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe.getMessage(), ioe);
-        }
     }
 
-    private void receive(CompletionHandler<SocketAddress, ByteBuffer> listener) {
-        ByteBuffer buffer = ByteBuffer.allocateDirect(512);
-        acceptor.receive(buffer, buffer, listener);
+    /* -- implement Transport -- */
+    
+    /** {@inheritDoc} */
+    @Override
+    public TransportDescriptor getDescriptor() {
+        return descriptor;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public synchronized void start() {
+        if (!acceptor.isOpen())
+            throw new IllegalStateException("transport has been shutdown");
+        
+        if (acceptFuture == null) {
+            receive(new AcceptorListener());
+            logger.log(Level.FINEST, "transport start");
+        }
     }
     
     /** {@inheritDoc} */
-    public void shutdown() {
+    @Override
+    public synchronized void shutdown() {
 	final IoFuture<?, ?> future = acceptFuture;
 	acceptFuture = null;
 	if (future != null) {
 	    future.cancel(true);
 	}
 
-	if (acceptor != null) {
+	if (acceptor.isOpen()) {
 	    try {
 		acceptor.close();
             } catch (IOException e) {
@@ -217,7 +224,7 @@ public class UDP implements Transport {
             }
 	}
 
-	if (asyncChannelGroup != null) {
+	if (!asyncChannelGroup.isShutdown()) {
 	    asyncChannelGroup.shutdown();
 	    boolean groupShutdownCompleted = false;
 	    try {
@@ -238,10 +245,16 @@ public class UDP implements Transport {
 		    // swallow exception
 		}
 	    }
+            logger.log(Level.FINEST, "acceptor shutdown");
 	}
-	logger.log(Level.FINEST, "acceptor shutdown");
     }
 
+    private void receive(CompletionHandler<SocketAddress, ByteBuffer> listener)
+    {
+        ByteBuffer buffer = ByteBuffer.allocateDirect(512);
+        acceptFuture = acceptor.receive(buffer, buffer, listener);
+    }
+    
     /** A completion handler for accepting initial datagrams. */
     private class AcceptorListener
         implements CompletionHandler<SocketAddress, ByteBuffer>
@@ -265,7 +278,8 @@ public class UDP implements Transport {
 //                    }
                     
                     AsynchronousDatagramChannel newChannel =
-                            AsynchronousDatagramChannel.open(null, asyncChannelGroup);
+                            AsynchronousDatagramChannel.open(null,
+                                                             asyncChannelGroup);
                     newChannel.bind(null);
                     newChannel.connect(newAddress,
                                 new ConnectListener(newChannel, firstMessage));
@@ -399,7 +413,8 @@ public class UDP implements Transport {
         }
     }
     
-    private static class FirstMessageFuture<Integer> implements Future<Integer> {
+    private static class FirstMessageFuture<Integer> implements Future<Integer>
+    {
 
         private final Integer size;
 
@@ -424,14 +439,9 @@ public class UDP implements Transport {
         }
 
         public Integer get(long arg0, TimeUnit arg1)
-                throws InterruptedException, ExecutionException, TimeoutException
+            throws InterruptedException, ExecutionException, TimeoutException
         {
             return size;
         }
-    }
-
-    @Override
-    public TransportDescriptor getDescriptor() {
-        return descriptor;
     }
 }

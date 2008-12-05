@@ -28,11 +28,9 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
-import com.sun.sgs.protocol.ProtocolHandler;
-import com.sun.sgs.protocol.Protocol;
-import com.sun.sgs.protocol.ProtocolConnectionListener;
-import com.sun.sgs.protocol.ProtocolDescriptor;
-import com.sun.sgs.protocol.session.SessionProtocolHandler;
+import com.sun.sgs.protocol.session.Protocol;
+import com.sun.sgs.protocol.session.ProtocolConnectionListener;
+import com.sun.sgs.protocol.session.ProtocolDescriptor;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
@@ -188,32 +186,13 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
                 throw new RuntimeException(e);
 	}
     }
-
-    /* -- implement ConnectionHandler -- */
-
+  
+    /* -- implement Protocol -- */
+    
     /** {@inheritDoc} */
     @Override
-    public void newConnection(AsynchronousByteChannel byteChannel,
-                              TransportDescriptor descriptor)
-        throws Exception
-    {
-        SimpleSgsProtocolConnection msgChannel =
-                new SimpleSgsProtocolConnection(byteChannel,
-                                                    this,
-                                                    readBufferSize);
-        ProtocolHandler msgHandler =
-                    connectionHandler.newConnection(msgChannel, protocolDesc);
-        assert msgHandler instanceof SessionProtocolHandler;
-        msgChannel.setHandler((SessionProtocolHandler)msgHandler);
-    }
-
-    /**
-     * Schedules a non-durable, non-transactional {@code task}.
-     *
-     * @param	task a non-durable, non-transactional task
-     */
-    void scheduleNonTransactionalTask(KernelRunnable task) {
-        taskScheduler.scheduleTask(task, taskOwner);
+    public void ready() throws Exception {
+        transport.start();
     }
 
     /** {@inheritDoc} */
@@ -226,5 +205,30 @@ public class SimpleSgsProtocolImpl implements Protocol, ConnectionHandler {
     @Override
     public void shutdown() {
         transport.shutdown();
+    }
+
+    /* -- implement ConnectionHandler -- */
+
+    /** {@inheritDoc} */
+    @Override
+    public void newConnection(AsynchronousByteChannel byteChannel,
+                              TransportDescriptor descriptor)
+        throws Exception
+    {
+        SimpleSgsProtocolConnection msgChannel =
+                    new SimpleSgsProtocolConnection(byteChannel,
+                                                    this,
+                                                    readBufferSize);
+        msgChannel.setHandler(
+                    connectionHandler.newConnection(msgChannel, protocolDesc));
+    }
+
+    /**
+     * Schedules a non-durable, non-transactional {@code task}.
+     *
+     * @param	task a non-durable, non-transactional task
+     */
+    void scheduleNonTransactionalTask(KernelRunnable task) {
+        taskScheduler.scheduleTask(task, taskOwner);
     }
 }

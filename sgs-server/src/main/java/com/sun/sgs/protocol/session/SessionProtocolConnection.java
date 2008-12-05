@@ -20,15 +20,15 @@
 package com.sun.sgs.protocol.session;
 
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.protocol.ProtocolConnection;
 import com.sun.sgs.service.Node;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 
 /**
  * A channel for sending protocol messages to a client.
  */
-public interface SessionProtocolConnection extends ProtocolConnection {
+public interface SessionProtocolConnection extends Channel {
 
     /**
      * Notifies the associated client that it should redirect its login.

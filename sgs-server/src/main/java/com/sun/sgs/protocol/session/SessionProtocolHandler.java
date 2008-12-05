@@ -20,8 +20,6 @@
 package com.sun.sgs.protocol.session;
 
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.protocol.CompletionFuture;
-import com.sun.sgs.protocol.ProtocolHandler;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
@@ -39,7 +37,7 @@ import java.nio.ByteBuffer;
  * <p>TBD: should reconnection be handled a this layer or transparently by
  * the transport layer?
  */
-public interface SessionProtocolHandler extends ProtocolHandler {
+public interface SessionProtocolHandler {
 
     /**
      * Processes a login request with the specified
@@ -100,7 +98,7 @@ public interface SessionProtocolHandler extends ProtocolHandler {
      * that a non-graceful disconnect from the client has occurred.
      *
      * <p>When this handler has completed processing the disconnection,
-     * it usess the returned future to notify the caller that the request
+     * it uses the returned future to notify the caller that the request
      * has been processed.
      *
      * @return	future a future to be notified when the request has been

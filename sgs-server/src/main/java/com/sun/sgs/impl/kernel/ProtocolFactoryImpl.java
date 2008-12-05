@@ -21,8 +21,8 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.protocol.Protocol;
-import com.sun.sgs.protocol.ProtocolConnectionListener;
+import com.sun.sgs.protocol.session.Protocol;
+import com.sun.sgs.protocol.session.ProtocolConnectionListener;
 import com.sun.sgs.protocol.ProtocolFactory;
 import com.sun.sgs.service.TransactionProxy;
 import java.lang.reflect.Constructor;

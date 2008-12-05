@@ -17,7 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.protocol;
+package com.sun.sgs.protocol.session;
+
+
 
 /**
  * Interface implemented by objects implementing a protocol connection handler.
@@ -39,7 +41,7 @@ public interface ProtocolConnectionListener {
      * @return handler to receive protocol messages
      * @throws Exception if the connection is to be refused
      */
-    ProtocolHandler newConnection(ProtocolConnection connection,
-                                  ProtocolDescriptor descriptor)
+    SessionProtocolHandler newConnection(SessionProtocolConnection connection,
+                                         ProtocolDescriptor descriptor)
         throws Exception;
 }

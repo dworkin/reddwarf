@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.protocol;
+package com.sun.sgs.protocol.session;
 
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;

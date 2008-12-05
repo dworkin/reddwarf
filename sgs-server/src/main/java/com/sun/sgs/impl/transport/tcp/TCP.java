@@ -125,19 +125,19 @@ public class TCP implements Transport {
     /** The default acceptor backlog (&lt;= 0 means default). */
     private static final int DEFAULT_ACCEPTOR_BACKLOG = 0;
 
-    private int acceptorBacklog;
+    private final int acceptorBacklog;
     
     /** The async channel group for this service. */
-    private AsynchronousChannelGroup asyncChannelGroup;
+    private final AsynchronousChannelGroup asyncChannelGroup;
 
     /** The acceptor for listening for new connections. */
-    private AsynchronousServerSocketChannel acceptor;
+    private final AsynchronousServerSocketChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
-    volatile IoFuture<?, ?> acceptFuture;
+    volatile IoFuture<?, ?> acceptFuture = null;
     
     /** The connection handler. */
-    private ConnectionHandler handler;
+    private final ConnectionHandler handler;
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -200,34 +200,43 @@ public class TCP implements Transport {
 		    acceptor.close();
                 } catch (IOException ioe) {
                     logger.logThrow(Level.WARNING, ioe,
-                        "problem closing acceptor");
+                                    "problem closing acceptor");
                 }
 		throw e;
 	    }
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
-		logger.logThrow(
-		    Level.CONFIG, e,
-		    "Failed to create TCP transport");
+		logger.logThrow(Level.CONFIG, e,
+                                "Failed to create TCP transport");
 	    }
 	    shutdown();
 	    throw new RuntimeException(e);
 	}
-        acceptFuture = acceptor.accept(new AcceptorListener());
-        try {
-            if (logger.isLoggable(Level.CONFIG)) {
-                logger.log(
-                    Level.CONFIG, "listening on {0}",
-                    acceptor.getLocalAddress());
-            }
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe.getMessage(), ioe);
-        }
     }
   
+    /* -- implement Transport -- */
+    
     /** {@inheritDoc} */
     @Override
-    public void shutdown() {
+    public synchronized void start() {
+        if (!acceptor.isOpen())
+            throw new IllegalStateException("transport has been shutdown");
+        
+        if (acceptFuture == null) {
+            acceptFuture = acceptor.accept(new AcceptorListener());
+            logger.log(Level.FINEST, "transport start");
+        }
+    }
+            
+    /** {@inheritDoc} */
+    @Override
+    public TransportDescriptor getDescriptor() {
+        return descriptor;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public synchronized void shutdown() {
 	final IoFuture<?, ?> future = acceptFuture;
 	acceptFuture = null;
         
@@ -235,7 +244,7 @@ public class TCP implements Transport {
 	    future.cancel(true);
 	}
 
-	if (acceptor != null) {
+	if (acceptor.isOpen()) {
 	    try {
 		acceptor.close();
             } catch (IOException e) {
@@ -244,7 +253,7 @@ public class TCP implements Transport {
             }
 	}
 
-	if (asyncChannelGroup != null) {
+	if (!asyncChannelGroup.isShutdown()) {
 	    asyncChannelGroup.shutdown();
 	    boolean groupShutdownCompleted = false;
 	    try {
@@ -265,8 +274,8 @@ public class TCP implements Transport {
 		    // swallow exception
 		}
 	    }
+            logger.log(Level.FINEST, "transport shutdown");
 	}
-	logger.log(Level.FINEST, "acceptor shutdown");
     }
   
     /** A completion handler for accepting connections. */
@@ -307,10 +316,5 @@ public class TCP implements Transport {
                 // TBD: take other actions, such as restarting acceptor?
             }
 	}
-    }
-    
-    @Override
-    public TransportDescriptor getDescriptor() {
-        return descriptor;
     }
 }
