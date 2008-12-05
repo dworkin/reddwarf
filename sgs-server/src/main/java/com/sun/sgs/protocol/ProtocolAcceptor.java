@@ -20,6 +20,7 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.service.Service;
+import java.io.IOException;
 
 /**
  * A service for accepting incoming connections for a given protocol. A
@@ -30,29 +31,30 @@ import com.sun.sgs.service.Service;
  * <li>{@link java.util.Properties}</li>
  * <li>{@link com.sun.sgs.kernel.ComponentRegistry}</li>
  * <li>{@link com.sun.sgs.service.TransactionProxy}</li>
- * <li>{@link com.sun.sgs.protocol.ProtocolListener}</li>
  * </ul>
- *
- * When an incoming connection with a given identity is established with
- * this protocol acceptor, the protocol acceptor should invoke the provided
- * listener's {@link ProtocolListener#newConnection
- * ProtocolListener.newConnection} method passing the protocol connection
- * and associated identity.
  */
-public interface ProtocolAcceptor extends Service {
+public interface ProtocolAcceptor {
 
     /**
-     * {@inheritDoc}
+     * Starts accepting connections, and notifies the specified {@code
+     * listener} of new connections.
      *
-     * This method begins accepting connections.
+     * <p>When an incoming connection with a given identity is established
+     * with this protocol acceptor, the protocol acceptor should invoke the
+     * provided listener's {@link ProtocolListener#newConnection
+     * newConnection} method with the identity and the {@link
+     * SessionPrototool protocol connection}.
+     *
+     * @param	listener a protocol listener
+     * @throws	IOException if an IO problem occurs
      */
-    void ready() throws Exception;
+    void accept(ProtocolListener listener) throws IOException;
 
     /**
-     * {@inheritDoc}
+     * Shuts down any pending accept operation as well as the acceptor
+     * itself.
      *
-     * This method shuts down any pending accept operation as well as the
-     * acceptor itself.
+     * @throws	IOException if an IO problem occurs
      */
-    boolean shutdown();
+    void close() throws IOException;
 }

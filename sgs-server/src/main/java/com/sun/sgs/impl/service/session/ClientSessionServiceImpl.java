@@ -354,12 +354,11 @@ public final class ClientSessionServiceImpl
 	    Constructor<?> acceptorConstr =
 		acceptorClass.getConstructor(
 		    Properties.class, ComponentRegistry.class,
-		    TransactionProxy.class, ProtocolListener.class);
+		    TransactionProxy.class);
 	    try {
 		protocolAcceptor = (ProtocolAcceptor)
 		    acceptorConstr.newInstance(
- 		    	properties, systemRegistry, txnProxy,
-			protocolListener);
+			properties, systemRegistry, txnProxy);
 	    } catch (InvocationTargetException ite) {
 		throw (Exception) ite.getCause();
 	    }
@@ -399,13 +398,25 @@ public final class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public void doReady() throws Exception {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
-	protocolAcceptor.ready();
+	try {
+	    protocolAcceptor.accept(protocolListener);
+	} catch (IOException e) {
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to start accepting connections");
+	    }
+	    throw e;
+	}
     }
 
     /** {@inheritDoc} */
     public void doShutdown() {
 	if (protocolAcceptor != null) {
-	    protocolAcceptor.shutdown();
+	    try {
+		protocolAcceptor.close();
+	    } catch (IOException ignore) {
+	    }
 	}
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();

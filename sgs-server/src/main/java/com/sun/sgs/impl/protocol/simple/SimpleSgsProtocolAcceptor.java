@@ -98,7 +98,7 @@ public class SimpleSgsProtocolAcceptor
     private final int readBufferSize;
 
     /** The protocol listener. */
-    private final ProtocolListener protocolListener;
+    private volatile ProtocolListener protocolListener;
 
     /** The async channel group for this service. */
     private final AsynchronousChannelGroup asyncChannelGroup;
@@ -114,19 +114,17 @@ public class SimpleSgsProtocolAcceptor
     
     /**
      * Constructs an instance with the specified {@code properties},
-     * {@code systemRegistry}, {@code txnProxy}, and {@code protocolListener}.
+     * {@code systemRegistry}, and {@code txnProxy}.
      *
      * @param	properties the configuration properties
      * @param	systemRegistry the system registry
      * @param	txnProxy a transaction proxy
-     * @param	protocolListener a protocol listener
      *
      * @throws	Exception if a problem occurs
      */
     public SimpleSgsProtocolAcceptor(Properties properties,
 				     ComponentRegistry systemRegistry,
-				     TransactionProxy txnProxy,
-				     ProtocolListener protocolListener)
+				     TransactionProxy txnProxy)
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
@@ -135,10 +133,6 @@ public class SimpleSgsProtocolAcceptor
 		   "Creating SimpleSgsProtcolAcceptor properties:{0}",
 		   properties);
 
-	if (protocolListener == null) {
-	    throw new NullPointerException("null protocolListener");
-	}
-	this.protocolListener = protocolListener;
 	
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
@@ -212,7 +206,6 @@ public class SimpleSgsProtocolAcceptor
     
     /** {@inheritDoc} */
     public void doReady() {
-	accept();
     }
     
     /** {@inheritDoc} */
@@ -255,6 +248,22 @@ public class SimpleSgsProtocolAcceptor
 	    }
 	}
 	logger.log(Level.FINEST, "acceptor shutdown");
+    }
+
+    /* -- Implement ProtocolAcceptor -- */
+
+    /** {@inheritDoc} */
+    public void accept(ProtocolListener protocolListener) {
+	if (protocolListener == null) {
+	    throw new NullPointerException("null protocolListener");
+	}
+	this.protocolListener = protocolListener;
+	accept();
+    }
+
+    /** {@inheritDoc} */
+    public void close() {
+	shutdown();
     }
 
     /* -- Public methods -- */
