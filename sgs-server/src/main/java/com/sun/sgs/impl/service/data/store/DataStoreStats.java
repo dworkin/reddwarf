@@ -143,12 +143,12 @@ class DataStoreStats implements DataStoreStatsMXBean {
     }
 
     /** {@inheritDoc} */
-    public long getClassIdCalls() {
+    public long getGetClassIdCalls() {
         return ((AggregateProfileOperation) getClassIdOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getClassInfoCalls() {
+    public long getGetClassInfoCalls() {
         return ((AggregateProfileOperation) getClassInfoOp).getCount();
     }
 
@@ -168,12 +168,12 @@ class DataStoreStats implements DataStoreStatsMXBean {
     }
 
     /** {@inheritDoc} */
-    public long getObjectCalls() {
+    public long getGetObjectCalls() {
         return ((AggregateProfileOperation) getObjectOp).getCount();
     }
 
     /** {@inheritDoc} */
-    public long getObjectForUpdateCalls() {
+    public long getGetObjectForUpdateCalls() {
         return ((AggregateProfileOperation) getObjectForUpdateOp).getCount();
     }
 

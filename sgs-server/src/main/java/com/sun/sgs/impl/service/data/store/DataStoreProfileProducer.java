@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.profile.ProfileCollector;

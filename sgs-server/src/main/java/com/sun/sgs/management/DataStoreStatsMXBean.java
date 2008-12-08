@@ -63,7 +63,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getClassId} has been called
      */
-    long getClassIdCalls();
+    long getGetClassIdCalls();
     
     /**
      * Returns the number of times
@@ -72,7 +72,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getClassInfo} has been called
      */
-    long getClassInfoCalls();
+    long getGetClassInfoCalls();
     
     /**
      * Returns the number of times
@@ -81,7 +81,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getObject} has been called
      */
-    long getObjectCalls();
+    long getGetObjectCalls();
     
     /**
      * Returns the number of times
@@ -90,7 +90,7 @@ public interface DataStoreStatsMXBean
      * 
      * @return the number of times {@code getObject} has been called
      */
-    long getObjectForUpdateCalls();
+    long getGetObjectForUpdateCalls();
     
     /**
      * Returns the number of times

@@ -19,18 +19,35 @@
 
 package com.sun.sgs.test.impl.profile;
 
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.management.ChannelServiceMXBean;
+import com.sun.sgs.management.ClientSessionServiceMXBean;
 import com.sun.sgs.management.ConfigMXBean;
 import com.sun.sgs.management.DataServiceMXBean;
+import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.management.NodeInfo;
+import com.sun.sgs.management.NodeMappingServiceMXBean;
 import com.sun.sgs.management.NodesMXBean;
+import com.sun.sgs.management.TaskServiceMXBean;
 import com.sun.sgs.management.WatchdogServiceMXBean;
 import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import com.sun.sgs.profile.ProfileConsumer;
+import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.lang.management.ManagementFactory;
+import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Properties;
 import javax.management.JMX;
 import javax.management.MBeanServer;
@@ -49,6 +66,7 @@ import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for management beans.
@@ -178,6 +196,16 @@ public class TestMBeans {
         
         assertEquals(1, bean.getNodes().length);
         assertEquals(1, nodes.length);
+        
+        // add a couple more nodes
+        addNodes(null, 2);
+        nodes = proxy.getNodes();
+        assertEquals(3, nodes.length);
+        
+        for (NodeInfo n : nodes) {
+            System.out.println("found node: " + n);
+            assertTrue(n.isLive());
+        }
     }
     
     @Test
@@ -238,7 +266,105 @@ public class TestMBeans {
     }
     
     @Test
+    public void testProfileControllerMXBean() {
+        fail("not yet implemented");
+    }
+    
+    
+    @Test
+    public void testDataStoreStatsMXBean() throws Exception {
+        // Turn on profiling for the store
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataStore");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
+        ObjectName name = 
+            new ObjectName(DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
+        
+        // Ensure the object was registered at startup
+        DataStoreStatsMXBean bean = (DataStoreStatsMXBean) 
+            profileCollector.getRegisteredMBean(
+                          DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
+        assertNotNull(bean);
+        
+        // Get individual fields, operations
+        long createObject = (Long) mbsc.getAttribute(name, "CreateObjectCalls");
+        long getBinding = (Long) mbsc.getAttribute(name, "GetBindingCalls");
+        long getClassId = (Long) mbsc.getAttribute(name, "GetClassIdCalls");
+        long getClassInfo = (Long) mbsc.getAttribute(name, "GetClassInfoCalls");
+        long getObject = (Long) mbsc.getAttribute(name, "GetObjectCalls");
+        long getObjectForUpdateCalls = 
+                (Long) mbsc.getAttribute(name, "GetObjectForUpdateCalls");
+        long markForUpdate = 
+                (Long) mbsc.getAttribute(name, "MarkForUpdateCalls");
+        long nextBoundName = 
+                (Long) mbsc.getAttribute(name, "NextBoundNameCalls");
+        long nextObjectId = (Long) mbsc.getAttribute(name, "NextObjectIdCalls");
+        long removeBinding = 
+                (Long) mbsc.getAttribute(name, "RemoveBindingCalls");
+        long removeObject = (Long) mbsc.getAttribute(name, "RemoveObjectCalls");
+        long setBinding = (Long) mbsc.getAttribute(name, "SetBindingCalls");
+        long setObject = (Long) mbsc.getAttribute(name, "SetObjectCalls");
+        long setObjects = (Long) mbsc.getAttribute(name, "SetObjectsCalls");
+        
+        // samples and counters
+        double avgRead = (Double) mbsc.getAttribute(name, "AvgReadBytesSample");
+        long minRead = (Long) mbsc.getAttribute(name, "MinReadBytesSample");
+        long maxRead = (Long) mbsc.getAttribute(name, "MaxReadBytesSample");
+        long readBytes = (Long) mbsc.getAttribute(name, "ReadBytesCount");
+        long readObjs = (Long) mbsc.getAttribute(name, "ReadObjectsCount");
+        
+        double avgWritten = 
+                (Double)mbsc.getAttribute(name, "AvgWrittenBytesSample");
+        long minWritten = 
+                (Long) mbsc.getAttribute(name, "MinWrittenBytesSample");
+        long maxWritten = 
+                (Long) mbsc.getAttribute(name, "MaxWrittenBytesSample");
+        long writtenBytes = 
+                (Long) mbsc.getAttribute(name, "WrittenBytesCount");
+        long writtenObjs = 
+                (Long) mbsc.getAttribute(name, "WrittenObjectsCount");
+        
+        // Create the proxy for the object
+        DataStoreStatsMXBean proxy = (DataStoreStatsMXBean)
+            JMX.newMXBeanProxy(mbsc, name, DataStoreStatsMXBean.class);
+        assertTrue(createObject <= proxy.getCreateObjectCalls());
+        assertTrue(getBinding <= proxy.getGetBindingCalls());
+        assertTrue(getClassId <= proxy.getGetClassIdCalls());
+        assertTrue(getClassInfo <= proxy.getGetClassInfoCalls());
+        assertTrue(getObject <= proxy.getGetObjectCalls());
+        assertTrue(getObjectForUpdateCalls <= proxy.getGetObjectForUpdateCalls());
+        assertTrue(markForUpdate <= proxy.getMarkForUpdateCalls());
+        assertTrue(nextBoundName <= proxy.getNextBoundNameCalls());
+        assertTrue(nextObjectId <= proxy.getNextObjectIdCalls());
+        assertTrue(removeBinding <= proxy.getRemoveBindingCalls());
+        assertTrue(removeObject <= proxy.getRemoveObjectCalls());
+        assertTrue(setBinding <= proxy.getSetBindingCalls());
+        assertTrue(setObject <= proxy.getSetObjectCalls());
+        assertTrue(setObjects <= proxy.getSetObjectsCalls());
+
+        // Test one of the APIs by calling through the data service
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+                    ManagedObject dummy = new DummyManagedObject();
+                    serverNode.getDataService().setBinding("dummy", dummy);
+		}}, taskOwner);
+        // Should certainly be greater number, not greater or equal
+        assertTrue(createObject < proxy.getCreateObjectCalls());
+        assertTrue(writtenBytes < proxy.getWrittenBytesCount());
+        assertTrue(writtenObjs < proxy.getWrittenObjectsCount());
+    }
+    
+    
+    @Test
     public void testDataServiceMXBean() throws Exception {
+        // Turn on profiling for the service
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataService");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
         ObjectName name = 
             new ObjectName(DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME);
         
@@ -308,10 +434,26 @@ public class TestMBeans {
         assertTrue(removeServiceBinding <= bean.getRemoveServiceBindingCalls());
         assertTrue(setBinding <= bean.getSetBindingCalls());
         assertTrue(setServiceBinding <= proxy.getSetServiceBindingCalls());
+        
+        // Test one of the APIs
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+                    ManagedObject dummy = new DummyManagedObject();
+                    serverNode.getDataService().setBinding("dummy", dummy);
+		}}, taskOwner);
+        // Should certainly be greater number, not greater or equal
+        assertTrue(setBinding < proxy.getSetBindingCalls());
+        assertTrue(setBinding < bean.getSetBindingCalls());
     }
     
     @Test
     public void testWatchdogServiceMXBean() throws Exception {
+        // Turn on profiling for the service
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "WatchdogService");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
         ObjectName name = 
             new ObjectName(WatchdogServiceMXBean.WATCHDOG_SERVICE_MXBEAN_NAME);
         
@@ -363,5 +505,199 @@ public class TestMBeans {
         assertTrue(isLocalNodeAlive <= bean.getIsLocalNodeAliveCalls());
         assertTrue(isLocalNodeAliveNonTransactional <= 
                     bean.getIsLocalNodeAliveNonTransactionalCalls());
+        
+        // Test one of the APIs
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+                    serverNode.getWatchdogService().getLocalNodeId();
+		}}, taskOwner);
+        // Should certainly be greater number, not greater or equal
+        long newValue = proxy.getGetLocalNodeIdCalls();
+        assertTrue(getLocalNodeId < newValue);
+        assertTrue(getLocalNodeId < bean.getGetLocalNodeIdCalls());
+        // and try outside a transaction
+        serverNode.getWatchdogService().getLocalNodeId();
+        assertTrue(newValue < proxy.getGetLocalNodeIdCalls());
+        assertTrue(newValue < bean.getGetLocalNodeIdCalls());
+    }
+    
+    @Test
+    public void tesNodeMapServiceMXBean() throws Exception {
+        // Turn on profiling for the service
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
+                "NodeMappingService");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
+        ObjectName name = new ObjectName(
+                NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
+        
+        // Ensure the object was registered at startup
+        NodeMappingServiceMXBean bean = (NodeMappingServiceMXBean) 
+            profileCollector.getRegisteredMBean(
+                          NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
+        assertNotNull(bean);
+        
+        // Get individual fields
+        long addNodeMapListener = 
+                (Long) mbsc.getAttribute(name, "AddNodeMappingListenerCalls");
+        long assignNode = (Long) mbsc.getAttribute(name, "AssignNodeCalls");
+        long getIds = (Long) mbsc.getAttribute(name, "GetIdentitiesCalls");
+        long getNode = (Long) mbsc.getAttribute(name, "GetNodeCalls");
+        long setStatus = (Long) mbsc.getAttribute(name, "SetStatusCalls");
+        
+        // Create the proxy for the object
+        NodeMappingServiceMXBean proxy = (NodeMappingServiceMXBean)
+            JMX.newMXBeanProxy(mbsc, name, NodeMappingServiceMXBean.class);
+        
+        assertTrue(addNodeMapListener <= 
+                        proxy.getAddNodeMappingListenerCalls());
+        assertTrue(assignNode <= proxy.getAssignNodeCalls());
+        assertTrue(getIds <= proxy.getGetIdentitiesCalls());
+        assertTrue(getNode <= proxy.getGetNodeCalls());
+        assertTrue(setStatus <= proxy.getSetStatusCalls());
+        
+        // Test an API
+        serverNode.getNodeMappingService().
+                assignNode(NodeMappingService.class, new IdentityImpl("first"));
+        assertTrue(assignNode < proxy.getAssignNodeCalls());
+        assertTrue(assignNode < bean.getAssignNodeCalls());     
+    }
+    
+    @Test
+    public void testTaskServiceMXBean() throws Exception {
+        // Turn on profiling for the service
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
+                "TaskService");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
+        ObjectName name = 
+                new ObjectName(TaskServiceMXBean.TASK_SERVICE_MXBEAN_NAME);
+        
+        // Ensure the object was registered at startup
+        TaskServiceMXBean bean = (TaskServiceMXBean) 
+            profileCollector.getRegisteredMBean(
+                          TaskServiceMXBean.TASK_SERVICE_MXBEAN_NAME);
+        assertNotNull(bean);
+        
+        // Get individual fields
+        long delayed = 
+                (Long) mbsc.getAttribute(name, "ScheduleDelayedTaskCalls");
+        long nondurable = 
+                (Long) mbsc.getAttribute(name, "ScheduleNonDurableTaskCalls");
+        long nondurableDelayed = 
+                (Long) mbsc.getAttribute(name, 
+                                         "ScheduleNonDurableTaskDelayedCalls");
+        long periodic = 
+                (Long) mbsc.getAttribute(name, "SchedulePeriodicTaskCalls");
+        long task = (Long) mbsc.getAttribute(name, "ScheduleTaskCalls");
+        
+        // Create the proxy for the object
+        TaskServiceMXBean proxy = (TaskServiceMXBean)
+            JMX.newMXBeanProxy(mbsc, name, TaskServiceMXBean.class);
+        
+        assertTrue(delayed <= proxy.getScheduleDelayedTaskCalls());
+        assertTrue(nondurable <= proxy.getScheduleNonDurableTaskCalls());
+        assertTrue(nondurableDelayed <= 
+                proxy.getScheduleNonDurableTaskDelayedCalls());
+        assertTrue(periodic <= proxy.getSchedulePeriodicTaskCalls());
+        assertTrue(task <= proxy.getScheduleTaskCalls());
+        
+        // Test an API
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() {
+                    serverNode.getTaskService().scheduleNonDurableTask(
+                        new TestAbstractKernelRunnable() {
+                            public void run() { }},
+                        false);
+                }
+            }, taskOwner);
+        
+        assertTrue(nondurable < proxy.getScheduleNonDurableTaskCalls());
+        assertTrue(nondurable < bean.getScheduleNonDurableTaskCalls());
+    }
+ 
+    @Test
+    public void testSessionServiceMXBean() throws Exception {
+        // Turn on profiling for the service
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
+                "ClientSessionService");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
+        ObjectName name = new ObjectName(
+                ClientSessionServiceMXBean.SESSION_SERVICE_MXBEAN_NAME);
+        
+        // Ensure the object was registered at startup
+        ClientSessionServiceMXBean bean = (ClientSessionServiceMXBean) 
+            profileCollector.getRegisteredMBean(
+                      ClientSessionServiceMXBean.SESSION_SERVICE_MXBEAN_NAME);
+        assertNotNull(bean);
+        
+        // Get individual fields
+        long reg = (Long) mbsc.getAttribute(name, 
+                                "RegisterSessionDisconnectListenerCalls");
+        long send = (Long) mbsc.getAttribute(name, 
+                                "SendProtocolMessageNonTransactionalCalls");
+        
+        // Create the proxy for the object
+        ClientSessionServiceMXBean proxy = (ClientSessionServiceMXBean)
+            JMX.newMXBeanProxy(mbsc, name, ClientSessionServiceMXBean.class);
+        
+        assertTrue(reg <= proxy.getRegisterSessionDisconnectListenerCalls());
+        assertTrue(send <= proxy.getSendProtocolMessageNonTransactionalCalls());
+        
+        serverNode.getClientSessionService().
+            sendProtocolMessageNonTransactional(new BigInteger("555"),
+                ByteBuffer.wrap("Message".getBytes()), Delivery.RELIABLE);
+        assertTrue(send < proxy.getSendProtocolMessageNonTransactionalCalls());
+        assertTrue(send < bean.getSendProtocolMessageNonTransactionalCalls());
+    }
+     
+    @Test
+    public void testChannelServiceMXBean() throws Exception {
+        // Turn on profiling for the service
+        ProfileConsumer cons = 
+            getCollector(serverNode).getConsumer(
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
+                "ChannelService");
+        cons.setProfileLevel(ProfileLevel.MAX);
+        
+        ObjectName name = new ObjectName(
+                ChannelServiceMXBean.CHANNEL_SERVICE_MXBEAN_NAME);
+        
+        // Ensure the object was registered at startup
+        ChannelServiceMXBean bean = (ChannelServiceMXBean) 
+            profileCollector.getRegisteredMBean(
+                      ChannelServiceMXBean.CHANNEL_SERVICE_MXBEAN_NAME);
+        assertNotNull(bean);
+        
+        // Get individual fields
+        long create = (Long) mbsc.getAttribute(name, "CreateChannelCalls");
+        long get = (Long) mbsc.getAttribute(name,  "GetChannelCalls");
+        
+        // Create the proxy for the object
+        ChannelServiceMXBean proxy = (ChannelServiceMXBean)
+            JMX.newMXBeanProxy(mbsc, name, ChannelServiceMXBean.class);
+        
+        assertTrue(create <= proxy.getCreateChannelCalls());
+        assertTrue(get <= proxy.getGetChannelCalls());
+        
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                public void run() {
+                    try {
+                        serverNode.getChannelService().getChannel("foo");
+                    } catch (NameNotBoundException nnb) {
+                        System.out.println("Got expected exception " + nnb);
+                    }
+                }
+            }, taskOwner);
+       
+        assertTrue(get < proxy.getGetChannelCalls());
+        assertTrue(get < bean.getGetChannelCalls());
     }
 }
