@@ -162,7 +162,14 @@
 	<!-- DARKSTAR: Don't enforce file length checks.  Files
              should be whatever length they need to be. -->
         <!-- <module name="FileLength"/> -->
-        <module name="LineLength"/>
+	<!-- DARKSTAR: Allow lines longer than 80 characters iff
+	     they are comment lines and consist of a single,
+	     unbroken word.  This allows the inclusion of long
+	     class or property names in javadoc comments without
+	     tripping the LineLength alarm. -->
+        <module name="LineLength">
+	  <property name="ignorePattern" value="^ \*\s*\S+$"/>
+	</module>
         <module name="MethodLength">
 	    <!-- DARKSTAR: Make this a warning since some methods
 		 really do need to be large -->
