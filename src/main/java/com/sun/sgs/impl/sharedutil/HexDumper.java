@@ -38,6 +38,13 @@ import java.nio.ByteBuffer;
  * Utility class for converting a byte array to a hex-formatted string.
  */
 public final class HexDumper {
+    
+    /**
+     * This class should not be instantiated.
+     */
+    private HexDumper() {
+        
+    }
 
     /**
      * Returns a string constructed with the contents of the byte
@@ -92,8 +99,9 @@ public final class HexDumper {
      * @return the contents of the buffer as a hex-formatted string
      */
     public static String format(ByteBuffer buf, int limit) {
-        if (! buf.hasRemaining())
+        if (!buf.hasRemaining()) {
             return "[]";
+        }
 
         boolean truncate = false;
         ByteBuffer readBuf = buf.slice().asReadOnlyBuffer();
@@ -149,7 +157,7 @@ public final class HexDumper {
     public static byte[] fromHexString(String hexString) {
         byte[] bytes = new byte[hexString.length() / 2];
         for (int i = 0; i < bytes.length; ++i) {
-            String hexByte = hexString.substring(2*i, 2*i+2);
+            String hexByte = hexString.substring(2 * i, 2 * i + 2);
             bytes[i] = Integer.valueOf(hexByte, 16).byteValue();
         }
         return bytes;
