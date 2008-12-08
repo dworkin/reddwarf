@@ -89,18 +89,18 @@ public class TestMBeans {
     private Identity taskOwner;
 
     /** JMX connection server */
-    private JMXConnectorServer cs;
+    private static JMXConnectorServer cs;
     /** JMX connector */
-    private JMXConnector cc;
+    private static JMXConnector cc;
     /** MBean server connection */
-    private MBeanServerConnection mbsc;
+    private static MBeanServerConnection mbsc;
     
     /** Any additional nodes, only used for selected tests */
     private SgsTestNode additionalNodes[];
     
     /** Test setup. */
     @BeforeClass
-    public void first() throws Exception {      
+    public static void first() throws Exception {      
         // Set up MBean Server, making sure we force all operations
         // to go through RMI (simulating a remote connection).
         // We hope to catch errors like non-serializable objects in our MBeans.
@@ -138,7 +138,7 @@ public class TestMBeans {
     }
     
     @AfterClass
-    public void last() throws Exception {     
+    public static void last() throws Exception {     
         if (cc != null) {
             cc.close();
         }
@@ -705,9 +705,6 @@ public class TestMBeans {
     
     @Test
     public void testProfileControllerMXBean() throws Exception {
-        ObjectName name = 
-                new ObjectName(ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
-        
         // Ensure the object was registered at startup
         ProfileControllerMXBean bean = 
             (ProfileControllerMXBean) profileCollector.getRegisteredMBean(
@@ -716,7 +713,9 @@ public class TestMBeans {
         
         // Create a proxy
         ProfileControllerMXBean proxy = (ProfileControllerMXBean)
-            JMX.newMXBeanProxy(mbsc, name, ProfileControllerMXBean.class);
+            JMX.newMXBeanProxy(mbsc, 
+                new ObjectName(ProfileControllerMXBean.PROFILE_MXBEAN_NAME), 
+                ProfileControllerMXBean.class);
         String[] consumers = proxy.getProfileConsumers();
         for (String con : consumers) {
             System.out.println("Found consumer " + con);
@@ -734,7 +733,10 @@ public class TestMBeans {
         assertEquals(ProfileLevel.MIN, level);
         
         DataServiceMXBean dataProxy = (DataServiceMXBean)
-            JMX.newMXBeanProxy(mbsc, name, DataServiceMXBean.class);
+            JMX.newMXBeanProxy(mbsc, 
+                new ObjectName(DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME), 
+                DataServiceMXBean.class);
+        
         // Test that consumer level can be changed
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
