@@ -258,7 +258,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
 	// Setup the KernelShutdownController object
 	shutdownController = ctrl;
-
+	
 	try {
 	    isCoreServerNode =
 		    wrappedProps.getBooleanProperty(START_SERVER_PROPERTY,
@@ -305,7 +305,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    } else {
 		appPort = -1;
 	    }
-	    
+
 	    /*
 	     * Check service version.
 	     */
@@ -321,11 +321,10 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
 	    exporter.export(clientImpl, clientPort);
 	    clientProxy = exporter.getProxy();
-
+	    
 	    String host;
 	    int serverPort;
 	    if (isCoreServerNode) {
-		System.err.println("---- core server node");
 		serverImpl =
 			new WatchdogServerImpl(properties, systemRegistry,
 				txnProxy, clientHost, appPort, clientProxy,
@@ -333,7 +332,6 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
-		System.err.println("---- not core server node");
 		host =
 			wrappedProps.getProperty(HOST_PROPERTY, wrappedProps
 				.getProperty(StandardProperties.SERVER_HOST));
@@ -368,6 +366,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		localNodeId = values[0];
 		renewInterval = values[1];
 	    }
+	    
 	    renewThread.start();
 
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -378,7 +377,9 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    }
 
 	} catch (Exception e) {
-	    System.err.println("-- FAILED! " + e.getLocalizedMessage());
+	    System.err.println("-- FAILED! " + e.getLocalizedMessage() + "\n**************");
+	    e.printStackTrace();
+	    
 	    logger.logThrow(Level.CONFIG, e,
 		    "Failed to create WatchdogServiceImpl");
 
@@ -439,17 +440,23 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
+	System.err.println("1) start");
 	checkState();
+	System.err.println("2) checked state");
 	if (!getIsAlive()) {
+	    System.err.println("3) local node not alive");
 	    return false;
 	} else {
+	    System.err.println("3) trying to get node");
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
+	    System.err.println("4) got node");
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
 		System.err.println("... called from isLocalNodeAlive()");
 		reportFailure(this.getClass().toString(), FailureLevel.MEDIUM);
 		return false;
 	    } else {
+		System.err.println("5) node is alive	");
 		return true;
 	    }
 	}
@@ -513,7 +520,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	try {
 	    reportFailure(getLocalNodeId(), className, severity);
 	} catch (IOException ioe) {
-	    System.err.println("...service:");
+	    System.err.println("... reportFailure IOException");
 	    logger.log(Level.WARNING, "Unexpected exception thrown:" +
 		    ioe.getLocalizedMessage());
 	}
@@ -524,10 +531,13 @@ public final class WatchdogServiceImpl extends AbstractService implements
      */
     public void reportFailure(long nodeId, String className,
 	    FailureLevel severity) throws IOException {
+	
+	System.err.println("a) entered reportFailure(1,2,3)");
 
 	// If the node is shutting down or is not alive, then
 	// we won't do anything
 	if (shuttingDown() || !isAlive) {
+	    System.err.println("b) shutting down or was alive");
 	    return;
 	}
 
@@ -551,17 +561,40 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		    logger.log(Level.SEVERE, "{0} reported failure",
 			    className);
 
-		    serverProxy.setNodeAsFailed(nodeId);
+		    /*
+		     * Try to report failure to the watchdog server. Since it
+		     * is possible that the failure is because of a broken
+		     * connection to the watchdog server, catch an IOException
+		     * that may be thrown as a result.
+		     */
+		    try {
+			serverProxy.setNodeAsFailed(nodeId);
+			System.err.println("-- reportFailure: successfully contacted server");
+		    } catch (IOException ioe) {
+			System.err.println("-- reportFailure: threw an IOException");
+			logger.log(Level.SEVERE,
+				"Cannot report failure to Watchdog Server: " +
+					ioe.getLocalizedMessage());
+		    } /* temporary */
+		    catch (Exception e) {
+			System.err.println("-- reportFailure: exception caught");
+			e.printStackTrace();
+		    }
 		    setFailedThenNotify(true);
+		    System.err.println("-- reportFailure: successfully setFailedThenNotify()");
 
 		} else {
 
+		    System.err.println("-- reportFailure: remote node case");
 		    // Inform the server to shutdown the remote node.
 		    // Note that this call may throw an IOException
 		    serverProxy.setNodeAsFailed(nodeId, className, severity,
 			    AbstractService.DEFAULT_MAX_IO_ATTEMPTS);
+		    System.err.println("-- reportFailure: no remote exception thrown");
 		}
+		System.err.println("-- reportFailure: finishing..");
 	}
+	System.err.println("-- ........");
     }
 
     /**
@@ -608,8 +641,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
 			System.err.println("... called from RenewThread.run()");
-			reportFailure(this.getClass().toString(),
-				FailureLevel.MEDIUM);
+			setFailedThenNotify(true);
 			return;
 		    }
 		    renewed = true;
@@ -628,8 +660,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
-		    reportFailure(this.getClass().toString(),
-			    FailureLevel.MEDIUM);
+		    setFailedThenNotify(true);
 		    break;
 		}
 		if (renewed) {
@@ -655,6 +686,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
      */
     private void checkState() {
 	if (shuttingDown()) {
+	    System.err.println("... throwing illegal state exception");
 	    throw new IllegalStateException("service shutting down");
 	}
     }
