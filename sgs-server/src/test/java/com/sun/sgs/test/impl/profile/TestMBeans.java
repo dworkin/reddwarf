@@ -35,6 +35,7 @@ import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.NodeMappingServiceMXBean;
 import com.sun.sgs.management.NodesMXBean;
+import com.sun.sgs.management.ProfileControllerMXBean;
 import com.sun.sgs.management.TaskServiceMXBean;
 import com.sun.sgs.management.WatchdogServiceMXBean;
 import com.sun.sgs.profile.ProfileCollector;
@@ -60,13 +61,14 @@ import javax.management.remote.JMXConnectorServer;
 import javax.management.remote.JMXConnectorServerFactory;
 import javax.management.remote.JMXServiceURL;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /**
  * Tests for management beans.
@@ -97,16 +99,8 @@ public class TestMBeans {
     private SgsTestNode additionalNodes[];
     
     /** Test setup. */
-    @Before
-    public void setUp() throws Exception {
-        Properties props = 
-                SgsTestNode.getDefaultProperties(APP_NAME, null, null);
-        serverNode = new SgsTestNode(APP_NAME, null, props);
-        profileCollector = getCollector(serverNode);
-        systemRegistry = serverNode.getSystemRegistry();
-        txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
-        taskOwner = serverNode.getProxy().getCurrentOwner();
-        
+    @BeforeClass
+    public void first() throws Exception {      
         // Set up MBean Server, making sure we force all operations
         // to go through RMI (simulating a remote connection).
         // We hope to catch errors like non-serializable objects in our MBeans.
@@ -116,6 +110,17 @@ public class TestMBeans {
         cs.start();
         cc = JMXConnectorFactory.connect(cs.getAddress());
         mbsc = cc.getMBeanServerConnection();
+    }
+    
+    @Before
+    public void setUp() throws Exception {
+        Properties props = 
+                SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+        serverNode = new SgsTestNode(APP_NAME, null, props);
+        profileCollector = getCollector(serverNode);
+        systemRegistry = serverNode.getSystemRegistry();
+        txnScheduler = systemRegistry.getComponent(TransactionScheduler.class);
+        taskOwner = serverNode.getProxy().getCurrentOwner();
     }
   
     /** Shut down the nodes and shut down JMX. */
@@ -130,7 +135,10 @@ public class TestMBeans {
             additionalNodes = null;
         }
         serverNode.shutdown(true);
-        
+    }
+    
+    @AfterClass
+    public void last() throws Exception {     
         if (cc != null) {
             cc.close();
         }
@@ -264,12 +272,6 @@ public class TestMBeans {
         assertEquals(serverHost, bean.getServerHostName());
         assertEquals(timeout, bean.getTxnTimeout());
     }
-    
-    @Test
-    public void testProfileControllerMXBean() {
-        fail("not yet implemented");
-    }
-    
     
     @Test
     public void testDataStoreStatsMXBean() throws Exception {
@@ -699,5 +701,56 @@ public class TestMBeans {
        
         assertTrue(get < proxy.getGetChannelCalls());
         assertTrue(get < bean.getGetChannelCalls());
+    }
+    
+    @Test
+    public void testProfileControllerMXBean() throws Exception {
+        ObjectName name = 
+                new ObjectName(ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
+        
+        // Ensure the object was registered at startup
+        ProfileControllerMXBean bean = 
+            (ProfileControllerMXBean) profileCollector.getRegisteredMBean(
+                                ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
+        assertNotNull(bean);
+        
+        // Create a proxy
+        ProfileControllerMXBean proxy = (ProfileControllerMXBean)
+            JMX.newMXBeanProxy(mbsc, name, ProfileControllerMXBean.class);
+        String[] consumers = proxy.getProfileConsumers();
+        for (String con : consumers) {
+            System.out.println("Found consumer " + con);
+        }
+        
+        // Default profile level is min
+        assertEquals(ProfileLevel.MIN, proxy.getDefaultProfileLevel());
+        // Can set the default profile level
+        proxy.setDefaultProfileLevel(ProfileLevel.MEDIUM);
+        assertEquals(ProfileLevel.MEDIUM, proxy.getDefaultProfileLevel());
+        
+        String consName = 
+                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataService";
+        ProfileLevel level = proxy.getConsumerLevel(consName);
+        assertEquals(ProfileLevel.MIN, level);
+        
+        DataServiceMXBean dataProxy = (DataServiceMXBean)
+            JMX.newMXBeanProxy(mbsc, name, DataServiceMXBean.class);
+        // Test that consumer level can be changed
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+                    ManagedObject dummy = new DummyManagedObject();
+                    serverNode.getDataService().setBinding("dummy", dummy);
+		}}, taskOwner);
+        assertEquals(0, dataProxy.getSetBindingCalls());
+        
+        proxy.setConsumerLevel(consName, ProfileLevel.MAX);
+        assertEquals(ProfileLevel.MAX, proxy.getConsumerLevel(consName));
+        
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+                    ManagedObject dummy = new DummyManagedObject();
+                    serverNode.getDataService().setBinding("dummy", dummy);
+		}}, taskOwner);
+        assertTrue(dataProxy.getSetBindingCalls() > 0);
     }
 }
