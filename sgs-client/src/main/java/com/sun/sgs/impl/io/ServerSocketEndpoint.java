@@ -125,8 +125,9 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
         IoAcceptor minaAcceptor;
         
         if (transportType.equals(TransportType.RELIABLE)) {
-            org.apache.mina.transport.socket.nio.SocketAcceptor minaSocketAcceptor = 
-                new org.apache.mina.transport.socket.nio.SocketAcceptor(
+            org.apache.mina.transport.socket.nio.SocketAcceptor 
+                    minaSocketAcceptor =
+                    new org.apache.mina.transport.socket.nio.SocketAcceptor(
                     numProcessors, executor);
             
             IoServiceConfig ioConfig = minaSocketAcceptor.getDefaultConfig();
@@ -138,7 +139,7 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
              */
             if (ioConfig instanceof SocketAcceptorConfig) {
                 SocketAcceptorConfig socketConfig =
-                    (SocketAcceptorConfig)ioConfig;
+                        (SocketAcceptorConfig) ioConfig;
                 
                 socketConfig.setReuseAddress(Boolean.parseBoolean(
                         System.getProperty(REUSE_ADDRESS_PROPERTY,

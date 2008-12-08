@@ -135,7 +135,7 @@ class SocketConnector implements Connector<SocketAddress>
 	if (future == null) {
 	    throw new IllegalStateException("No connect attempt in progress");
 	}
-	if (! future.isConnected()) {
+        if (!future.isConnected()) {
 	    future.join(timeout);
 	}
 

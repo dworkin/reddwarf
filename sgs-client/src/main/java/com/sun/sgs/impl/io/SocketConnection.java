@@ -78,15 +78,16 @@ public class SocketConnection implements Connection, FilterListener {
     SocketConnection(ConnectionListener listener, CompleteMessageFilter filter,
                  IoSession session)
     {
-        if (listener == null || filter == null || session == null)
+        if (listener == null || filter == null || session == null) {
             throw new NullPointerException("null argument to constructor");
+        }
 
         this.listener = listener;
         this.filter = filter;
         this.session = session;
 
         if (session.getTransportType() == TransportType.SOCKET) {
-            SocketSessionConfig cfg = (SocketSessionConfig)session.getConfig();
+            SocketSessionConfig cfg = (SocketSessionConfig) session.getConfig();
             cfg.setTcpNoDelay(true);
         }
     }
