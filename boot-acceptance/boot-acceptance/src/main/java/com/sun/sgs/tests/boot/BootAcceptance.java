@@ -863,7 +863,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloChannels() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloChannels.boot");
         this.config = boot.getAbsolutePath();
@@ -876,7 +875,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloEcho() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloEcho.boot");
         this.config = boot.getAbsolutePath();
@@ -889,7 +887,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloLogger() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloLogger.boot");
         this.config = boot.getAbsolutePath();
@@ -902,7 +899,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloPersistence() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloPersistence.boot");
         this.config = boot.getAbsolutePath();
@@ -915,7 +911,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloPersistence2() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloPersistence2.boot");
         this.config = boot.getAbsolutePath();
@@ -928,7 +923,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloPersistence3() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloPersistence3.boot");
         this.config = boot.getAbsolutePath();
@@ -941,7 +935,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloTimer() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloTimer.boot");
         this.config = boot.getAbsolutePath();
@@ -954,7 +947,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloUser() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloUser.boot");
         this.config = boot.getAbsolutePath();
@@ -967,7 +959,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloUser2() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloUser2.boot");
         this.config = boot.getAbsolutePath();
@@ -980,7 +971,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialHelloWorld() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/HelloWorld.boot");
         this.config = boot.getAbsolutePath();
@@ -993,7 +983,6 @@ public class BootAcceptance {
     
     @Test(timeout=TIMEOUT)
     public void testTutorialSwordWorld() throws Exception {
-        Util.loadTutorial(installationDirectory);
         File boot = new File(installationDirectory, 
                              "tutorial/conf/SwordWorld.boot");
         this.config = boot.getAbsolutePath();
