@@ -79,10 +79,10 @@ import java.util.logging.LogManager;
  * every 10 seconds, put the following text in the logging configuration file:
  *
  * <pre>
- *   .level = INFO
- *   handlers = java.util.logging.ConsoleHandler
- *   config = com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration
- *   com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration.interval = 10000
+ *   .level=INFO
+ *   handlers=java.util.logging.ConsoleHandler
+ *   config=com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration
+ *   com.sun.sgs.impl.sharedutil.logging.ResamplingUrlLogConfiguration.interval=10000
  * </pre> <p>
  *
  * To specify the location of the logging configuration file using the HTTP URL
@@ -157,7 +157,14 @@ public class ResamplingUrlLogConfiguration {
 
     /** * Creates an instance of this class. */
     public ResamplingUrlLogConfiguration() {
-	synchronized (lock) {
+	init();
+    }
+    
+    /**
+     * Initialize this class.
+     */
+    protected void init() {
+        synchronized (lock) {
 	    if (initialized) {
 		return;
 	    }
