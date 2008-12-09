@@ -862,49 +862,43 @@ class Kernel {
      */
     private static Properties findProperties(String propLoc) throws Exception {
         // load the application specific configuration file
-        // backed by the system properties
         // as the default set of options if it exists
-        Properties baseProperties = null;
-        URL propsIn = Kernel.class.getClassLoader().
-                getResource(BootProperties.DEFAULT_APP_PROPERTIES);
-        if(propsIn != null) {
+        Properties baseProperties = new Properties();
+        URL propsIn = ClassLoader.getSystemResource(
+                BootProperties.DEFAULT_APP_PROPERTIES);
+        if (propsIn != null) {
             baseProperties = loadProperties(propsIn, null);
-        }
-        else {
-            baseProperties = System.getProperties();
         }
         
         // load the overriding set of configuration properties from the
         // file indicated by the filename argument
         Properties fileProperties = baseProperties;
-        if(propLoc != null && !propLoc.equals("")) {
+        if (propLoc != null && !propLoc.equals("")) {
             File propFile = new File(propLoc);
-            if(!propFile.isFile() || !propFile.canRead()) {
+            if (!propFile.isFile() || !propFile.canRead()) {
                 logger.log(Level.SEVERE, "can't access file :" + propFile);
-                throw new IllegalStateException("can't access file " + 
-                                                propFile);
+                throw new IllegalArgumentException("can't access file " + 
+                                                   propFile);
             }
             fileProperties = loadProperties(propFile.toURI().toURL(),
                                             baseProperties);
         }
         
         // if a properties file exists in the user's home directory, use
-        // it to override any properties, otherwise just use the 
-        // nextProperties alone
+        // it to override any properties
         Properties homeProperties = fileProperties;
         File homeConfig = new File(System.getProperty("user.home") +
                                    File.separator + 
                                    BootProperties.DEFAULT_HOME_CONFIG_FILE);
-        if(homeConfig.isFile() && homeConfig.canRead()) {
+        if (homeConfig.isFile() && homeConfig.canRead()) {
             homeProperties = loadProperties(homeConfig.toURI().toURL(),
                                             fileProperties);
         }
         
         // override any properties with the values from the System properties
         Properties finalProperties = new Properties(homeProperties);
-        for(String k : System.getProperties().stringPropertyNames()) {
-            finalProperties.setProperty(k, System.getProperty(k));
-        }
+        finalProperties.putAll(System.getProperties());
+
         return finalProperties;
     }
     

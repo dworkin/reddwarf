@@ -55,7 +55,7 @@ public final class Boot {
      * the required components to startup an application in a Project
      * Darkstar container.  If no argument is given on the command line, 
      * the filename is assumed to be at the location specified by the system 
-     * resource {@link BootEnvironment#SGS_BOOT}.
+     * resource {@value BootEnvironment#SGS_BOOT}.
      * <p>
      * The properties included in the configuration file must conform to
      * the rules allowed by {@link SubstitutionProperties}.
@@ -81,8 +81,8 @@ public final class Boot {
         String javaCmd = "java";
         String javaHome = properties.getProperty(BootEnvironment.JAVA_HOME);
         if (javaHome != null) {
-            javaCmd = javaHome + File.separator + "jre" + 
-                    File.separator + "bin" + File.separator + javaCmd;
+            javaCmd = javaHome + File.separator + "bin" + 
+                    File.separator + javaCmd;
         }
         
         //build the command
@@ -93,7 +93,9 @@ public final class Boot {
         executeCmd.add("-Djava.library.path=" + bootNativePath(properties));
         executeCmd.add("-Djava.util.logging.config.file=" + 
                        properties.getProperty(BootEnvironment.SGS_LOGGING));
-        executeCmd.add(bootCommandLineProps(properties));
+        for(String i : bootCommandLineProps(properties)) {
+            executeCmd.add(i);
+        }
         for (String j : bootJavaOpts(properties)) {
             executeCmd.add(j);
         }
@@ -116,8 +118,14 @@ public final class Boot {
                 //for the log file
                 File log = new File(logFile);
                 File parentDir = log.getParentFile();
-                if (parentDir != null && !parentDir.exists()) {
-                    parentDir.mkdirs();
+                if (parentDir != null && 
+                        !parentDir.exists() &&
+                        !parentDir.mkdirs()) {
+                    logger.log(Level.SEVERE, 
+                               "Unable to create log directory : " +
+                               parentDir);
+                    throw new IOException("Unable to create log directory : " + 
+                                          parentDir);
                 }
                 
                 //create a stream for the log file
@@ -130,7 +138,7 @@ public final class Boot {
             }
         }
         
-        //initiate the shutdown handler first so that any problems
+        //instantiate the shutdown handler first so that any problems
         //opening the socket server happen before the subprocess starts
         ShutdownHandler shutdownHandler = new ShutdownHandler(
                 Integer.valueOf(
@@ -190,7 +198,7 @@ public final class Boot {
         if (!sgsHomeDir.isDirectory()) {
             return "";
         }
-        StringBuffer buf = new StringBuffer();
+        StringBuilder buf = new StringBuilder();
         
         //determine BDB_TYPE
         String bdbType = env.getProperty(BootEnvironment.BDB_TYPE);
@@ -311,20 +319,24 @@ public final class Boot {
      * @param env the environment
      * @return additional set of properties to be passed to the command line
      */
-    private static String bootCommandLineProps(Properties env) {
+    private static List<String> bootCommandLineProps(Properties env) {
+        List<String> props = new ArrayList<String>();
+        
         String type = env.getProperty(BootEnvironment.BDB_TYPE);
         String line = 
                 "-Dcom.sun.sgs.impl.service.data.store.db.environment.class";
         
         if (type.equals("db")) {
-            return line + "=" +
-                    "com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment";
+            props.add(line + "=" +
+                      "com.sun.sgs.impl.service.data.store.db.bdb." +
+                      "BdbEnvironment");
         } else if (type.equals("je")) {
-            return line + "=" +
-                    "com.sun.sgs.impl.service.data.store.db.je.JeEnvironment";
-        } else {
-            return "";
-        }
+            props.add(line + "=" +
+                      "com.sun.sgs.impl.service.data.store.db.je." +
+                      "JeEnvironment");
+        } 
+        
+        return props;
     }
     
     /**

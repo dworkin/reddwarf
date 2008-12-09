@@ -43,8 +43,8 @@ class ShutdownHandler implements Runnable {
             Logger.getLogger(ShutdownHandler.class.getName());
     
     private Process p;
-    private ServerSocket listen;
-    private Set<SocketListener> currentListeners;
+    private final ServerSocket listen;
+    private final Set<SocketListener> currentListeners;
     
     /**
      * Constructs a new {@code ShutdownHandler} that will
@@ -57,7 +57,7 @@ class ShutdownHandler implements Runnable {
             throws IOException {
         this.currentListeners = new HashSet<SocketListener>();
         try {
-            listen = new ServerSocket(port, -1, InetAddress.getLocalHost());
+            listen = new ServerSocket(port, -1, InetAddress.getByName(null));
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Unable to listen on port : " + port, e);
             throw e;
@@ -84,7 +84,7 @@ class ShutdownHandler implements Runnable {
     
     /**
      * This method should be called upon receiving a
-     * {@link BootEnvironment#SHUTDOWN_COMMNAD} command from a connected 
+     * {@link BootEnvironment#SHUTDOWN_COMMAND} command from a connected 
      * {@code Socket}.
      * This method destroys the {@code Process} set via the 
      * {@link #setProcess(java.lang.Process)} method, closes the incoming

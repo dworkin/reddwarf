@@ -74,7 +74,7 @@
 
     <!-- Include the main distribution license and readme files -->
     <fileSet>
-      <directory>src/main/etc</directory>
+      <directory>${basedir}/src/main/etc</directory>
       <excludes>
         <exclude>README</exclude>
         <exclude>NOTICE.txt</exclude>
@@ -99,7 +99,7 @@
 	 DLL -->
     <fileSet>
       <directory>${project.build.directory}/bdb-${bdb.version}</directory>
-      <outputDirectory>natives</outputDirectory>
+      <outputDirectory>lib/natives</outputDirectory>
       <excludes>
 	<exclude>db.jar</exclude>
 	<exclude>LICENSE</exclude>
@@ -111,7 +111,7 @@
 	 it executable -->
     <fileSet>
       <directory>${project.build.directory}/bdb-${bdb.version}</directory>
-      <outputDirectory>natives</outputDirectory>
+      <outputDirectory>lib/natives</outputDirectory>
       <includes>
 	<include>win32-x86/libdb_java45.dll</include>
       </includes>

@@ -83,8 +83,8 @@ public final class Stop {
             logger.log(Level.INFO, "Sending " + 
                        BootEnvironment.SHUTDOWN_COMMAND + 
                        " to port " + port + 
-                       " on " + InetAddress.getLocalHost());
-            socket = new Socket(InetAddress.getLocalHost(), port);
+                       " on " + InetAddress.getByName(null));
+            socket = new Socket(InetAddress.getByName(null), port);
             out = new PrintStream(socket.getOutputStream());
             out.println(BootEnvironment.SHUTDOWN_COMMAND);
             logger.log(Level.INFO, BootEnvironment.SHUTDOWN_COMMAND + 

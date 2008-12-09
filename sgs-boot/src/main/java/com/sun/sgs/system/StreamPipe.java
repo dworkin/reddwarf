@@ -26,7 +26,7 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 /**
- * Reads input from a given {@code InputStream} and pipes it directory to a
+ * Reads input from a given {@code InputStream} and pipes it directly to a
  * given {@code OutputStream}.
  */
 public class StreamPipe implements Runnable {
@@ -34,8 +34,8 @@ public class StreamPipe implements Runnable {
     private static final Logger logger = 
             Logger.getLogger(StreamPipe.class.getName());
     
-    private InputStream input;
-    private OutputStream output;
+    private final InputStream input;
+    private final OutputStream output;
     
     /**
      * Constructs a new {@code StreamPipe}.

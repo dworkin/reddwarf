@@ -34,7 +34,24 @@ import java.io.Reader;
  * PROP2=${PROP1}<br><br>
  * 
  * When loading the above set of properties from a file, PROP2 will
- * automatically subsitute PROP1 for its value.
+ * automatically substitute PROP1 for its value. <p>
+ * 
+ * Additional usage requirements:
+ * <ul>
+ * <li>When properties are provided from a file or {@code InputStream} of some
+ * sort, properties can appear in any order and all values will be
+ * interpolated as expected.</li>
+ * <li>If a property is set using the 
+ * {@link #setProperty(java.lang.String, java.lang.String)} method, it will
+ * <em>not</em> automatically cause its value to be interpolated in other
+ * properties where it is included.</li>
+ * <li>An automatically interpolated value of another property can be included
+ * in a property by surrounding the key of the value with the start delimiter of
+ * '${' and the end delimiter of '}'.</li>
+ * <li>Property keys can contain any characters except for the end delimiter
+ * of '}'.  Inclusion of this character via an escape sequence is not
+ * supported.</li>
+ * </ul>
  */
 public class SubstitutionProperties extends Properties {
     
@@ -174,7 +191,7 @@ public class SubstitutionProperties extends Properties {
         
         //walk through the value, building a new string and replacing
         //properties as we go
-        StringBuffer newValue = new StringBuffer(propValue.length());
+        StringBuilder newValue = new StringBuilder(propValue.length());
         int currentIndex = 0;
         for (int startIndex = propValue.indexOf(START_KEY); startIndex != -1;
                 startIndex = propValue.indexOf(START_KEY, currentIndex)) {
@@ -190,7 +207,9 @@ public class SubstitutionProperties extends Properties {
                 }
                 newValue.append(replace(subPropName, beingInterpolated));
             } else {
-                throw new IllegalStateException(propName + " : " + propValue);
+                throw new IllegalArgumentException(
+                        "illegal property name, '" + END_KEY + "' not found " +
+                        "when interpolating property : " + propName);
             }
         }
         newValue.append(propValue.substring(currentIndex, propValue.length()));

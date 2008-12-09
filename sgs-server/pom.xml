@@ -61,6 +61,29 @@
   <build>
     <plugins>
 
+      <!-- Customize the manifest for this particular jar
+	   to include the the Kernel as the executable class
+	   and the sgs jar files in the classpath -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+	      <addClasspath>false</addClasspath>
+	      <mainClass>com.sun.sgs.impl.kernel.Kernel</mainClass>
+            </manifest>
+	    <manifestEntries>
+	      <Class-Path>
+		sgs-shared-${sgs-shared.version}.jar
+		sgs-server-api-${sgs.version}.jar
+	      </Class-Path>
+	    </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+
+
       <!-- Always attach a sources jar (with the assembly plugin)
 	   Normally the maven-source-plugin should be used for this.
 	   However, that plugin currently does not attach classifier

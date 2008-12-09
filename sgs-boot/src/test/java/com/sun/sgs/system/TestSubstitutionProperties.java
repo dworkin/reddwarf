@@ -122,13 +122,38 @@ public class TestSubstitutionProperties {
         Assert.assertNull(p.getProperty("name2"));
     }
     
-    @Test(expected=IllegalStateException.class)
+    @Test(expected=IllegalArgumentException.class)
     public void testCreationWithInvalidVariableFormat() {
         Properties testProps = new Properties();
         
         testProps.setProperty("name1", "${name2");
         
         SubstitutionProperties p = new SubstitutionProperties(testProps);
+    }
+    
+    @Test
+    public void testCreationWithFunnyButValidVariableFormat() {
+        Properties testProps = new Properties();
+        
+        testProps.setProperty("name2", "value");
+        testProps.setProperty("name1", "${name2}}");
+        
+        SubstitutionProperties p = new SubstitutionProperties(testProps);
+        
+        Assert.assertEquals(p.getProperty("name1"), "value}");
+    }
+    
+    @Test
+    public void testCreationWithFunnyButValidVariableFormat2() {
+        Properties testProps = new Properties();
+        
+        testProps.setProperty("${name2", "value");
+        testProps.setProperty("name1", "${${name2}");
+        
+        SubstitutionProperties p = new SubstitutionProperties(testProps);
+        
+        Assert.assertEquals(p.getProperty("name1"), "value");
+        Assert.assertEquals(p.getProperty("${name2"), "value");
     }
     
     @Test
