@@ -113,11 +113,13 @@ class CompleteMessageFilter {
 
         // Process complete messages, if any
         while (msgBuf.hasRemaining()) {
-            if (msgBuf.remaining() < 2)
+            if (msgBuf.remaining() < 2) {
                 break;
+            }
 
-            if (! msgBuf.prefixedDataAvailable(2))
+            if (!msgBuf.prefixedDataAvailable(2)) {
                 break;
+            }
 
             int msgLen = msgBuf.getShort() & 0xFFFF;
 
