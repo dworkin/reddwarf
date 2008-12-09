@@ -25,9 +25,11 @@ import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
@@ -43,8 +45,10 @@ import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -88,6 +92,15 @@ public class SimpleSgsProtocolAcceptor
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
     private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
+    /** The name of the disconnect delay property. */
+    private static final String DISCONNECT_DELAY_PROPERTY =
+	PKG_NAME + ".disconnect.delay";
+    
+    /** The time (in milliseconds) that a disconnecting connection is
+     * allowed before this service forcibly disconnects it.
+     */
+    private static final long DEFAULT_DISCONNECT_DELAY = 1000;
+
     /** The identity manager. */
     private final IdentityCoordinator identityManager;
     
@@ -96,6 +109,9 @@ public class SimpleSgsProtocolAcceptor
 
     /** The read buffer size for new connections. */
     private final int readBufferSize;
+
+    /** The disconnect delay (in milliseconds) for disconnecting sessions. */
+    private final long disconnectDelay;
 
     /** The protocol listener. */
     private volatile ProtocolListener protocolListener;
@@ -108,10 +124,21 @@ public class SimpleSgsProtocolAcceptor
     
     /** The currently-active accept operation, or {@code null} if none. */
     volatile IoFuture<?, ?> acceptFuture;
-    
+
+    /** The acceptor listener. */
     private final AcceptorListener acceptorListener =
 	new AcceptorListener();
     
+    /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
+     * the time the connection should expire.
+     */
+    private final ConcurrentSkipListMap<Long, SessionProtocol>
+	disconnectingHandlersMap =
+	    new ConcurrentSkipListMap<Long, SessionProtocol>();
+
+    /** The handle for the task that monitors disconnecting client sessions. */
+    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
+
     /**
      * Constructs an instance with the specified {@code properties},
      * {@code systemRegistry}, and {@code txnProxy}.
@@ -145,6 +172,9 @@ public class SimpleSgsProtocolAcceptor
             readBufferSize = wrappedProps.getIntProperty(
                 READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
+	    disconnectDelay = wrappedProps.getLongProperty(
+		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
+		200, Long.MAX_VALUE);
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    
@@ -180,6 +210,16 @@ public class SimpleSgsProtocolAcceptor
                 }
 		throw e;
 	    }
+
+	    /*
+	     * Set up recurring task to monitor disconnecting client sessions.
+	     */
+	    monitorDisconnectingSessionsTaskHandle =
+		taskScheduler.scheduleRecurringTask(
+ 		    new MonitorDisconnectingSessionsTask(),
+		    taskOwner, System.currentTimeMillis(),
+		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
+	    monitorDisconnectingSessionsTaskHandle.start();
 	    
 	    // TBD: check service version?
 	    
@@ -248,6 +288,16 @@ public class SimpleSgsProtocolAcceptor
 	    }
 	}
 	logger.log(Level.FINEST, "acceptor shutdown");
+
+	if (monitorDisconnectingSessionsTaskHandle != null) {
+	    try {
+		monitorDisconnectingSessionsTaskHandle.cancel();
+	    } finally {
+		monitorDisconnectingSessionsTaskHandle = null;
+	    }
+	}
+	    
+	disconnectingHandlersMap.clear();
     }
 
     /* -- Implement ProtocolAcceptor -- */
@@ -294,6 +344,20 @@ public class SimpleSgsProtocolAcceptor
     Identity authenticate(String name, String password) throws LoginException {
 	return identityManager.authenticateIdentity(
 	    new NamePasswordCredentials(name, password.toCharArray()));
+    }
+
+    /**
+     * Adds the specified {@code protocol} to the map containing {@code
+     * SessionProtocol}s that are disconnecting.  The map is keyed by
+     * connection expiration time.  The connection will expire after a fixed
+     * delay and will be forcibly terminated if the client hasn't already
+     * closed the connection.
+     *
+     * @param	protocol a {@code SessionProtocol} that is disconnecting
+     */
+    void monitorDisconnection(SessionProtocol protocol) {
+	disconnectingHandlersMap.put(
+	    System.currentTimeMillis() + disconnectDelay,  protocol);
     }
     
     /**
@@ -369,6 +433,39 @@ public class SimpleSgsProtocolAcceptor
 				Level.SEVERE, e, "acceptor error on {0}", addr);
 		
 		// TBD: take other actions, such as restarting acceptor?
+	    }
+	}
+    }
+
+    /**
+     * A task to monitor disconnecting sessions to ensure that their
+     * associated connections are closed by the client in a timely manner.
+     * If a connection is not terminated by the expiration time, then the
+     * connection is forcibly closed.
+     */
+    private class MonitorDisconnectingSessionsTask
+	extends AbstractKernelRunnable
+    {
+	/** Constructs and instance. */
+	MonitorDisconnectingSessionsTask() {
+	    super(null);
+	}
+	
+	/** {@inheritDoc} */
+	public void run() {
+	    long now = System.currentTimeMillis();
+	    if (!disconnectingHandlersMap.isEmpty() &&
+		disconnectingHandlersMap.firstKey() < now) {
+
+		Map<Long, SessionProtocol> expiredSessions = 
+		    disconnectingHandlersMap.headMap(now);
+		for (SessionProtocol protocol : expiredSessions.values()) {
+		    try {
+			protocol.close();
+		    } catch (IOException e) {
+		    }
+		}
+		expiredSessions.clear();
 	    }
 	}
     }

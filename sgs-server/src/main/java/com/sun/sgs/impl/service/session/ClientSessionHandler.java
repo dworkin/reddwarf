@@ -349,8 +349,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 	    if (closeConnection) {
 		closeConnection();
-	    } else {
-		sessionService.monitorDisconnection(this);
 	    }
 	}
 
@@ -524,13 +522,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	long assignedNodeId = node.getId();
 	if (assignedNodeId == sessionService.getLocalNodeId()) {
 	    /*
-	     * Handle this login request locally: Set the client
-	     * session's identity, store the client session in the data
-	     * store (which assigns it an ID--the ID of the reference
-	     * to the client session object), inform the session
-	     * service that this handler is available (by invoking
-	     * "addHandler", and schedule a task to perform client
-	     * login (call the AppListener.loggedIn method).
+	     * Handle this login request locally: Validate that the
+	     * user is allowed to log in, store the client session in
+	     * the data store (which assigns it an ID--the ID of the
+	     * reference to the client session object), inform the
+	     * session service that this handler is available (by
+	     * invoking "addHandler"), and schedule a task to perform
+	     * client login (call the AppListener.loggedIn method).
 	     */
 	    if (!sessionService.validateUserLogin(
 		    identity, ClientSessionHandler.this))

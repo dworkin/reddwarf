@@ -306,7 +306,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
 		    StandardProperties.APP_PORT, "20000",
-		    "com.sun.sgs.impl.service.session.disconnect.delay", "199");
+		    "com.sun.sgs.impl.protocol.simple.disconnect.delay", "199");
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());

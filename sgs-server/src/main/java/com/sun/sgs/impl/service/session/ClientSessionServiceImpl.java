@@ -40,7 +40,6 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
@@ -77,7 +76,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -162,9 +160,6 @@ public final class ClientSessionServiceImpl
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
 
-    /** The disconnect delay (in milliseconds) for disconnecting sessions. */
-    private final long disconnectDelay;
-
     /** The local node's ID. */
     private final long localNodeId;
 
@@ -230,16 +225,6 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
-    /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
-     * the time the connection should expire.
-     */
-    private final ConcurrentSkipListMap<Long, ClientSessionHandler>
-	disconnectingHandlersMap =
-	    new ConcurrentSkipListMap<Long, ClientSessionHandler>();
-
-    /** The handle for the task that monitors disconnecting client sessions. */
-    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
-
     /** The maximum number of session events to sevice per transaction. */
     final int eventsPerTxn;
 
@@ -281,9 +266,6 @@ public final class ClientSessionServiceImpl
 	    eventsPerTxn = wrappedProps.getIntProperty(
 		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
 		1, Integer.MAX_VALUE);
-	    disconnectDelay = wrappedProps.getLongProperty(
-		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
-		200, Long.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
@@ -363,16 +345,6 @@ public final class ClientSessionServiceImpl
 		throw (Exception) ite.getCause();
 	    }
 	    
-	    /*
-	     * Set up recurring task to monitor disconnecting client sessions.
-	     */
-	    monitorDisconnectingSessionsTaskHandle =
-		taskScheduler.scheduleRecurringTask(
- 		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, System.currentTimeMillis(),
-		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
-	    monitorDisconnectingSessionsTaskHandle.start();
-
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -432,17 +404,7 @@ public final class ClientSessionServiceImpl
 		// swallow exception
 	    }
 	}
-
-	if (monitorDisconnectingSessionsTaskHandle != null) {
-	    try {
-		monitorDisconnectingSessionsTaskHandle.cancel();
-	    } finally {
-		monitorDisconnectingSessionsTaskHandle = null;
-	    }
-	}
-	    
-	disconnectingHandlersMap.clear();
-
+	
 	synchronized (flushContextsLock) {
 	    flushContextsLock.notifyAll();
 	}
@@ -1166,21 +1128,6 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Adds the specified {@code handler} to the map containing {@code
-     * ClientSessionHandler}s that are disconnecting.  The map is keyed by
-     * connection expiration time.  The connection will expire after a fixed
-     * delay and will be forcibly terminated if the client hasn't already
-     * closed the connection.
-     *
-     * @param	handler a {@code ClientSessionHandler} for a disconnecting
-     *		{@code ClientSession}
-     */
-    void monitorDisconnection(ClientSessionHandler handler) {
-	disconnectingHandlersMap.put(
-	    System.currentTimeMillis() + disconnectDelay,  handler);
-    }
-
-    /**
      * Schedules a non-durable, transactional task using the given
      * {@code Identity} as the owner.
      */
@@ -1236,36 +1183,6 @@ public final class ClientSessionServiceImpl
      */
     ChannelServiceImpl getChannelService() {
 	return channelService;
-    }
-
-    /**
-     * A task to monitor disconnecting {@code ClientSessionHandler}s to ensure
-     * that their associated connections are closed by the client in a
-     * timely manner.  If a connection is not terminated by the expiration
-     * time, then the connection is forcibly closed.
-     */
-    private class MonitorDisconnectingSessionsTask
-	extends AbstractKernelRunnable
-    {
-	/** Constructs and instance. */
-	MonitorDisconnectingSessionsTask() {
-	    super(null);
-	}
-	
-	/** {@inheritDoc} */
-	public void run() {
-	    long now = System.currentTimeMillis();
-	    if (!disconnectingHandlersMap.isEmpty() &&
-		disconnectingHandlersMap.firstKey() < now) {
-
-		Map<Long, ClientSessionHandler> expiredSessions = 
-		    disconnectingHandlersMap.headMap(now);
-		for (ClientSessionHandler handler : expiredSessions.values()) {
-		    handler.closeConnection();
-		}
-		expiredSessions.clear();
-	    }
-	}
     }
 
     /**

@@ -44,8 +44,10 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
@@ -102,6 +104,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** Messages enqueued to be sent after a login ack is sent. */
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
+    /** The immutable set of supported delivery requirements. */
+    private final Set<Delivery> deliverySet =
+	Collections.singleton(Delivery.RELIABLE);
+
     /**
      * Creates a new instance of this class.
      *
@@ -132,6 +138,11 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /* -- Implement SessionProtocol -- */
 
+    /** {@inheritDoc} */
+    public Set<Delivery> supportedDeliveries() {
+	return deliverySet;
+    }
+    
     /** {@inheritDoc} */
     public void sessionMessage(ByteBuffer message) {
 	ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
@@ -180,6 +191,14 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	writeOrEnqueueIfLoginNotHandled(buf);
     }
 
+    /** {@inheritDoc} */
+    public void disconnect(DisconnectReason reason) throws IOException {
+	// TBD: The SimpleSgsProtocol does not yet support sending a
+	// message to the client in the case of session termination or
+	// preemption, so just close the connection for now.
+	close();
+    }
+    
     /* -- Private methods for sending protocol messages -- */
 
     /**
@@ -216,6 +235,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
             putInt(node.getPort());
 	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
+	acceptor.monitorDisconnection(this);
     }
     
     /**
@@ -239,6 +259,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
             putString(reason);
         writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
+	acceptor.monitorDisconnection(this);
     }
     
     /**
@@ -249,9 +270,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	buf.put(SimpleSgsProtocol.LOGOUT_SUCCESS).
 	    flip();
 	writeToWriteHandler(buf);
+	acceptor.monitorDisconnection(this);
     }
 
     /* -- Implement Channel -- */
+    
+    /** {@inheritDoc} */
+    public boolean isOpen() {
+        return asyncMsgChannel.isOpen();
+    }
 
     /** {@inheritDoc} */
     public void close() throws IOException {
@@ -260,11 +287,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
         writeHandler = new ClosedWriteHandler();
     }
 
-    /** {@inheritDoc} */
-    public boolean isOpen() {
-        return asyncMsgChannel.isOpen();
-    }
-    
     /* -- Methods for reading and writing -- */
     
     /**
@@ -610,7 +632,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		}
 		    
 		protocolHandler =
-		    listener.newConnection(identity, SimpleSgsProtocolImpl.this);
+		    listener.newConnection(
+			identity, SimpleSgsProtocolImpl.this);
 		acceptor.scheduleNonTransactionalTask(
  		    new LoginCompletionTask(
 			protocolHandler.loginRequest()));
@@ -745,8 +768,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Task to wait for an associated request to complete. Reading is resumed when
-     * the associated task completes.
+     * Task to wait for an associated request to complete. Reading is resumed
+     * when request completes.
      */
     private class RequestCompletionTask extends AbstractKernelRunnable {
 
