@@ -34,6 +34,7 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
+import com.sun.sgs.protocol.LoginFailureException.FailureReason;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -102,8 +103,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /** The connection state. */
     private State state = State.CONNECTED;
 
-    private LoginCompletionFutureImpl loginCompletionFuture =
-	new LoginCompletionFutureImpl();
+    private final LoginCompletionFutureImpl loginCompletionFuture =
+	new LoginCompletionFutureImpl(this);
 
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
@@ -135,6 +136,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
         this.dataService = dataService;
 	this.protocol = sessionProtocol;
 	this.identity = identity;
+	
+	scheduleNonTransactionalTask(
+	    new AbstractKernelRunnable("HandleLoginRequest") {
+		public void run() {
+		    handleLoginRequest();
+		} });
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -145,17 +152,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /* -- Implement SessionProtocolHandler -- */
     
-    /** {@inheritDoc} */
-    public LoginCompletionFuture loginRequest() {
-	scheduleNonTransactionalTask(
-	    new AbstractKernelRunnable("HandleLoginRequest") {
-		public void run() {
-		    handleLoginRequest();
-		} });
-	return loginCompletionFuture;
-    }
-    
-
     /** {@inheritDoc} */
     public CompletionFuture sessionMessage(final ByteBuffer message) {
 	CompletionFutureImpl future = new CompletionFutureImpl();
@@ -240,6 +236,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /* -- Instance methods -- */
+
+    /** Returns the login completion future for this handler. */
+    LoginCompletionFuture getLoginCompletionFuture() {
+	return loginCompletionFuture;
+    }
 
     /**
      * Returns {@code true} if this handler is connected, otherwise
@@ -515,7 +516,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    logger.logThrow(
 	        Level.WARNING, e,
 		"getting node assignment for identity:{0} throws", identity);
-	    sendLoginFailureAndDisconnect(e);
+	    sendLoginFailureAndDisconnect(
+		new LoginFailureException(LOGIN_REFUSED_REASON, e));
 	    return;
 	}
 
@@ -534,7 +536,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    identity, ClientSessionHandler.this))
 	    {
 		// This login request is not allowed to proceed.
-		sendLoginFailureAndDisconnect(null);
+		sendLoginFailureAndDisconnect(
+		    new LoginFailureException(
+			LOGIN_REFUSED_REASON, FailureReason.DUPLICATE_LOGIN));
 		return;
 	    }
 	    taskQueue = sessionService.createTaskQueue();
@@ -546,7 +550,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		logger.logThrow(
 		    Level.WARNING, e,
 		    "Storing ClientSession for identity:{0} throws", identity);
-		sendLoginFailureAndDisconnect(e);
+		sendLoginFailureAndDisconnect(
+		    new LoginFailureException(LOGIN_REFUSED_REASON, e));
 		return;
 	    }
 	    sessionService.addHandler(
@@ -599,7 +604,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	synchronized (lock) {
 	    checkConnectedState();
 	    loggedIn = true;
-	    loginCompletionFuture.loginSuccess(sessionRefId);
+	    loginCompletionFuture.loginSuccess();
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -609,14 +614,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * the client, and sets local state indicating that the login request
      * has been handled.
      *
-     * @param	reason a reason for the login failure
-     * @param	throwable an exception that occurred while processing the
-     *		login request, or {@code null}
+     * @param	exception the login failure exception
      */
-    void loginFailure(String reason, Throwable throwable) {
+    void loginFailure(LoginFailureException exception) {
+	if (exception == null) {
+	    throw new NullPointerException("null exception");
+	}
 	synchronized (lock) {
 	    checkConnectedState();
-	    loginCompletionFuture.loginFailure(reason, throwable);
+	    loginCompletionFuture.loginFailure(exception);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -647,13 +653,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * @param	throwable an exception that occurred while processing the
      * 		login request, or {@code null}
      */
-    private void sendLoginFailureAndDisconnect(final Throwable throwable) {
-	// TBD: identity may be null. Fix to pass a non-null identity
-	// when scheduling the task.
+    private void sendLoginFailureAndDisconnect(
+ 	final LoginFailureException exception)
+    {
 	scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("SendLoginFailureMessage") {
 		public void run() {
-		    loginFailure(LOGIN_REFUSED_REASON, throwable);
+		    loginFailure(exception);
 		    handleDisconnect(false, false);
 		} });
     }
@@ -790,21 +796,28 @@ class ClientSessionHandler implements SessionProtocolHandler {
 			} });
 		
 	    } else {
+		LoginFailureException loginFailureEx;
 		if (ex == null) {
 		    logger.log(
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
+		    loginFailureEx = new LoginFailureException(
+			LOGIN_REFUSED_REASON, FailureReason.REJECTED_LOGIN);
 		} else if (!isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +
 			"session: {1} throws",
 			appListener, ClientSessionHandler.this);
+		    loginFailureEx =
+			new LoginFailureException(LOGIN_REFUSED_REASON, ex);
 		} else {
 		    throw ex;
 		}
-		sessionService.addLoginResult(sessionImpl, false, ex);
+		sessionService.addLoginResult(
+		    sessionImpl, false, loginFailureEx);
+
 		sessionImpl.disconnect();
 	    }
 	}
@@ -889,8 +902,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * This future is returned from {@link SessionProtocolHandler}
      * operations.
      */
-    private class LoginCompletionFutureImpl implements LoginCompletionFuture {
-
+    private static class LoginCompletionFutureImpl
+	implements LoginCompletionFuture
+    {
 	/** Lock for accessing this object's fields. */
 	private Object lock = new Object();
 	
@@ -900,14 +914,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 */
 	private boolean done = false;
 
-	/** A session ID, or {@code null}. */
-	private BigInteger sessionId = null;
+	/** A session protocol handler. */
+	private final SessionProtocolHandler handler;
 
 	/** An exception cause, or {@code null}. */
 	private Throwable exceptionCause = null;
 
 	/** Constructs an instance. */
-	LoginCompletionFutureImpl() {
+	LoginCompletionFutureImpl(SessionProtocolHandler handler) {
+	    this.handler = handler;
 	}
 
 	/** {@inheritDoc} */
@@ -916,23 +931,23 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	/** {@inheritDoc} */
-	public BigInteger get()
+	public SessionProtocolHandler get()
 	    throws InterruptedException, ExecutionException
 	{
 	    synchronized (lock) {
 		while (!done) {
 		    lock.wait();
 		}
-		if (sessionId != null) {
-		    return sessionId;
-		} else {
+		if (exceptionCause != null) {
 		    throw new ExecutionException(exceptionCause);
+		} else {
+		    return handler;
 		}
 	    }
 	}
 
 	/** {@inheritDoc} */
-	public BigInteger get(long timeout, TimeUnit unit)
+	public SessionProtocolHandler get(long timeout, TimeUnit unit)
 	    throws InterruptedException, ExecutionException, TimeoutException
 	{
 	    synchronized (lock) {
@@ -941,10 +956,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		}
 		if (!done) {
 		    throw new TimeoutException();
-		} else if (sessionId != null) {
-		    return sessionId;
-		} else {
+		} else if (exceptionCause != null) {
 		    throw new ExecutionException(exceptionCause);
+		} else {
+		    return handler;
 		}
 	    }
 	}
@@ -966,12 +981,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 * is complete. Subsequent invocations to {@link #isDone
 	 * isDone} will return {@code true}.
 	 */
-	void loginSuccess(BigInteger sessionId) {
-	    if (sessionId == null) {
-		throw new NullPointerException("null sessionId");
-	    }
+	void loginSuccess() {
 	    synchronized (lock) {
-		this.sessionId = sessionId;
 		done = true;
 		lock.notifyAll();
 	    }
@@ -987,9 +998,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		lock.notifyAll();
 	    }
 	}
-	void loginFailure(String reason, Throwable throwable) {
+	void loginFailure(LoginFailureException loginFailureException) {
 	    synchronized (lock) {
-		exceptionCause = new LoginFailureException(reason, throwable);
+		exceptionCause = loginFailureException;
 		done = true;
 		lock.notifyAll();
 	    }

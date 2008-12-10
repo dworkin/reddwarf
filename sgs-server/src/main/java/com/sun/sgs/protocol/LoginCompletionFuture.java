@@ -30,17 +30,16 @@ import java.util.concurrent.TimeoutException;
  * SessionProtocolHandler#loginRequest SessionProtocolHandler.loginRequest}
  * operation.
  */
-public interface LoginCompletionFuture extends Future<BigInteger> {
+public interface LoginCompletionFuture extends Future<SessionProtocolHandler> {
 
     /**
      * {@inheritDoc}
      *
-     * <p>Returns the session ID for the identity associated with the login
-     * request. If login fails, this method will throw {@link
+     * <p>Returns the protocol handler for the identity associated with the
+     * login request. If login fails, this method will throw {@link
      * ExecutionException} with a <i>cause</i> that indicates the
-     * exceptional condition that occurred.  The {@link
-     * Throwable#getCause getCause} method may return one of the following
-     * exceptions: <ul>
+     * exceptional condition that occurred.  The {@link Throwable#getCause
+     * getCause} method may return one of the following exceptions: <ul>
      *
      * <li>{@code LoginRedirectException}: indicates that the login should
      * be redirected to the node returned by the exception's {@link
@@ -52,17 +51,17 @@ public interface LoginCompletionFuture extends Future<BigInteger> {
      * <i>cause</i> (possibly {@code null} of the login failure.</li>
      * </ul>
      */
-    BigInteger get() throws InterruptedException, ExecutionException;
+    SessionProtocolHandler get()
+	throws InterruptedException, ExecutionException;
 
     /**
      * {@inheritDoc}
      *
-     * <p>Returns the session ID for the identity associated with the login
-     * request. If login fails, this method will throw {@link
+     * <p>Returns the protocol handler for the identity associated with the
+     * login request. If login fails, this method will throw {@link
      * ExecutionException} with a <i>cause</i> that indicates the
-     * exceptional condition that occurred.  The {@link
-     * Throwable#getCause getCause} method may return one of the following
-     * exceptions: <ul>
+     * exceptional condition that occurred.  The {@link Throwable#getCause
+     * getCause} method may return one of the following exceptions: <ul>
      *
      * <li>{@code LoginRedirectException}: indicates that the login should
      * be redirected to the node returned by the exception's {@link
@@ -74,6 +73,6 @@ public interface LoginCompletionFuture extends Future<BigInteger> {
      * <i>cause</i> (possibly {@code null} of the login failure.</li>
      * </ul>
      */
-    BigInteger get(long timeout, TimeUnit unit)
+    SessionProtocolHandler get(long timeout, TimeUnit unit)
 	throws InterruptedException, ExecutionException, TimeoutException;
 }

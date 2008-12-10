@@ -394,8 +394,7 @@ public class SimpleSgsProtocolAcceptor
 	implements CompletionHandler<AsynchronousSocketChannel, Void>
     {
 	/** Handle new connection or report failure. */
-	public void completed(
-			      IoFuture<AsynchronousSocketChannel, Void> result)
+	public void completed(IoFuture<AsynchronousSocketChannel, Void> result)
 	{
 	    try {
 		try {
@@ -405,7 +404,7 @@ public class SimpleSgsProtocolAcceptor
 		    
 		    /*
 		     * The protocol will call the ProtocolListener's
-		     * newConnection method if the authentication succeeds.
+		     * newLogin method if the authentication succeeds.
 		     */
 		    new SimpleSgsProtocolImpl(
 			protocolListener,

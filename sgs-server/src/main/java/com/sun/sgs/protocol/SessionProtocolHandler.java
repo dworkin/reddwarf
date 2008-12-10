@@ -38,20 +38,6 @@ import java.util.concurrent.ExecutionException;
 public interface SessionProtocolHandler {
 
     /**
-     * Processes a login request for the identity associated with this
-     * handler and returns a future for the result, a session ID.
-     * If the login request is processed successfully, then invoking the
-     * {@link LoginCompletionFuture#get get} method on the returned future
-     * returns the session ID for the associated session's login.  If the
-     * login was unsuccessful, the {@code get} method throws {@link
-     * ExecutionException} which contains a <i>cause</i> that indicates why
-     * the login failed.
-     *
-     * @return	future a future for the result
-     */
-    LoginCompletionFuture loginRequest();
-
-    /**
      * Processes a message sent by the associated client and returns a
      * future for determining when this handler has completed processing
      * the session message.

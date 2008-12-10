@@ -28,15 +28,23 @@ import java.math.BigInteger;
 public interface ProtocolListener {
 
     /**
-     * Notifies this listener that an incoming connection with the
-     * specified {@code identity} and {@code protocol} as been established,
-     * and returns a handler for processing incoming requests received by
-     * the protocol.
+     * Handles a new login request for the specified {@code identity} and
+     * corresponding {@code protocol}, and returns a future for the result,
+     * a {@link SessionProtocolHandler} for processing incoming requests
+     * received by the protocol.
+     *
+     * <p>If the login request is processed successfully, then invoking the
+     * {@link LoginCompletionFuture#get get} method on the returned future
+     * returns the {@code SessionProtocolHandler} for processing incoming
+     * request received by the protocol.  If the
+     * login was unsuccessful, the {@code get} method throws {@link
+     * ExecutionException} which contains a <i>cause</i> that indicates why
+     * the login failed.
      *
      * @param	identity an identity
      * @param	protocol a session protocol
-     * @return	a protocol handler for processing incoming requests
+     * @return	a future for obtaining the protocol handler
      */
-    SessionProtocolHandler newConnection(
+    LoginCompletionFuture newLogin(
 	Identity identity, SessionProtocol protocol);
 }

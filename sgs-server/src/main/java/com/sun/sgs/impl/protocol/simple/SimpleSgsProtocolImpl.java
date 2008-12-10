@@ -43,6 +43,7 @@ import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -71,6 +72,14 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The default reason string returned for login failure. */
     private static final String DEFAULT_LOGIN_FAILED_REASON = "login refused";
 
+    /** The default length of the reconnect key, in bytes.
+     * TBD: the reconnection key length should be configurable.
+     */
+    private static final int DEFAULT_RECONNECT_KEY_LENGTH = 16;
+
+    /** A random number generator for reconnect keys. */
+    private static SecureRandom random = new SecureRandom();
+    
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...).
@@ -88,6 +97,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** The identity. */
     private volatile Identity identity;
+
+    /** The reconnect key. */
+    private byte[] reconnectKey;
 
     /** The completion handler for reading from the I/O channel. */
     private volatile ReadHandler readHandler = new ConnectedReadHandler();
@@ -127,7 +139,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
 	this.listener = listener;
 	this.acceptor = acceptor;
-
+	this.reconnectKey = getNextReconnectKey();
+	
 	/*
 	 * TBD: It might be a good idea to implement high- and low-water marks
 	 * for the buffers, so they don't go into hysteresis when they get
@@ -192,27 +205,23 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void disconnect(DisconnectReason reason) throws IOException {
+    public void disconnect(DisconnectReason reason) {
 	// TBD: The SimpleSgsProtocol does not yet support sending a
 	// message to the client in the case of session termination or
 	// preemption, so just close the connection for now.
-	close();
+	try {
+	    close();
+	} catch (IOException e) {
+	}
     }
     
     /* -- Private methods for sending protocol messages -- */
 
     /**
      * Notifies the associated client that the previous login attempt was
-     * successful, and the client is assigned the given {@code sessionId}.
-     *
-     * @param	sessionId a session ID
+     * successful.
      */
-    private void loginSuccess(BigInteger sessionId) {
-	// FIXME: currently we choose the reconnect key to be
-	// the session ID, to facilitate the test of the Channel Service.
-	// If the reconnect key is generated some other way, the test
-	// will have to be updated to get the session key some other way.
-	byte[] reconnectKey = sessionId.toByteArray();
+    private void loginSuccess() {
 	MessageBuffer buf = new MessageBuffer(1 + reconnectKey.length);
 	buf.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 	    putBytes(reconnectKey);
@@ -366,6 +375,17 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	}
     }
     
+    /**
+     * Returns the next reconnect key.
+     *
+     * @return the next reconnect key
+     */
+    private static synchronized byte[] getNextReconnectKey() {
+	byte[] key = new byte[DEFAULT_RECONNECT_KEY_LENGTH];
+	random.nextBytes(key);
+	return key;
+    }
+
     /* -- I/O completion handlers -- */
 
     /** A completion handler for writing to a connection. */
@@ -630,13 +650,12 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    
 		    break;
 		}
-		    
-		protocolHandler =
-		    listener.newConnection(
+
+		LoginCompletionFuture loginCompletionFuture =
+		    listener.newLogin(
 			identity, SimpleSgsProtocolImpl.this);
 		acceptor.scheduleNonTransactionalTask(
- 		    new LoginCompletionTask(
-			protocolHandler.loginRequest()));
+ 		    new LoginCompletionTask(loginCompletionFuture));
 		
                 // Resume reading immediately
 		read();
@@ -714,7 +733,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			"unknown opcode 0x{0}",
 			Integer.toHexString(opcode));
 		}
-		protocolHandler.disconnect();
+		if (protocolHandler != null) {
+		    protocolHandler.disconnect();
+		}
 		break;
 	    }
 	}
@@ -743,8 +764,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	/** {@inheritDoc} */
 	public void run() {
 	    try {
-		BigInteger sessionId = future.get();
-		loginSuccess(sessionId);
+		protocolHandler = future.get();
+		loginSuccess();
 		
 	    } catch (InterruptedException e) {
 		// reschedule interrupted execution

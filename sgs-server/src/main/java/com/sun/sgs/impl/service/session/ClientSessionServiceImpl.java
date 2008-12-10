@@ -41,6 +41,8 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.protocol.LoginCompletionFuture;
+import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
@@ -479,12 +481,12 @@ public final class ClientSessionServiceImpl
     private class ProtocolListenerImpl implements ProtocolListener {
 
 	/** {@inheritDoc} */
-	public SessionProtocolHandler newConnection(
+	public LoginCompletionFuture newLogin(
 	    Identity identity, SessionProtocol protocol)
 	{
-	    return new ClientSessionHandler(
+	    ClientSessionHandler handler = new ClientSessionHandler(
 		ClientSessionServiceImpl.this, dataService, protocol, identity);
-	    
+	    return handler.getLoginCompletionFuture();
 	}
 	
     }
@@ -523,18 +525,17 @@ public final class ClientSessionServiceImpl
      *
      * @param	session	a client session
      * @param	success if {@code true}, login was successful
-     * @param	throwable an exception that occurred while processing the
-     *		login request, or {@code null} (only valid if {@code
-     *		success} is {@code false}
+     * @param	exception a login failure exception, or {@code null} (only valid
+     *		if {@code *		success} is {@code false}
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
     void addLoginResult(
-	ClientSessionImpl session, boolean success, Throwable throwable)
+	ClientSessionImpl session, boolean success, LoginFailureException ex)
     {
 	Context context = checkContext();
-	context.addLoginResult(session, success, throwable);
+	context.addLoginResult(session, success, ex);
     }
 
     /**
@@ -596,7 +597,8 @@ public final class ClientSessionServiceImpl
 	 * the login acknowledgment.
 	 */
 	void addLoginResult(
-	    ClientSessionImpl session, boolean success, Throwable throwable)
+	    ClientSessionImpl session, boolean success,
+	    LoginFailureException ex)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -607,7 +609,7 @@ public final class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		getCommitActions(session).addLoginResult(success, throwable);
+		getCommitActions(session).addLoginResult(success, ex);
 
 	    
 	    } catch (RuntimeException e) {
@@ -780,7 +782,7 @@ public final class ClientSessionServiceImpl
 	private boolean loginSuccess = false;
 
 	/** The login exception. */
-	private Throwable loginException;
+	private LoginFailureException loginException;
 	
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
@@ -799,10 +801,10 @@ public final class ClientSessionServiceImpl
 	    messages.add(message);
 	}
 
-	void addLoginResult(boolean success, Throwable throwable) {
+	void addLoginResult(boolean success, LoginFailureException ex) {
 	    sendLoginResult = true;
 	    loginSuccess = success;
-	    loginException = throwable;
+	    loginException = ex;
 	}
 	
 	void setDisconnect() {
@@ -841,7 +843,7 @@ public final class ClientSessionServiceImpl
 		    if (loginSuccess) {
 			handler.loginSuccess();
 		    } else {
-			handler.loginFailure("login refused", loginException);
+			handler.loginFailure(loginException);
 			return;
 		    }
 		}

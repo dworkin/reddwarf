@@ -1129,6 +1129,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
 	client.connect(serverNode.getAppPort()).login();
+	client.sendMessage(new byte[0]);
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
@@ -1243,7 +1244,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String reason;
 	private String redirectHost;
         private int redirectPort;
-	private byte[] reconnectKey;
+	private byte[] reconnectKey = new byte[0];
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -1413,9 +1414,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 */
 	void sendMessage(byte[] message) {
 	    MessageBuffer buf =
-		new MessageBuffer(1+ message.length);
+		new MessageBuffer(5 + reconnectKey.length + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putBytes(message);
+		putByteArray(reconnectKey).
+		putByteArray(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1615,6 +1617,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			System.err.println("login succeeded: " + name);
 			lock.notifyAll();
 		    }
+		    sendMessage(new byte[0]);
 		    break;
 		    
 		case SimpleSgsProtocol.LOGIN_FAILURE:
@@ -1772,6 +1775,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final static long serialVersionUID = 1L;
 	private final String name;
 	private final BigInteger sessionRefId;
+	private BigInteger reconnectKey;
 	private final boolean disconnectedThrowsException;
 
 
@@ -1792,7 +1796,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			       "] disconnected invoked with " + graceful);
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.markForUpdate(this);
-	    DummyClient client = dummyClients.get(sessionRefId);
+	    DummyClient client = dummyClients.get(reconnectKey);
 	    ClientSession session = (ClientSession)
 		dataManager.getBinding(name);
 	    dataManager.removeObject(session);
@@ -1809,9 +1813,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void receivedMessage(ByteBuffer message) {
-            byte[] bytes = new byte[message.remaining()];
-            message.asReadOnlyBuffer().get(bytes);
-	    DummyClient client = dummyClients.get(sessionRefId);
+            byte[] messageBytes = new byte[message.remaining()];
+	    message.get(messageBytes);
+	    MessageBuffer buf = new MessageBuffer(messageBytes);
+	    AppContext.getDataManager().markForUpdate(this);
+	    reconnectKey = new BigInteger(1, buf.getByteArray());
+	    byte[] bytes = buf.getByteArray();
+	    if (bytes.length == 0) {
+		return;
+	    }
+	    DummyClient client = dummyClients.get(reconnectKey);
 	    System.err.println(
 		"receivedMessage: " + HexDumper.toHexString(bytes) + 
 		"\nthrowException: " + client.throwException);
