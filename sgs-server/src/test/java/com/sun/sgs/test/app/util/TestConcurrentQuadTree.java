@@ -9,6 +9,7 @@ import java.util.Random;
 import junit.framework.TestCase;
 
 import com.sun.sgs.app.util.ConcurrentQuadTree;
+import com.sun.sgs.app.util.QuadTreeIterator;
 
 public class TestConcurrentQuadTree extends TestCase {
     private ConcurrentQuadTree<String> quadtree;
@@ -206,7 +207,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	// test simple one-level add and remove
 	tree.put(5, 5, "A");
 	assertFalse(tree.isEmpty());
-	assertNotNull(tree.remove(5, 5));
+	assertNotNull(tree.removeAll(5, 5));
 
 	assertTrue(tree.isEmpty());
 
@@ -217,9 +218,9 @@ public class TestConcurrentQuadTree extends TestCase {
 	tree.put(99, 1, "C");
 	assertFalse(tree.isEmpty());
 	// begin removing
-	assertNotNull(tree.remove(1, 1));
+	assertNotNull(tree.removeAll(1, 1));
 	assertFalse(tree.isEmpty());
-	assertNotNull(tree.remove(99, 1));
+	assertNotNull(tree.removeAll(99, 1));
 
 	assertTrue(tree.isEmpty());
     }
@@ -298,11 +299,8 @@ public class TestConcurrentQuadTree extends TestCase {
 	for (int i = 0; i < timesToRun; i++) {
 	    double x = values[i][TestContainer.X];
 	    double y = values[i][TestContainer.Y];
-	    String s = tree.remove(x, y);
-	    if (s != null) {
-		assertEquals(Double.toString(values[i][TestContainer.VALUE]),
-			s);
-	    }
+	    boolean b = tree.removeAll(x, y);
+	    assertTrue(b);
 	}
 	assertTrue(tree.isEmpty());
     }
@@ -313,43 +311,48 @@ public class TestConcurrentQuadTree extends TestCase {
 	// Create a tree with a bucket size larger than 1
 	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(5, 0, 0, 100, 100);
 	assertTrue(tree.isEmpty());
-	tree.put(1, 1, "A");
-	tree.put(1, 1, "B");
-	tree.put(1, 1, "C");
-	assertNotNull(tree.remove(1, 1));
-	assertNotNull(tree.remove(1, 1));
-	assertNotNull(tree.remove(1, 1));
+	final double x1 = 1.0;
+	final double y1 = 2.0;
+	tree.put(x1, y1, "A");
+	tree.put(x1, y1, "B");
+	tree.put(x1, y1, "C");
 	
-	tree.put(99, 99, "D");
-	tree.put(99, 99, "E");
-	tree.put(99, 99, "F");
-	assertNotNull(tree.remove(99, 99));
-	assertNotNull(tree.remove(99, 99));
-	assertNotNull(tree.remove(99, 99));
-	
-    }
-    
-    
-    public void testRemovingAtSamePoint() {
-	final int bucketSize = 5;
-	ConcurrentQuadTree<String> tree = new ConcurrentQuadTree<String>(bucketSize, 0, 0, 100, 100);
+	QuadTreeIterator<String> iter = tree.iterator();
+	String s;
+	int i = 0;
+	while (iter.hasNext()) {
+	    i++;
+	    s = iter.next();
+	    assertTrue(s == "A" || s == "B" || s == "C");
+	    assertEquals(x1, iter.currentX());
+	    assertEquals(y1, iter.currentY());
+	}
+	assertEquals(3, i);
+	assertTrue(tree.removeAll(x1, y1));
 	assertTrue(tree.isEmpty());
-	List<String> shadow = new ArrayList<String>();
 	
-	// add to the tree and shadow
-	for (int i=0 ; i<bucketSize ; i++) {
-	    String s = Integer.toString(i);
-	    tree.put(1, 1, s);
-	    shadow.add(s);
+	// try with a few more elements this time
+	final double x2 = 99;
+	final double y2 = 97;
+	tree.put(x2, y2, "D");
+	tree.put(x2, y2, "E");
+	tree.put(x2, y2, "F");
+	tree.put(x2, y2, "G");
+	tree.put(x2, y2, "H");
+	i = 0;
+	iter = tree.iterator();
+	while (iter.hasNext()) {
+	    i++;
+	    s = iter.next();
+	    assertTrue(s == "D" || s == "E" || s == "F" || s == "G" ||
+		    s == "H");
+	    assertEquals(x2, iter.currentX());
+	    assertEquals(y2, iter.currentY());
 	}
-	
-	// remove from the tree and shadow list
-	String val;
-	while ((val = tree.remove(1, 1)) != null) {
-	    shadow.remove(val);
-	}
-	assertEquals(shadow.isEmpty(), tree.isEmpty());
+	assertEquals(5, i);
+	assertTrue(tree.removeAll(x2, y2));
     }
+    
     
     
     /**
@@ -379,66 +382,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	    return table;
 	}
     }
-
-    private void setUsingRandomEntries(int bucketSize, int iterations) {
-	TestContainer container = addToTree(bucketSize, iterations);
-	ConcurrentQuadTree<String> tree = container.getTree();
-	double values[][] = container.getTable();
-
-	for (int i = 0; i < values.length; i++) {
-	    String old =
-		    tree.set(values[i][TestContainer.X],
-			    values[i][TestContainer.Y], Integer.toString(i));
-	    assertEquals(Double.toString(values[i][TestContainer.VALUE]), old);
-	}
-    }
-
-    public void testSetWithRandomEntries_BucketSize1() {
-	setUsingRandomEntries(1, 2);
-    }
-
-    public void testSetWithRandomEntries_BucketSize2() {
-	setUsingRandomEntries(2, 5);
-    }
-
-    public void testSetWithRandomEntries_BucketSize3() {
-	setUsingRandomEntries(3, 10);
-    }
-
-    public void testSetWithRandomEntries_BucketSize4() {
-	setUsingRandomEntries(4, 25);
-    }
-
-    public void testSetWithRandomEntries_StressTest_BucketSize1() {
-	setUsingRandomEntries(1, 100);
-    }
-
-    public void testSetWithRandomEntries_StressTest_BucketSize2() {
-	setUsingRandomEntries(2, 100);
-    }
-    
-    public void testSetWithRandomEntries_StressTest_BucketSize3() {
-	setUsingRandomEntries(3, 100);
-    }
-    
-    public void testSetWithRandomEntries_StressTest_BucketSize10() {
-	setUsingRandomEntries(10, 100);
-    }
-
-    public void testSetCornerCases() {
-	ConcurrentQuadTree<String> tree = makeEmptyTree();
-	assertTrue(tree.isEmpty());
-
-	// This set command should not have changed the tree
-	String s = tree.set(1, 1, "A");
-	assertEquals(null, s);
-	assertTrue(tree.isEmpty());
-
-	// should not change tree; tree is still empty
-	s = tree.set(1, 1, null);
-	assertEquals(null, s);
-	assertTrue(tree.isEmpty());
-    }
+   
 
     private void getUsingRandomEntries(int maxDepth, int iterations) {
 	TestContainer container = addToTree(maxDepth, iterations);
@@ -448,7 +392,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	for (int i = 0; i < iterations; i++) {
 	    double x = values[i][TestContainer.X];
 	    double y = values[i][TestContainer.Y];
-	    assertEquals(Double.toString(values[i][TestContainer.VALUE]), tree.get(x, y));
+	    assertTrue(tree.contains(x, y));
 	}
     }
 
@@ -722,7 +666,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	assertFalse(tree.contains(1, 0.99));
 	
 	// remove and check again
-	assertNotNull(tree.remove(1, 1));
+	assertNotNull(tree.removeAll(1, 1));
 	assertFalse(tree.contains(1, 1));
 	
 	// try adding duplicates; this should be fine
@@ -730,9 +674,7 @@ public class TestConcurrentQuadTree extends TestCase {
 	tree.put(99, 99, s);
 	tree.put(99, 99, s);
 	assertTrue(tree.contains(99, 99));
-	assertNotNull(tree.remove(99, 99));
-	assertTrue(tree.contains(99, 99));
-	assertNotNull(tree.remove(99, 99));
+	assertTrue(tree.removeAll(99, 99));
 	assertFalse(tree.contains(99, 99));
     }
     
@@ -748,10 +690,10 @@ public class TestConcurrentQuadTree extends TestCase {
 	// exactly equal to (1, 1), they should return null
 	for (int i=0 ; i<10 ; i++) {
 	    double decimal = random.nextDouble() + 0.000001;
-	    assertEquals(null, tree.remove(1 + decimal, 1));
-	    assertEquals(null, tree.remove(1 - decimal, 1));
-	    assertEquals(null, tree.remove(1, 1 + decimal));
-	    assertEquals(null, tree.remove(1, 1 - decimal));
+	    assertFalse(tree.removeAll(1 + decimal, 1));
+	    assertFalse(tree.removeAll(1 - decimal, 1));
+	    assertFalse(tree.removeAll(1, 1 + decimal));
+	    assertFalse(tree.removeAll(1, 1 - decimal));
 	}
     }
     

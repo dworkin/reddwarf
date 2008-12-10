@@ -34,7 +34,7 @@ public interface QuadTreeIterator<T> extends Iterator<T> {
 	 * to by the iterator, or {@code NaN} if there is no element
 	 * currently pointed to by the iterator
 	 */
-	double getX();
+	double currentX();
 	
 	/**
 	 * Returns the y-coordinate of the element currently pointed
@@ -43,7 +43,7 @@ public interface QuadTreeIterator<T> extends Iterator<T> {
 	 * to by the iterator, or {@code NaN} if there is no element
 	 * currently pointed to by the iterator
 	 */
-	double getY();
+	double currentY();
 	
 	/**
 	 * Advances the iterator without returning the next element in the
@@ -59,7 +59,7 @@ public interface QuadTreeIterator<T> extends Iterator<T> {
 	 * would cause an {@code ObjectNotFoundException} to be thrown if
 	 * {@code next()} had been called instead
 	 */
-	boolean nextWithoutReturningElement();
+	boolean nextNoReturn();
 	
 	/**
 	 * Returns the element the cursor is pointing to. This should be used
@@ -71,5 +71,5 @@ public interface QuadTreeIterator<T> extends Iterator<T> {
 	 * @return the element that the cursor is pointing to, or {@code null}
 	 * if there is no reference to the element
 	 */
-	T getCurrentElement();
+	T current();
 }

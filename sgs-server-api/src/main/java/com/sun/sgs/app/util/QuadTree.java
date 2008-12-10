@@ -69,28 +69,6 @@ public interface QuadTree<T> extends ManagedObjectRemoval {
      */
     boolean contains(double x, double y);
     
-    /**
-     * Removes an element from the quadtree corresponding to the provided
-     * coordinate and returns the result of the operation.
-     * 
-     * @param x the x-coordinate of the element to remove
-     * @param y the y-coordinate of the element to remove
-     * @return {@code true} if the object was removed, and {@code false}
-     * otherwise
-     */
-    boolean delete(double x, double y);
-    
-    /**
-     * Returns the element with the given Cartesian parameters. If the
-     * parameters do not correspond to a stored element, then {@code null} is
-     * returned.
-     * 
-     * @param x the x-coordinate of the arbitrary point
-     * @param y the y-coordinate of the arbitrary point
-     * @return the element at the given coordinates, or {@code null} if none
-     * exists
-     */
-    T get(double x, double y);
     
     /**
      * Returns an array of four coordinates which represent the individual x
@@ -125,26 +103,14 @@ public interface QuadTree<T> extends ManagedObjectRemoval {
     public QuadTreeIterator<T> iterator();
     
     /**
-     * Removes an element from the quadtree corresponding to the provided
+     * Removes all elements from the quadtree corresponding to the provided
      * coordinate.
      * 
      * @param x the x-coordinate of the element to remove
      * @param y the y-coordinate of the element to remove
-     * @return the object corresponding to the coordinate, or {@code null} if
-     * none exists
-     * @throws ObjectNotFoundException if the underlying element was removed
-     * from the data manager
+     * @return {@code true} if there was at least one element removed, and
+     * {@code false} otherwise
      */
-    public T remove(double x, double y);
+    public boolean removeAll(double x, double y);
     
-    /**
-     * Replaces the element at the given coordinate with the given parameter.
-     * 
-     * @param x the x-coordinate to set the new element
-     * @param y the y-coordinate to set the new element
-     * @param element the new element to replace the current one
-     * @return the old element which was replaced, or {@code null} if there
-     * was no element existing at the supplied coordinate
-     */
-    public T set(double x, double y, T element);
 }
