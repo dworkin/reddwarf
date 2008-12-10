@@ -805,10 +805,14 @@ public class DataStoreImpl
 	boolean done = false;
 	try {
 	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
-	    if(!directoryFile.exists() && !directoryFile.mkdirs()) {
-		throw new DataStoreException("Unable to create database " + 
-					     "directory : " +
-					     directoryFile.getName());
+            if (!directoryFile.exists()) {
+                logger.log(Level.INFO, "Creating database directory : " +
+                           directoryFile.getAbsolutePath());
+                if (!directoryFile.mkdirs()) {
+                    throw new DataStoreException("Unable to create database " +
+                                                 "directory : " +
+                                                 directoryFile.getName());
+                }
 	    }
 	    env = DbEnvironmentFactory.getEnvironment(
 		directory, properties, scheduler);

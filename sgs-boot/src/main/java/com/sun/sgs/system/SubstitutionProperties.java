@@ -22,6 +22,7 @@ package com.sun.sgs.system;
 import java.util.Properties;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Enumeration;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.Reader;
@@ -164,9 +165,10 @@ public class SubstitutionProperties extends Properties {
      * not exist, it is replaced with the empty string.
      */
     private void replaceAll() {
-        Set<String> properties = super.stringPropertyNames();
-        for (String p : properties) {
-            replace(p, new HashSet<String>());
+        for (Enumeration<?> e = this.propertyNames();
+                e.hasMoreElements(); )  {
+            String property = (String) e.nextElement();
+            replace(property, new HashSet<String>());
         }
     }
     

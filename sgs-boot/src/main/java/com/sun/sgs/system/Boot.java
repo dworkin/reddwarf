@@ -77,13 +77,17 @@ public final class Boot {
             properties = BootEnvironment.loadProperties(args[0]);
         }
         
-        //get the java executable
-        String javaCmd = "java";
+        //get the java executable and verify version
         String javaHome = properties.getProperty(BootEnvironment.JAVA_HOME);
-        if (javaHome != null) {
-            javaCmd = javaHome + File.separator + "bin" + 
-                    File.separator + javaCmd;
+        if (System.getProperty("java.home").equals(javaHome) &&
+                System.getProperty("java.version").startsWith("1.5.")) {
+            logger.log(Level.SEVERE,
+                       "Project Darkstar Server requires Java 6 or higher");
+            throw new IllegalStateException(
+                    "Project Darkstar Server requires Java 6 or higher");
         }
+        String javaCmd = javaHome + File.separator + "bin" +
+                File.separator + "java";
         
         //build the command
         List<String> executeCmd = new ArrayList<String>();
@@ -93,7 +97,7 @@ public final class Boot {
         executeCmd.add("-Djava.library.path=" + bootNativePath(properties));
         executeCmd.add("-Djava.util.logging.config.file=" + 
                        properties.getProperty(BootEnvironment.SGS_LOGGING));
-        for(String i : bootCommandLineProps(properties)) {
+        for (String i : bootCommandLineProps(properties)) {
             executeCmd.add(i);
         }
         for (String j : bootJavaOpts(properties)) {
@@ -111,7 +115,7 @@ public final class Boot {
         
         //get the output stream
         OutputStream output = System.out;
-        String logFile = properties.getProperty(BootEnvironment.SGS_LOGFILE);
+        String logFile = properties.getProperty(BootEnvironment.SGS_OUTPUT);
         if (logFile != null) {
             try {
                 //attempt to create any necessary parent directories
@@ -281,7 +285,7 @@ public final class Boot {
         String type = env.getProperty(BootEnvironment.BDB_TYPE);
         String bdb = env.getProperty(BootEnvironment.BDB_NATIVES);
         String custom = env.getProperty(BootEnvironment.CUSTOM_NATIVES);
-        StringBuffer buf = new StringBuffer();
+        StringBuilder buf = new StringBuilder();
         
         if (type.equals("db")) {
             buf.append(bdb);

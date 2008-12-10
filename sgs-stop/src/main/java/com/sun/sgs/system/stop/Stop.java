@@ -17,8 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.system;
+package com.sun.sgs.system.stop;
 
+import com.sun.sgs.system.BootEnvironment;
+import com.sun.sgs.system.SubstitutionProperties;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.InetAddress;

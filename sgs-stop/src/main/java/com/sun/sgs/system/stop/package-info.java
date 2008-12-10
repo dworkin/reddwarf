@@ -18,7 +18,7 @@
  */
 
 /**
- * Provides utilities to bootstrap, launch, and shutdown a 
+ * Provides utilities to shutdown a 
  * Project Darkstar Server application.
  */
-package com.sun.sgs.system;
+package com.sun.sgs.system.stop;

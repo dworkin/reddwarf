@@ -687,19 +687,22 @@ class Kernel {
             
             return properties;
         } catch (IOException ioe) {
-            if (logger.isLoggable(Level.SEVERE))
+            if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, ioe, "Unable to load " +
                                 "from resource {0}: ", resource);
+            }
             throw ioe;
         } finally {
-            if (in != null)
+            if (in != null) {
                 try {
                     in.close();
                 } catch (IOException e) {
-                    if (logger.isLoggable(Level.CONFIG))
-                        logger.logThrow(Level.CONFIG, e, "failed to close "+
+                    if (logger.isLoggable(Level.CONFIG)) {
+                        logger.logThrow(Level.CONFIG, e, "failed to close " +
                                         "resource {0}", resource);
+                    }
                 }
+            }
         }
     }
     
@@ -876,7 +879,7 @@ class Kernel {
         if (propLoc != null && !propLoc.equals("")) {
             File propFile = new File(propLoc);
             if (!propFile.isFile() || !propFile.canRead()) {
-                logger.log(Level.SEVERE, "can't access file :" + propFile);
+                logger.log(Level.SEVERE, "can't access file : " + propFile);
                 throw new IllegalArgumentException("can't access file " + 
                                                    propFile);
             }
@@ -893,6 +896,8 @@ class Kernel {
         if (homeConfig.isFile() && homeConfig.canRead()) {
             homeProperties = loadProperties(homeConfig.toURI().toURL(),
                                             fileProperties);
+        } else if (homeConfig.isFile() && !homeConfig.canRead()) {
+            logger.log(Level.WARNING, "can access file : " + homeConfig);
         }
         
         // override any properties with the values from the System properties
@@ -940,7 +945,7 @@ class Kernel {
      */
     public static void main(String [] args) throws Exception {
         // ensure we don't have too many arguments
-        if(args.length > 1) {
+        if (args.length > 1) {
             logger.log(Level.SEVERE, "Invalid number of arguments: halting");
             System.exit(1);
         }
@@ -950,8 +955,7 @@ class Kernel {
         Properties appProperties = null;
         if (args.length == 1) {
             appProperties = findProperties(args[0]);
-        }
-        else {
+        } else {
             appProperties = findProperties(null);
         }
         

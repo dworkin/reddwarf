@@ -35,7 +35,7 @@ import java.util.logging.Level;
  * This class also provides utility methods to load configuration properties
  * from a config file into a {@link SubstitutionProperties} object.
  */
-final class BootEnvironment {
+public final class BootEnvironment {
     private static final Logger logger = Logger.getLogger(
             BootEnvironment.class.getName());
     
@@ -49,136 +49,158 @@ final class BootEnvironment {
     /**
      * Default location of the bootstrapper jar relative to {@code SGS_HOME}.
      */
-    static final String SGS_JAR = 
+    public static final String SGS_JAR = 
             "bin" + File.separator + "sgs-boot.jar";
     
     /**
      * Name of the properties file to locate and retrieve properties
      * for the environment.
      */
-    static final String SGS_BOOT = "sgs-boot.properties";
+    public static final String SGS_BOOT = "sgs-boot.properties";
 
     /**
      * Denotes the installation directory for the Project Darkstar server.
      */
-    static final String SGS_HOME = "SGS_HOME";
+    public static final String SGS_HOME = "SGS_HOME";
     
     /**
      * The directory where deployed applications should place jar files
      * and application properties files.
      */
-    static final String SGS_DEPLOY = "SGS_DEPLOY";
+    public static final String SGS_DEPLOY = "SGS_DEPLOY";
     
     /**
      * The properties file used to configure the Project Darkstar kernel.
      * This file should be fed to the Project Darkstar Kernel.
      */
-    static final String SGS_PROPERTIES = "SGS_PROPERTIES";
+    public static final String SGS_PROPERTIES = "SGS_PROPERTIES";
     
     /**
      * The logging properties file for the Project Darkstar server.
      */
-    static final String SGS_LOGGING = "SGS_LOGGING";
+    public static final String SGS_LOGGING = "SGS_LOGGING";
     
     /**
      * The name of the log file to send output to.
      */
-    static final String SGS_LOGFILE = "SGS_LOGFILE";
+    public static final String SGS_OUTPUT = "SGS_OUTPUT";
     
     /**
      * A toggle used to specify which flavor of Berkeley DB is to be
      * used by the application.
      */
-    static final String BDB_TYPE = "BDB_TYPE";
+    public static final String BDB_TYPE = "BDB_TYPE";
     
     /**
      * The location of the Berkeley DB natives to include as part
      * of the {@code java.library.path}.
      */
-    static final String BDB_NATIVES = "BDB_NATIVES";
+    public static final String BDB_NATIVES = "BDB_NATIVES";
     
     /**
      * A custom set of native library directories to include as part of the
      * {@code java.library.path}.
      */
-    static final String CUSTOM_NATIVES = "CUSTOM_NATIVES";
+    public static final String CUSTOM_NATIVES = "CUSTOM_NATIVES";
     
     /**
      * A custom set of additional jar files to include on the classpath.
      */
-    static final String CUSTOM_CLASSPATH_ADD = "CUSTOM_CLASSPATH_ADD";
+    public static final String CUSTOM_CLASSPATH_ADD = "CUSTOM_CLASSPATH_ADD";
     
     /**
      * Port to listen for SHUTDOWN command.
      */
-    static final String SHUTDOWN_PORT = "SHUTDOWN_PORT";
+    public static final String SHUTDOWN_PORT = "SHUTDOWN_PORT";
     
     /**
      * Location of the JDK to use when booting up the Kernel.
      */
-    static final String JAVA_HOME = "JAVA_HOME";
+    public static final String JAVA_HOME = "JAVA_HOME";
     
     /**
      * Command line arguments for the JVM.
      */
-    static final String JAVA_OPTS = "JAVA_OPTS";
+    public static final String JAVA_OPTS = "JAVA_OPTS";
     
     /**
      * The default value for the {@code SGS_DEPLOY} property.
      */
-    static final String DEFAULT_SGS_DEPLOY = 
+    public static final String DEFAULT_SGS_DEPLOY = 
             "${SGS_HOME}" + File.separator + "deploy";
     /**
      * The default value for the {@code SGS_PROPERTIES} property.
      */
-    static final String DEFAULT_SGS_PROPERTIES = 
+    public static final String DEFAULT_SGS_PROPERTIES = 
             "${SGS_HOME}" + File.separator + "conf" + File.separator +
             "sgs-server.properties";
     /**
      * The default value for the {@code SGS_LOGGING} property.
      */
-    static final String DEFAULT_SGS_LOGGING = 
+    public static final String DEFAULT_SGS_LOGGING = 
             "${SGS_HOME}" + File.separator + "conf" + File.separator +
             "sgs-logging.properties";
     /**
      * The default value for the {@code BDB_TYPE} property.
      */
-    static final String DEFAULT_BDB_TYPE = "db";
+    public static final String DEFAULT_BDB_TYPE = "db";
     /**
      * The standard location to look for application properties config
      * file in jars from the {@code SGS_DEPLOY} directory.
      */
-    static final String DEFAULT_APP_PROPERTIES = 
+    public static final String DEFAULT_APP_PROPERTIES = 
             "META-INF/app.properties";
     /**
      * The default value for the {@code DEFAULT_SHUTDOWN_PORT} property.
      */
-    static final String DEFAULT_SHUTDOWN_PORT = "1138";
+    public static final String DEFAULT_SHUTDOWN_PORT = "1138";
     
     /**
-     * The default remote command used to initiate a shutdown
+     * The default remote command used to initiate a shutdown.
      */
-    static final String SHUTDOWN_COMMAND = "SHUTDOWN";
+    public static final String SHUTDOWN_COMMAND = "SHUTDOWN";
     
-    
-    static final String DEFAULT_BDB_ROOT = 
+    /**
+     * The default directory of the BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_ROOT = 
             "${SGS_HOME}" + File.separator + 
             "lib" + File.separator + "natives";
-    static final String DEFAULT_BDB_LINUX_X86 = 
+    /**
+     * Default subdirectory of Linux x86 BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_LINUX_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "linux-x86";
-    static final String DEFAULT_BDB_LINUX_X86_64 = 
+    /**
+     * Default subdirectory of Linux x86_64 BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_LINUX_X86_64 = 
             DEFAULT_BDB_ROOT + File.separator + "linux-x86_64";
-    static final String DEFAULT_BDB_MACOSX_X86 =
+    /**
+     * Default subdirectory of Mac OSX x86 BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_MACOSX_X86 =
             DEFAULT_BDB_ROOT + File.separator + "macosx-x86";
-    static final String DEFAULT_BDB_SOLARIS_SPARC = 
+    /**
+     * Default subdirectory of Solaris Sparc BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_SOLARIS_SPARC = 
             DEFAULT_BDB_ROOT + File.separator + "solaris-sparc";
-    static final String DEFAULT_BDB_SOLARIS_X86 = 
+    /**
+     * Default subdirectory of Solaris x86 BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_SOLARIS_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "solaris-x86";
-    static final String DEFAULT_BDB_WIN32_X86 = 
+    /**
+     * Default subdirectory of Win32 x86 BDB native libraries.
+     */
+    public static final String DEFAULT_BDB_WIN32_X86 = 
             DEFAULT_BDB_ROOT + File.separator + "win32-x86";
     
-    
-    static final String KERNEL_CLASS = "com.sun.sgs.impl.kernel.Kernel";
+    /**
+     * The name of the Kernel class used to boot PDS.
+     */
+    public static final String KERNEL_CLASS = "com.sun.sgs.impl.kernel.Kernel";
     
     /**
      * Loads configuration properties from a file into a
@@ -192,8 +214,10 @@ final class BootEnvironment {
      * @param filename name of the config file or {@code null} for default
      * @return a {@code SubstitutionProperties} object representing the
      *         configuration parameters in the file
+     * @throws IOException if there is a problem loading the file
+     * @throws URISyntaxException if the filename is invalid
      */
-    static SubstitutionProperties loadProperties(String filename) 
+    public static SubstitutionProperties loadProperties(String filename)
             throws IOException, URISyntaxException {
         
         //load properties from configuration file
@@ -214,7 +238,9 @@ final class BootEnvironment {
             throw e;
         } finally {
             try {
-                is.close();
+                if (is != null) {
+                    is.close();
+                }
             } catch (IOException ignore) {
                 logger.log(Level.FINEST, "Unable to close stream", ignore);
             }
@@ -239,6 +265,7 @@ final class BootEnvironment {
                 properties.setProperty(BootEnvironment.SGS_HOME, sgsHome);
                 //reload the properties so that the value for SGS_HOME
                 //is interpolated correctly in any other variables
+                is = null;
                 try {
                     is = sgsBoot.openStream();
                     properties.load(is);
@@ -248,9 +275,12 @@ final class BootEnvironment {
                     throw e;
                 } finally {
                     try {
-                        is.close();
+                        if (is != null) {
+                            is.close();
+                        }
                     } catch (IOException ignore) {
-                        logger.log(Level.FINEST, "Unable to close stream", ignore);
+                        logger.log(Level.FINEST, 
+                                   "Unable to close stream", ignore);
                     }
                 }
             }
@@ -323,6 +353,12 @@ final class BootEnvironment {
                 throw new IllegalStateException("Unsupported platform");
             }
             properties.setProperty(BootEnvironment.BDB_NATIVES, bdb);
+        }
+        
+        //configure JAVA_HOME automatically if necessary
+        if (properties.getProperty(BootEnvironment.JAVA_HOME) == null) {
+            properties.setProperty(BootEnvironment.JAVA_HOME,
+                                   System.getProperty("java.home"));
         }
     }
     

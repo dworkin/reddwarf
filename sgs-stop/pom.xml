@@ -41,7 +41,7 @@
         <configuration>
           <archive>
             <manifest>
-	      <mainClass>com.sun.sgs.system.Stop</mainClass>
+	      <mainClass>com.sun.sgs.system.stop.Stop</mainClass>
             </manifest>
 	    <manifestEntries>
 	      <Class-Path>../conf/ sgs-boot.jar</Class-Path>
