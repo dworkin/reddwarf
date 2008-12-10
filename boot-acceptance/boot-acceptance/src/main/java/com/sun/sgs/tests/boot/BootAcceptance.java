@@ -45,7 +45,7 @@ public class BootAcceptance {
     private static final String SGS_DEPLOY = "alt-deploy";
     private static final String SGS_PROPERTIES = "alt-server.properties";
     private static final String SGS_LOGGING = "alt-logging.properties";
-    private static final String SGS_LOGFILE = "alt.log";
+    private static final String SGS_OUTPUT = "alt.log";
     private static final String CONFIG_LOGGING = "config.logging";
     private static final int TIMEOUT = 10000;
     private static final int SMALL_PAUSE = 1000;
@@ -63,7 +63,7 @@ public class BootAcceptance {
     private File alternateSGS_DEPLOY;
     private File alternateSGS_PROPERTIES;
     private File alternateSGS_LOGGING;
-    private File alternateSGS_LOGFILE;
+    private File alternateSGS_OUTPUT;
     private File configLogging;
     
     private File homeConfig;
@@ -162,8 +162,8 @@ public class BootAcceptance {
         Util.copyFileToFile(actualSGS_LOGGING, alternateSGS_LOGGING);
         
         //specify location of logfile
-        this.alternateSGS_LOGFILE = new File(alternateDirectory,
-                                             BootAcceptance.SGS_LOGFILE);
+        this.alternateSGS_OUTPUT = new File(alternateDirectory,
+                                             BootAcceptance.SGS_OUTPUT);
         
         //copy config logging file
         this.configLogging = new File(alternateDirectory,
@@ -323,13 +323,13 @@ public class BootAcceptance {
     }
     
     /**
-     * Test with a configured SGS_LOGFILE to redirect output
+     * Test with a configured SGS_OUTPUT to redirect output
      */
     @Test(timeout=TIMEOUT)
-    public void testCustomSGS_LOGFILE() throws Exception {
+    public void testCustomSGS_OUTPUT() throws Exception {
         Util.loadTutorial(installationDirectory);
         URL bootConfig = this.getClass().getResource(
-                "customSGS_LOGFILE.properties");
+                "customSGS_OUTPUT.properties");
         Assert.assertNotNull(bootConfig);
         Util.copyURLToFile(bootConfig, alternateSGS_BOOT);
         Util.clearSGS_BOOT(installationDirectory);
@@ -338,8 +338,8 @@ public class BootAcceptance {
         this.server = Util.bootPDS(installationDirectory, null, config);
         //give server time to boot
         Thread.sleep(LARGE_PAUSE);
-        Assert.assertTrue(this.alternateSGS_LOGFILE.exists());
-        Assert.assertTrue(Util.expectLines(this.alternateSGS_LOGFILE,
+        Assert.assertTrue(this.alternateSGS_OUTPUT.exists());
+        Assert.assertTrue(Util.expectLines(this.alternateSGS_OUTPUT,
                                            "The Kernel is ready",
                                            "HelloWorld: application is ready"));
     }
