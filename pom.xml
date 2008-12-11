@@ -8,16 +8,16 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>9</version>
+  <version>10</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
     It defines settings common to all projects
   </description>
 
-  <!-- Require at least Maven version 2.0.8 to build -->
+  <!-- Require at least Maven version 2.0.9 to build -->
   <prerequisites>
-    <maven>2.0.8</maven>
+    <maven>2.0.9</maven>
   </prerequisites>
 
   <build>
@@ -396,17 +396,59 @@
       </activation>
     </profile>
 
-    <!-- profile enabled to test with BDB Java edition
-	 This will set the run.bdb.env property to the BDB java
-	 class rather than the native class. -->
+    <!-- profile enabled to test with BDB Java edition.
+	 This will set the run.bdb.env property to the BDB Java edition
+	 class rather than the native class.  It will also
+	 blank out the run.javapath and ensure that the BDB Java
+	 edition dependency is declared BEFORE the BDB native edition
+	 dependency.  The reason for this is so that we can ensure
+	 that BDB Java edition appears first on the classpath to avoid
+	 incompatible classes available in both editions. -->
     <profile>
       <id>bdb-java</id>
       <properties>
 	<run.bdb.env>
 	  com.sun.sgs.impl.service.data.store.db.je.JeEnvironment
 	</run.bdb.env>
+	<run.javapath></run.javapath>	  
       </properties>
       <dependencies>
+	<dependency>
+	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <artifactId>je</artifactId>
+	</dependency>
+	<dependency>
+	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <artifactId>db</artifactId>
+	</dependency>
+      </dependencies>
+    </profile>
+
+ 
+    <!-- profile enabled to test with BDB native edition.
+	 This will set the run.bdb.env property to the BDB native
+	 class rather than the Java edition class.  It will also
+	 set the run.javapath to the appropriate native library
+	 location and ensure that the BDB native edition dependency
+	 is declared BEFORE the BDB Java edition dependency.
+	 The reason for this is so that we can ensure
+	 that BDB native edition appears first on the classpath to avoid
+	 incompatible classes available in both editions. -->
+    <profile>
+      <id>bdb</id>
+      <properties>
+	<run.bdb.env>
+	  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+	</run.bdb.env>
+	<run.javapath>
+	  target/bdb-${bdb.version}/${bdb.lib.dir}/
+	</run.javapath>	  
+      </properties>
+      <dependencies>
+	<dependency>
+	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <artifactId>db</artifactId>
+	</dependency>
 	<dependency>
 	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
 	  <artifactId>je</artifactId>
