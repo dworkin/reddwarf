@@ -37,6 +37,7 @@ public interface NodesMXBean {
     
     // Maybe add method to shut down node?  Need Rob's node shutdown
     // work to tell the watchdog we need the node shut down.
+    // Notification when a node joins or leaves?
     
     /** 
      * Information about the nodes in the system.

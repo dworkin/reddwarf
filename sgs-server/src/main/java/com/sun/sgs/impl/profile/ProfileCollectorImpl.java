@@ -153,7 +153,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         taskStats = new TaskAggregateStats(this,
                 CORE_CONSUMER_PREFIX + "TaskAggregateStats");
         try {
-//            registerMBean(taskAgg, TaskAggregate.MXBEAN_NAME);
+            registerMBean(taskAgg, TaskAggregate.MXBEAN_NAME);
             registerMBean(taskStats, TaskAggregate.MXBEAN_NAME + "Stats");
             registerMBean(new ProfileController(this),
                           ProfileControllerMXBean.MXBEAN_NAME);
@@ -161,7 +161,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-            e.printStackTrace();
         }
 
         // start a long-lived task to consume the other end of the queue
@@ -208,7 +207,7 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             }
         }
     }
-
+    
     /** {@inheritDoc} */
     public ProfileLevel getDefaultProfileLevel() {
         return defaultProfileLevel;
@@ -328,7 +327,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             platServer.registerMBean(mBean, name);
 //                new StandardMBean(stats, DataStoreStatsMXBean.class) { },
                     // Still not clear why I'd use an anon class here
-                    // Can provide descriptors for my attributes: how?
 
             registeredMBeans.putIfAbsent(mBeanName, mBean);
             logger.log(Level.CONFIG, "Registered MBean {0}", name);

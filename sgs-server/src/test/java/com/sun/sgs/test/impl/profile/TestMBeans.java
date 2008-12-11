@@ -51,6 +51,7 @@ import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import java.util.Set;
 import javax.management.InstanceNotFoundException;
 import javax.management.JMException;
 import javax.management.JMX;
@@ -114,6 +115,17 @@ public class TestMBeans {
         cs.start();
         cc = JMXConnectorFactory.connect(cs.getAddress());
         mbsc = cc.getMBeanServerConnection();
+        
+        // Ensure that all com.sun.sgs MBeans are removed from the system
+        // platform MBean server.  This prevents interactions with other
+        // tests.  In particular, tests in JUnit 3 style can leave things
+        // behind.
+        ObjectName query = new ObjectName("com.sun.sgs*:*");
+        Set<ObjectName> names = mbsc.queryNames(query, null);
+        for (ObjectName name : names) {
+            System.out.println("BEFORECLASS unregistering : " + name);
+            mbsc.unregisterMBean(name);
+        }
     }
     
     @Before
@@ -139,7 +151,6 @@ public class TestMBeans {
             additionalNodes = null;
         }
         serverNode.shutdown(true);
-        Thread.sleep(500);
     }
     
     @AfterClass
