@@ -28,12 +28,12 @@ import com.sun.sgs.service.DataService;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #DATA_SERVICE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface DataServiceMXBean {
     /** The name for uniquely identifying this MBean. */
-    String DATA_SERVICE_MXBEAN_NAME = "com.sun.sgs.service:type=DataService";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=DataService";
     
     /**
      * Returns the number of times 

@@ -29,13 +29,12 @@ import com.sun.sgs.service.WatchdogService;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #WATCHDOG_SERVICE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface WatchdogServiceMXBean {
     /** The name for uniquely identifying this MBean. */
-    String WATCHDOG_SERVICE_MXBEAN_NAME = 
-            "com.sun.sgs.service:type=WatchdogService";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=WatchdogService";
     
     /**
      * Returns the number of times {@link WatchdogService#addNodeListener 

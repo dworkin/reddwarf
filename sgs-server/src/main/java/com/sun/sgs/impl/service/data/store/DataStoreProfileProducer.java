@@ -81,8 +81,7 @@ public class DataStoreProfileProducer
 
         stats = new DataStoreStats(collector);
         try {
-            collector.registerMBean(stats,
-                DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
+            collector.registerMBean(stats, DataStoreStatsMXBean.MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }

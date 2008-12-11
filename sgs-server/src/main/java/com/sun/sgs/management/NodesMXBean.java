@@ -20,12 +20,20 @@
 package com.sun.sgs.management;
 
 /**
- *  A management interface for all the nodes in the system, available
+ * The management interface for all the nodes in the system, available
  *  only from the core server node.
+ * <p>
+ * An instance implementing this MBean can be obtained from the from the 
+ * {@link java.lang.management.ManagementFactory.html#getPlatformMBeanServer() 
+ * getPlatformMBeanServer} method.
+ * <p>
+ * The {@code ObjectName} for uniquely identifying this MBean is
+ * {@value #MXBEAN_NAME}.
+ * 
  */
 public interface NodesMXBean {
     /** The name for uniquely identifying this MBean. */
-    String NODES_MXBEAN_NAME = "com.sun.sgs:type=Nodes";
+    String MXBEAN_NAME = "com.sun.sgs:type=Nodes";
     
     // Maybe add method to shut down node?  Need Rob's node shutdown
     // work to tell the watchdog we need the node shut down.

@@ -503,8 +503,8 @@ public class NodeMappingServiceImpl
                 systemRegistry.getComponent(ProfileCollector.class);
             serviceStats = new NodeMappingServiceStats(collector);
             try {
-                collector.registerMBean(serviceStats,
-                    NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
+                collector.registerMBean(serviceStats, 
+                                        NodeMappingServiceMXBean.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }

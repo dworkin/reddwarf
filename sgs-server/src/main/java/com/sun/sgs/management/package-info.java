@@ -19,5 +19,9 @@
 
 /**
  * Management interfaces exposed via JMX.
+ * <p>
+ * By convention, only one of these objects will be registered with a 
+ * given MBean server.  The {@code ObjectName} for uniquely identifying 
+ * MBeans in this package is the field {@code MXBEAN_NAME}.
  */
 package com.sun.sgs.management;

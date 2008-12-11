@@ -372,8 +372,8 @@ public final class WatchdogServiceImpl
                 systemRegistry.getComponent(ProfileCollector.class);
             serviceStats = new WatchdogServiceStats(collector);
             try {
-                collector.registerMBean(serviceStats,
-                    WatchdogServiceStats.WATCHDOG_SERVICE_MXBEAN_NAME);
+                collector.registerMBean(serviceStats, 
+                                        WatchdogServiceStats.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }

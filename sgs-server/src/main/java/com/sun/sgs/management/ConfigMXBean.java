@@ -27,12 +27,12 @@ package com.sun.sgs.management;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #CONFIG_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface ConfigMXBean {
     /** The name for uniquely identifying this MBean. */
-    String CONFIG_MXBEAN_NAME = "com.sun.sgs:type=Config";
+    String MXBEAN_NAME = "com.sun.sgs:type=Config";
     
     // Maybe combine this object with the NodeInfo data?
     

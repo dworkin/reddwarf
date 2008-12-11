@@ -455,7 +455,7 @@ public final class DataServiceImpl implements DataService {
             serviceStats = new DataServiceStats(collector);
             try {
                 collector.registerMBean(serviceStats,
-                    DataServiceStats.DATA_SERVICE_MXBEAN_NAME);
+                                        DataServiceStats.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }

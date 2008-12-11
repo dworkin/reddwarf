@@ -47,9 +47,12 @@ import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Properties;
+import javax.management.InstanceNotFoundException;
+import javax.management.JMException;
 import javax.management.JMX;
 import javax.management.MBeanServer;
 import javax.management.MBeanServerConnection;
@@ -68,6 +71,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -135,6 +139,7 @@ public class TestMBeans {
             additionalNodes = null;
         }
         serverNode.shutdown(true);
+        Thread.sleep(500);
     }
     
     @AfterClass
@@ -169,6 +174,127 @@ public class TestMBeans {
 
      ////////     The tests     /////////
 
+    @Test
+    public void testRegisterMBean() throws Exception {
+        SimpleTestMBean bean1 = new SimpleTest();
+        String beanName = "com.sun.sgs:type=Test";
+        profileCollector.registerMBean(bean1, beanName);
+        
+        SimpleTestMBean bean2 = 
+                (SimpleTestMBean) profileCollector.getRegisteredMBean(beanName);
+        bean1.setSomething(55);
+        assertEquals(bean1.getSomething(), bean2.getSomething());
+        
+        // Create a proxy for the object.  This is how management
+        // consoles will typically want to reach it.  Note that we're
+        // going through a remote mbean server, forcing our proxy access
+        // to go through RMI.
+        SimpleTestMBean proxy = JMX.newMBeanProxy(mbsc, 
+                                                  new ObjectName(beanName), 
+                                                  SimpleTestMBean.class);
+        proxy.clearSomething();
+        assertEquals(0, bean1.getSomething());
+        assertEquals(0, bean2.getSomething());
+        assertEquals(0, proxy.getSomething());
+    }
+    
+    public void testRegisterMXBean() throws Exception {
+        TestMXBean bean1 = new TestMXImpl();
+        String beanName = "com.sun.sgs:type=Test";
+        profileCollector.registerMBean(bean1, beanName);
+        
+        TestMXBean bean2 = 
+                (TestMXBean) profileCollector.getRegisteredMBean(beanName);
+        bean1.setSomething(55);
+        assertEquals(bean1.getSomething(), bean2.getSomething());
+        
+        // Create a proxy for the object.  
+        TestMXBean proxy = JMX.newMXBeanProxy(mbsc, 
+                                              new ObjectName(beanName), 
+                                              TestMXBean.class);
+        proxy.clearSomething();
+        assertEquals(0, bean1.getSomething());
+        assertEquals(0, bean2.getSomething());
+        assertEquals(0, proxy.getSomething());
+    }
+    
+    @Test(expected = NullPointerException.class)
+    public void testRegisterNullBean() throws Exception {
+        profileCollector.registerMBean(null, "com.sun.sgs:type=TEST");
+    }
+    
+    @Test(expected = JMException.class)
+    public void testRegisterBadBean() throws Exception{
+        profileCollector.registerMBean(new String("bad"), 
+                                       "com.sun.sgs:type=Bad");
+    }
+    
+    @Test(expected = NullPointerException.class)
+    public void testGetRegisteredMBeanNull() {
+        Object o = profileCollector.getRegisteredMBean(null);
+    }
+    
+    @Test
+    public void testGetRegisteredMBeanNotThere() {
+        Object o = profileCollector.getRegisteredMBean("notFound");
+        assertNull(o);
+    }
+    
+    @Test
+    public void testMBeanShutdown() throws Exception {
+        // Ensure that registered MBeans are cleared after profile
+        // collector shutdown
+        TestMXBean bean1 = new TestMXImpl();
+        String beanName = "com.sun.sgs:type=Test";
+        String otherName = "com.sun.sgs:type=AnotherName";
+        profileCollector.registerMBean(bean1, beanName);
+        profileCollector.registerMBean(bean1, otherName);
+        
+        TestMXBean proxy1 = JMX.newMXBeanProxy(mbsc, 
+                                               new ObjectName(beanName), 
+                                               TestMXBean.class);
+        TestMXBean proxy2 = JMX.newMXBeanProxy(mbsc, 
+                                               new ObjectName(otherName), 
+                                               TestMXBean.class);
+        proxy1.setSomething(55);
+        assertEquals(55, bean1.getSomething());
+        assertEquals(55, proxy2.getSomething());
+        
+        profileCollector.shutdown();
+        Object o = profileCollector.getRegisteredMBean(beanName);
+        assertNull(o);
+        o = profileCollector.getRegisteredMBean(otherName);
+        assertNull(o);
+        
+        proxy1 = JMX.newMXBeanProxy(mbsc,
+                                    new ObjectName(beanName),
+                                    TestMXBean.class);
+        
+        // If an invalid MBean proxy is used, the exception is wrapped in
+        // reflection's UndeclaredThrowableException.
+        try {
+            int value = proxy1.getSomething();
+        } catch (UndeclaredThrowableException e) {
+            Throwable cause = e.getCause();
+            System.out.println(e.getCause());
+            assertEquals(InstanceNotFoundException.class, cause.getClass());
+        }
+        
+        proxy2 = JMX.newMXBeanProxy(mbsc,
+                                    new ObjectName(otherName),
+                                    TestMXBean.class);
+        
+        // If an invalid MBean proxy is used, the exception is wrapped in
+        // reflection's UndeclaredThrowableException.
+        try {
+            int value = proxy2.getSomething();
+        } catch (UndeclaredThrowableException e) {
+            Throwable cause = e.getCause();
+            System.out.println(e.getCause());
+            assertEquals(InstanceNotFoundException.class, cause.getClass());
+        }
+    }
+    
     // For each MBean in our manager directory, make sure it has been
     // registered properly during system startup (can we find it in our
     // profile collector?), retrieve it through our remote connection,
@@ -180,12 +306,12 @@ public class TestMBeans {
     // reflection overhead of the proxy.
     @Test
     public void testNodesMXBean() throws Exception {
-        ObjectName name = new ObjectName(NodesMXBean.NODES_MXBEAN_NAME);
+        ObjectName name = new ObjectName(NodesMXBean.MXBEAN_NAME);
         
         // Ensure that the object name has been registered during 
         // kernel startup.
         NodesMXBean bean = (NodesMXBean)
-            profileCollector.getRegisteredMBean(NodesMXBean.NODES_MXBEAN_NAME);
+            profileCollector.getRegisteredMBean(NodesMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         CompositeData[] nodesData = 
@@ -194,8 +320,7 @@ public class TestMBeans {
         assertEquals(1, nodesData.length);
         
         // Create the proxy for the object
-        NodesMXBean proxy = (NodesMXBean)
-            JMX.newMXBeanProxy(mbsc, name, NodesMXBean.class);
+        NodesMXBean proxy = JMX.newMXBeanProxy(mbsc, name, NodesMXBean.class);
         NodeInfo[] nodes = proxy.getNodes();
         for (NodeInfo n : nodes) {
             System.out.println("found node: " + n);
@@ -218,12 +343,12 @@ public class TestMBeans {
     
     @Test
     public void testConfigMXBean() throws Exception {
-        ObjectName name = new ObjectName(ConfigMXBean.CONFIG_MXBEAN_NAME);
+        ObjectName name = new ObjectName(ConfigMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         ConfigMXBean bean = 
             (ConfigMXBean) profileCollector.getRegisteredMBean(
-                                            ConfigMXBean.CONFIG_MXBEAN_NAME);
+                                            ConfigMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -250,7 +375,7 @@ public class TestMBeans {
         System.out.println("  server host:" + serverHost);
         
         // Create the proxy for the object
-        ConfigMXBean proxy = (ConfigMXBean)
+        ConfigMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ConfigMXBean.class);
         assertEquals(appListener, proxy.getAppListener());
         assertEquals(appName, proxy.getAppName());
@@ -281,13 +406,12 @@ public class TestMBeans {
                 ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataStore");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = 
-            new ObjectName(DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
+        ObjectName name = new ObjectName(DataStoreStatsMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         DataStoreStatsMXBean bean = (DataStoreStatsMXBean) 
             profileCollector.getRegisteredMBean(
-                          DataStoreStatsMXBean.DATA_STORE_STATS_MXBEAN_NAME);
+                                    DataStoreStatsMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields, operations
@@ -329,7 +453,7 @@ public class TestMBeans {
                 (Long) mbsc.getAttribute(name, "WrittenObjectsCount");
         
         // Create the proxy for the object
-        DataStoreStatsMXBean proxy = (DataStoreStatsMXBean)
+        DataStoreStatsMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, DataStoreStatsMXBean.class);
         assertTrue(createObject <= proxy.getCreateObjectCalls());
         assertTrue(getBinding <= proxy.getGetBindingCalls());
@@ -367,13 +491,11 @@ public class TestMBeans {
                 ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataService");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = 
-            new ObjectName(DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME);
+        ObjectName name = new ObjectName(DataServiceMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         DataServiceMXBean bean = (DataServiceMXBean) 
-            profileCollector.getRegisteredMBean(
-                          DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME);
+            profileCollector.getRegisteredMBean(DataServiceMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -401,7 +523,7 @@ public class TestMBeans {
         
         
         // Create the proxy for the object
-        DataServiceMXBean proxy = (DataServiceMXBean)
+        DataServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, DataServiceMXBean.class);
         
         // We might have had some service calls in between getting the
@@ -456,13 +578,12 @@ public class TestMBeans {
                 ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "WatchdogService");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = 
-            new ObjectName(WatchdogServiceMXBean.WATCHDOG_SERVICE_MXBEAN_NAME);
+        ObjectName name = new ObjectName(WatchdogServiceMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         WatchdogServiceMXBean bean = (WatchdogServiceMXBean) 
             profileCollector.getRegisteredMBean(
-                          WatchdogServiceMXBean.WATCHDOG_SERVICE_MXBEAN_NAME);
+                                    WatchdogServiceMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -483,7 +604,7 @@ public class TestMBeans {
                                 "IsLocalNodeAliveNonTransactionalCalls");
         
         // Create the proxy for the object
-        WatchdogServiceMXBean proxy = (WatchdogServiceMXBean)
+        WatchdogServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, WatchdogServiceMXBean.class);
         
         // We might have had some service calls in between getting the
@@ -532,13 +653,12 @@ public class TestMBeans {
                 "NodeMappingService");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = new ObjectName(
-                NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
+        ObjectName name = new ObjectName(NodeMappingServiceMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         NodeMappingServiceMXBean bean = (NodeMappingServiceMXBean) 
             profileCollector.getRegisteredMBean(
-                          NodeMappingServiceMXBean.NODEMAP_SERVICE_MXBEAN_NAME);
+                          NodeMappingServiceMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -550,7 +670,7 @@ public class TestMBeans {
         long setStatus = (Long) mbsc.getAttribute(name, "SetStatusCalls");
         
         // Create the proxy for the object
-        NodeMappingServiceMXBean proxy = (NodeMappingServiceMXBean)
+        NodeMappingServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, NodeMappingServiceMXBean.class);
         
         assertTrue(addNodeMapListener <= 
@@ -576,13 +696,11 @@ public class TestMBeans {
                 "TaskService");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = 
-                new ObjectName(TaskServiceMXBean.TASK_SERVICE_MXBEAN_NAME);
+        ObjectName name = new ObjectName(TaskServiceMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         TaskServiceMXBean bean = (TaskServiceMXBean) 
-            profileCollector.getRegisteredMBean(
-                          TaskServiceMXBean.TASK_SERVICE_MXBEAN_NAME);
+            profileCollector.getRegisteredMBean(TaskServiceMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -598,7 +716,7 @@ public class TestMBeans {
         long task = (Long) mbsc.getAttribute(name, "ScheduleTaskCalls");
         
         // Create the proxy for the object
-        TaskServiceMXBean proxy = (TaskServiceMXBean)
+        TaskServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, TaskServiceMXBean.class);
         
         assertTrue(delayed <= proxy.getScheduleDelayedTaskCalls());
@@ -631,13 +749,13 @@ public class TestMBeans {
                 "ClientSessionService");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = new ObjectName(
-                ClientSessionServiceMXBean.SESSION_SERVICE_MXBEAN_NAME);
+        ObjectName name = 
+                new ObjectName(ClientSessionServiceMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         ClientSessionServiceMXBean bean = (ClientSessionServiceMXBean) 
             profileCollector.getRegisteredMBean(
-                      ClientSessionServiceMXBean.SESSION_SERVICE_MXBEAN_NAME);
+                      ClientSessionServiceMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -647,7 +765,7 @@ public class TestMBeans {
                                 "SendProtocolMessageNonTransactionalCalls");
         
         // Create the proxy for the object
-        ClientSessionServiceMXBean proxy = (ClientSessionServiceMXBean)
+        ClientSessionServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ClientSessionServiceMXBean.class);
         
         assertTrue(reg <= proxy.getRegisterSessionDisconnectListenerCalls());
@@ -669,13 +787,12 @@ public class TestMBeans {
                 "ChannelService");
         cons.setProfileLevel(ProfileLevel.MAX);
         
-        ObjectName name = new ObjectName(
-                ChannelServiceMXBean.CHANNEL_SERVICE_MXBEAN_NAME);
+        ObjectName name = new ObjectName(ChannelServiceMXBean.MXBEAN_NAME);
         
         // Ensure the object was registered at startup
         ChannelServiceMXBean bean = (ChannelServiceMXBean) 
             profileCollector.getRegisteredMBean(
-                      ChannelServiceMXBean.CHANNEL_SERVICE_MXBEAN_NAME);
+                      ChannelServiceMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Get individual fields
@@ -683,7 +800,7 @@ public class TestMBeans {
         long get = (Long) mbsc.getAttribute(name,  "GetChannelCalls");
         
         // Create the proxy for the object
-        ChannelServiceMXBean proxy = (ChannelServiceMXBean)
+        ChannelServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ChannelServiceMXBean.class);
         
         assertTrue(create <= proxy.getCreateChannelCalls());
@@ -708,13 +825,13 @@ public class TestMBeans {
         // Ensure the object was registered at startup
         ProfileControllerMXBean bean = 
             (ProfileControllerMXBean) profileCollector.getRegisteredMBean(
-                                ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
+                                ProfileControllerMXBean.MXBEAN_NAME);
         assertNotNull(bean);
         
         // Create a proxy
         ProfileControllerMXBean proxy = (ProfileControllerMXBean)
             JMX.newMXBeanProxy(mbsc, 
-                new ObjectName(ProfileControllerMXBean.PROFILE_MXBEAN_NAME), 
+                new ObjectName(ProfileControllerMXBean.MXBEAN_NAME), 
                 ProfileControllerMXBean.class);
         String[] consumers = proxy.getProfileConsumers();
         for (String con : consumers) {
@@ -732,9 +849,9 @@ public class TestMBeans {
         ProfileLevel level = proxy.getConsumerLevel(consName);
         assertEquals(ProfileLevel.MIN, level);
         
-        DataServiceMXBean dataProxy = (DataServiceMXBean)
+        DataServiceMXBean dataProxy = 
             JMX.newMXBeanProxy(mbsc, 
-                new ObjectName(DataServiceMXBean.DATA_SERVICE_MXBEAN_NAME), 
+                new ObjectName(DataServiceMXBean.MXBEAN_NAME), 
                 DataServiceMXBean.class);
         
         // Test that consumer level can be changed
@@ -754,5 +871,43 @@ public class TestMBeans {
                     serverNode.getDataService().setBinding("dummy", dummy);
 		}}, taskOwner);
         assertTrue(dataProxy.getSetBindingCalls() > 0);
+    }
+    /**
+     * A simple object implementing an MBean interface.
+     */
+    public class SimpleTest implements SimpleTestMBean {
+        private int something;
+        public int getSomething() { return something; }
+        public void setSomething(int value) { something = value; }
+        public void clearSomething() { something = 0; }
+    }
+    
+    /**
+     * A simple MBean interface.
+     */
+    public interface SimpleTestMBean {
+        int getSomething();
+        void setSomething(int value);
+        void clearSomething();
+    }
+
+    /**
+     * A simple XMBean interface.  MXBeans don't need to have their 
+     * implementation classes in the same directory as the interface,
+     * and don't need to follow the MBean naming conventions.
+     */
+    public static interface TestMXBean {
+        int getSomething();
+        void setSomething(int value);
+        void clearSomething();
+    }
+    /**
+     * A simple object implementing an MXBean interface.
+     */
+    public static class TestMXImpl implements TestMXBean {
+        private int something;
+        public int getSomething() { return something; }
+        public void setSomething(int value) { something = value; }
+        public void clearSomething() { something = 0; }
     }
 }

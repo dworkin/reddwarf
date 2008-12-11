@@ -29,18 +29,18 @@ import com.sun.sgs.app.ChannelManager;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #CHANNEL_SERVICE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface ChannelServiceMXBean {
     /** The name for uniquely identifying this MBean. */
-    String CHANNEL_SERVICE_MXBEAN_NAME = 
-            "com.sun.sgs.service:type=ChannelService";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=ChannelService";
     
     // Maybe add the number of channels in the system?
     // Maybe add, for each channel, a way to get to the channel name,
     //  approx number of users, number joins/leaves, 
     //  channel coordinator node id?
+    //  amount of traffic on channel
     
     /**
      * Returns the number of times {@link ChannelManager#createChannel 

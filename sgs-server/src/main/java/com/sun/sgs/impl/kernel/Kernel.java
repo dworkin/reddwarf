@@ -256,7 +256,7 @@ class Kernel {
                 new ConfigManager(appProperties, transactionCoordinator);
             try {
                 profileCollector.registerMBean(config, 
-                                           ConfigManager.CONFIG_MXBEAN_NAME);
+                                               ConfigManager.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }

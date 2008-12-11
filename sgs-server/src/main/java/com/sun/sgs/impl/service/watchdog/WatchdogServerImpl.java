@@ -306,7 +306,7 @@ public final class WatchdogServerImpl
             systemRegistry.getComponent(ProfileCollector.class);
         NodeManager nodeMgr = new NodeManager(this);
         try {
-            collector.registerMBean(nodeMgr, NodeManager.NODES_MXBEAN_NAME);
+            collector.registerMBean(nodeMgr, NodeManager.MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }

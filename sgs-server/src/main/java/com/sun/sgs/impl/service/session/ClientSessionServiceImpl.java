@@ -442,7 +442,7 @@ public final class ClientSessionServiceImpl
             serviceStats = new ClientSessionServiceStats(collector);
             try {
                 collector.registerMBean(serviceStats,
-                    ClientSessionServiceStats.SESSION_SERVICE_MXBEAN_NAME);
+                                        ClientSessionServiceStats.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }

@@ -31,12 +31,12 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #PROFILE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface ProfileControllerMXBean {
     /** The name for uniquely identifying this MBean. */
-    String PROFILE_MXBEAN_NAME = "com.sun.sgs:type=ProfileController";
+    String MXBEAN_NAME = "com.sun.sgs:type=ProfileController";
     
     // Maybe add a way to add/remove listeners?
     

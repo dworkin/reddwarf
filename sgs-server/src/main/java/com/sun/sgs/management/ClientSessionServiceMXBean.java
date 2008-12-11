@@ -28,16 +28,17 @@ import com.sun.sgs.service.ClientSessionService;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #SESSION_SERVICE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface ClientSessionServiceMXBean {
     /** The name for uniquely identifying this MBean. */
-    String SESSION_SERVICE_MXBEAN_NAME = 
-            "com.sun.sgs.service:type=ClientSessionService";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=ClientSessionService";
     
     // Maybe add number of active clients in the system, number
     // of connects/disconnects?
+    // number of channels a client is connected to
+    // amount of communications traffic this client sends/receives?
     
     /**
      * Returns the number of times {@link 

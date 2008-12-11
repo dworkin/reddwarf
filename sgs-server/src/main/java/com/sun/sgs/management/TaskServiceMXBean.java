@@ -29,12 +29,12 @@ import com.sun.sgs.service.TaskService;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #TASK_SERVICE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface TaskServiceMXBean {
     /** The name for uniquely identifying this MBean. */
-    String TASK_SERVICE_MXBEAN_NAME = "com.sun.sgs.service:type=TaskService";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=TaskService";
     
     /**
      * Returns the number of times 

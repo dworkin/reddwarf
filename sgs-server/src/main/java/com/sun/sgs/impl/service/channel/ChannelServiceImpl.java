@@ -310,8 +310,8 @@ public final class ChannelServiceImpl
 		systemRegistry.getComponent(ProfileCollector.class);
             serviceStats = new ChannelServiceStats(collector);
             try {
-                collector.registerMBean(serviceStats,
-                    ChannelServiceStats.CHANNEL_SERVICE_MXBEAN_NAME);
+                collector.registerMBean(serviceStats, 
+                                        ChannelServiceStats.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }

@@ -27,12 +27,12 @@ package com.sun.sgs.management;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #TASK_AGGREGATE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface TaskAggregateMXBean {
     /** The name for uniquely identifying this MBean. */
-    String TASK_AGGREGATE_MXBEAN_NAME = "com.sun.sgs:type=TaskAggregate";
+    String MXBEAN_NAME = "com.sun.sgs:type=TaskAggregate";
     /**
      * Returns the total number of tasks run.
      * @return the total number of tasks run

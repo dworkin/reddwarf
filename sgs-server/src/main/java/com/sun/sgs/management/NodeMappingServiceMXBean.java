@@ -29,13 +29,13 @@ import com.sun.sgs.service.NodeMappingService;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #NODEMAP_SERVICE_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface NodeMappingServiceMXBean {
     /** The name for uniquely identifying this MBean. */
-    String NODEMAP_SERVICE_MXBEAN_NAME = 
-                                "com.sun.sgs.service:type=NodeMappingService";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=NodeMappingService";
+    
     // Maybe add number of active identities on this node? 
     //   (don't know how to capture that)
     

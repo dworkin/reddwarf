@@ -30,14 +30,13 @@ import com.sun.sgs.profile.AggregateProfileSample;
  * getPlatformMBeanServer} method.
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
- * {@value #DATA_STORE_STATS_MXBEAN_NAME}.
+ * {@value #MXBEAN_NAME}.
  * 
  */
 public interface DataStoreStatsMXBean 
 {
     /** The name for uniquely identifying this MBean. */
-    String DATA_STORE_STATS_MXBEAN_NAME = 
-            "com.sun.sgs.service:type=DataStoreStats";
+    String MXBEAN_NAME = "com.sun.sgs.service:type=DataStoreStats";
 
     /**
      * Returns the number of times 

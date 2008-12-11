@@ -314,8 +314,7 @@ public class TaskServiceImpl
             systemRegistry.getComponent(ProfileCollector.class);
         serviceStats = new TaskServiceStats(collector);
         try {
-            collector.registerMBean(serviceStats,
-                TaskServiceStats.TASK_SERVICE_MXBEAN_NAME);
+            collector.registerMBean(serviceStats, TaskServiceStats.MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }

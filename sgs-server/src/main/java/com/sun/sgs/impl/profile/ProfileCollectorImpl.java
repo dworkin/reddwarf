@@ -153,15 +153,15 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         taskStats = new TaskAggregateStats(this,
                 CORE_CONSUMER_PREFIX + "TaskAggregateStats");
         try {
-            registerMBean(taskAgg, TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME);
-            registerMBean(taskStats, 
-                    TaskAggregate.TASK_AGGREGATE_MXBEAN_NAME + "Stats");
+//            registerMBean(taskAgg, TaskAggregate.MXBEAN_NAME);
+            registerMBean(taskStats, TaskAggregate.MXBEAN_NAME + "Stats");
             registerMBean(new ProfileController(this),
-                    ProfileControllerMXBean.PROFILE_MXBEAN_NAME);
+                          ProfileControllerMXBean.MXBEAN_NAME);
         } catch (JMException e) {
             // Continue on if we couldn't register this bean, although
             // it's probably a very bad sign
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            e.printStackTrace();
         }
 
         // start a long-lived task to consume the other end of the queue
