@@ -20,11 +20,13 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Set;
 
 /**
  * A wrapper for a {@code ClientSessionImpl} object that is passed to the
@@ -66,6 +68,11 @@ public class ClientSessionWrapper
 	return getClientSession().getName();
     }
 
+    /** {@inheritDoc} */
+    public Set<Delivery> supportedDeliveries() {
+	return getClientSession().supportedDeliveries();
+    }
+    
     /** {@inheritDoc} */
     public boolean isConnected() {
 	try {

@@ -21,6 +21,7 @@ package com.sun.sgs.app;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Set;
 
 /**
  * Interface representing a single, connected login session between a
@@ -74,6 +75,14 @@ public interface ClientSession extends ManagedObject {
      * 		a problem with the current transaction
      */
     String getName();
+    
+    /**
+     * Returns a set containing the delivery requirements supported by
+     * this session.  The returned set is serializable.
+     *
+     * @return	a set containing the supported delivery requirements
+     */
+    Set<Delivery> supportedDeliveries();
     
     /**
      * Sends a message contained in the specified {@link ByteBuffer} to

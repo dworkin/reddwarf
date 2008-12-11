@@ -255,6 +255,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    if (session == null) {
 		throw new NullPointerException("null session");
 	    }
+	    checkDelivery(session);
+	    
 	    /*
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
@@ -282,6 +284,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 
 	    /*
+	     * Check for null elements, and check that sessions support
+	     * this channel's delivery requirement
+	     */
+	    for (ClientSession session : sessions) {
+		if (session == null) {
+		    throw new NullPointerException(
+			"sessions contains a null element");
+		}
+		checkDelivery(session);
+	    }
+	    
+	    /*
 	     * Enqueue join requests, each with underlying (unwrapped)
 	     * client session object.
 	     *
@@ -299,6 +313,25 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    /**
+     * Throws {@code IllegalArgumentException} if: the specified {@code
+     * session} does not support this channel's delivery requirement or
+     * {@code Delivery.RELIABLE}.
+     *
+     * @param	session a client session
+     * @throws	IllegalArgumentException if the specified {@code session}
+     *		does not support this channel's delivery requirement
+     */
+    void checkDelivery(ClientSession session) {
+	Set<Delivery> deliveries = session.supportedDeliveries();
+	if (!deliveries.contains(delivery) ||
+	    !deliveries.contains(Delivery.RELIABLE))
+	{
+	    throw new IllegalArgumentException(
+		"session unable to support delivery: " + delivery);
+	}
+    }
+    
     /**
      * Returns the underlying {@code ClientSession} for the specified
      * {@code session}.  Note: The client session service wraps each client

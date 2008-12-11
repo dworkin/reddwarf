@@ -715,7 +715,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	/** {@inheritDoc} */
 	public void run() {
 	    ClientSessionImpl sessionImpl =
-		new ClientSessionImpl(sessionService, identity);
+		new ClientSessionImpl(sessionService, identity,
+				      protocol.supportedDeliveries());
 	    sessionRefId = sessionImpl.getId();
 	}
     }

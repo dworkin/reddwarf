@@ -138,6 +138,8 @@ public interface Channel extends ManagedObject {
      * @return this channel
      *
      * @throws IllegalStateException if this channel is closed
+     * @throws IllegalArgumentException if the session does not support the
+     * 	       minimum delivery requirement of this channel
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
      * @throws TransactionException if the operation failed because of
@@ -153,6 +155,8 @@ public interface Channel extends ManagedObject {
      * @return this channel
      *
      * @throws IllegalStateException if this channel is closed
+     * @throws IllegalArgumentException if any session does not support the
+     * 	       minimum delivery requirement of this channel
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
      * @throws TransactionException if the operation failed because of

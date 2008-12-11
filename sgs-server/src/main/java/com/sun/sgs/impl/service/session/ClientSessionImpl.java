@@ -46,6 +46,7 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -94,6 +95,9 @@ public class ClientSessionImpl
     /** The identity for this session. */
     private final Identity identity;
 
+    /** The set of delivery requirements for this session. */
+    private final Set<Delivery> deliveries;
+
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
 
@@ -110,8 +114,9 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}, {@code identity}, and the local node ID, and stores
-     * this instance with the following bindings:<p>
+     * sessionService}, {@code identity}, supported {@code deliveries} and
+     * the local node ID, and stores this instance with the following
+     * bindings:<p>
      *
      * <pre>
      * com.sun.sgs.impl.service.session.impl.&lt;idBytes&gt;
@@ -121,20 +126,23 @@ public class ClientSessionImpl
      *
      * @param	sessionService a client session service
      * @param	identity the session's identity
+     * @param	deliveries the session's supported delivery requirements
      * @throws TransactionException if there is a problem with the
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
-		      Identity identity)
+		      Identity identity, Set<Delivery> deliveries)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
-	}
-	if (identity == null) {
-	    throw new IllegalStateException("session's identity is not set");
+	} else if (identity == null) {
+	    throw new NullPointerException("null identity");
+	} else if (deliveries == null) {
+	    throw new NullPointerException("null deliveries");
 	}
 	this.sessionService = sessionService;
 	this.identity = identity;
+	this.deliveries = deliveries;
 	this.nodeId = sessionService.getLocalNodeId();
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
@@ -162,6 +170,11 @@ public class ClientSessionImpl
 	return name;
     }
 
+    /** {@inheritDoc} */
+    public Set<Delivery> supportedDeliveries() {
+	return deliveries;
+    }
+    
     /** {@inheritDoc} */
     public boolean isConnected() {
 	return connected;
