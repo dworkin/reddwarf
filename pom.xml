@@ -401,7 +401,9 @@
 	 class rather than the native class.  It will also
 	 blank out the run.javapath and ensure that the BDB Java
 	 edition dependency is declared BEFORE the BDB native edition
-	 dependency-->
+	 dependency.  The reason for this is so that we can ensure
+	 that BDB Java edition appears first on the classpath to avoid
+	 incompatible classes available in both editions. -->
     <profile>
       <id>bdb-java</id>
       <properties>
@@ -428,7 +430,10 @@
 	 class rather than the Java edition class.  It will also
 	 set the run.javapath to the appropriate native library
 	 location and ensure that the BDB native edition dependency
-	 is declared BEFORE the BDB Java edition dependency -->
+	 is declared BEFORE the BDB Java edition dependency.
+	 The reason for this is so that we can ensure
+	 that BDB native edition appears first on the classpath to avoid
+	 incompatible classes available in both editions. -->
     <profile>
       <id>bdb</id>
       <properties>
