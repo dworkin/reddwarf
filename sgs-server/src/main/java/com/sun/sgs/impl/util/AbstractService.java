@@ -171,10 +171,11 @@ public abstract class AbstractService implements Service {
      * service is shutting down, or is already shut down, this method
      * throws {@code IllegalStateException}.
      *
+     * @throws	Exception if a problem occurs
      * @throws	IllegalStateException if this service is shutting down
      *		or is already shut down
      */
-    public void ready() {
+    public void ready() throws Exception {
 	logger.log(Level.FINEST, "ready");
 	synchronized (lock) {
 	    switch (state) {
@@ -200,8 +201,10 @@ public abstract class AbstractService implements Service {
      * Performs ready operations.  This method is invoked by the
      * {@link #ready ready} method only once so that the subclass can
      * perform any operations necessary during the "ready" phase.
+     *
+     * @throws	Exception if a problem occurs
      */
-    protected abstract void doReady();
+    protected abstract void doReady() throws Exception;
 
     /**
      * {@inheritDoc}

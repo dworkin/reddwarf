@@ -2091,7 +2091,6 @@ public class TestChannelServiceImpl extends TestCase {
     private class DummyClient {
 
 	String name;
-	byte[] sessionId;
 	private Connector<SocketAddress> connector;
 	private ConnectionListener listener;
 	private Connection connection;
@@ -2118,10 +2117,6 @@ public class TestChannelServiceImpl extends TestCase {
 	private long nodeId = serverNode.getWatchdogService().getLocalNodeId();
 	
 	DummyClient() {
-	}
-
-	byte[] getSessionId() {
-	    return sessionId;
 	}
 
 	boolean isConnected() {
@@ -2450,11 +2445,7 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-                    // FIXME: this is actually the reconnect key, but the
-                    // current implementation sends the sessionId to aid
-                    // this test.
                     reconnectKey = buf.getBytes(buf.limit() - buf.position());
-                    sessionId = reconnectKey;
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;

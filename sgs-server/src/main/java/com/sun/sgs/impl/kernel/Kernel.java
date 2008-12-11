@@ -240,9 +240,6 @@ class Kernel {
 
             // collect the shared system components into a registry
             systemRegistry.addComponent(new TransportFactoryImpl(appProperties));
-            systemRegistry.addComponent(new ProtocolFactoryImpl(appProperties,
-                                                                systemRegistry,
-                                                                proxy));
             systemRegistry.addComponent(accessCoordinator);
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);

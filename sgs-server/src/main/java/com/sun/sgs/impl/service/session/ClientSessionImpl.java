@@ -38,7 +38,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.session.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import java.io.IOException;
@@ -46,6 +45,7 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -93,9 +93,9 @@ public class ClientSessionImpl
 
     /** The identity for this session. */
     private final Identity identity;
-    
-    /** The underlying transport for this session. */
-    private final ProtocolDescriptor protocolDesc;
+
+    /** The set of delivery requirements for this session. */
+    private final Set<Delivery> deliveries;
 
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
@@ -113,8 +113,9 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}, {@code identity}, and the local node ID, and stores
-     * this instance with the following bindings:<p>
+     * sessionService}, {@code identity}, supported {@code deliveries} and
+     * the local node ID, and stores this instance with the following
+     * bindings:<p>
      *
      * <pre>
      * com.sun.sgs.impl.service.session.impl.&lt;idBytes&gt;
@@ -124,22 +125,23 @@ public class ClientSessionImpl
      *
      * @param	sessionService a client session service
      * @param	identity the session's identity
+     * @param	deliveries the session's supported delivery requirements
      * @throws TransactionException if there is a problem with the
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
-		      Identity identity,
-                      ProtocolDescriptor protocolDesc)
+		      Identity identity, Set<Delivery> deliveries)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
-	}
-	if (identity == null) {
-	    throw new IllegalStateException("session's identity is not set");
+	} else if (identity == null) {
+	    throw new NullPointerException("null identity");
+	} else if (deliveries == null) {
+	    throw new NullPointerException("null deliveries");
 	}
 	this.sessionService = sessionService;
 	this.identity = identity;
-        this.protocolDesc = protocolDesc;
+	this.deliveries = deliveries;
 	this.nodeId = sessionService.getLocalNodeId();
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
@@ -159,7 +161,6 @@ public class ClientSessionImpl
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */
-    @Override
     public String getName() {
 	if (!isConnected()) {
 	    throw new IllegalStateException("client session is not connected");
@@ -169,7 +170,11 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
-    @Override
+    public Set<Delivery> supportedDeliveries() {
+	return deliveries;
+    }
+    
+    /** {@inheritDoc} */
     public boolean isConnected() {
 	return connected;
     }
@@ -178,7 +183,6 @@ public class ClientSessionImpl
      *
      * Enqueues a send event to this client session's event queue for servicing.
      */
-    @Override
     public ClientSession send(ByteBuffer message) {
 	try {
             if (!isConnected())
@@ -191,7 +195,7 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-            byte[] msgBytes = new byte[message.remaining()];
+	    byte[] msgBytes = new byte[message.remaining()];
 	    message.asReadOnlyBuffer().get(msgBytes);
 	    addEvent(new SendEvent(msgBytes));
 
@@ -327,10 +331,6 @@ public class ClientSessionImpl
 	return wrappedSessionRef.get();
     }
 
-//    public boolean canSupport(Delivery required) {
-//        return protocolDesc.canSupport(required);
-//    }
-    
     /**
      * Invokes the {@code disconnected} callback on this session's {@code
      * ClientSessionListener} (if present and {@code notify} is
@@ -733,7 +733,8 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-            sessionImpl.sessionService.addSessionMessage(sessionImpl, message);
+	    sessionImpl.sessionService.
+		addSessionMessage(sessionImpl, message);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -759,7 +760,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-            sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
+	    sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

@@ -336,13 +336,8 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             // APP_NODE just needs a unique number, so getNextUniquePort will do
             StandardProperties.APP_NODE,
                 Integer.toString(SgsTestNode.getNextUniquePort()),
-            "com.sun.sgs.impl.service.session.protocols",
-                "com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl",
-            "com.sun.sgs.impl.service.session.protocol.properties.0",
-                "com.sun.sgs.impl.protocol.simple.transport:" +
-                    "com.sun.sgs.impl.transport.tcp.TCP:" +
-                "com.sun.sgs.impl.transport.tcp.listen.port:" +
-                    Integer.toString(SgsTestNode.getNextUniquePort()),
+            "com.sun.sgs.impl.transport.tcp.listen.port",
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
             StandardProperties.APP_LISTENER,

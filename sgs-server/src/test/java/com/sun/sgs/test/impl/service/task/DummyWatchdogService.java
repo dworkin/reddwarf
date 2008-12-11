@@ -21,7 +21,7 @@ package com.sun.sgs.test.impl.service.task;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
-import com.sun.sgs.protocol.session.ProtocolDescriptor;
+import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;

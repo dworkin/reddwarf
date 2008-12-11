@@ -20,7 +20,7 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.protocol.session.SessionProtocolConnection;
+import com.sun.sgs.protocol.SessionProtocol;
 import java.math.BigInteger;
 
 /**
@@ -42,19 +42,16 @@ public interface ClientSessionService extends Service {
         ClientSessionDisconnectListener listener);
 
     /**
-     * Returns a session connection for the <i>local</i> client session
-     * with the
-     * specified {@code sessionRefId}. If the specified client session is
-     * not connected to the local node, an {@code IllegalArgumentException}
-     * is thrown.
+     * Returns a protocol for the <i>local</i> client session with the
+     * specified {@code sessionRefId} or {@code null} if the specified
+     * client session is not connected to the local node.
      *
      * <p> The {@code sessionRefId} is the ID obtained by invoking {@link
      * ManagedReference#getId getId} on a {@link ManagedReference} to the
      * associated {@code ClientSession}.
      *
      * @param	sessionRefId a client session ID, as a {@code BigInteger}
-     * @return the {@code SessionProtocolConnection} associated with the
-     * specified session
+     * @return	a protocol, or {@code null}
      */
-    SessionProtocolConnection getSessionConnection(BigInteger sessionRefId);
+    SessionProtocol getSessionProtocol(BigInteger sessionRefId);
 }

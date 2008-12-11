@@ -17,12 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.protocol.session;
+package com.sun.sgs.protocol;
 
 import java.util.concurrent.Future;
 
 /**
- * A future for the completion of protocol handler operations.
+ * A future for the completion of {@link SessionProtocolHandler}
+ * operations.
  */
 public interface CompletionFuture extends Future<Void> {
 }

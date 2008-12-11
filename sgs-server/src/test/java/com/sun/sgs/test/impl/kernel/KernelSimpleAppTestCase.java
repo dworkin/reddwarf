@@ -72,13 +72,8 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    "com.sun.sgs.app.listener",
 	    "com.sun.sgs.test.impl.kernel.SimpleApp",
 	    "com.sun.sgs.app.name", "SimpleApp",
-            "com.sun.sgs.impl.service.session.protocols",
-                "com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl",
-            "com.sun.sgs.impl.service.session.protocol.properties.0",
-                "com.sun.sgs.impl.protocol.simple.transport:" +
-                    "com.sun.sgs.impl.transport.tcp.TCP:" +
-                "com.sun.sgs.impl.transport.tcp.listen.port:" +
-                    String.valueOf(getPort()),
+            "com.sun.sgs.impl.transport.tcp.listen.port",
+                String.valueOf(getPort()),
 	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath(),
 	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
 	    "com.sun.sgs.impl.service.watchdog.server.start", "true");

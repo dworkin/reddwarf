@@ -32,7 +32,7 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.protocol.session.ProtocolDescriptor;
+import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -413,13 +413,8 @@ public class SgsTestNode {
             StandardProperties.APP_NODE, Integer.toString(getNextUniquePort()),
             StandardProperties.SERVER_START, startServer,
             StandardProperties.SERVER_HOST, "localhost",
-            "com.sun.sgs.impl.service.session.protocols",
-                "com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl",
-            "com.sun.sgs.impl.service.session.protocol.properties.0",
-                "com.sun.sgs.impl.protocol.simple.transport:" +
-                    "com.sun.sgs.impl.transport.tcp.TCP:" +
-                "com.sun.sgs.impl.transport.tcp.listen.port:" +
-                    String.valueOf(getNextUniquePort()),
+            "com.sun.sgs.impl.transport.tcp.listen.port",
+                String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.port", 

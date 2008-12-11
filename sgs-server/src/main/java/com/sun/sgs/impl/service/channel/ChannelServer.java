@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -101,12 +100,10 @@ public interface ChannelServer extends Remote {
      *
      * @param	channelId a channel ID
      * @param	message a channel message
-     * @param delivery
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(byte[] channelId, byte[] message, Delivery delivery)
-            throws IOException;
+    void send(byte[] channelId, byte[] message) throws IOException;
 
     /**
      * Notifies this server that the channel with the specified {@code

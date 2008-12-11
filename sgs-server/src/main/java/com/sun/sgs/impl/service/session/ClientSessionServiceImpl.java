@@ -25,6 +25,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -38,14 +39,13 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.session.ProtocolDescriptor;
-import com.sun.sgs.protocol.session.Protocol;
-import com.sun.sgs.protocol.session.ProtocolConnectionListener;
-import com.sun.sgs.protocol.ProtocolFactory;
-import com.sun.sgs.protocol.session.SessionProtocolConnection;
-import com.sun.sgs.protocol.session.SessionProtocolHandler;
+import com.sun.sgs.protocol.LoginCompletionFuture;
+import com.sun.sgs.protocol.LoginFailureException;
+import com.sun.sgs.protocol.ProtocolAcceptor;
+import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -57,7 +57,10 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -72,7 +75,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -117,7 +119,7 @@ import java.util.logging.Logger;
  */
 public final class ClientSessionServiceImpl
     extends AbstractService
-    implements ClientSessionService, ProtocolConnectionListener
+    implements ClientSessionService
 {
     /** The package name. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.session";
@@ -139,14 +141,6 @@ public final class ClientSessionServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
     
-    /** The transport(s) to use for incoming client connections. */
-    public static final String PROTOCOL_LIST_PROPERTY =
-        PKG_NAME + ".protocols";
-    
-    /** The transport properties base */
-    public static final String PROTOCOL_PROPERTIES_BASE =
-        PKG_NAME + ".protocol.properties.";
-    
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
 	PKG_NAME + ".server.port";
@@ -154,12 +148,6 @@ public final class ClientSessionServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
-    private static final String EVENTS_PER_TXN_PROPERTY =
-	PKG_NAME + ".events.per.txn";
-
-    /** The default events per transaction. */
-    private static final int DEFAULT_EVENTS_PER_TXN = 1;
-    
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".buffer.write.max";
@@ -167,27 +155,27 @@ public final class ClientSessionServiceImpl
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
+    /** The events per transaction property. */
+    private static final String EVENTS_PER_TXN_PROPERTY =
+	PKG_NAME + ".events.per.txn";
+
+    /** The default events per transaction. */
+    private static final int DEFAULT_EVENTS_PER_TXN = 1;
+
     /** The name of the allow new login property. */
     private static final String ALLOW_NEW_LOGIN_PROPERTY =
 	PKG_NAME + ".allow.new.login";
 
-    /** The name of the disconnect delay property. */
-    private static final String DISCONNECT_DELAY_PROPERTY =
-	PKG_NAME + ".disconnect.delay";
-    
-    /** The time (in milliseconds) that a disconnecting connection is
-     * allowed before this service forcibly disconnects it.
-     */
-    private static final long DEFAULT_DISCONNECT_DELAY = 1000;
+    /** The protocol acceptor property name. */
+    private static final String PROTOCOL_ACCEPTOR_PROPERTY =
+	PKG_NAME + ".protocol.acceptor";
 
-    /** Properties. */
-    private final PropertiesWrapper wrappedProps;
-    
+    /** The default protocol acceptor class. */
+    private static final String DEFAULT_PROTOCOL_ACCEPTOR =
+	SimpleSgsProtocolAcceptor.class.getName();
+
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
-
-    /** The disconnect delay (in milliseconds) for disconnecting sessions. */
-    private final long disconnectDelay;
 
     /** The local node's ID. */
     private final long localNodeId;
@@ -228,15 +216,6 @@ public final class ClientSessionServiceImpl
     /** The channel service. */
     private volatile ChannelServiceImpl channelService;
     
-    /** Protocol factory */
-    private final ProtocolFactory protocolFactory;
-    
-    /** Protocol class name(s). */
-    private final String protocolList;
-    
-    /** Transport object(s). */
-    private final List<Protocol> protocols = new ArrayList<Protocol>();
-
     /** The exporter for the ClientSessionServer. */
     private final Exporter<ClientSessionServer> exporter;
 
@@ -245,6 +224,12 @@ public final class ClientSessionServiceImpl
 	
     /** The proxy for the ClientSessionServer. */
     private final ClientSessionServer serverProxy;
+
+    /** The protocol listener. */
+    private final ProtocolListener protocolListener;
+
+    /** The protocol acceptor. */
+    private final ProtocolAcceptor protocolAcceptor;
 
     /** The map of logged in {@code ClientSessionHandler}s, keyed by
      *  identity.
@@ -257,17 +242,7 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
-    /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
-     * the time the connection should expire.
-     */
-    private final ConcurrentSkipListMap<Long, ClientSessionHandler>
-	disconnectingHandlersMap =
-	    new ConcurrentSkipListMap<Long, ClientSessionHandler>();
-
-    /** The handle for the task that monitors disconnecting client sessions. */
-    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
-
-    /** The maximum number of session events to service per transaction. */
+    /** The maximum number of session events to sevice per transaction. */
     final int eventsPerTxn;
 
     /** The flag that indicates how to handle same user logins.  If {@code
@@ -279,7 +254,6 @@ public final class ClientSessionServiceImpl
 
     /**
      * Constructs an instance of this class with the specified properties.
-     * 
      *
      * @param properties service properties
      * @param systemRegistry system registry
@@ -296,31 +270,19 @@ public final class ClientSessionServiceImpl
 	logger.log(Level.CONFIG,
 		   "Creating ClientSessionServiceImpl properties:{0}",
 		   properties);
-	wrappedProps = new PropertiesWrapper(properties);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-            protocolList = wrappedProps.getProperty(PROTOCOL_LIST_PROPERTY);
-            
-            if (protocolList == null)
-                throw new IllegalArgumentException(
-                        "at least one protocol must be specified");
-
 	    /*
 	     * Get the property for controlling session event processing
 	     * and connection disconnection.
 	     */
-	    eventsPerTxn = wrappedProps.getIntProperty(
-		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
-		1, Integer.MAX_VALUE);
-
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-
-	    disconnectDelay = wrappedProps.getLongProperty(
-		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
-		200, Long.MAX_VALUE);
-
+	    eventsPerTxn = wrappedProps.getIntProperty(
+		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
+		1, Integer.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
@@ -351,7 +313,6 @@ public final class ClientSessionServiceImpl
 	    /*
 	     * Get services and check service version.
 	     */
-            protocolFactory = systemRegistry.getComponent(ProtocolFactory.class);
 	    flushContextsThread.start();
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
@@ -360,6 +321,7 @@ public final class ClientSessionServiceImpl
 	    localNodeId = watchdogService.getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
+	    
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
@@ -381,39 +343,25 @@ public final class ClientSessionServiceImpl
 		taskOwner);
 
 	    /*
-	     * Set up recurring task to monitor disconnecting client sessions.
+	     * Create the protocol acceptor.
 	     */
-	    monitorDisconnectingSessionsTaskHandle =
-		taskScheduler.scheduleRecurringTask(
- 		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, System.currentTimeMillis(),
-		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
-	    monitorDisconnectingSessionsTaskHandle.start();
-
-            // Temporary until we resolve the configuration issue
-            int i = 0;
-            for (String protocolClassName : protocolList.split(":")) {
-                protocols.add(
-                        protocolFactory.newProtocol(protocolClassName,
-                                                    wrappedProps.getEmbeddedProperties(PROTOCOL_PROPERTIES_BASE + i++),
-                                                    this));
-            }
-            final ProtocolDescriptor[] descriptors =
-                                    new ProtocolDescriptor[protocols.size()];
-            i = 0;
-            for (Protocol protocol : protocols) {
-                descriptors[i++] = protocol.getDescriptor();
-            }
-
-            transactionScheduler.runTask(
-                new AbstractKernelRunnable("UpdateNode") {
-		    public void run() {
-                        Node node =
-                                watchdogService.getNodeForUpdate(localNodeId);
-                        assert node != null;
-                        node.setClientListener(descriptors);
-                    } },
-                    taskOwner);
+	    protocolListener = new ProtocolListenerImpl();
+	    String acceptorClassName = wrappedProps.getProperty(
+		PROTOCOL_ACCEPTOR_PROPERTY, DEFAULT_PROTOCOL_ACCEPTOR);
+	    Class<?> acceptorClass =
+		Class.forName(acceptorClassName);
+	    Constructor<?> acceptorConstr =
+		acceptorClass.getConstructor(
+		    Properties.class, ComponentRegistry.class,
+		    TransactionProxy.class);
+	    try {
+		protocolAcceptor = (ProtocolAcceptor)
+		    acceptorConstr.newInstance(
+			properties, systemRegistry, txnProxy);
+	    } catch (InvocationTargetException ite) {
+		throw (Exception) ite.getCause();
+	    }
+	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -428,7 +376,6 @@ public final class ClientSessionServiceImpl
     /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */
-    @Override
     protected void handleServiceVersionMismatch(
 	Version oldVersion, Version currentVersion)
     {
@@ -438,29 +385,33 @@ public final class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    @Override
-    public void doReady() {
+    public void doReady() throws Exception {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
-        try {
-            for (Protocol protocol : protocols) {
-                protocol.ready();
-            }
-        } catch (Exception ex) {
-            throw new RuntimeException(ex.getMessage(), ex);
-        }
+	try {
+	    protocolAcceptor.accept(protocolListener);
+	} catch (IOException e) {
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to start accepting connections");
+	    }
+	    throw e;
+	}
     }
 
     /** {@inheritDoc} */
-    @Override
     public void doShutdown() {
-        for (Protocol protocol : protocols)
-            protocol.shutdown();
-
+	if (protocolAcceptor != null) {
+	    try {
+		protocolAcceptor.close();
+	    } catch (IOException ignore) {
+	    }
+	}
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
 	}
 	handlers.clear();
-
+	
 	if (exporter != null) {
 	    try {
 		exporter.unexport();
@@ -470,16 +421,7 @@ public final class ClientSessionServiceImpl
 		// swallow exception
 	    }
 	}
-
-	if (monitorDisconnectingSessionsTaskHandle != null) {
-	    try {
-		monitorDisconnectingSessionsTaskHandle.cancel();
-	    } finally {
-		monitorDisconnectingSessionsTaskHandle = null;
-	    }
-	}    
-	disconnectingHandlersMap.clear();
-
+	
 	synchronized (flushContextsLock) {
 	    flushContextsLock.notifyAll();
 	}
@@ -517,7 +459,6 @@ public final class ClientSessionServiceImpl
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
-    @Override
     public void registerSessionDisconnectListener(
         ClientSessionDisconnectListener listener)
     {
@@ -526,20 +467,29 @@ public final class ClientSessionServiceImpl
         }
         sessionDisconnectListeners.add(listener);
     }
-
+    
     /** {@inheritDoc} */
-    @Override
-    public SessionProtocolConnection
-            getSessionConnection(BigInteger sessionRefId)
-    {
-        ClientSessionHandler handler = handlers.get(sessionRefId);
-                
-        if (handler == null || !handler.isConnected())
-            return null;
-        
-        return handler.getSessionMessageChannel();
+    public SessionProtocol getSessionProtocol(BigInteger sessionRefId) {
+	ClientSessionHandler handler = handlers.get(sessionRefId);
+	
+	return handler != null ? handler.getSessionProtocol() : null;
     }
 
+    /* -- Implement ProtocolListener -- */
+
+    private class ProtocolListenerImpl implements ProtocolListener {
+
+	/** {@inheritDoc} */
+	public LoginCompletionFuture newLogin(
+	    Identity identity, SessionProtocol protocol)
+	{
+	    ClientSessionHandler handler = new ClientSessionHandler(
+		ClientSessionServiceImpl.this, dataService, protocol, identity);
+	    return handler.getLoginCompletionFuture();
+	}
+	
+    }
+    
     /* -- Package access methods for adding commit actions -- */
     
     /**
@@ -559,33 +509,34 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Records the login result in the current context for delivery to the
-     * specified client {@code session} when the context commits.  If
-     * {@code success} is {@code false}, a {@link
-     * ProtocolMessageChannel#loginFailure loginFailure} message will be
-     * sent and no subsequent session messages will be forwarded to the
-     * session, even if they have been enqueued during the current
-     * transaction.  If success if {@code true}, then a {@link
-     * ProtocolMessageChannel#loginSuccess loginSuccess}
+     * Records the login result in the current context for delivery to the specified
+     * client {@code session} when the context commits.  If {@code success} is
+     * {@code false}, the specified {@code exception} will be used as the cause of
+     * the {@code ExecutionException} in the associated session's {@link
+     * LoginCompletionFuture} and no subsequent session messages will be forwarded
+     * to the session, even if they have been enqueued during the current
+     * transaction.  If success is {@code true}, then the session's associated
+     * {@code LoginCompletionFuture}'s {@link LoginCompletionFuture#get get} method
+     * will return the appropriate {@link SessionProtocolHandler} for the session.
      *
-     * <p>When the transaction commits, the login acknowledgment message is
-     * delivered to the client session first, and if {@code success} is
-     * {@code true}, all other enqueued messages will be delivered.
+     * <p>When the transaction commits, the {@code LoginCompletionFuture} is
+     * notified of the login result, and if {@code success} is
+     * {@code true}, all other enqueued messages will be delivered to the client
+     * session. 
      *
      * @param	session	a client session
      * @param	success if {@code true}, login was successful
-     * @param	throwable an exception that occurred while processing the
-     *		login request, or {@code null} (only valid if {@code
-     *		success} is {@code false}
+     * @param	exception a login failure exception, or {@code null} (only valid
+     *		if {@code success} is {@code false}
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void addLoginResult(
-	ClientSessionImpl session, boolean success, Throwable throwable)
+    void addLoginResult(ClientSessionImpl session,
+			boolean success,
+			LoginFailureException exception)
     {
-	Context context = checkContext();
-	context.addLoginResult(session, success, throwable);
+	checkContext().addLoginResult(session, success, exception);
     }
 
     /**
@@ -611,26 +562,6 @@ public final class ClientSessionServiceImpl
         return writeBufferSize;
     }
 
-    /* -- Implement ConnectionHandler -- */
-    
-    /** {@inheritDoc} */
-    @Override
-    public SessionProtocolHandler newConnection(
-                                        SessionProtocolConnection connection,
-                                        ProtocolDescriptor descriptor)
-        throws Exception
-    {
-        assert connection instanceof SessionProtocolConnection;
-        
-        logger.log(Level.FINER, "new connection on {0}", connection);
-
-        /* The handler will call addHandler if login succeeds */
-        return new ClientSessionHandler(this,
-                                        dataService,
-                                        (SessionProtocolConnection)connection,
-                                        descriptor);
-    }
-
     /* -- Implement TransactionContextFactory -- */
 
     private class ContextFactory extends TransactionContextFactory<Context> {
@@ -639,7 +570,6 @@ public final class ClientSessionServiceImpl
 	}
 
 	/** {@inheritDoc} */
-        @Override
 	public Context createContext(Transaction txn) {
 	    return new Context(txn);
 	}
@@ -661,15 +591,15 @@ public final class ClientSessionServiceImpl
 	    super(txn);
 	}
 
-        /**
+	/**
 	 * Adds the specified login result be sent to the specified
 	 * session after this transaction commits.  If {@code success} is
 	 * {@code false}, no other messages are sent to the session after
 	 * the login acknowledgment.
 	 */
-	void addLoginResult(ClientSessionImpl session,
-                            boolean success,
-                            Throwable throwable)
+	void addLoginResult(
+	    ClientSessionImpl session, boolean success,
+	    LoginFailureException ex)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -680,7 +610,9 @@ public final class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		getCommitActions(session).addLoginResult(success, throwable);
+		getCommitActions(session).addLoginResult(success, ex);
+
+	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
@@ -692,7 +624,7 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
-	 * Adds a message to be sent to the specified session after
+	 * Enqueues a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
 	private void addMessage(ClientSessionImpl session, byte[] message) {
@@ -849,13 +781,9 @@ public final class ClientSessionServiceImpl
 	
 	/** The login result. */
 	private boolean loginSuccess = false;
-	/** The login ack protocol message, or null. */
-	private byte[] loginAck = null;
 
 	/** The login exception. */
-	private Throwable loginException;
-//	/** The login outcome, only valid if {@code loginAck} is non-null. */
-//	private boolean loginSuccess = false;
+	private LoginFailureException loginException;
 	
 	/** List of protocol messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
@@ -874,17 +802,17 @@ public final class ClientSessionServiceImpl
 	    messages.add(message);
 	}
 
-	void addLoginResult(boolean success, Throwable throwable) {
+	void addLoginResult(boolean success, LoginFailureException ex) {
 	    sendLoginResult = true;
 	    loginSuccess = success;
-	    loginException = throwable;
+	    loginException = ex;
 	}
 	
 	void setDisconnect() {
 	    disconnect = true;
 	}
 
-        void flush() {
+	void flush() {
 	    sendSessionMessages();
 	    if (disconnect) {
 		ClientSessionHandler handler = handlers.get(sessionRefId);
@@ -903,9 +831,9 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 
-        void sendSessionMessages() {
+	void sendSessionMessages() {
+
 	    ClientSessionHandler handler = handlers.get(sessionRefId);
-            
 	    /*
 	     * If a local handler exists, forward messages to local
 	     * handler to send to client session; otherwise log
@@ -916,14 +844,15 @@ public final class ClientSessionServiceImpl
 		    if (loginSuccess) {
 			handler.loginSuccess();
 		    } else {
-			handler.loginFailure("login refused", loginException);
-                        return;
-                    }
+			handler.loginFailure(loginException);
+			return;
+		    }
 		}
-		SessionProtocolConnection msgChannel =
-		    handler.getSessionMessageChannel();//(Delivery.RELIABLE);
-		for (byte[] message : messages) {
-		    msgChannel.sessionMessage(ByteBuffer.wrap(message));
+		SessionProtocol protocol = handler.getSessionProtocol();
+		if (protocol != null) {
+		    for (byte[] message : messages) {
+			protocol.sessionMessage(ByteBuffer.wrap(message));
+		    }
 		}
 	    } else {
 		logger.log(
@@ -1015,7 +944,6 @@ public final class ClientSessionServiceImpl
     private class SessionServerImpl implements ClientSessionServer {
 
 	/** {@inheritDoc} */
-        @Override
 	public void serviceEventQueue(final byte[] sessionId) {
 	    callStarted();
 	    try {
@@ -1042,7 +970,8 @@ public final class ClientSessionServiceImpl
 		    } }, taskOwner);
 	    } finally {
 		callFinished();
-            }
+	    }
+	    
 	}
     }
     
@@ -1203,21 +1132,6 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Adds the specified {@code handler} to the map containing {@code
-     * ClientSessionHandler}s that are disconnecting.  The map is keyed by
-     * connection expiration time.  The connection will expire after a fixed
-     * delay and will be forcibly terminated if the client hasn't already
-     * closed the connection.
-     *
-     * @param	handler a {@code ClientSessionHandler} for a disconnecting
-     *		{@code ClientSession}
-     */
-    void monitorDisconnection(ClientSessionHandler handler) {
-	disconnectingHandlersMap.put(
-	    System.currentTimeMillis() + disconnectDelay,  handler);
-    }
-
-    /**
      * Schedules a non-durable, transactional task using the given
      * {@code Identity} as the owner.
      */
@@ -1276,36 +1190,6 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * A task to monitor disconnecting {@code ClientSessionHandler}s to ensure
-     * that their associated connections are closed by the client in a
-     * timely manner.  If a connection is not terminated by the expiration
-     * time, then the connection is forcibly closed.
-     */
-    private class MonitorDisconnectingSessionsTask
-	extends AbstractKernelRunnable
-    {
-	/** Constructs and instance. */
-	MonitorDisconnectingSessionsTask() {
-	    super(null);
-	}
-	
-	/** {@inheritDoc} */
-	public void run() {
-	    long now = System.currentTimeMillis();
-	    if (!disconnectingHandlersMap.isEmpty() &&
-		disconnectingHandlersMap.firstKey() < now) {
-
-		Map<Long, ClientSessionHandler> expiredSessions = 
-		    disconnectingHandlersMap.headMap(now);
-		for (ClientSessionHandler handler : expiredSessions.values()) {
-		    handler.closeConnection();
-		}
-		expiredSessions.clear();
-	    }
-	}
-    }
-
-    /**
      * The {@code RecoveryListener} for handling requests to recover
      * for a failed {@code ClientSessionService}.
      */
@@ -1313,7 +1197,6 @@ public final class ClientSessionServiceImpl
 	implements RecoveryListener
     {
 	/** {@inheritDoc} */
-        @Override
 	public void recover(final Node node, RecoveryCompleteFuture future) {
 	    final long nodeId = node.getId();
 	    final TaskService taskService = getTaskService();
@@ -1400,3 +1283,4 @@ public final class ClientSessionServiceImpl
 	}
     }
 }
+

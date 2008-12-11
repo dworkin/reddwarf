@@ -389,7 +389,7 @@ public final class WatchdogServiceImpl
     }
     
     /** {@inheritDoc} */
-    protected void doReady() {
+    protected void doReady() throws Exception {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
 	// chance to register.

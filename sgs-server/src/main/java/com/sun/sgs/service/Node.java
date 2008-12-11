@@ -19,8 +19,6 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.protocol.session.ProtocolDescriptor;
-
 /**
  * An abstraction for node information, used in conjunction
  * with the {@link WatchdogService} and {@link NodeListener}s.
@@ -52,7 +50,7 @@ public interface Node {
     boolean isAlive();
     
     /**
-     * Returns the set of transports descriptors that respresent the
+     * Returns the set of transports descriptors that represent the
      * transports listening for client connections on this
      * node. {@code null} is returned if this is not an application node.
      * 

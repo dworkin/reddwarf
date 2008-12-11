@@ -98,7 +98,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private static final String APP_NAME = "TestClientSessionServiceImpl";
-
+    
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
     private static final int WAIT_TIME = 5000;
@@ -130,12 +130,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-            "com.sun.sgs.impl.service.session.protocols",
-                "com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl",
-            "com.sun.sgs.impl.service.session.protocol.properties.0",
-                "com.sun.sgs.impl.protocol.simple.transport:" +
-                    "com.sun.sgs.impl.transport.tcp.TCP:" +
-                "com.sun.sgs.impl.transport.tcp.listen.port:20000");
+            "com.sun.sgs.impl.transport.tcp.listen.port", "20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
@@ -310,7 +305,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Properties props =
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
-		    "com.sun.sgs.impl.service.session.disconnect.delay", "199");
+		    "com.sun.sgs.impl.protocol.simple.disconnect.delay", "199");
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());
@@ -1133,6 +1128,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
 	client.connect(serverNode.getAppPort()).login();
+	client.sendMessage(new byte[0]);
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
@@ -1247,7 +1243,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String reason;
 	private String redirectHost;
         private int redirectPort;
-	private byte[] reconnectKey;
+	private byte[] reconnectKey = new byte[0];
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -1417,9 +1413,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 */
 	void sendMessage(byte[] message) {
 	    MessageBuffer buf =
-		new MessageBuffer(1+ message.length);
+		new MessageBuffer(5 + reconnectKey.length + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putBytes(message);
+		putByteArray(reconnectKey).
+		putByteArray(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1619,6 +1616,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			System.err.println("login succeeded: " + name);
 			lock.notifyAll();
 		    }
+		    sendMessage(new byte[0]);
 		    break;
 		    
 		case SimpleSgsProtocol.LOGIN_FAILURE:
@@ -1776,6 +1774,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final static long serialVersionUID = 1L;
 	private final String name;
 	private final BigInteger sessionRefId;
+	private BigInteger reconnectKey;
 	private final boolean disconnectedThrowsException;
 
 
@@ -1796,7 +1795,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			       "] disconnected invoked with " + graceful);
 	    DataManager dataManager = AppContext.getDataManager();
 	    dataManager.markForUpdate(this);
-	    DummyClient client = dummyClients.get(sessionRefId);
+	    DummyClient client = dummyClients.get(reconnectKey);
 	    ClientSession session = (ClientSession)
 		dataManager.getBinding(name);
 	    dataManager.removeObject(session);
@@ -1813,9 +1812,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void receivedMessage(ByteBuffer message) {
-            byte[] bytes = new byte[message.remaining()];
-            message.asReadOnlyBuffer().get(bytes);
-	    DummyClient client = dummyClients.get(sessionRefId);
+            byte[] messageBytes = new byte[message.remaining()];
+	    message.get(messageBytes);
+	    MessageBuffer buf = new MessageBuffer(messageBytes);
+	    AppContext.getDataManager().markForUpdate(this);
+	    reconnectKey = new BigInteger(1, buf.getByteArray());
+	    byte[] bytes = buf.getByteArray();
+	    if (bytes.length == 0) {
+		return;
+	    }
+	    DummyClient client = dummyClients.get(reconnectKey);
 	    System.err.println(
 		"receivedMessage: " + HexDumper.toHexString(bytes) + 
 		"\nthrowException: " + client.throwException);
