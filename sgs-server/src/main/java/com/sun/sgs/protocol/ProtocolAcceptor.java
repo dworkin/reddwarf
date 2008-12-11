@@ -41,9 +41,9 @@ public interface ProtocolAcceptor {
      *
      * <p>When an incoming connection with a given identity is established
      * with this protocol acceptor, the protocol acceptor should invoke the
-     * provided listener's {@link ProtocolListener#newConnection
-     * newConnection} method with the identity and the {@link
-     * SessionPrototool protocol connection}.
+     * provided listener's {@link ProtocolListener#newLogin newLogin}
+     * method with the identity and the {@link SessionProtocol protocol
+     * connection}.
      *
      * @param	listener a protocol listener
      * @throws	IOException if an IO problem occurs

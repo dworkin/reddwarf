@@ -40,7 +40,6 @@ import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
-import com.sun.sgs.service.UnsupportedDeliveryException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -121,7 +120,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @param	sessionService the ClientSessionService instance
      * @param	dataService the DataService instance
-     * @param	byteChannel the byte channel for communicating with the client
+     * @param	sessionProtocol a session protocol
+     * @param	identity an identity
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
 			 DataService dataService,

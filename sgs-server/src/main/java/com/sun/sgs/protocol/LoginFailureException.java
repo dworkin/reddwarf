@@ -80,7 +80,7 @@ public class LoginFailureException extends Exception {
 
     /**
      * Returns a failure reason.  If the returned reason is {@link
-     * Failure#OTHER}, then the {@link Throwable#getCause cause} may
+     * FailureReason#OTHER}, then the {@link Throwable#getCause cause} may
      * contain an exception that caused the failure.
      *
      * @return a failure reason

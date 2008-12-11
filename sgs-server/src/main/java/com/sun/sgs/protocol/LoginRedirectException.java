@@ -23,7 +23,7 @@ import com.sun.sgs.service.Node;
 
 /**
  * An exception that indicates a login should be redirected to the node
- * returned by the exception's {@link #get get} method.
+ * returned by the exception's {@link #getNode getNode} method.
  *
  * @see LoginCompletionFuture
  */

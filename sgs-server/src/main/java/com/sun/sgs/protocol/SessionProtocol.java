@@ -38,7 +38,7 @@ import java.util.Set;
  * acknowledgment, and if the protocol requires, these messages should be
  * enqueued until the login acknowledgment has been sent to the client.
  *
- * TBD: should these methods throw IOException?
+ * <p>TBD: should these methods throw IOException?
  */
 public interface SessionProtocol extends Channel {
 

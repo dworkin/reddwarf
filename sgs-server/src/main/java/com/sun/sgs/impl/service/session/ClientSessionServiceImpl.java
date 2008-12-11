@@ -510,32 +510,34 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Records the login result in the current context for delivery to the
-     * specified client {@code session} when the context commits.  If
-     * {@code success} is {@code false}, a {@link
-     * SessionProtocol#loginFailure loginFailure} message will be
-     * sent and no subsequent session messages will be forwarded to the
-     * session, even if they have been enqueued during the current
-     * transaction.  If success if {@code true}, then a {@link
-     * SessionProtocol#loginSuccess loginSuccess}
+     * Records the login result in the current context for delivery to the specified
+     * client {@code session} when the context commits.  If {@code success} is
+     * {@code false}, the specified {@code exception} will be used as the cause of
+     * the {@code ExecutionException} in the associated session's {@link
+     * LoginCompletionFuture} and no subsequent session messages will be forwarded
+     * to the session, even if they have been enqueued during the current
+     * transaction.  If success is {@code true}, then the session's associated
+     * {@code LoginCompletionFuture}'s {@link LoginCompletionFuture#get get} method
+     * will return the appropriate {@link SessionProtocolHandler} for the session.
      *
-     * <p>When the transaction commits, the login acknowledgment message is
-     * delivered to the client session first, and if {@code success} is
-     * {@code true}, all other enqueued messages will be delivered.
+     * <p>When the transaction commits, the {@code LoginCompletionFuture} is
+     * notified of the login result, and if {@code success} is
+     * {@code true}, all other enqueued messages will be delivered to the client
+     * session. 
      *
      * @param	session	a client session
      * @param	success if {@code true}, login was successful
      * @param	exception a login failure exception, or {@code null} (only valid
-     *		if {@code *		success} is {@code false}
+     *		if {@code success} is {@code false}
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void addLoginResult(
-	ClientSessionImpl session, boolean success, LoginFailureException ex)
+    void addLoginResult(ClientSessionImpl session,
+			boolean success,
+			LoginFailureException exception)
     {
-	Context context = checkContext();
-	context.addLoginResult(session, success, ex);
+	checkContext().addLoginResult(session, success, exception);
     }
 
     /**

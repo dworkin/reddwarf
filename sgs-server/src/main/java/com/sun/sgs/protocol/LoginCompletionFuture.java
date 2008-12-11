@@ -19,6 +19,7 @@
 
 package com.sun.sgs.protocol;
 
+import com.sun.sgs.protocol.LoginFailureException.FailureReason;
 import java.math.BigInteger;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -26,9 +27,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * A future for the completion of the {@link
- * SessionProtocolHandler#loginRequest SessionProtocolHandler.loginRequest}
- * operation.
+ * A future for the completion of the {@link ProtocolListener#newLogin
+ * ProtocolListener.newLogin} operation.
  */
 public interface LoginCompletionFuture extends Future<SessionProtocolHandler> {
 
@@ -44,12 +44,18 @@ public interface LoginCompletionFuture extends Future<SessionProtocolHandler> {
      * <li>{@code LoginRedirectException}: indicates that the login should
      * be redirected to the node returned by the exception's {@link
      * LoginRedirectException#getNode getNode} method. </li>
+     *
      * <li>{@code LoginFailureException}: indicates that the login failed.
-     * The exception's {@link Throwable#getMessage getMessage} method
-     * returns the reason (possibly {@code null}) for the failure, and the
-     * exception's  {@link Throwable#getCause getCause} method returns the
-     * <i>cause</i> (possibly {@code null} of the login failure.</li>
-     * </ul>
+     * The exception's {@link LoginFailureException#getReason getReason}
+     * method returns the reason for the failure.  If the reason is {@link
+     * FailureReason#DUPLICATE_LOGIN FailureReason.DUPLICATE_LOGIN}, then
+     * the server rejected the login because of an existing session with
+     * the same identity.  If the reason is {@link
+     * FailureReason#REJECTED_LOGIN FailureReason.REJECTED_LOGIN}, then the
+     * application rejected the login. If the reason is {@link
+     * FailureReason#OTHER FailureReason.OTHER}, then the exception's
+     * {@link Throwable#getCause getCause} method returns the <i>cause</i>
+     * of the login failure.</li> </ul>
      */
     SessionProtocolHandler get()
 	throws InterruptedException, ExecutionException;
@@ -66,12 +72,18 @@ public interface LoginCompletionFuture extends Future<SessionProtocolHandler> {
      * <li>{@code LoginRedirectException}: indicates that the login should
      * be redirected to the node returned by the exception's {@link
      * LoginRedirectException#getNode getNode} method. </li>
+     *
      * <li>{@code LoginFailureException}: indicates that the login failed.
-     * The exception's {@link Throwable#getMessage getMessage} method
-     * returns the reason (possibly {@code null}) for the failure, and the
-     * exception's  {@link Throwable#getCause getCause} method returns the
-     * <i>cause</i> (possibly {@code null} of the login failure.</li>
-     * </ul>
+     * The exception's {@link LoginFailureException#getReason getReason}
+     * method returns the reason for the failure.  If the reason is {@link
+     * FailureReason#DUPLICATE_LOGIN FailureReason.DUPLICATE_LOGIN}, then
+     * the server rejected the login because of an existing session with
+     * the same identity.  If the reason is {@link
+     * FailureReason#REJECTED_LOGIN FailureReason.REJECTED_LOGIN}, then the
+     * application rejected the login. If the reason is {@link
+     * FailureReason#OTHER FailureReason.OTHER}, then the exception's
+     * {@link Throwable#getCause getCause} method returns the <i>cause</i>
+     * of the login failure.</li> </ul>
      */
     SessionProtocolHandler get(long timeout, TimeUnit unit)
 	throws InterruptedException, ExecutionException, TimeoutException;

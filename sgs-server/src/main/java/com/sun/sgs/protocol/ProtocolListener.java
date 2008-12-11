@@ -21,6 +21,7 @@ package com.sun.sgs.protocol;
 
 import com.sun.sgs.auth.Identity;
 import java.math.BigInteger;
+import java.util.concurrent.ExecutionException;
 
 /**
  * The listener for incoming protocol connections.
@@ -36,10 +37,9 @@ public interface ProtocolListener {
      * <p>If the login request is processed successfully, then invoking the
      * {@link LoginCompletionFuture#get get} method on the returned future
      * returns the {@code SessionProtocolHandler} for processing incoming
-     * request received by the protocol.  If the
-     * login was unsuccessful, the {@code get} method throws {@link
-     * ExecutionException} which contains a <i>cause</i> that indicates why
-     * the login failed.
+     * requests received by the protocol.  If the login was unsuccessful,
+     * the {@code get} method throws {@link ExecutionException} which
+     * contains a <i>cause</i> that indicates why the login failed.
      *
      * @param	identity an identity
      * @param	protocol a session protocol
