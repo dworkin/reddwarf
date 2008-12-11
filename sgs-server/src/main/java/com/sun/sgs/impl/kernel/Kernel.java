@@ -897,7 +897,7 @@ class Kernel {
             homeProperties = loadProperties(homeConfig.toURI().toURL(),
                                             fileProperties);
         } else if (homeConfig.isFile() && !homeConfig.canRead()) {
-            logger.log(Level.WARNING, "can access file : " + homeConfig);
+            logger.log(Level.WARNING, "can't access file : " + homeConfig);
         }
         
         // override any properties with the values from the System properties
