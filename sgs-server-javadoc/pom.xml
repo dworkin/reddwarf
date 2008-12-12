@@ -37,14 +37,6 @@
       <artifactId>sgs-server-api</artifactId>
       <classifier>sources</classifier>
     </dependency>
-
-    <!-- Included in the classpath since it is not a
-	 transitive dependency -->
-    <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-      <artifactId>je</artifactId>
-      <scope>provided</scope>
-    </dependency>
   </dependencies>
 
 
