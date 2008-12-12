@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>10</version>
+  <version>11</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -265,7 +265,7 @@
       </dependency>
 
       <dependency>
-	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	<groupId>com.sleepycat</groupId>
 	<artifactId>je</artifactId>
 	<version>${bdb.je.version}</version>
       </dependency>
@@ -414,7 +414,7 @@
       </properties>
       <dependencies>
 	<dependency>
-	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <groupId>com.sleepycat</groupId>
 	  <artifactId>je</artifactId>
 	</dependency>
 	<dependency>
@@ -450,7 +450,7 @@
 	  <artifactId>db</artifactId>
 	</dependency>
 	<dependency>
-	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <groupId>com.sleepycat</groupId>
 	  <artifactId>je</artifactId>
 	</dependency>
       </dependencies>
@@ -485,6 +485,12 @@
       <url>http://download.java.net/maven/2/</url>
       <layout>default</layout>
     </repository>
+    <repository>
+      <id>oracle</id>
+      <name>Oracle Maven2 Repository</name>
+      <url>http://download.oracle.com/maven</url>
+      <layout>default</layout>
+    </repository>
   </repositories>
   
   <!-- Configuration properties which should be consistent
@@ -498,7 +504,7 @@
     <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
     <bdb.version>4.5.20</bdb.version>
-    <bdb.je.version>3.2.23</bdb.je.version>
+    <bdb.je.version>3.3.75</bdb.je.version>
     <junit.version>4.5</junit.version>
     <easymock.version>2.4</easymock.version>
     <org.apache.mina.version>1.1.0</org.apache.mina.version>
