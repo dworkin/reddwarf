@@ -25,6 +25,7 @@ import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
@@ -45,15 +46,15 @@ import java.util.Set;
  * bindings in the data service to store key/value pairs.  This map does
  * not permit {@code null} keys or values.
  *
- * <p>The {@code keyPrefix} specified during construction is used as a prefix to
- * each binding key the map uses for an entry. A key provided to this map's
+ * <p>The {@code keyPrefix} specified during construction is used as a prefix
+ * to each binding key the map uses for an entry. A key provided to this map's
  * methods must have a unique and reproducible {@code toString} result because
  * the {@code toString} result is used as a suffix of the binding's key in the
  * data service.
  */
 public class BindingKeyedHashMap<K, V>
     extends AbstractMap<K, V>
-    implements Serializable, ManagedObjectRemoval
+    implements ManagedObjectValueMap<K, V>, Serializable, ManagedObjectRemoval
 {
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -75,8 +76,11 @@ public class BindingKeyedHashMap<K, V>
 	}
 	this.keyPrefix = keyPrefix + ".";
 	ChannelServiceImpl.getDataService().setServiceBinding(
-	    getBindingName(KEY_STOP), new KeyValuePair(KEY_STOP, null));
+	    getBindingName(KEY_STOP), KeyValuePair.createKeyStop());
+	
 	// TBD: have "key start" too?
+	// TBD: should this throw an exception of a map with the same
+	// key prefix already exists?
     }
 
     /* -- Override AbstractMap methods -- */
@@ -96,12 +100,17 @@ public class BindingKeyedHashMap<K, V>
 	V previousValue = remove(key);
 
 	// Store key/value pair.
-	KeyValuePair<K, V> pair = new KeyValuePair<K, V>(key, value);
-	ChannelServiceImpl.getDataService().
-	    setServiceBinding(getBindingName(key.toString()), pair);
+	putInternal(key, value);
 	
 	return previousValue;
     }
+
+    private void putInternal(K key, V value) {
+	KeyValuePair<K, V> pair = new KeyValuePair<K, V>(key, value);
+	ChannelServiceImpl.getDataService().
+	    setServiceBinding(getBindingName(key.toString()), pair);
+    }
+    
 
     /** {@inheritDoc} */
     public V get(Object key) {
@@ -128,16 +137,18 @@ public class BindingKeyedHashMap<K, V>
     /** {@inheritDoc} */
     public boolean containsKey(Object key) {
 	checkNull("key", key);
-	Iterator iter = new KeyIterator(keyPrefix);
-	while (iter.hasNext()) {
-	    try {
-		if (key.equals(iter.next())) {
-		    return true;
-		}
-	    } catch (ObjectNotFoundException e) {
-	    }
+	DataService dataService = ChannelServiceImpl.getDataService();
+	String bindingName = getBindingName(key.toString());
+	boolean containsKey = false;
+	try {
+	    KeyValuePair<K, V>  pair = uncheckedCast(
+		dataService.getServiceBinding(bindingName));
+	    Object currentKey = pair.getKey();
+	    containsKey = currentKey.equals(key);
+	} catch (NameNotBoundException e) {
+	} catch (ObjectNotFoundException e) {
 	}
-	return false;
+	return containsKey;
     }
 
     /** {@inheritDoc} */
@@ -531,6 +542,31 @@ public class BindingKeyedHashMap<K, V>
 	    return nextEntry().getValue();
 	}
     }
+
+    /* -- Implement ManagedObjectValueMap -- */
+
+    /** {@inheritDoc} */
+    public boolean putOverride(K key, V value) {
+	checkSerializable("key", key);
+	checkSerializable("value", value);
+	boolean previouslyMapped = containsKey(key);
+	putInternal(key, value);
+	return previouslyMapped;
+    }
+
+    /** {@inheritDoc} */
+    public boolean removeOverride(K key) {
+	checkNull("key", key);
+	boolean previouslyMapped = containsKey(key);
+	if (previouslyMapped) {
+	    DataService dataService = ChannelServiceImpl.getDataService();
+	    String bindingName = getBindingName(key.toString());
+	    dataService.removeObject(
+		dataService.getServiceBinding(bindingName));
+	    dataService.removeServiceBinding(bindingName);
+	}
+	return previouslyMapped;
+    }
     
     /* -- Implement ManagedObjectRemoval -- */
 
@@ -576,6 +612,15 @@ public class BindingKeyedHashMap<K, V>
 	    v = new Wrapper<V>(value);
 	}
 	
+	static KeyValuePair createKeyStop() {
+	    return new KeyValuePair();
+	}
+	
+	private KeyValuePair() {
+	    k = new Wrapper<K>(null);
+	    v = new Wrapper<V>(null);
+	}
+	
 	/** {@inheritDoc} */
 	public K getKey() {
 	    return k.get();
@@ -615,7 +660,7 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */
 	public String toString() {
-	    return getKey().toString() + "=" + getValue().toString();
+	    return k.toString() + "=" + v.toString();
 	}
     }
 
@@ -660,6 +705,11 @@ public class BindingKeyedHashMap<K, V>
 		obj = null;
 	    }
 	    s.defaultWriteObject();
+	}
+
+	public String toString() {
+	    T o = get();
+	    return o != null ? o.toString() : "null";
 	}
     }
 

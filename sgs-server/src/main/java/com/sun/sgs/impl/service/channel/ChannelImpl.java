@@ -32,6 +32,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -60,6 +61,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -80,6 +82,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /** The package name. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.channel.";
+
+    /** The channels map key. */
+    private static final String CHANNELS_MAP_KEY = PKG_NAME + "channelsMap";
 
     /** The channel name component prefix. */
     private static final String NAME_COMPONENT = "name.";
@@ -128,9 +133,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** The transaction. */
     private transient Transaction txn;
 
-    /** The data service. */
-    private transient DataService dataService;
-
     /** Flag that is 'true' if this channel is closed. */
     private boolean isClosed = false;
 
@@ -157,7 +159,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    throw new NullPointerException("null name");
 	}
 	this.name = name;
-	this.dataService = ChannelServiceImpl.getDataService();
+	DataService dataService = getDataService();
 	if (listener != null) {
 	    if (!(listener instanceof Serializable)) {
 		throw new IllegalArgumentException("non-serializable listener");
@@ -180,8 +182,32 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    logger.log(Level.FINER, "Created ChannelImpl:{0}",
 		       HexDumper.toHexString(channelId));
 	}
-	dataService.setServiceBinding(getChannelKey(), this);
+	getChannelsMap().put(name, this);
 	dataService.setServiceBinding(getEventQueueKey(), new EventQueue(this));
+    }
+
+    /** Returns the data service. */
+    private static DataService getDataService() {
+	return ChannelServiceImpl.getDataService();
+    }
+
+    /**
+     * Returns the channels map, keyed by channel name.  Creates and
+     * stores the map if it doesn't already exist.
+     */
+    private static ManagedObjectValueMap<String, ChannelImpl> getChannelsMap() {
+	DataService dataService = getDataService();
+	ManagedObjectValueMap<String, ChannelImpl> channelsMap;
+	try {
+	    channelsMap = uncheckedCast(
+		dataService.getServiceBinding(CHANNELS_MAP_KEY));
+	} catch (NameNotBoundException e) {
+	    channelsMap =
+		new BindingKeyedHashMap<String, ChannelImpl>(
+		    CHANNELS_MAP_KEY + ".entry");
+	    dataService.setServiceBinding(CHANNELS_MAP_KEY, channelsMap);
+	}
+	return channelsMap;
     }
 
     /* -- Factory methods -- */
@@ -204,12 +230,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns a channel with the given {@code name}.
      */
     static Channel getInstance(String name) {
-	try {
-	    return ((ChannelImpl) ChannelServiceImpl.getDataService().
-		getServiceBinding(getChannelKey(name))).getWrappedChannel();
-	} catch (ObjectNotFoundException e) {
-	    // TBD: This shouldn't happen, so log at SEVERE?
-	    throw new NameNotBoundException("channel not found!", e);
+	ChannelImpl channelImpl = getChannelsMap().get(name);
+	if (channelImpl != null) {
+	    return channelImpl.getWrappedChannel();
+	} else {
+	    throw new NameNotBoundException("channel not found: " + name);
 	}
     }
 
@@ -238,14 +263,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     boolean hasSessions() {
 	checkClosed();
 	String prefix = getSessionPrefix();
-	String name = dataService.nextServiceBoundName(prefix);
+	String name = getDataService().nextServiceBoundName(prefix);
 	return name != null && name.startsWith(prefix);
     }
 
     /** Implements {@link Channel#getSessions}. */
     Iterator<ClientSession> getSessions() {
 	checkClosed();
-	return new ClientSessionIterator(dataService, getSessionPrefix());
+	return new ClientSessionIterator(getSessionPrefix());
     }
 
     /** Implements {@link Channel#join(ClientSession)}. */
@@ -571,30 +596,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     {
 	in.defaultReadObject();
 	txn = ChannelServiceImpl.getTransaction();
-	dataService = ChannelServiceImpl.getDataService();
     }
 
     /* -- Binding prefix/key methods -- */
-
-    /**
-     * Return a key for accessing the channel with the specified
-     * {@code name}.  The key has the following form:
-     *
-     * com.sun.sgs.impl.service.channel.name.<channelName>
-     */
-    private static String getChannelKey(String name) {
-	return PKG_NAME + NAME_COMPONENT + name;
-    }
-
-    /**
-     * Returns a key for accessing this channel.  The key has the
-     * following form:
-     *
-     * com.sun.sgs.impl.service.channel.name.<channelName>
-     */
-    private String getChannelKey() {
-	return getChannelKey(name);
-    }
 
     /**
      * Returns the prefix for accessing all client sessions on this
@@ -698,7 +702,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns the ID for the specified {@code session}.
      */
     private static byte[] getSessionIdBytes(ClientSession session) {
-	return ChannelServiceImpl.getDataService().
+	return getDataService().
 	    createReference(session).getId().toByteArray();
     }
 
@@ -775,7 +779,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 */
 	long nodeId = getNodeId(session);
 	if (!hasServerNode(nodeId)) {
-	    dataService.markForUpdate(this);
+	    getDataService().markForUpdate(this);
 	    servers.add(nodeId);
 	}
 
@@ -783,6 +787,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Add session binding.
 	 */
 	String sessionKey = getSessionKey(session);
+	DataService dataService = getDataService();
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
 
@@ -804,6 +809,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * key is not bound.
      */
     private void removeSessionBinding(String sessionKey) {
+	DataService dataService = getDataService();
 	ClientSessionInfo sessionInfo = (ClientSessionInfo)
 	    dataService.getServiceBinding(sessionKey);
 	dataService.removeServiceBinding(sessionKey);
@@ -836,7 +842,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * from the server map.
 	 */
 	if (!hasSessionsOnNode(nodeId)) {
-	    dataService.markForUpdate(this);
+	    getDataService().markForUpdate(this);
 	    servers.remove(nodeId);
 	}
 
@@ -877,6 +883,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * coordinator to restart this channel's event processing.
      */
     private void reassignCoordinator(long failedCoordNodeId) {
+	DataService dataService = getDataService();
 	dataService.markForUpdate(this);
 	if (coordNodeId != failedCoordNodeId) {
 	    logger.log(
@@ -999,9 +1006,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      *		problem with the current transaction
      */
     private static Object getObjectForId(BigInteger refId) {
-	DataService dataService = ChannelServiceImpl.getDataService();
 	try {
-	    return dataService.createReferenceForId(refId).get();
+	    return getDataService().createReferenceForId(refId).get();
 	} catch (ObjectNotFoundException e) {
 	    return null;
 	}
@@ -1021,6 +1027,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * when all sessions leave the channel.
      */
     private void removeAllSessions() {
+	DataService dataService = getDataService();
 	for (String sessionKey :
 		 BoundNamesUtil.getServiceBoundNamesIterable(
 		    dataService, getSessionPrefix()))
@@ -1041,8 +1048,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * the channel is closed.
      */
     private void removeChannel() {
+	DataService dataService = getDataService();
 	removeAllSessions();
-	dataService.removeServiceBinding(getChannelKey());
+	getChannelsMap().removeOverride(name);
+	// TBD: should the channels map be removed if it is empty after the
+	// above removal?
 	dataService.removeObject(this);
 	if (listenerRef != null) {
 	    ChannelListener maybeWrappedListener = listenerRef.get();
@@ -1069,7 +1079,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private boolean hasSessionsOnNode(long nodeId) {
 	String keyPrefix = getSessionNodePrefix(channelId, nodeId);
-	return dataService.nextServiceBoundName(keyPrefix).
+	return getDataService().nextServiceBoundName(keyPrefix).
 	    startsWith(keyPrefix);
     }
 
@@ -1090,7 +1100,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	String sessionKey = getSessionKey(session);
 	ClientSessionInfo info = null;
 	try {
-	    info = (ClientSessionInfo) dataService.getServiceBinding(
+	    info = (ClientSessionInfo) getDataService().getServiceBinding(
 		sessionKey);
 	} catch (NameNotBoundException e) {
 	} catch (ObjectNotFoundException e) {
@@ -1123,8 +1133,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance of this class with the specified
 	 * {@code dataService} and {@code keyPrefix}.
 	 */
-	ClientSessionIterator(DataService dataService, String keyPrefix) {
-	    this.dataService = dataService;
+	ClientSessionIterator(String keyPrefix) {
+	    this.dataService = getDataService();
 	    this.iterator =
 		BoundNamesUtil.getServiceBoundNamesIterator(
 		    dataService, keyPrefix);
@@ -1275,8 +1285,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an event queue for the specified {@code channel}.
 	 */
 	EventQueue(ChannelImpl channel) {
-	    channelRef = channel.dataService.createReference(channel);
-	    queueRef = channel.dataService.createReference(
+	    DataService dataService = getDataService();
+	    channelRef = dataService.createReference(channel);
+	    queueRef = dataService.createReference(
 		new ManagedQueue<ChannelEvent>());
 	    writeBufferAvailable = channel.getWriteBufferCapacity();
 	}
@@ -1299,7 +1310,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    boolean success = getQueue().offer(event);
 	    if (success && (cost > 0)) {
-		ChannelServiceImpl.getDataService().markForUpdate(this);
+		getDataService().markForUpdate(this);
                 writeBufferAvailable -= cost;
                 if (logger.isLoggable(Level.FINEST)) {
                     logger.log(Level.FINEST,
@@ -1357,7 +1368,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * coordinator's recovery.
 	 */
 	void setSendRefresh() {
-	    ChannelServiceImpl.getDataService().markForUpdate(this);
+	    getDataService().markForUpdate(this);
 	    sendRefresh = true;
 	}
 
@@ -1381,8 +1392,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
-	    DataService dataService =
-		ChannelServiceImpl.getDataService();
+	    DataService dataService = getDataService();
+	    
 	    /*
 	     * If a new coordinator has taken over (i.e., 'sendRefresh' is
 	     * true), then all pending events should to be serviced, since
@@ -1452,8 +1463,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	/** {@inheritDoc} */
 	public void removingObject() {
 	    try {
-		DataService dataService = ChannelServiceImpl.getDataService();
-		dataService.removeObject(queueRef.get());
+		getDataService().removeObject(queueRef.get());
 	    } catch (ObjectNotFoundException e) {
 		// already removed.
 	    }
@@ -1782,10 +1792,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private static EventQueue getEventQueue(long nodeId, byte[] channelId) {
 	String eventQueueKey = getEventQueueKey(nodeId, channelId);
-	DataService dataService = ChannelServiceImpl.getDataService();
+	DataService dataService = getDataService();
 	try {
 	    return
-		(EventQueue) dataService.getServiceBinding(eventQueueKey);
+		(EventQueue) getDataService().getServiceBinding(eventQueueKey);
 	} catch (NameNotBoundException e) {
 	    logger.logThrow(
 		Level.WARNING, e,
@@ -1847,7 +1857,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static String nextServiceBoundNameWithPrefix(
  	DataService dataService, String key, String prefix)
     {
-	String name = dataService.nextServiceBoundName(key);
+	String name = getDataService().nextServiceBoundName(key);
 	return
 	    (name != null && name.startsWith(prefix)) ? name : null;
     }
@@ -1887,7 +1897,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	public void run() {
 	    WatchdogService watchdogService =
 		ChannelServiceImpl.getWatchdogService();
-	    DataService dataService = ChannelServiceImpl.getDataService();
+	    DataService dataService = getDataService();
 	    TaskService taskService = ChannelServiceImpl.getTaskService();
 	    String prefix = getEventQueuePrefix(nodeId);
 	    String key = nextServiceBoundNameWithPrefix(
@@ -1969,7 +1979,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * then this task takes no action.
 	 */
 	public void run() {
-	    DataService dataService = ChannelServiceImpl.getDataService();
+	    DataService dataService = getDataService();
 	    TaskService taskService = ChannelServiceImpl.getTaskService();
 	    eventQueueKey = nextServiceBoundNameWithPrefix(
 		dataService, eventQueueKey, localNodePrefix);
@@ -2018,7 +2028,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	/** {@inheritDoc} */
 	public void run() {
-	    DataService dataService = ChannelServiceImpl.getDataService();
+	    DataService dataService = getDataService();
 	    sessionKey =
 		nextServiceBoundNameWithPrefix(
 		    dataService, sessionKey, sessionPrefix);
@@ -2099,7 +2109,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	/** {@inheritDoc} */
 	public void run() {
-	    DataService dataService = ChannelServiceImpl.getDataService();
+	    DataService dataService = getDataService();
 	    String prefix = getChannelSetPrefix(failedNodeId);
 	    String key =
 		nextServiceBoundNameWithPrefix(dataService, prefix, prefix);
@@ -2153,5 +2163,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static BigInteger getLastComponentAsBigInteger(String key) {
 	int index = key.lastIndexOf('.');
 	return new BigInteger(key.substring(index + 1), 16);
+    }
+
+    /** Avoids warnings about unchecked casts.*/
+    @SuppressWarnings("unchecked")
+    private static <T> T uncheckedCast(Object object) {
+        return (T) object;
     }
 }

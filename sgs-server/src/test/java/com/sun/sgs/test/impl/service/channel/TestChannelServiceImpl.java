@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -771,6 +771,10 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelJoin() throws Exception {
 	String channelName = "joinTest";
 	ClientGroup group = new ClientGroup(someUsers);
+	// This create/close of channel done so that the global channel
+	// table is created and won't effect the object count.
+	createChannel("foo");
+	closeChannel("foo");
 	Thread.sleep(1000);
 	int count = getObjectCount();
 	createChannel(channelName);
@@ -2749,10 +2753,14 @@ public class TestChannelServiceImpl extends TestCase {
                 // managed objects, so a more general way to exclude these from
                 // the count would be nice but for now the specific types that
                 // are accumulated get excluded from the count
-                String name = dataService.createReferenceForId(next).get().
-		    getClass().getName();
-                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask"))
+		ManagedReference ref =
+		    dataService.createReferenceForId(next);
+		Object obj = ref.get();
+                String name = obj.getClass().getName();
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+		    System.err.println(count + ": " + obj.toString());
                     count++;
+		}
                 last = next;
 	    }
 	}
