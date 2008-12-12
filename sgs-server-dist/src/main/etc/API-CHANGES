@@ -1,5 +1,27 @@
 Project Darkstar Server API Changes
 
+Version 0.9.8
+
+- Add support for pluggable AppContext behavior
+
+  A new package, com.sun.sgs.internal, has been introduced to support
+  swapping out the behavior of the AppContext class.  As part of this
+  package, the ManagerLocator interface was added to define this behavior,
+  and the InternalContext was added to select a behavior to use.
+
+  The following methods also had ManagerNotFoundException added to their
+  throws clause:
+
+  - AppContext.getChannelManager
+  - AppContext.getDataManager
+  - AppContext.getTaskManager
+
+- Add new scalable data structures
+
+  The ScalableDeque and ScalableList classes were added for general use by
+  applications.  Additionally, the ManagedSerializable utility class was
+  added.
+
 Version 0.9.6:
 
 - Use ByteBuffer for channel and session message parameters

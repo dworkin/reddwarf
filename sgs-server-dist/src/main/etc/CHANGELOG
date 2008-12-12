@@ -1,3 +1,28 @@
+Version 0.9.8:
+- Add ScalableDeque and ScalableList implementations
+- Add object access and contention tracking capabilities
+- Improve concurrency of login authentication (issue #96)
+- Improve profiling output by adding descriptive information to the
+  AbstractKernelRunnable class (issue #91)
+- Improve performance of markForUpdate and removeObject methods of the
+  DataManager
+- Add configurable support for optimistic write locking in data service
+- Improve documentation of wire protocol specification
+- API changes:
+  - Decoupled API classes from implementation classes (issue #102)
+  - Add support for pluggable behavior of AppContext with addition of
+    com.sun.sgs.internal package (issue #101)
+- Add profiling support for non-task related data (issue #111)
+- Remove dependency on Apache MINA and SLF4J
+- Restructure distribution (issue #103)
+  - Eliminate sgs.sh and sgs.bat bootstrapper scripts in favor of platform
+    independent Java bootstrapper
+  - Integrate BDB files into unified file hierarchy
+  - Add BDB-JE to the distribution
+  - Modify data store so that it automatically creates the database directory
+    if it does not exist
+- Also fix issues #21, #77, #78, #86, #87, #88, #93, #95, #105, #106, #110
+
 Version 0.9.7:
 - Improve channel service concurrency by removing channel sets (issue
   #18), and by caching channel server proxies (issue #19)
