@@ -35,7 +35,6 @@ import com.sun.sgs.protocol.LoginFailureException.FailureReason;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
-import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.IOException;

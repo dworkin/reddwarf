@@ -294,20 +294,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());
 
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
+	    fail("Expected InvocationTargetException");
+	} catch (InvocationTargetException e) {
 	    System.err.println(e);
 	}
     }
 
     public void testConstructorDisconnectDelayTooSmall() throws Exception {
 	try {
-	    Properties props =
-		createProperties(
-		    StandardProperties.APP_NAME, APP_NAME,
+            serviceProps.setProperty(
 		    "com.sun.sgs.impl.protocol.simple.disconnect.delay", "199");
 	    new ClientSessionServiceImpl(
-		props, serverNode.getSystemRegistry(),
+		serviceProps, serverNode.getSystemRegistry(),
 		serverNode.getProxy());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {

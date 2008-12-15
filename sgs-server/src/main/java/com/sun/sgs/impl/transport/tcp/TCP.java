@@ -33,6 +33,7 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Properties;
@@ -169,14 +170,17 @@ public class TCP implements Transport {
 
         try {
              // Listen for incoming client connections. If no host address
-             // is supplied, default to listen on all interfaces.
+             // is supplied, default to listen on all interfaces on the local
+             // host.
              //
             InetSocketAddress listenAddress =
                         host == null ?
                                 new InetSocketAddress(port) :
                                 new InetSocketAddress(host, port);
             
-            descriptor = new TCPDescriptor(listenAddress.getHostName(),
+            descriptor = new TCPDescriptor(host == null ?
+                                           InetAddress.getLocalHost().getHostName() :
+                                           host,
                                            listenAddress.getPort());
             AsynchronousChannelProvider provider =
                 AsynchronousChannelProvider.provider();
@@ -188,9 +192,10 @@ public class TCP implements Transport {
 	    try {
                 acceptor.bind(listenAddress, acceptorBacklog);
 		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(
-			Level.CONFIG, "bound to port:{0,number,#}",
-			descriptor.getListeningPort());
+		    logger.log(Level.CONFIG,
+                               "acceptor bound to host: {0} port:{1,number,#}",
+                               descriptor.getHostName(),
+                               descriptor.getListeningPort());
 		}
 	    } catch (Exception e) {
 		logger.logThrow(Level.WARNING, e,

@@ -51,6 +51,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
+import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
@@ -361,6 +362,20 @@ public final class ClientSessionServiceImpl
 	    } catch (InvocationTargetException ite) {
 		throw (Exception) ite.getCause();
 	    }
+            
+            final ProtocolDescriptor[] descriptors = new ProtocolDescriptor[1];
+            
+            descriptors[0] = protocolAcceptor.getDescriptor();
+
+            transactionScheduler.runTask(
+                new AbstractKernelRunnable("UpdateNode") {
+		    public void run() {
+                        Node node =
+                                watchdogService.getNodeForUpdate(localNodeId);
+                        assert node != null;
+                        node.setClientListener(descriptors);
+                    } },
+                    taskOwner);
 	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

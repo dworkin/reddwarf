@@ -19,7 +19,7 @@
 
 package com.sun.sgs.protocol;
 
-import com.sun.sgs.service.Service;
+import com.sun.sgs.service.ProtocolDescriptor;
 import java.io.IOException;
 
 /**
@@ -34,7 +34,15 @@ import java.io.IOException;
  * </ul>
  */
 public interface ProtocolAcceptor {
-
+    
+    /**
+     * Returns the descriptor for this protocol. Multiple calls to this
+     * method may return the same object.
+     * 
+     * @return the descriptor for this protocol
+     */
+    ProtocolDescriptor getDescriptor();
+    
     /**
      * Starts accepting connections, and notifies the specified {@code
      * listener} of new connections.

@@ -67,7 +67,11 @@ public class SimpleSgsProtocolAcceptor
     private static final String READ_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".buffer.read.max";
 
-    public static final String TRANSPORT_CLASS_NAME_PROPERTY =
+    /**
+     * The transport property. The specified transport must support
+     * RELIABLE delivery.
+     */
+    public static final String TRANSPORT_PROPERTY =
         PKG_NAME + ".transport";
     
     /** The default transport */
@@ -92,7 +96,9 @@ public class SimpleSgsProtocolAcceptor
     /** The read buffer size for new connections. */
     private final int readBufferSize;
 
+    /** The transport */
     private final Transport transport;
+    
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
     private final long disconnectDelay;
 
@@ -148,7 +154,7 @@ public class SimpleSgsProtocolAcceptor
                 systemRegistry.getComponent(TransportFactory.class);
             
             String transportClassName =
-                    wrappedProps.getProperty(TRANSPORT_CLASS_NAME_PROPERTY,
+                    wrappedProps.getProperty(TRANSPORT_PROPERTY,
                                              DEFAULT_TRANSPORT);
             
             transport =
@@ -220,7 +226,7 @@ public class SimpleSgsProtocolAcceptor
     /* -- Implement ProtocolAcceptor -- */
 
     /** {@inheritDoc} */
-//    @Override
+    @Override
     public ProtocolDescriptor getDescriptor() {
         return protocolDesc;
     }
@@ -256,7 +262,6 @@ public class SimpleSgsProtocolAcceptor
                                       SimpleSgsProtocolAcceptor.this,
                                       byteChannel,
                                       readBufferSize);
-
         }
     }
     

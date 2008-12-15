@@ -41,7 +41,7 @@ import java.util.logging.Logger;
  * messages with a 2-byte message length, and masking (and re-issuing) partial
  * I/O operations.  Also enforces a fixed buffer size when reading.
  */
-class AsynchronousMessageChannel implements Channel {
+public class AsynchronousMessageChannel implements Channel {
 
     /** The number of bytes used to represent the message length. */
     private static final int PREFIX_LENGTH = 2;
@@ -74,8 +74,8 @@ class AsynchronousMessageChannel implements Channel {
      * @throws	IllegalArgumentException if {@code readBufferSize} is smaller
      *		than {@value #PREFIX_LENGTH}
      */
-    AsynchronousMessageChannel(AsynchronousByteChannel channel,
-                               int readBufferSize)
+    public AsynchronousMessageChannel(AsynchronousByteChannel channel,
+                                      int readBufferSize)
     {
 	if (readBufferSize < PREFIX_LENGTH) {
 	    throw new IllegalArgumentException(
@@ -103,7 +103,8 @@ class AsynchronousMessageChannel implements Channel {
      *		space to read the next message
      * @throws	ReadPendingException if a read is in progress
      */
-    IoFuture<ByteBuffer, Void> read(CompletionHandler<ByteBuffer, Void> handler)
+    public IoFuture<ByteBuffer, Void> read(CompletionHandler<ByteBuffer,
+                                                             Void> handler)
     {
         if (!readPending.compareAndSet(false, true)) {
             throw new ReadPendingException();
@@ -122,8 +123,8 @@ class AsynchronousMessageChannel implements Channel {
      * @return	a future representing the result of the operation
      * @throws	WritePendingException if a write is in progress
      */
-    IoFuture<Void, Void> write(ByteBuffer src,
-                               CompletionHandler<Void, Void> handler)
+    public IoFuture<Void, Void> write(ByteBuffer src,
+                                      CompletionHandler<Void, Void> handler)
     {
         if (!writePending.compareAndSet(false, true)) {
             throw new WritePendingException();
