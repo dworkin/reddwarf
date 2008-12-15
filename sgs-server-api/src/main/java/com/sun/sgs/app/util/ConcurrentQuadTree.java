@@ -32,6 +32,8 @@ import java.util.NoSuchElementException;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedObjectRemoval;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 
@@ -40,45 +42,47 @@ import com.sun.sgs.app.Task;
  * defined type and its Cartesian position in a rectangular, two-dimensional
  * region. More specifically, the data structure subdivides existing regions
  * into four, equally-sized regions in order to allot one region for a desired
- * number of elements. Therefore, each {@code Point} inserted into the
- * {@code ConcurrentQuadTree} will be located in a region containing no more
- * than the specified number of elements for each leaf node. This parameter is
- * defined in the constructor of the quadtree, and is referred to as the
- * {@code bucketSize}. A quadtree enables a two-dimensional space to
- * efficiently hold onto a certain number of {@code Point}s using a
- * relatively simple and low-cost scheme. The quadtree does not support null
- * elements; that is, calling {@code add(x, y, null)} is not permitted.
+ * number of elements. These sub-regions are also referred to as quadrants,
+ * and are represented by leaf nodes in the tree. Therefore, each
+ * {@code Point} inserted into the {@code ConcurrentQuadTree} will be located
+ * in a region containing no more than the specified number of elements for
+ * each leaf node. This parameter is defined in the constructor of the
+ * quadtree, and is referred to as the {@code bucketSize}. A quadtree enables
+ * a two-dimensional space to efficiently hold onto a certain number of
+ * {@code Point}s using a relatively simple and low-cost scheme. The quadtree
+ * does not support null elements; that is, calling {@code add(x, y, null)} is
+ * not permitted. The quadtree does, however, support multiple elements at the
+ * same coordinate location. In other words, it is legal to do the following:
+ * <p>
+ * {@code add(1, 1, object1);}<br>
+ * {@code add(1, 1, object2);}, etc.
+ * <p>
+ * In order to determine the number of elements stored at a given location, it
+ * is necessary to create an iterator with a bounding box encompassing the
+ * coordinate ({@code boundingBoxIterator(double, double, double, double)}),
+ * or alternately, an iterator for the point itself ({@code pointIterator(double, double)}).
  * <p>
  * This type of organization is best interpreted as a tree whereby "deeper"
  * nodes correspond to smaller regions. Elements can only exist at the leaf
  * nodes; if a node overflows its bucket size, then it splits into smaller
- * regions and the elements are reallocated. The depth of leaf nodes depends
- * on the maximum depth of the tree provided during instantiation: a large
- * depth limit allows for more entries and for them to exist within very small
- * regions, whereas a smaller depth limit can support fewer entries but they
- * exist in larger regions. The depth limit should be proportional to the
- * number of entries which need to be stored and the minimum region size you
- * wish to support. If not specified (by using the five-argument constructor),
- * the quadtree will have a default maximum depth of 10. Therefore, any
- * element additions that would require the tree to grow deeper would not be
- * applied to the quadtree.
+ * regions at an incremented depth and the elements are reallocated.
  * <p>
  * Overall, many of the methods occur in logarithmic time because the tree has
  * to be walked in order to locate the correct region to manipulate. This is
- * not often very costly because the quadtree has a tendency to grow
- * horizontally, especially if values are spaced far enough apart and if the
- * tree has a shallow depth.
+ * not very costly because the quadtree has a tendency to grow horizontally,
+ * especially if values are spaced far enough apart.
  * <p>
- * To allow for concurrency, this data structure does not propagate changes
- * from leaf nodes toward the root node. Since the tree does not grow upwards,
- * nodes that have been created maintain their tree depth permanently unless
- * they are removed. As mentioned above, a tree depth of 0 corresponds to a
- * single node (the root), without any children. Each subsequent level
- * increments the depth. Nodes are removed when there are no children
- * containing elements. By definition, this also means that the size of the
- * node and all its children are 0. This measure is taken to improve the
- * performance of walking the tree in the future and reduces memory
- * requirements.
+ * To allow concurrency, this data structure does not propagate changes from
+ * leaf nodes toward the root node. Since the tree does not grow upwards,
+ * nodes that have been created permanently maintain their tree depth, unless
+ * they are removed (in other words, collapsed or pruned). As suggested above,
+ * a tree depth of 0 corresponds to a single node (the root), without any
+ * children. Each subsequent level incurs its parent's incremented depth.
+ * Nodes are removed from the tree (and thus, data manager) when there are
+ * neither children containing elements, nor children containing children. By
+ * definition, this also means that the size of the node and all its children
+ * are 0. This measure is taken to improve the performance of walking the tree
+ * in the future and reduces memory requirements.
  * <p>
  * Iteration of the tree is achieved by defining an optional region within
  * which to search. Therefore, the order of elements in the iteration is not
@@ -87,10 +91,18 @@ import com.sun.sgs.app.Task;
  * an {@code boundingBox}) of the tree. Since there may be many elements in
  * the tree, this approach removes the need to walk through the tree to
  * collect and return all elements in an otherwise lengthy process.
+ * <p>
+ * As suggested above, accessing elements in the quadtree is achieved by using
+ * an iterator over a given rectangular region. Since there may be more than
+ * one element at a given location, it is infeasible to specify the
+ * characteristics of the object to be removed or retrieved. Instead,
+ * individual removals can be achieved by using the iterator's
+ * {@code remove()} method.
  * 
  * @param <T> the type the quadtree is to hold
  */
-public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
+public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable,
+	ManagedObjectRemoval {
     private static final long serialVersionUID = 1L;
 
     /*
@@ -121,10 +133,10 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * An object consisting of two corners that comprise the box representing
      * the sample space
      */
-    private final BoundingBox boundingBox;
+    private final ManagedReference<BoundingBox> boundingBox;
 
     /** The root element of the quadtree */
-    private Node<T> root;
+    private ManagedReference<Node<T>> root;
 
     /**
      * The five-argument constructor which defines a quadtree with a depth
@@ -133,8 +145,6 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * represent the first {@code Point} and ({@code x2}, {@code y2})
      * represents the second {@code Point} of the defining {@code BoundingBox}.
      * 
-     * @param maxDepth the maximum depth the tree is permitted to grow; this
-     * value cannot be negative
      * @param bucketSize the maximum capacity of a leaf node
      * @param x1 the x-coordinate of the first point defining the tree's
      * bounding box
@@ -153,8 +163,13 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 		    "Bucket size cannot be negative");
 	}
 	this.bucketSize = bucketSize;
-	boundingBox = new BoundingBox(new Point(x1, y1), new Point(x2, y2));
-	root = new Node<T>(boundingBox, bucketSize);
+
+	DataManager dm = AppContext.getDataManager();
+	BoundingBox box =
+		new BoundingBox(new Point(x1, y1), new Point(x2, y2));
+	boundingBox = dm.createReference(box);
+	Node<T> node = new Node<T>(boundingBox, bucketSize);
+	root = dm.createReference(node);
     }
 
     /**
@@ -190,7 +205,8 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * {@inheritDoc}
      */
     public boolean isEmpty() {
-	return (root.children == null) && (root.values == null);
+	return (root.get().getChildren() == null) &&
+		(root.get().getValues() == null);
     }
 
     /**
@@ -201,13 +217,16 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	// the returned quadrant could be null if the point is
 	// out of bounds
 	Point point = new Point(x, y);
-	Object quadrant = Node.Quadrant.determineQuadrant(boundingBox, point);
+	Object quadrant =
+		Node.Quadrant.determineQuadrant(boundingBox.get(), point);
 	if (!(quadrant instanceof Node.Quadrant)) {
 	    throw new IllegalArgumentException(
-		    "The coordinates are not contained within the bounding box");
+		    "The coordinates are not contained "
+			    + "within the bounding box");
+
 	}
 
-	Node<T> leaf = Node.getLeafNode(root, point);
+	Node<T> leaf = Node.getLeafNode(root.get(), point);
 	return leaf.add(point, element, true);
     }
 
@@ -217,12 +236,60 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
     public boolean removeAll(double x, double y) {
 	boolean result = false;
 	Point point = new Point(x, y);
-	Node<T> leaf = Node.getLeafNode(root, point);
-	
+	Node<T> leaf = Node.getLeafNode(root.get(), point);
+
+	System.err.println(" ~~~ a");
+
 	while (leaf.remove(point) != null) {
 	    result = true;
 	}
 	return result;
+    }
+
+    /**
+     * Returns the {@code ManagedObject} which is being referenced by the
+     * argument
+     * 
+     * @param ref the reference whose value to return
+     * @return the value of the reference, or null if either the reference is
+     * {@code null} or the object no longer exists
+     */
+    static Object getReferenceValue(ManagedReference<?> ref) {
+	if (ref != null) {
+	    try {
+		return ref.get();
+	    } catch (ObjectNotFoundException onfe) {
+	    }
+	}
+	return null;
+    }
+
+    /**
+     * Creates a reference to the supplied argument if it is not {@code null}.
+     * 
+     * @param <T> the type of the object
+     * @param t the object to reference
+     * @return a {@code ManagedReference} of the object, or {@code null} if
+     * the argument is null.
+     */
+    static <T> ManagedReference<T> createReferenceIfNecessary(T t) {
+	if (t == null) {
+	    return null;
+	}
+	return AppContext.getDataManager().createReference(t);
+    }
+
+    /**
+     * Casts the object to the desired type in order to avoid unchecked cast
+     * warnings
+     * 
+     * @param <T> the type to cast to
+     * @param object the object to cast
+     * @return the casted version of the object
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T uncheckedCast(Object object) {
+	return (T) object;
     }
 
     /**
@@ -236,7 +303,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      */
     public boolean removeNoReturn(double x, double y) {
 	Point point = new Point(x, y);
-	Node<T> leaf = Node.getLeafNode(root, point);
+	Node<T> leaf = Node.getLeafNode(root.get(), point);
 	return leaf.delete(point);
     }
 
@@ -244,7 +311,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * {@inheritDoc}
      */
     public double[] getDirectionalBoundingBox() {
-	return BoundingBox.organizeCoordinates(boundingBox);
+	return BoundingBox.organizeCoordinates(boundingBox.get());
     }
 
     /**
@@ -256,14 +323,23 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	Point corner2 = new Point(x2, y2);
 	BoundingBox box = new BoundingBox(corner1, corner2);
 
-	return new ElementIterator<T>(root, box);
+	return new ElementIterator<T>(root.get(), box);
+    }
+    
+    
+    /**
+     * {@inheritDoc}
+     **/
+    public QuadTreeIterator<T> pointIterator(double x, double y) {
+	Point point = new Point(x, y);
+	BoundingBox box = new BoundingBox(point, point);
+	return new ElementIterator<T>(root.get(), box);
     }
 
     /**
      * {@inheritDoc}
      */
     public void clear() {
-
 	// If the tree is empty, there is no work to be done
 	if (isEmpty()) {
 	    return;
@@ -273,7 +349,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	removingObject();
 
 	// Create a new root for the new tree
-	root = new Node<T>(boundingBox, bucketSize);
+	Node<T> newRoot = new Node<T>(boundingBox, bucketSize);
+	AppContext.getDataManager().markForUpdate(this);
+	root = AppContext.getDataManager().createReference(newRoot);
     }
 
     /**
@@ -281,7 +359,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      */
     public boolean contains(double x, double y) {
 	Point point = new Point(x, y);
-	Node<T> leaf = Node.getLeafNode(root, point);
+	Node<T> leaf = Node.getLeafNode(root.get(), point);
 	return leaf.contains(point);
     }
 
@@ -290,7 +368,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      */
     public void removingObject() {
 	AsynchronousClearTask<T> clearTask =
-		new AsynchronousClearTask<T>(root);
+		new AsynchronousClearTask<T>(root.get());
 
 	// Schedule asynchronous task here
 	// which will delete the list
@@ -301,7 +379,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * {@inheritDoc}
      */
     public QuadTreeIterator<T> iterator() {
-	return new ElementIterator<T>(root, boundingBox);
+	return new ElementIterator<T>(root.get(), boundingBox.get());
     }
 
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -320,7 +398,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      */
     static class ElementIterator<T> implements QuadTreeIterator<T>,
 	    Serializable {
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 4L;
 
 	/** A region specific to this iterator */
 	private final BoundingBox box;
@@ -359,7 +437,8 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * An iterator for the values of a list storing the elements at a
 	 * given coordinate
 	 */
-	private Iterator<T> valueIterator;
+	private Iterator<ManagedReference<
+		ManagedSerializable<T>>> valueIterator;
 
 	/**
 	 * A {@code Point} object representing the current point being
@@ -397,7 +476,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	ElementIterator(Node<T> root, BoundingBox box) {
 	    this.box = box;
-	    current = getFirstQualifiedLeafNode(root);
+	    current =
+		    uncheckedCast(getReferenceValue(
+			    getFirstQualifiedLeafNode(root)));
 	    currentPoint = null;
 	    valueIterator = null;
 
@@ -475,7 +556,8 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 
 		// Check if the next point sits inside the bounding box
 		if (isFullyContained || box.contains(currentPoint)) {
-		    List<T> list = next.getValues().get(currentPoint);
+		    List<ManagedReference<ManagedSerializable<T>>> list =
+			    next.getValues().get(currentPoint);
 
 		    // Go to next map entry if the list is null
 		    if (list == null) {
@@ -491,7 +573,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 
 	    // If there are no more points, we need to fetch a new node
 	    // and try again
-	    next = getNextQualifiedLeafNode(next);
+	    next =
+		    uncheckedCast(getReferenceValue(
+			    getNextQualifiedLeafNode(next)));
 	    if (next != null) {
 		entryIterator = next.getValues().keySet().iterator();
 		return getNextQualifiedElement();
@@ -510,7 +594,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 
 		// If there are elements remaining, return the next one
 		while (valueIterator.hasNext()) {
-		    return valueIterator.next();
+		    return valueIterator.next().get().get();
 		}
 	    }
 	    return null;
@@ -526,6 +610,17 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * modified or removed.
 	 */
 	public T next() {
+	    loadNext();
+	    return entry.getValue();
+	}
+
+	
+	/**
+	 * Sets up the next element without returning it. The two
+	 * "next" methods will decide whether they want to return
+	 * the value or not
+	 */
+	private void loadNext() {
 	    checkDataIntegrity();
 	    if (!hasNext()) {
 		throw new NoSuchElementException();
@@ -541,21 +636,21 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	    current = next;
 	    nextEntry = getNextQualifiedElement();
 	    dataIntegrityValue = current.getDataIntegrityValue();
-	    return entry.getValue();
 	}
-
+	
+	
 	/**
 	 * {@inheritDoc}
 	 */
 	public boolean nextNoReturn() {
 	    try {
-		next();
+		loadNext();
 	    } catch (ObjectNotFoundException onfe) {
-		// If we get here, then the element in the data manager was
-		// removed without
-		// updating the quadtree. Notify that no true reference
-		// exists, even though
-		// the element does.
+		/*
+		 * If we get here, then the element in the data manager was
+		 * removed without updating the quadtree. Notify that no true
+		 * reference exists, even though the element does.
+		 */ 
 		entry = null;
 		return false;
 	    }
@@ -601,10 +696,10 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * by {@code node}
 	 * @throws IllegalStateException if a leaf node could not be found
 	 */
-	static <T> Node<T> getFirstLeafNode(Node<T> node) {
+	static <T> ManagedReference<Node<T>> getFirstLeafNode(Node<T> node) {
 	    // If the given node is a leaf with values, we are done
 	    if (node.isLeaf()) {
-		return node;
+		return AppContext.getDataManager().createReference(node);
 	    }
 
 	    // Iterate through all the children in a depth-first
@@ -629,7 +724,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return the next node in the depth-first traversal, or {@code null}
 	 * if none exists
 	 */
-	static <T> Node<T> getNextLeafNode(Node<T> node) {
+	static <T> ManagedReference<Node<T>> getNextLeafNode(Node<T> node) {
 	    Node<T> parent = node.getParent();
 
 	    // End condition: we reached the root; there is no next leaf node
@@ -649,7 +744,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 		if (!child.isLeaf()) {
 		    return getFirstLeafNode(child);
 		} else if (child.getValues() != null) {
-		    return child;
+		    return AppContext.getDataManager().createReference(child);
 		}
 
 		// Get the next sibling
@@ -666,17 +761,18 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return the first leaf node containing entries, or {@code null} if
 	 * one does not exist
 	 */
-	private Node<T> getFirstQualifiedLeafNode(Node<T> node) {
+	private ManagedReference<Node<T>> getFirstQualifiedLeafNode(
+		Node<T> node) {
 
 	    // Return the leaf if no region was specified, or if the
 	    // region intersects with the leaf node
-	    Node<T> leaf = getFirstLeafNode(node);
+	    ManagedReference<Node<T>> leaf = getFirstLeafNode(node);
 	    if (isQualified(leaf)) {
 		return leaf;
 	    }
 
 	    // Otherwise, try getting the next qualified node
-	    return getNextQualifiedLeafNode(leaf);
+	    return getNextQualifiedLeafNode(leaf.get());
 	}
 
 	/**
@@ -690,23 +786,24 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return the next node containing qualified entries, or {@code null}
 	 * if none exists
 	 */
-	private Node<T> getNextQualifiedLeafNode(Node<T> node) {
-	    Node<T> child = getNextLeafNode(node);
+	private ManagedReference<Node<T>> getNextQualifiedLeafNode(
+		Node<T> node) {
+	    ManagedReference<Node<T>> child = getNextLeafNode(node);
 
 	    // Check if this child is "qualified"
 	    while (child != null) {
 
 		// Skip over nodes whose bounding boxes do not intersect
 		// the iterator's defined bounding box
-		if (isQualified(child) && child.getValues() != null) {
-		    BoundingBox box = child.getBoundingBox();
+		if (isQualified(child) && child.get().getValues() != null) {
+		    BoundingBox box = child.get().getBoundingBox();
 		    isFullyContained =
 			    (this.box.getContainment(box) == 
 				BoundingBox.Containment.FULL);
 		    return child;
 		}
 		// get the next node
-		child = getNextLeafNode(child);
+		child = getNextLeafNode(child.get());
 	    }
 	    return null;
 	}
@@ -721,14 +818,18 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return {@code true} if an intersection occurs (qualified), and
 	 * {@code false} otherwise (disqualified)
 	 */
-	private boolean isQualified(Node<T> node) {
+	private boolean isQualified(ManagedReference<Node<T>> node) {
+	    if (node == null) {
+		return false;
+	    }
+
 	    // The node is not qualified if it doesn't have values to
 	    // iterate over
-	    if (node.getValues() == null) {
+	    if (node.get().getValues() == null) {
 		return false;
 	    }
 	    // Otherwise, check that the node intersects the region
-	    BoundingBox box = node.getBoundingBox();
+	    BoundingBox box = node.get().getBoundingBox();
 	    return (box == null || this.box.getContainment(box) != 
 		BoundingBox.Containment.NONE);
 	}
@@ -771,13 +872,14 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	private static final long serialVersionUID = 3L;
 
 	/** The node currently being examined */
-	private Node<T> current;
+	private ManagedReference<Node<T>> current;
 
 	/** The total number of elements to remove for each task iteration */
 	private final int MAX_OPERATIONS = 50;
 
 	/** The iterator which traverses the unique coordinates in a map */
-	private Iterator<Point> keyIterator;
+	private ManagedReference<
+		ManagedSerializable<Iterator<Point>>> keyIterator;
 
 	/** The point currently being examined */
 	private Point currentPoint;
@@ -790,11 +892,16 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	AsynchronousClearTask(Node<T> root) {
 	    assert (root != null) : "The root parameter must not be null";
+
 	    current = ElementIterator.getFirstLeafNode(root);
-	    keyIterator = setupKeyIterator(current);
+	    ManagedSerializable<Iterator<Point>> iter =
+		    new ManagedSerializable<Iterator<Point>>(
+			    setupKeyIterator(current));
+	    keyIterator = createReferenceIfNecessary(iter);
 	    currentPoint =
-		    (keyIterator == null || !keyIterator.hasNext() ? null
-			    : keyIterator.next());
+		    (keyIterator == null ||
+			    !keyIterator.get().get().hasNext() ? null
+			    : keyIterator.get().get().next());
 	}
 
 	/**
@@ -839,23 +946,31 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 		// Point to try and remove.
 		if (!removeElement()) {
 		    currentPoint =
-			    (keyIterator == null || !keyIterator.hasNext()
-				    ? null : keyIterator.next());
+			    (keyIterator == null ||
+				    !keyIterator.get().get().hasNext() ? null
+				    : keyIterator.get().get().next());
 
-		    // We are done with this node; get the next one
+		    // We are done with this node; delete it from
+		    // the data manager and then get the next one
 		    if (currentPoint == null) {
-			// TODO: delete node from data store and shift
-			// reference
-			current = ElementIterator.getNextLeafNode(current);
-			keyIterator = setupKeyIterator(current);
+			ManagedReference<Node<T>> nextNode =
+				ElementIterator
+					.getNextLeafNode(current.get());
+			AppContext.getDataManager().removeObject(
+				current.get());
+			current = nextNode;
+			ManagedSerializable<Iterator<Point>> iter =
+				new ManagedSerializable<Iterator<Point>>(
+					setupKeyIterator(current));
+			keyIterator = createReferenceIfNecessary(iter);
 			currentPoint =
 				(keyIterator == null ||
-					!keyIterator.hasNext() ? null
-					: keyIterator.next());
+					!keyIterator.get().get().hasNext()
+					? null : keyIterator.get().get()
+						.next());
 		    }
 		}
 	    }
-	    // TODO: bind current as necessary
 	    return (current != null);
 	}
 
@@ -868,8 +983,10 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return an iterator over the points in the bucket, or {@code null}
 	 * if there are none
 	 */
-	private static <T> Iterator<Point> setupKeyIterator(Node<T> node) {
-	    Map<Point, List<T>> values = node.getValues();
+	private static <T> Iterator<Point> setupKeyIterator(
+		ManagedReference<Node<T>> node) {
+	    Map<Point, List<ManagedReference<ManagedSerializable<T>>>> values =
+		    node.get().getValues();
 	    if (values == null || values.isEmpty()) {
 		return null;
 	    }
@@ -892,7 +1009,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	    }
 
 	    // Deletes the next element located at currentPoint
-	    return (current.delete(currentPoint));
+	    return (current.get().delete(currentPoint));
 	}
     }
 
@@ -907,7 +1024,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * meaning the {@code BoundingBox} edges either intersect the axes at
      * right angles or coincide with them.
      */
-    static class BoundingBox {
+    static class BoundingBox implements Serializable, ManagedObject {
+	private static final long serialVersionUID = 3L;
+
 	public static final byte TOTAL_CORNERS = 4;
 
 	/**
@@ -934,22 +1053,14 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * Converts the {@code BoundingBox} instance to a string
 	 * representation.
 	 * 
-	 * @return a string representation of the {@code BoundingBox}
+	 * @return a string representation of the {@code BoundingBox} public
+	 * String toString() { StringBuilder sb = new StringBuilder();
+	 * sb.append("<("); sb.append(bounds.get()[0].x); sb.append(", ");
+	 * sb.append(bounds.get()[0].y); sb.append(") "); sb.append("(");
+	 * sb.append(bounds.get()[1].x); sb.append(", ");
+	 * sb.append(bounds.get()[1].y); sb.append(")>"); return
+	 * sb.toString(); }
 	 */
-	public String toString() {
-	    StringBuilder sb = new StringBuilder();
-	    sb.append("<(");
-	    sb.append(bounds[0].x);
-	    sb.append(", ");
-	    sb.append(bounds[0].y);
-	    sb.append(") ");
-	    sb.append("(");
-	    sb.append(bounds[1].x);
-	    sb.append(", ");
-	    sb.append(bounds[1].y);
-	    sb.append(")>");
-	    return sb.toString();
-	}
 
 	/**
 	 * Constructs a new {@code BoundingBox} given two points representing
@@ -970,7 +1081,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @param quadrant the quadrant to determine
 	 * @return the bounds for this node
 	 */
-	static BoundingBox createBounds(BoundingBox parentBoundingBox,
+	static BoundingBox createBoundingBox(BoundingBox parentBoundingBox,
 		Node.Quadrant quadrant) {
 	    // get the individual coordinates
 	    double[] coords = organizeCoordinates(parentBoundingBox);
@@ -1003,13 +1114,14 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * accessed using the fields {@code X_MIN}, {@code X_MAX},
 	 * {@code Y_MIN}, or {@code Y_MAX} as array indices.
 	 * 
-	 * @param bounding box the region, represented as an array of two
+	 * @param box the region, represented as an array of two
 	 * {@code Points}
 	 * @return an array which contains individual coordinates
 	 */
 	static double[] organizeCoordinates(BoundingBox box) {
 	    Point[] bounds = box.bounds;
 
+	    // Accumulate max and min values
 	    double xMin = Math.min(bounds[0].x, bounds[1].x);
 	    double yMin = Math.min(bounds[0].y, bounds[1].y);
 	    double xMax = Math.max(bounds[0].x, bounds[1].x);
@@ -1024,7 +1136,16 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Determines the parameter's degree of containment in relation to the
+	 * region specified by this object. The object either is fully
+	 * contained, partially contained, or not contained at all.
+	 * 
+	 * @param anotherBoundingBox the region to check containment
+	 * @return {@code Containment.FULL} if this region completely contains
+	 * the parameter region, {@code Containment.PARTIAL} if this region
+	 * contains a portion of the parameter region, or
+	 * {@code Containment.NONE} if there are no intersections of the two
+	 * regions
 	 */
 	public Containment getContainment(BoundingBox anotherBoundingBox) {
 	    double[] coords = organizeCoordinates(this);
@@ -1078,9 +1199,14 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	}
 
 	/**
-	 * {@inheritDoc}
+	 * Determines if the argument is contained within the bounding region
+	 * specified by this object.
+	 * 
+	 * @param point the {@code Point} to check for containment
+	 * @return {@code true} if the point exists within or on the bounding
+	 * region, and {@code false} otherwise
 	 */
-	public boolean contains(Point point) {
+	boolean contains(Point point) {
 	    // Since a point cannot be partially contained, if it is not
 	    // contained, return false; otherwise return true;
 	    BoundingBox box = new BoundingBox(point, point);
@@ -1109,7 +1235,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * stored object and its coordinates in the form of a {@code Point}
      * object.
      */
-    static class Entry<T> {
+    static class Entry<T> implements Serializable, ManagedObject {
+	private static final long serialVersionUID = 5L;
+
 	/** The coordinate of the element */
 	final Point coordinate;
 
@@ -1138,6 +1266,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	void setValue(T value) {
 	    assert (value != null) : "Value cannot be null";
+	    AppContext.getDataManager().markForUpdate(this);
 	    this.value = value;
 	}
 
@@ -1160,11 +1289,70 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	}
     }
 
+    @SuppressWarnings("unchecked")
+    private static class ReferenceContainer<T> implements ManagedObject,
+	    Serializable {
+	private static final long serialVersionUID = 9L;
+
+	/**
+	 * The array of references which will refer to the array of
+	 * {@code ManagedObject}s
+	 */
+	private final ManagedReference<T>[] container;
+
+	/**
+	 * Creates a {@code ReferenceContainer} to encapsulate the supplied
+	 * object array. The supplied object array must implement the
+	 * {@code ManagedObject} interface because
+	 * 
+	 * @param obj the array which is to be contained
+	 * @throws IllegalArgumentException if the parameter is {@code null},
+	 * or if the parameter does not implement the {@code ManagedObject}
+	 * interface
+	 */
+	ReferenceContainer(T[] obj) {
+	    if (obj == null) {
+		throw new IllegalArgumentException("Argument cannot be null");
+	    }
+	    if (!(obj instanceof ManagedObject[])) {
+		throw new IllegalArgumentException(
+			"Argument must implement ManagedObject");
+	    }
+	    DataManager dm = AppContext.getDataManager();
+	    container = new ManagedReference[obj.length];
+
+	    for (int i = 0; i < obj.length; i++) {
+		container[i] = dm.createReference(obj[i]);
+	    }
+	}
+
+	/**
+	 * Returns the value at the given index of the array
+	 * 
+	 * @param index the object's index
+	 * @return the value at the given index
+	 * @throws IndexOutOfBoundsException if the index is out of bounds of
+	 * the underlying array
+	 * @throws ObjectNotFoundException if the underlying object in the
+	 * array was removed without updating this reference
+	 */
+	T get(int index) throws ObjectNotFoundException {
+	    if (index < 0 || index > container.length - 1) {
+		throw new IndexOutOfBoundsException("The index " + index +
+			" is out of bounds");
+	    }
+	    return container[index].get();
+	}
+
+    } // end container class
+
     /**
      * A class that represents a point as an ({@code x}, {@code y})
      * coordinate pair.
      */
-    public static class Point {
+    public static class Point implements Serializable {
+	private static final long serialVersionUID = 7L;
+
 	/** the format for rounded doubles; provides eight decimal spaces */
 	private static final String DEFAULT_DECIMAL_FORMAT = "0.########";
 
@@ -1264,7 +1452,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
      * 
      * @param <T> the type of coordinates to store
      */
-    static class Node<T> {
+    static class Node<T> implements Serializable, ManagedObject {
+	private static final long serialVersionUID = 6L;
+
 	/** Enumeration representing the different quadrants for each node */
 	public static enum Quadrant {
 	    /**
@@ -1404,7 +1594,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 		Integer.MIN_VALUE;
 
 	/** the parent of this node */
-	private final Node<T> parent;
+	private final ManagedReference<Node<T>> parent;
 
 	/** the depth of the node, which will not change */
 	private final int depth;
@@ -1425,16 +1615,21 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * the area (determined by two corner points) representing the node's
 	 * bounds
 	 */
-	private final BoundingBox boundingBox;
+	private final ManagedReference<BoundingBox> boundingBox;
 
 	/** the quadrant this node belongs to */
-	private Quadrant myQuadrant;
+	private final Quadrant myQuadrant;
 
-	/** the map of entries, with the value being a list of */
-	private Map<Point, List<T>> values;
+	/**
+	 * the map of entries, with the value being a list of
+	 * {@code ManagedReference}s which point to
+	 * {@code ManagedSerializable} objects containing the stored entries.
+	 */
+	private Map<Point, List<ManagedReference<
+		ManagedSerializable<T>>>> values;
 
 	/** references to the children */
-	private Node<T>[] children;
+	private ManagedReference<ReferenceContainer<Node<T>>> children;
 
 	/**
 	 * Constructor to be used when instantiating the root. If children
@@ -1443,7 +1638,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @param box the region corresponding to this node's bounding box
 	 * @param bucketSize the maximum capacity of a leaf node
 	 */
-	Node(BoundingBox box, int bucketSize) {
+	Node(ManagedReference<BoundingBox> box, int bucketSize) {
 	    this.boundingBox = box;
 	    this.parent = null;
 	    this.bucketSize = bucketSize;
@@ -1466,11 +1661,14 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	Node(Node<T> parent, Quadrant quadrant, int bucketSize) {
 	    assert (quadrant != null) : "The quadrant cannot be null";
-	    boundingBox =
-		    BoundingBox.createBounds(parent.getBoundingBox(),
-			    quadrant);
+	    DataManager dm = AppContext.getDataManager();
 
-	    this.parent = parent;
+	    BoundingBox box =
+		    BoundingBox.createBoundingBox(parent.getBoundingBox(),
+			    quadrant);
+	    boundingBox = dm.createReference(box);
+
+	    this.parent = dm.createReference(parent);
 	    this.depth = parent.depth + 1;
 	    this.bucketSize = bucketSize;
 	    dataIntegrityValue = DEFAULT_INTEGRITY_START_VALUE;
@@ -1515,10 +1713,24 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 		if (i > 0) {
 		    sb.append(", ");
 		}
-		sb.append(children[i].toString());
+		sb.append(children.get().get(i).toString());
 	    }
 	    sb.append("]");
 	    return sb.toString();
+	}
+
+	/**
+	 * Returns the children of this node. This is intended to be used by
+	 * the {@code isEmpty} method.
+	 * 
+	 * @return the children of this node, or {@code null} if no children
+	 * exist
+	 */
+	ReferenceContainer<Node<T>> getChildren() {
+	    if (children == null) {
+		return null;
+	    }
+	    return children.get();
 	}
 
 	/**
@@ -1549,19 +1761,25 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	Node<T> getChild(Quadrant quadrant) {
 	    assert (!isLeaf()) : "The node is a leaf node";
 	    int index = Quadrant.toInt(quadrant);
-	    return children[index];
+	    return getChild(index);
 	}
 
 	/**
 	 * Returns the child corresponding to the given index
 	 * 
 	 * @param index the index of the child
-	 * @return the child corresponding to the given quadrant
+	 * @return the child corresponding to the given quadrant, or
+	 * {@code null} if none exists
 	 * @throws IndexOutOfBoundsException if the index is out of bounds
+	 * @throws ObjectNotFoundException if the underlying object was
+	 * removed without updating the children list
 	 */
 	Node<T> getChild(int index) {
 	    assert (!isLeaf()) : "The node is a leaf node";
-	    return children[index];
+	    if (children == null) {
+		return null;
+	    }
+	    return children.get().get(index);
 	}
 
 	/**
@@ -1570,7 +1788,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return the corner points of the region corresponding to this node
 	 */
 	BoundingBox getBoundingBox() {
-	    return boundingBox;
+	    return boundingBox.get();
 	}
 
 	/**
@@ -1585,7 +1803,6 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	    if (!isLeaf() || values == null) {
 		return false;
 	    }
-
 	    return values.containsKey(point);
 	}
 
@@ -1595,7 +1812,10 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * @return this node's parent, or {@code null} if it is the root
 	 */
 	Node<T> getParent() {
-	    return parent;
+	    if (parent == null) {
+		return null;
+	    }
+	    return parent.get();
 	}
 
 	/**
@@ -1604,7 +1824,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * 
 	 * @return this node's {@code Map} of values
 	 */
-	Map<Point, List<T>> getValues() {
+	Map<Point, List<ManagedReference<ManagedSerializable<T>>>> getValues() {
 	    return values;
 	}
 
@@ -1639,8 +1859,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	     * Otherwise, append normally.
 	     */
 	    if (values == null) {
-		assert (values.size() == 0) : "Size was not zero for Node.add()";
-		values = new HashMap<Point, List<T>>();
+		values =
+			new HashMap<Point, 
+			List<ManagedReference<ManagedSerializable<T>>>>();
 
 	    } else if (size(this) == bucketSize) {
 		if (!allowSplit) {
@@ -1665,14 +1886,16 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	    int size = 0;
 
 	    // Check for a valid map entry
-	    Map<Point, List<T>> values = node.getValues();
+	    Map<Point, List<ManagedReference<ManagedSerializable<T>>>> values =
+		    node.getValues();
 	    if (values != null) {
 
 		// For all the coordinates in this node,
 		// get the size of the lists
 		Iterator<Point> keyIterator = values.keySet().iterator();
 		while (keyIterator.hasNext()) {
-		    List<T> list = values.get(keyIterator.next());
+		    List<ManagedReference<ManagedSerializable<T>>> list =
+			    values.get(keyIterator.next());
 		    size += list.size();
 		}
 	    }
@@ -1691,7 +1914,10 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	private boolean splitThenAdd(Point point, T element) {
 	    int quadrant;
-	    Map<Point, List<T>> existingValues = values;
+	    Map<Point, List<ManagedReference<
+	    	ManagedSerializable<T>>>> existingValues =
+		    values;
+	    AppContext.getDataManager().markForUpdate(this);
 	    initializeNewChildren();
 
 	    // Add back the old elements to the appropriate new leaves.
@@ -1699,27 +1925,33 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	    // one individually to allocate it in the correct quadrant.
 	    Iterator<Point> keyIter = existingValues.keySet().iterator();
 	    Point key;
-	    List<T> list;
+	    List<ManagedReference<ManagedSerializable<T>>> list;
 
 	    // iterate through all the keys. They hold onto lists
 	    // which each contain at least one element
 	    while (keyIter.hasNext()) {
 		key = keyIter.next();
 		list = existingValues.get(key);
-		quadrant = Quadrant.determineQuadrantAsInt(boundingBox, key);
+		quadrant =
+			Quadrant.determineQuadrantAsInt(boundingBox.get(),
+				key);
 
 		// add all the items in the list at the given key
-		Iterator<T> iter = list.iterator();
+		Iterator<ManagedReference<ManagedSerializable<T>>> iter =
+			list.iterator();
 		T value;
 		while (iter.hasNext()) {
-		    value = iter.next();
-		    children[quadrant].add(key, value, false);
+		    value = iter.next().get().get();
+		    children.getForUpdate().get(quadrant).add(key, value,
+			    false);
 		}
 	    }
 
 	    // add in the new value
-	    quadrant = Quadrant.determineQuadrantAsInt(boundingBox, point);
-	    return children[quadrant].add(point, element, false);
+	    quadrant =
+		    Quadrant.determineQuadrantAsInt(boundingBox.get(), point);
+	    return children.getForUpdate().get(quadrant).add(point, element,
+		    false);
 	}
 
 	/**
@@ -1729,14 +1961,22 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	private void insert(Point point, T value) {
 	    assert (isLeaf()) : "The node is not a leaf";
-	    List<T> list = values.get(point);
+	    assert (value != null) : "The value cannot be null";
+	    List<ManagedReference<ManagedSerializable<T>>> list =
+		    values.get(point);
 
 	    // Decide if we need to make a new instance or not
 	    if (list == null) {
-		list = new ArrayList<T>();
+		list = new ArrayList<
+			ManagedReference<ManagedSerializable<T>>>();
 		values.put(point, list);
 	    }
-	    list.add(value);
+	    ManagedSerializable<T> ms = new ManagedSerializable<T>(value);
+	    ManagedReference<ManagedSerializable<T>> ref =
+		    AppContext.getDataManager().createReference(ms);
+	    list.add(ref);
+
+	    AppContext.getDataManager().markForUpdate(this);
 	    dataIntegrityValue++;
 	}
 
@@ -1747,18 +1987,26 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	@SuppressWarnings("unchecked")
 	private void initializeNewChildren() {
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(this);
 	    values = null;
-	    children = new Node[numChildren];
+
+	    Node<T>[] newChildren = new Node[numChildren];
 
 	    // Initialize each direction separately
-	    children[Quadrant.iNE] =
+	    newChildren[Quadrant.iNE] =
 		    new Node<T>(this, Quadrant.NE, bucketSize);
-	    children[Quadrant.iNW] =
+	    newChildren[Quadrant.iNW] =
 		    new Node<T>(this, Quadrant.NW, bucketSize);
-	    children[Quadrant.iSE] =
+	    newChildren[Quadrant.iSE] =
 		    new Node<T>(this, Quadrant.SE, bucketSize);
-	    children[Quadrant.iSW] =
+	    newChildren[Quadrant.iSW] =
 		    new Node<T>(this, Quadrant.SW, bucketSize);
+
+	    // Create the container where the children are to reside
+	    ReferenceContainer<Node<T>> container =
+		    new ReferenceContainer(newChildren);
+	    children = dm.createReference(container);
 	}
 
 	/**
@@ -1766,6 +2014,9 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 * if so (recursively).
 	 */
 	void doRemoveWork() {
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(this);
+
 	    // If we reach here, then we are empty. If we
 	    // have populated children, then we just return
 	    if (!canPrune()) {
@@ -1773,13 +2024,19 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 		return;
 	    }
 
-	    values = null;
-	    children = null;
+	    // Remove the children from the data manager if they exist
+	    if (children != null) {
+		for (int i = 0; i < numChildren; i++) {
+		    dm.removeObject(children.get().get(i));
+		}
+		values = null;
+		children = null;
+	    }
 
 	    // we are at the root; do not delete ourselves.
 	    if (parent != null) {
 		// TODO: remove ourselves from data store
-		parent.doRemoveWork();
+		parent.getForUpdate().doRemoveWork();
 	    }
 	}
 
@@ -1799,7 +2056,7 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 
 	    // Otherwise, check each node
 	    for (int i = 0; i < numChildren; i++) {
-		Node<T> child = children[i];
+		Node<T> child = children.get().get(i);
 
 		// There exists elements as long as a child is
 		// not null and:
@@ -1848,25 +2105,42 @@ public class ConcurrentQuadTree<T> implements QuadTree<T>, Serializable {
 	 */
 	private static <T> T removeEntry(Point point, Node<T> node) {
 	    assert (node.isLeaf()) : "The node is not a leaf";
-	    Map<Point, List<T>> values = node.getValues();
+	    Map<Point, List<ManagedReference<ManagedSerializable<T>>>> values =
+		    node.getValues();
 
 	    // If there was no value stored, or if the node has children,
 	    // return null since we cannot remove anything from this node
 	    if (values == null) {
 		return null;
 	    }
-	    List<T> list = values.get(point);
+	    List<ManagedReference<ManagedSerializable<T>>> list =
+		    values.get(point);
+
+	    System.err.println("lalalala");
+
 	    if (list == null) {
 		return null;
 	    }
-	    T old = list.remove(0);
+	    DataManager dm = AppContext.getDataManager();
+	    dm.markForUpdate(node);
+
+	    System.err.println("~~ test: " + list.size());
+
+	    // extract the element from the list, and delete the wrapper
+	    ManagedReference<ManagedSerializable<T>> ref = list.remove(0);
+	    T old = ref.get().get();
+	    dm.removeObject(ref.get());
+
+	    System.err.println("list size is now: " + list.size());
 
 	    // if list is now empty, remove the key
 	    if (list.isEmpty()) {
+		System.err.println("list is considered empty");
 		values.remove(point);
 
 		// set the map to null if we removed the last entry
 		if (values.isEmpty()) {
+		    System.err.println("map is considered empty");
 		    values = null;
 		}
 	    }

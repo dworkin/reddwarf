@@ -20,7 +20,9 @@
 package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.ManagedObjectRemoval;
-import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.util.ConcurrentQuadTree.BoundingBox;
+import com.sun.sgs.app.util.ConcurrentQuadTree.ElementIterator;
+import com.sun.sgs.app.util.ConcurrentQuadTree.Point;
 
 public interface QuadTree<T> extends ManagedObjectRemoval {
 
@@ -52,6 +54,20 @@ public interface QuadTree<T> extends ManagedObjectRemoval {
      */
     QuadTreeIterator<T> boundingBoxIterator(double x1, double y1, double x2,
 	    double y2);
+    
+    
+    /**
+     * Returns an iterator for the elements which exist at the point
+     * defined by the {@code x} and {@code y} parameters. The elements which
+     * can be iterated are in no particular order, and there may not be any
+     * elements to iterate over (empty iterator).
+     * 
+     * @param x the x-coordinate
+     * @param y the y-coordinate
+     * @return an iterator which can traverse over the entries that exist
+     * at ({@code x}, {@code y})
+     */
+    QuadTreeIterator<T> pointIterator(double x, double y);
     
     /**
      * Asynchronously clears the tree and replaces it with an empty
@@ -100,7 +116,7 @@ public interface QuadTree<T> extends ManagedObjectRemoval {
      * 
      * @return an {@code Iterator} over all the elements in the map
      */
-    public QuadTreeIterator<T> iterator();
+    QuadTreeIterator<T> iterator();
     
     /**
      * Removes all elements from the quadtree corresponding to the provided
@@ -111,6 +127,6 @@ public interface QuadTree<T> extends ManagedObjectRemoval {
      * @return {@code true} if there was at least one element removed, and
      * {@code false} otherwise
      */
-    public boolean removeAll(double x, double y);
+    boolean removeAll(double x, double y);
     
 }
