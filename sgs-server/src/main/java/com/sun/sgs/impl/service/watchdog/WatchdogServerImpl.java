@@ -961,8 +961,8 @@ public final class WatchdogServerImpl
         /** The watchdog server we'll use to get the node info. */
         private WatchdogServerImpl watchdog;
         
-        /** Descriptions of the notifications. */
-        MBeanNotificationInfo[] notificationInfo =
+        /** Description of the notifications. */
+        private static MBeanNotificationInfo[] notificationInfo =
             new MBeanNotificationInfo[] {
                 new MBeanNotificationInfo(
                         new String[] {NODE_STARTED_NOTIFICATION, 
@@ -974,6 +974,7 @@ public final class WatchdogServerImpl
          * @param watchdog  the watchdog server
          */
         NodeManager(WatchdogServerImpl watchdog) {
+            super(notificationInfo);
             this.watchdog = watchdog;
         }
 
@@ -982,16 +983,6 @@ public final class WatchdogServerImpl
             return watchdog.getAllNodeInfo();
         }
  
-
-        /*
-         * Implement NotificationBroadcasterSupport.
-         */
-
-        /** {@inheritDoc} */
-        public MBeanNotificationInfo[] getNotificationInfo() {
-             return notificationInfo;
-        }
-        
         /*
          * Package private methods.
          */
