@@ -771,10 +771,6 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelJoin() throws Exception {
 	String channelName = "joinTest";
 	ClientGroup group = new ClientGroup(someUsers);
-	// This create/close of channel done so that the global channel
-	// table is created and won't effect the object count.
-	createChannel("foo");
-	closeChannel("foo");
 	Thread.sleep(1000);
 	int count = getObjectCount();
 	createChannel(channelName);

@@ -521,6 +521,17 @@ public abstract class AbstractService implements Service {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }
+
+    /**
+     * Avoids warnings about unchecked casts.
+     *
+     * @param	object the object to cast
+     * @return	the object, cast without warnings
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T uncheckedCast(Object object) {
+        return (T) object;
+    }
     
     /**
      * An immutable class to hold the current version of the keys

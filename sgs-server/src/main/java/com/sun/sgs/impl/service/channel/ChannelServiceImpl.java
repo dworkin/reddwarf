@@ -28,7 +28,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -104,6 +104,10 @@ public final class ChannelServiceImpl
     
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
+
+    /** The channel servers map key. */
+    private static final String CHANNEL_SERVERS_MAP_KEY =
+	PKG_NAME + "channelServersMap";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -128,9 +132,6 @@ public final class ChannelServiceImpl
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
-    /** The write buffer size for new channels. */
-    private final int writeBufferSize;
-    
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
 
@@ -197,6 +198,9 @@ public final class ChannelServiceImpl
     private final Map<BigInteger, TaskQueue> channelTaskQueues =
 	new HashMap<BigInteger, TaskQueue>();
 
+    /** The write buffer size for new channels. */
+    private final int writeBufferSize;
+    
     /** The maximum number of channel events to sevice per transaction. */
     final int eventsPerTxn;
 
@@ -276,15 +280,15 @@ public final class ChannelServiceImpl
 		    } },  taskOwner);
 	    
 	    /*
-	     * Store the ChannelServer proxy in the data store.
+	     * Create global maps: channels map, keyed by name, and channel
+	     * server map, keyed by node ID.  Then store channel server in
+	     * the channel server map.
 	     */
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreChannelServerProxy") {
 		    public void run() {
-			dataService.setServiceBinding(
-			    getChannelServerKey(localNodeId),
-			    new ManagedSerializable<ChannelServer>(
-				serverProxy));
+			ChannelImpl.getChannelsMap();
+			getChannelServersMap().put(localNodeId, serverProxy);
 		    } },
 		taskOwner);
 
@@ -299,6 +303,9 @@ public final class ChannelServiceImpl
 
             sessionService.registerSessionDisconnectListener(
                 new ChannelSessionDisconnectListener());
+
+	    
+	    
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -1052,15 +1059,6 @@ public final class ChannelServiceImpl
     }
 
     /**
-     * Returns the key for accessing the {@code ChannelServer}
-     * instance (which is wrapped in a {@code ManagedSerializable})
-     * for the specified {@code nodeId}.
-     */
-    private static String getChannelServerKey(long nodeId) {
-	return PKG_NAME + ".server." + nodeId;
-    }
-
-    /**
      * Returns the {@code ChannelServer} for the given {@code nodeId},
      * or {@code null} if no channel server exists for the given
      * {@code nodeId}.  If the specified {@code nodeId} is the local
@@ -1228,21 +1226,11 @@ public final class ChannelServiceImpl
 	}
 
 	/**
-	 * Removes the channel server proxy and binding for the node
+	 * Removes the channel server proxy and for the node ID
 	 * specified during construction.
 	 */
 	public void run() {
-	    String channelServerKey = getChannelServerKey(nodeId);
-	    DataService dataService = getDataService();
-	    try {
-		dataService.removeObject(
-		    dataService.getServiceBinding(channelServerKey));
-	    } catch (NameNotBoundException e) {
-		// already removed
-		return;
-	    } catch (ObjectNotFoundException e) {
-	    }
-	    dataService.removeServiceBinding(channelServerKey);
+	    getChannelServersMap().removeOverride(nodeId);
 	}
     }
 
@@ -1261,20 +1249,29 @@ public final class ChannelServiceImpl
 
 	/** {@inheritDoc} */
 	public void run() {
-	    String channelServerKey = getChannelServerKey(nodeId);
-	    try {
-		ManagedSerializable wrappedProxy = (ManagedSerializable)
-		    getDataService().getServiceBinding(channelServerKey);
-		channelServer = (ChannelServer) wrappedProxy.get();
-	    } catch (NameNotBoundException e) {
-		channelServer = null;
-	    } catch (ObjectNotFoundException e) {
-		logger.logThrow(
-		    Level.SEVERE, e,
-		    "ChannelServer binding:{0} exists, but object removed",
-		    channelServerKey);
-		channelServer = null;
-	    }
+	    channelServer = getChannelServersMap().get(nodeId);
 	}
+    }
+
+    /**
+     * Returns the channel servers map, keyed by node ID.  Creates and
+     * stores the map if it doesn't already exist.
+     */
+    private static ManagedObjectValueMap<Long, ChannelServer>
+	getChannelServersMap()
+    {
+	DataService dataService = getDataService();
+	ManagedObjectValueMap<Long, ChannelServer> channelServersMap;
+	try {
+	    channelServersMap = uncheckedCast(
+		dataService.getServiceBinding(CHANNEL_SERVERS_MAP_KEY));
+	} catch (NameNotBoundException e) {
+	    channelServersMap =
+		new BindingKeyedHashMap<Long, ChannelServer>(
+		    CHANNEL_SERVERS_MAP_KEY + ".entry");
+	    dataService.setServiceBinding(CHANNEL_SERVERS_MAP_KEY,
+					  channelServersMap);
+	}
+	return channelServersMap;
     }
 }

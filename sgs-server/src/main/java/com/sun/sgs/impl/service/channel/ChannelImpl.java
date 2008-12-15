@@ -40,6 +40,7 @@ import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import static com.sun.sgs.impl.util.AbstractService.uncheckedCast;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
@@ -195,7 +196,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns the channels map, keyed by channel name.  Creates and
      * stores the map if it doesn't already exist.
      */
-    private static ManagedObjectValueMap<String, ChannelImpl> getChannelsMap() {
+    static ManagedObjectValueMap<String, ChannelImpl> getChannelsMap() {
 	DataService dataService = getDataService();
 	ManagedObjectValueMap<String, ChannelImpl> channelsMap;
 	try {
@@ -2163,11 +2164,5 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static BigInteger getLastComponentAsBigInteger(String key) {
 	int index = key.lastIndexOf('.');
 	return new BigInteger(key.substring(index + 1), 16);
-    }
-
-    /** Avoids warnings about unchecked casts.*/
-    @SuppressWarnings("unchecked")
-    private static <T> T uncheckedCast(Object object) {
-        return (T) object;
     }
 }
