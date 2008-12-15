@@ -52,11 +52,16 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.management.InstanceNotFoundException;
 import javax.management.JMException;
 import javax.management.JMX;
 import javax.management.MBeanServer;
 import javax.management.MBeanServerConnection;
+import javax.management.Notification;
+import javax.management.NotificationEmitter;
+import javax.management.NotificationListener;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.remote.JMXConnector;
@@ -330,11 +335,13 @@ public class TestMBeans {
         
         assertEquals(1, nodesData.length);
         
-        // Create the proxy for the object
-        NodesMXBean proxy = JMX.newMXBeanProxy(mbsc, name, NodesMXBean.class);
+        // Create the proxy for the object, specifying that it supports
+        // notification emitter.
+        NodesMXBean proxy = 
+                JMX.newMXBeanProxy(mbsc, name, NodesMXBean.class, true);
         NodeInfo[] nodes = proxy.getNodes();
         for (NodeInfo n : nodes) {
-            System.out.println("found node: " + n);
+            System.out.println("found node: " + n + n.getId());
             assertTrue(n.isLive());
         }
         
@@ -347,9 +354,44 @@ public class TestMBeans {
         assertEquals(3, nodes.length);
         
         for (NodeInfo n : nodes) {
-            System.out.println("found node: " + n);
+            System.out.println("found node: " + n + n.getId());
             assertTrue(n.isLive());
         }
+        
+        // Test notifications
+        NotificationEmitter notifyProxy = (NotificationEmitter) proxy;
+        TestJMXNotificationListener listener = 
+                new TestJMXNotificationListener();
+        notifyProxy.addNotificationListener(listener, null, null);
+        // add another node
+        SgsTestNode node3 = null;
+        try {
+            node3 = new SgsTestNode(serverNode, null, null);
+            // We expect to see one notification for a started node
+            AtomicLong count = listener.notificationMap.get(
+                                NodesMXBean.NODE_STARTED_NOTIFICATION);
+            assertNotNull(count);
+            assertEquals(1, count.longValue());
+            
+            // and no notifications for failed nodes
+            assertNull(listener.notificationMap.get(
+                                NodesMXBean.NODE_FAILED_NOTIFICATION));
+        } finally {
+            if (node3 != null) {
+                node3.shutdown(false);
+            }
+            // Shutdown takes a little while...need to detect that the
+            // node is gone
+            int renewTime = Integer.valueOf(serverNode.getServiceProperties().
+                getProperty(
+                "com.sun.sgs.impl.service.watchdog.server.renew.interval"));
+            Thread.sleep(renewTime * 2);
+            AtomicLong count = listener.notificationMap.get(
+                                NodesMXBean.NODE_FAILED_NOTIFICATION);
+            assertNotNull(count);
+            assertEquals(1, count.longValue());
+        }
+        notifyProxy.removeNotificationListener(listener);
     }
     
     @Test
@@ -920,5 +962,23 @@ public class TestMBeans {
         public int getSomething() { return something; }
         public void setSomething(int value) { something = value; }
         public void clearSomething() { something = 0; }
+    }
+    
+    /**
+     * A simple JMX listener that holds a map of notifications to the
+     * number of times the notification occurred.
+     */
+    private class TestJMXNotificationListener implements NotificationListener {
+        ConcurrentHashMap<String, AtomicLong> notificationMap = 
+                new ConcurrentHashMap<String, AtomicLong>();
+        public void handleNotification(Notification notification, 
+                                       Object handback) 
+        {
+            System.out.println("Received JMX notification: " + notification);
+            
+            String type = notification.getType();
+            notificationMap.putIfAbsent(type, new AtomicLong());
+            notificationMap.get(type).incrementAndGet();
+        }
     }
 }

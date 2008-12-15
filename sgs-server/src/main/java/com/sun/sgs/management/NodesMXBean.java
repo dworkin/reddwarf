@@ -19,6 +19,8 @@
 
 package com.sun.sgs.management;
 
+import javax.management.Notification;
+
 /**
  * The management interface for all the nodes in the system, available
  *  only from the core server node.
@@ -29,15 +31,24 @@ package com.sun.sgs.management;
  * <p>
  * The {@code ObjectName} for uniquely identifying this MBean is
  * {@value #MXBEAN_NAME}.
+ * <p>
+ * Each time a node joins the cluster or fails, a notification of class
+ * {@link Notification} is emitted.  The notification will be of type
+ * {@value #NODE_STARTED_NOTIFICATION} or {@value #NODE_FAILED_NOTIFICATION}.
  * 
  */
 public interface NodesMXBean {
     /** The name for uniquely identifying this MBean. */
     String MXBEAN_NAME = "com.sun.sgs:type=Nodes";
     
+    /** The type for node started notifications. */
+    String NODE_STARTED_NOTIFICATION = "com.sun.sgs.node.started";
+    
+    /** The type for node failed notifications. */
+    String NODE_FAILED_NOTIFICATION = "com.sun.sgs.node.failed";
+    
     // Maybe add method to shut down node?  Need Rob's node shutdown
     // work to tell the watchdog we need the node shut down.
-    // Notification when a node joins or leaves?
     
     /** 
      * Information about the nodes in the system.

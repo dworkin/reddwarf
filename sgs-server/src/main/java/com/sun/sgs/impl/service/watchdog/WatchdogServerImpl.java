@@ -50,6 +50,9 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
+import javax.management.MBeanNotificationInfo;
+import javax.management.Notification;
+import javax.management.NotificationBroadcasterSupport;
 
 /**
  * The {@link WatchdogServer} implementation. <p>
@@ -214,6 +217,9 @@ public final class WatchdogServerImpl
     /** The thread for checking node expiration times and checking if
      * recovering nodes need backups assigned.. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
+    
+    /** The JMX MXBean to expose nodes in the system. */
+    private final NodeManager nodeMgr;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -295,22 +301,24 @@ public final class WatchdogServerImpl
 	    recoveringNodes.put(failedNode.getId(), failedNode);
 	}
  
-        // register our local id
-        int jmxPort = wrappedProps.getIntProperty(
-                    "com.sun.management.jmxremote.port", -1);
-        long[] values = registerNode(host, port, client, jmxPort);
-        localNodeId = values[0];
-        
-        // Create the node manager MBean and register it
+                
+        // Create the node manager MBean and register it.  This must be
+        // done before regiseterNode is called.
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
-        NodeManager nodeMgr = new NodeManager(this);
+        nodeMgr = new NodeManager(this);
         try {
             collector.registerMBean(nodeMgr, NodeManager.MXBEAN_NAME);
         } catch (JMException e) {
             logger.logThrow(Level.CONFIG, e, "Could not register MBean");
         }
         
+        // register our local id
+        int jmxPort = wrappedProps.getIntProperty(
+                    "com.sun.management.jmxremote.port", -1);
+        long[] values = registerNode(host, port, client, jmxPort);
+        localNodeId = values[0];
+
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	this.port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
@@ -393,6 +401,10 @@ public final class WatchdogServerImpl
 	    new HashSet<NodeImpl>(failedNodes);
 	failedNodesExceptMe.remove(aliveNodes.get(localNodeId));
 	notifyClients(failedNodesExceptMe, failedNodes);
+        
+        for (Long nodeId: aliveNodes.keySet()) {
+            nodeMgr.notifyNodeFailed(nodeId);
+        }
 	aliveNodes.clear();
     }
 
@@ -471,6 +483,7 @@ public final class WatchdogServerImpl
 	    // Put node in set, sorted by expiration.
 	    node.setExpiration(calculateExpiration());
 	    aliveNodes.put(nodeId, node);
+            nodeMgr.notifyNodeStarted(nodeId);
 
 	    // TBD: use a ConcurrentSkipListSet?
 	    expirationSet.add(node);
@@ -628,6 +641,7 @@ public final class WatchdogServerImpl
 		     */
 		    for (NodeImpl node : expiredNodes) {
 			aliveNodes.remove(node.getId());
+                        nodeMgr.notifyNodeFailed(node.getId());
                         removeHostPortMapEntry(node);
 		    }
                     
@@ -941,11 +955,20 @@ public final class WatchdogServerImpl
     /**
      * Private class for JMX information.
      */
-    static class NodeManager implements NodesMXBean {
-
+    static class NodeManager extends NotificationBroadcasterSupport
+            implements NodesMXBean 
+    {
         /** The watchdog server we'll use to get the node info. */
         private WatchdogServerImpl watchdog;
-
+        
+        /** Descriptions of the notifications. */
+        MBeanNotificationInfo[] notificationInfo =
+            new MBeanNotificationInfo[] {
+                new MBeanNotificationInfo(
+                        new String[] {NODE_STARTED_NOTIFICATION, 
+                                      NODE_FAILED_NOTIFICATION }, 
+                        Notification.class.getName(), 
+                        "A node has started or failed") };
         /**
          * Create an instance of the manager.
          * @param watchdog  the watchdog server
@@ -957,6 +980,44 @@ public final class WatchdogServerImpl
         /** {@inheritDoc} */
         public NodeInfo[] getNodes() {
             return watchdog.getAllNodeInfo();
+        }
+ 
+
+        /*
+         * Implement NotificationBroadcasterSupport.
+         */
+
+        /** {@inheritDoc} */
+        public MBeanNotificationInfo[] getNotificationInfo() {
+             return notificationInfo;
+        }
+        
+        /*
+         * Package private methods.
+         */
+               
+        /**
+         * Send JMX notification that a node started.
+         * @param nodeId the identifier of the newly started node
+         */
+        void notifyNodeStarted(long nodeId) {
+            sendNotification(
+                    new Notification(NODE_STARTED_NOTIFICATION,
+                                     this,
+                                     System.currentTimeMillis(),
+                                     "Node started: " + nodeId));
+        }
+        
+        /**
+         * Send JMX notification that a node failed.
+         * @param nodeId the identifier of the failed node
+         */
+        void notifyNodeFailed(long nodeId) {
+            sendNotification(
+                    new Notification(NODE_FAILED_NOTIFICATION,
+                                     this,
+                                     System.currentTimeMillis(),
+                                     "Node failed:  " + nodeId));
         }
     }
 }
