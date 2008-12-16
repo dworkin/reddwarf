@@ -7,7 +7,7 @@ Version 0.9.8
   A new package, com.sun.sgs.internal, has been introduced to support
   swapping out the behavior of the AppContext class.  As part of this
   package, the ManagerLocator interface was added to define this behavior,
-  and the InternalContext was added to select a behavior to use.
+  and the InternalContext class was added to select a behavior to use.
 
   The following methods also had ManagerNotFoundException added to their
   throws clause:
@@ -16,11 +16,16 @@ Version 0.9.8
   - AppContext.getDataManager
   - AppContext.getTaskManager
 
+- Remove the AppContext constructor
+
 - Add new scalable data structures
 
-  The ScalableDeque and ScalableList classes were added for general use by
-  applications.  Additionally, the ManagedSerializable utility class was
-  added.
+  The ScalableDeque and ScalableList classes were added to the
+  com.sun.sgs.util package for general use by applications.  Additionally,
+  the ManagedSerializable utility class was added to this package.
+
+- Modify TransactionNotActiveException to implement ExceptionRetryStatus
+
 
 Version 0.9.6:
 

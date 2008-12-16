@@ -21,7 +21,7 @@ Version 0.9.8:
   - Add BDB-JE to the distribution
   - Modify data store so that it automatically creates the database directory
     if it does not exist
-- Also fix issues #21, #77, #78, #86, #87, #88, #93, #95, #105, #106, #110
+- Also fix issues #21, #77, #78, #86, #87, #88, #90, #93, #95, #105, #106, #110
 
 Version 0.9.7:
 - Improve channel service concurrency by removing channel sets (issue
