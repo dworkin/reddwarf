@@ -18,10 +18,24 @@
  */
 
 /**
- * Management interfaces exposed via JMX.
+ * Provides the Project Darkstar management interfaces exposed via JMX.
  * <p>
- * By convention, only one of these objects will be registered with a 
- * given MBean server.  The {@code ObjectName} for uniquely identifying 
- * MBeans in this package is the field {@code MXBEAN_NAME}.
+ * By convention, only one of these objects will be registered with the 
+ * platform MBean server.  The {@code ObjectName} for uniquely identifying 
+ * MBeans in this package is the field {@code MXBEAN_NAME} within each MBean.
+ * <p>
+ * Each node in a Project Darkstar cluster may be monitored locally or 
+ * remotely.  See 
+ * <a href="../app/doc-files/config-properties.html#MonitoringProperties">this document</a>
+ * for information on enabling remote monitoring and management.
+ * <p>
+ * For more information, please refer to the <a href="http://java.sun.com/javase/6/docs/technotes/guides/management/toc.html">
+ * Java SE Monitoring and Management Guide</a>, especially Chapter 2, 
+ * Monitoring and Management Using JMX Technology.
+ * <p>
+ * Additional information on the use of MBeans, with simple examples, can be
+ * found in
+ * <a href="http://java.sun.com/javase/6/docs/api/java/lang/management/package-summary.html?is-external=true#examples">here</a>
+ * in the {@code java.lang.management} package.
  */
 package com.sun.sgs.management;
