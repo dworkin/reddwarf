@@ -53,7 +53,7 @@
     </dependency>
 
     <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <groupId>com.sleepycat</groupId>
       <artifactId>je</artifactId>
     </dependency>
   </dependencies>

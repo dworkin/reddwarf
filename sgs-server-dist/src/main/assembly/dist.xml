@@ -23,7 +23,7 @@
 	<include>com.projectdarkstar.server:sgs-shared:jar</include>
 	<include>com.projectdarkstar.server:sgs-server-api:jar</include>
 	<include>com.projectdarkstar.ext.berkeleydb:db:jar</include>
-	<include>com.projectdarkstar.ext.berkeleydb:je:jar</include>
+	<include>com.sleepycat:je:jar</include>
       </includes>
       <outputDirectory>lib</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
