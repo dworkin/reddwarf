@@ -26,7 +26,7 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
-import java.util.logging.Level;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.management.MBeanNotificationInfo;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
@@ -38,29 +38,33 @@ import javax.management.NotificationBroadcasterSupport;
 public class TaskAggregateStats extends NotificationBroadcasterSupport
         implements TaskAggregateMXBean
 {
-    final AggregateProfileCounter numTasks;
-    final AggregateProfileCounter numTransactionalTasks;
-//    final AggregateProfileCounter numSuccessfulTasks;
-    final AggregateProfileCounter numFailedTasks;
-    final AggregateProfileCounter numReadyTasks;
+    /* Task counts */
+    private final AggregateProfileCounter numTasks;
+    private final AggregateProfileCounter numTransactionalTasks;
+    private final AggregateProfileCounter numFailedTasks;
     
-    /* task ready counts */
-    final AggregateProfileSample readyCount;
-    /* task runtimes */
-    final AggregateProfileSample runtime;
-    /* failed tasks / all tasks  JANE ? */
-//    final AggregateProfileSample failureRate;
-    /* task lag time JANE ? */
-    final AggregateProfileSample lagTime;
+    /* Statistics for all tasks */
+    private final AggregateProfileSample readyCount;
     
+    /* Statistics for successful tasks */
+    private final AggregateProfileSample runtime;
+    private final AggregateProfileSample lagtime;
+    private final AggregateProfileSample latency;
+    
+    /* We're going to ignore the first few tasks, because they are run
+     * during startup, with an infinite timeout.
+     */
+    private boolean startupLatch = true;
+    private final AtomicInteger firstTasks = new AtomicInteger(20);
     /** 
      * Smoothing factor for exponential smoothing, between 0 and 1.
      * A value closer to one provides less smoothing of the data, and
      * more weight to recent data;  a value closer to zero provides more
      * smoothing but is less responsive to recent changes.
+     * <p>
+     * There's a lot of data coming through here, so we want a lot of smoothing.
      */
-    // JANE?
-    private float smoothingFactor = (float) 0.9;
+    private double smoothingFactor = 0.01;
 
     private long seqNumber = 1;
     
@@ -79,21 +83,22 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
                 consumer.createCounter("numTasks", type, level);
         numTransactionalTasks = (AggregateProfileCounter)
                 consumer.createCounter("numTransactionalTasks", type, level);
-//        numSuccessfulTasks = (AggregateProfileCounter)
-//                consumer.createCounter("numSuccessfulTasks", type, level);
         numFailedTasks = (AggregateProfileCounter)
                 consumer.createCounter("numFailedTasks", type, level);
-        numReadyTasks = (AggregateProfileCounter)
-                consumer.createCounter("numReadyTasks", type, level);
         readyCount = (AggregateProfileSample)
                 consumer.createSample("readyCount", type, level);
         runtime = (AggregateProfileSample)
                 consumer.createSample("runtime", type, level);
-//        failureRate = (AggregateProfileSample)
-//                consumer.createSample("failureRate", type, level);
-        lagTime = (AggregateProfileSample)
+        lagtime = (AggregateProfileSample)
                 consumer.createSample("lagTime", type, level);
+        latency = (AggregateProfileSample)
+                consumer.createSample("latency", type, level);
+        setSmoothing(smoothingFactor);
     }
+    
+    
+    // JANE THIS NEEDS TO CHANGE .  IMPLEMENT NOTIFY IN A BETTER WAY?
+    // OR JUST REMOVE?
     /** {@inheritDoc} */
     public void notifyTaskQueue() {
         sendNotification(
@@ -132,62 +137,109 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     }
 
     /** {@inheritDoc} */
-    public long getFailedTaskCount() {
+    public long getTaskFailureCount() {
         return numFailedTasks.getCount();
     }
 
     /** {@inheritDoc} */
-    public long getMaxRuntime() {
-        return runtime.getMaxSample();
-    }
-
-    /** {@inheritDoc} */
-    public float getSmoothingFactor() {
-        //JANE?
+    public double getSmoothingFactor() {
         return smoothingFactor;
     }
 
     /** {@inheritDoc} */
-    public void setSmoothingFactor(float newFactor) {
-        smoothingFactor = newFactor;
+    public void setSmoothingFactor(double newFactor) {
+        setSmoothing(newFactor);
     }
 
     /** {@inheritDoc} */
-    public double getTaskRuntimeAvg() {
+    public long getSuccessfulRuntimeMax() {
+        return runtime.getMaxSample();
+    }
+    
+    /** {@inheritDoc} */
+    public double getSuccessfulRuntimeAvg() {
         return runtime.getAverage();
     }
 
     /** {@inheritDoc} */
-    public double getTaskFailureAvg() {
-//        return failureRate.getAverage();
-//        System.out.println("failed task count is " + getFailedTaskCount());
-//        System.out.println("total task count is " +  getTaskCount());
-        return (getFailedTaskCount() * 100) / (double) getTaskCount();
+    public double getTaskFailureRate() {
+        return (getTaskFailureCount() * 100) / (double) getTaskCount();
     }
 
     /** {@inheritDoc} */
-    public double getTaskReadyCountAvg() {
+    public double getReadyCountAvg() {
         return readyCount.getAverage();
     }
 
     /** {@inheritDoc} */
-    public double getTaskLagTimeAvg() {
-        return lagTime.getAverage();
+    public double getSuccessfulLagTimeAvg() {
+        return lagtime.getAverage();
     }
 
     /** {@inheritDoc} */
-    public double getTaskLatencyAvg() {
-        double successful = getTaskCount() - getFailedTaskCount();
-        return (getTaskRuntimeAvg() + getTaskLagTimeAvg()) / successful;
+    public double getSuccessfulLatencyAvg() {
+        return latency.getAverage();
     }
 
     /** {@inheritDoc} */
-    public double getQueueSize() {
-        return numReadyTasks.getCount() / (double) numTasks.getCount();
+    public void clear() {
+        numTasks.clearCount();
+        numTransactionalTasks.clearCount();
+        numFailedTasks.clearCount();
+        readyCount.clearSamples();
+        runtime.clearSamples();
+        lagtime.clearSamples();
+        latency.clearSamples();
     }
+    
+    // Methods used by ProfileCollector to update our values when
+    // tasks complete
+    void taskFinishedSuccess(boolean trans, long ready, long run, long lag) {
+        taskFinishedCommon(trans, ready);  
+//        System.out.println("success: run " + run + ", lag " + lag + ", 
+//        latency " + (run + lag));
+        if (startupLatch) {
+            return;
+        }
+        runtime.addSample(run);
+        lagtime.addSample(lag);
+        latency.addSample(run + lag);
+//        System.out.println("   avgs: run " + runtime.getAverage() + ", lag "
+//        + lagtime.getAverage() + ", latency " + latency.getAverage());
 
-    /** {@inheritDoc} */
-    public long getTaskReadyCountTotal() {
-        return numReadyTasks.getCount();
+    }
+    void taskFinishedFail(boolean trans, long ready) {
+        taskFinishedCommon(trans, ready);
+        if (startupLatch) {
+            return;
+        }
+        numFailedTasks.incrementCount();
+    }
+    void taskFinishedCommon(boolean trans, long ready) {
+        // We throw out the first several tasks, because they occur during
+        // startup and can be arbitrarily long.
+        if (startupLatch) {
+            if (firstTasks.decrementAndGet() < 0) {
+                startupLatch = false;
+            } 
+        } else {
+            numTasks.incrementCount();
+            numTransactionalTasks.incrementCount();
+            readyCount.addSample(ready);
+        }
+    }
+    
+    /**
+     * Set the smoothing factor for each sample.
+     * @param smooth the new smoothing factor
+     * @throws IllegalArgumentException if {@code smooth} is not between
+     *                                  0.0 and 1.0, inclusive
+     */
+    private void setSmoothing(double smooth) {
+        readyCount.setSmoothingFactor(smooth);
+        runtime.setSmoothingFactor(smooth);
+        lagtime.setSmoothingFactor(smooth);
+        latency.setSmoothingFactor(smooth);
+        smoothingFactor = smooth;
     }
 }

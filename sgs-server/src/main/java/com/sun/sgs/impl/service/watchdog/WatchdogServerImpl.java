@@ -402,7 +402,7 @@ public final class WatchdogServerImpl
 	failedNodesExceptMe.remove(aliveNodes.get(localNodeId));
 	notifyClients(failedNodesExceptMe, failedNodes);
         
-        for (Long nodeId: aliveNodes.keySet()) {
+        for (Long nodeId : aliveNodes.keySet()) {
             nodeMgr.notifyNodeFailed(nodeId);
         }
 	aliveNodes.clear();

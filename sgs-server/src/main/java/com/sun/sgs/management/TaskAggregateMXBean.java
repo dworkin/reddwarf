@@ -33,6 +33,10 @@ package com.sun.sgs.management;
 public interface TaskAggregateMXBean {
     /** The name for uniquely identifying this MBean. */
     String MXBEAN_NAME = "com.sun.sgs:type=TaskAggregate";
+    
+    // Thruput?  Notifications?  Or maybe monitor service would be used
+    // for that?
+    
     /**
      * Returns the total number of tasks run.
      * @return the total number of tasks run
@@ -49,22 +53,71 @@ public interface TaskAggregateMXBean {
      * Returns the total number of tasks which failed.
      * @return the total number of tasks which failed
      */
-    long getFailedTaskCount();
+    long getTaskFailureCount();
     
-    long getMaxRuntime();
+    /**
+     * Returns the percentage of failed tasks to total tasks.
+     * @return the percentage of failed tasks to total tasks
+     */
+    double getTaskFailureRate();
+      
+    /**
+     * Returns the average number of tasks which are ready to run in
+     * the system.  A large average indicates the task queue is falling 
+     * behind.
+     * @return the average number of tasks which are ready to run 
+     */
+    double getReadyCountAvg();
     
-    long getTaskReadyCountTotal();
+    /**
+     * Returns the maximum runtime for successful tasks, in milliseconds.
+     * @return the maximum runtime for successful tasks
+     */
+    long getSuccessfulRuntimeMax();
     
-    float getSmoothingFactor();
-    void setSmoothingFactor(float newFactor);
-    
-    double getTaskRuntimeAvg();
-    double getTaskFailureAvg();
-    double getTaskReadyCountAvg();
-    double getTaskLagTimeAvg();
-    double getTaskLatencyAvg();
+    /**
+     * Returns the average runtime for successful tasks, in milliseconds.
+     * @return the average runtime for successful tasks
+     */
+    double getSuccessfulRuntimeAvg();
 
-    double getQueueSize();
+    /**
+     * Returns the average lag time for successful tasks, in milliseconds. 
+     * Lag time is the amount of time spent on the ready queue before the 
+     * task starts.
+     * @return the average lag time for successful tasks
+     */
+    double getSuccessfulLagTimeAvg();
     
-    void notifyTaskQueue();
+    /**
+     * Returns the average latency for successful tasks, in milliseconds. 
+     * Latency is total amount of time it takes a successful task to run, and 
+     * is the sum of lagtime and runtime.
+     * @return the average latency for successful tasks.
+     */
+    double getSuccessfulLatencyAvg();
+    
+    /**
+     * Returns the smoothing factor used for averages in this MBean.
+     * @return the smoothing factory used for averages
+     */
+    double getSmoothingFactor();
+    
+    /**
+     * Set the smoothing factor for all averages in this MBean, between
+     * {@code 0.0} and {@code 1.0}, inclusive. A value closer to {@code 1.0} 
+     * provides less smoothing of the data, and more weight to recent data; a 
+     * value closer to {@code 0.0} provides more smoothing but is less 
+     * responsive to recent changes. 
+     *
+     * @param newFactor the new smoothing factor
+     * @throws IllegalArgumentException if the value is not between {@code 0.0} 
+     *                                  and {@code 1.0}, inclusive
+     */
+    void setSmoothingFactor(double newFactor);
+    
+    /**
+     * Clear all data values.
+     */
+    void clear();
 }

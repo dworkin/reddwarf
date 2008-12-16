@@ -30,6 +30,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.management.ProfileControllerMXBean;
 
+import com.sun.sgs.management.TaskAggregateMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -45,6 +46,7 @@ import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.EmptyStackException;
 import java.util.List;
 import java.util.Map;
@@ -148,13 +150,13 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         // Create the task aggregator, add it as a listener, and register
         // it as an MBean.  We do this here so we can gather task data for
         // all services that are started after us.
-        TaskAggregate taskAgg = new TaskAggregate();
-        addListener(taskAgg, true);
+//        TaskAggregate taskAgg = new TaskAggregate();
+//        addListener(taskAgg, true);
         taskStats = new TaskAggregateStats(this,
                 CORE_CONSUMER_PREFIX + "TaskAggregateStats");
         try {
-            registerMBean(taskAgg, TaskAggregate.MXBEAN_NAME);
-            registerMBean(taskStats, TaskAggregate.MXBEAN_NAME + "Stats");
+//            registerMBean(taskAgg, TaskAggregate.MXBEAN_NAME);
+            registerMBean(taskStats, TaskAggregateMXBean.MXBEAN_NAME);
             registerMBean(new ProfileController(this),
                           ProfileControllerMXBean.MXBEAN_NAME);
         } catch (JMException e) {
@@ -325,8 +327,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         try {
             ObjectName name = new ObjectName(mBeanName);
             platServer.registerMBean(mBean, name);
-//                new StandardMBean(stats, DataStoreStatsMXBean.class) { },
-                    // Still not clear why I'd use an anon class here
 
             registeredMBeans.putIfAbsent(mBeanName, mBean);
             logger.log(Level.CONFIG, "Registered MBean {0}", name);
@@ -421,7 +421,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         profileReport.transactionId = txnId;
-        taskStats.numTransactionalTasks.incrementCount();
     }
 
     /**
@@ -523,22 +522,39 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         queue.offer(profileReport);
         
         // Update the task aggregate data 
-        // JANE probably want to encapsulate this neatly
-        taskStats.numTasks.incrementCount();
-        taskStats.readyCount.addSample(profileReport.readyCount);
-        taskStats.numReadyTasks.incrementCount(profileReport.readyCount);
+        boolean trans = profileReport.wasTaskTransactional();
         if (successful) {
-            taskStats.runtime.addSample(runtime);
             long lagtime = profileReport.actualStartTime -
                            profileReport.scheduledStartTime;
-            taskStats.lagTime.addSample(lagtime);
+            taskStats.taskFinishedSuccess(trans, profileReport.readyCount, 
+                                          runtime, lagtime);
         } else {
-            taskStats.numFailedTasks.incrementCount();
+            taskStats.taskFinishedFail(trans, profileReport.readyCount);
         }
+
+//        if (runtime == 0) {
+//            Date now = new Date(profileReport.actualStartTime);
+//            System.out.println("JANE ZERO RUNTIME " + 
+//                profileReport.getTask() + " started: "  + now);
+//        }
+//        // JANE probably want to encapsulate this neatly
+//        taskStats.numTasks.incrementCount();
+//        taskStats.readyCount.addSample(profileReport.readyCount);
+//        taskStats.numReadyTasks.incrementCount(profileReport.readyCount);
+//        if (successful) {
+//            taskStats.runtime.addSample(runtime);
+//            long lagtime = profileReport.actualStartTime -
+//                           profileReport.scheduledStartTime;
+//            taskStats.lagTime.addSample(lagtime);
+//        } else {
+//            taskStats.numFailedTasks.incrementCount();
+//        }
+        
+        
 //        taskStats.runtime.addSample(runtime);
 ////        taskStats.failureRate.addSample(
-//////            taskStats.getFailedTaskCount() / taskStats.getTaskCount());
-////        (taskStats.getFailedTaskCount() * 100) / taskStats.getTaskCount());
+//////            taskStats.getTaskFailureCount() / taskStats.getTaskCount());
+////        (taskStats.getTaskFailureCount() * 100) / taskStats.getTaskCount());
 //        taskStats.lagTime.addSample(lagtime);
     }
 

@@ -43,7 +43,7 @@ public interface AggregateProfileSample extends ProfileSample {
     List<Long> getSamples();
     
     /**
-     * Clear the accumulated samples.
+     * Clear the accumulated samples and their statistics.
      */
     void clearSamples();
     
@@ -111,6 +111,8 @@ public interface AggregateProfileSample extends ProfileSample {
      * more smoothing but is less responsive to recent changes.
      *
      * @param smooth the smoothing factor
+     * @throws IllegalArgumentException if {@code smooth} is not between
+     *                           {@code 0.0} and {{@code 1.1}, inclusive.
      */
     void setSmoothingFactor(double smooth);
     

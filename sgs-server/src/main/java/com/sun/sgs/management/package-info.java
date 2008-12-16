@@ -26,16 +26,25 @@
  * <p>
  * Each node in a Project Darkstar cluster may be monitored locally or 
  * remotely.  See 
- * <a href="../app/doc-files/config-properties.html#MonitoringProperties">this document</a>
- * for information on enabling remote monitoring and management.
+ * <a href="../app/doc-files/config-properties.html#MonitoringProperties">
+ * this document</a> for information on enabling remote monitoring and 
+ * management.
  * <p>
- * For more information, please refer to the <a href="http://java.sun.com/javase/6/docs/technotes/guides/management/toc.html">
+ * For more information, please refer to the <a href=
+ * "http://java.sun.com/javase/6/docs/technotes/guides/management/toc.html">
  * Java SE Monitoring and Management Guide</a>, especially Chapter 2, 
  * Monitoring and Management Using JMX Technology.
  * <p>
+ * Profiling for services can be dynamically enabled with 
+ * {@link com.sun.sgs.management.ProfileControllerMXBean#setConsumerLevel 
+ * ProfileControllerMXBean.setConsumerLevel}.  
+ * The names of the profile consumers enabled in the system can be found with
+ * {@link com.sun.sgs.management.ProfileControllerMXBean#getProfileConsumers
+ * ProfileControllerMXBean.getProfileConsumers}.
+ * <p>
  * Additional information on the use of MBeans, with simple examples, can be
- * found in
- * <a href="http://java.sun.com/javase/6/docs/api/java/lang/management/package-summary.html?is-external=true#examples">here</a>
- * in the {@code java.lang.management} package.
+ * found <a href=
+ * "http://java.sun.com/javase/6/docs/api/java/lang/management/package-summary.html?is-external=true#examples">
+ * here</a> in the {@code java.lang.management} package.
  */
 package com.sun.sgs.management;

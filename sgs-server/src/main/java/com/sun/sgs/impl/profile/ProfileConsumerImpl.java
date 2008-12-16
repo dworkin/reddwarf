@@ -679,7 +679,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
         public void setSmoothingFactor(double smooth) {
             if (smooth < 0.0 || smooth > 1.0) {
                 throw new IllegalArgumentException(
-                        "Smoothing factor must be between 0 and 100, was " 
+                        "Smoothing factor must be between 0.0 and 1.0, was " 
                       + smooth);
             }
             smoothingFactor = smooth;
