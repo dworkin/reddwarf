@@ -19,7 +19,6 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 
 /**
@@ -27,12 +26,6 @@ import java.io.Serializable;
  * must also implement {@link Serializable}.
  */
 public interface ProtocolDescriptor {
-    
-    /**
-     * Return the descriptor for the transport being used by this protocol.
-     * @return the transport descriptor
-     */
-    TransportDescriptor getTransport();     // Hack for testing
     
     /**
      * Check if the specified protocol is compatible with the protocol this

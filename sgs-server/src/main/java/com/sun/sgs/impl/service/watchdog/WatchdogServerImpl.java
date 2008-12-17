@@ -213,8 +213,6 @@ public final class WatchdogServerImpl
      * @param	systemRegistry the system registry
      * @param	txnProxy the transaction proxy
      * @param	host the local host name
-     * @param   instance the application node instance or -1 if this is not
-     * an application node
      * @param	client the local watchdog client
      * @param   fullStack {@code true} if this server is running on a full
      *            stack
@@ -225,7 +223,6 @@ public final class WatchdogServerImpl
 			      ComponentRegistry systemRegistry,
 			      TransactionProxy txnProxy,
                               String host, 
-                              int instance,
                               WatchdogClient client,
                               boolean fullStack)
 	throws Exception
@@ -237,7 +234,7 @@ public final class WatchdogServerImpl
 	
 	isFullStack = fullStack;
 	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ", " + instance +
+	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host +
 		       "]: detected " +
 		       (isFullStack ? "full stack" : "server stack"));
 	}
@@ -263,7 +260,7 @@ public final class WatchdogServerImpl
 		RENEW_INTERVAL_PROPERTY, DEFAULT_RENEW_INTERVAL,
 		RENEW_INTERVAL_LOWER_BOUND, RENEW_INTERVAL_UPPER_BOUND);
 	if (logger.isLoggable(Level.CONFIG)) {
-	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host + ", " + instance +
+	    logger.log(Level.CONFIG, "WatchdogServerImpl[" + host +
 		       "]: renewInterval:" + renewInterval);
 	}
 
@@ -286,7 +283,7 @@ public final class WatchdogServerImpl
 	}
  
         // register our local id
-        long[] values = registerNode(host, instance, client);
+        long[] values = registerNode(host, client);
         localNodeId = values[0];
         
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
@@ -380,15 +377,13 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public long[] registerNode(final String host, 
-                               final int instance,
                                WatchdogClient client)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
 
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "registering node {0} on host:{0}",
-                       instance, host);
+	    logger.log(Level.FINEST, "registering node on host:{0}", host);
 	}
 
 	try {
@@ -405,20 +400,20 @@ public final class WatchdogServerImpl
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "Failed to obtain node ID for node {0} on {1}, throws",
-		    instance, host);
+		    "Failed to obtain node ID for node on {0}, throws",
+		    host);
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, host, instance, client);
+	    final NodeImpl node = new NodeImpl(nodeId, host, client);
             
             synchronized (aliveNodes) {
                 assert ! aliveNodes.containsKey(nodeId);
 
                 if (aliveNodes.containsValue(node))
                     throw new IllegalArgumentException(
-                                    "configuration error: node " + instance +
-                                    " on host " + host +
+                                    "configuration error: node on host "
+                                    + host +
                                     " already exists");
                 aliveNodes.put(nodeId, node);
             }
@@ -816,7 +811,6 @@ public final class WatchdogServerImpl
 	int size = changedNodes.size();
 	long[] ids = new long[size];
 	String[] hosts = new String[size];
-        int[] instances = new int[size];
 	boolean[] status = new boolean[size];
 	long[] backups = new long[size];
 
@@ -825,7 +819,6 @@ public final class WatchdogServerImpl
 	    logger.log(Level.FINEST, "changed node:{0}", changedNode);
 	    ids[i] = changedNode.getId();
 	    hosts[i] = changedNode.getHostName();
-            instances[i] = changedNode.getInstance();
 	    status[i] = changedNode.isAlive();
 	    backups[i] = changedNode.getBackupId();
 	    i++;
@@ -840,7 +833,7 @@ public final class WatchdogServerImpl
 			Level.FINEST,
 			"notifying client:{0} of status change", notifyNode);
 		}
-		client.nodeStatusChanges(ids, hosts, instances, status, backups);
+		client.nodeStatusChanges(ids, hosts, status, backups);
 	    } catch (Exception e) {
 		// TBD: Should it try harder to notify the client in
 		// the non-restart case?  In the restart case, the

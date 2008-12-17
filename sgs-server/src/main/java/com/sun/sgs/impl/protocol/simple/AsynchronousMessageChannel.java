@@ -44,7 +44,7 @@ import java.util.logging.Logger;
 public class AsynchronousMessageChannel implements Channel {
 
     /** The number of bytes used to represent the message length. */
-    private static final int PREFIX_LENGTH = 2;
+    public static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
     private static final LoggerWrapper logger = new LoggerWrapper(

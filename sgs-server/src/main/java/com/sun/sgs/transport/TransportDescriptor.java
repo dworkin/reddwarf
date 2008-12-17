@@ -29,12 +29,6 @@ import java.io.Serializable;
 public interface TransportDescriptor {
     
     /**
-     * Get the transport type.
-     * @return the transport type.
-     */
-    String getType();
-    
-    /**
      * Get supported delivery guarantees for the transport.
      * @return the supported delivery guarantees for the transport
      */
@@ -47,19 +41,7 @@ public interface TransportDescriptor {
      * delivery guarantee, and {@code false} otherwise
      */
     boolean canSupport(Delivery required);
-    
-    /**
-     * Get the host name used to connect to the transport.
-     * @return the hostname
-     */
-    String getHostName();
-    
-    /**
-     * Get the port that the transport is listening on for new connections.
-     * @return the listening port
-     */
-    int getListeningPort();
-    
+
     /**
      * Check if the specified transport is compatible with the transport this
      * descriptor represents. The comparison is transport specific.
@@ -69,4 +51,10 @@ public interface TransportDescriptor {
      * {@code false} otherwise
      */
     boolean isCompatibleWith(TransportDescriptor descriptor);
+    
+    /**
+     * Return the transport specific connection data as a byte array.
+     * @return the connection data
+     */
+    byte[] getConnectionData();
 }

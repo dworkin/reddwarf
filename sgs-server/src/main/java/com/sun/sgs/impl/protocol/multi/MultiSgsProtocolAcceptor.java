@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.protocol.simple;
+package com.sun.sgs.impl.protocol.multi;
 
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
@@ -44,15 +44,54 @@ import com.sun.sgs.transport.TransportFactory;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
 
 /**
- * A protocol acceptor for connections that speak the {@link SimpleSgsProtocol}.
+ * A protocol acceptor for connections that speak the {@link SimpleSgsProtocol}
+ * using two transports. The {@link #MultiSgsProtocolAcceptor constructor}
+ * supports the following properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #PRIMARY_TRANSPORT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_PRIMARY_TRANSPORT}
+ *
+ * <dd style="padding-top: .5em">Specifies the primary transport. The
+ *      specified transport must support RELIABLE delivery..<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #SECONDARY_TRANSPORT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_SECONDARY_TRANSPORT}<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the secondary transport.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #READ_BUFFER_SIZE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_READ_BUFFER_SIZE}<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the read buffer size.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #DISCONNECT_DELAY_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_DISCONNECT_DELAY}<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the disconnect delay (in milliseconds) for disconnecting
+ *      sessions.<p>
+ * </dl> <p>
  */
-public class SimpleSgsProtocolAcceptor
+public class MultiSgsProtocolAcceptor
     extends AbstractService
     implements ProtocolAcceptor
 {
@@ -63,32 +102,41 @@ public class SimpleSgsProtocolAcceptor
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + "acceptor"));
 
-    /** The name of the read buffer size property. */
-    private static final String READ_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.read.max";
-
     /**
-     * The transport property. The specified transport must support
-     * RELIABLE delivery.
+     * The primary transport property. The primary transport must
+     * support RELIABLE delivery.
      */
-    public static final String TRANSPORT_PROPERTY =
-        PKG_NAME + ".transport";
+    public static final String PRIMARY_TRANSPORT_PROPERTY =
+        PKG_NAME + ".transport.primary";
     
-    /** The default transport */
-    public static final String DEFAULT_TRANSPORT =
+    /** The default primary transport */
+    public static final String DEFAULT_PRIMARY_TRANSPORT =
         "com.sun.sgs.impl.transport.tcp.TCP";
             
+    /**  The secondary transport property. */
+    public static final String SECONDARY_TRANSPORT_PROPERTY =
+        PKG_NAME + ".transport.primary";
+    
+    /** The default primary transport */
+    public static final String DEFAULT_SECONDARY_TRANSPORT =
+        "com.sun.sgs.impl.transport.udp.UDP";
+    
+    /** The name of the read buffer size property. */
+    public static final String READ_BUFFER_SIZE_PROPERTY =
+        PKG_NAME + ".buffer.read.max";
+
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
-    private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
+    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
     /** The name of the disconnect delay property. */
-    private static final String DISCONNECT_DELAY_PROPERTY =
+    public static final String DISCONNECT_DELAY_PROPERTY =
 	PKG_NAME + ".disconnect.delay";
     
     /** The time (in milliseconds) that a disconnecting connection is
-     * allowed before this service forcibly disconnects it.
+     * allowed before this service forcibly disconnects it:
+     * {@value #DEFAULT_DISCONNECT_DELAY}
      */
-    private static final long DEFAULT_DISCONNECT_DELAY = 1000;
+    public static final long DEFAULT_DISCONNECT_DELAY = 1000;
 
     /** The identity manager. */
     private final IdentityCoordinator identityManager;
@@ -96,8 +144,11 @@ public class SimpleSgsProtocolAcceptor
     /** The read buffer size for new connections. */
     private final int readBufferSize;
 
-    /** The transport */
-    private final Transport transport;
+    /** The primary transport. */
+    private final Transport primaryTransport;
+    
+    /** The secondary transport. */
+    private final Transport secondaryTransport;
     
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
     private final long disconnectDelay;
@@ -117,6 +168,14 @@ public class SimpleSgsProtocolAcceptor
     /** The handle for the task that monitors disconnecting client sessions. */
     private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
 
+        /**
+     * Map of connections that have processed successful logins an the
+     * reconnect key. Used to attach the secondary connection to the
+     * primary connection.
+     */
+    private final Map<byte[], MultiSgsProtocolImpl> logins =
+            new ConcurrentHashMap<byte[], MultiSgsProtocolImpl>();
+    
     /**
      * Constructs an instance with the specified {@code properties},
      * {@code systemRegistry}, and {@code txnProxy}.
@@ -127,9 +186,9 @@ public class SimpleSgsProtocolAcceptor
      *
      * @throws	Exception if a problem occurs
      */
-    public SimpleSgsProtocolAcceptor(Properties properties,
-				     ComponentRegistry systemRegistry,
-				     TransactionProxy txnProxy)
+    public MultiSgsProtocolAcceptor(Properties properties,
+				    ComponentRegistry systemRegistry,
+				    TransactionProxy txnProxy)
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
@@ -153,20 +212,35 @@ public class SimpleSgsProtocolAcceptor
                 systemRegistry.getComponent(TransportFactory.class);
             
             String transportClassName =
-                    wrappedProps.getProperty(TRANSPORT_PROPERTY,
-                                             DEFAULT_TRANSPORT);
+                    wrappedProps.getProperty(PRIMARY_TRANSPORT_PROPERTY,
+                                             DEFAULT_PRIMARY_TRANSPORT);
             
-            transport =
-                transportFactory.startTransport(transportClassName,
-                                                properties);
+            primaryTransport =
+                            transportFactory.startTransport(transportClassName,
+                                                            properties);
             
-            if (!transport.getDescriptor().canSupport(Delivery.RELIABLE)) {
-                transport.shutdown();
+            if (!primaryTransport.getDescriptor().canSupport(Delivery.RELIABLE))
+            {
+                primaryTransport.shutdown();
                 throw new IllegalArgumentException(
                         "transport must support RELIABLE delivery");
             }
+            transportClassName =
+                    wrappedProps.getProperty(SECONDARY_TRANSPORT_PROPERTY,
+                                             DEFAULT_SECONDARY_TRANSPORT);
+            
+            try {
+                secondaryTransport =
+                            transportFactory.startTransport(transportClassName,
+                                                            properties);
+            } catch (Exception e) {
+                primaryTransport.shutdown();
+                throw e;
+            }
             protocolDesc =
-                    new SimpleSgsProtocolDescriptor(transport.getDescriptor());
+                    new MultiSgsProtocolDescriptor(
+                                            primaryTransport.getDescriptor(),
+                                            secondaryTransport.getDescriptor());
 
 	    /*
 	     * Set up recurring task to monitor disconnecting client sessions.
@@ -208,7 +282,8 @@ public class SimpleSgsProtocolAcceptor
     
     /** {@inheritDoc} */
     public void doShutdown() {
-        transport.shutdown();
+        primaryTransport.shutdown();
+        secondaryTransport.shutdown();
 
 	if (monitorDisconnectingSessionsTaskHandle != null) {
 	    try {
@@ -236,7 +311,8 @@ public class SimpleSgsProtocolAcceptor
 	    throw new NullPointerException("null protocolListener");
 	}
 	this.protocolListener = protocolListener;
-        transport.accept(new ConnectionHandlerImpl());
+        primaryTransport.accept(new PrimaryHandlerImpl());
+        secondaryTransport.accept(new SecondaryHandlerImpl());
     }
 
     /** {@inheritDoc} */
@@ -246,9 +322,9 @@ public class SimpleSgsProtocolAcceptor
     }
 
     /**
-     * Transport connection handler.
+     * Primary transport connection handler.
      */
-    private class ConnectionHandlerImpl implements ConnectionHandler {
+    private class PrimaryHandlerImpl implements ConnectionHandler {
 
         /** {@inheritDoc} */
         @Override
@@ -256,15 +332,60 @@ public class SimpleSgsProtocolAcceptor
                                   TransportDescriptor descriptor)
             throws Exception
         {
-            new SimpleSgsProtocolImpl(protocolListener,
-                                      SimpleSgsProtocolAcceptor.this,
-                                      byteChannel,
-                                      readBufferSize);
+            new MultiSgsProtocolImpl(protocolListener,
+                                     MultiSgsProtocolAcceptor.this,
+                                     byteChannel,
+                                     readBufferSize);
+        }
+    }
+    
+    /**
+     * Secondary transport connection handler.
+     */
+    private class SecondaryHandlerImpl implements ConnectionHandler {
+
+        /** {@inheritDoc} */
+        @Override
+        public void newConnection(AsynchronousByteChannel byteChannel,
+                                  TransportDescriptor descriptor)
+            throws Exception
+        {
+            new SecondaryChannel(descriptor.getSupportedDelivery(),
+                                    MultiSgsProtocolAcceptor.this,
+                                    byteChannel,
+                                    readBufferSize);
         }
     }
     
     /* -- Package access methods -- */
 
+    /**
+     * Record a successful login.
+     * @param key the reconnect key
+     * @param connection the session connection
+     */
+    void sucessfulLogin(byte[] key, MultiSgsProtocolImpl protocol) {
+        logins.put(key, protocol);
+    }
+    
+    /**
+     * A session has logged out (or otherwise disconnected)
+     * @param key the reconnect key for that session
+     */
+    void disconnect(byte[] key) {
+        logins.remove(key);
+    }
+    
+    /**
+     * Return the session connection associated with the specified
+     * reconnect key. Returns {@code null} if no association exists. 
+     * @param key the reconnect key
+     * @return the session connection or {@code null}
+     */
+    MultiSgsProtocolImpl attach(byte[] key) {
+        return logins.get(key);
+    }
+    
     /**
      * Returns the authenticated identity for the specified {@code name} and
      * {@code password}.

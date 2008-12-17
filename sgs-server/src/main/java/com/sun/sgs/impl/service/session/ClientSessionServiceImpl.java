@@ -90,33 +90,6 @@ import java.util.logging.Logger;
  * these public configuration <a
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
- * 
- * * The {@link #ClientSessionServiceImpl constructor} supports the following
- * properties: <p>
- *
- * <dl style="margin-left: 1em">
- *
- * <dt> <i>Property:</i> <code><b>
- *	{@value #PROTOCOL_LIST_PROPERTY}
- *	</b></code><br>
- *	<i>Default:</i> Required property.
- *
- * <dd style="padding-top: .5em">Specifies a colon ":" separated list of
- * protocol class names to use for session communication. Specified
- * classes must implement {@link SessionProtocolConnection}<p>
- *
- * <dt> <i>Property:</i> <code><b>
- *	{@value #PROTOCOL_PROPERTIES_BASE}.n
- *	</b></code><br>
- *	<i>Default:</i> Required property(s). There needs to be a numbered
- * property specified for each protocol class name specified in
- * {@value #PROTOCOL_LIST_PROPERTY}.<br>
- *
- * <dd style="padding-top: .5em"> 
- *	Specifies a colon ":" separated list of name value pairs which
- * are interpreted as properties which are passed to the protocol factory.<p>
- * 
- * </dl> <p>
  */
 public final class ClientSessionServiceImpl
     extends AbstractService

@@ -39,14 +39,13 @@ public interface TransportFactory {
      * Start a new transport.
      * The transport name must resolve to a class that implements
      * {@link Transport}. The class should be public, not abstract, and should
-     * provide a public constructor with a {@link Properties} and
-     * {@link ConnectionHandler} parameter. The newly created transport object
+     * provide a public constructor with a {@link Properties} parameter.
+     * The newly created transport object
      * is returned and each call will return a new instance.
      * 
      * @param transportClassName name of the class that implements
      * {@link Transport}
      * @param properties properties passed to the transport's constructor
-     * @param handler handler passed to the transport's constructor
      * @return the transport object
      * @throws IllegalArgumentException if any argument is {@code null} or if
      * the class specified by {@code transportClassName} does not implement
@@ -54,7 +53,6 @@ public interface TransportFactory {
      * @throws Exception thrown from the transport's constructor
      */
     Transport startTransport(String transportClassName,
-                             Properties properties,
-                             ConnectionHandler handler) throws Exception;
+                             Properties properties) throws Exception;
 
 }

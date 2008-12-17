@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportFactory;
 import java.lang.reflect.Constructor;
@@ -34,7 +33,7 @@ import java.util.logging.Logger;
 public class TransportFactoryImpl implements TransportFactory {
 
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(TransportFactoryImpl.class.getName()));
+      new LoggerWrapper(Logger.getLogger(TransportFactoryImpl.class.getName()));
     
     /**
      * @param appProperties
@@ -46,34 +45,28 @@ public class TransportFactoryImpl implements TransportFactory {
     /** {@inheritDoc} */
     @Override
     public Transport startTransport(String transportClassName,
-                                    Properties properties,
-                                    ConnectionHandler handler)
+                                    Properties properties)
         throws Exception
     {
-        if (properties == null)
-            throw new IllegalArgumentException("properties can not be null");
-
-        if (transportClassName == null)
-            throw new IllegalArgumentException("transportClassName can not be null");
-        
-        if (handler == null)
-            throw new IllegalArgumentException("handler can not be null");
-        
+        if (properties == null) {
+            throw new NullPointerException("properties is null");
+        } else if (transportClassName == null) {
+            throw new NullPointerException("transportClassName is null");
+        }
         logger.log(Level.FINE, "starting transport: {0}", transportClassName);
         
         Class<?> transportClass = Class.forName(transportClassName);
     
         if (!Transport.class.isAssignableFrom(transportClass))
             throw new IllegalArgumentException(transportClassName +
-                                " class does not implement Transport interface");
+                               " class does not implement Transport interface");
         
         Constructor<?> [] constructors = transportClass.getConstructors();
         Constructor<?> transportConstructor = null;
         for (int i = 0; i < constructors.length; i++) {
             Class<?> [] types = constructors[i].getParameterTypes();
-            if (types.length == 2) {
-                if (types[0].isAssignableFrom(Properties.class) &&
-                    types[1].isAssignableFrom(ConnectionHandler.class)) {
+            if (types.length == 1) {
+                if (types[0].isAssignableFrom(Properties.class)) {
                     transportConstructor = constructors[i];
                     break;
                 }
@@ -81,9 +74,9 @@ public class TransportFactoryImpl implements TransportFactory {
         }
 
         if (transportConstructor == null)
-            throw new NoSuchMethodException("Could not find a constructor for " +
-                                            transportClass);
+            throw new NoSuchMethodException("Could not find a constructor for "
+                                            + transportClass);
         
-        return (Transport)transportConstructor.newInstance(properties, handler);
+        return (Transport)transportConstructor.newInstance(properties);
     }
 }

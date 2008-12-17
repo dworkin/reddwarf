@@ -17,10 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.protocol.simple;
+package com.sun.sgs.impl.protocol.multi;
 
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.protocol.simple.AsynchronousMessageChannel;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -45,7 +46,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -55,19 +56,20 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implements the protocol specified in {@code SimpleSgsProtocol}.  The
+ * Implements the protocol specified in {@code SimpleSgsProtocol} over two
+ * communication channels.  The
  * implementation uses a wrapper channel, {@link AsynchronousMessageChannel},
  * that reads and writes complete messages by framing messages with a 2-byte
  * message length, and masking (and re-issuing) partial I/O operations.  Also
  * enforces a fixed buffer size when reading.
  */
-class SimpleSgsProtocolImpl implements SessionProtocol {
+class MultiSgsProtocolImpl implements SessionProtocol {
     /** The number of bytes used to represent the message length. */
     private static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
     private static final LoggerWrapper logger = new LoggerWrapper(
-	Logger.getLogger(SimpleSgsProtocolImpl.class.getName()));
+	Logger.getLogger(MultiSgsProtocolImpl.class.getName()));
 
     /** The default reason string returned for login failure. */
     private static final String DEFAULT_LOGIN_FAILED_REASON = "login refused";
@@ -90,7 +92,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
     private volatile SessionProtocolHandler protocolHandler;
 
     /** This protocol's acceptor. */
-    private final SimpleSgsProtocolAcceptor acceptor;
+    private final MultiSgsProtocolAcceptor acceptor;
 
     /** The protocol listener. */
     private final ProtocolListener listener;
@@ -99,7 +101,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
     private volatile Identity identity;
 
     /** The reconnect key. */
-    private final byte[] reconnectKey;
+    private byte[] reconnectKey;
 
     /** The completion handler for reading from the I/O channel. */
     private volatile ReadHandler readHandler = new ConnectedReadHandler();
@@ -117,9 +119,17 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
     /** The immutable set of supported delivery requirements. */
-    private final Set<Delivery> deliverySet =
-	Collections.singleton(Delivery.RELIABLE);
+    private final Set<Delivery> deliverySet = new HashSet<Delivery>();
 
+    /**
+     * Flags on whether to use the primary (reliable) connection or
+     * to use the secondary connection.
+     */
+    private final boolean[] usePrimary = new boolean[Delivery.values().length];
+    
+    /** Secondary comm channel. */
+    private SecondaryChannel secondaryChannel = null;
+    
     /**
      * Creates a new instance of this class.
      *
@@ -128,18 +138,21 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
      * @param	byteChannel a byte channel for the underlying connection
      * @param	readBufferSize the read buffer size
      */
-    SimpleSgsProtocolImpl(ProtocolListener listener,
-                          SimpleSgsProtocolAcceptor acceptor,
-                          AsynchronousByteChannel byteChannel,
-                          int readBufferSize)
+    public MultiSgsProtocolImpl(ProtocolListener listener,
+                                MultiSgsProtocolAcceptor acceptor,
+                                AsynchronousByteChannel byteChannel,
+                                int readBufferSize)
     {
 	// The read buffer size lower bound is enforced by the protocol acceptor
 	assert readBufferSize >= PREFIX_LENGTH;
-	this.asyncMsgChannel =
-	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
 	this.listener = listener;
 	this.acceptor = acceptor;
-	this.reconnectKey = getNextReconnectKey();
+        asyncMsgChannel =
+	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
+	reconnectKey = getNextReconnectKey();
+        deliverySet.add(Delivery.RELIABLE);
+        for (Delivery delivery : Delivery.values())
+            usePrimary[delivery.ordinal()] = true;
 	
 	/*
 	 * TBD: It might be a good idea to implement high- and low-water marks
@@ -149,6 +162,33 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 	scheduleReadOnReadHandler();
     }
 
+    /**
+     * Attach the secondary connection.
+     * @param connection
+     * @param supportedDelivery
+     * @return
+     */
+    SessionProtocolHandler attach(SecondaryChannel channel,
+                                  Delivery[] supportedDelivery)
+    {
+        if (protocolHandler != null) {
+        
+            // Set the usePrimary flag to false for any delivery that the
+            // secondary connection can support. Skipping reliable, since
+            // the primary does that.
+            //
+            for (Delivery delivery : supportedDelivery) {
+                if (delivery != Delivery.RELIABLE) {
+                    deliverySet.add(delivery);
+                    usePrimary[delivery.ordinal()] = false;
+                }
+            }
+            secondaryChannel = channel;
+            return protocolHandler;
+        } else
+            return null;
+    }
+    
     /* -- Implement SessionProtocol -- */
 
     /** {@inheritDoc} */
@@ -198,16 +238,20 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                                ByteBuffer message,
                                Delivery delivery)
     {
-	byte[] channelIdBytes = channelId.toByteArray();
-	ByteBuffer buf =
-	    ByteBuffer.allocate(3 + channelIdBytes.length +
-				message.remaining());
-	buf.put(SimpleSgsProtocol.CHANNEL_MESSAGE).
-	    putShort((short) channelIdBytes.length).
-	    put(channelIdBytes).
-	    put(message).
-	    flip();
-	writeOrEnqueueIfLoginNotHandled(buf);
+        byte[] channelIdBytes = channelId.toByteArray();
+        ByteBuffer buf =
+            ByteBuffer.allocate(3 + channelIdBytes.length +
+                                message.remaining());
+        buf.put(SimpleSgsProtocol.CHANNEL_MESSAGE).
+            putShort((short) channelIdBytes.length).
+            put(channelIdBytes).
+            put(message).
+            flip();
+        if (usePrimary[delivery.ordinal()]) {
+            writeOrEnqueueIfLoginNotHandled(buf);
+        } else {
+            secondaryChannel.writeOrEnqueueIfLoginNotHandled(buf);
+        }
     }
 
     /** {@inheritDoc} */
@@ -233,6 +277,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 	    putBytes(reconnectKey);
 	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
+        acceptor.sucessfulLogin(reconnectKey, this);
     }
 
     /**
@@ -245,7 +290,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
         ProtocolDescriptor[] descriptors = node.getClientListeners();
         for (ProtocolDescriptor descriptor : descriptors) {
             if (acceptor.getDescriptor().isCompatibleWith(descriptor)) {
-                loginRedirect((SimpleSgsProtocolDescriptor)descriptor);
+                loginRedirect((MultiSgsProtocolDescriptor)descriptor);
                 return;
             }
         }
@@ -255,11 +300,14 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                    node);
     }
 
-    private void loginRedirect(SimpleSgsProtocolDescriptor newListener) {
-        byte[] connectionData = newListener.transportDesc.getConnectionData();
-	MessageBuffer buf = new MessageBuffer(1 + connectionData.length);
+    private void loginRedirect(MultiSgsProtocolDescriptor newListener) {
+        byte[] primaryData = newListener.primaryDesc.getConnectionData();
+        byte[] secondaryData = newListener.secondaryDesc.getConnectionData();
+	MessageBuffer buf = new MessageBuffer(1 + primaryData.length +
+                                                  secondaryData.length);
         buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
-            putBytes(connectionData);
+            putBytes(primaryData).
+            putBytes(secondaryData);
 	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
 	acceptor.monitorDisconnection(this);
@@ -309,9 +357,15 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /** {@inheritDoc} */
     public void close() throws IOException {
-        asyncMsgChannel.close();
-	readHandler = new ClosedReadHandler();
-        writeHandler = new ClosedWriteHandler();
+        try {
+            asyncMsgChannel.close();
+            if (secondaryChannel != null)
+                secondaryChannel.close();
+        } finally {
+            readHandler = new ClosedReadHandler();
+            writeHandler = new ClosedWriteHandler();
+            acceptor.disconnect(reconnectKey);
+        }
     }
 
     /* -- Methods for reading and writing -- */
@@ -467,7 +521,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(Level.FINEST,
 			   "write protocol:{0} message:{1} first:{2}",
-                           SimpleSgsProtocolImpl.this,
+                           MultiSgsProtocolImpl.this,
 			   HexDumper.format(message, 0x50), first);
             }
             if (first) {
@@ -492,7 +546,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                 logger.log(
 		    Level.FINEST,
 		    "processQueue protocol:{0} size:{1,number,#} head={2}",
-		    SimpleSgsProtocolImpl.this, pendingWrites.size(),
+		    MultiSgsProtocolImpl.this, pendingWrites.size(),
 		    HexDumper.format(message, 0x50));
             }
             try {
@@ -500,7 +554,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
             } catch (RuntimeException e) {
                 logger.logThrow(Level.SEVERE, e,
 				"{0} processing message {1}",
-				SimpleSgsProtocolImpl.this,
+				MultiSgsProtocolImpl.this,
 				HexDumper.format(message, 0x50));
                 throw e;
             }
@@ -518,7 +572,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 		resetMessage.reset();
                 logger.log(Level.FINEST,
 			   "completed write session:{0} message:{1}",
-			   SimpleSgsProtocolImpl.this,
+			   MultiSgsProtocolImpl.this,
 			   HexDumper.format(resetMessage, 0x50));
             }
             try {
@@ -533,7 +587,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(Level.FINE, e,
 				    "write session:{0} message:{1} throws",
-				    SimpleSgsProtocolImpl.this,
+				    MultiSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
 		disconnect();
@@ -606,7 +660,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                     logger.log(
                         Level.FINEST,
                         "completed read protocol:{0} message:{1}",
-                        SimpleSgsProtocolImpl.this,
+                        MultiSgsProtocolImpl.this,
 			HexDumper.format(message, 0x50));
                 }
 
@@ -676,7 +730,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 
 		LoginCompletionFuture loginCompletionFuture =
 		    listener.newLogin(
-			identity, SimpleSgsProtocolImpl.this);
+			identity, MultiSgsProtocolImpl.this);
 		acceptor.scheduleNonTransactionalTask(
  		    new LoginCompletionTask(loginCompletionFuture));
 		
@@ -696,7 +750,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 			    "Dropping early session message:{0} " +
 			    "for protocol:{1}",
 			    HexDumper.format(clientMessage, 0x50),
-			    SimpleSgsProtocolImpl.this);
+			    MultiSgsProtocolImpl.this);
 		    }
 		    return;
 		}
@@ -719,7 +773,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 			    "Dropping early channel message:{0} " +
 			    "for protocol:{1}",
 			    HexDumper.format(channelMessage, 0x50),
-			    SimpleSgsProtocolImpl.this);
+			    MultiSgsProtocolImpl.this);
 		    }
 		    return;
 		}
@@ -841,7 +895,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 		    logger.logThrow(
 			Level.FINE, e,
 			"Request future:{0} for protocol:{1} throws",
-			future, SimpleSgsProtocolImpl.this);
+			future, MultiSgsProtocolImpl.this);
 		}
 	    }
 	    readHandler.read();

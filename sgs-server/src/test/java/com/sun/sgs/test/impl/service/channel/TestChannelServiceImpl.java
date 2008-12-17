@@ -30,7 +30,6 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.TransactionNotActiveException;
@@ -143,9 +142,6 @@ public class TestChannelServiceImpl extends TestCase {
     /** The listen port for the client session service. */
     private int port;
 
-    /** The node ID for the local node. */
-    private long serverNodeId;
-
     /** If {@code true}, shuts off some printing during performance tests. */
     private boolean isPerformanceTest = false;
     
@@ -191,8 +187,6 @@ public class TestChannelServiceImpl extends TestCase {
 
         dataService = serverNode.getDataService();
 	channelService = serverNode.getChannelService();
-	
-	serverNodeId = serverNode.getWatchdogService().getLocalNodeId();
     }
 
     /** Sets passed if the test passes. */
@@ -2114,7 +2108,6 @@ public class TestChannelServiceImpl extends TestCase {
         private byte[] reconnectKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
-	private long nodeId = serverNode.getWatchdogService().getLocalNodeId();
 	
 	DummyClient() {
 	}
@@ -2123,10 +2116,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    synchronized (lock) {
 		return connected;
 	    }
-	}
-
-	long getNodeId() {
-	    return nodeId;
 	}
 
 	DummyClient connect(int port) {
@@ -2220,7 +2209,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
-	    String host = null;
 	    synchronized (lock) {
 		try {
 		    if (loginAck == false) {
@@ -2233,7 +2221,12 @@ public class TestChannelServiceImpl extends TestCase {
 		    if (loginSuccess) {
 			return this;
 		    } else if (loginRedirect) {
-			host = redirectHost;
+                        // cache a local copy of redirect port, in case it's ever
+                        // cleared by disconnect
+                        int port = redirectPort;
+                        disconnect();
+                        connect(port);
+                        return login(user, pass);
 		    } else {
 			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
 		    }
@@ -2242,16 +2235,6 @@ public class TestChannelServiceImpl extends TestCase {
 			"DummyClient.login[" + name + "] timed out", e);
 		}
 	    }
-
-	    // handle redirected login
-	    SgsTestNode node = additionalNodes.get(host);
-	    nodeId = node.getWatchdogService().getLocalNodeId();
-            // cache a local copy of redirect port, in case it's ever
-            // cleared by disconnect
-            int port = redirectPort;
-	    disconnect();
-	    connect(port);
-	    return login(user, pass);
 	}
 
 	ClientSession getSession() throws Exception {

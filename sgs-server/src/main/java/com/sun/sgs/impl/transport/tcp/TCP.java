@@ -19,10 +19,8 @@
 
 package com.sun.sgs.impl.transport.tcp;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.transport.TransportDescriptorImpl;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
@@ -62,11 +60,11 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	{@value #LISTEN_PORT_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> Required property.<br>
+ *	<i>Default:</i> {@value #DEFAULT_PORT}<br>
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies the network port that the transport instance will listen on.
- *      This property is required. The value must be between 1 and 65535.<p>
+ *      The value must be between 1 and 65535.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
  *	{@value #ACCEPTOR_BACKLOG_PROPERTY}
@@ -86,27 +84,7 @@ public class TCP implements Transport {
     
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
-    
-    private final TCPDescriptor descriptor;
-    
-    private static class TCPDescriptor extends TransportDescriptorImpl {
-        private static final long serialVersionUID = 1L;
-
-        TCPDescriptor(String hostName, int listeningPort) {
-            super("TCP", Delivery.values(), hostName, listeningPort);
-        }
-
-        @Override
-        public boolean canSupport(Delivery required) {
-            return true; // optimization, TCP supports all
-        }
-
-        @Override
-        public boolean isCompatibleWith(TransportDescriptor descriptor) {
-            return getType().equals(descriptor.getType());
-        }
-    }
-    
+        
     /**
      * The server listen address property.
      * This is the host interface we are listening on. Default is listen
@@ -119,6 +97,9 @@ public class TCP implements Transport {
     public static final String LISTEN_PORT_PROPERTY =
 	PKG_NAME + ".listen.port";
 
+    /** The default port: {@value #DEFAULT_PORT} */
+    public static final int DEFAULT_PORT = 62964;
+    
     /** The name of the acceptor backlog property. */
     public static final String ACCEPTOR_BACKLOG_PROPERTY =
         PKG_NAME + ".acceptor.backlog";
@@ -135,53 +116,52 @@ public class TCP implements Transport {
     private final AsynchronousServerSocketChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
-    volatile IoFuture<?, ?> acceptFuture = null;
+    private volatile IoFuture<?, ?> acceptFuture = null;
     
     /** The connection handler. */
-    private final ConnectionHandler handler;
+    private ConnectionHandler handler = null;
     
+    /** The transport descriptor */
+    private final TCPDescriptor descriptor;
+
     /**
      * Constructs an instance of this class with the specified properties.
      *
      * @param properties
-     * @param handler
      * @throws java.lang.Exception
      */
-    public TCP(Properties properties, ConnectionHandler handler)
-	throws Exception
-    {
-        assert properties != null;
-        assert handler != null;
-                
+    public TCP(Properties properties) throws Exception {
+        
+        if (properties == null) {
+            throw new NullPointerException("properties is null");
+        }
 	logger.log(Level.CONFIG,
 	           "Creating TCP transport with properties:{0}",
 	           properties);
         
-        this.handler = handler;
-
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        acceptorBacklog = wrappedProps.getIntProperty(
-                    ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
+        acceptorBacklog = wrappedProps.getIntProperty(ACCEPTOR_BACKLOG_PROPERTY,
+                                                      DEFAULT_ACCEPTOR_BACKLOG);
         
         String host = properties.getProperty(LISTEN_HOST_PROPERTY);
-        int port = wrappedProps.getRequiredIntProperty(LISTEN_PORT_PROPERTY,
-                                                       1, 65535);
+        int port = wrappedProps.getIntProperty(LISTEN_PORT_PROPERTY,
+                                               DEFAULT_PORT, 1, 65535);
 
         try {
-             // Listen for incoming client connections. If no host address
-             // is supplied, default to listen on all interfaces on the local
-             // host.
-             //
+            // If no host address is supplied, default to listen on all
+            // interfaces on the local host.
+            //
             InetSocketAddress listenAddress =
                         host == null ?
                                 new InetSocketAddress(port) :
                                 new InetSocketAddress(host, port);
             
-            descriptor = new TCPDescriptor(host == null ?
-                                           InetAddress.getLocalHost().getHostName() :
-                                           host,
-                                           listenAddress.getPort());
+            descriptor =
+                    new TCPDescriptor(host == null ?
+                                      InetAddress.getLocalHost().getHostName() :
+                                      host,
+                                      listenAddress.getPort());
             AsynchronousChannelProvider provider =
                 AsynchronousChannelProvider.provider();
             asyncChannelGroup =
@@ -194,8 +174,8 @@ public class TCP implements Transport {
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(Level.CONFIG,
                                "acceptor bound to host: {0} port:{1,number,#}",
-                               descriptor.getHostName(),
-                               descriptor.getListeningPort());
+                               descriptor.hostName,
+                               descriptor.listeningPort);
 		}
 	    } catch (Exception e) {
 		logger.logThrow(Level.WARNING, e,
@@ -223,13 +203,19 @@ public class TCP implements Transport {
     
     /** {@inheritDoc} */
     @Override
-    public synchronized void start() {
+    public synchronized void accept(ConnectionHandler handler) {
         if (!acceptor.isOpen())
             throw new IllegalStateException("transport has been shutdown");
         
-        if (acceptFuture == null) {
+        if (handler == null) {
+            throw new NullPointerException("handler is null");
+        }
+        
+        if (this.handler == null) {
+            this.handler = handler;
+            assert acceptFuture == null;
             acceptFuture = acceptor.accept(new AcceptorListener());
-            logger.log(Level.FINEST, "transport start");
+            logger.log(Level.FINEST, "transport accepting connections");
         }
     }
             

@@ -125,17 +125,16 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String NODE_PREFIX =
 	"com.sun.sgs.impl.service.watchdog.node";
 
-
     /** The ClientSession service properties. */
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-            "com.sun.sgs.impl.transport.tcp.listen.port", "20000");
+            com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY, "20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
-    /** Any additional nodes, keyed by node hostname (for tests
+    /** Any additional nodes, keyed by node host name (for tests
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
@@ -286,18 +285,11 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructorNoPort() throws Exception {
-	try {
-	    Properties props =
-		createProperties(
-		    StandardProperties.APP_NAME, APP_NAME);
-	    new ClientSessionServiceImpl(
-		props, serverNode.getSystemRegistry(),
-		serverNode.getProxy());
-
-	    fail("Expected InvocationTargetException");
-	} catch (InvocationTargetException e) {
-	    System.err.println(e);
-	}
+        Properties props =
+            createProperties(StandardProperties.APP_NAME, APP_NAME);
+        new ClientSessionServiceImpl(
+            props, serverNode.getSystemRegistry(),
+            serverNode.getProxy());
     }
 
     public void testConstructorDisconnectDelayTooSmall() throws Exception {

@@ -19,11 +19,9 @@
 
 package com.sun.sgs.impl.transport.udp;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.nio.AttachedFuture;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.transport.TransportDescriptorImpl;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
@@ -34,6 +32,7 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -65,11 +64,11 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	{@value #LISTEN_PORT_PROPERTY}
  *	</b></code><br>
- *	<i>Default:</i> Required property<br>
+ *	<i>Default:</i> {@value #DEFAULT_PORT}<br>
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies the network port that the transport instance will listen on.
- *      This property is required. The value must be between 1 and 65535.
+ *      The value must be between 1 and 65535.
  * </dl> <p>
  */
 public class UDP implements Transport {
@@ -79,19 +78,6 @@ public class UDP implements Transport {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
 
-    private final TransportDescriptor descriptor;
-    
-    private static class UDPDescriptor extends TransportDescriptorImpl {
-        private static final long serialVersionUID = 1L;
-
-        UDPDescriptor(String hostName, int listeningPort) {
-             super("UDP",
-                   new Delivery[] {Delivery.UNRELIABLE},
-                   hostName,
-                   listeningPort);
-        }
-    }
-    
     /**
      * The server listen address property.
      * This is the host interface we are listening on. Default is listen
@@ -104,6 +90,9 @@ public class UDP implements Transport {
     public static final String LISTEN_PORT_PROPERTY =
 	PKG_NAME + ".listen.port";
 
+    /** The default port: {@value #DEFAULT_PORT} */
+    public static final int DEFAULT_PORT = 62964;
+    
     /** The async channel group for this service. */
     private final AsynchronousChannelGroup asyncChannelGroup;
 
@@ -111,43 +100,47 @@ public class UDP implements Transport {
     private final AsynchronousDatagramChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
-    volatile IoFuture<?, ?> acceptFuture = null;
+    private volatile IoFuture<?, ?> acceptFuture = null;
 
-    private final ConnectionHandler handler;
+    /** The connection handler. */
+    private ConnectionHandler handler = null;
+    
+    /** The transport descriptor */
+    private final UDPDescriptor descriptor;
     
     /**
      * Constructs an instance of this class with the specified properties.
      *
      * @param properties
-     * @param handler
      * @throws java.lang.Exception
      */
-    public UDP(Properties properties, ConnectionHandler handler)
-	throws Exception
-    {	
-        assert properties != null;
-        assert handler != null;
-                
-        this.handler = handler;
+    public UDP(Properties properties) throws Exception {
+        
+        if (properties == null) {
+            throw new NullPointerException("properties is null");
+        }
 	logger.log(Level.CONFIG,
 	           "Creating UDP transport with properties:{0}",
 	           properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	
 	try {
-	    int port = wrappedProps.getRequiredIntProperty(LISTEN_PORT_PROPERTY,
-                                                           1, 65535);
+	    int port = wrappedProps.getIntProperty(LISTEN_PORT_PROPERTY,
+                                                   DEFAULT_PORT, 1, 65535);
             
-	    // Listen for incoming client connections. If no host address
-            // is supplied, default to listen on all interfaces.
+	    // If no host address is supplied, default to listen on all
+            // interfaces on the local host.
 	    //
             String host = properties.getProperty(LISTEN_HOST_PROPERTY);
             InetSocketAddress listenAddress =
                         host == null ? new InetSocketAddress(port) :
                                        new InetSocketAddress(host, port);
             
-            descriptor = new UDPDescriptor(listenAddress.getHostName(),
-                                           listenAddress.getPort());
+            descriptor =
+                    new UDPDescriptor(host == null ?
+                                      InetAddress.getLocalHost().getHostName() :
+                                      host,
+                                      listenAddress.getPort());
             AsynchronousChannelProvider provider =
                 // TODO fetch from config
                 AsynchronousChannelProvider.provider();
@@ -196,13 +189,19 @@ public class UDP implements Transport {
 
     /** {@inheritDoc} */
     @Override
-    public synchronized void start() {
+    public synchronized void accept(ConnectionHandler handler) {
         if (!acceptor.isOpen())
             throw new IllegalStateException("transport has been shutdown");
         
-        if (acceptFuture == null) {
+         if (handler == null) {
+            throw new NullPointerException("handler is null");
+        }
+        
+        if (this.handler == null) {
+            this.handler = handler;
+            assert acceptFuture == null;
             receive(new AcceptorListener());
-            logger.log(Level.FINEST, "transport start");
+            logger.log(Level.FINEST, "transport accepting connection");
         }
     }
     

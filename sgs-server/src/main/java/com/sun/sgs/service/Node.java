@@ -33,9 +33,9 @@ public interface Node {
     long getId();
 
     /** 
-     * Returns this node's hostname.
+     * Returns this node's host name.
      *
-     * @return	this node's hostname
+     * @return	this node's host name
      */
     String getHostName();
     
@@ -50,8 +50,8 @@ public interface Node {
     boolean isAlive();
     
     /**
-     * Returns the set of transports descriptors that represent the
-     * transports listening for client connections on this
+     * Returns the set of protocol descriptors that represent the
+     * protocols listening for client connections on this
      * node. {@code null} is returned if this is not an application node.
      * 
      * @return the set of transport descriptors or {@code null}
@@ -59,8 +59,9 @@ public interface Node {
     ProtocolDescriptor[] getClientListeners();
     
     /**
-     * Sets the set of transports listening for client connections on this node.
-     * The specified set will override the value from a previous call.
+     * Sets the set of protocol listening for client connections on this node.
+     * Once this method is called any further invocations will throw an
+     * {@code IllegalStateException}.
      * 
      * @param descriptors set of transport descriptors
      */

@@ -205,12 +205,6 @@ public final class WatchdogServiceImpl
     /** The name of the local host. */
     final String localHost;
     
-    /**
-     * The application node instance number. -1 indicates not an
-     * application node
-     */
-    final int appNode;
-    
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
@@ -290,20 +284,6 @@ public final class WatchdogServiceImpl
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
 
-            // If we're running on a full stack (the usual case), or a
-            // partial stack that includes the client session service
-            // get the node instance number.
-            //
-            // Otherwise, no number is needed or required, and we simply use
-            // -1 as a placeholder.
-            if (isFullStack || 
-                (StandardService.ClientSessionService.ordinal() <=
-                    finalStandardService.ordinal()) ) {
-                appNode = wrappedProps.getIntProperty(StandardProperties.APP_NODE, 0);
-            } else {
-                appNode = -1;
-            }
-
 	    /*
 	     * Check service version.
 	     */
@@ -324,7 +304,7 @@ public final class WatchdogServiceImpl
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
-		    clientHost, appNode, clientProxy, isFullStack);
+		    clientHost, clientProxy, isFullStack);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -349,7 +329,6 @@ public final class WatchdogServiceImpl
                 renewInterval = serverImpl.renewInterval;
             } else {
                 long[] values = serverProxy.registerNode(clientHost,
-                                                         appNode, 
                                                          clientProxy);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
@@ -364,8 +343,8 @@ public final class WatchdogServiceImpl
             
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, instance:{1} localNodeId:{2}",
-			   clientHost, appNode, localNodeId);
+			   "node registered, host:{0}, localNodeId:{1}",
+			   clientHost, localNodeId);
 	    }
 	    
 	} catch (Exception e) {
@@ -625,7 +604,7 @@ public final class WatchdogServiceImpl
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, appNode, false);
+	    Node node = new NodeImpl(localNodeId, localHost, false);
 	    notifyNodeListeners(node);
 	}
     }
@@ -717,7 +696,6 @@ public final class WatchdogServiceImpl
         @Override
 	public void nodeStatusChanges(long[] ids,
                                       String hosts[],
-                                      int instances[], 
                                       boolean[] status,
                                       long[] backups)
 	{
@@ -732,8 +710,7 @@ public final class WatchdogServiceImpl
 		    continue;
 		}
 		Node node =
-		    new NodeImpl(ids[i], hosts[i], instances[i], 
-                                 status[i], backups[i]);
+                        new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (!status[i] && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);

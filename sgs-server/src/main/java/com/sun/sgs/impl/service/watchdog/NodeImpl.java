@@ -47,7 +47,7 @@ class NodeImpl
     private static final long serialVersionUID = 1L;
 
     /** The ID for an unknown node. */
-    static final long INVALID_ID = -1L;
+    public static final long INVALID_ID = -1L;
 
     /** The name of this class. */
     private static final String PKG_NAME =
@@ -61,9 +61,6 @@ class NodeImpl
     
     /** The host name, or {@code null}. */
     private final String host;
-    
-    /** The node instance. */
-    private final int instance;
     
     /** The client listeners set, or {@code null} if not an application node. */
     private ProtocolDescriptor[] clientListeners = null;
@@ -89,17 +86,16 @@ class NodeImpl
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code port}, and {@code client}.  
+     * nodeId}, {@code hostName}, and {@code client}.  
      * This instance's alive status is set to {@code true}.  The expiration 
      * time for this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name
-     * @param   port     a port
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, int instance, WatchdogClient client) {
-        this (nodeId, hostName, instance, client, true, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, WatchdogClient client) {
+        this (nodeId, hostName, client, true, INVALID_ID);
     }
 
     /**
@@ -110,30 +106,26 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, int instance, boolean isAlive) {
-	this(nodeId, hostName, instance, null, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, boolean isAlive) {
+	this(nodeId, hostName, null, isAlive, INVALID_ID);
     }
 	
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code port}, {@code isAlive} status, and 
+     * nodeId}, {@code hostName}, {@code isAlive} status, and 
      * {@code backupId}.  This instance's watchdog client is set to
      * {@code null}.
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, int instance, 
-             boolean isAlive, long backupId) 
-    {
-        this(nodeId, hostName, instance, null, isAlive, backupId);
+    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
+        this(nodeId, hostName, null, isAlive, backupId);
     }
     
     /**
@@ -148,12 +140,11 @@ class NodeImpl
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    private NodeImpl(long nodeId, String hostName, int instance, 
+    private NodeImpl(long nodeId, String hostName, 
                      WatchdogClient client, boolean isAlive, long backupId) 
     {
         this.id = nodeId;
 	this.host = hostName;
-        this.instance = instance;
         this.client = client;
         this.isAlive = isAlive;
         this.backupId = backupId;
@@ -171,10 +162,6 @@ class NodeImpl
 	return host;
     }
     
-    int getInstance() {
-        return instance;
-    }
-    
     /** {@inheritDoc} */
     @Override
     public ProtocolDescriptor[] getClientListeners() {
@@ -183,7 +170,10 @@ class NodeImpl
     
     /** {@inheritDoc} */
     @Override
-    public void setClientListener(ProtocolDescriptor[] descriptors) {
+    public synchronized void setClientListener(ProtocolDescriptor[] descriptors)
+    {
+        if (clientListeners != null)
+            throw new IllegalStateException("client listeners already set");
         clientListeners = descriptors;
     }
 
@@ -216,8 +206,15 @@ class NodeImpl
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
-	    return id == node.id && compareStrings(host, node.host) == 0 &&
-                     instance == node.instance;
+            if (id == node.id) {
+                if (compareStrings(host, node.host) != 0) {
+                    throw new RuntimeException("two node objects with ID " +
+                                               id +
+                                               " have different host names: " +
+                                               host + " and " + node.host);
+                }
+                return true;
+            }
 	}
 	return false;
     }
@@ -232,7 +229,7 @@ class NodeImpl
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
 	    (backupId == INVALID_ID ? "(none)" : backupId) + 
-            "]@" + host + " instance " + instance;
+            "]@" + host;
     }
 
     /* -- package access methods -- */
