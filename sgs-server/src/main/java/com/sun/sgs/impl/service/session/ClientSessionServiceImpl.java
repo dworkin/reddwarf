@@ -299,17 +299,14 @@ public final class ClientSessionServiceImpl
 				    TransactionProxy txnProxy)
 	throws Exception
     {
-	super(properties, systemRegistry, txnProxy, logger);
-	
+	super(properties, systemRegistry, txnProxy, logger);	
 	logger.log(Level.CONFIG,
 		   "Creating ClientSessionServiceImpl properties:{0}",
 		   properties);
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);	
 	try {
             appPort = wrappedProps.getRequiredIntProperty(
                 StandardProperties.APP_PORT, 1, 65535);
-
 	    /*
 	     * Get the property for controlling session event processing
 	     * and connection disconnection.
@@ -329,9 +326,7 @@ public final class ClientSessionServiceImpl
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
-	    /*
-	     * Export the ClientSessionServer.
-	     */
+	    /* Export the ClientSessionServer. */
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    serverImpl = new SessionServerImpl();
@@ -341,9 +336,8 @@ public final class ClientSessionServiceImpl
 		int port = exporter.export(serverImpl, serverPort);
 		serverProxy = exporter.getProxy();
 		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(
-			Level.CONFIG, "export successful. port:{0,number,#}",
-			port);
+		    logger.log(Level.CONFIG, 
+                            "export successful. port:{0,number,#}", port);
 		}
 	    } catch (Exception e) {
 		try {
@@ -353,9 +347,7 @@ public final class ClientSessionServiceImpl
 		throw e;
 	    }
 
-	    /*
-	     * Get services and check service version.
-	     */
+	    /* Get services and check service version. */
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
@@ -375,9 +367,7 @@ public final class ClientSessionServiceImpl
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
 		    } },  taskOwner);
 	    
-	    /*
-	     * Store the ClientSessionServer proxy in the data store.
-	     */
+	    /* Store the ClientSessionServer proxy in the data store. */
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreClientSessionServiceProxy") {
 		    public void run() {
