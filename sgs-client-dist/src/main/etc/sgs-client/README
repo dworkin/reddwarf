@@ -43,7 +43,7 @@ processors:
 This distribution requires Java(TM) 2 Platform Standard Edition 5.0 or
 greater.
 
-It has been tested with version 1.5.0_16 of the J2SE(TM) Runtime
+It has been tested with version 1.5.0_17 of the J2SE(TM) Runtime
 Environment 5.0 on Solaris, Windows, and Linux platforms, and version
 1.5.0_13 on Mac OS X platforms.
 
@@ -77,4 +77,4 @@ information and to the Project Darkstar forums.
 If you cannot find an answer to your question in any of these places,
 please email the Darkstar team at:
 
-   ProjectDarkstar@games.dev.java.net
+   dev@games.dev.java.net
