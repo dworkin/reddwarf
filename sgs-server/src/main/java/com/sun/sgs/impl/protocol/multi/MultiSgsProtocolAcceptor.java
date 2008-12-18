@@ -96,7 +96,7 @@ public class MultiSgsProtocolAcceptor
     implements ProtocolAcceptor
 {
     /** The package name. */
-    public static final String PKG_NAME = "com.sun.sgs.impl.protocol.simple";
+    public static final String PKG_NAME = "com.sun.sgs.impl.protocol.multi";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
