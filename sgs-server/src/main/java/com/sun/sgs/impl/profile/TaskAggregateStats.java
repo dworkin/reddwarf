@@ -104,7 +104,11 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     // Need to determine what notifications make sense here and figure out
     // how to decide when they should be sent.
     // Also, perhaps JMX monitors would work better here?
-    public void notifyTaskQueue() {
+    /**
+     * Send a notification that the task queue is falling behind.  This
+     * method is not used yet.
+     */
+    void notifyTaskQueue() {
         sendNotification(
                 new Notification("com.sun.sgs.task.queue.behind",
                                  this,
