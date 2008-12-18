@@ -12,6 +12,7 @@ Version 0.9.8:
   - Decoupled API classes from implementation classes (issue #102)
   - Add support for pluggable behavior of AppContext with addition of
     com.sun.sgs.internal package (issue #101)
+  - Move API classes into separate sgs-server-api.jar file
 - Add profiling support for non-task related data (issue #111)
 - Remove dependency on Apache MINA and SLF4J
 - Restructure distribution (issue #103)
