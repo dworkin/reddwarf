@@ -32,7 +32,7 @@ import com.sun.sgs.profile.ProfileOperation;
  *
  * The Statistics MBean object for the watchdog service.
  */
-public class WatchdogServiceStats implements WatchdogServiceMXBean {
+class WatchdogServiceStats implements WatchdogServiceMXBean {
     // the profiled operations
     final ProfileOperation addNodeListenerOp;
     final ProfileOperation addRecoveryListenerOp;

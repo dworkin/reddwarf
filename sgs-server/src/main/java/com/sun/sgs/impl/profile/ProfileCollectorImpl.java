@@ -147,15 +147,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         
         registeredMBeans = new ConcurrentHashMap<String, Object>();
 
-        // Create the task aggregator, add it as a listener, and register
-        // it as an MBean.  We do this here so we can gather task data for
-        // all services that are started after us.
-//        TaskAggregate taskAgg = new TaskAggregate();
-//        addListener(taskAgg, true);
+        // Create the task aggregator MBean and register it, as well as
+        // the profile controller MBean.
         taskStats = new TaskAggregateStats(this,
                 CORE_CONSUMER_PREFIX + "TaskAggregateStats");
         try {
-//            registerMBean(taskAgg, TaskAggregate.MXBEAN_NAME);
             registerMBean(taskStats, TaskAggregateMXBean.MXBEAN_NAME);
             registerMBean(new ProfileController(this),
                           ProfileControllerMXBean.MXBEAN_NAME);
@@ -396,9 +392,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         profileReports.get().push(new ProfileReportImpl(task, owner,
                                                         scheduledStartTime,
                                                         readyCount));
-//        taskStats.numTasks.incrementCount();
-//        taskStats.readyCount.addSample(readyCount);
-//        taskStats.numReadyTasks.incrementCount(readyCount);
     }
 
     /**
@@ -537,25 +530,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 //            System.out.println("JANE ZERO RUNTIME " + 
 //                profileReport.getTask() + " started: "  + now);
 //        }
-//        // JANE probably want to encapsulate this neatly
-//        taskStats.numTasks.incrementCount();
-//        taskStats.readyCount.addSample(profileReport.readyCount);
-//        taskStats.numReadyTasks.incrementCount(profileReport.readyCount);
-//        if (successful) {
-//            taskStats.runtime.addSample(runtime);
-//            long lagtime = profileReport.actualStartTime -
-//                           profileReport.scheduledStartTime;
-//            taskStats.lagTime.addSample(lagtime);
-//        } else {
-//            taskStats.numFailedTasks.incrementCount();
-//        }
-        
-        
-//        taskStats.runtime.addSample(runtime);
-////        taskStats.failureRate.addSample(
-//////            taskStats.getTaskFailureCount() / taskStats.getTaskCount());
-////        (taskStats.getTaskFailureCount() * 100) / taskStats.getTaskCount());
-//        taskStats.lagTime.addSample(lagtime);
     }
 
     /**

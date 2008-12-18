@@ -40,7 +40,7 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
         ProfileConsumer consumer = 
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
                                   "ClientSessionService");
-        ProfileLevel level = ProfileLevel.MEDIUM;
+        ProfileLevel level = ProfileLevel.MAX;
         // Both of the operations are non-transactional
         ProfileDataType type = ProfileDataType.AGGREGATE;
         

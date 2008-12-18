@@ -24,8 +24,6 @@ import com.sun.sgs.management.ConfigMXBean;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * The configuration manager for this node.  This object is immutable

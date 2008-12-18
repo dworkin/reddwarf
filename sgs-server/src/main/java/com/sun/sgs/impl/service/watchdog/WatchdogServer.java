@@ -50,7 +50,8 @@ public interface WatchdogServer extends Remote {
      * @param	host  a host name
      * @param   port  a port number
      * @param	client a watchdog client
-     * @param   jmxPort the port JMX is listening on
+     * @param   jmxPort the port JMX is listening on, or -1 if JMX is not
+     *                   enabled for remote listening on the node
      *
      * @return 	an array containing two {@code long} values consisting of
      *		a unique node ID and a renew interval (in milliseconds)

@@ -40,7 +40,7 @@ class ChannelServiceStats implements ChannelServiceMXBean {
         ProfileConsumer consumer = 
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
                                   "ChannelService");
-        ProfileLevel level = ProfileLevel.MEDIUM;
+        ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
         
         // Manager operations

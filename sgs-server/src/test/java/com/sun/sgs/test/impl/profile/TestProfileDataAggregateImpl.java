@@ -194,7 +194,7 @@ public class TestProfileDataAggregateImpl {
    }
    
    @Test(expected=IllegalArgumentException.class)
-   public void testAggregateProfileBasdSmoothing() throws Exception {
+   public void testAggregateProfileBadSmoothing() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
         final AggregateProfileSample samp =

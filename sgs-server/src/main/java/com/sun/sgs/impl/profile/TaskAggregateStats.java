@@ -71,7 +71,10 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     TaskAggregateStats(ProfileCollector collector, String name) {
         ProfileConsumer consumer = collector.getConsumer(name);
 
-        ProfileLevel level = ProfileLevel.MIN;
+        // We could determine that some of these statistics need to be
+        // on all the time (level MIN) so we can use them for load balancing
+        // or because they are extremely useful.
+        ProfileLevel level = ProfileLevel.MEDIUM;
         // These statistics are reported to the profile reports
         // directly, with the ProfileCollector.
         // They should not be reported as TASK_AND_AGGREGATE because,
@@ -97,9 +100,10 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     }
     
     
-    // JANE THIS NEEDS TO CHANGE .  IMPLEMENT NOTIFY IN A BETTER WAY?
-    // OR JUST REMOVE?
-    /** {@inheritDoc} */
+    // This is how we'd send a notification - this is not yet well defined.
+    // Need to determine what notifications make sense here and figure out
+    // how to decide when they should be sent.
+    // Also, perhaps JMX monitors would work better here?
     public void notifyTaskQueue() {
         sendNotification(
                 new Notification("com.sun.sgs.task.queue.behind",
@@ -196,16 +200,12 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     // tasks complete
     void taskFinishedSuccess(boolean trans, long ready, long run, long lag) {
         taskFinishedCommon(trans, ready);  
-//        System.out.println("success: run " + run + ", lag " + lag + ", 
-//        latency " + (run + lag));
         if (startupLatch) {
             return;
         }
         runtime.addSample(run);
         lagtime.addSample(lag);
         latency.addSample(run + lag);
-//        System.out.println("   avgs: run " + runtime.getAverage() + ", lag "
-//        + lagtime.getAverage() + ", latency " + latency.getAverage());
 
     }
     void taskFinishedFail(boolean trans, long ready) {
