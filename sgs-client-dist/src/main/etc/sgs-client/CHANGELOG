@@ -1,3 +1,9 @@
+Version 0.9.8:
+- Ensure Java 5 compatibility (issue #7)
+- Refactored to use sgs-shared version 1.3 and inherit the com.sun.sgs.io
+  and com.sun.sgs.impl.io packages from the old version of sgs-shared
+- Also fixes issue #6
+
 Version 0.9.7:
 - Disconnect the client connection after a LOGIN_FAILURE,
   LOGIN_REDIRECT, or LOGOUT_SUCCESS message (issue #4)
