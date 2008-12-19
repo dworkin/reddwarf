@@ -48,7 +48,7 @@ class HelloUserSessionListener
     /** The session this {@code ClientSessionListener} is listening to. */
     private final ManagedReference<ClientSession> sessionRef;
     
-    /** The name of the {@code ClientSession} for this listener */
+    /** The name of the {@code ClientSession} for this listener. */
     private final String sessionName;
 
     /**
