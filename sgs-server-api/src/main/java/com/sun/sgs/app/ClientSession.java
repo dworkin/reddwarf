@@ -69,7 +69,6 @@ public interface ClientSession extends ManagedObject {
      *
      * @return	the name used to authenticate this session
      *
-     * @throws	IllegalStateException if this session is disconnected
      * @throws 	TransactionException if the operation failed because of
      * 		a problem with the current transaction
      */

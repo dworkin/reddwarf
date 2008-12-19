@@ -26,6 +26,13 @@ Version 0.9.8
 
 - Modify TransactionNotActiveException to implement ExceptionRetryStatus
 
+- Update behavior of getName methods for ClientSession and Channel
+
+  The following methods had IllegalStateException removed from their
+  throws clause:
+
+  - ClientSession.getName
+  - Channel.getName
 
 Version 0.9.6:
 
