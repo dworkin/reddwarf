@@ -294,7 +294,6 @@ public final class WatchdogServerImpl extends AbstractService implements
 	}
 	
 	checkExpirationThread.start();
-	System.err.println("-- server: done");
     }
 
     /** Calls NodeImpl.markAllNodesFailed. */
@@ -595,7 +594,7 @@ public final class WatchdogServerImpl extends AbstractService implements
 	    callFinished();
 	}
     }
-
+    
     /**
      * {@inheritDoc}
      */
@@ -612,8 +611,12 @@ public final class WatchdogServerImpl extends AbstractService implements
 	    return;
 	}
 	int count = maxNumberOfAttempts;
-	NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
-
+	NodeImpl remoteNode = aliveNodes.get(nodeId);
+	if (remoteNode == null) {
+	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
+		    "' is already reported as failed");
+	    return;
+	}
 	// Run the methods which declare the node as failed
 	processNodeFailure(remoteNode);
 
@@ -630,7 +633,6 @@ public final class WatchdogServerImpl extends AbstractService implements
 		// Try again
 
 	    } catch (Exception e) {
-		System.err.println("...SERVER:");
 		logger.log(Level.WARNING, "Unexpected exception thrown: {0}" +
 			e.getLocalizedMessage(), nodeId);
 	    }
@@ -644,22 +646,34 @@ public final class WatchdogServerImpl extends AbstractService implements
 		    "Could not retrieve watchdog client given " +
 			    maxNumberOfAttempts + " attempt(s)";
 	    logger.log(Level.WARNING, msg);
-	    throw new IOException(msg);
+	    // throw new IOException(msg);
 	}
     }
 
     /**
      * {@inheritDoc}
      */
-    public void setNodeAsFailed(long nodeId) throws IOException {
+    public void setNodeAsFailed(final long nodeId) throws IOException {
 	// We will only process if it is not being processed already
 	if (!aliveNodes.containsKey(nodeId)) {
 	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
 		    "' is already reported as failed");
 	    return;
 	}
-	NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
-	processNodeFailure(remoteNode);
+
+	try {
+	    final String instanceName = "ProcessingFailure";
+	    transactionScheduler.runTask(new AbstractKernelRunnable(
+		    instanceName) {
+		public void run() throws Exception {
+		    NodeImpl remoteNode =
+			    NodeImpl.getNode(dataService, nodeId);
+		    processNodeFailure(remoteNode);
+		}
+	    }, taskOwner);
+	} catch (Exception e) {
+	    logger.log(Level.FINEST, "Node could not be processed as failed");
+	}
     }
 
     /**

@@ -41,10 +41,8 @@ import junit.framework.TestCase;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
@@ -1277,33 +1275,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     /* --- test shutdown procedures --- */
     
-    /** Creates node properties with a db directory based on the app name. */
-    private Properties getPropsForShutdownTests(String appName)
-	throws Exception
-    {
-        String dir = System.getProperty("java.io.tmpdir") +
-            File.separator + appName + ".db";
-        Properties props =
-	    SgsTestNode.getDefaultProperties(appName, null, null);
-        props.setProperty(
-            "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-            dir);
-        props.setProperty(
-                StandardProperties.WATCHDOG_SERVICE,
-                WatchdogServiceImpl.class.getName());
-        
-        System.err.println("::"+props.getProperty(StandardProperties.WATCHDOG_SERVICE));
-        return props;
-    }
-    
-    
-    public void testLoop() throws Exception {
-	addNodes(null, 1);
-	System.err.println("::B");
-	//serverNode.shutdown(true);
-    }
-    
-    
     /** 
      * Check that a node can report a failure and become
      * shutdown
@@ -1319,181 +1290,118 @@ public class TestWatchdogServiceImpl extends TestCase {
         	DummyKernelShutdownController dummyCtrl = new DummyKernelShutdownController();
         	WatchdogServiceImpl watchdogService = new WatchdogServiceImpl(properties, systemRegistry, txnProxy, dummyCtrl);
         	
-        	// shutdown node
+        	// Report a failure, which should shutdown the node
         	watchdogService.reportFailure(appName,
         		WatchdogService.FailureLevel.FATAL);
-        	System.err.println("-- testReportFailure: successfully reported failure");
-        	// Node should not be alive since we reported a failure
 
-        	System.err.println("-- testReportFailure: asking if local node is alive");
+        	// Node should not be alive since we reported a failure
         	try {
         	    assertFalse(watchdogService.isLocalNodeAlive());
-        	} catch (IllegalStateException ise) {
-        	    // expected
         	} catch (Exception e) {
         	    fail("Not expecting an Exception: " + e.getLocalizedMessage());
         	}
         	
+        	// The shutdown controller should be incremented as a 
+        	// result of the failure being reported
         	assertEquals(1, dummyCtrl.getShutdownCount());
         	
-        	System.err.println("-- DONE");
 	} catch (Exception e) {
-	    System.err.println("-- problem....");
-	    e.printStackTrace();
-	    System.err.println("!! testReportFailure threw exception: " +
-		    e.getLocalizedMessage());
-	    
-	}
-	System.err.println("-- DONE..");
-    }
-   
-    
-    private static class SgsTestNode_Watchdog extends SgsTestNode {
-	final DummyKernelShutdownController ctrl;
-	
-	SgsTestNode_Watchdog(String appName,
-                Class<?> listenerClass,
-                Properties properties,
-                DummyKernelShutdownController ctrl) throws Exception {
-	    super(appName, listenerClass, properties);
-	    this.ctrl = ctrl;
-	}
-	
-	void shutdown() { 
-	    ctrl.shutdownNode();
+	    fail("Not expecting an Exception");
 	}
     }
-    
     
     /**
      * Check that a node can report a failure and become shutdown
      */
     public void testFailureDueToNoRenewal() throws Exception {
-
 	final String appName = "testFailureDueToNoRenewal";
-
-	// Make a watchdog service with a very small renew interval;
-	// this should cause the renew process to cause a shutdown
 	Properties properties = getPropsForApplication(appName);
-	//properties.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
-	//	"5000");
+	final SgsTestNode server = new SgsTestNode(appName, null, properties);
+	final SgsTestNode node = new SgsTestNode(server, null, null);
 	
-	SgsTestNode server = new SgsTestNode(appName, null, properties);
-	System.err.println("::A");
-	properties = getPropsForApplication(appName);
-	final SgsTestNode anotherNode = new SgsTestNode(server, null, properties);
-	System.err.println("::B");
-	//server.shutdown(true);
+	server.shutdown(true);
 	
-	System.err.println("server id: "+ server.getNodeId());
-	System.err.println("node id: "+ anotherNode.getNodeId());
-	
-	//server.shutdown(true);	<--- still problematic for some reason
-	
-	System.err.println("::C");
-	
-	// wait for the renew thread to fail, and check if
-	// the node is alive. Since the renew should fail,
-	// checking if it is alive should throw an
-	// IllegalStateException
-	Thread.sleep(1000);
+	// wait a bit for the shutdown to process and the renew to fail
+	Thread.sleep(2000);
 
 	try {
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-		    /*
-		     * Since this is commented out, the test should just exit
-		     * normally...
-		     */
-		    //anotherNode.getWatchdogService().isLocalNodeAlive();
-		}
-	    }, taskOwner);
-	    System.err.println("::D");
-	    //fail("Expecting IllegalStateException");
+	    System.err.println("Is node alive? " +
+		    node.getWatchdogService()
+			    .isLocalNodeAliveNonTransactional());
+	    fail ("Expecting an IllegalStateException");
 	} catch (IllegalStateException ise) {
-	    System.err.println("::E (good!)");
 	    // Expected
 	} catch (Exception e) {
-	    System.err.println("::F");
-	    e.printStackTrace();
-	    fail("Not expecting Exception:" + e.getLocalizedMessage());
-	} finally {
-	    //node.shutdown(true);
+	    fail ("Not expecting an Exception");
 	}
-	System.err.println("::G: done!");
-
     }
      
     
-    
-    
     /**
-     * Check that a node can report a failure and become shutdown 
+     * Check that a node can report a failure and become shutdown
      */
     	public void testReportRemoteFailure() throws Exception {
-    	System.err.println("000");
 	final String appName = "TestReportRemoteFailure_node";
 
 	try {
-	    /*
-	     * There appears to be a problem early on; the trace does not seem to
-	     * include '000' above, or 'a' below. Looks like it is hanging again,
-	     * but I am not using the server node. 
-	     */
-	    // instantiate the second node
-	    System.err.println("a");
-	    
-	    SgsTestNode server = new SgsTestNode(appName, null, getPropsForApplication(appName));
-	    SgsTestNode node = new SgsTestNode(server, null, getPropsForApplication(appName));
+	    // instantiate two nodes
+	    final SgsTestNode server = new SgsTestNode(appName, null, getPropsForApplication(appName));
+	    final SgsTestNode node = new SgsTestNode(server, null, null);
 
 	    // report that the second node failed
-	    System.err.println("svr node id: " + server.getNodeId());
-	    System.err.println("new node id: " + node.getNodeId());
+	    System.err.println("server node id: " + server.getNodeId());
+	    System.err.println("   new node id: " + node.getNodeId());
 	    
-	    
-	    watchdogService.reportFailure(node.getNodeId(), this.getName(),
+	    server.getWatchdogService().reportFailure(node.getNodeId(), this.getName(),
 		    WatchdogService.FailureLevel.FATAL);
-	    System.err
-		    .println("testReportRemoteFailure: after reporting failure");
+	    
 	    // This node should be unaffected
-//	    assertTrue(server.getWatchdogService().isLocalNodeAlive());
-//	    System.err
-//		    .println("testReportRemoteFailure: node of watchdog is alive");
-	    // This node should have failed
+	    TransactionScheduler sched = server.getSystemRegistry().getComponent(TransactionScheduler.class);
+            Identity own = server.getProxy().getCurrentOwner();
+            sched.runTask(new TestAbstractKernelRunnable() {
+                public void run() throws Exception {
+                    if (! server.getWatchdogService().isLocalNodeAlive()) {
+                        fail("Expected watchdogService.isLocalNodeAlive() " +
+                              "to return true");
+                    }
+                }
+            }, own);
+	    
 	    try {
-//		boolean alive = node.getWatchdogService().isLocalNodeAlive();
-//		System.err.println("is node 2 alive? : " + alive);
+		// This node should have failed
+		sched = node.getSystemRegistry().getComponent(TransactionScheduler.class);
+	            own = node.getProxy().getCurrentOwner();
+	            sched.runTask(new TestAbstractKernelRunnable() {
+	                public void run() throws Exception {
+	                    if (node.getWatchdogService().isLocalNodeAlive()) {
+	                        fail("Expected watchdogService.isLocalNodeAlive() " +
+	                              "to return false");
+	                    }
+	                }
+	            }, own);
 	    } catch (IllegalStateException ise) {
 		// expected
 	    } catch (Exception e) {
-		e.printStackTrace();
+		fail("Not expecting an Exception (1)");
 	    }
-	    System.err.println("done!");
 	} catch (Exception e) {
-	    System.err.println("problem");
-	    e.printStackTrace();
-	} finally {
-	//    if (node != null) {
-	//	node.shutdown(true);
-	//  }
-	}
-	System.err.println("done");
+	    fail("Not expecting an Exception (2)");
+	} 
     }
-    
     
     
     
     /**
      * Check that a server can report a failure and cause it to become
-     * shutdown
+     * shutdown.
+     * 
+     * TODO: At the moment, this test is not functioning as expected.
+     * The ideal behavior is to have the server realize a problem and
+     * issue a shutdown of the remote node.
      
     public void testFailureServerSide() {
 	try {
 	    final String appName = "testFailureServerSide";
-
-	    // Make a watchdog service with a very small renew interval;
-	    // this should cause the renew process to cause a shutdown
-	    WatchdogServiceImpl watchdog = null;
 	    Properties properties =
 		    createProperties(StandardProperties.APP_NAME, appName,
 			    StandardProperties.APP_PORT, "20000",
@@ -1504,49 +1412,36 @@ public class TestWatchdogServiceImpl extends TestCase {
 
 	    NodeMappingServerImpl nodeMappingServer = null;
 	    try {
-		System.err.println("-- A");
 		// Set up the node mapping server and give it a removable
 		// identity
-		
-		
 		nodeMappingServer =
 			new NodeMappingServerImpl(properties, systemRegistry,
 				txnProxy);
-		System.err.println("-- B");
 		nodeMappingServer.canRemove(new IdentityImpl(appName +
 			"_identity"));
-		System.err.println("-- C");
 	    } catch (IllegalArgumentException e) {
-		System.err.println("-- illegal arg:" + e.getLocalizedMessage());
 		fail("Unexpected IllegalArgumentException: " +
 			e.getLocalizedMessage());
-	    } finally {
-		if (watchdog != null)
-		    watchdog.shutdown();
-	    }
-	    System.err.println("-- D");
+	    } 
+	    
 	    // wait for NodeMappingServerImpl.RemoveThread.run() to run
 	    Thread.sleep(3000);
 	    try {
 		
-		watchdogService.isLocalNodeAlive();
+		// TODO: in here, check if a remote node was successfully
+		// shutdown by the node mapping server
 		
-		
-		System.err.println("-- E");
 		fail("Expecting IllegalStateException");
 	    } catch (IllegalStateException ise) {
-		System.err.println("-- F");
 		// Expected
 	    } catch (Exception e) {
-		System.err.println("-- G: " + e.getLocalizedMessage());
-		fail("Not expecting Exception:" + e.getLocalizedMessage());
+		fail("Not expecting Exception (1)");
 	    }
 	} catch (Exception e) {
-	    e.printStackTrace();
+	    fail("Not expecting Exception (2)");
 	}
-	System.err.println("-- H");
     }
-     */
+    */
     
     
     /** Creates node properties with a db directory based on the app name. */

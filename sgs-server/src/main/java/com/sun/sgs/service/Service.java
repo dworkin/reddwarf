@@ -53,7 +53,7 @@ package com.sun.sgs.service;
  * it may do so by calling {@code TransactionScheduler.runTask}.
  */
 public interface Service {
-    static final int DEFAULT_MAX_IO_ATTEMPTS = 25; 
+    static final int DEFAULT_MAX_IO_ATTEMPTS = 5; 
 
     /**
      * Returns the name used to identify this service.
