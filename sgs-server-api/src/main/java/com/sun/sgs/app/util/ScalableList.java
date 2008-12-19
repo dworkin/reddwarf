@@ -1419,10 +1419,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * Increments the number of children and size, and determines whether
 	 * the parent should do both, or just perform an increment of the
 	 * size.
-	 * 
-	 * @return the operation corresponding to the next recursive operation
-	 * to perform. The byte can be looked-up in the {@code TreeNode}
-	 * static fields.
 	 */
 	void incrementChildrenAndSize() {
 	    AppContext.getDataManager().markForUpdate(this);
@@ -1462,10 +1458,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	/**
 	 * Decrements the number of children and size, and determines whether
 	 * the parent should do both again, or just decrement the size.
-	 * 
-	 * @return the operation corresponding to the next recursive operation
-	 * to perform. The byte can be looked-up in the {@code TreeNode}
-	 * static fields.
 	 */
 	void decrementChildrenAndSize() {
 	    TreeNode<E> parent = getParent();
@@ -1893,7 +1885,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * Constructor used to create a {@code ScalableListIterator} for the
 	 * underlying elements in the {@code ScalableList}.
 	 * 
-	 * @param head the head {@code ListNode} of the collection
+	 * @param list the {@code ScalableList} over which to iterate
 	 */
 	ScalableIterator(ScalableList<E> list) {
 	    this(list, list.getHead());
@@ -2140,7 +2132,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * Constructor which starts the iterations at the specified
 	 * {@code ListNode}.
 	 * 
-	 * @param listNode the starting {@code ListNode}
+	 * @param list the {@code ScalableList} over which to iterate
 	 */
 	ScalableListIterator(ScalableList<E> list) {
 	    super(list);
@@ -2325,7 +2317,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * operation). This process will automatically remove the old element
 	 * from the data manager if it was not a {@code ManagedObject}.
 	 * 
-	 * @param e the element with which to replace the last element
+	 * @param o the element with which to replace the last element
 	 * returned by <tt>next</tt> or <tt>previous</tt>.
 	 * @throws IllegalStateException if the operation is called without
 	 * {@code next} or {@code previous} being called
@@ -2415,7 +2407,7 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * returned by a call to <tt>nextIndex</tt> or
 	 * <tt>previousIndex</tt>.)
 	 * 
-	 * @param e the element to insert.
+	 * @param o the element to insert.
 	 * @throws IndexOutOfBoundsException if the index which the element is
 	 * to be added is out of bounds
 	 */
@@ -2622,8 +2614,6 @@ public class ScalableList<E> extends AbstractList<E> implements Serializable,
 	 * necessary.
 	 * 
 	 * @param e the element to append
-	 * @return whether the operation was successful; {@code true} if so,
-	 * {@code false} otherwise
 	 */
 	void append(E e) {
 	    getSubList().append(e);
