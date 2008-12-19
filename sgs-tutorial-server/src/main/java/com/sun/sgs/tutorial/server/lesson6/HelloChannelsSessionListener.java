@@ -51,6 +51,9 @@ class HelloChannelsSessionListener
 
     /** The session this {@code ClientSessionListener} is listening to. */
     private final ManagedReference<ClientSession> sessionRef;
+    
+    /** The name of the {@code ClientSession} for this listener */
+    private final String sessionName;
 
     /**
      * Creates a new {@code HelloChannelsSessionListener} for the session.
@@ -66,6 +69,7 @@ class HelloChannelsSessionListener
 
         DataManager dataMgr = AppContext.getDataManager();
         sessionRef = dataMgr.createReference(session);
+        sessionName = session.getName();
         
         // Join the session to all channels.  We obtain the channel
         // in two different ways, by reference and by name.
@@ -96,7 +100,6 @@ class HelloChannelsSessionListener
      */
     public void receivedMessage(ByteBuffer message) {
         ClientSession session = getSession();
-        String sessionName = session.getName();
 
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE, "Message from {0}", sessionName);
@@ -110,11 +113,10 @@ class HelloChannelsSessionListener
      * Logs when the client disconnects.
      */
     public void disconnected(boolean graceful) {
-        ClientSession session = getSession();
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO,
             "User {0} has logged out {1}",
-            new Object[] { session.getName(), grace }
+            new Object[] { sessionName, grace }
         );
     }
 }
