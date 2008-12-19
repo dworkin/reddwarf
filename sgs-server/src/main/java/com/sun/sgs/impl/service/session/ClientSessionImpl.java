@@ -155,6 +155,9 @@ public class ClientSessionImpl
 
     /** {@inheritDoc} */
     public String getName() {
+	if (!isConnected()) {
+	    throw new IllegalStateException("client session is not connected");
+	}
         String name = identity.getName();
 	return name;
     }

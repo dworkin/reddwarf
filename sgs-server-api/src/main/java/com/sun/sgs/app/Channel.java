@@ -69,6 +69,7 @@ public interface Channel extends ManagedObject {
      *
      * @return the name bound to this channel
      *
+     * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
