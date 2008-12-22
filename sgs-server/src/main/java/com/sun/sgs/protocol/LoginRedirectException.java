@@ -20,6 +20,7 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.service.Node;
+import java.util.Collection;
 
 /**
  * An exception that indicates a login should be redirected to the node
@@ -32,26 +33,40 @@ public class LoginRedirectException extends Exception {
     /** The serial version for this class. */
     private static final long serialVersionUID = 1L;
 
+    /** The node. */
     private final Node node;
 
+    /** The protocol descriptors for the {@code node}. */
+    private final Collection<ProtocolDescriptor> descriptors;
+
     /**
-     * Constructs and instance with the specified {@code node}.
+     * Constructs and instance with the specified {@code node} and
+     * protocol {@code descriptors}.
      *
      * @param	node a node
+     * @param	descriptors a collection of protocol descriptors
+     *		supported by the specified {@code node}, or {@code null}
      */
-    public LoginRedirectException(Node node) {
-	this(node, null);
+    public LoginRedirectException(
+	Node node, Collection<ProtocolDescriptor> descriptors)
+    {
+	this(node, descriptors, null);
     }
     
     /**
-     * Constructs and instance with the specified {@code node} and detail
-     * {@code message}.
+     * Constructs and instance with the specified {@code node}, {@code
+     * descriptors} and detail {@code message}.
      *
      * @param	node a node
+     * @param	descriptors a collection of protocol descriptors
+     *		supported by the specified {@code node}, or {@code null}
      * @param	message a detail message, or {@code null}
      */
-    public LoginRedirectException(Node node, String message) {
-	this(node, message, null);
+    public LoginRedirectException(
+	Node node, Collection<ProtocolDescriptor> descriptors,
+	String message)
+    {
+	this(node, descriptors, message, null);
     }
     
     /**
@@ -59,15 +74,21 @@ public class LoginRedirectException extends Exception {
      * {@code message}, and {@code cause}.
      *
      * @param	node a node
+     * @param	descriptors a collection of protocol descriptors
+     *		supported by the specified {@code node}, or {@code null}
      * @param	message a detail message, or {@code null}
      * @param	cause the cause of this exception, or {@code null}
      */
-    public LoginRedirectException(Node node, String message, Throwable cause) {
+    public LoginRedirectException(
+	Node node, Collection<ProtocolDescriptor> descriptors,
+	String message, Throwable cause)
+    {
 	super(message, cause);
 	if (node == null) {
 	    throw new NullPointerException("null node");
 	}
 	this.node = node;
+	this.descriptors = descriptors;
     }
 
     /**
@@ -77,5 +98,16 @@ public class LoginRedirectException extends Exception {
      */
     public Node getNode() {
 	return node;
+    }
+    
+    /**
+     * Returns a collection of protocol descriptors supported by
+     * the node returned by {@link #getNode getNode}, or {@code
+     * null} if the node has no protocol descriptors
+     *
+     * @return	a collection of protocol descriptors, or {@code null}
+     */
+    public Collection<ProtocolDescriptor> getProtocolDescriptors() {
+	return descriptors;
     }
 }

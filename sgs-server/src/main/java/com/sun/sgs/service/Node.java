@@ -48,23 +48,4 @@ public interface Node {
      * 		otherwise
      */
     boolean isAlive();
-    
-    /**
-     * Returns the set of protocol descriptors that represent the
-     * protocols listening for client connections on this
-     * node. {@code null} is returned if this is not an application node.
-     * 
-     * @return the set of transport descriptors or {@code null}
-     */
-    ProtocolDescriptor[] getClientListeners();
-    
-    /**
-     * Sets the set of protocol listening for client connections on this node.
-     * Once this method is called any further invocations will throw an
-     * {@code IllegalStateException}.
-     * 
-     * @param descriptors set of transport descriptors
-     */
-    void setClientListener(ProtocolDescriptor[] descriptors);
-
 }

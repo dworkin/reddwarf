@@ -19,7 +19,6 @@
 
 package com.sun.sgs.protocol;
 
-import com.sun.sgs.service.ProtocolDescriptor;
 import java.io.IOException;
 
 /**

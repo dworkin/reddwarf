@@ -24,6 +24,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
@@ -43,6 +44,7 @@ import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.ProtocolAcceptor;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -51,7 +53,6 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingService;
-import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TaskService;
@@ -65,6 +66,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -108,6 +110,10 @@ public final class ClientSessionServiceImpl
 
     /** The name of the version key. */
     private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The name of the key for the protocol descriptors map. */
+    private static final String PROTOCOL_DESCRIPTORS_MAP_KEY =
+	PKG_NAME + ".service.protocolDescriptorsMap";
 
     /** The major version. */
     private static final int MAJOR_VERSION = 1;
@@ -336,20 +342,6 @@ public final class ClientSessionServiceImpl
 		throw (Exception) ite.getCause();
 	    }
             
-            final ProtocolDescriptor[] descriptors = new ProtocolDescriptor[1];
-            
-            descriptors[0] = protocolAcceptor.getDescriptor();
-
-            transactionScheduler.runTask(
-                new AbstractKernelRunnable("UpdateNode") {
-		    public void run() {
-                        Node node =
-                                watchdogService.getNodeForUpdate(localNodeId);
-                        assert node != null;
-                        node.setClientListener(descriptors);
-                    } },
-                    taskOwner);
-	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -385,6 +377,16 @@ public final class ClientSessionServiceImpl
 	    }
 	    throw e;
 	}
+	
+	transactionScheduler.runTask(
+            new AbstractKernelRunnable("AddProtocolDescriptorMapping") {
+		public void run() {
+		    getProtocolDescriptorsMap().
+			put(localNodeId,
+			    Collections.singleton(
+				protocolAcceptor.getDescriptor()));
+		} },
+	    taskOwner);
     }
 
     /** {@inheritDoc} */
@@ -1212,10 +1214,12 @@ public final class ClientSessionServiceImpl
 				
 			    /*
 			     * Remove client session server proxy and
-			     * associated binding for failed node.
+			     * associated binding for failed node, as
+			     * well as protocol descriptors for the
+			     * failed node.
 			     */
 			    taskService.scheduleTask(
-				new RemoveClientSessionServerProxyTask(nodeId));
+				new RemoveNodeSpecificDataTask(nodeId));
 			} },
 		    taskOwner);
 					     
@@ -1232,10 +1236,10 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * A persistent task to remove the client session server proxy for a
-     * specified node.
+     * A persistent task to remove the client session server proxy
+     * and protocol descriptors for a failed node.
      */
-    private static class RemoveClientSessionServerProxyTask
+    private static class RemoveNodeSpecificDataTask
 	 implements Task, Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -1248,12 +1252,13 @@ public final class ClientSessionServiceImpl
 	 * Constructs an instance of this class with the specified
 	 * {@code nodeId}.
 	 */
-	RemoveClientSessionServerProxyTask(long nodeId) {
+	RemoveNodeSpecificDataTask(long nodeId) {
 	    this.nodeId = nodeId;
 	}
 
 	/**
-	 * Removes the client session server proxy and binding for the node
+	 * Removes the client session server proxy and binding and
+	 * also removes the protocol descriptors for the node
 	 * specified during construction.
 	 */
 	public void run() {
@@ -1262,6 +1267,7 @@ public final class ClientSessionServiceImpl
 	    try {
 		dataService.removeObject(
 		    dataService.getServiceBinding(sessionServerKey));
+		getProtocolDescriptorsMap().remove(nodeId);
 	    } catch (NameNotBoundException e) {
 		// already removed
 		return;
@@ -1269,6 +1275,66 @@ public final class ClientSessionServiceImpl
 	    }
 	    dataService.removeServiceBinding(sessionServerKey);
 	}
+    }
+
+    /**
+     * Returns a collection of protocol descriptors for the specified
+     * {@code nodeId}, or {@code null} if there are no descriptors
+     * for the node.  This method must be run outside a transaction.
+     */
+    Collection<ProtocolDescriptor> getProtocolDescriptors(long nodeId) {
+	checkNonTransactionalContext();
+	GetProtocolDescriptorsTask protocolDescriptorsTask =
+	    new GetProtocolDescriptorsTask(nodeId);
+	try {
+	    transactionScheduler.runTask(protocolDescriptorsTask, taskOwner);
+	    return protocolDescriptorsTask.descriptors;
+	} catch (Exception e) {
+	    return null;
+	}
+    }
+
+    /**
+     * A task to obtain the protocol descriptors for a given node.
+     */
+    private static class GetProtocolDescriptorsTask
+	extends AbstractKernelRunnable
+    {
+	private final long nodeId;
+	volatile Collection<ProtocolDescriptor> descriptors = null;
+
+	/** Constructs an instance with the specified {@code nodeId}. */
+	GetProtocolDescriptorsTask(long nodeId) {
+	    super(null);
+	    this.nodeId = nodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    descriptors = getProtocolDescriptorsMap().get(nodeId);
+	}
+    }
+
+    /**
+     * Returns the protocol descriptors map, keyed by node ID.  Creates and
+     * stores the map if it doesn't already exist.  This method must be run
+     * within a transaction.
+     */
+    private static Map<Long, Collection<ProtocolDescriptor>>
+	getProtocolDescriptorsMap()
+    {
+	DataService dataService = getDataService();
+	Map<Long, Collection<ProtocolDescriptor>> protocolDescriptorsMap;
+	try {
+	    protocolDescriptorsMap = uncheckedCast(
+		dataService.getServiceBinding(PROTOCOL_DESCRIPTORS_MAP_KEY));
+	} catch (NameNotBoundException e) {
+	    protocolDescriptorsMap =
+		new ScalableHashMap<Long, Collection<ProtocolDescriptor>>();
+	    dataService.setServiceBinding(PROTOCOL_DESCRIPTORS_MAP_KEY,
+					  protocolDescriptorsMap);
+	}
+	return protocolDescriptorsMap;
     }
 }
 

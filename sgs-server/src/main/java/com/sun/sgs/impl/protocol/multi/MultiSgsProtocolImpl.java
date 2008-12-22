@@ -35,10 +35,10 @@ import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
-import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.Node;
 import java.io.IOException;
@@ -46,6 +46,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -286,11 +287,12 @@ class MultiSgsProtocolImpl implements SessionProtocol {
      *
      * @param	node a node to redirect the login
      */
-    public void loginRedirect(Node node) {
-        ProtocolDescriptor[] descriptors = node.getClientListeners();
+    public void loginRedirect(
+	Node node, Collection<ProtocolDescriptor> descriptors)
+    {
         for (ProtocolDescriptor descriptor : descriptors) {
-            if (acceptor.getDescriptor().isCompatibleWith(descriptor)) {
-                loginRedirect((MultiSgsProtocolDescriptor)descriptor);
+            if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
+                loginRedirect((MultiSgsProtocolDescriptor) descriptor);
                 return;
             }
         }
@@ -852,8 +854,17 @@ class MultiSgsProtocolImpl implements SessionProtocol {
 		Throwable cause = e.getCause();
 		if (cause instanceof LoginRedirectException) {
 		    // redirect
-		    Node node = ((LoginRedirectException) cause).getNode();
-		    loginRedirect(node);
+		    LoginRedirectException redirectException =
+			(LoginRedirectException) cause;
+		    Node node = redirectException.getNode();
+		    Collection<ProtocolDescriptor> descriptors =
+			redirectException.getProtocolDescriptors();
+		    if (descriptors != null) {
+			loginRedirect(node, descriptors);
+		    } else {
+			loginFailure(
+			    "unable to redirect to node: " + node, cause);
+		    }
 		} else if (cause instanceof LoginFailureException) {
 		    loginFailure(cause.getMessage(), cause.getCause());
 		} else {

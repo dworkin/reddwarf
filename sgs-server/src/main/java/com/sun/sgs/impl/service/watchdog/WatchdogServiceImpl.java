@@ -445,16 +445,6 @@ public final class WatchdogServiceImpl
     }
 
     /** {@inheritDoc} */
-    @Override
-    public Node getNodeForUpdate(long nodeId) {
-	checkState();
-	if (nodeId < 0) {
-	    throw new IllegalArgumentException("invalid nodeId: " + nodeId);
-	}
-	return NodeImpl.getNodeForUpdate(dataService, nodeId);
-    }
-    
-    /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
 	checkState();
 	if (listener == null) {

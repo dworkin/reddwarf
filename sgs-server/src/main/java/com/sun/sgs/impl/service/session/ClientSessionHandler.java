@@ -33,6 +33,7 @@ import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginFailureException.FailureReason;
 import com.sun.sgs.protocol.LoginRedirectException;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
@@ -41,6 +42,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -991,8 +993,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    if (node == null) {
 		throw new NullPointerException("null node");
 	    }
+
+	    Collection<ProtocolDescriptor> descriptors =
+		ClientSessionServiceImpl.getInstance().
+		    getProtocolDescriptors(node.getId());
 	    synchronized (lock) {
-		exceptionCause = new LoginRedirectException(node);
+		exceptionCause = new LoginRedirectException(node, descriptors);
 		done = true;
 		lock.notifyAll();
 	    }

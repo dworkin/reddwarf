@@ -19,37 +19,47 @@
 
 package com.sun.sgs.impl.protocol.simple;
 
-import com.sun.sgs.service.ProtocolDescriptor;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 
 /**
- * Base protocol descriptor class. A protocol may use this class directly
- * or extend it, overriding methods for transport specific needs. For delivery
- * related methods, {@code getSupportedDelivery} and {@code canSupport}
- * this class defers to the transport descriptor.
+ * A protocol descriptor with an underlying transport descriptor. A
+ * protocol may use this class directly or extend it, overriding methods
+ * for protocol and/or transport-specific needs.
  */
 class SimpleSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
+    
     private static final long serialVersionUID = 1L;
 
+    /** The transport descriptor for this protocol. */
     final TransportDescriptor transportDesc;   
         
     /**
-     * Constructor.
-     * @param transportDesc transport descriptor
+     * Constructs an instance with the specified transport descriptor.
+     *
+     * @param	transportDesc transport descriptor
      */
     SimpleSgsProtocolDescriptor(TransportDescriptor transportDesc) {
         assert transportDesc != null;
         this.transportDesc = transportDesc;
     }
 
+    /** {@inheritDoc}
+     *
+     * <p>This implementation returns {@code true} if the specified {@code
+     * descriptor} is an instance of this class and this descriptor's
+     * underlying transport descriptor is compatible with the specified
+     * {@code descriptor}'s transport descriptor.
+     */
     @Override
-    public boolean isCompatibleWith(ProtocolDescriptor descriptor) {
-        if (!(descriptor instanceof SimpleSgsProtocolDescriptor))
+    public boolean supportsProtocol(ProtocolDescriptor descriptor) {
+        if (!(descriptor instanceof SimpleSgsProtocolDescriptor)) {
             return false;
+	}
         
         SimpleSgsProtocolDescriptor desc =
-                            (SimpleSgsProtocolDescriptor)descriptor;
+	    (SimpleSgsProtocolDescriptor) descriptor;
         
         return transportDesc.isCompatibleWith(desc.transportDesc);
     }

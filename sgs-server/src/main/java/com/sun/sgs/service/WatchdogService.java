@@ -94,22 +94,6 @@ public interface WatchdogService extends Service {
     Node getNode(long nodeId);
 
     /**
-     * Returns node status information for the node with the specified
-     * {@code nodeId} with the intent to update. {@code null} is returned
-     * if the node is unknown.  This method must only be called within a
-     * transaction.
-     *
-     * @param	nodeId	a node ID
-     * @return	node status information for the specified {@code nodeId},
-     *		or {@code null}
-     * @throws	IllegalArgumentException if the specified {@code nodeId}
-     *		is not within the range of valid IDs
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    Node getNodeForUpdate(long nodeId);
-    
-    /**
      * Returns the node that is designated as the backup for the node
      * with the specified {@code nodeId}, or {@code null} if no backup
      * is currently designated.  This method must be called within a
@@ -153,6 +137,4 @@ public interface WatchdogService extends Service {
      * @param	listener a recovery listener
      */
     void addRecoveryListener(RecoveryListener listener);
-
-    
 }

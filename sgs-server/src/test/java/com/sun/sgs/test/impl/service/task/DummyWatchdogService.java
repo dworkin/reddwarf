@@ -21,7 +21,6 @@ package com.sun.sgs.test.impl.service.task;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
-import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
@@ -117,11 +116,6 @@ public class DummyWatchdogService implements WatchdogService {
         return node;
     }
 
-    @Override
-    public Node getNodeForUpdate(long nodeId) {
-        return getNode(nodeId);
-    }
-        
     /** {@inheritDoc} */
     public void addNodeListener(NodeListener listener) {
         listeners.add(listener);
@@ -146,7 +140,7 @@ public class DummyWatchdogService implements WatchdogService {
     /** A basic, private implementation of Node. */
     private class NodeImpl implements Node {
         private final long nodeId;
-        private ProtocolDescriptor[] descriptors = null;
+
         NodeImpl(long nodeId) {
             this.nodeId = nodeId;
         }
@@ -161,16 +155,6 @@ public class DummyWatchdogService implements WatchdogService {
         }
         public boolean isAlive() {
             return isLocalNodeAlive();
-        }
-
-        @Override
-        public ProtocolDescriptor[] getClientListeners() {
-            return descriptors;
-        }
-
-        @Override
-        public void setClientListener(ProtocolDescriptor[] descriptors) {
-            this.descriptors = descriptors;
         }
     }
 }

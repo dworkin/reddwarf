@@ -526,6 +526,17 @@ public abstract class AbstractService implements Service {
     }
     
     /**
+     * Avoids warnings about unchecked casts.
+     *
+     * @param	object the object to cast
+     * @return	the object, cast without warnings
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T uncheckedCast(Object object) {
+        return (T) object;
+    }
+     
+   /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
      */   
@@ -615,7 +626,7 @@ public abstract class AbstractService implements Service {
      * and throws {@code IllegalStateException} if the thread is in a
      * transactional context.
      */
-    private void checkNonTransactionalContext() {
+    protected void checkNonTransactionalContext() {
 	try {
 	    txnProxy.getCurrentTransaction();
 	    throw new IllegalStateException(

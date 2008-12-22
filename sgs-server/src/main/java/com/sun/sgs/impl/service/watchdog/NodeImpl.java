@@ -23,7 +23,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
-import com.sun.sgs.service.ProtocolDescriptor;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.Serializable;
@@ -62,9 +61,6 @@ class NodeImpl
     /** The host name, or {@code null}. */
     private final String host;
     
-    /** The client listeners set, or {@code null} if not an application node. */
-    private ProtocolDescriptor[] clientListeners = null;
-
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
     
@@ -162,21 +158,6 @@ class NodeImpl
 	return host;
     }
     
-    /** {@inheritDoc} */
-    @Override
-    public ProtocolDescriptor[] getClientListeners() {
-        return clientListeners;
-    }
-    
-    /** {@inheritDoc} */
-    @Override
-    public synchronized void setClientListener(ProtocolDescriptor[] descriptors)
-    {
-        if (clientListeners != null)
-            throw new IllegalStateException("client listeners already set");
-        clientListeners = descriptors;
-    }
-
     /** {@inheritDoc} */
     public synchronized boolean isAlive() {
 	return isAlive;

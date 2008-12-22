@@ -19,26 +19,30 @@
 
 package com.sun.sgs.impl.protocol.multi;
 
-import com.sun.sgs.service.ProtocolDescriptor;
+import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
 
 /**
- * Base protocol descriptor class. A protocol may use this class directly
- * or extend it, overriding methods for transport specific needs. For delivery
- * related methods, {@code getSupportedDelivery} and {@code canSupport}
- * this class defers to the transport descriptor.
+ * A protocol descriptor with primary and secondary transport descriptors.
+ * A protocol may use this class directly or extend it, overriding methods
+ * for protocol and/or transport-specific needs.
  */
 class MultiSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
+    
     private static final long serialVersionUID = 1L;
 
+    /** The primary transport descriptor. */
     final TransportDescriptor primaryDesc;
     
+    /** The secondary transport descriptor. */
     final TransportDescriptor secondaryDesc;   
 
     /**
-     * Constructor.
-     * @param transportDesc transport descriptor
+     * Constructs an instance with the given transport descriptors.
+     *
+     * @param	primaryDesc primary transport descriptor
+     * @param	secondaryDesc secondary transport descriptor
      */
     MultiSgsProtocolDescriptor(TransportDescriptor primaryDesc,
                                TransportDescriptor secondaryDesc)
@@ -49,13 +53,22 @@ class MultiSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
         this.secondaryDesc = secondaryDesc;
     }
 
+    /** {@inheritDoc}
+     *
+     * <p>This implementation returns {@code true} if the specified {@code
+     * descriptor} is an instance of this class and this descriptor's
+     * underlying primary and secondary transport descriptors are
+     * compatible with (respectively) the specified {@code descriptor}'s
+     * primary and secondary transport descriptors.
+     */
     @Override
-    public boolean isCompatibleWith(ProtocolDescriptor descriptor) {
-        if (!(descriptor instanceof MultiSgsProtocolDescriptor))
+    public boolean supportsProtocol(ProtocolDescriptor descriptor) {
+        if (!(descriptor instanceof MultiSgsProtocolDescriptor)) {
             return false;
+	}
         
         MultiSgsProtocolDescriptor desc =
-                            (MultiSgsProtocolDescriptor)descriptor;
+	    (MultiSgsProtocolDescriptor) descriptor;
         
         return primaryDesc.isCompatibleWith(desc.primaryDesc) &&
                secondaryDesc.isCompatibleWith(desc.secondaryDesc);
