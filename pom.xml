@@ -181,6 +181,8 @@
     <sgs.version>${version}</sgs.version>
     <sgs-shared.version>1.3</sgs-shared.version>
     <sgs-client.version>0.9.8</sgs-client.version>
+    <bdb.version>4.5.20</bdb.version>
+    <bdb.je.version>3.2.76</bdb.je.version>
   </properties>
 
 </project>
