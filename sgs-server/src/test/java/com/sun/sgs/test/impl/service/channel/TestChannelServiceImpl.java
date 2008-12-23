@@ -1151,11 +1151,12 @@ public class TestChannelServiceImpl extends TestCase {
 	    printServiceBindings();
 	    // nuke non-coordinator node
 	    System.err.println("shutting down node: " + otherHost);
+	    int otherHostPort = additionalNodes.get(otherHost).getAppPort();
 	    shutdownNode(otherHost);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
-		group.removeSessionsFromGroup(otherHost);
+		group.removeSessionsFromGroup(otherHostPort);
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
 	    for (String channelName : channelNames) {
@@ -1196,11 +1197,13 @@ public class TestChannelServiceImpl extends TestCase {
 	    printServiceBindings();
 	    // nuke coordinator node
 	    System.err.println("shutting down node: " + coordinatorHost);
+	    int coordinatorHostPort =
+		additionalNodes.get(coordinatorHost).getAppPort();
 	    shutdownNode(coordinatorHost);
 	    // remove disconnected sessions from client group
 	    System.err.println("remove disconnected sessions");
 	    ClientGroup disconnectedSessionsGroup =
-		group.removeSessionsFromGroup(coordinatorHost);
+		group.removeSessionsFromGroup(coordinatorHostPort);
 	    // send messages to sessions that are left
 	    System.err.println("send messages to remaining members");
 	    for (String channelName : channelNames) {
@@ -1609,7 +1612,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    client.disconnect();
 	}
     }
-    
+
     // -- END TEST CASES --
 
     private class ClientGroup {
@@ -1646,9 +1649,9 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
-	// Removes the client sessions on the given host from  this group
+	// Removes the client sessions on the given host from this group
 	// and returns a ClientGroup with the removed sessions.
-	ClientGroup removeSessionsFromGroup(String host) {
+	ClientGroup removeSessionsFromGroup(int port) {
 	    Iterator<String> iter = clients.keySet().iterator();
 	    Map<String, DummyClient> removedClients =
 		new HashMap<String, DummyClient>();
@@ -1656,13 +1659,14 @@ public class TestChannelServiceImpl extends TestCase {
 		String user = iter.next();
 		DummyClient client = clients.get(user);
 		System.err.println("user: " + user +
-				   ", redirectHost: " + client.redirectHost);
-                // Note that the redirectHost can sometimes be null,
+				   ", redirectHost: " + client.redirectHost +
+				   ", redirectPort: " + client.redirectPort);
+                // Note that the redirectPort can sometimes be zero,
                 // as it won't be assigned if the initial login request
-                // was successful.  That would occur if the initial node 
-                // assignment for the client is the localhost, where the
-                // serverNode is running.
-		if (host.equals(client.redirectHost)) {
+                // was successful.
+		if ((client.redirectPort != 0 && port == client.redirectPort) ||
+		    (client.redirectPort == 0 && port == client.initialPort))
+		{
 		    iter.remove();
 		    removedClients.put(user, client);
 		    client.disconnect();
@@ -2102,7 +2106,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    new HashMap<BigInteger, String>();
 	private Map<String, BigInteger> channelNameToId =
 	    new HashMap<String, BigInteger>();
-	private String reason;	
+	private String reason;
+	private int initialPort;
 	private String redirectHost;
         private int redirectPort;
         private byte[] reconnectKey;
@@ -2119,6 +2124,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	DummyClient connect(int port) {
+	    this.initialPort = port;
 	    if (connected) {
 		throw new RuntimeException("DummyClient.connect: already connected");
 	    }
