@@ -48,9 +48,7 @@ dist:
 clean:
 	-/bin/rm -rf $(OBJDIR)/sgs $(TOPDIR)/target
 	-@cd $(TOPDIR)/test && $(MAKE) $@
-	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
 
 realclean: clean
 	-/bin/rm -f $(LIB)
 	-@cd $(TOPDIR)/test && $(MAKE) $@
-	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
