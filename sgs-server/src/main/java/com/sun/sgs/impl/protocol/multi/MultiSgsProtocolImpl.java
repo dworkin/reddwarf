@@ -278,7 +278,7 @@ class MultiSgsProtocolImpl implements SessionProtocol {
 	    putBytes(reconnectKey);
 	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
 	flushMessageQueue();
-        acceptor.sucessfulLogin(reconnectKey, this);
+        acceptor.successfulLogin(reconnectKey, this);
     }
 
     /**

@@ -50,7 +50,37 @@ import java.util.logging.Logger;
 import javax.security.auth.login.LoginException;
 
 /**
- * A protocol acceptor for connections that speak the {@link SimpleSgsProtocol}.
+ * A protocol acceptor for connections that speak the {@link
+ * SimpleSgsProtocol}. The {@link #SimpleSgsProtocolAcceptor constructors}
+ * support the following properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #TRANSPORT_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_TRANSPORT}
+ *
+ * <dd style="padding-top: .5em">Specifies the transport. The
+ *      specified transport must support RELIABLE delivery..<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #READ_BUFFER_SIZE_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_READ_BUFFER_SIZE}<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the read buffer size.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	{@value #DISCONNECT_DELAY_PROPERTY}
+ *	</b></code><br>
+ *	<i>Default:</i> {@value #DEFAULT_DISCONNECT_DELAY}<br>
+ *
+ * <dd style="padding-top: .5em"> 
+ *	Specifies the disconnect delay (in milliseconds) for disconnecting
+ *      sessions.<p>
+ * </dl> <p>
  */
 public class SimpleSgsProtocolAcceptor
     extends AbstractService
@@ -60,7 +90,7 @@ public class SimpleSgsProtocolAcceptor
     public static final String PKG_NAME = "com.sun.sgs.impl.protocol.simple";
     
     /** The logger for this class. */
-    private static final LoggerWrapper logger =
+    private static final LoggerWrapper staticLogger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + "acceptor"));
 
     /** The name of the read buffer size property. */
@@ -90,22 +120,29 @@ public class SimpleSgsProtocolAcceptor
      */
     private static final long DEFAULT_DISCONNECT_DELAY = 1000;
 
+    /** The logger for this instance. */
+    private  final LoggerWrapper logger;
+
     /** The identity manager. */
     private final IdentityCoordinator identityManager;
 
     /** The read buffer size for new connections. */
-    private final int readBufferSize;
+    protected final int readBufferSize;
 
+    /** The transport factory. */
+    protected final TransportFactory transportFactory;
+    
     /** The transport */
-    private final Transport transport;
+    protected final Transport transport;
     
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
     private final long disconnectDelay;
 
     /** The protocol listener. */
-    private volatile ProtocolListener protocolListener;
-    
-    private final ProtocolDescriptor protocolDesc;
+    protected volatile ProtocolListener protocolListener;
+
+    /** The protocol descriptor. */
+    private ProtocolDescriptor protocolDesc;
   
     /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
      * the time the connection should expire.
@@ -132,8 +169,29 @@ public class SimpleSgsProtocolAcceptor
 				     TransactionProxy txnProxy)
 	throws Exception
     {
-	super(properties, systemRegistry, txnProxy, logger);
+	this(properties, systemRegistry, txnProxy, staticLogger);
 	
+    }
+
+    /**
+     * Constructs an instance with the specified {@code properties},
+     * {@code systemRegistry}, and {@code txnProxy}.
+     *
+     * @param	properties the configuration properties
+     * @param	systemRegistry the system registry
+     * @param	txnProxy a transaction proxy
+     * @param	logger a logger for this instance
+     *
+     * @throws	Exception if a problem occurs
+     */
+    protected SimpleSgsProtocolAcceptor(Properties properties,
+					ComponentRegistry systemRegistry,
+					TransactionProxy txnProxy,
+					LoggerWrapper logger)
+	throws Exception
+    {
+	super(properties, systemRegistry, txnProxy, logger);
+	this.logger = logger;
 	logger.log(Level.CONFIG,
 		   "Creating SimpleSgsProtcolAcceptor properties:{0}",
 		   properties);
@@ -149,7 +207,7 @@ public class SimpleSgsProtocolAcceptor
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    
-            TransportFactory transportFactory =
+            transportFactory =
                 systemRegistry.getComponent(TransportFactory.class);
             
             String transportClassName =
@@ -165,9 +223,6 @@ public class SimpleSgsProtocolAcceptor
                 throw new IllegalArgumentException(
                         "transport must support RELIABLE delivery");
             }
-            protocolDesc =
-                    new SimpleSgsProtocolDescriptor(transport.getDescriptor());
-
 	    /*
 	     * Set up recurring task to monitor disconnecting client sessions.
 	     */
@@ -189,7 +244,7 @@ public class SimpleSgsProtocolAcceptor
 	    throw e;
 	}
     }
-
+    
     /* -- Implement AbstractService -- */
     
     /** {@inheritDoc} */
@@ -202,7 +257,6 @@ public class SimpleSgsProtocolAcceptor
     }
     
     /** {@inheritDoc} */
-    @Override
     public void doReady() {
     }
     
@@ -224,13 +278,15 @@ public class SimpleSgsProtocolAcceptor
     /* -- Implement ProtocolAcceptor -- */
 
     /** {@inheritDoc} */
-    @Override
-    public ProtocolDescriptor getDescriptor() {
+    public synchronized ProtocolDescriptor getDescriptor() {
+	if (protocolDesc == null) {
+            protocolDesc =
+		new SimpleSgsProtocolDescriptor(transport.getDescriptor());
+	}
         return protocolDesc;
     }
     
     /** {@inheritDoc} */
-    @Override
     public void accept(ProtocolListener protocolListener) {
 	if (protocolListener == null) {
 	    throw new NullPointerException("null protocolListener");
@@ -240,7 +296,6 @@ public class SimpleSgsProtocolAcceptor
     }
 
     /** {@inheritDoc} */
-    @Override
     public void close() {
 	shutdown();
     }
@@ -275,7 +330,9 @@ public class SimpleSgsProtocolAcceptor
      * @throws	LoginException if a problem occurs authenticating the name and
      *		password 
      */
-    Identity authenticate(String name, String password) throws LoginException {
+    public Identity authenticate(String name, String password)
+	throws LoginException
+    {
 	return identityManager.authenticateIdentity(
 	    new NamePasswordCredentials(name, password.toCharArray()));
     }
@@ -289,7 +346,7 @@ public class SimpleSgsProtocolAcceptor
      *
      * @param	protocol a {@code SessionProtocol} that is disconnecting
      */
-    void monitorDisconnection(SessionProtocol protocol) {
+    public void monitorDisconnection(SessionProtocol protocol) {
 	disconnectingHandlersMap.put(
 	    System.currentTimeMillis() + disconnectDelay,  protocol);
     }
@@ -299,7 +356,7 @@ public class SimpleSgsProtocolAcceptor
      *
      * @param	task a non-durable, non-transactional task
      */
-    void scheduleNonTransactionalTask(KernelRunnable task) {
+    public void scheduleNonTransactionalTask(KernelRunnable task) {
         taskScheduler.scheduleTask(task, taskOwner);
     }
     

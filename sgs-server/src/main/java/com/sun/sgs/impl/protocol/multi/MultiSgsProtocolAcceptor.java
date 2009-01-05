@@ -20,18 +20,11 @@
 package com.sun.sgs.impl.protocol.multi;
 
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
-import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
@@ -41,29 +34,20 @@ import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
 import com.sun.sgs.transport.TransportFactory;
-import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.security.auth.login.LoginException;
 
 /**
  * A protocol acceptor for connections that speak the {@link SimpleSgsProtocol}
  * using two transports. The {@link #MultiSgsProtocolAcceptor constructor}
- * supports the following properties: <p>
+ * supports the properties specified for the {@link
+ * SimplSgsProtocolAcceptor} constructor and following properties: <p>
  *
  * <dl style="margin-left: 1em">
- *
- * <dt> <i>Property:</i> <code><b>
- *	{@value #PRIMARY_TRANSPORT_PROPERTY}
- *	</b></code><br>
- *	<i>Default:</i> {@value #DEFAULT_PRIMARY_TRANSPORT}
- *
- * <dd style="padding-top: .5em">Specifies the primary transport. The
- *      specified transport must support RELIABLE delivery..<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	{@value #SECONDARY_TRANSPORT_PROPERTY}
@@ -72,28 +56,10 @@ import javax.security.auth.login.LoginException;
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies the secondary transport.<p>
- * 
- * <dt> <i>Property:</i> <code><b>
- *	{@value #READ_BUFFER_SIZE_PROPERTY}
- *	</b></code><br>
- *	<i>Default:</i> {@value #DEFAULT_READ_BUFFER_SIZE}<br>
- *
- * <dd style="padding-top: .5em"> 
- *	Specifies the read buffer size.<p>
- * 
- * <dt> <i>Property:</i> <code><b>
- *	{@value #DISCONNECT_DELAY_PROPERTY}
- *	</b></code><br>
- *	<i>Default:</i> {@value #DEFAULT_DISCONNECT_DELAY}<br>
- *
- * <dd style="padding-top: .5em"> 
- *	Specifies the disconnect delay (in milliseconds) for disconnecting
- *      sessions.<p>
  * </dl> <p>
  */
 public class MultiSgsProtocolAcceptor
-    extends AbstractService
-    implements ProtocolAcceptor
+    extends SimpleSgsProtocolAcceptor
 {
     /** The package name. */
     public static final String PKG_NAME = "com.sun.sgs.impl.protocol.multi";
@@ -121,60 +87,19 @@ public class MultiSgsProtocolAcceptor
     public static final String DEFAULT_SECONDARY_TRANSPORT =
         "com.sun.sgs.impl.transport.udp.UDP";
     
-    /** The name of the read buffer size property. */
-    public static final String READ_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.read.max";
-
-    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
-    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
-    
-    /** The name of the disconnect delay property. */
-    public static final String DISCONNECT_DELAY_PROPERTY =
-	PKG_NAME + ".disconnect.delay";
-    
-    /** The time (in milliseconds) that a disconnecting connection is
-     * allowed before this service forcibly disconnects it:
-     * {@value #DEFAULT_DISCONNECT_DELAY}
-     */
-    public static final long DEFAULT_DISCONNECT_DELAY = 1000;
-
-    /** The identity manager. */
-    private final IdentityCoordinator identityManager;
-
-    /** The read buffer size for new connections. */
-    private final int readBufferSize;
-
-    /** The primary transport. */
-    private final Transport primaryTransport;
-    
     /** The secondary transport. */
     private final Transport secondaryTransport;
     
-    /** The disconnect delay (in milliseconds) for disconnecting sessions. */
-    private final long disconnectDelay;
-
-    /** The protocol listener. */
-    private volatile ProtocolListener protocolListener;
-    
-    private final ProtocolDescriptor protocolDesc;
+    /** The protocol descriptor. */
+    private ProtocolDescriptor protocolDesc;
   
-    /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
-     * the time the connection should expire.
-     */
-    private final ConcurrentSkipListMap<Long, SessionProtocol>
-	disconnectingHandlersMap =
-	    new ConcurrentSkipListMap<Long, SessionProtocol>();
-
-    /** The handle for the task that monitors disconnecting client sessions. */
-    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
-
-        /**
+    /**
      * Map of connections that have processed successful logins an the
      * reconnect key. Used to attach the secondary connection to the
      * primary connection.
      */
-    private final Map<byte[], MultiSgsProtocolImpl> logins =
-            new ConcurrentHashMap<byte[], MultiSgsProtocolImpl>();
+    private final Map<ReconnectionKey, MultiSgsProtocolImpl> logins =
+            new ConcurrentHashMap<ReconnectionKey, MultiSgsProtocolImpl>();
     
     /**
      * Constructs an instance with the specified {@code properties},
@@ -194,65 +119,23 @@ public class MultiSgsProtocolAcceptor
 	super(properties, systemRegistry, txnProxy, logger);
 	
 	logger.log(Level.CONFIG,
-		   "Creating SimpleSgsProtcolAcceptor properties:{0}",
+		   "Creating MultiSgsProtcolAcceptor properties:{0}",
 		   properties);
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
-            readBufferSize = wrappedProps.getIntProperty(
-                READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
-                8192, Integer.MAX_VALUE);
-	    disconnectDelay = wrappedProps.getLongProperty(
-		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
-		200, Long.MAX_VALUE);
-	    identityManager =
-		systemRegistry.getComponent(IdentityCoordinator.class);
-	    
-            TransportFactory transportFactory =
-                systemRegistry.getComponent(TransportFactory.class);
-            
             String transportClassName =
-                    wrappedProps.getProperty(PRIMARY_TRANSPORT_PROPERTY,
-                                             DEFAULT_PRIMARY_TRANSPORT);
-            
-            primaryTransport =
-                            transportFactory.startTransport(transportClassName,
-                                                            properties);
-            
-            if (!primaryTransport.getDescriptor().canSupport(Delivery.RELIABLE))
-            {
-                primaryTransport.shutdown();
-                throw new IllegalArgumentException(
-                        "transport must support RELIABLE delivery");
-            }
-            transportClassName =
-                    wrappedProps.getProperty(SECONDARY_TRANSPORT_PROPERTY,
-                                             DEFAULT_SECONDARY_TRANSPORT);
+                wrappedProps.getProperty(SECONDARY_TRANSPORT_PROPERTY,
+					 DEFAULT_SECONDARY_TRANSPORT);
             
             try {
                 secondaryTransport =
-                            transportFactory.startTransport(transportClassName,
-                                                            properties);
+		    transportFactory.startTransport(transportClassName,
+						    properties);
             } catch (Exception e) {
-                primaryTransport.shutdown();
+                transport.shutdown();
                 throw e;
             }
-            protocolDesc =
-                    new MultiSgsProtocolDescriptor(
-                                            primaryTransport.getDescriptor(),
-                                            secondaryTransport.getDescriptor());
-
-	    /*
-	     * Set up recurring task to monitor disconnecting client sessions.
-	     */
-	    monitorDisconnectingSessionsTaskHandle =
-		taskScheduler.scheduleRecurringTask(
- 		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, System.currentTimeMillis(),
-		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
-	    monitorDisconnectingSessionsTaskHandle.start();
-	    
-	    // TBD: check service version?
 	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -267,41 +150,24 @@ public class MultiSgsProtocolAcceptor
     /* -- Implement AbstractService -- */
     
     /** {@inheritDoc} */
-    protected void handleServiceVersionMismatch(
-	Version oldVersion, Version currentVersion)
-    {
-	throw new IllegalStateException(
-	    "unable to convert version:" + oldVersion +
-	    " to current version:" + currentVersion);
-    }
-    
-    /** {@inheritDoc} */
     @Override
-    public void doReady() {
-    }
-    
-    /** {@inheritDoc} */
     public void doShutdown() {
-        primaryTransport.shutdown();
+	super.doShutdown();
         secondaryTransport.shutdown();
-
-	if (monitorDisconnectingSessionsTaskHandle != null) {
-	    try {
-		monitorDisconnectingSessionsTaskHandle.cancel();
-	    } finally {
-		monitorDisconnectingSessionsTaskHandle = null;
-	    }
-	}
-	    
-	disconnectingHandlersMap.clear();
     }
 
     /* -- Implement ProtocolAcceptor -- */
 
     /** {@inheritDoc} */
     @Override
-    public ProtocolDescriptor getDescriptor() {
-        return protocolDesc;
+    public synchronized ProtocolDescriptor getDescriptor() {
+	if (protocolDesc == null) {
+	    protocolDesc =
+		new MultiSgsProtocolDescriptor(
+		    transport.getDescriptor(),
+		    secondaryTransport.getDescriptor());
+	}
+	return protocolDesc;
     }
     
     /** {@inheritDoc} */
@@ -311,14 +177,8 @@ public class MultiSgsProtocolAcceptor
 	    throw new NullPointerException("null protocolListener");
 	}
 	this.protocolListener = protocolListener;
-        primaryTransport.accept(new PrimaryHandlerImpl());
+        transport.accept(new PrimaryHandlerImpl());
         secondaryTransport.accept(new SecondaryHandlerImpl());
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void close() {
-	shutdown();
     }
 
     /**
@@ -351,7 +211,7 @@ public class MultiSgsProtocolAcceptor
             throws Exception
         {
             new SecondaryChannel(descriptor.getSupportedDelivery(),
-                                    MultiSgsProtocolAcceptor.this,
+				 MultiSgsProtocolAcceptor.this,
                                     byteChannel,
                                     readBufferSize);
         }
@@ -364,8 +224,8 @@ public class MultiSgsProtocolAcceptor
      * @param key the reconnect key
      * @param connection the session connection
      */
-    void sucessfulLogin(byte[] key, MultiSgsProtocolImpl protocol) {
-        logins.put(key, protocol);
+    void successfulLogin(byte[] key, MultiSgsProtocolImpl protocol) {
+        logins.put(new ReconnectionKey(key), protocol);
     }
     
     /**
@@ -373,7 +233,7 @@ public class MultiSgsProtocolAcceptor
      * @param key the reconnect key for that session
      */
     void disconnect(byte[] key) {
-        logins.remove(key);
+        logins.remove(new ReconnectionKey(key));
     }
     
     /**
@@ -383,79 +243,36 @@ public class MultiSgsProtocolAcceptor
      * @return the session connection or {@code null}
      */
     MultiSgsProtocolImpl attach(byte[] key) {
-        return logins.get(key);
-    }
-    
-    /**
-     * Returns the authenticated identity for the specified {@code name} and
-     * {@code password}.
-     *
-     * @param	name a name
-     * @param	password a password
-     * @return	the authenticated identity
-     * @throws	LoginException if a problem occurs authenticating the name and
-     *		password 
-     */
-    Identity authenticate(String name, String password) throws LoginException {
-	return identityManager.authenticateIdentity(
-	    new NamePasswordCredentials(name, password.toCharArray()));
-    }
-
-    /**
-     * Adds the specified {@code protocol} to the map containing {@code
-     * SessionProtocol}s that are disconnecting.  The map is keyed by
-     * connection expiration time.  The connection will expire after a fixed
-     * delay and will be forcibly terminated if the client hasn't already
-     * closed the connection.
-     *
-     * @param	protocol a {@code SessionProtocol} that is disconnecting
-     */
-    void monitorDisconnection(SessionProtocol protocol) {
-	disconnectingHandlersMap.put(
-	    System.currentTimeMillis() + disconnectDelay,  protocol);
-    }
-    
-    /**
-     * Schedules a non-durable, non-transactional {@code task}.
-     *
-     * @param	task a non-durable, non-transactional task
-     */
-    void scheduleNonTransactionalTask(KernelRunnable task) {
-        taskScheduler.scheduleTask(task, taskOwner);
+        return logins.get(new ReconnectionKey(key));
     }
     
     /* -- Private methods and classes -- */
 
     /**
-     * A task to monitor disconnecting sessions to ensure that their
-     * associated connections are closed by the client in a timely manner.
-     * If a connection is not terminated by the expiration time, then the
-     * connection is forcibly closed.
+     * A container for a reconnection key so that it can be used as a key
+     * in a map.
      */
-    private class MonitorDisconnectingSessionsTask
-	extends AbstractKernelRunnable
-    {
-	/** Constructs and instance. */
-	MonitorDisconnectingSessionsTask() {
-	    super(null);
-	}
-	
-	/** {@inheritDoc} */
-	public void run() {
-	    long now = System.currentTimeMillis();
-	    if (!disconnectingHandlersMap.isEmpty() &&
-		disconnectingHandlersMap.firstKey() < now) {
+    private static class ReconnectionKey {
 
-		Map<Long, SessionProtocol> expiredSessions = 
-		    disconnectingHandlersMap.headMap(now);
-		for (SessionProtocol protocol : expiredSessions.values()) {
-		    try {
-			protocol.close();
-		    } catch (IOException e) {
-		    }
-		}
-		expiredSessions.clear();
-	    }
+	/** The reconnection key. */
+	private final byte[] key;
+
+	/** Constructs an instance with the specified {@code key}. */
+	ReconnectionKey(byte[] key) {
+	    this.key = new byte[key.length];
+	    System.arraycopy(key, 0, this.key, 0, key.length);
+	}
+
+	/** {@inheritDoc} */
+	public boolean equals(Object obj) {
+	    return
+		obj instanceof ReconnectionKey &&
+		Arrays.equals(key, ((ReconnectionKey) obj).key);
+	}
+
+	/** {@inheritDoc} */
+	public int hashCode() {
+	    return Arrays.hashCode(key);
 	}
     }
 }
