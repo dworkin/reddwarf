@@ -21,10 +21,8 @@ package com.sun.sgs.tests.deadlock;
 
 import java.util.Random;
 import java.util.logging.Logger;
-import java.util.logging.Level;
 import java.io.Serializable;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.util.ManagedSerializable;
 
 /**
  *
