@@ -29,7 +29,17 @@ import com.sun.sgs.app.AppContext;
 
 
 /**
- *
+ * A simple PDS application that initiates a set of self-rescheduling
+ * tasks which intentionally causes pathological contention between
+ * them.
+ * <p>
+ * The application contains a list of {@link ManagedInteger} references
+ * and there is a task associated with each {@code ManagedInteger} in the
+ * list.  Each task attempts to sum up the values of all of the integers,
+ * and record this sum in the state of the associated integer.  Operating
+ * concurrently, this causes significant contention as every task is trying
+ * to acquire an exclusive write lock one one of the integers, while also
+ * acquiring a read lock on all of the other integers.
  */
 public class Deadlock implements AppListener, Serializable {
     
@@ -55,6 +65,8 @@ public class Deadlock implements AppListener, Serializable {
                     new SumTask(integers, integers[i]));
         }
         
+        AppContext.getTaskManager().schedulePeriodicTask(
+                new ReportTask(integers[0]), 1000, 1000);
     }
 
     /**

@@ -19,57 +19,37 @@
 
 package com.sun.sgs.tests.deadlock;
 
-import java.util.Random;
+import java.io.Serializable;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import java.io.Serializable;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.Task;
+import com.sun.sgs.app.ManagedReference;
 
 /**
  *
  */
-public class ManagedInteger implements Serializable, ManagedObject {
+public class ReportTask implements Task, Serializable {
     
     private static Logger logger = Logger.getLogger(
             ManagedInteger.class.getName());
+    
+    private final ManagedReference<ManagedInteger> integer;
+    private final long startTimestamp;
+    
+    public ReportTask(ManagedReference<ManagedInteger> integer) {
+        this.integer = integer;
+        this.startTimestamp = System.currentTimeMillis();
+    }
 
-    /** 
-     * The version of the serialized form.
-     */
-    private static final long serialVersionUID = 1;
-    
-    private static int MAX = 100;
-    private static int CHECK = 100;
+    @Override
+    public void run() throws Exception {
+        int updates = integer.get().getUpdates();
+        
+        long timestamp = System.currentTimeMillis();
+        long timeLapse = timestamp - startTimestamp;
+            
+        double rate = (double) updates / ((double) timeLapse / 1000.0);
+        logger.log(Level.INFO, rate + " Updates/Second");
+    }
 
-    private Random random;
-    private int value;
-    private int sum;
-    
-    private int updates;
-
-    public ManagedInteger() {
-        random = new Random();
-        value = random.nextInt(MAX);
-        sum = 0;
-        updates = 0;
-    }
-    
-    public int getValue() {
-        return value;
-    }
-    
-    public void setValue() {
-        value = random.nextInt(MAX);
-        updates++;
-    }
-    
-    public void setSum(int sum) {
-        this.sum = sum;
-    }
-    
-    public int getUpdates() {
-        return updates;
-    }
-    
 }
