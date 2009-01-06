@@ -17,7 +17,7 @@ SRCS = \
 
 LIB = libsgsclient.a
 
-VERSION = 0.9.7
+VERSION = 0.9.8
 
 DIST_FILE = sgs-c-client-dist-$(VERSION).zip
 
@@ -33,7 +33,7 @@ $(LIB): $(OBJS)
 dist:
 	-/bin/rm -rf $(TOPDIR)/target/$(DIST_DIR) $(TOPDIR)/target/$(DIST_FILE)
 	-mkdir -p $(TOPDIR)/target/$(DIST_DIR)
-	-cp GNUmakefile LICENSE NOTICE.txt README $(TOPDIR)/target/$(DIST_DIR)
+	-cp GNUmakefile LICENSE NOTICE.txt README CHANGELOG $(TOPDIR)/target/$(DIST_DIR)
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/etc
 	-cp etc/*.mk etc/*.bat $(TOPDIR)/target/$(DIST_DIR)/etc
 	-mkdir $(TOPDIR)/target/$(DIST_DIR)/sgs
@@ -48,9 +48,7 @@ dist:
 clean:
 	-/bin/rm -rf $(OBJDIR)/sgs $(TOPDIR)/target
 	-@cd $(TOPDIR)/test && $(MAKE) $@
-	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
 
 realclean: clean
 	-/bin/rm -f $(LIB)
 	-@cd $(TOPDIR)/test && $(MAKE) $@
-	-@cd $(TOPDIR)/chatclient && $(MAKE) $@
