@@ -34,6 +34,7 @@ import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
 import com.sun.sgs.transport.TransportFactory;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
@@ -98,8 +99,8 @@ public class MultiSgsProtocolAcceptor
      * reconnect key. Used to attach the secondary connection to the
      * primary connection.
      */
-    private final Map<ReconnectionKey, MultiSgsProtocolImpl> logins =
-            new ConcurrentHashMap<ReconnectionKey, MultiSgsProtocolImpl>();
+    private final Map<BigInteger, MultiSgsProtocolImpl> logins =
+            new ConcurrentHashMap<BigInteger, MultiSgsProtocolImpl>();
     
     /**
      * Constructs an instance with the specified {@code properties},
@@ -225,7 +226,7 @@ public class MultiSgsProtocolAcceptor
      * @param connection the session connection
      */
     void successfulLogin(byte[] key, MultiSgsProtocolImpl protocol) {
-        logins.put(new ReconnectionKey(key), protocol);
+        logins.put(new BigInteger(1, key), protocol);
     }
     
     /**
@@ -233,7 +234,7 @@ public class MultiSgsProtocolAcceptor
      * @param key the reconnect key for that session
      */
     void disconnect(byte[] key) {
-        logins.remove(new ReconnectionKey(key));
+        logins.remove(new BigInteger(1, key));
     }
     
     /**
@@ -243,36 +244,6 @@ public class MultiSgsProtocolAcceptor
      * @return the session connection or {@code null}
      */
     MultiSgsProtocolImpl attach(byte[] key) {
-        return logins.get(new ReconnectionKey(key));
-    }
-    
-    /* -- Private methods and classes -- */
-
-    /**
-     * A container for a reconnection key so that it can be used as a key
-     * in a map.
-     */
-    private static class ReconnectionKey {
-
-	/** The reconnection key. */
-	private final byte[] key;
-
-	/** Constructs an instance with the specified {@code key}. */
-	ReconnectionKey(byte[] key) {
-	    this.key = new byte[key.length];
-	    System.arraycopy(key, 0, this.key, 0, key.length);
-	}
-
-	/** {@inheritDoc} */
-	public boolean equals(Object obj) {
-	    return
-		obj instanceof ReconnectionKey &&
-		Arrays.equals(key, ((ReconnectionKey) obj).key);
-	}
-
-	/** {@inheritDoc} */
-	public int hashCode() {
-	    return Arrays.hashCode(key);
-	}
+        return logins.get(new BigInteger(1, key));
     }
 }
