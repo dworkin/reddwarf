@@ -40,7 +40,7 @@ perl -i -pe "s/<version>.*SNAPSHOT<\/version>/<version>$VERSION<\/version>/g" $(
 
 # verify POM updates
 ! (grep -c  "<version>.*SNAPSHOT<\/version>" $(find . -name pom.xml))
-mvn install
+mvn install -DskipTests
 mvn clean
 
 # checkin POM updates
@@ -50,5 +50,5 @@ svn --non-interactive commit -m "updating POM versions for release $VERSION"
 mvn deploy -DskipTests
 
 # tag the branch
- svn --non-interactive --username $USERNAME --password $PASSWORD copy $URL/branches/$BRANCH $URL/tags/$TAG -m "tagging release $VERSION"
+svn --non-interactive --username $USERNAME --password $PASSWORD copy $URL/branches/$BRANCH $URL/tags/$TAG -m "tagging release $VERSION"
 
