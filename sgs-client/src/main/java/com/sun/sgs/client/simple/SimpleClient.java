@@ -135,6 +135,8 @@ public class SimpleClient implements ServerSession {
         this.clientListener = listener;
     }
 
+    /* -- Implement ServerSession -- */
+
     /**
      * Initiates a login session with the server. A session is established
      * asynchronously with the server as follows:
@@ -202,8 +204,6 @@ public class SimpleClient implements ServerSession {
         ClientConnector connector = ClientConnector.create(props);
         connector.connect(connListener);
     }
-
-    /* -- Implement ServerSession -- */
     
     /**
      * {@inheritDoc}

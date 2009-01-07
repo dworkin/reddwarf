@@ -34,6 +34,7 @@ package com.sun.sgs.client;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Properties;
 
 /**
  * Represents a client's view of a login session with the server. Each time
@@ -50,6 +51,17 @@ import java.nio.ByteBuffer;
  */
 public interface ServerSession {
 
+    /**
+     * Initiates a login session with the server. The use of properties
+     * parameter is implementation specific.
+     * 
+     * @param props the implementation specific connection properties to use
+     *          in creating the client's session
+     * 
+     * @throws java.io.IOException
+     */
+    void login(Properties props) throws IOException;
+    
     /**
      * Sends the message contained in the specified {@code ByteBuffer} to
      * the server.  The message starts at the buffer's current position and
