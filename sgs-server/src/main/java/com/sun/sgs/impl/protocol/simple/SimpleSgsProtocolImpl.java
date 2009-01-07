@@ -186,13 +186,17 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void channelJoin(String name, BigInteger channelId) {
+    public void channelJoin(
+	String name, BigInteger channelId, Delivery delivery)
+    {
 	byte[] channelIdBytes = channelId.toByteArray();
 	MessageBuffer buf =
 	    new MessageBuffer(1 + MessageBuffer.getSize(name) +
+			      1 +
 			      channelIdBytes.length);
 	buf.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 	    putString(name).
+	    putByte(delivery.ordinal()).
 	    putBytes(channelIdBytes);
 	writeOrEnqueueIfLoginNotHandled(ByteBuffer.wrap(buf.getBuffer()));
     }

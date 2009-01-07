@@ -72,9 +72,13 @@ public interface SessionProtocol extends Channel {
      * with the specified {@code name} and {@code channelId}.
      *
      * @param	name a channel name
-     * @param	channelId channelId
+     * @param	channelId the channel's ID
+     * @param	delivery the channel's delivery requirement
+     *
+     * @throws	DeliveryNotSupportedException if the specified {@code
+     *		delivery} requirement is not supported by this protocol
      */
-    void channelJoin(String name, BigInteger channelId);
+    void channelJoin(String name, BigInteger channelId, Delivery delivery);
 
     /**
      * Notifies the associated client that it is no longer a member of
@@ -92,7 +96,7 @@ public interface SessionProtocol extends Channel {
      *
      * @param	channelId a channel ID
      * @param	message a channel message
-     * @param	delivery a delivery requirement
+     * @param	delivery the channel's delivery requirement
      *
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} requirement is not supported by this protocol

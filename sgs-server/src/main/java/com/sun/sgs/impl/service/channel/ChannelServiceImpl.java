@@ -438,7 +438,7 @@ public final class ChannelServiceImpl
 	 * missed, then send the appropriate channel join or channel join
 	 * message to the effected session(s).
 	 */
-	public void refresh(String name, byte[] channelId) {
+	public void refresh(String name, byte[] channelId, Delivery delivery) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "refreshing channelId:{0}",
@@ -500,7 +500,7 @@ public final class ChannelServiceImpl
 			SessionProtocol protocol =
 			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
-			    protocol.channelJoin(name, channelRefId);
+			    protocol.channelJoin(name, channelRefId, delivery);
 			}
 		    }
 		}
@@ -526,7 +526,9 @@ public final class ChannelServiceImpl
 	 * channel join message to the session with the corresponding
 	 * {@code sessionId}.
 	 */
-	public void join(String name, byte[] channelId, byte[] sessionId) {
+	public void join(
+	    String name, byte[] channelId, Delivery delivery, byte[] sessionId)
+	{
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -569,7 +571,7 @@ public final class ChannelServiceImpl
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
 		if (protocol != null) {
-		    protocol.channelJoin(name, channelRefId);
+		    protocol.channelJoin(name, channelRefId, delivery);
 		}
 
 	    } finally {

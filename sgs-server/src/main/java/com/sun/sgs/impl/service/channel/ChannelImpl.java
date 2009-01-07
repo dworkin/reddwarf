@@ -1430,6 +1430,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
 		final String channelName = channel.name;
+		final Delivery channelDelivery = channel.delivery;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelIdBytes));
@@ -1441,7 +1442,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    public void run() throws IOException {
 				ChannelServer server = getChannelServer(nodeId);
 				if (server != null) {
-				    server.refresh(channelName, channelIdBytes);
+				    server.refresh(channelName, channelIdBytes,
+						   channelDelivery);
 				}
 			    } },
 			nodeId);
@@ -1566,11 +1568,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    final String channelName = channel.name;
 	    final byte[] channelIdBytes = channel.channelId;
+	    final Delivery channelDelivery = channel.delivery;
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		eventQueue.getChannelRefId(),
 		new IoRunnable() {
 		    public void run() throws IOException {
-			server.join(channelName, channelIdBytes, sessionId);
+			server.join(channelName, channelIdBytes,
+				    channelDelivery, sessionId);
 		    } },
 		nodeId);
 	}
