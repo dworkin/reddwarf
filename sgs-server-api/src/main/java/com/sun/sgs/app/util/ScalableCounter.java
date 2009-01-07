@@ -62,7 +62,7 @@ public class ScalableCounter extends Number
     /**
      * Creates a new {@code ScalableCounter} with an initial value of
      * {@code 0} and the number of {@code InternalCounter}s set to
-     * {@value #DEFAULT_NUM_COUNTERS}.
+     * {@value ScalableCounter#DEFAULT_NUM_COUNTERS}.
      */
     public ScalableCounter() {
         this(0, DEFAULT_NUM_COUNTERS);
@@ -71,7 +71,7 @@ public class ScalableCounter extends Number
     /**
      * Creates a new {@code ScalableCounter} with a configurable initial value
      * and the number of {@code InternalCounter}s set to
-     * {@value #DEFAULT_NUM_COUNTERS}.
+     * {@value ScalableCounter#DEFAULT_NUM_COUNTERS}.
      * 
      * @param initialValue the initial value of the {@code ScalableCounter}
      */
@@ -97,7 +97,7 @@ public class ScalableCounter extends Number
         }
         
         counters = new ManagedReference[numCounters];
-        counters[1] = AppContext.getDataManager().createReference(
+        counters[0] = AppContext.getDataManager().createReference(
                 new InternalCounter(initialValue));
         for(int i = 1; i < numCounters; i++) {
             counters[i] = AppContext.getDataManager().createReference(
