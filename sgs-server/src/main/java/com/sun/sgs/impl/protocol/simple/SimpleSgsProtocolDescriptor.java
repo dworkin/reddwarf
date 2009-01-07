@@ -28,19 +28,21 @@ import java.io.Serializable;
  * protocol may use this class directly or extend it, overriding methods
  * for protocol and/or transport-specific needs.
  */
-class SimpleSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
-    
+public class SimpleSgsProtocolDescriptor
+    implements ProtocolDescriptor, Serializable
+{
+
     private static final long serialVersionUID = 1L;
 
     /** The transport descriptor for this protocol. */
-    final TransportDescriptor transportDesc;   
+    protected final TransportDescriptor transportDesc;   
         
     /**
      * Constructs an instance with the specified transport descriptor.
      *
      * @param	transportDesc transport descriptor
      */
-    SimpleSgsProtocolDescriptor(TransportDescriptor transportDesc) {
+    public SimpleSgsProtocolDescriptor(TransportDescriptor transportDesc) {
         assert transportDesc != null;
         this.transportDesc = transportDesc;
     }
@@ -63,4 +65,9 @@ class SimpleSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
         
         return transportDesc.isCompatibleWith(desc.transportDesc);
     }
+
+    public byte[] getRedirectionData() {
+	return transportDesc.getConnectionData();
+    }
+    
 }

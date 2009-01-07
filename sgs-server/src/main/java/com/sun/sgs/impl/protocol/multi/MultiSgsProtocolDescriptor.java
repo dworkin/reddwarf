@@ -19,24 +19,21 @@
 
 package com.sun.sgs.impl.protocol.multi;
 
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.transport.TransportDescriptor;
-import java.io.Serializable;
 
 /**
  * A protocol descriptor with primary and secondary transport descriptors.
  * A protocol may use this class directly or extend it, overriding methods
  * for protocol and/or transport-specific needs.
  */
-class MultiSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
+class MultiSgsProtocolDescriptor extends SimpleSgsProtocolDescriptor {
     
     private static final long serialVersionUID = 1L;
 
-    /** The primary transport descriptor. */
-    final TransportDescriptor primaryDesc;
-    
     /** The secondary transport descriptor. */
-    final TransportDescriptor secondaryDesc;   
+    private final TransportDescriptor secondaryDesc;   
 
     /**
      * Constructs an instance with the given transport descriptors.
@@ -47,9 +44,8 @@ class MultiSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
     MultiSgsProtocolDescriptor(TransportDescriptor primaryDesc,
                                TransportDescriptor secondaryDesc)
     {
-        assert primaryDesc != null;
+	super(primaryDesc);
         assert secondaryDesc != null;
-        this.primaryDesc = primaryDesc;
         this.secondaryDesc = secondaryDesc;
     }
 
@@ -70,7 +66,22 @@ class MultiSgsProtocolDescriptor implements ProtocolDescriptor, Serializable {
         MultiSgsProtocolDescriptor desc =
 	    (MultiSgsProtocolDescriptor) descriptor;
         
-        return primaryDesc.isCompatibleWith(desc.primaryDesc) &&
+        return transportDesc.isCompatibleWith(desc.transportDesc) &&
                secondaryDesc.isCompatibleWith(desc.secondaryDesc);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public byte[] getRedirectionData() {
+	byte[] primaryData = transportDesc.getConnectionData();
+	byte[] secondaryData = secondaryDesc.getConnectionData();
+	byte[] redirectionData =
+	    new byte[primaryData.length + secondaryData.length];
+	System.arraycopy(primaryData, 0, redirectionData, 0, primaryData.length);
+	System.arraycopy(secondaryData, 0, redirectionData,
+			 primaryData.length, secondaryData.length);
+	return redirectionData;
     }
 }

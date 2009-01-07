@@ -47,6 +47,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -62,12 +63,12 @@ import java.util.logging.Logger;
  * message length, and masking (and re-issuing) partial I/O operations.  Also
  * enforces a fixed buffer size when reading.
  */
-class SimpleSgsProtocolImpl implements SessionProtocol {
+public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The number of bytes used to represent the message length. */
     private static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
-    private static final LoggerWrapper logger = new LoggerWrapper(
+    private static final LoggerWrapper staticLogger = new LoggerWrapper(
 	Logger.getLogger(SimpleSgsProtocolImpl.class.getName()));
 
     /** The default reason string returned for login failure. */
@@ -88,19 +89,22 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
     private final AsynchronousMessageChannel asyncMsgChannel;
 
     /** The protocol handler. */
-    private volatile SessionProtocolHandler protocolHandler;
+    protected volatile SessionProtocolHandler protocolHandler;
 
     /** This protocol's acceptor. */
-    private final SimpleSgsProtocolAcceptor acceptor;
+    protected final SimpleSgsProtocolAcceptor acceptor;
 
-    /** The protocol listener. */
+    /** The logger for this instance. */
+    private final LoggerWrapper logger;
+    
+   /** The protocol listener. */
     private final ProtocolListener listener;
 
     /** The identity. */
     private volatile Identity identity;
 
     /** The reconnect key. */
-    private final byte[] reconnectKey;
+    protected final byte[] reconnectKey;
 
     /** The completion handler for reading from the I/O channel. */
     private volatile ReadHandler readHandler = new ConnectedReadHandler();
@@ -118,8 +122,8 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
     /** The immutable set of supported delivery requirements. */
-    private final Set<Delivery> deliverySet =
-	Collections.singleton(Delivery.RELIABLE);
+    protected final Set<Delivery> deliverySet = new HashSet<Delivery>();
+
 
     /**
      * Creates a new instance of this class.
@@ -134,14 +138,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                           AsynchronousByteChannel byteChannel,
                           int readBufferSize)
     {
-	// The read buffer size lower bound is enforced by the protocol acceptor
-	assert readBufferSize >= PREFIX_LENGTH;
-	this.asyncMsgChannel =
-	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
-	this.listener = listener;
-	this.acceptor = acceptor;
-	this.reconnectKey = getNextReconnectKey();
-	
+	this(listener, acceptor, byteChannel, readBufferSize, staticLogger);
 	/*
 	 * TBD: It might be a good idea to implement high- and low-water marks
 	 * for the buffers, so they don't go into hysteresis when they get
@@ -149,12 +146,34 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 	 */
 	scheduleReadOnReadHandler();
     }
-
+    
+    /**
+     *
+     * The subclass should invoke {@link scheduleReadOnReadHandler} after
+     * constructing the instance to commence reading.
+     */
+    protected  SimpleSgsProtocolImpl(ProtocolListener listener,
+				     SimpleSgsProtocolAcceptor acceptor,
+				     AsynchronousByteChannel byteChannel,
+				     int readBufferSize,
+				     LoggerWrapper logger)
+    {
+	// The read buffer size lower bound is enforced by the protocol acceptor
+	assert readBufferSize >= PREFIX_LENGTH;
+	this.asyncMsgChannel =
+	    new AsynchronousMessageChannel(byteChannel, readBufferSize);
+	this.listener = listener;
+	this.acceptor = acceptor;
+	this.logger = logger;
+	this.reconnectKey = getNextReconnectKey();
+	deliverySet.add(Delivery.RELIABLE);
+    }
+    
     /* -- Implement SessionProtocol -- */
 
     /** {@inheritDoc} */
     public Set<Delivery> supportedDeliveries() {
-	return deliverySet;
+	return Collections.unmodifiableSet(deliverySet);
     }
     
     /** {@inheritDoc} */
@@ -191,10 +210,14 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 
     /***
      * {@inheritDoc}
-     * The {@code delivery} parameter is ignored. This protocol only supports
-     * reliable delivery.
+     *
+     * <p>This implementation invokes the protected method {@link
+     * #writeBuffer writeBuffer} with the channel protocol message (a
+     * {@code ByteBuffer}) and the specified delivery requirement.  A
+     * subclass can override the {@code writeBuffer} method if it supports
+     * other delivery guarantees and can make use of alternate transports
+     * for those other delivery requirements.
      */
-    @Override
     public void channelMessage(BigInteger channelId,
                                ByteBuffer message,
                                Delivery delivery)
@@ -208,6 +231,24 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
 	    put(channelIdBytes).
 	    put(message).
 	    flip();
+	writeBuffer(buf, delivery);
+    }
+
+    /**
+     * Writes the specified buffer, satisfying the specified delivery
+     * requirement.
+     *
+     * <p>This implementation writes the buffer reliably, because this
+     * protocol only supports reliable delivery.
+     *
+     * <p>A subclass can override the {@code writeBuffer} method if it
+     * supports other delivery guarantees and can make use of alternate
+     * transports for those other delivery requirements.
+     *
+     * @param	buf a byte buffer containing a protocol message
+     * @param	delivery a delivery requirement
+     */
+    protected void writeBuffer(ByteBuffer buf, Delivery delivery) {
 	writeOrEnqueueIfLoginNotHandled(buf);
     }
 
@@ -228,7 +269,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
      * Notifies the associated client that the previous login attempt was
      * successful.
      */
-    private void loginSuccess() {
+    protected void loginSuccess() {
 	MessageBuffer buf = new MessageBuffer(1 + reconnectKey.length);
 	buf.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 	    putBytes(reconnectKey);
@@ -245,12 +286,21 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
      * @param	descriptors a collection of protocol descriptors supported
      *		by {@code node}
      */
-    public void loginRedirect(
+    private void loginRedirect(
 	Node node, Collection<ProtocolDescriptor> descriptors)
     {
         for (ProtocolDescriptor descriptor : descriptors) {
             if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
-                loginRedirect((SimpleSgsProtocolDescriptor) descriptor);
+		byte[] redirectionData =
+		    ((SimpleSgsProtocolDescriptor) descriptor).
+		        getRedirectionData();
+		MessageBuffer buf =
+		    new MessageBuffer(1 + redirectionData.length);
+		buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
+		    putBytes(redirectionData);
+		writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
+		flushMessageQueue();
+		acceptor.monitorDisconnection(this);
                 return;
             }
         }
@@ -260,16 +310,6 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
                    node);
     }
 
-    private void loginRedirect(SimpleSgsProtocolDescriptor newListener) {
-        byte[] connectionData = newListener.transportDesc.getConnectionData();
-	MessageBuffer buf = new MessageBuffer(1 + connectionData.length);
-        buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
-            putBytes(connectionData);
-	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
-	flushMessageQueue();
-	acceptor.monitorDisconnection(this);
-    }
-    
     /**
      * Notifies the associated client that the previous login attempt was
      * unsuccessful for the specified {@code reason}.  The specified {@code
@@ -324,7 +364,7 @@ class SimpleSgsProtocolImpl implements SessionProtocol {
     /**
      * Schedules an asynchronous task to resume reading.
      */
-    private void scheduleReadOnReadHandler() {
+    protected void scheduleReadOnReadHandler() {
 	acceptor.scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
 		public void run() {
