@@ -61,7 +61,9 @@ import java.util.logging.Logger;
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
 
-    // the standard prefix for consumer names created by core packages
+    /**
+     * the standard prefix for consumer names created by core packages
+     */
     public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
     
     // the logger for this class
