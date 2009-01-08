@@ -23,7 +23,14 @@ package com.sun.sgs.impl.kernel;
  * This class contains filenames that are used during Kernel
  * bootup to locate application configuration files.
  */
-class BootProperties {
+final class BootProperties {
+    
+    /**
+     * This class should not be instantiated
+     */
+    private BootProperties() {
+        
+    }
     
     /**
      * the standard location for the home directory properties config file

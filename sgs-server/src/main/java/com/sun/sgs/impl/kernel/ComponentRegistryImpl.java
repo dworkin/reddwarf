@@ -25,8 +25,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.MissingResourceException;
-import java.util.Set;
-
 
 /**
  * This is a simple implementation of <code>ComponentRegistry</code> used
@@ -57,18 +55,20 @@ class ComponentRegistryImpl implements ComponentRegistry {
             // see if provided type matches the component
             if (type.isAssignableFrom(component.getClass())) {
                 // if this isn't the first match, it's an error
-                if (matchingComponent != null)
+                if (matchingComponent != null) {
                     throw new MissingResourceException("More than one " +
                                                        "matching component",
                                                        type.getName(), null);
+                }
                 matchingComponent = component;
             }
         }
 
         // if no matches were found, it's an error
-        if (matchingComponent == null)
+        if (matchingComponent == null) {
             throw new MissingResourceException("No matching components",
                                                type.getName(), null);
+        }
 
         return type.cast(matchingComponent);
     }

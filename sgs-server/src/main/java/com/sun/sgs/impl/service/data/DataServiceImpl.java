@@ -382,10 +382,10 @@ public final class DataServiceImpl implements DataService {
      * @param	systemRegistry the registry of available system components
      * @param	txnProxy the transaction proxy
      * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
-     *		</code> property is not specified, if the value of the <code>
-     *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
-     *		</code> property is not a valid integer, or if the data store
-     *		constructor detects an illegal property value
+     *        </code> property is not specified, if the value of the <code>
+     *        com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+     *	      </code> property is not a valid integer, or if the data store
+     *	      constructor detects an illegal property value
      * @throws	Exception if a problem occurs creating the service
      */
     public DataServiceImpl(Properties properties,
@@ -420,10 +420,12 @@ public final class DataServiceImpl implements DataService {
 	    // bindings.
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
-	    oidAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME+":objects", BigInteger.class);
-	    boundNameAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME+":bound-names", String.class);
+	    oidAccesses = 
+                    accessCoordinator.registerAccessSource(
+                    CLASSNAME + ":objects", BigInteger.class);
+	    boundNameAccesses = 
+                    accessCoordinator.registerAccessSource(
+                    CLASSNAME + ":bound-names", String.class);
 
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
@@ -827,7 +829,8 @@ public final class DataServiceImpl implements DataService {
 	    /*
 	     * Incomplete implementation left for future reference:
 	     *
-	     * String nextBoundName = nextBoundNameInternal(name, serviceBinding);
+	     * String nextBoundName = nextBoundNameInternal(name,
+             *                                              serviceBinding);
 	     * if (nextBoundName == null) {
  	     *     boundNameAccesses.
 	     *         reportObjectAccess(END_OF_NAMESPACE, AccessType.WRITE);
