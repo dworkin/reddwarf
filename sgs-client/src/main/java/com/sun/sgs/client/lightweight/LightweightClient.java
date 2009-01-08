@@ -56,7 +56,8 @@ public final class LightweightClient implements ServerSession {
     // the connector and the actual channel used to send messages
     private static LightweightConnector connector = null;
     
-    private SocketChannel channel = null;
+    // Communication channel
+    private volatile SocketChannel channel = null;
 
     // the map of joined channels
     private final HashMap<IdWrapper,IdWrapper> channelMap =
@@ -65,8 +66,8 @@ public final class LightweightClient implements ServerSession {
     // the listener used for notification
     private final SimpleClientListener listener;
 
-    // flag that tracks whether we think we're currently connected
-    private volatile boolean connected = false;
+    // flag that tracks whether we think we're currently logged-in
+    private volatile boolean loggedIn = false;
 
     /**  Creates an instance of {@code LightweightClient}. */
     public LightweightClient(SimpleClientListener listener) {
@@ -90,28 +91,17 @@ public final class LightweightClient implements ServerSession {
 
     /* Implement ServerSession. */
 
-    public void login(Properties p) throws IOException {
-        if (isConnected())
-            throw new IllegalStateException("Already connected");
+    public synchronized void login(Properties p) throws IOException {
+        if (isConnected() || channel != null)
+            throw new IllegalStateException("Already connected or connecting");
 
-        try {
-            // try to establish a connection based on standard properties
-            String host = p.getProperty("host");
-            int port = Integer.valueOf(p.getProperty("port"));
-            channel = connector.addConnection(host, port, this);
-        } catch (Exception e) {
-            listener.disconnected(true, e.getMessage());
-            return;
-        }
+        String host = p.getProperty("host");
+        int port = Integer.valueOf(p.getProperty("port"));
+        channel = connector.addConnection(host, port, this);
 
         PasswordAuthentication creds = listener.getPasswordAuthentication();
         byte [] name = creds.getUserName().getBytes();
         byte [] pass = String.valueOf(creds.getPassword()).getBytes();
-
-        if (name.length == 0) {
-            listener.disconnected(true, "missing required credentials");
-            return;
-        }
 
         short payloadLength = (short)(name.length + pass.length + 6);
         ByteBuffer buffer = ByteBuffer.allocate(payloadLength + 2);
@@ -122,9 +112,13 @@ public final class LightweightClient implements ServerSession {
         buffer.put(name);
         buffer.putShort((short)(pass.length));
         buffer.put(pass);
-
         buffer.rewind();
-        channel.write(buffer);
+        try {
+            channel.write(buffer);
+        } catch (IOException ioe) {
+            closeSocketChannel();
+            throw ioe;
+        }
     }
 
     public void send(ByteBuffer message) throws IOException {
@@ -140,20 +134,21 @@ public final class LightweightClient implements ServerSession {
     }
 
     public boolean isConnected() {
-        return connected;
+        return loggedIn;
     }
 
-    public void logout(boolean force) {
-        if (! isConnected())
+    synchronized public void logout(boolean force) {
+        if (! isConnected()) {
+            closeSocketChannel();
             throw new IllegalStateException("Not connected");
-
-        if (force) {
-            disconnect(false, null);
-            
+        }
+        
+        if (force) {            
             // FIXME: we're not tracking the channel itself
             for (IdWrapper id : channelMap.keySet())
                 id.ccl.leftChannel(id.cc);
             channelMap.clear();
+            disconnect(false, "forced logout");
         } else {
             ByteBuffer buffer = ByteBuffer.allocate(3);
             buffer.putShort((short)1);
@@ -174,21 +169,33 @@ public final class LightweightClient implements ServerSession {
     }
 
     void loginSucceeded() {
-        connected = true;
+        loggedIn = true;
         listener.loggedIn();
     }
 
+    void loginFailed(String reason) {
+        assert loggedIn == false;
+        listener.loginFailed(reason);
+        closeSocketChannel();
+    }
+    
     void logoutSucceeded() {
         disconnect(true, "logout succeeded");
     }
     
-    void disconnect(boolean graceful, String reason) {
-        try {
-            channel.close();
-        } catch (IOException ioe) {}
+    private void closeSocketChannel() {
+        if (channel != null) {
+            try {
+                channel.close();
+            } catch (IOException ioe) {}
+        }
+    }
+    
+    synchronized void disconnect(boolean graceful, String reason) {
+        closeSocketChannel();
         
-        if (connected) {
-            connected = false;
+        if (loggedIn) {
+            loggedIn = false;
             listener.disconnected(graceful, reason);
         }
     }

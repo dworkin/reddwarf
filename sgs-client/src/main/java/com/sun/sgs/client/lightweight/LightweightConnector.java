@@ -37,10 +37,13 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,6 +57,27 @@ class LightweightConnector {
     private static final Logger logger =
             Logger.getLogger(LightweightConnector.class.getName());
 
+    private static class PendingConnection {
+        private final LightweightClient client;
+        private final SocketChannel channel;
+        
+        PendingConnection(LightweightClient client, SocketChannel channel) {
+            this.client = client;
+            this.channel = channel;
+        }
+        
+        void register(Selector selector) {
+            try {
+                channel.register(selector, SelectionKey.OP_READ, client);
+            } catch (ClosedChannelException ex) {
+                client.disconnect(false, "channel closed");
+            }
+        }
+    }
+    
+    private static final Queue<PendingConnection> pendingConnections =
+            new ConcurrentLinkedQueue<PendingConnection>();
+    
     // the selector for all incoming messages
     private final Selector selector;
 
@@ -78,8 +102,8 @@ class LightweightConnector {
         SocketChannel channel =
             SocketChannel.open(new InetSocketAddress(host, port));
         channel.configureBlocking(false);
+        pendingConnections.add(new PendingConnection(client, channel));
         selector.wakeup();
-        channel.register(selector, SelectionKey.OP_READ, client);
         return channel;
     }
 
@@ -99,38 +123,41 @@ class LightweightConnector {
         public void run() {
             try {
                 while (true) {
-                    // get the ready-set, or wait up to half a second...the
-                    // latter is done to force periodic pauses in case a
-                    // new channel is trying to register
-                    if ((selector.selectNow() > 0) ||
-                        (selector.select(500) > 0)) {
-                        Iterator<SelectionKey> it =
+                    selector.selectNow();
+                    
+                    // Check if any new connections
+                    PendingConnection pending;
+                    while ((pending = pendingConnections.poll()) != null) {
+                        pending.register(selector);
+                    }
+                    
+                    // Check for input
+                    Iterator<SelectionKey> it =
                             selector.selectedKeys().iterator();
-                        while (it.hasNext()) {
-                            SelectionKey key = it.next();
-                            it.remove();
-                            if (key.isValid()) {
-                                readBuffer.clear();
-                                SocketChannel channel =
+                    while (it.hasNext()) {
+                        SelectionKey key = it.next();
+                        it.remove();
+                        if (key.isValid()) {
+                            readBuffer.clear();
+                            SocketChannel channel =
                                     (SocketChannel)(key.channel());
-                                LightweightClient client =
+                            LightweightClient client =
                                     ((LightweightClient)(key.attachment()));
-                                int bytes = -1; // Will cause disconnect if read fails
-                                try {
-                                    bytes = channel.read(readBuffer);
-                                } catch (IOException ioe) {
-                                    logger.log(Level.WARNING,
-                                               "Exception from read", ioe);
-                                }
-                                if (bytes < 0) {
-                                    client.disconnect(false, "channel close");
-                                    continue;
-                                }
-                                readBuffer.limit(bytes);
-                                readBuffer.rewind();
-                                while (readBuffer.hasRemaining())
-                                    handleMessage(readBuffer, client);
+                            int bytes = -1; // Will cause disconnect if read fails
+                            try {
+                                bytes = channel.read(readBuffer);
+                            } catch (IOException ioe) {
+                                logger.log(Level.WARNING,
+                                           "Exception from read", ioe);
                             }
+                            if (bytes < 0) {
+                                client.disconnect(false, "channel closed");
+                                continue;
+                            }
+                            readBuffer.limit(bytes);
+                            readBuffer.rewind();
+                            while (readBuffer.hasRemaining())
+                                handleMessage(readBuffer, client);
                         }
                     }
                 }
@@ -154,7 +181,7 @@ class LightweightConnector {
                 // reason(String)
                 byte [] reason = new byte[buffer.getShort()];
                 buffer.get(reason);
-                client.getListener().loginFailed(new String(reason));
+                client.loginFailed(new String(reason));
                 break;
             case SimpleSgsProtocol.SESSION_MESSAGE:
                 // message(byte [])
