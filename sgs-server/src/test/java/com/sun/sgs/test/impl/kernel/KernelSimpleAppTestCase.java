@@ -73,7 +73,7 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	    StandardProperties.APP_LISTENER,
                 "com.sun.sgs.test.impl.kernel.SimpleApp",
 	    StandardProperties.APP_NAME, "SimpleApp",
-            com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY,
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 String.valueOf(getPort()),
 	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath(),
 	    "com.sun.sgs.impl.service.nodemap.server.start", "true",

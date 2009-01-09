@@ -1140,9 +1140,9 @@ public class TestWatchdogServiceImpl extends TestCase {
             // than an IllegalArgumentException.
  	    Properties props1 = getPropsForApplication(appName + "1");
  	    props1.setProperty(
-                com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY,
+                com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 props.getProperty(
-                    com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY));
+                    com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY));
 	    node1 = new SgsTestNode(appName, null, props1, true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {

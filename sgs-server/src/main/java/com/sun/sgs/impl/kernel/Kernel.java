@@ -239,7 +239,6 @@ class Kernel {
             taskScheduler.setContext(ctx);
 
             // collect the shared system components into a registry
-            systemRegistry.addComponent(new TransportFactoryImpl(appProperties));
             systemRegistry.addComponent(accessCoordinator);
             systemRegistry.addComponent(transactionScheduler);
             systemRegistry.addComponent(taskScheduler);

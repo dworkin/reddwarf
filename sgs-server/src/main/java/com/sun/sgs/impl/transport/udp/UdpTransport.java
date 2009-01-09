@@ -47,8 +47,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of a UDP {@link Transport}.
- * The {@link #UDP constructor} supports the following
+ * Implementation of a UdpTransport {@link Transport}.
+ * The {@link #UdpTransport constructor} supports the following
  * properties: <p>
  *
  * <dl style="margin-left: 1em">
@@ -71,7 +71,7 @@ import java.util.logging.Logger;
  *      The value must be between 1 and 65535.
  * </dl> <p>
  */
-public class UDP implements Transport {
+public class UdpTransport implements Transport {
     
     private static final String PKG_NAME = "com.sun.sgs.impl.transport.udp";
     
@@ -106,7 +106,7 @@ public class UDP implements Transport {
     private ConnectionHandler handler = null;
     
     /** The transport descriptor */
-    private final UDPDescriptor descriptor;
+    private final UdpDescriptor descriptor;
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -114,7 +114,7 @@ public class UDP implements Transport {
      * @param properties
      * @throws java.lang.Exception
      */
-    public UDP(Properties properties) throws Exception {
+    public UdpTransport(Properties properties) throws Exception {
         
         if (properties == null) {
             throw new NullPointerException("properties is null");
@@ -137,7 +137,7 @@ public class UDP implements Transport {
                                        new InetSocketAddress(host, port);
             
             descriptor =
-                    new UDPDescriptor(host == null ?
+                    new UdpDescriptor(host == null ?
                                       InetAddress.getLocalHost().getHostName() :
                                       host,
                                       listenAddress.getPort());

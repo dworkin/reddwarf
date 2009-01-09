@@ -19,24 +19,25 @@
 
 package com.sun.sgs.transport;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import java.lang.reflect.Constructor;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A factory for creating {@link Transport} instances for
  * sending and receiving messages.
- * A {@code TransportFactory} must have a constructor that takes
- * the following arguments:
- *
- * <ul>
- * <li>{@link java.util.Properties}</li>
- * <li>{@link com.sun.sgs.kernel.ComponentRegistry}</li>
- * <li>{@link com.sun.sgs.service.TransactionProxy}</li>
- * </ul>
  */
-public interface TransportFactory {
+public class TransportFactory {
 
+    private static final LoggerWrapper logger =
+      new LoggerWrapper(Logger.getLogger(TransportFactory.class.getName()));
+    
+    private TransportFactory() {}
+    
     /**
-     * Start a new transport.
+     * Create a new transport.
      * The transport name must resolve to a class that implements
      * {@link Transport}. The class should be public, not abstract, and should
      * provide a public constructor with a {@link Properties} parameter.
@@ -52,7 +53,40 @@ public interface TransportFactory {
      * {@link Transport}
      * @throws Exception thrown from the transport's constructor
      */
-    Transport startTransport(String transportClassName,
-                             Properties properties) throws Exception;
+    static public Transport newTransport(String transportClassName,
+                                    Properties properties)
+        throws Exception
+    {
+        if (properties == null) {
+            throw new NullPointerException("properties is null");
+        } else if (transportClassName == null) {
+            throw new NullPointerException("transportClassName is null");
+        }
+        logger.log(Level.FINE, "starting transport: {0}", transportClassName);
+        
+        Class<?> transportClass = Class.forName(transportClassName);
+    
+        if (!Transport.class.isAssignableFrom(transportClass))
+            throw new IllegalArgumentException(transportClassName +
+                               " class does not implement Transport interface");
+        
+        Constructor<?> [] constructors = transportClass.getConstructors();
+        Constructor<?> transportConstructor = null;
+        for (int i = 0; i < constructors.length; i++) {
+            Class<?> [] types = constructors[i].getParameterTypes();
+            if (types.length == 1) {
+                if (types[0].isAssignableFrom(Properties.class)) {
+                    transportConstructor = constructors[i];
+                    break;
+                }
+            }
+        }
+
+        if (transportConstructor == null)
+            throw new NoSuchMethodException("Could not find a constructor for "
+                                            + transportClass);
+        
+        return (Transport)transportConstructor.newInstance(properties);
+    }
 
 }

@@ -129,7 +129,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-            com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY, "20000");
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY, "20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;

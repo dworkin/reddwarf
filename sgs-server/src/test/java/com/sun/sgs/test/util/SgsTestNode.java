@@ -252,14 +252,14 @@ public class SgsTestNode {
         sessionService = getService(ClientSessionService.class);
         channelService = getService(ChannelServiceImpl.class);
 
-        // If an app node, we assume SimpleSgsProtocol and TCP transport
+        // If an app node, we assume SimpleSgsProtocol and TcpTransport transport
         // for the client IO stack.
         if (sessionService != null) {
             String portProp =
                     props.getProperty(
-                       com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY);
+                       com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY);
             appPort = portProp == null ?
-                            com.sun.sgs.impl.transport.tcp.TCP.DEFAULT_PORT :
+                            com.sun.sgs.impl.transport.tcp.TcpTransport.DEFAULT_PORT :
                             Integer.parseInt(portProp);
         }
     }
@@ -406,7 +406,7 @@ public class SgsTestNode {
             StandardProperties.APP_NAME, appName,
             StandardProperties.SERVER_START, startServer,
             StandardProperties.SERVER_HOST, "localhost",
-            com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY,
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,

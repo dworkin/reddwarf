@@ -43,8 +43,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of a TCP {@link Transport}.
- * The {@link #TCP constructor} supports the following
+ * Implementation of a TcpTransport {@link Transport}.
+ * The {@link #TcpTransport constructor} supports the following
  * properties: <p>
  *
  * <dl style="margin-left: 1em">
@@ -78,7 +78,7 @@ import java.util.logging.Logger;
  *      AsynchronousServerSocketChannel.bind} method.
  * </dl> <p>
  */
-public class TCP implements Transport {
+public class TcpTransport implements Transport {
  
     public static final String PKG_NAME = "com.sun.sgs.impl.transport.tcp";
     
@@ -122,7 +122,7 @@ public class TCP implements Transport {
     private ConnectionHandler handler = null;
     
     /** The transport descriptor */
-    private final TCPDescriptor descriptor;
+    private final TcpDescriptor descriptor;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -130,7 +130,7 @@ public class TCP implements Transport {
      * @param properties
      * @throws java.lang.Exception
      */
-    public TCP(Properties properties) throws Exception {
+    public TcpTransport(Properties properties) throws Exception {
         
         if (properties == null) {
             throw new NullPointerException("properties is null");
@@ -158,7 +158,7 @@ public class TCP implements Transport {
                                 new InetSocketAddress(host, port);
             
             descriptor =
-                    new TCPDescriptor(host == null ?
+                    new TcpDescriptor(host == null ?
                                       InetAddress.getLocalHost().getHostName() :
                                       host,
                                       listenAddress.getPort());

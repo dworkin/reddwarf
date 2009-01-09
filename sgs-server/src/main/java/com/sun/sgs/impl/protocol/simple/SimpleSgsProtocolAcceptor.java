@@ -106,7 +106,7 @@ public class SimpleSgsProtocolAcceptor
     
     /** The default transport */
     public static final String DEFAULT_TRANSPORT =
-        "com.sun.sgs.impl.transport.tcp.TCP";
+        "com.sun.sgs.impl.transport.tcp.TcpTransport";
             
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
     private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
@@ -128,9 +128,6 @@ public class SimpleSgsProtocolAcceptor
 
     /** The read buffer size for new connections. */
     protected final int readBufferSize;
-
-    /** The transport factory. */
-    protected final TransportFactory transportFactory;
     
     /** The transport */
     protected final Transport transport;
@@ -206,17 +203,13 @@ public class SimpleSgsProtocolAcceptor
 		200, Long.MAX_VALUE);
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
-	    
-            transportFactory =
-                systemRegistry.getComponent(TransportFactory.class);
             
             String transportClassName =
                     wrappedProps.getProperty(TRANSPORT_PROPERTY,
                                              DEFAULT_TRANSPORT);
             
-            transport =
-                transportFactory.startTransport(transportClassName,
-                                                properties);
+            transport = TransportFactory.newTransport(transportClassName,
+                                                      properties);
             
             if (!transport.getDescriptor().canSupport(Delivery.RELIABLE)) {
                 transport.shutdown();

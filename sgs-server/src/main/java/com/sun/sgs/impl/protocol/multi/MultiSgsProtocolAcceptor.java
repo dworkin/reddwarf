@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.protocol.multi;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -27,7 +26,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
-import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
@@ -35,7 +33,6 @@ import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
 import com.sun.sgs.transport.TransportFactory;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,16 +66,16 @@ public class MultiSgsProtocolAcceptor
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + "acceptor"));
 
-    /**
-     * The primary transport property. The primary transport must
-     * support RELIABLE delivery.
-     */
-    public static final String PRIMARY_TRANSPORT_PROPERTY =
-        PKG_NAME + ".transport.primary";
-    
-    /** The default primary transport */
-    public static final String DEFAULT_PRIMARY_TRANSPORT =
-        "com.sun.sgs.impl.transport.tcp.TCP";
+//    /**
+//     * The primary transport property. The primary transport must
+//     * support RELIABLE delivery.
+//     */
+//    public static final String PRIMARY_TRANSPORT_PROPERTY =
+//        PKG_NAME + ".transport.primary";
+//    
+//    /** The default primary transport */
+//    public static final String DEFAULT_PRIMARY_TRANSPORT =
+//        "com.sun.sgs.impl.transport.tcp.TcpTransport";
             
     /**  The secondary transport property. */
     public static final String SECONDARY_TRANSPORT_PROPERTY =
@@ -86,7 +83,7 @@ public class MultiSgsProtocolAcceptor
     
     /** The default primary transport */
     public static final String DEFAULT_SECONDARY_TRANSPORT =
-        "com.sun.sgs.impl.transport.udp.UDP";
+        "com.sun.sgs.impl.transport.udp.UdpTransport";
     
     /** The secondary transport. */
     private final Transport secondaryTransport;
@@ -131,8 +128,8 @@ public class MultiSgsProtocolAcceptor
             
             try {
                 secondaryTransport =
-		    transportFactory.startTransport(transportClassName,
-						    properties);
+                        TransportFactory.newTransport(transportClassName,
+						      properties);
             } catch (Exception e) {
                 transport.shutdown();
                 throw e;

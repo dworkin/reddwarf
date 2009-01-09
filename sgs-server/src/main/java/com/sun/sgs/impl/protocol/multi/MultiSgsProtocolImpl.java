@@ -24,12 +24,10 @@ import com.sun.sgs.impl.protocol.simple.AsynchronousMessageChannel;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
-import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**

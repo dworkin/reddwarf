@@ -333,7 +333,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 
         return UtilProperties.createProperties(
             StandardProperties.APP_NAME, appName,
-            com.sun.sgs.impl.transport.tcp.TCP.LISTEN_PORT_PROPERTY,
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 Integer.toString(SgsTestNode.getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
