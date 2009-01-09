@@ -174,7 +174,7 @@ public abstract class AbstractService implements Service {
      * @throws	IllegalStateException if this service is shutting down
      *		or is already shut down
      */
-    public void ready() {
+    public void ready() throws Exception {
 	logger.log(Level.FINEST, "ready");
 	synchronized (lock) {
 	    switch (state) {
@@ -200,8 +200,10 @@ public abstract class AbstractService implements Service {
      * Performs ready operations.  This method is invoked by the
      * {@link #ready ready} method only once so that the subclass can
      * perform any operations necessary during the "ready" phase.
+     *
+     * @throws Exception if a problem occurs
      */
-    protected abstract void doReady();
+    protected abstract void doReady() throws Exception;
 
     /**
      * {@inheritDoc}
@@ -623,7 +625,7 @@ public abstract class AbstractService implements Service {
      * and throws {@code IllegalStateException} if the thread is in a
      * transactional context.
      */
-    private void checkNonTransactionalContext() {
+    protected void checkNonTransactionalContext() {
 	try {
 	    txnProxy.getCurrentTransaction();
 	    throw new IllegalStateException(

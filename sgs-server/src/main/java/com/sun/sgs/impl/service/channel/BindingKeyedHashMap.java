@@ -27,6 +27,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -46,11 +47,9 @@ import java.util.Set;
  * bindings in the data service to store key/value pairs.  This map does
  * not permit {@code null} keys or values.
  *
- * <p>The {@code keyPrefix} specified during construction is used as a prefix
- * to each binding key the map uses for an entry. A key provided to this map's
- * methods must have a unique and reproducible {@code toString} result because
- * the {@code toString} result is used as a suffix of the binding's key in the
- * data service.
+ * <p>A key provided to this map's methods must have a unique and reproducible
+ * {@code toString} result because the {@code toString} result is used as a
+ * suffix of the binding's key in the data service.
  */
 public class BindingKeyedHashMap<K, V>
     extends AbstractMap<K, V>
@@ -59,6 +58,9 @@ public class BindingKeyedHashMap<K, V>
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
+    /** The key prefix's prefix. */
+    private static String PREFIX = BindingKeyedHashMap.class.getName() + "_";
+
     /** The key stop (works for alphanumeric keys). */
     private static final String KEY_STOP = "~";
 
@@ -66,16 +68,13 @@ public class BindingKeyedHashMap<K, V>
     private final String keyPrefix;
 
     /**
-     * Constructs an instance with the specified {@code keyPrefix}.
-     *
-     * @param	keyPrefix a key prefix
+     * Constructs an instance.
      */
-    public BindingKeyedHashMap(String keyPrefix) {
-	if (keyPrefix == null) {
-	    throw new NullPointerException("null keyPrefix");
-	}
-	this.keyPrefix = keyPrefix + ".";
-	ChannelServiceImpl.getDataService().setServiceBinding(
+    public BindingKeyedHashMap() {
+	DataService dataService = ChannelServiceImpl.getDataService();
+	this.keyPrefix = PREFIX + HexDumper.toHexString(
+	    dataService.createReference(this).getId().toByteArray()) + ".";
+	dataService.setServiceBinding(
 	    getBindingName(KEY_STOP), KeyValuePair.createKeyStop());
 	
 	// TBD: have "key start" too?
@@ -110,7 +109,6 @@ public class BindingKeyedHashMap<K, V>
 	ChannelServiceImpl.getDataService().
 	    setServiceBinding(getBindingName(key.toString()), pair);
     }
-    
 
     /** {@inheritDoc} */
     public V get(Object key) {

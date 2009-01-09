@@ -67,8 +67,6 @@ public class TestBindingKeyedHashMap extends TestCase {
     /** A fixed random number generator for use in the test. */
     private static final Random RANDOM = new Random(1337);
 
-    private static final String NAME = "name";
-
     /**
      * Test management.
      */
@@ -88,24 +86,6 @@ public class TestBindingKeyedHashMap extends TestCase {
     }
 
     /*
-     * Test constructor
-     */
-
-    @Test public void testConstructorNullArg() throws Exception {
-	txnScheduler.runTask(
-	    new TestAbstractKernelRunnable() {
-		public void run() throws Exception {
-		    try {
-			BindingKeyedHashMap test =
-			    new BindingKeyedHashMap<Integer,Integer>(null);
-			fail("expected NullPointerException");
-		    } catch (NullPointerException e) {
-		    }
-		}
-	    }, taskOwner);
-    }
-
-    /*
      * Test putAll
      */
 
@@ -119,7 +99,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 			control.put(i,i);
 		    }
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    test.putAll(control);
 		    assertEquals(control, test);
 		}
@@ -131,7 +111,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    try {
 			test.putAll(null);
 			fail("Expected NullPointerException");
@@ -146,7 +126,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Object,Object> test =
-			new BindingKeyedHashMap<Object,Object>(NAME);
+			new BindingKeyedHashMap<Object,Object>();
 		    Object nonSerializable = Thread.currentThread();
 		    Map<Object,Object> other = new HashMap<Object,Object>();
 		    other.put(nonSerializable, Boolean.TRUE);
@@ -171,7 +151,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Object,Object> test =
-			new BindingKeyedHashMap<Object,Object>(NAME);
+			new BindingKeyedHashMap<Object,Object>();
 		    Map<Object,Object> other = new HashMap<Object,Object>();
 		    other.put(null, Boolean.TRUE);
 		    try {
@@ -199,7 +179,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test =
-			new BindingKeyedHashMap<Integer,Foo>(NAME);
+			new BindingKeyedHashMap<Integer,Foo>();
 		    Foo result = test.put(1, new Foo(1));
 		    assertEquals(null, result);
 		    result = test.put(1, new Foo(1));
@@ -215,7 +195,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Object,Object> test =
-			new BindingKeyedHashMap<Object,Object>(NAME);
+			new BindingKeyedHashMap<Object,Object>();
 		    Object nonSerializable = Thread.currentThread();
 		    try {
 			test.put(nonSerializable, Boolean.TRUE);
@@ -238,7 +218,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -279,7 +259,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -324,7 +304,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<String,Integer> test =
-			new BindingKeyedHashMap<String,Integer>(NAME);
+			new BindingKeyedHashMap<String,Integer>();
 		    try {
 			test.put(null, 0);
 			fail("expected NullPointerException");
@@ -339,7 +319,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,String> test =
-			new BindingKeyedHashMap<Integer,String>(NAME);
+			new BindingKeyedHashMap<Integer,String>();
 		    try {
 			test.put(0, null);
 			fail("expected NullPointerException");
@@ -358,7 +338,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test =
-			new BindingKeyedHashMap<Integer,Foo>(NAME);
+			new BindingKeyedHashMap<Integer,Foo>();
 		    assertEquals(null, test.get(1));
 		    test.put(1, new Foo(1));
 		    assertEquals(new Foo(1), test.get(1));
@@ -373,7 +353,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -414,7 +394,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -445,7 +425,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<String,Integer> test =
-			new BindingKeyedHashMap<String,Integer>(NAME);
+			new BindingKeyedHashMap<String,Integer>();
 		    try {
 			test.get(null);
 			fail("expected NullPointerException");
@@ -464,7 +444,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test =
-			new BindingKeyedHashMap<Integer,Foo>(NAME);
+			new BindingKeyedHashMap<Integer,Foo>();
 		    assertFalse(test.containsKey(1));
 		    test.put(1, new Foo(1));
 		    assertTrue(test.containsKey(1));
@@ -479,7 +459,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<String,Integer> test =
-			new BindingKeyedHashMap<String,Integer>(NAME);
+			new BindingKeyedHashMap<String,Integer>();
 		    try {
 			test.containsKey(null);
 			fail("expected NullPointerException");
@@ -494,7 +474,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -528,7 +508,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -562,7 +542,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -590,7 +570,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test =
-			new BindingKeyedHashMap<Integer,Foo>(NAME);
+			new BindingKeyedHashMap<Integer,Foo>();
 		    assertFalse(test.containsValue(new Foo(1)));
 		    test.put(1, new Foo(1));
 		    assertTrue(test.containsValue(new Foo(1)));
@@ -606,7 +586,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    try {
 			test.containsValue(null);
 			fail("expected NullPointerException");
@@ -622,7 +602,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -656,7 +636,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -690,7 +670,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -714,7 +694,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -745,7 +725,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Collection<Integer> values = test.values();
 		    
 		    assertTrue(values.isEmpty());
@@ -783,7 +763,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Collection<Integer> control = new ArrayList<Integer>(50);
 
 		    int[] inputs = new int[50];
@@ -811,7 +791,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map test = new BindingKeyedHashMap(NAME);
+		    Map test = new BindingKeyedHashMap();
 		    Set keys = test.keySet();
 		    assertEquals(controlKeys, keys);
 		    assertIteratorDone(keys.iterator());
@@ -852,7 +832,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map test = new BindingKeyedHashMap(NAME);
+		    Map test = new BindingKeyedHashMap();
 		    Set entries = test.entrySet();
 		    assertEquals(controlEntries, entries);
 		    assertIteratorDone(entries.iterator());
@@ -891,7 +871,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    assertFalse(test.equals(null));
 		    assertFalse(test.equals(1));
 		    assertTrue(control.equals(test));
@@ -927,7 +907,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    assertEquals("{}", test.toString());
 		    test.put(1, 2);
 		    assertEquals("{1=2}", test.toString());
@@ -944,7 +924,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test =
-			new BindingKeyedHashMap<Integer,Foo>(NAME);
+			new BindingKeyedHashMap<Integer,Foo>();
 		    assertEquals(null, test.remove(1));
 		    test.put(1, new Foo(1));
 		    assertEquals(null, test.remove(2));
@@ -961,7 +941,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<String,Integer> test =
-			new BindingKeyedHashMap<String,Integer>(NAME);
+			new BindingKeyedHashMap<String,Integer>();
 		    try {
 			test.remove(null);
 			fail("expected NullPointerException");
@@ -976,7 +956,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -1017,7 +997,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -1056,7 +1036,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1090,7 +1070,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    test.clear();
 		    assertEquals(control, test);
 
@@ -1141,7 +1121,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1162,7 +1142,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1181,7 +1161,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1207,7 +1187,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1233,7 +1213,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1259,7 +1239,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1286,7 +1266,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new LinkedHashMap<Integer,Integer>();
 
@@ -1316,7 +1296,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new LinkedHashMap<Integer,Integer>();
 
@@ -1342,7 +1322,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1392,7 +1372,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1420,7 +1400,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1450,7 +1430,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1478,7 +1458,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1521,7 +1501,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1570,7 +1550,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1613,7 +1593,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -1647,7 +1627,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 
 		    // put in numbers
 		    for (int i = 4000; i < 4100; i++) {
@@ -1671,7 +1651,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 
 		    assertEquals(0, test.size());
 		    assertTrue(test.isEmpty());
@@ -1707,7 +1687,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 
 		    int SAMPLE_SIZE = 10;
 
@@ -1743,7 +1723,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 		public void run() throws Exception {
 		    // create a tree with an artificially small leaf size
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 
 		    assertEquals(0, test.size());
 
@@ -1774,7 +1754,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 		public void run() throws Exception {
 		    // create a tree with an artificially small leaf size
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 
 		    assertEquals(0, test.size());
 
@@ -1834,7 +1814,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Foo> test =
-			new BindingKeyedHashMap<Integer,Foo>(NAME);
+			new BindingKeyedHashMap<Integer,Foo>();
 		    Set<Integer> keys = test.keySet();
 		    Iterator<Integer> keysIter = keys.iterator();
 		    try {
@@ -1882,7 +1862,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    BindingKeyedHashMap test = new BindingKeyedHashMap(NAME);
+		    BindingKeyedHashMap test = new BindingKeyedHashMap();
 		    dataService.setBinding("test", test);
 		    Bar bar = new Bar(1);
 		    dataService.setBinding("bar", bar);
@@ -1931,7 +1911,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Set<Integer> control = new HashSet<Integer>();
 
 		    // get from outside the range of the put
@@ -1956,7 +1936,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 		public void run() throws Exception {
 		    // create a tree with an artificially small leaf size
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    HashMap<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2023,7 +2003,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Set<Integer> control = new HashSet<Integer>();
 
 		    // get from outside the range of the put
@@ -2046,7 +2026,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Set<Integer> control = new HashSet<Integer>();
 
 		    // get from outside the range of the put
@@ -2069,7 +2049,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Set<Integer> control = new HashSet<Integer>();
 
 		    // get from outside the range of the put
@@ -2092,7 +2072,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Set<Integer> control = new HashSet<Integer>();
 
 		    // get from outside the range of the put
@@ -2115,7 +2095,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 
 		    // put in numbers
 		    for (int i = 4000; i < 4100; i++) {
@@ -2136,7 +2116,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer, Integer>(NAME);
+			new BindingKeyedHashMap<Integer, Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2173,7 +2153,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    Map<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2216,7 +2196,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Bar,Foo> test = new BindingKeyedHashMap<Bar,Foo>(NAME);
+		    Map<Bar,Foo> test = new BindingKeyedHashMap<Bar,Foo>();
 		    Map<Bar,Foo> control = new HashMap<Bar,Foo>();
 
 		    for (int i = 0; i < 64; i++) {
@@ -2232,7 +2212,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Foo,Bar> test = new BindingKeyedHashMap<Foo,Bar>(NAME);
+		    Map<Foo,Bar> test = new BindingKeyedHashMap<Foo,Bar>();
 		    Map<Foo,Bar> control = new HashMap<Foo,Bar>();
 
 		    for (int i = 0; i < 64; i++) {
@@ -2248,7 +2228,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Bar,Bar> test = new BindingKeyedHashMap<Bar,Bar>(NAME);
+		    Map<Bar,Bar> test = new BindingKeyedHashMap<Bar,Bar>();
 		    Map<Bar,Bar> control = new HashMap<Bar,Bar>();
 
 		    for (int i = 0; i < 64; i++) {
@@ -2266,7 +2246,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Foo,Foo> test = new BindingKeyedHashMap<Foo,Foo>(NAME);
+		    Map<Foo,Foo> test = new BindingKeyedHashMap<Foo,Foo>();
 		    Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
 		    for (int i = 0; i < 64; i++) {
@@ -2289,7 +2269,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Foo,Foo> test = new BindingKeyedHashMap<Foo,Foo>(NAME);
+		    Map<Foo,Foo> test = new BindingKeyedHashMap<Foo,Foo>();
 		    Map<Foo,Foo> control = new HashMap<Foo,Foo>();
 
 		    for (int i = 0; i < 64; i++) {
@@ -2322,7 +2302,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2358,7 +2338,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2413,7 +2393,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2473,7 +2453,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2529,7 +2509,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
 
@@ -2606,7 +2586,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Equals,Integer> test =
-			new BindingKeyedHashMap<Equals,Integer>(NAME);
+			new BindingKeyedHashMap<Equals,Integer>();
 		    Map<Equals,Integer> control =
 			new HashMap<Equals,Integer>();
 
@@ -2657,7 +2637,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Equals,Integer> test =
-			new BindingKeyedHashMap<Equals,Integer>(NAME);
+			new BindingKeyedHashMap<Equals,Integer>();
 		    Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 		    int[] a = new int[128];
@@ -2716,7 +2696,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Equals,Integer> test =
-			new BindingKeyedHashMap<Equals,Integer>(NAME);
+			new BindingKeyedHashMap<Equals,Integer>();
 		    Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 		    // immediately get the iterator while the map size is zero
@@ -2767,7 +2747,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Equals,Integer> test =
-			new BindingKeyedHashMap<Equals,Integer>(NAME);
+			new BindingKeyedHashMap<Equals,Integer>();
 		    Map<Equals,Integer> control = new HashMap<Equals,Integer>();
 
 		    int[] a = new int[128];
@@ -2840,11 +2820,11 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    BindingKeyedHashMap<Integer,Integer> test =
-			new BindingKeyedHashMap<Integer,Integer>(NAME);
+			new BindingKeyedHashMap<Integer,Integer>();
 		    for (int i =0; i < 10; i++) {
 			test.put(i, i);
 		    }
-		    AppContext.getDataManager().setBinding(NAME, test);
+		    AppContext.getDataManager().setBinding("test", test);
 		} },
 	    taskOwner);
 	int countAfterCreation = getObjectCount();
@@ -2853,7 +2833,7 @@ public class TestBindingKeyedHashMap extends TestCase {
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    DataManager dm = AppContext.getDataManager();
-		    ManagedObject obj = dm.getBinding(NAME);
+		    ManagedObject obj = dm.getBinding("test");
 		    dm.removeObject(obj);
 		} },
 	    taskOwner);

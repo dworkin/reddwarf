@@ -107,7 +107,7 @@ public final class ChannelServiceImpl
 
     /** The channel servers map key. */
     private static final String CHANNEL_SERVERS_MAP_KEY =
-	PKG_NAME + "channelServersMap";
+	PKG_NAME + ".channelServersMap";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -329,7 +329,20 @@ public final class ChannelServiceImpl
     }
     
      /** {@inheritDoc} */
-    protected void doReady() {
+    protected void doReady() throws Exception {
+	/*
+	 * Create global channels map, if not already created.  The global
+	 * channels map can't (currently) be created during service
+	 * construction if the channels map is a ScalableHashMap (because
+	 * DataManager is not yet available in the AppContext).
+	 * -- awol (1/8/09)
+	 */
+	transactionScheduler.runTask(
+	    new AbstractKernelRunnable("StoreChannelsMap") {
+		public void run() {
+		    ChannelImpl.getChannelsMap();
+		    ChannelImpl.getNodeToEventQueuesMap();
+		} },  taskOwner);
     }
 
     /** {@inheritDoc} */
@@ -1255,7 +1268,8 @@ public final class ChannelServiceImpl
 
     /**
      * Returns the channel servers map, keyed by node ID.  Creates and
-     * stores the map if it doesn't already exist.
+     * stores the map if it doesn't already exist.  This method must be run
+     * within a transaction.
      */
     private static ManagedObjectValueMap<Long, ChannelServer>
 	getChannelServersMap()
@@ -1267,8 +1281,7 @@ public final class ChannelServiceImpl
 		dataService.getServiceBinding(CHANNEL_SERVERS_MAP_KEY));
 	} catch (NameNotBoundException e) {
 	    channelServersMap =
-		new BindingKeyedHashMap<Long, ChannelServer>(
-		    CHANNEL_SERVERS_MAP_KEY + ".entry");
+		new BindingKeyedHashMap<Long, ChannelServer>();
 	    dataService.setServiceBinding(CHANNEL_SERVERS_MAP_KEY,
 					  channelServersMap);
 	}

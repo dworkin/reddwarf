@@ -778,6 +778,7 @@ public class TestChannelServiceImpl extends TestCase {
 	try {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
+	    printServiceBindings();
 	    closeChannel(channelName);
 	    Thread.sleep(1000);
 	    assertEquals(count, getObjectCount());
@@ -1615,7 +1616,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    client.disconnect();
 	}
     }
-    
+
     // -- END TEST CASES --
 
     private class ClientGroup {
@@ -2754,7 +2755,14 @@ public class TestChannelServiceImpl extends TestCase {
 		Object obj = ref.get();
                 String name = obj.getClass().getName();
                 if (! name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
-		    System.err.println(count + ": " + obj.toString());
+		    /*
+		    System.err.print(count + "[" + obj.getClass().getName() + "]:");
+		    try {
+			System.err.println(obj.toString());
+		    } catch (ObjectNotFoundException e) {
+			System.err.println("<< caught ObjectNotFoundException >>");
+		    }
+		    */
                     count++;
 		}
                 last = next;
