@@ -41,6 +41,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
+import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
@@ -593,18 +594,24 @@ class Kernel {
      * and {@code false} otherwise
      */
     private boolean isWatchdogService(Class<?> serviceClass) {
-	String watchdogServiceProperty = appProperties.getProperty(
-		StandardProperties.WATCHDOG_SERVICE);
-	if (watchdogServiceProperty == null) { 
-	    System.err.println("returned false");
-	    return false;
-	}
-	int index = watchdogServiceProperty.lastIndexOf(".");
-	String watchdogServiceClassName = watchdogServiceProperty.
-		substring(index).toUpperCase();
-	
-	return serviceClass.getName().toUpperCase().contains(
-		watchdogServiceClassName);
+    	
+    //FIXME: getting property always seems to fail, so this does not work
+	//	String watchdogServiceProperty = appProperties.getProperty(
+	//		StandardProperties.WATCHDOG_SERVICE);
+	//	if (watchdogServiceProperty == null) { 
+	//	    System.err.println("returned false!!");
+	//	    return false;
+	//	}
+	//	int index = watchdogServiceProperty.lastIndexOf(".");
+	//	String watchdogServiceClassName = watchdogServiceProperty.
+	//		substring(index).toUpperCase();
+	//	
+	//	return serviceClass.getName().toUpperCase().contains(
+	//		watchdogServiceClassName);
+
+    	//FIXME: this method is not great since implementation can change
+    	//       the serviceClass should be an interface
+    	return serviceClass.getName().equals(WatchdogServiceImpl.class.getName());
     }
     
     /**

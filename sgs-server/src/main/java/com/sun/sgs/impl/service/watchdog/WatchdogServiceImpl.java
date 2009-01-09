@@ -847,8 +847,8 @@ public final class WatchdogServiceImpl extends AbstractService implements
      * Implements the WatchdogClient that receives callbacks from the
      * WatchdogServer.
      */
-    private final class ComponentWatchdogClientImpl implements
-	    ComponentWatchdogClient {
+    private final class ComponentWatchdogClientImpl /* implements
+	    ComponentWatchdogClient */ {
 
 	/**
 	 * {@inheritDoc}
