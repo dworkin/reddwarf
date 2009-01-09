@@ -47,10 +47,12 @@ class SimpleTaskReservation implements TaskReservation {
      */
     public SimpleTaskReservation(SchedulerQueue queue,
                                  ScheduledTask task) {
-        if (queue == null)
+        if (queue == null) {
             throw new NullPointerException("Queue cannot be null");
-        if (task == null)
+        }
+        if (task == null) {
             throw new NullPointerException("Task cannot be null");
+        }
 
         this.queue = queue;
         this.task = task;
@@ -60,8 +62,9 @@ class SimpleTaskReservation implements TaskReservation {
      * {@inheritDoc}
      */
     public synchronized void cancel() {
-        if (finished)
+        if (finished) {
             throw new IllegalStateException("cannot cancel reservation");
+        }
         finished = true;
     }
 
@@ -70,8 +73,9 @@ class SimpleTaskReservation implements TaskReservation {
      */
     public void use() {
         synchronized (this) {
-            if (finished)
+            if (finished) {
                 throw new IllegalStateException("cannot use reservation");
+            }
             finished = true;
         }
         queue.addTask(task);
