@@ -15,7 +15,7 @@
   <artifactId>sgs-server-parent</artifactId>
   <name>Project Darkstar Server Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.8-SNAPSHOT</version>
+  <version>0.9.9-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -180,7 +180,9 @@
   <properties>
     <sgs.version>${version}</sgs.version>
     <sgs-shared.version>1.3</sgs-shared.version>
-    <sgs-client.version>0.9.7.3</sgs-client.version>
+    <sgs-client.version>0.9.8</sgs-client.version>
+    <bdb.version>4.5.20</bdb.version>
+    <bdb.je.version>3.2.76</bdb.je.version>
   </properties>
 
 </project>

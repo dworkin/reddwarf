@@ -74,8 +74,11 @@ import javax.management.ObjectName;
  * kernel to collect and report profiling data. It uses a single thread to
  * consume and report profiling data.
  */
-public final class ProfileCollectorImpl implements ProfileCollector { 
-    /** The standard prefix for consumer names created by core packages. */
+public final class ProfileCollectorImpl implements ProfileCollector {
+
+    /**
+     * The standard prefix for consumer names created by core packages.
+     */
     public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
     
     // the logger for this class
