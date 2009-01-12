@@ -26,6 +26,7 @@ import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
+import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
@@ -34,141 +35,125 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Properties;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
 /**
  * Test the TcpTransport transport.
  */
-public class TestTcpTransport extends TestCase {
+@RunWith(NameRunner.class)
+public class TestTcpTransport {
+    
+    private volatile Transport transport;
+    
+    @Before
+    public void setUp() throws Exception {
+        transport = null;
+    }
 
-    public TestTcpTransport(String name) {
-        super(name);
+    @After
+    public void tearDown() throws Exception {
+        shutdown();
     }
     
-    @Override
-    protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
+    @Test(expected=NullPointerException.class)
+    public void testNullProperties() throws Exception {        
+        transport = new TcpTransport(null); 
     }
     
-    public void testNullProperties() throws Exception {
-        try {
-            final Transport transport = new TcpTransport(null);
-            shutdown(transport);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException npe) {
-            System.err.println(npe);
-        }
-    }
-    
+    @Test
     public void testDefaults() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        try {
-            if (transport.getDescriptor() == null)
-                fail("Null descriptor");
-        } finally {
-            shutdown(transport);
-        }
-    }
-    
-    public void testShutdown() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        transport.shutdown();
-    }
-    
-    public void testNullHandler() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        try {
-            transport.accept(null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException npe) {
-            System.err.println(npe);
-        } finally {
-            shutdown(transport);
-        }
-    }
-    
-    public void testAcceptAfterShutdown() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        try {
-            transport.shutdown();
-            transport.accept(new DummyHandler());
-            fail("Expected IllegalStateException");
-        } catch (IllegalStateException ise) {
-            System.err.println(ise);
-        }
-    }
-    
-    public void testAccept() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        try {
-            transport.accept(new DummyHandler());
-        } finally {
-            shutdown(transport);
-        }
-    }
-    
-    public void testAcceptConnect() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        try {
-            DummyHandler handler = new DummyHandler();
-            transport.accept(handler);
-            final DummyClient client = new DummyClient("testAcceptConnect");
-            client.connect(TcpTransport.DEFAULT_PORT);    
-            if (!handler.isConnected()) {
-                fail("Server did not receive connect");
-            }
-        } finally {
-            shutdown(transport);
-        }
-    }
-    
-    public void testServerDisconnect() throws Exception {
-        final Transport transport = new TcpTransport(new Properties());
-        try {
-            DummyHandler handler = new DummyHandler();
-            transport.accept(handler);
-            final DummyClient client = new DummyClient("testServerDisconnect");
-            client.connect(TcpTransport.DEFAULT_PORT);
-                
-            if (!handler.isConnected()) {
-                fail("Server did not receive connect");
-            }
-            transport.shutdown();
-            
-            if (client.waitForDisconnect()) {
-                fail("Client did not receive disconnect");
-            }
-        } finally {
-            shutdown(transport);
-        }
-    }
+        transport = new TcpTransport(new Properties());
         
-//    public void testClientDisconnect() throws Exception {
-//        final Transport transport = new TcpTransport(new Properties());
-//        try {
-//            DummyHandler handler = new DummyHandler();
-//            transport.accept(handler);
-//            final DummyClient client = new DummyClient("testClientDisconnect");
-//            client.connect(TcpTransport.DEFAULT_PORT);
-//                
-//            if (!handler.isConnected()) {
-//                fail("Server did not receive connect");
-//            }
-//            client.disconnect();
-//            
-//            if (handler.isConnected()) {
-//                fail("Server did not receive disconnect");
-//            }
-//        } finally {
-//            shutdown(transport);
-//        }
-//    }
+        if (transport.getDescriptor() == null)
+            throw new Exception("Null descriptor");
+        shutdown();
+    }
+    
+    @Test
+    public void testShutdown() throws Exception {
+        transport = new TcpTransport(new Properties());
+        transport.shutdown();
+        shutdown();
+    }
+    
+    @Test(expected=NullPointerException.class)
+    public void testNullHandler() throws Exception {
+        transport = new TcpTransport(new Properties());
+        transport.accept(null);
+    }
+    
+    @Test(expected=IllegalStateException.class)
+    public void testAcceptAfterShutdown() throws Exception {
+        transport = new TcpTransport(new Properties());
+        Transport t = transport;
+        shutdown();
+        t.accept(new DummyHandler());
+    }
+    
+    @Test
+    public void testAccept() throws Exception {
+        transport = new TcpTransport(new Properties());
+        transport.accept(new DummyHandler());
+        shutdown();
+    }
+    
+    @Test
+    public void testAcceptConnect() throws Exception {
+        transport = new TcpTransport(new Properties());
+        DummyHandler handler = new DummyHandler();
+        transport.accept(handler);
+        final DummyClient client = new DummyClient("testAcceptConnect");
+        client.connect(TcpTransport.DEFAULT_PORT);    
+        if (!handler.isConnected()) {
+            throw new Exception("Server did not receive connect");
+        }
+        shutdown();
+    }
+    
+    @Test
+    public void testServerDisconnect() throws Exception {
+        transport = new TcpTransport(new Properties());
+        DummyHandler handler = new DummyHandler();
+        transport.accept(handler);
+        final DummyClient client = new DummyClient("testServerDisconnect");
+        client.connect(TcpTransport.DEFAULT_PORT);
+
+        if (!handler.isConnected()) {
+            throw new Exception("Server did not receive connect");
+        }
+        shutdown();
+
+        if (client.waitForDisconnect()) {
+            throw new Exception("Client did not receive disconnect");
+        }
+    }
       
-    private void shutdown(Transport transport) {
-        try {
+    @Test
+    public void testClientDisconnect() throws Exception {
+        transport = new TcpTransport(new Properties());
+        DummyHandler handler = new DummyHandler();
+        transport.accept(handler);
+        final DummyClient client = new DummyClient("testClientDisconnect");
+        client.connect(TcpTransport.DEFAULT_PORT);
+
+        if (!handler.isConnected()) {
+            throw new Exception("Server did not receive connect");
+        }
+        client.disconnect();
+
+//        if (handler.isConnected()) {
+//            throw new Exception("Server did not receive disconnect");
+//        }
+        shutdown();
+    }
+      
+    private void shutdown() {
+        if (transport != null) {
             transport.shutdown();
-        } catch (Exception e) {
-            System.err.println("Exception during shutdown: " + e);
+            transport = null;
         }
     }
 
@@ -319,7 +304,7 @@ public class TestTcpTransport extends TestCase {
 
             @Override
             public void bytesReceived(Connection arg0, byte[] arg1) {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
 	}
     }

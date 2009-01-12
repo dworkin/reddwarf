@@ -19,20 +19,13 @@
 
 package com.sun.sgs.transport;
 
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import java.lang.reflect.Constructor;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * A factory for creating {@link Transport} instances for
- * sending and receiving messages.
+ * A factory for creating {@link Transport} instances.
  */
 public class TransportFactory {
-
-    private static final LoggerWrapper logger =
-      new LoggerWrapper(Logger.getLogger(TransportFactory.class.getName()));
     
     private TransportFactory() {}
     
@@ -48,10 +41,15 @@ public class TransportFactory {
      * {@link Transport}
      * @param properties properties passed to the transport's constructor
      * @return the transport object
-     * @throws IllegalArgumentException if any argument is {@code null} or if
-     * the class specified by {@code transportClassName} does not implement
-     * {@link Transport}
-     * @throws Exception thrown from the transport's constructor
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws ClassNotFoundException if the class specified by
+     * {@code transportClassName} can not be found
+     * @throws IllegalArgumentException if the class specified by
+     * {@code transportClassName} does not implement {@link Transport}
+     * @throws NoSuchMethodException is the class specified by
+     * {@code transportClassName} does not have the required constructor
+     * @throws InvocationTargetException if an exception is thrown from the
+     * transport's constructor
      */
     static public Transport newTransport(String transportClassName,
                                     Properties properties)
@@ -61,9 +59,7 @@ public class TransportFactory {
             throw new NullPointerException("properties is null");
         } else if (transportClassName == null) {
             throw new NullPointerException("transportClassName is null");
-        }
-        logger.log(Level.FINE, "starting transport: {0}", transportClassName);
-        
+        }        
         Class<?> transportClass = Class.forName(transportClassName);
     
         if (!Transport.class.isAssignableFrom(transportClass))
@@ -88,5 +84,4 @@ public class TransportFactory {
         
         return (Transport)transportConstructor.newInstance(properties);
     }
-
 }

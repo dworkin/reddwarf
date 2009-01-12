@@ -21,8 +21,8 @@ package com.sun.sgs.transport;
 
 /**
  * I/O transport. A transport object handles incoming connection request for
- * a specific transport type. A {@code Transport} must have a constructor that
- * takes the following argument:
+ * a specific transport type. A {@code Transport} must have a public
+ * constructor that takes the following argument:
  *
  * <ul>
  * <li>{@link java.util.Properties}</li>
@@ -41,12 +41,14 @@ public interface Transport {
     TransportDescriptor getDescriptor();
     
     /**
-     * Start accepting connections. the transport, calling the specified
-     * {@code handler} when a connection is received. Once {@code accept} has
+     * Start accepting connections. The transport, will invoke the specified
+     * {@code handler}'s {@link ConnectionHandler#newConnection newConnection}
+     * method when a connection is received. Once {@code accept} has
      * been called, subsequent invocations will have no affect. If
      * {@link #shutdown} has been called this method will throw an
      * {@code IllegalStateException}.
      * @param handler the connection handler
+     * @throws IllegalStateException is the transport has been shutdown
      */
     void accept(ConnectionHandler handler);
     

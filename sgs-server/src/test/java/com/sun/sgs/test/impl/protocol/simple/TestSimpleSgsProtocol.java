@@ -33,6 +33,7 @@ import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
+import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SgsTestNode.DummyAppListener;
 import com.sun.sgs.transport.ConnectionHandler;
@@ -42,100 +43,100 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Properties;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import junit.framework.TestCase;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
 /**
  * Test the simple sgs protocol.
  */
-public class TestSimpleSgsProtocol extends TestCase {
+@RunWith(NameRunner.class)
+public class TestSimpleSgsProtocol {
 
     private static final String APP_NAME = "TestSimpleSgsProtocol";
     
     private SgsTestNode serverNode;
-
-    public TestSimpleSgsProtocol(String name) {
-        super(name);
-    }
     
-    @Override
-    protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
+    private volatile ProtocolAcceptor acceptor;
+    
+    @Before
+    public void setUp() throws Exception {
         Properties props = 
             SgsTestNode.getDefaultProperties(APP_NAME, null, 
                                              DummyAppListener.class);
         serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, true);
+        acceptor = null;
     }
 
-    @Override
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
+        close();
         Thread.sleep(100);
         serverNode.shutdown(true);
         serverNode = null;
     }
     
+    @Test(expected=NullPointerException.class)
     public void testNullProperties() throws Exception {
-        try {
-            new SimpleSgsProtocolAcceptor(null,
-                                          serverNode.getSystemRegistry(),
-                                          serverNode.getProxy());
-            fail("Expected NullPointerException");
-        } catch (NullPointerException npe) {
-            System.err.println(npe);
-        }
+        acceptor = new SimpleSgsProtocolAcceptor(null,
+                                                 serverNode.getSystemRegistry(),
+                                                 serverNode.getProxy());
     }
     
+    @Test
     public void testDefaults() throws Exception {
         final Properties props = new Properties();
         props.setProperty(StandardProperties.APP_NAME, APP_NAME);
-        final ProtocolAcceptor acceptor =
-                new SimpleSgsProtocolAcceptor(props,
-                                              serverNode.getSystemRegistry(),
-                                              serverNode.getProxy());
-        acceptor.close();
+        acceptor = new SimpleSgsProtocolAcceptor(props,
+                                                 serverNode.getSystemRegistry(),
+                                                 serverNode.getProxy());
+        close();
     }
     
+    @Test
     public void testAcceptNPE() throws Exception {
         final Properties props = new Properties();
         props.setProperty(StandardProperties.APP_NAME, APP_NAME);
-        props.setProperty(com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor.TRANSPORT_PROPERTY,
+        props.setProperty(SimpleSgsProtocolAcceptor.TRANSPORT_PROPERTY,
                           DummyTransport.class.getName());
  
-        final ProtocolAcceptor acceptor =
-            new SimpleSgsProtocolAcceptor(props,
-                                          serverNode.getSystemRegistry(),
-                                          serverNode.getProxy());
+        acceptor = new SimpleSgsProtocolAcceptor(props,
+                                                 serverNode.getSystemRegistry(),
+                                                 serverNode.getProxy());
         try {
             acceptor.accept(null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException npe) {
-            System.err.println(npe);
+            throw new Exception("Expected NullPointerException");
+        } catch (NullPointerException expected) {}
+    }
+    
+    @Test
+    public void testAccept() throws Exception {
+        final Properties props = new Properties();
+        props.setProperty(StandardProperties.APP_NAME, APP_NAME);
+        props.setProperty(SimpleSgsProtocolAcceptor.TRANSPORT_PROPERTY,
+                          DummyTransport.class.getName());
+ 
+        acceptor = new SimpleSgsProtocolAcceptor(props,
+                                                 serverNode.getSystemRegistry(),
+                                                 serverNode.getProxy());
+        DummyListener listener = new DummyListener();
+        acceptor.accept(listener);
+        close();
+    }
+    
+    private void close() throws IOException {
+        if (acceptor != null) {
+            acceptor.close();
+            acceptor = null;
         }
     }
     
-//    public void testAccept() throws Exception {
-//        final Properties props = new Properties();
-//        props.setProperty(StandardProperties.APP_NAME, APP_NAME);
-//        props.setProperty(com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor.TRANSPORT_PROPERTY,
-//                          DummyTransport.class.getName());
-// 
-//        final ProtocolAcceptor acceptor =
-//            new SimpleSgsProtocolAcceptor(props,
-//                                          serverNode.getSystemRegistry(),
-//                                          serverNode.getProxy());
-//            DummyListener listener = new DummyListener();
-//            acceptor.accept(listener);
-//            if (listener.identity == null || listener.protocol == null) {
-//                fail("Expected new connection");
-//            }
-//    }
-        
     static private class DummyListener implements ProtocolListener {
 
         Identity identity = null;
@@ -171,17 +172,17 @@ public class TestSimpleSgsProtocol extends TestCase {
 
             @Override
             public boolean cancel(boolean arg0) {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
 
             @Override
             public boolean isCancelled() {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
 
             @Override
             public boolean isDone() {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
         }
         
@@ -189,24 +190,24 @@ public class TestSimpleSgsProtocol extends TestCase {
 
             @Override
             public CompletionFuture sessionMessage(ByteBuffer message) {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
 
             @Override
-            public CompletionFuture channelMessage(BigInteger channelId, ByteBuffer message) {
-                throw new UnsupportedOperationException("Not supported yet.");
+            public CompletionFuture channelMessage(BigInteger channelId,
+                                                   ByteBuffer message) {
+                throw new UnsupportedOperationException();
             }
 
             @Override
             public CompletionFuture logoutRequest() {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
 
             @Override
             public CompletionFuture disconnect() {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
-            
         }
     }
             
@@ -226,7 +227,8 @@ public class TestSimpleSgsProtocol extends TestCase {
                 throw new IllegalArgumentException(
                                 "Transport.accept called with null handler");
             try {
-                handler.newConnection(new DummyChannel(), new DummyDescriptor());
+                handler.newConnection(new DummyChannel(),
+                                      new DummyDescriptor());
             } catch (Exception ex) {
                 throw new RuntimeException(
                         "Unexpected exception from newConnection", ex);
@@ -235,13 +237,16 @@ public class TestSimpleSgsProtocol extends TestCase {
 
         @Override
         public void shutdown() {
-            throw new UnsupportedOperationException("Not supported yet.");
+            throw new UnsupportedOperationException();
         }
         
         private class DummyChannel implements AsynchronousByteChannel {
 
             @Override
-            public <A> IoFuture<Integer, A> read(ByteBuffer dst, A attachment, CompletionHandler<Integer, ? super A> handler) {
+            public <A> IoFuture<Integer, A> read(ByteBuffer dst,
+                                                 A attachment,
+                                  CompletionHandler<Integer, ? super A> handler)
+            {
                 System.err.println("DummyChannel.read ");
                 return AttachedFuture.wrap(new Future<Integer>() {
 
@@ -261,32 +266,44 @@ public class TestSimpleSgsProtocol extends TestCase {
                     }
 
                     @Override
-                    public Integer get() throws InterruptedException, ExecutionException {
+                    public Integer get() throws InterruptedException,
+                                                ExecutionException
+                    {
                         System.err.println("FU.get");
-                        throw new UnsupportedOperationException("Not supported yet.");
+                       throw new UnsupportedOperationException();
                     }
 
                     @Override
-                    public Integer get(long arg0, TimeUnit arg1) throws InterruptedException, ExecutionException, TimeoutException {
+                    public Integer get(long arg0, TimeUnit arg1)
+                            throws InterruptedException,
+                                   ExecutionException,
+                                   TimeoutException
+                    {
                         System.err.println("FU.get");
-                        throw new UnsupportedOperationException("Not supported yet.");
+                       throw new UnsupportedOperationException();
                     }
                 }, attachment);
             }
 
             @Override
-            public <A> IoFuture<Integer, A> read(ByteBuffer dst, CompletionHandler<Integer, ? super A> handler) {
+            public <A> IoFuture<Integer, A> read(ByteBuffer dst,
+                                  CompletionHandler<Integer, ? super A> handler)
+            {
                 return read(dst, null, handler);
             }
 
             @Override
-            public <A> IoFuture<Integer, A> write(ByteBuffer src, A attachment, CompletionHandler<Integer, ? super A> handler) {
-                throw new UnsupportedOperationException("Not supported yet.");
+            public <A> IoFuture<Integer, A> write(ByteBuffer src, A attachment,
+                                  CompletionHandler<Integer, ? super A> handler)
+            {
+                throw new UnsupportedOperationException();
             }
 
             @Override
-            public <A> IoFuture<Integer, A> write(ByteBuffer src, CompletionHandler<Integer, ? super A> handler) {
-                throw new UnsupportedOperationException("Not supported yet.");
+            public <A> IoFuture<Integer, A> write(ByteBuffer src,
+                                  CompletionHandler<Integer, ? super A> handler)
+            {
+                throw new UnsupportedOperationException();
             }
 
             @Override
@@ -296,7 +313,6 @@ public class TestSimpleSgsProtocol extends TestCase {
 
             @Override
             public void close() throws IOException {}
-            
         }
         
         private class DummyDescriptor implements TransportDescriptor {
@@ -318,7 +334,7 @@ public class TestSimpleSgsProtocol extends TestCase {
 
             @Override
             public byte[] getConnectionData() {
-                throw new UnsupportedOperationException("Not supported yet.");
+                throw new UnsupportedOperationException();
             }
         }
     }
