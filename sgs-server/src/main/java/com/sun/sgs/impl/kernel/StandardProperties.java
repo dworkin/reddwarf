@@ -38,14 +38,7 @@ package com.sun.sgs.impl.kernel;
  * A deprecated property is <code>CONFIG_FILE</code>, which, if present,
  * will be combined with the application property file.
  */
-public final class StandardProperties {
-    
-    /**
-     * This class should not be instantiated
-     */
-    private StandardProperties() {
-        
-    }
+public class StandardProperties {
 
     // the root of all the properties
     private static final String NS = "com.sun.sgs.";
@@ -204,12 +197,11 @@ public final class StandardProperties {
      * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE} whose value
      *      is {@value #APP_LISTENER_NONE} to indicate that no application code
      *      will run on the server node
-     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to
-     *      indicate the set of services to run on the server node
+     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to indicate
+     *      the set of services to run on the server node
      * <li> {@value #SERVER_START} set to {@code true} to indicate that the
      *       services' servers should be started
-     * <li>
-     *   {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
+     * <li> {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
      *   set to {@code com.sun.sgs.impl.service.data.store.net.DataStoreClient}
      *   to indicate the multi-node data service should be used
      *

@@ -69,7 +69,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
     public static final String DEFAULT_FILE_NAME = "passwords";
 
     // a fixed map from name to passowrd, loaded from the password file
-    private final HashMap<String, byte[]> passwordMap;
+    private final HashMap<String,byte[]> passwordMap;
 
     // the instance used to hash passwords
     private MessageDigest digest;
@@ -85,11 +85,10 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
      * @throws NoSuchAlgorithmException if SHA-256 is not supported
      */
     public NamePasswordAuthenticator(Properties properties)
-        throws IOException, NoSuchAlgorithmException
+        throws FileNotFoundException, IOException, NoSuchAlgorithmException
     {
-        if (properties == null) {
+        if (properties == null)
             throw new NullPointerException("Null properties not allowed");
-        }
 
         // get the name of the password file
         String passFile = properties.getProperty(PASSWORD_FILE_PROPERTY);
@@ -103,13 +102,12 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         StreamTokenizer stok = new StreamTokenizer(new InputStreamReader(in));
         stok.eolIsSignificant(false);
         //stok.wordChars('0', '0' + 16);
-        passwordMap = new HashMap<String, byte[]>();
+        passwordMap = new HashMap<String,byte[]>();
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
             String name = stok.sval;
-            if (stok.nextToken() == StreamTokenizer.TT_EOF) {
+            if (stok.nextToken() == StreamTokenizer.TT_EOF)
                 throw new IOException("Unexpected EOL at line " +
                                       stok.lineno());
-            }
             byte [] password = decodeBytes(stok.sval.getBytes("UTF-8"));
             passwordMap.put(name, password);
         }
@@ -133,8 +131,8 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         byte [] decoded = new byte[bytes.length / 2];
         for (int i = 0; i < decoded.length; i++) {
             int encodedIndex = i * 2;
-            decoded[i] = (byte) (((bytes[encodedIndex] - 'a') << 4) +
-                    (bytes[encodedIndex + 1] - 'a'));
+            decoded[i] = (byte)(((bytes[encodedIndex] - 'a') << 4) +
+                                (bytes[encodedIndex + 1] - 'a'));
         }
         return decoded;
     }
@@ -154,8 +152,8 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         byte [] encoded = new byte[bytes.length * 2];
         for (int i = 0; i < bytes.length; i++) {
             int encodedIndex = i * 2;
-            encoded[encodedIndex] = (byte) (((bytes[i] & 0xF0) >> 4) + 'a');
-            encoded[encodedIndex + 1] = (byte) ((bytes[i] & 0x0F) + 'a');
+            encoded[encodedIndex] = (byte)(((bytes[i] & 0xF0) >> 4) + 'a');
+            encoded[encodedIndex + 1] = (byte)((bytes[i] & 0x0F) + 'a');
         }
         return encoded;
     }
@@ -180,17 +178,15 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         throws AccountNotFoundException, CredentialException
     {
         // make sure that we were given the right type of credentials
-        if (!(credentials instanceof NamePasswordCredentials)) {
+        if (! (credentials instanceof NamePasswordCredentials))
             throw new CredentialException("unsupported credentials");
-        }
-        NamePasswordCredentials npc = (NamePasswordCredentials) credentials;
+        NamePasswordCredentials npc = (NamePasswordCredentials)credentials;
 
         // get the name, and make sure they have a password entry
         String name = npc.getName();
         byte [] validPass = passwordMap.get(name);
-        if (validPass == null) {
+        if (validPass == null)
             throw new AccountNotFoundException("Unknown user: " + name);
-        }
 
         // hash the given password
         byte [] pass = null;
@@ -206,9 +202,8 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         }
         
         // verify that the hashes match
-        if (!Arrays.equals(validPass, pass)) {
+        if (! Arrays.equals(validPass, pass))
             throw new CredentialException("Invalid credentials");
-        }
 
         return new IdentityImpl(name);
     }

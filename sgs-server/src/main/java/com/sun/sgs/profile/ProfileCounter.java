@@ -19,14 +19,14 @@
 
 package com.sun.sgs.profile;
 
+
 /**
- * A counter used in profiling. All counters have a name associated with them,
- * and start at zero. Counters can only be incremented. 
- * <p>
- * Profile counters are created with calls to 
- * {@link ProfileConsumer#createCounter ProfileConsumer.createCounter}.  
- * A counter's name includes both the {@code name} supplied to 
- * {@code createCounter} and the value of {@link ProfileConsumer#getName}.
+ * Interface that represents a counter used in profiling tasks run through
+ * the scheduler. All counters have a name associated with them, and start
+ * at zero. Counters can only be incremented. Counters are either aggregate,
+ * where all increments are aggregated over the lifetime of the system, or
+ * task-local, in which each counter is effectively first set to zero for each
+ * task where that counter is modified.
  */
 public interface ProfileCounter {
 
@@ -35,7 +35,15 @@ public interface ProfileCounter {
      *
      * @return the counter's name
      */
-    String getName();
+    String getCounterName();
+
+    /**
+     * Returns whether this is a task-local counter.
+     *
+     * @return <code>true</code> if this counter is task-local,
+     *         <code>false</code> if this counter is aggregated
+     */
+    boolean isTaskLocal();
 
     /**
      * Increments the counter by <code>1</code>.
@@ -43,11 +51,10 @@ public interface ProfileCounter {
     void incrementCount();
 
     /**
-     * Increments the counter by the given non-negative value.
+     * Increments the counter by the given value.
      *
      * @param value the amount to increment the counter
-     * 
-     * @throws IllegalArgumentException if {@code value} is negative
      */
     void incrementCount(long value);
+
 }

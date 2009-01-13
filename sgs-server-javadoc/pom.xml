@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.9-SNAPSHOT</version>
+    <version>0.9.8-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-javadoc</artifactId>
@@ -36,6 +36,14 @@
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server-api</artifactId>
       <classifier>sources</classifier>
+    </dependency>
+
+    <!-- Included in the classpath since it is not a
+	 transitive dependency -->
+    <dependency>
+      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <artifactId>je</artifactId>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 
@@ -103,6 +111,7 @@
 	    <configuration>
 	      <links>
 		<link>http://java.sun.com/javase/6/docs/api/</link>
+		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
 	      <show>package</show>
 	      <author>false</author>
@@ -135,6 +144,7 @@
 	    <configuration>
 	      <links>
 		<link>http://java.sun.com/javase/6/docs/api/</link>
+		<link>http://mina.apache.org/report/1.1/apidocs/</link>
               </links>
 	      <show>public</show>
 	      <author>false</author>

@@ -65,10 +65,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class AggregateProfileListener implements ProfileListener {
 
-    private Map<String, Long> sOpCounts =
-            new HashMap<String, Long>();
-    private Map<String, Long> fOpCounts =
-            new HashMap<String, Long>();
+    private Map<ProfileOperation, Long> sOpCounts =
+            new HashMap<ProfileOperation, Long>();
+    private Map<ProfileOperation, Long> fOpCounts =
+            new HashMap<ProfileOperation, Long>();
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -86,7 +86,9 @@ public class AggregateProfileListener implements ProfileListener {
     private volatile long tTaskCount = 0;
     private volatile long tRunTime = 0;
 
-    // the aggregate counters for task-local counters
+    // the highest values for aggregate counters, and the aggregate counters
+    // for task-local counters
+    private Map<String, Long> aggregateCounters;
     private Map<String, Long> localCounters;
 
     // the reporter used to publish data
@@ -120,6 +122,7 @@ public class AggregateProfileListener implements ProfileListener {
                                     ComponentRegistry registry)
         throws IOException
     {
+	aggregateCounters = new ConcurrentHashMap<String, Long>();
 	localCounters = new ConcurrentHashMap<String, Long>();
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -142,14 +145,14 @@ public class AggregateProfileListener implements ProfileListener {
                 equals("com.sun.sgs.profile.newop")) 
         {          
 	    ProfileOperation op = (ProfileOperation) (event.getNewValue());
-	    sOpCounts.put(op.getName(), 0L);
-	    fOpCounts.put(op.getName(), 0L);
+	    sOpCounts.put(op, 0L);
+	    fOpCounts.put(op, 0L);
 	}
     }
 
     /** {@inheritDoc}*/
     public void report(ProfileReport profileReport) {
-        List<String> ops = profileReport.getReportedOperations();
+        List<ProfileOperation> ops = profileReport.getReportedOperations();
         if (profileReport.wasTaskSuccessful()) {
             sTaskCount++;
             sTaskOpCount += ops.size();
@@ -157,7 +160,7 @@ public class AggregateProfileListener implements ProfileListener {
             delayTime += (profileReport.getActualStartTime() -
                           profileReport.getScheduledStartTime());
             tryCount += profileReport.getRetryCount();
-            for (String op : ops) {
+            for (ProfileOperation op : ops) {
                 Long i = sOpCounts.get(op);
 		sOpCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	    }
@@ -165,7 +168,7 @@ public class AggregateProfileListener implements ProfileListener {
             fTaskCount++;
             fTaskOpCount += ops.size();
             fRunTime += profileReport.getRunningTime();
-            for (String op : ops) {
+            for (ProfileOperation op : ops) {
                 Long i = fOpCounts.get(op);
 		fOpCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	    }
@@ -176,7 +179,22 @@ public class AggregateProfileListener implements ProfileListener {
             tRunTime += profileReport.getRunningTime();
         }
 
-	Map<String, Long> map = profileReport.getUpdatedTaskCounters();
+	Map<String, Long> map = profileReport.getUpdatedAggregateCounters();
+	if (map != null) {
+	    for (Entry<String, Long> entry : map.entrySet()) {
+		String key = entry.getKey();
+		Long value = entry.getValue();
+		if (!aggregateCounters.containsKey(key)) {
+		    aggregateCounters.put(key, value);
+		} else {
+		    if (value > aggregateCounters.get(key)) {
+			aggregateCounters.put(key, value);
+                    }
+		}
+	    }
+	}
+
+	map = profileReport.getUpdatedTaskCounters();
 	if (map != null) {
 	    for (Entry<String, Long> entry : map.entrySet()) {
 		String key = entry.getKey();
@@ -240,7 +258,7 @@ public class AggregateProfileListener implements ProfileListener {
 
             reportStr.format("OpCounts:%n");
 	    int j, k = 0;
-	    for (String op : sOpCounts.keySet()) {
+	    for (ProfileOperation op : sOpCounts.keySet()) {
 		j = sOpCounts.get(op).intValue();
                 reportStr.format("   %s=%d/%d", op, j, j + fOpCounts.get(op));
 		if (++k % 3 == 0) {
@@ -249,6 +267,13 @@ public class AggregateProfileListener implements ProfileListener {
             }
 	    reportStr.format("%n");
 
+	    if (!aggregateCounters.isEmpty()) {
+		reportStr.format("AggregateCounters (total):%n");
+		for (Entry<String, Long> entry : aggregateCounters.entrySet()) {
+		    reportStr.format(
+			"  %s=%d%n", entry.getKey(), entry.getValue());
+                }
+	    }
 	    if (!localCounters.isEmpty()) {
 		reportStr.format("LocalCounters (avg per task):%n");
 		for (Entry<String, Long> entry : localCounters.entrySet()) {

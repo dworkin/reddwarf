@@ -31,6 +31,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileListener;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -140,7 +141,7 @@ public class AggregateTaskListener implements ProfileListener {
                     detail.opCount +=
                         profileReport.getReportedOperations().size();
                     detail.retries += profileReport.getRetryCount();
-		    for (String op :
+		    for (ProfileOperation op :
                               profileReport.getReportedOperations()) 
                     {
                         Long l = detail.ops.get(op);
@@ -164,7 +165,7 @@ public class AggregateTaskListener implements ProfileListener {
         long time = 0;
         long opCount = 0;
         long retries = 0;
-	Map<String, Long> ops = new HashMap<String, Long>();
+	Map<ProfileOperation, Long> ops = new HashMap<ProfileOperation, Long>();
 	
 
         public String toString() {
@@ -178,7 +179,7 @@ public class AggregateTaskListener implements ProfileListener {
             if (opCount > 0) {
                 formatter.format("%n  ");
             }
-	    for (String op : ops.keySet()) {
+	    for (ProfileOperation op : ops.keySet()) {
 		formatter.format(
 		    "%s=%2.2f%% ", op,
 		    100.0 * (double) (ops.get(op).longValue()) /

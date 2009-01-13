@@ -75,8 +75,8 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
     private long threadCount = 0;
 
     // counts of the registered operations
-    private Map<String, Long> opCounts =
-            new HashMap<String, Long>();
+    private Map<ProfileOperation, Long> opCounts =
+            new HashMap<ProfileOperation, Long>();
 
 
     // the commit/abort total counts, and the reported running time total
@@ -118,7 +118,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
                 equals("com.sun.sgs.profile.newop")) 
         {        
 	    ProfileOperation op = (ProfileOperation) (event.getNewValue());
-	    opCounts.put(op.getName(), 0L);
+	    opCounts.put(op, 0L);
 	} else {
 	    if (event.getPropertyName().
                     equals("com.sun.sgs.profile.threadcount")) 
@@ -138,7 +138,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 
         totalRunningTime += profileReport.getRunningTime();
 
-        for (String op : profileReport.getReportedOperations()) {
+        for (ProfileOperation op : profileReport.getReportedOperations()) {
 	    Long i = opCounts.get(op);
 	    opCounts.put(op, Long.valueOf(i == null ? 1 : i + 1));
 	}
@@ -160,7 +160,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
                 long now = System.currentTimeMillis();
                 Formatter opCountTally = new Formatter();
                 boolean first = true;
-                for (String op : opCounts.keySet()) {
+                for (ProfileOperation op : opCounts.keySet()) {
                     if (!first) {
                         opCountTally.format("%n");
                     }
@@ -189,7 +189,7 @@ public class OperationLoggingProfileOpListener implements ProfileListener {
 			   opCountTally.toString() + "\n" +
 			   counterTally.toString());
             } else {
-                for (String op : opCounts.keySet()) {
+                for (ProfileOperation op : opCounts.keySet()) {
                     opCounts.put(op, 0L);
                 }
             }

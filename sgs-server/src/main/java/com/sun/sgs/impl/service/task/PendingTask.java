@@ -170,10 +170,9 @@ class PendingTask implements ManagedObject, Serializable {
      * is thrown.
      */
     void setRunningNode(long nodeId) {
-        if (!isPeriodic()) {
+        if (! isPeriodic())
             throw new IllegalStateException("Cannot assign running node " +
                                             "for a non-periodic task");
-        }
         AppContext.getDataManager().markForUpdate(this);
         runningNode = nodeId;
     }
@@ -195,12 +194,10 @@ class PendingTask implements ManagedObject, Serializable {
      * transaction.
      */
     boolean isTaskAvailable() {
-        if (task != null) {
+        if (task != null)
             return true;
-        }
-        if (taskRef == null) {
+        if (taskRef == null)
           return false;
-        }
         try {
             taskRef.get();
             return true;

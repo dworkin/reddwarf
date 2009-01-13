@@ -626,10 +626,10 @@ public class DataStoreServerImpl implements DataStoreServer {
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if the value of the {@code
-     *	      com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
-     *	      property is less than {@code 0} or greater than {@code 65535},
-     *	      or if thrown by the {@link
-     *	      DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
+     *		property is less than {@code 0} or greater than {@code 65535},
+     *		or if thrown by the {@link
+     *		DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
      * @throws	IOException if a network problem occurs
      */
     public DataStoreServerImpl(Properties properties) throws IOException {

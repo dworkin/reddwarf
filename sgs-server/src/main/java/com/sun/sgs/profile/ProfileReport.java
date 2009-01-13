@@ -120,10 +120,24 @@ public interface ProfileReport {
      * running of the task. If no operations were reported, then an
      * empty <code>List</code> is returned.
      *
-     * @return a {@code List} of {@code String}s of the names of the reported
-     *         operations, in the order they were reported
+     * @return a <code>List</code> of <code>ProfileOperation</code>
+     *         representing the ordered set of reported operations
      */
-    List<String> getReportedOperations();
+    List<ProfileOperation> getReportedOperations();
+
+    /**
+     * Returns the updated values of the aggregate counters that were
+     * updated during the running of the task. If no aggregate
+     * counters were updated, an empty <code>Map</code> is
+     * returned. The <code>Map</code> is a mapping from counter name
+     * to counter value. Note that the reported values are the values
+     * observed during the running of the task, not the value (which
+     * may have changed) at the time this report is provided to any
+     * listeners.
+     *
+     * @return a <code>Map</code> from counter name to observed value
+     */
+    Map<String, Long> getUpdatedAggregateCounters();
 
     /**
      * Returns the values of the task-local counters that were updated
@@ -135,6 +149,21 @@ public interface ProfileReport {
      * @return a <code>Map</code> from counter name to observed value
      */
     Map<String, Long> getUpdatedTaskCounters();
+
+    /**
+     * Returns a mapping for each sample that records for the lifetime
+     * of the application that was updated, to the entire list of
+     * samples for that name. If no lifetime samples were updated,
+     * then an empty <code>Map</code> is returned. The
+     * <code>Map</code> is a mapping from sample name to an
+     * oldest-first list of sample values.  The list of samples
+     * includes all samples collected during the lifetime of the
+     * application.
+     *
+     * @return a <code>Map</code> from sample name to a list of values
+     *         added during the task  
+     */
+    Map<String, List<Long>> getUpdatedAggregateSamples();
 
     /**
      * Returns the list of values for the task-local samples that were
@@ -159,10 +188,14 @@ public interface ProfileReport {
     AccessedObjectsDetail getAccessedObjectsDetail();
 
     /**
-     * Returns the number of tasks in the scheduler and ready to run when 
-     * this report's task was started. 
+     * Returns the number of tasks in the same context as this report's task
+     * that were in the scheduler and ready to run when this report's task
+     * was started. Note that some schedulers may not differentiate between
+     * application contexts, so this value may represent some other ready
+     * count, such as the total number of tasks ready to run across all
+     * contexts.
      *
-     * @return the number of ready tasks
+     * @return the number of ready tasks in the same context
      */
     int getReadyCount();
 

@@ -114,15 +114,12 @@ class ScheduledTaskImpl implements ScheduledTask {
      */
     ScheduledTaskImpl(KernelRunnable task, Identity owner,
                       Priority priority, long startTime, long period) {
-        if (task == null) {
+        if (task == null)
             throw new NullPointerException("Task cannot be null");
-        }
-        if (owner == null) {
+        if (owner == null)
             throw new NullPointerException("Owner cannot be null");
-        }
-        if (priority == null) {
+        if (priority == null)
             throw new NullPointerException("Priority cannot be null");
-        }
 
         this.task = task;
         this.owner = owner;
@@ -177,16 +174,14 @@ class ScheduledTaskImpl implements ScheduledTask {
     public synchronized boolean cancel(boolean allowInterrupt)
         throws InterruptedException
     {
-        if (isDone()) {
-            return false; 
-        }
+        if (isDone())
+            return false;
         while (state == State.RUNNING) {
             try {
                 wait();
             } catch (InterruptedException ie) {
-                if (allowInterrupt) {
+                if (allowInterrupt)
                     throw ie;
-                }
             }
         }
         if (state != State.CANCELLED) {
@@ -214,12 +209,10 @@ class ScheduledTaskImpl implements ScheduledTask {
      */
     synchronized Throwable get() throws InterruptedException {
         // wait for the task to finish
-        while (!isDone()) {
+        while (! isDone())
             wait();
-        }
-        if (state == State.CANCELLED) {
+        if (state == State.CANCELLED)
             throw new InterruptedException("interrupted while getting result");
-        }
         return result;
     }
 
@@ -233,13 +226,11 @@ class ScheduledTaskImpl implements ScheduledTask {
      * the task has already been cancelled or has completed.
      */
     synchronized boolean setRunning(boolean running) {
-        if (isDone()) {
+        if (isDone())
             return false;
-        }
         state = running ? State.RUNNING : State.RUNNABLE;
-        if (!running) {
+        if (! running)
             notifyAll();
-        }
         return true;
     }
 
@@ -257,9 +248,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      * the task is set as no longer running.
      */
     synchronized void setDone(Throwable result) {
-        if (state != State.RUNNING) {
+        if (state != State.RUNNING)
             return;
-        }
         state = State.COMPLETED;
         this.result = result;
         notifyAll();
@@ -270,9 +260,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      * the task is not recurring.
      */
     void setRecurringTaskHandle(RecurringTaskHandle handle) {
-        if (!isRecurring()) {
+        if (! isRecurring())
             throw new IllegalStateException("Not a recurring task");
-        }
         recurringTaskHandle = handle;
     }
 

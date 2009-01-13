@@ -188,9 +188,9 @@ public class ClientSessionImpl
              * pre-allocate buffers. -JM
              */
             ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
-            buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
-		put(message.asReadOnlyBuffer()).
-		flip();
+            buf.put(SimpleSgsProtocol.SESSION_MESSAGE)
+               .put(message)
+               .flip();
 	    addEvent(new SendEvent(buf.array()));
 
 	    return getWrappedClientSession();

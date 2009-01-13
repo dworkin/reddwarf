@@ -175,9 +175,8 @@ public final class TransactionAwareLogManager extends LogManager {
 	// The root logger will have a 0-length name, in which case we should
 	// return null and let the default LogManager code create the
 	// RootLogger instance correctly.
-	if (name.length() == 0) {
+	if (name.length() == 0) 
 	    return null;
-        }
 	
 	Logger result = super.getLogger(name);
 
@@ -202,8 +201,9 @@ public final class TransactionAwareLogManager extends LogManager {
 	    // add any such Loggers to a list of unconfigured ones and revisit
 	    // them upon the manager's configuration.
 	    if (txnProxy == null) {
-                unconfiguredLoggers.add((TransactionalLogger) result);
-            } else {
+		unconfiguredLoggers.add((TransactionalLogger)result);
+	    }
+	    else {
 		result.config("This logger now has transactional semantics");
 	    }
 
@@ -289,13 +289,15 @@ public final class TransactionAwareLogManager extends LogManager {
 		// TransactionalHandler
 		if (txnProxy == null) {
 		    super.addHandler(handler);
-                } else {
+		}
+		else {
 		    // wrap the original handler in one that has transactional
 		    // semantics
 		    super.addHandler(new TransactionalHandler(txnProxy, 
 							      handler));
 		}
-            } else {
+	    }
+	    else {
 		// if we were passed an existing TransactionalHandler, use it
 		// as is.  This case could occur if the handler had already
 		// been created for another Logger.
@@ -357,9 +359,8 @@ public final class TransactionAwareLogManager extends LogManager {
 	// TxnAwareLogManager.  Therefore neither methods of this class require
 	// locks
 	void configure(TransactionProxy txnProxy) {
- 	    if (txnProxy == null) {
+ 	    if (txnProxy == null)
  		return;
-            }
 	    
 	    this.txnProxy = txnProxy;
 	    
@@ -370,16 +371,16 @@ public final class TransactionAwareLogManager extends LogManager {
 	    // being wrapped by a TransactionalHandler
 	    if (getHandlers().length == 0) {
 		attachParentHandlers();
-	    } else {
-                // If handlers have been assigned to this Logger, wrap them in
-                // TransactionalHandlers
-                
+	    }
+	    
+	    // If handlers have been assigned to this Logger, wrap them in
+	    // TransactionalHandlers
+	    else {
 		for (Handler h : getHandlers()) {
 		    // check that we aren't already dealing with a handler that
 		    // has already been made transactional.
-		    if (h instanceof TransactionalHandler) {
+		    if (h instanceof TransactionalHandler)
 			continue;
-                    }
 		    super.addHandler(new TransactionalHandler(txnProxy, h));
 		    removeHandler(h);
 		    // ensure that any log calls to this logger don't work

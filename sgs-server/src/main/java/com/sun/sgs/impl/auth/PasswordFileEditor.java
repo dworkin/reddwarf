@@ -19,7 +19,10 @@
 
 package com.sun.sgs.impl.auth;
 
+import com.sun.sgs.impl.auth.NamePasswordAuthenticator;
+
 import java.io.FileOutputStream;
+
 import java.security.MessageDigest;
 
 
@@ -30,14 +33,8 @@ import java.security.MessageDigest;
  * whitespace, a SHA-256 hashed password encoded via a call to
  * <code>NamePasswordAuthenticator.encodeBytes</code>, and finally a newline.
  */
-public final class PasswordFileEditor
+public class PasswordFileEditor
 {
-    /**
-     * This class should not be instantiated
-     */
-    private PasswordFileEditor() {
-    
-    }
 
     /**
      * Main-line for this utility. This utility takes three arguments on

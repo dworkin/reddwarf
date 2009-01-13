@@ -24,6 +24,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.profile.ProfileReport;
 
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+
 /**
  * Package-private implementation of <code>ProfileReport</code>.
  */
@@ -47,11 +49,7 @@ class ProfileReportImpl implements ProfileReport {
      */
     private static final Map<String, Long> EMPTY_COUNTER_MAP = 
 	Collections.emptyMap();
-    
-    /**
-     * An empty list for returning when no operations have been updated.
-     */
-    private static final List<String> EMPTY_OPS = Collections.emptyList();
+
     /**
      * An empty map for returning when no profile samples have been
      * updated.  We need this map as well because typing issues
@@ -73,19 +71,21 @@ class ProfileReportImpl implements ProfileReport {
     long runningTime = 0;
     int tryCount = 0;
     Throwable throwable = null;
-    private AccessedObjectsDetail accessedObjectsDetail = null;
+    AccessedObjectsDetail accessedObjectsDetail = null;
 
-    private Set<ProfileParticipantDetail> participants;
+    Set<ProfileParticipantDetail> participants;
 
     // counters that are updated through methods on this class
-    private Map<String, Long> taskCounters;
+    Map<String, Long> aggCounters;
+    Map<String, Long> taskCounters;
 
     // a list of operations performed, which is updated through
     // methods on this class
-    private List<String>ops;
+    List<ProfileOperation> ops;
 
-    // samples that are added through methods on this class
-    private Map<String, List<Long>> taskSamples;
+    // samples that are aggregated through methods on this class
+    Map<String, List<Long>> localSamples;
+    Map<String, List<Long>> aggregateSamples;
 
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
@@ -106,11 +106,26 @@ class ProfileReportImpl implements ProfileReport {
         this.readyCount = readyCount;
         this.actualStartTime = System.currentTimeMillis();
 
+	ops = new ArrayList<ProfileOperation>();
 	participants = new HashSet<ProfileParticipantDetail>();
-
+	aggCounters = null;
 	taskCounters = null;
-        ops = null;
-	taskSamples = null;
+	localSamples = null;
+	aggregateSamples = null;
+    }
+
+    /**
+     * Package-private method used to update aggregate counters that were
+     * changed during this task.
+     *
+     * @param counter the name of the counter
+     * @param value the new value of this counter
+     */
+    void updateAggregateCounter(String counter, long value) {
+        if (aggCounters == null) {
+            aggCounters = new HashMap<String, Long>();
+        }
+        aggCounters.put(counter, value);
     }
 
     /**
@@ -142,43 +157,45 @@ class ProfileReportImpl implements ProfileReport {
      * @param sampleName the name of the sample
      * @param value the latest value for the sample
      */
-    void addTaskSample(String sampleName, long value) {
+    void addLocalSample(String sampleName, long value) {
 	List<Long> samples;
-        if (taskSamples == null) {
-            taskSamples = new HashMap<String, List<Long>>();
+        if (localSamples == null) {
+            localSamples = new HashMap<String, List<Long>>();
 	    samples = new LinkedList<Long>();
-	    taskSamples.put(sampleName, samples);
+	    localSamples.put(sampleName, samples);
         } else {
-            if (taskSamples.containsKey(sampleName)) {
-		samples = taskSamples.get(sampleName);
+            if (localSamples.containsKey(sampleName)) {
+		samples = localSamples.get(sampleName);
             } else {
 		samples = new LinkedList<Long>();
-		taskSamples.put(sampleName, samples);		
+		localSamples.put(sampleName, samples);		
 	    }
         }
 	samples.add(value);
     }
-    
+
     /**
-     * Package-private method used to add an operation.
-     * 
-     * @param operationName name of the operation
+     * Package-private method used to add to an aggregate sample. If
+     * this sample hasn't had a value reported yet for this task, then
+     * a new list is made and the the provided value is added to it.
+     *
+     * @param sampleName the name of the sample
+     * @param samples the list of all samples for this name
      */
-    void addOperation(String operationName) {
-        if (ops == null) {
-            ops = new ArrayList<String>(); 
+    void registerAggregateSamples(String sampleName, List<Long> samples) {
+	// NOTE: we make the list unmodifiable so that the user cannot
+	// alter any of the samples.  This is important since the same
+	// list is used for the lifetime of the application.
+        if (aggregateSamples == null) {
+            aggregateSamples = new HashMap<String, List<Long>>();
+	    aggregateSamples.put(sampleName, 
+				Collections.unmodifiableList(samples));
+        } else if (!aggregateSamples.containsKey(sampleName)) {
+	    aggregateSamples.put(sampleName, 
+				 Collections.unmodifiableList(samples));
         }
-        ops.add(operationName);
     }
 
-    void addParticipant(ProfileParticipantDetail participantDetail) {
-        participants.add(participantDetail);
-    }
-    
-    void setAccessedObjectsDetail(AccessedObjectsDetail detail) {
-        accessedObjectsDetail = detail;
-    }
-    
     /**
      * {@inheritDoc}
      */
@@ -252,8 +269,15 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public List<String> getReportedOperations() {
-        return (ops == null) ? EMPTY_OPS : ops;
+    public List<ProfileOperation> getReportedOperations() {
+        return ops;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Map<String, Long> getUpdatedAggregateCounters() {
+        return (aggCounters == null) ? EMPTY_COUNTER_MAP : aggCounters;
     }
 
     /**
@@ -266,8 +290,15 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
+    public Map<String, List<Long>> getUpdatedAggregateSamples() {
+	return (aggregateSamples == null) ? EMPTY_SAMPLE_MAP : aggregateSamples;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public Map<String, List<Long>> getUpdatedTaskSamples() {
-	return (taskSamples == null) ? EMPTY_SAMPLE_MAP : taskSamples;
+	return (localSamples == null) ? EMPTY_SAMPLE_MAP : localSamples;
     }
 
     /**
@@ -318,24 +349,24 @@ class ProfileReportImpl implements ProfileReport {
 	    }
 	}
 
-	if (report.taskSamples != null) {
-	    if (taskSamples == null) {
-		taskSamples = new HashMap<String, List<Long>>();
+	if (report.localSamples != null) {
+	    if (localSamples == null) {
+		localSamples = new HashMap<String, List<Long>>();
 		for (Map.Entry<String, List<Long>> e : 
-			 report.taskSamples.entrySet()) 
+			 report.localSamples.entrySet()) 
                 {
 		    // make a copy of the child task's samples
 		    List<Long> samples = new LinkedList<Long>(e.getValue());
-		    taskSamples.put(e.getKey(), samples);
+		    localSamples.put(e.getKey(), samples);
 		}
 	    } else {
 		for (Map.Entry<String, List<Long>> e : 
-			 report.taskSamples.entrySet()) 
+			 report.localSamples.entrySet()) 
                 {
-		    List<Long> samples = taskSamples.get(e.getKey());
+		    List<Long> samples = localSamples.get(e.getKey());
 		    if (samples == null) {
 			// make a copy of the child task's samples
-			taskSamples.put(e.getKey(),
+			localSamples.put(e.getKey(),
 					 new LinkedList<Long>(e.getValue()));
                     } else {
 			samples.addAll(e.getValue());
@@ -346,32 +377,20 @@ class ProfileReportImpl implements ProfileReport {
 
 	if (report.ops != null) {
 	    if (ops == null) {
-                ops = new LinkedList<String>(report.ops);
+		ops = new LinkedList<ProfileOperation>(report.ops);
 	    } else {
 		ops.addAll(report.ops);
 	    }
 	}
+
+	// NOTE: we do not need to update the aggregateSamples and
+	//       aggregateCounters, as this is being collected across
+	//       all tasks, and so by updating we would really be
+	//       double counting the data
 
 	// NOTE: we do not include the the participants information
 	//       since this is specific to a task and not to its
 	//       children.
     }
 
-    /**
-     * Package-private method to note that a task has finished running.
-     * All collections are modified to be immutable.
-     */
-    void finish() {
-        if (ops != null) {
-            ops = Collections.unmodifiableList(ops);
-        }
-        if (taskCounters != null) {
-            taskCounters = Collections.unmodifiableMap(taskCounters);
-        }
-        if (taskSamples != null) {
-            taskSamples = Collections.unmodifiableMap(taskSamples);
-        }
-        
-        participants = Collections.unmodifiableSet(participants);
-    }
 }

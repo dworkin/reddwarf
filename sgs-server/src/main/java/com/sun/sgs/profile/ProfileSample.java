@@ -20,27 +20,37 @@
 package com.sun.sgs.profile;
 
 
-/** 
- * A profile sample is a list of {@code long} data points.
- * <p>
- * Profile samples are created with calls to 
- * {@link ProfileConsumer#createSample ProfileConsumer.createSample}.  A 
- * sample's name includes both the {@code name} supplied to {@code createSample}
- * and the value of {@link ProfileConsumer#getName}.
+/**
+ * A profile sample is a list of data points that are accumulated
+ * during the lifetime of a task.  A profile sample may be for either
+ * a single task or span multiple tasks.  A profile sample allows for
+ * different aggregations on data at a later time.
+ *
+ * @see ProfileCounter
+ * @see ProfileOperation
  */
 public interface ProfileSample {
 
     /**
      * Returns the name of this list of samples.
      *
-     * @return the sample's name
+     * @return the counter's name
      */
-    String getName();
+    String getSampleName();
+
+    /**
+     * Returns whether this is a task-local list of samples.
+     *
+     * @return <code>true</code> if this counter is task-local,
+     *         <code>false</code> if this counter is aggregated
+     */
+    boolean isTaskLocal();
 
     /**
      * Adds a new sample to the end of the current list of samples.
      *
-     * @param value the data sample to be added
+     * @param value the amount to increment the counter
      */
     void addSample(long value);
+    
 }

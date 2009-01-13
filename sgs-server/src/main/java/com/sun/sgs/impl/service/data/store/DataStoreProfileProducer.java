@@ -19,11 +19,9 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileSample;
@@ -115,40 +113,35 @@ public class DataStoreProfileProducer
 	}
 	this.dataStore = dataStore;
 	participant = (TransactionParticipant) dataStore;
-        ProfileConsumer consumer = collector.getConsumer(
-                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataStore");
+        ProfileConsumer consumer =
+	    collector.getConsumer(DataStore.class.getName());
         ProfileLevel level = ProfileLevel.MAX;
-        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
-	createObjectOp = consumer.createOperation("createObject", type, level);
-	markForUpdateOp = 
-            consumer.createOperation("markForUpdate", type, level);
-	getObjectOp = consumer.createOperation("getObject", type, level);
+	createObjectOp = consumer.registerOperation("createObject", level);
+	markForUpdateOp = consumer.registerOperation("markForUpdate", level);
+	getObjectOp = consumer.registerOperation("getObject", level);
 	getObjectForUpdateOp =
-	    consumer.createOperation("getObjectForUpdate", type, level);
-	setObjectOp = consumer.createOperation("setObject", type, level);
-	setObjectsOp = consumer.createOperation("setObjects", type, level);
-	removeObjectOp = consumer.createOperation("removeObject", type, level);
-	getBindingOp = consumer.createOperation("getBinding", type, level);
-	setBindingOp = consumer.createOperation("setBinding", type, level);
-	removeBindingOp = 
-            consumer.createOperation("removeBinding", type, level);
-	nextBoundNameOp = 
-            consumer.createOperation("nextBoundName", type, level);
-	getClassIdOp = consumer.createOperation("getClassId", type, level);
-	getClassInfoOp = consumer.createOperation("getClassInfo", type, level);
-	nextObjectIdOp = 
-            consumer.createOperation("nextObjectIdOp", type, level);
-	readBytesCounter = consumer.createCounter("readBytes", type, level);
+	    consumer.registerOperation("getObjectForUpdate", level);
+	setObjectOp = consumer.registerOperation("setObject", level);
+	setObjectsOp = consumer.registerOperation("setObjects", level);
+	removeObjectOp = consumer.registerOperation("removeObject", level);
+	getBindingOp = consumer.registerOperation("getBinding", level);
+	setBindingOp = consumer.registerOperation("setBinding", level);
+	removeBindingOp = consumer.registerOperation("removeBinding", level);
+	nextBoundNameOp = consumer.registerOperation("nextBoundName", level);
+	getClassIdOp = consumer.registerOperation("getClassId", level);
+	getClassInfoOp = consumer.registerOperation("getClassInfo", level);
+	nextObjectIdOp = consumer.registerOperation("nextObjectIdOp", level);
+	readBytesCounter = consumer.registerCounter("readBytes", true, level);
 	readObjectsCounter =
-	    consumer.createCounter("readObjects", type, level);
+	    consumer.registerCounter("readObjects", true, level);
 	writtenBytesCounter =
-	    consumer.createCounter("writtenBytes", type, level);
+	    consumer.registerCounter("writtenBytes", true, level);
 	writtenObjectsCounter =
-	    consumer.createCounter("writtenObjects", type, level);
-	readBytesSample = 
-            consumer.createSample("readBytes", ProfileDataType.TASK, level);
-	writtenBytesSample = 
-            consumer.createSample("writtenBytes", ProfileDataType.TASK, level);
+	    consumer.registerCounter("writtenObjects", true, level);
+	readBytesSample = consumer.registerSampleSource(
+	    "readBytes", true, Integer.MAX_VALUE, level);
+	writtenBytesSample = consumer.registerSampleSource(
+	    "writtenBytes", true, Integer.MAX_VALUE, level);
     }
 
     /* -- Implement DataStore -- */

@@ -63,9 +63,8 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
     public FIFOSchedulerQueue(Properties properties) {
         logger.log(Level.CONFIG, "Creating a FIFO Scheduler Queue");
 
-        if (properties == null) {
+        if (properties == null)
             throw new NullPointerException("Properties cannot be null");
-        }
 
         queue = new LinkedBlockingQueue<ScheduledTask>();
         timedTaskHandler = new TimedTaskHandler(this);
@@ -85,9 +84,8 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
         throws InterruptedException
     {
         ScheduledTask task = queue.poll();
-        if ((task != null) || (!wait)) {
+        if ((task != null) || (! wait))
             return task;
-        }
         return queue.take();
     }
 
@@ -102,10 +100,9 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(ScheduledTask task) {
-        if (task.isRecurring()) {
+        if (task.isRecurring())
             throw new TaskRejectedException("Recurring tasks cannot get " +
                                             "reservations");
-        }
 
         return new SimpleTaskReservation(this, task);
     }
@@ -114,17 +111,15 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
      * {@inheritDoc}
      */
     public void addTask(ScheduledTask task) {
-        if (task == null) {
+        if (task == null)
             throw new NullPointerException("Task cannot be null");
-        }
 
-        if (!timedTaskHandler.runDelayed(task)) {
+        if (! timedTaskHandler.runDelayed(task)) {
             // check if the task is recurring, because we're not allowed to
             // reject those tasks
-            if (!task.isRecurring()) {
-                if (!queue.offer(task)) {
+            if (! task.isRecurring()) {
+                if (! queue.offer(task))
                     throw new TaskRejectedException("Request was rejected");
-                }
             } else {
                 timedTaskReady(task);
             }
@@ -135,12 +130,10 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
      * {@inheritDoc}
      */
     public RecurringTaskHandle createRecurringTaskHandle(ScheduledTask task) {
-        if (task == null) {
+        if (task == null)
             throw new NullPointerException("Task cannot be null");
-        }
-        if (!task.isRecurring()) {
+        if (! task.isRecurring())
             throw new IllegalArgumentException("Not a recurring task");
-        }
 
         return new RecurringTaskHandleImpl(this, task);
     }
@@ -156,10 +149,7 @@ public class FIFOSchedulerQueue implements SchedulerQueue, TimedTaskListener {
      * {@inheritDoc}
      */
     public void timedTaskReady(ScheduledTask task) {
-        boolean success;
-        do {
-            success = queue.offer(task);
-        } while(!success);
+        while (! queue.offer(task)) { /* spin */ }
     }
 
     /**

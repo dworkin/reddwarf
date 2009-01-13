@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.9-SNAPSHOT</version>
+    <version>0.9.8-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-dist</artifactId>
@@ -22,14 +22,6 @@
 
 
   <dependencies>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-boot</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-stop</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-server</artifactId>

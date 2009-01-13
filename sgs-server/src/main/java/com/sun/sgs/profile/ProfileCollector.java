@@ -89,9 +89,9 @@ public interface ProfileCollector {
      * profiling data reports. The listener is immediately updated on
      * the current set of operations and the number of scheduler
      * threads. The listener can be marked as unable to be removed by
-     * {@link #removeListener removeListener} or shutdown by {@link #shutdown};
-     * if these operations are performed on a listener that does not allow them,
-     * they are silently ignored.
+     * {@link #removeListener} or shutdown by {@link #shutdown};  if these
+     * operations are performed on a listener that does not allow them, they
+     * are silently ignored.
      *
      * @param listener the {@code ProfileListener} to add
      * @param canRemove {@code true} if this listener can be removed or 
@@ -127,8 +127,8 @@ public interface ProfileCollector {
     /**
      * Removes a {@code ProfileListener} and calls
      * {@link ProfileListener#shutdown} on the listener.  If the
-     * {@code listener} has never been added with 
-     * {@link #addListener addListener}, no action is taken.
+     * {@code listener} has never been added with {@link #addListener}, no
+     * action is taken.
      *
      * @param listener the listener to remove
      */
@@ -136,17 +136,7 @@ public interface ProfileCollector {
     
     /**
      * Returns the named {@code ProfileConsumer}, or creates a new one with
-     * that name.  
-     * <p>
-     * Note that the name must be unique for a new {@code ProfileConsumer} to 
-     * be created. Consumers created by the core server packages have a prefix
-     * of {@value 
-     * com.sun.sgs.impl.profile.ProfileCollectorImpl#CORE_CONSUMER_PREFIX}
-     * to distinguish their namespace. Consumers created by code outside of the
-     * core server packages should create their own unique namespace.
-     * <p>
-     * Calling {@link #getConsumers} will return a map keyed by names already 
-     * in use.
+     * that name.
      *
      * @param name the unique name of the profile consumer
      *
@@ -157,7 +147,7 @@ public interface ProfileCollector {
     /**
      * Returns a read-only map of {@code ProfileConsumer} names to the 
      * {@code ProfileConsumer}s which have been created through a call to 
-     * {@link #getConsumer getConsumer}.
+     * {@link #getConsumer}.
      * 
      * @return the map of names to consumers
      */

@@ -34,8 +34,7 @@ import java.beans.PropertyChangeEvent;
  * <p>
  *
  * In order to create listeners with all of the facilities that they need,
- * all implementations of <code>ProfileListener</code> specified with
- * the {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property must
+ * all implementations of <code>ProfileListener</code> must
  * implement a constructor of the form (<code>java.util.Properties</code>,
  * <code>com.sun.sgs.kernel.TaskOwner</code>,
  * <code>com.sun.sgs.kernel.ComponentRegistry</code>).

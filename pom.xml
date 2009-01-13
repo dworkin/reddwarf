@@ -8,14 +8,14 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>11</version>
+    <version>9</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
   <artifactId>sgs-server-parent</artifactId>
   <name>Project Darkstar Server Parent POM</name>
   <packaging>pom</packaging>
-  <version>0.9.9-SNAPSHOT</version>
+  <version>0.9.8-SNAPSHOT</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>
@@ -33,14 +33,7 @@
     Parent POM of the Project Darkstar Server
   </description>
 
-  <!-- Require at least Maven version 2.0.9 to build -->
-  <prerequisites>
-    <maven>2.0.9</maven>
-  </prerequisites>
-
   <modules>
-    <module>sgs-boot</module>
-    <module>sgs-stop</module>
     <module>sgs-server</module>
     <module>sgs-server-api</module>
     <module>sgs-server-dist</module>
@@ -92,13 +85,6 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-	<groupId>com.projectdarkstar.client</groupId>
-	<artifactId>sgs-client</artifactId>
-	<version>${sgs-client.version}</version>
-	<scope>test</scope>
-      </dependency>
-
-      <dependency>
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-shared</artifactId>
 	<version>${sgs-shared.version}</version>
@@ -110,16 +96,6 @@
 	<version>${sgs-shared.version}</version>
       </dependency>
 
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-boot</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
-      <dependency>
-	<groupId>com.projectdarkstar.server</groupId>
-	<artifactId>sgs-stop</artifactId>
-	<version>${sgs.version}</version>
-      </dependency>
       <dependency>
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-server</artifactId>
@@ -179,10 +155,7 @@
 
   <properties>
     <sgs.version>${version}</sgs.version>
-    <sgs-shared.version>1.3</sgs-shared.version>
-    <sgs-client.version>0.9.8</sgs-client.version>
-    <bdb.version>4.5.20</bdb.version>
-    <bdb.je.version>3.2.76</bdb.je.version>
+    <sgs-shared.version>1.1</sgs-shared.version>
   </properties>
 
 </project>

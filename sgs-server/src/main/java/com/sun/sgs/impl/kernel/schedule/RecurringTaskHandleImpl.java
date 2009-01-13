@@ -58,15 +58,12 @@ class RecurringTaskHandleImpl implements RecurringTaskHandle {
      */
     public RecurringTaskHandleImpl(SchedulerQueue queue,
                                    ScheduledTask task) {
-        if (queue == null) {
+        if (queue == null)
             throw new NullPointerException("Queue cannot be null");
-        }
-        if (task == null) {
+        if (task == null)
             throw new NullPointerException("Task cannot be null");
-        }
-        if (!task.isRecurring()) {
+        if (! task.isRecurring())
             throw new IllegalArgumentException("Task must be recurring");
-        }
 
         this.queue = queue;
         this.task = task;
@@ -81,9 +78,8 @@ class RecurringTaskHandleImpl implements RecurringTaskHandle {
      * @param timerTask the associated <code>TimerTask</code>
      */
     synchronized void setTimerTask(TimerTask timerTask) {
-        if (timerTask == null) {
+        if (timerTask == null)
             throw new NullPointerException("TimerTask cannot be null");
-        }
 
         currentTimerTask = timerTask;
     }
@@ -109,21 +105,18 @@ class RecurringTaskHandleImpl implements RecurringTaskHandle {
      */
     public void cancel() {
         synchronized (this) {
-            if (cancelled) {
+            if (cancelled)
                 throw new IllegalStateException("cannot cancel task");
-            }
             cancelled = true;
         }
         try {
-            if (task.cancel(false)) {
+            if (task.cancel(false))
                 queue.notifyCancelled(task);
-            }
         } catch (InterruptedException ie) {
             // this will never happen because false was passed to cancel()
         }
-        if (currentTimerTask != null) {
+        if (currentTimerTask != null)
             currentTimerTask.cancel();
-        }
     }
 
     /**
@@ -137,9 +130,8 @@ class RecurringTaskHandleImpl implements RecurringTaskHandle {
      */
     public void start() {
         synchronized (this) {
-            if ((cancelled) || (started)) {
+            if ((cancelled) || (started))
                 throw new IllegalStateException("cannot start task");
-            }
             started = true;
         }
         queue.addTask(task);

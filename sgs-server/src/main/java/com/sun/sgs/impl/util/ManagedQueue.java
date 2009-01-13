@@ -106,8 +106,7 @@ public class ManagedQueue<E>
 	ManagedReference<Entry<E>> entryRef =
 	    dataManager.createReference(entry);
 	if (tailRef == null) {
-	    headRef = entryRef;
-            tailRef = entryRef;
+	    headRef = tailRef = entryRef;
 	} else {
 	    Entry<E> tail = tailRef.getForUpdate();
 	    tail.nextEntryRef = entryRef;
