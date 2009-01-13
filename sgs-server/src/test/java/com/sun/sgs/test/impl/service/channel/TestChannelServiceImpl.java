@@ -1122,14 +1122,22 @@ public class TestChannelServiceImpl extends TestCase {
 	//	Thread.sleep(WAIT_TIME);
 	printServiceBindings();
 	addNodes("ay", "bee", "sea");
-	Thread.sleep(2000);
-	// Make sure that previous sessions were cleaned up.
-	assertEquals(count, getObjectCount());
+	int afterCount = getObjectCount();
+	for (int i = 0; i < 10; i++) {
+	    // Make sure that previous sessions were cleaned up.
+	    if (count == afterCount) {
+		break;
+	    } else {
+		Thread.sleep(1000);
+		afterCount = getObjectCount();
+	    }
+	}
 	ClientGroup group2 = new ClientGroup(someUsers);
 	try {
 	    joinUsers(channelName, someUsers);
 	    sendMessagesToChannel(channelName, group2, 2);
 	    group1.checkMembership(channelName, false);
+	    assertEquals(count, afterCount);
 	} finally {
 	    printServiceBindings();
 	    group2.disconnect(false);

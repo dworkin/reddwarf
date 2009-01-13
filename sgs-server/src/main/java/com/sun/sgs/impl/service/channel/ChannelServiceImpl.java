@@ -421,21 +421,20 @@ public final class ChannelServiceImpl
 	 * servicing a channel event accesses a single per-channel data
 	 * structure (the channel's event queue).
 	 */
-	public void serviceEventQueue(final byte[] channelId) {
+	public void serviceEventQueue(final BigInteger channelRefId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "serviceEventQueue channelId:{0}",
-			       HexDumper.toHexString(channelId));
+			       HexDumper.toHexString(channelRefId.toByteArray()));
 		}
 
-		BigInteger channelIdRef = new BigInteger(1, channelId);
-		TaskQueue taskQueue = coordinatorTaskQueues.get(channelIdRef);
+		TaskQueue taskQueue = coordinatorTaskQueues.get(channelRefId);
 		if (taskQueue == null) {
 		    TaskQueue newTaskQueue =
 			transactionScheduler.createTaskQueue();
 		    taskQueue = coordinatorTaskQueues.
-			putIfAbsent(channelIdRef, newTaskQueue);
+			putIfAbsent(channelRefId, newTaskQueue);
 		    if (taskQueue == null) {
 			taskQueue = newTaskQueue;
 		    }
@@ -443,7 +442,7 @@ public final class ChannelServiceImpl
 		taskQueue.addTask(
 		  new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
-			ChannelImpl.serviceEventQueue(channelId);
+			ChannelImpl.serviceEventQueue(channelRefId);
 		    } }, taskOwner);
 					  
 	    } finally {
@@ -454,19 +453,18 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Reads the local membership list for the specified
-	 * {@code channelId}, and updates the local membership cache
+	 * {@code channelRefId}, and updates the local membership cache
 	 * for that channel.  If any join or leave notifications were
 	 * missed, then send the appropriate CHANNEL_JOIN or CHANNEL_LEAVE
 	 * protocol message to the effected session(s).
 	 */
-	public void refresh(String name, byte[] channelId) {
+	public void refresh(String name, BigInteger channelRefId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "refreshing channelId:{0}",
-			   HexDumper.toHexString(channelId));
+			   HexDumper.toHexString(channelRefId.toByteArray()));
 	    }
 	    try {
-		BigInteger channelRefId = new BigInteger(1, channelId);
 		GetLocalMembersTask getMembersTask =
 		    new GetLocalMembersTask(channelRefId);
 		try {
@@ -477,13 +475,13 @@ public final class ChannelServiceImpl
 		    logger.logThrow(
  			Level.WARNING, e,
 			"obtaining members of channel:{0} throws",
-			HexDumper.toHexString(channelId));
+			HexDumper.toHexString(channelRefId.toByteArray()));
 		}
 		Set<BigInteger> newLocalMembers = Collections.synchronizedSet(
 		    getMembersTask.getLocalMembers());
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "newLocalMembers for channel:{0}",
-			       HexDumper.toHexString(channelId));
+			       HexDumper.toHexString(channelRefId.toByteArray()));
 		    for (BigInteger sessionRefId : newLocalMembers) {
 			logger.log(
 			   Level.FINEST, "member:{0}",
@@ -516,6 +514,7 @@ public final class ChannelServiceImpl
 			leavers = oldLocalMembers;
 		    }
 		}
+		byte[] channelId = channelRefId.toByteArray();
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
 			MessageBuffer msg =
@@ -551,22 +550,21 @@ public final class ChannelServiceImpl
 	
 	/** {@inheritDoc}
 	 *
-	 * Adds the specified {@code sessionId} to the per-channel cache
+	 * Adds the specified {@code sessionRefId} to the per-channel cache
 	 * for the given channel's local member sessions, and sends a
 	 * CHANNEL_JOIN protocol message to the session with the corresponding
 	 * {@code sessionId}.
 	 */
-	public void join(String name, byte[] channelId, byte[] sessionId) {
+	public void join(String name, BigInteger channelRefId, BigInteger sessionRefId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "join channelId:{0} sessionId:{1}",
-			       HexDumper.toHexString(channelId),
-			       HexDumper.toHexString(sessionId));
+			       HexDumper.toHexString(channelRefId.toByteArray()),
+			       HexDumper.toHexString(sessionRefId.toByteArray()));
 		}
 
 		// Update local channel membership cache.
-		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers =
 		    localChannelMembersMap.get(channelRefId);
 		if (localMembers == null) {
@@ -578,7 +576,6 @@ public final class ChannelServiceImpl
 			localMembers = newLocalMembers;
 		    }
 		}
-		BigInteger sessionRefId = new BigInteger(1, sessionId);
 		localMembers.add(sessionRefId);
 
 		// Update per-session channel set cache.
@@ -596,6 +593,7 @@ public final class ChannelServiceImpl
 		channelSet.add(channelRefId);
 
 		// Send CHANNEL_JOIN protocol message.
+		byte[] channelId = channelRefId.toByteArray();
 		MessageBuffer msg =
 		    new MessageBuffer(1 +
 			MessageBuffer.getSize(name) +
@@ -615,29 +613,27 @@ public final class ChannelServiceImpl
 	
 	/** {@inheritDoc}
 	 *
-	 * Removes the specified {@code sessionId} from the per-channel
+	 * Removes the specified {@code sessionRefId} from the per-channel
 	 * cache for the given channel's local member sessions, and sends a
 	 * CHANNEL_LEAVE protocol message to the session with the corresponding
-	 * {@code sessionId}.
+	 * {@code sessionRefId}.
 	 */
-	public void leave(byte[] channelId, byte[] sessionId) {
+	public void leave(BigInteger channelRefId, BigInteger sessionRefId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST, "leave channelId:{0} sessionId:{1}",
-			HexDumper.toHexString(channelId),
-			HexDumper.toHexString(sessionId));
+			HexDumper.toHexString(channelRefId.toByteArray()),
+			HexDumper.toHexString(sessionRefId.toByteArray()));
 		}
 
 		// Update local channel membership cache.
-		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers;
 		localMembers = localChannelMembersMap.get(channelRefId);
 		if (localMembers == null) {
 		    return;
 		}
-		BigInteger sessionRefId = new BigInteger(1, sessionId);
 		localMembers.remove(sessionRefId);
 
 		// Update per-session channel set cache.
@@ -648,6 +644,7 @@ public final class ChannelServiceImpl
 		}
 
 		// Send CHANNEL_LEAVE protocol message.
+		byte[] channelId = channelRefId.toByteArray();
 		ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
 		msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
 		    put(channelId).
@@ -666,16 +663,16 @@ public final class ChannelServiceImpl
 	 * sessions, and sends a CHANNEL_LEAVE protocol message to the
 	 * channel's local member sessions.
 	 */
-	public void leaveAll(byte[] channelId) {
+	public void leaveAll(BigInteger channelRefId) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "leaveAll channelId:{0}",
-			       HexDumper.toHexString(channelId));
+			       HexDumper.toHexString(channelRefId.toByteArray()));
 		}
-		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers;
 		localMembers = localChannelMembersMap.remove(channelRefId);
+		byte[] channelId = channelRefId.toByteArray();
 		if (localMembers != null) {
 		    ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
 		    msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
@@ -701,12 +698,12 @@ public final class ChannelServiceImpl
 	 * TBD: (optimization) this method should handle sending multiple
 	 * messages to a given channel.
 	 */
-	public void send(byte[] channelId, byte[] message) {
+	public void send(BigInteger channelRefId, byte[] message) {
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "send channelId:{0} message:{1}",
-			       HexDumper.toHexString(channelId),
+			       HexDumper.toHexString(channelRefId.toByteArray()),
 			       HexDumper.format(message, 0x50));
 		}
 		/*
@@ -716,7 +713,6 @@ public final class ChannelServiceImpl
 		 * continue processing of the event queue.  Right now,
 		 * process the send request inline here.
 		 */
-		BigInteger channelRefId = new BigInteger(1, channelId);
 		Set<BigInteger> localMembers =
 		    localChannelMembersMap.get(channelRefId);
 		if (localMembers == null) {
@@ -725,6 +721,7 @@ public final class ChannelServiceImpl
 		    return;
 		}
 
+		byte[] channelId = channelRefId.toByteArray();
 		ByteBuffer msg =
 		    ByteBuffer.allocate(3 + channelId.length + message.length);
 		msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
@@ -749,10 +746,9 @@ public final class ChannelServiceImpl
 	 * Removes the specified channel from the per-channel cache of
 	 * local members.
 	 */
-	public void close(byte[] channelId) {
+	public void close(BigInteger channelRefId) {
 	    callStarted();
 	    try {
-		BigInteger channelRefId = new BigInteger(1, channelId);
 		localChannelMembersMap.remove(channelRefId);
 
 	    } finally {
@@ -851,13 +847,13 @@ public final class ChannelServiceImpl
      * Adds the specified {@code ioTask} (in a wrapper that runs the task by
      * invoking {@link AbstractService#runIoTask runIoTask} with the {@code
      * ioTask} and {@code nodeId}) to the task list of the given {@code
-     * channelId}.
+     * channelRefId}.
      */
     void addChannelTask(
-	BigInteger channelId, final IoRunnable ioTask, final long nodeId)
+	BigInteger channelRefId, final IoRunnable ioTask, final long nodeId)
     {
 	addChannelTask(
-	    channelId,
+	    channelRefId,
 	    new AbstractKernelRunnable("RunIoTask") {
 		public void run() {
 		    runIoTask(ioTask, nodeId);
@@ -866,11 +862,11 @@ public final class ChannelServiceImpl
 
     /**
      * Adds the specified {@code task} to the task list of the given {@code
-     * channelId}.
+     * channelRefId}.
      */
-    void addChannelTask(BigInteger channelId, KernelRunnable task) {
+    void addChannelTask(BigInteger channelRefId, KernelRunnable task) {
 	Context context = contextFactory.joinTransaction();
-	context.addTask(channelId, task);
+	context.addTask(channelRefId, task);
     }
 
     /* -- Implement TransactionContext -- */
@@ -898,14 +894,14 @@ public final class ChannelServiceImpl
 
 	/**
 	 * Adds the specified {@code task} to the task list of the given
-	 * {@code channelId}.  If the transaction commits, the task will be
+	 * {@code channelRefId}.  If the transaction commits, the task will be
 	 * added to the channel's tasks queue.
 	 */
-	public void addTask(BigInteger channelId, KernelRunnable task) {
-	    List<KernelRunnable> taskList = internalTaskLists.get(channelId);
+	public void addTask(BigInteger channelRefId, KernelRunnable task) {
+	    List<KernelRunnable> taskList = internalTaskLists.get(channelRefId);
 	    if (taskList == null) {
 		taskList = new LinkedList<KernelRunnable>();
-		internalTaskLists.put(channelId, taskList);
+		internalTaskLists.put(channelRefId, taskList);
 	    }
 	    taskList.add(task);
 	}
@@ -961,9 +957,9 @@ public final class ChannelServiceImpl
 	private boolean flush() {
 	    assert Thread.holdsLock(contextList);
 	    if (isCommitted) {
-		for (BigInteger channelId : internalTaskLists.keySet()) {
+		for (BigInteger channelRefId : internalTaskLists.keySet()) {
 		    flushTasks(
-			channelId, internalTaskLists.get(channelId));
+			channelRefId, internalTaskLists.get(channelRefId));
 		}
 	    }
 	    return isCommitted;
@@ -976,14 +972,14 @@ public final class ChannelServiceImpl
      * flushed during transaction commit.
      */
     private void flushTasks(
-	BigInteger channelId, List<KernelRunnable> taskList)
+	BigInteger channelRefId, List<KernelRunnable> taskList)
 	
     {
         assert Thread.holdsLock(contextList);
-	TaskQueue taskQueue = channelTaskQueues.get(channelId);
+	TaskQueue taskQueue = channelTaskQueues.get(channelRefId);
 	if (taskQueue == null) {
 	    taskQueue = taskScheduler.createTaskQueue();
-	    channelTaskQueues.put(channelId, taskQueue);
+	    channelTaskQueues.put(channelRefId, taskQueue);
 	}
 	for (KernelRunnable task : taskList) {
 	    taskQueue.addTask(task, taskOwner);
@@ -1020,13 +1016,12 @@ public final class ChannelServiceImpl
 	     * currently a member of.
 	     */
 	    if (channelSet != null) {
-		final byte[] sessionIdBytes = sessionRefId.toByteArray();
 		for (final BigInteger channelRefId : channelSet) {
 		    transactionScheduler.scheduleTask(
 			new AbstractKernelRunnable("RemoveSessionFromChannel") {
 			    public void run() {
 				ChannelImpl.removeSessionFromChannel(
-				    localNodeId, sessionIdBytes, channelRefId);
+				    localNodeId, sessionRefId, channelRefId);
 			    }
 			}, taskOwner);
 		}

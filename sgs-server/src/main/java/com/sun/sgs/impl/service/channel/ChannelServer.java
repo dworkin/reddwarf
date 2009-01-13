@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.channel;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.rmi.Remote;
 
 /**
@@ -30,17 +31,17 @@ public interface ChannelServer extends Remote {
 
     /**
      * Notifies this server that it should service the event queue of
-     * the channel with the specified {@code channelId}.
+     * the channel with the specified {@code channelRefId}.
      *
-     * @param	channelId a channel ID
+     * @param	channelRefId a channel ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void serviceEventQueue(byte[] channelId) throws IOException;
+    void serviceEventQueue(BigInteger channelRefId) throws IOException;
 
     /**
      * Notifies this server that it should reread the channel
-     * membership list of the specified {@code channelId} for
+     * membership list of the specified {@code channelRefId} for
      * sessions connected to this node before processing any other
      * events on the channel.  {@code refresh} requests are sent
      * when a node performs recovery operations for a channel
@@ -51,67 +52,68 @@ public interface ChannelServer extends Remote {
      * any more events.
      *
      * @param	name a channel name
-     * @param	channelId a channel ID
+     * @param	channelRefId a channel ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void refresh(String name, byte[] channelId) throws IOException;
+    void refresh(String name, BigInteger channelRefId) throws IOException;
 
     /**
      * Notifies this server that the locally-connected session with
-     * the specified {@code sessionId} has joined the channel with
-     * the specified {@code name} and {@code channelId}.
+     * the specified {@code sessionRefId} has joined the channel with
+     * the specified {@code name} and {@code channelRefId}.
      *
      * @param	name a channel name
-     * @param	channelId a channel ID
-     * @param	sessionId a session ID
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void join(String name, byte[] channelId, byte[] sessionId)
+    void join(String name, BigInteger channelRefId, BigInteger sessionRefId)
 	throws IOException;
 
     /**
      * Notifies this server that the locally-connected session with
-     * the specified {@code sessionId} has left the channel with the
-     * specified {@code channelId}.
+     * the specified {@code sessionRefId} has left the channel with the
+     * specified {@code channelRefId}.
      *
-     * @param	channelId a channel ID
-     * @param	sessionId a session ID
+     * @param	channelRefId a channel ID
+     * @param	sessionRefId a session ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void leave(byte[] channelId, byte[] sessionId) throws IOException;
+    void leave(BigInteger channelRefId, BigInteger sessionRefId)
+	throws IOException;
 
     /**
      * Notifies this server that all locally-connected member sessions
-     * have left the channel with the specified {@code channelId}.
+     * have left the channel with the specified {@code channelRefId}.
      *
-     * @param	channelId a channel ID
+     * @param	channelRefId a channel ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void leaveAll(byte[] channelId) throws IOException;
+    void leaveAll(BigInteger channelRefId) throws IOException;
 
     /**
      * Sends the specified message to all locally-connected sessions
      * that are members of the channel with the specified {@code
-     * channelId}.
+     * channelRefId}.
      *
-     * @param	channelId a channel ID
+     * @param	channelRefId a channel ID
      * @param	message a channel message
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void send(byte[] channelId, byte[] message) throws IOException;
+    void send(BigInteger channelRefId, byte[] message) throws IOException;
 
     /**
      * Notifies this server that the channel with the specified {@code
-     * channelId} is closed.
+     * channelRefId} is closed.
      *
-     * @param	channelId a channel ID
+     * @param	channelRefId a channel ID
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void close(byte[] channelId) throws IOException;
+    void close(BigInteger channelRefId) throws IOException;
 }
