@@ -149,7 +149,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     
     /**
      *
-     * The subclass should invoke {@link scheduleReadOnReadHandler} after
+     * The subclass should invoke {@link #scheduleReadOnReadHandler} after
      * constructing the instance to commence reading.
      */
     protected  SimpleSgsProtocolImpl(ProtocolListener listener,

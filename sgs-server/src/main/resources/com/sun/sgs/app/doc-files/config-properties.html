@@ -163,17 +163,13 @@ Server, and can be used in any node configuration unless otherwise specified.
 
 <a name="AppServerPorts"></a>
 <h3>Application Server Port Properties</h3>
-These properties can be used by application nodes to specify 
-ports to be used for the client listeners. 
+By default, the application server uses a TCP transport for client communications. This property can be used by application nodes to specify 
+the port to be used for the client listeners. 
 
 <dl>
 <dt><a name="com.sun.sgs.impl.transport.tcp.listen.port">com.sun.sgs.impl.transport.tcp.listen.port</a>
 <span class="default">62964</span>
 <dd>The TCP port on which to listen for client connections when the TCP
-transport is configured.
-<dt><a name="com.sun.sgs.impl.transport.udp.listen.port">com.sun.sgs.impl.transport.udp.listen.port</a>
-<span class="default">62964</span>
-<dd>The UDP port on which to listen for client connections when the UDP
 transport is configured.
 </dl>
 

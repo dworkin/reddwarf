@@ -94,7 +94,7 @@ public class SimpleSgsProtocolAcceptor
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + "acceptor"));
 
     /** The name of the read buffer size property. */
-    private static final String READ_BUFFER_SIZE_PROPERTY =
+    public static final String READ_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".buffer.read.max";
 
     /**
@@ -109,16 +109,16 @@ public class SimpleSgsProtocolAcceptor
         "com.sun.sgs.impl.transport.tcp.TcpTransport";
             
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
-    private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
+    public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
     /** The name of the disconnect delay property. */
-    private static final String DISCONNECT_DELAY_PROPERTY =
+    public static final String DISCONNECT_DELAY_PROPERTY =
 	PKG_NAME + ".disconnect.delay";
     
     /** The time (in milliseconds) that a disconnecting connection is
      * allowed before this service forcibly disconnects it.
      */
-    private static final long DEFAULT_DISCONNECT_DELAY = 1000;
+    public static final long DEFAULT_DISCONNECT_DELAY = 1000;
 
     /** The logger for this instance. */
     private  final LoggerWrapper logger;

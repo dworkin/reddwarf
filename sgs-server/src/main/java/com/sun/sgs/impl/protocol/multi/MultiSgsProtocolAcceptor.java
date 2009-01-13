@@ -43,7 +43,7 @@ import java.util.logging.Logger;
  * A protocol acceptor for connections that speak the {@link SimpleSgsProtocol}
  * using two transports. The {@link #MultiSgsProtocolAcceptor constructor}
  * supports the properties specified for the {@link
- * SimplSgsProtocolAcceptor} constructor and following properties: <p>
+ * SimpleSgsProtocolAcceptor} constructor and following properties: <p>
  *
  * <dl style="margin-left: 1em">
  *
@@ -79,7 +79,7 @@ public class MultiSgsProtocolAcceptor
             
     /**  The secondary transport property. */
     public static final String SECONDARY_TRANSPORT_PROPERTY =
-        PKG_NAME + ".transport.primary";
+        PKG_NAME + ".transport.secondary";
     
     /** The default primary transport */
     public static final String DEFAULT_SECONDARY_TRANSPORT =

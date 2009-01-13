@@ -29,8 +29,7 @@ package com.sun.sgs.impl.kernel;
  * set the associated behavior for that application. If no value is provided
  * for a given key, then the default or system-provided value is used.
  * Note that some keys are required to have values, specifically
- * <code>APP_NAME</code>, <code>APP_ROOT</code>, <code>APP_LISTENER</code>,
- * and <code>APP_PORT</code>.
+ * <code>APP_NAME</code>, <code>APP_ROOT</code> and <code>APP_LISTENER</code>.
  * <p>
  * Default values can be provided for all applications by using any of the
  * properties specified in this class as a system property.
@@ -136,7 +135,7 @@ public final class StandardProperties {
      * An optional colon-separated key that specifies extra managers to use.
      * This must contain the same number of classes as
      * <code>SERVICES</code>. Each manager in this list will be paired with
-     * the cooresponding <code>Service</code> from the <code>SERVICES</code>
+     * the corresponding <code>Service</code> from the <code>SERVICES</code>
      * list. To specify a <code>Service</code> with no manager, leave the
      * appropriate element in the list empty. E.g.:
      * <pre>
