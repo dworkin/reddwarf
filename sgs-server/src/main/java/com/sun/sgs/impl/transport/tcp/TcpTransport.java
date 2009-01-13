@@ -43,7 +43,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of a TcpTransport {@link Transport}.
+ * Implementation of a TCP {@link Transport}.
  * The {@link #TcpTransport constructor} supports the following
  * properties: <p>
  *

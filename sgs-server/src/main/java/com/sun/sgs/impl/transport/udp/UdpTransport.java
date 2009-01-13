@@ -47,7 +47,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Implementation of a UdpTransport {@link Transport}.
+ * Implementation of a UDP {@link Transport}.
  * The {@link #UdpTransport constructor} supports the following
  * properties: <p>
  *
