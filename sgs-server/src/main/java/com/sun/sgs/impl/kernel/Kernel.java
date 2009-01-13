@@ -57,8 +57,11 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 
-import java.io.FileInputStream;
+import java.io.File;
+import java.io.InputStream;
 import java.io.IOException;
+
+import java.net.URL;
 
 import java.lang.reflect.Constructor;
 
@@ -124,7 +127,7 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
-
+    
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
@@ -667,11 +670,11 @@ class Kernel {
     /**
      * Helper method for loading properties files with backing properties.
      */
-    private static Properties getProperties(String filename,
-                                            Properties backingProperties)
-        throws Exception
+    private static Properties loadProperties(URL resource,
+                                             Properties backingProperties) 
+            throws Exception
     {
-        FileInputStream inputStream = null;
+        InputStream in = null;
         try {
             Properties properties;
             if (backingProperties == null) {
@@ -679,9 +682,38 @@ class Kernel {
             } else {
                 properties = new Properties(backingProperties);
             }
-            inputStream = new FileInputStream(filename);
-            properties.load(inputStream);
+            in = resource.openStream();
+            properties.load(in);
             
+            return properties;
+        } catch (IOException ioe) {
+            if (logger.isLoggable(Level.SEVERE)) {
+                logger.logThrow(Level.SEVERE, ioe, "Unable to load " +
+                                "from resource {0}: ", resource);
+            }
+            throw ioe;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException e) {
+                    if (logger.isLoggable(Level.CONFIG)) {
+                        logger.logThrow(Level.CONFIG, e, "failed to close " +
+                                        "resource {0}", resource);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Helper method that filters properties, loading appropriate defaults
+     * if necessary.
+     */
+    private static Properties filterProperties(Properties properties)
+        throws Exception
+    {
+        try {
             // Expand properties as needed.
             String value = properties.getProperty(StandardProperties.NODE_TYPE);
             if (value == null) {
@@ -729,38 +761,20 @@ class Kernel {
             }
 
             return properties;
-        } catch (IOException ioe) {
-            if (logger.isLoggable(Level.SEVERE)) {
-                logger.logThrow(Level.SEVERE, ioe, "Unable to load " +
-                                "properties file {0}: ", filename);
-            }
-            throw ioe;
         } catch (IllegalArgumentException iae) {
             if (logger.isLoggable(Level.SEVERE)) {
                 logger.logThrow(Level.SEVERE, iae, "Illegal data in " +
-                                "properties file {0}: ", filename);
+                                "properties");
             }
             throw iae;
-        } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (IOException e) {
-                    if (logger.isLoggable(Level.CONFIG)) {
-                        logger.logThrow(Level.CONFIG, e, "failed to close " +
-                                        "property file {0}", filename);
-                    }
-                }
-            }
-        }
+        } 
     }
 
     /**
      * Check for obvious errors in the properties file, logging and
      * throwing an {@code IllegalArgumentException} if there is a problem.
      */
-    private static void checkProperties(Properties appProperties, 
-                                        String configFile) 
+    private static void checkProperties(Properties appProperties) 
     {
         String appName =
                 appProperties.getProperty(StandardProperties.APP_NAME);
@@ -769,11 +783,9 @@ class Kernel {
         // they are then start the application
         if (appName == null) {
             logger.log(Level.SEVERE, "Missing required property " +
-                       StandardProperties.APP_NAME + " from config file "
-                       + configFile);
+                       StandardProperties.APP_NAME);
             throw new IllegalArgumentException("Missing required property " +
-                    StandardProperties.APP_NAME + " from config file " +
-                    configFile);
+                    StandardProperties.APP_NAME);
         }
         
         if (appProperties.getProperty(StandardProperties.APP_ROOT) == null) {
@@ -836,44 +848,110 @@ class Kernel {
     }
     
     /**
+     * This method is used to automatically determine an application's set
+     * of configuration properties.
+     */
+    private static Properties findProperties(String propLoc) throws Exception {
+        // load the application specific configuration file
+        // as the default set of options if it exists
+        Properties baseProperties = new Properties();
+        URL propsIn = ClassLoader.getSystemResource(
+                BootProperties.DEFAULT_APP_PROPERTIES);
+        if (propsIn != null) {
+            baseProperties = loadProperties(propsIn, null);
+        }
+        
+        // load the overriding set of configuration properties from the
+        // file indicated by the filename argument
+        Properties fileProperties = baseProperties;
+        if (propLoc != null && !propLoc.equals("")) {
+            File propFile = new File(propLoc);
+            if (!propFile.isFile() || !propFile.canRead()) {
+                logger.log(Level.SEVERE, "can't access file : " + propFile);
+                throw new IllegalArgumentException("can't access file " + 
+                                                   propFile);
+            }
+            fileProperties = loadProperties(propFile.toURI().toURL(),
+                                            baseProperties);
+        }
+        
+        // if a properties file exists in the user's home directory, use
+        // it to override any properties
+        Properties homeProperties = fileProperties;
+        File homeConfig = new File(System.getProperty("user.home") +
+                                   File.separator + 
+                                   BootProperties.DEFAULT_HOME_CONFIG_FILE);
+        if (homeConfig.isFile() && homeConfig.canRead()) {
+            homeProperties = loadProperties(homeConfig.toURI().toURL(),
+                                            fileProperties);
+        } else if (homeConfig.isFile() && !homeConfig.canRead()) {
+            logger.log(Level.WARNING, "can't access file : " + homeConfig);
+        }
+        
+        // override any properties with the values from the System properties
+        Properties finalProperties = new Properties(homeProperties);
+        finalProperties.putAll(System.getProperties());
+
+        return finalProperties;
+    }
+    
+    /**
      * Main-line method that starts the {@code Kernel}. Each kernel
      * instance runs a single application.
      * <p>
-     * The argument on the command-line is a {@code Properties} file for the
-     * application. Some properties are required to be specified in that file.
-     * See {@code StandardProperties} for the required and optional properties.
+     * If a single argument is given, the value of the argument is assumed 
+     * to be a filename.  This file
+     * is used in combination with additional configuration settings to 
+     * determine an application's configuration properties.
      * <p>
-     * The order of precedence for properties is as follows. If a value is
-     * provided for a given property key by the application's configuration,
-     * then that value takes precedence over any others. If no value is
-     * provided by the application's configuration, then the system
-     * property value, if specified (provided on the command-line
-     * using a "-D" flag) is used. If no value is specified for a given
-     * property in either of these places, then a default is used
-     * or an <code>Exception</code> is thrown (depending on whether a default
-     * value is available).
+     * The order of precedence for properties is as follows (from highest
+     * to lowest):
+     * <ol>
+     * <li>System properties specified on the command line using a 
+     * "-D" flag</li>
+     * <li>Properties specified in the file from the user's home directory
+     * with the name specified by
+     * {@link BootProperties#DEFAULT_HOME_CONFIG_FILE}.</li>
+     * <li>Properties specified in the file given as a command line 
+     * argument.</li>
+     * <li>Properties specified in the resource with the name 
+     * {@link BootProperties#DEFAULT_APP_PROPERTIES}
+     * This file is typically included as part of the application jar file.</li>
+     * </ol>
      * 
-     * @param args filename for <code>Properties</code> file associated with
-     *             the application to run
+     * If no value is specified for a given
+     * property in any of these places, then a default is used
+     * or an <code>Exception</code> is thrown (depending on whether a default
+     * value is available).  Certain properties are required to be 
+     * specified somewhere in the application's configuration.
+     * See {@link StandardProperties} for the required and optional properties.
+     * 
+     * @param args optional filename for <code>Properties</code> file 
+     *             associated with the application to run
      *
      * @throws Exception if there is any problem starting the system
      */
     public static void main(String [] args) throws Exception {
-        // make sure we were given an application to run
-        if (args.length != 1) {
-            logger.log(Level.SEVERE, "No application was provided: halting");
-            System.out.println("Usage: AppPropertyFile ");
-            System.exit(0);
+        // ensure we don't have too many arguments
+        if (args.length > 1) {
+            logger.log(Level.SEVERE, "Invalid number of arguments: halting");
+            System.exit(1);
         }
-
-        // Get the properties, merging properties given on the command line
-        // with the first argument, which is the application config file.
-        // The config file properties have precedence.
-        Properties appProperties = getProperties(args[0], 
-                                                 System.getProperties());
+        
+        // if an argument is specified on the command line, use it
+        // for the value of the filename
+        Properties appProperties = null;
+        if (args.length == 1) {
+            appProperties = findProperties(args[0]);
+        } else {
+            appProperties = findProperties(null);
+        }
+        
+        // filter the properties with appropriate defaults
+        filterProperties(appProperties);
         
         // check the standard properties
-        checkProperties(appProperties, args[0]);
+        checkProperties(appProperties);
         
         // boot the kernel
         new Kernel(appProperties);

@@ -1,74 +1,52 @@
 <assembly>
-  <includeBaseDirectory>false</includeBaseDirectory>
   <formats>
     <format>zip</format>
   </formats>
   
   <dependencySets>
 
-    <!-- Include the main sgs-server jar
-	 Strip out the version number to simplify usage -->
+    <!-- Include the sgs-boot bootstrapper -->
+    <dependencySet>
+      <includes>
+        <include>com.projectdarkstar.server:sgs-boot</include>
+	<include>com.projectdarkstar.server:sgs-stop</include>
+      </includes>
+      <outputDirectory>bin</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
+    </dependencySet>
+
+    <!-- Include the sgs-server jar files required in the lib directory -->
     <dependencySet>
       <includes>
 	<include>com.projectdarkstar.server:sgs-server:jar</include>
+	<include>com.projectdarkstar.server:sgs-shared:jar</include>
+	<include>com.projectdarkstar.server:sgs-server-api:jar</include>
+	<include>com.projectdarkstar.ext.berkeleydb:db:jar</include>
+	<include>com.sleepycat:je:jar</include>
       </includes>
-      <outputDirectory>sgs-server-${sgs.version}/lib</outputDirectory>
+      <outputDirectory>lib</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
-      <outputFileNameMapping>${artifact.artifactId}.${artifact.extension}</outputFileNameMapping>
     </dependencySet>
 
     <!-- Include the sgs-server source files -->
     <dependencySet>
       <includes>
 	<include>com.projectdarkstar.server:sgs-server:jar:sources</include>
-      </includes>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-
-    <!-- Include the jar of sgs shared classes in the lib director -->
-    <dependencySet>
-      <includes>
-	<include>com.projectdarkstar.server:sgs-shared:jar</include>
-      </includes>
-      <outputDirectory>sgs-server-${sgs.version}/lib</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-    
-    <!-- Include the sgs-shared source files -->
-    <dependencySet>
-      <includes>
 	<include>com.projectdarkstar.server:sgs-shared:jar:sources</include>
-      </includes>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-
-    <!-- Include the jar of sgs-server-api classes in the lib director -->
-    <dependencySet>
-      <includes>
-	<include>com.projectdarkstar.server:sgs-server-api:jar</include>
-      </includes>
-      <outputDirectory>sgs-server-${sgs.version}/lib</outputDirectory>
-      <useProjectArtifact>false</useProjectArtifact>
-    </dependencySet>
-    
-    <!-- Include the sgs-server-api source files -->
-    <dependencySet>
-      <includes>
 	<include>com.projectdarkstar.server:sgs-server-api:jar:sources</include>
       </includes>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <outputDirectory>src</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
-    
+
     <!-- Unpack the tutorial component -->
     <dependencySet>
       <includes>       
 	<include>com.projectdarkstar.server:sgs-tutorial-server-dist:zip</include>
       </includes>
       <unpack>true</unpack>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <outputDirectory></outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
     
@@ -86,41 +64,45 @@
 	  <exclude>options</exclude>
 	</excludes>
       </unpackOptions>
-      <outputDirectory>sgs-server-${sgs.version}/doc</outputDirectory>
+      <outputDirectory>doc</outputDirectory>
       <useProjectArtifact>false</useProjectArtifact>
     </dependencySet>
   </dependencySets>
   
   
   <fileSets>
-    
+
     <!-- Include the main distribution license and readme files -->
     <fileSet>
-      <directory>src/main/etc/sgs-server</directory>
+      <directory>${basedir}/src/main/etc</directory>
       <excludes>
         <exclude>README</exclude>
         <exclude>NOTICE.txt</exclude>
-        <exclude>NOTICE-gpl</exclude>
-        <exclude>sgs.sh</exclude>
+        <exclude>license/NOTICE-gpl</exclude>
       </excludes>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
+      <outputDirectory></outputDirectory>
     </fileSet>
 
-    <!-- This is here just to get an empty bdb directory in lib -->
+    <!-- Filter the README and NOTICE files to replace parameters -->
     <fileSet>
-       <directory>${java.io.tmpdir}</directory>
-       <outputDirectory>sgs-server-${sgs.version}/lib/bdb</outputDirectory>
-       <excludes>
-           <exclude>**/*</exclude>
-        </excludes>
+      <directory>${basedir}/src/main/etc</directory>
+      <includes>
+        <include>README</include>
+        <include>NOTICE.txt</include>
+        <include>license/NOTICE-gpl</include>
+      </includes>
+      <filtered>true</filtered>
+      <outputDirectory></outputDirectory>
     </fileSet>
 
     <!-- Include all of the Berkeley DB binaries except for the Windows
 	 DLL -->
     <fileSet>
       <directory>${project.build.directory}/bdb-${bdb.version}</directory>
-      <outputDirectory>bdb-${bdb.version}</outputDirectory>
+      <outputDirectory>lib/natives</outputDirectory>
       <excludes>
+	<exclude>db.jar</exclude>
+	<exclude>LICENSE</exclude>
 	<exclude>win32-x86/libdb_java45.dll</exclude>
       </excludes>
     </fileSet>
@@ -129,53 +111,23 @@
 	 it executable -->
     <fileSet>
       <directory>${project.build.directory}/bdb-${bdb.version}</directory>
-      <outputDirectory>bdb-${bdb.version}</outputDirectory>
+      <outputDirectory>lib/natives</outputDirectory>
       <includes>
 	<include>win32-x86/libdb_java45.dll</include>
       </includes>
       <fileMode>755</fileMode>
     </fileSet>
 
+    <!-- This is here just to get an empty deploy directory -->
+    <fileSet>
+      <directory>${java.io.tmpdir}</directory>
+      <outputDirectory>deploy</outputDirectory>
+      <excludes>
+        <exclude>**/*</exclude>
+      </excludes>
+    </fileSet>
+
   </fileSets>
-  
 
-  <files>
-    <!-- Filter README files to replace parameterized version numbers -->
-    <file>
-      <source>src/main/etc/README</source>
-      <outputDirectory>.</outputDirectory>
-      <filtered>true</filtered>
-      <fileMode>644</fileMode>
-    </file>
-    <file>
-      <source>src/main/etc/sgs-server/README</source>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
-      <filtered>true</filtered>
-      <fileMode>644</fileMode>
-    </file>
-
-    <!-- Filter the NOTICE files -->
-    <file>
-      <source>src/main/etc/sgs-server/NOTICE.txt</source>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
-      <filtered>true</filtered>
-      <fileMode>644</fileMode>
-    </file>
-    <file>
-      <source>src/main/etc/sgs-server/NOTICE-gpl</source>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
-      <filtered>true</filtered>
-      <fileMode>644</fileMode>
-    </file>
-
-    <!-- This shouldn't be necessary but there's a bug in the Maven
-	 assembly plugin that doesn't preserve file permissions.
-	 This includes the bootstrapper with the execute bit set -->
-    <file>
-      <source>src/main/etc/sgs-server/sgs.sh</source>
-      <outputDirectory>sgs-server-${sgs.version}</outputDirectory>
-      <fileMode>755</fileMode>
-    </file>
-  </files>
   
 </assembly>
