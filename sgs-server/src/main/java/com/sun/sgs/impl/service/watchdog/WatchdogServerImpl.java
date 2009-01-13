@@ -307,7 +307,7 @@ public final class WatchdogServerImpl
 
     /** Calls NodeImpl.markAllNodesFailed. */
     private class FailedNodesRunnable extends AbstractKernelRunnable {
-	Collection<NodeImpl> nodes;
+	Collection<NodeImpl> nodes = null;
 
 	/** Constructs an instance. */
 	FailedNodesRunnable() {

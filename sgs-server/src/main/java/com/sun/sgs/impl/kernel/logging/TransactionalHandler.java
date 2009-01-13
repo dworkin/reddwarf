@@ -53,7 +53,7 @@ public class TransactionalHandler extends Handler
      * A mapping from transaction to the list of records waiting to be
      * published on transaction commit.
      */
-    private final ConcurrentMap<Transaction,Queue<LogRecord>> 
+    private final ConcurrentMap<Transaction, Queue<LogRecord>>
 	bufferedRecords;
     
     /**
@@ -81,12 +81,14 @@ public class TransactionalHandler extends Handler
      *         {@code proxy} is {@code null}.
      */
     TransactionalHandler(TransactionProxy proxy, Handler backingHandler) {
-	if (proxy == null || backingHandler == null)
+	if (proxy == null || backingHandler == null) {
 	    throw new NullPointerException();
+        }
 
 	this.proxy = proxy;
 	this.handler = backingHandler;	
-	bufferedRecords = new ConcurrentHashMap<Transaction,Queue<LogRecord>>();
+        bufferedRecords =
+                new ConcurrentHashMap<Transaction, Queue<LogRecord>>();
     }
 
     /**
@@ -235,8 +237,7 @@ public class TransactionalHandler extends Handler
 	    // then we just pass the log record on through without
 	    // buffering
 	    handler.publish(record);
-	}
-	else {
+        } else {
 	    Queue<LogRecord> records = bufferedRecords.get(txn);
 	    if (records == null) {
 		txn.join(this);
@@ -259,7 +260,7 @@ public class TransactionalHandler extends Handler
 	// because it has protected access, so we emulate the code in
 	// Hander.java directly here, including the catch block
 	try {
-	    handler.getErrorManager().error(msg,ex,code);
+            handler.getErrorManager().error(msg, ex, code);
 	} catch (Exception ex2) {
 	    System.err.println("TransactionalHandler.reportError() caught:");
 	    ex2.printStackTrace();
