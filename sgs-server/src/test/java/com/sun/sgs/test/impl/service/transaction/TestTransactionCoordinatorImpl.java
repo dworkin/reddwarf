@@ -23,13 +23,14 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
@@ -60,13 +61,14 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    String.valueOf(TIMEOUT));
     }
 
-    /** A profile collector. */
-    private final ProfileCollector collector = 
-            new ProfileCollectorImpl(ProfileLevel.MIN, null, null);
+    /** A profile collector handle. */
+    private final ProfileCollectorHandle collectorHandle =
+            new ProfileCollectorHandleImpl(
+                new ProfileCollectorImpl(ProfileLevel.MIN, null, null));
     
     /** The instance to test. */
     private final TransactionCoordinator coordinator =
-	new TransactionCoordinatorImpl(coordinatorProps, collector);
+	new TransactionCoordinatorImpl(coordinatorProps, collectorHandle);
     
     /** The handle to test. */
     private TransactionHandle handle;
@@ -126,7 +128,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	};
 	for (Properties props : allProperties) {
 	    try {
-		new TransactionCoordinatorImpl(props, collector);
+		new TransactionCoordinatorImpl(props, collectorHandle);
 		fail("Expected IllegalArgumentException");
 	    } catch (IllegalArgumentException e) {
 		System.err.println(props + ": " + e);
@@ -713,7 +715,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	p.setProperty(TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY,
 		      "100000");
 	TransactionCoordinator coordinator =
-	    new TransactionCoordinatorImpl(p, collector);
+	    new TransactionCoordinatorImpl(p, collectorHandle);
 	Transaction txn = coordinator.createTransaction(false).
 	    getTransaction();
 	assertTrue("Incorrect bounded Transaction timeout: " +

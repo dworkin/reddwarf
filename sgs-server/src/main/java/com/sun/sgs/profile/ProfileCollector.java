@@ -19,13 +19,8 @@
 
 package com.sun.sgs.profile;
 
-import com.sun.sgs.auth.Identity;
-
-import com.sun.sgs.kernel.KernelRunnable;
-
 import java.util.List;
 import java.util.Map;
-
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -94,9 +89,9 @@ public interface ProfileCollector {
      * profiling data reports. The listener is immediately updated on
      * the current set of operations and the number of scheduler
      * threads. The listener can be marked as unable to be removed by
-     * {@link #removeListener} or shutdown by {@link #shutdown};  if these
-     * operations are performed on a listener that does not allow them, they
-     * are silently ignored.
+     * {@link #removeListener removeListener} or shutdown by {@link #shutdown};
+     * if these operations are performed on a listener that does not allow them,
+     * they are silently ignored.
      *
      * @param listener the {@code ProfileListener} to add
      * @param canRemove {@code true} if this listener can be removed or 
@@ -132,108 +127,39 @@ public interface ProfileCollector {
     /**
      * Removes a {@code ProfileListener} and calls
      * {@link ProfileListener#shutdown} on the listener.  If the
-     * {@code listener} has never been added with {@link #addListener}, no
-     * action is taken.
+     * {@code listener} has never been added with 
+     * {@link #addListener addListener}, no action is taken.
      *
      * @param listener the listener to remove
      */
     void removeListener(ProfileListener listener);
     
     /**
+     * Returns the named {@code ProfileConsumer}, or creates a new one with
+     * that name.  
+     * <p>
+     * Note that the name must be unique for a new {@code ProfileConsumer} to 
+     * be created. Consumers created by the core server packages have a prefix
+     * of {@value 
+     * com.sun.sgs.impl.profile.ProfileCollectorImpl#CORE_CONSUMER_PREFIX}
+     * to distinguish their namespace. Consumers created by code outside of the
+     * core server packages should create their own unique namespace.
+     * <p>
+     * Calling {@link #getConsumers} will return a map keyed by names already 
+     * in use.
+     *
+     * @param name the unique name of the profile consumer
+     *
+     * @return a {@code ProfileConsumer} with the given name
+     */
+    ProfileConsumer getConsumer(String name);
+    
+    /**
      * Returns a read-only map of {@code ProfileConsumer} names to the 
-     * {@code ProfileConsumer}s which have been registered through a call to 
-     * {@link ProfileRegistrar#registerProfileProducer}.
+     * {@code ProfileConsumer}s which have been created through a call to 
+     * {@link #getConsumer getConsumer}.
      * 
      * @return the map of names to consumers
      */
     Map<String, ProfileConsumer> getConsumers();
-    
-    /**
-     * Notifies the collector that a thread has been added to the scheduler.
-     */
-    void notifyThreadAdded();
-
-    /**
-     * Notifies the collector that a thread has been removed from the
-     * scheduler.
-     */
-    void notifyThreadRemoved();
-
-    /**
-     * Tells the collector that a new task is starting in the context of
-     * the calling thread. If another task was alrady being profiled in the
-     * context of the calling thread then that profiling data is pushed
-     * onto a stack until the new task finishes from a call to
-     * <code>finishTask</code>.
-     *
-     * @param task the <code>KernelRunnable</code> that is starting
-     * @param owner the <code>Identity</code> of the task owner
-     * @param scheduledStartTime the requested starting time for the task
-     * @param readyCount the number of ready tasks at the scheduler
-     */
-    void startTask(KernelRunnable task, Identity owner,
-                   long scheduledStartTime, int readyCount);
-
-    /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is
-     * transactional. This does not mean that all operations of the task
-     * are transactional, but that at least some of the task is run in a
-     * transactional context.
-     *
-     * @param transactionId the identifier for the transaction
-     *
-     * @throws IllegalStateException if no task is bound to this thread
-     */
-    void noteTransactional(byte [] transactionId);
-
-    /**
-     * Tells the collector about a participant of a transaction when that
-     * participant has finished participating (i.e., has committed, has
-     * prepared read-only, or has aborted). The transaction must be the
-     * current transaction for the current task, and therefore
-     * <code>noteTransactional</code> must first have been called in
-     * the context of the current thread.
-     *
-     * @param participantDetail the detail associated with the participant
-     *
-     * @throws IllegalStateException if no transactional task is bound to
-     *                               this thread
-     */
-    void addParticipant(ProfileParticipantDetail participantDetail);
-
-    /**
-     * Sets the detail for all objects accessed during the task as
-     * reported to the <code>AccessCoordinator</code>.
-     * 
-     * @param detail all detail of the accessed objects
-     *
-     * @throws IllegalStateException if no transactional task is bound to
-     *                               this thread
-     */
-    void setAccessedObjectsDetail(AccessedObjectsDetail detail);
-
-    /**
-     * Tells the collector that the current task associated with the
-     * calling thread (as associated by a call to
-     * <code>startTask</code>) has now successfully finished.
-     *
-     * @param tryCount the number of times that the task has tried to run
-     *
-     * @throws IllegalStateException if no task is bound to this thread
-     */
-    void finishTask(int tryCount);
-
-    /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is now
-     * finished and that an exception occured during its execution.
-     *
-     * @param tryCount the number of times that the task has tried to run
-     * @param t the <code>Throwable</code> thrown during task execution
-     *
-     * @throws IllegalStateException if no task is bound to this thread
-     */
-    void finishTask(int tryCount, Throwable t);
-
 }

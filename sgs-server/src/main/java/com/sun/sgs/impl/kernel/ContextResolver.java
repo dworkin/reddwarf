@@ -35,7 +35,7 @@ import com.sun.sgs.service.Transaction;
  * This class is used to resolve the state associated with the current task's
  * context, including its owner and active transaction.
  */
-public final class ContextResolver {
+final class ContextResolver {
 
     // the context of any current thread, needed only so that we can run
     // multiple stacks in the same VM
@@ -156,12 +156,14 @@ public final class ContextResolver {
     static Transaction getCurrentTransaction() {
         Transaction txn = currentTransaction.get();
 
-        if (txn == null)
+        if (txn == null) {
             throw new TransactionNotActiveException("no current transaction");
+        }
 
-        if (txn.isAborted())
+        if (txn.isAborted()) {
             throw new TransactionNotActiveException("Transaction is aborted",
                                                     txn.getAbortCause());
+        }
 
         txn.checkTimeout();
 
@@ -178,13 +180,15 @@ public final class ContextResolver {
      * @throws IllegalStateException if there is already an active transaction
      */
     static void setCurrentTransaction(Transaction transaction) {
-        if (transaction == null)
+        if (transaction == null) {
             throw new NullPointerException("null transactions not allowed");
+        }
 
         Transaction txn = currentTransaction.get();
-        if (txn != null)
+        if (txn != null) {
             throw new IllegalStateException("an active transaction is " +
                                             "currently running");
+        }
 
         currentTransaction.set(transaction);
     }
@@ -202,15 +206,18 @@ public final class ContextResolver {
      *                                  is not the active transaction
      */
     static void clearCurrentTransaction(Transaction transaction) {
-        if (transaction == null)
+        if (transaction == null) {
             throw new NullPointerException("transaction cannot be null");
+        }
 
         Transaction txn = currentTransaction.get();
-        if (txn == null)
+        if (txn == null) {
             throw new IllegalStateException("no active transaction to clear");
-        if (! txn.equals(transaction))
+        }
+        if (!txn.equals(transaction)) {
             throw new IllegalArgumentException("provided transaction is " +
                                                "not currently active");
+        }
 
         currentTransaction.set(null);
     }

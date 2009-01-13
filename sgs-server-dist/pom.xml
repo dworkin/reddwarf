@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.8-SNAPSHOT</version>
+    <version>0.9.9-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-dist</artifactId>
@@ -24,11 +24,15 @@
   <dependencies>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-server</artifactId>
+      <artifactId>sgs-boot</artifactId>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
+      <artifactId>sgs-stop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server</artifactId>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
@@ -38,24 +42,6 @@
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-tutorial-server-dist</artifactId>
-      <type>zip</type>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.mina</groupId>
-      <artifactId>mina-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-jdk14</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-      <artifactId>db-binaries</artifactId>
       <type>zip</type>
     </dependency>
   </dependencies>

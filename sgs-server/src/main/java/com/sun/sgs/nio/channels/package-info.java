@@ -32,18 +32,24 @@
  <td>[[NOT IMPLEMENTED]] An asynchronous channel for reading,
  writing, and manipulating a file</td></tr>
 
- <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousSocketChannel}</td>
+ <tr><td valign=top>
+     {@link com.sun.sgs.nio.channels.AsynchronousSocketChannel}</td>
  <td>An asynchronous channel to a stream-oriented connecting socket</td></tr>
- <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousServerSocketChannel}</td>
+ <tr><td valign=top>
+     {@link com.sun.sgs.nio.channels.AsynchronousServerSocketChannel}</td>
  <td>An asynchronous channel to a stream-oriented listening socket</td></tr>  
- <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousDatagramChannel}</td>
+ <tr><td valign=top>
+     {@link com.sun.sgs.nio.channels.AsynchronousDatagramChannel}</td>
  <td>An asynchronous channel to a datagram-oriented socket</td></tr>
 
  <tr><td valign=top>{@link com.sun.sgs.nio.channels.CompletionHandler}</td>
- <td>A handler for consuming the result of an asynchronous operation</td></tr>   
+ <td>A handler for consuming the result of an asynchronous operation</td>
+ </tr>   
  <tr><td valign=top>{@link com.sun.sgs.nio.channels.IoFuture}</td>
- <td>A Future representing the result of an asynchronous I/O operation</td></tr> 
- <tr><td valign=top>{@link com.sun.sgs.nio.channels.AsynchronousChannelGroup}</td>
+ <td>A Future representing the result of an asynchronous I/O operation</td>
+ </tr> 
+ <tr><td valign=top>
+     {@link com.sun.sgs.nio.channels.AsynchronousChannelGroup}</td>
  <td>A grouping of asynchronous channels for the purpose of resource
  sharing</td></tr> 
  </table></blockquote>
@@ -52,14 +58,14 @@
  Asynchronous I/O is provided by asynchronous channels, I/O futures, and 
  completion handlers. 
  <p>
- {@link com.sun.sgs.nio.channels.AsynchronousChannel Asynchronous channels} are a 
- special type of channel capable of asynchronous I/O operations. Asynchronous
+ {@link com.sun.sgs.nio.channels.AsynchronousChannel Asynchronous channels} are
+ a special type of channel capable of asynchronous I/O operations. Asynchronous
  channels are non-blocking and define methods to initiate asynchronous 
- operations, returning an {@link com.sun.sgs.nio.channels.IoFuture} representing the 
- pending result of each operation. The {@code IoFuture} can be used to poll or
- wait for the result of the operation. Asynchronous I/O operations can also 
- specify a {@link com.sun.sgs.nio.channels.CompletionHandler} to invoke when the 
- operation completes. A completion handler is user provided code that is
+ operations, returning an {@link com.sun.sgs.nio.channels.IoFuture} representing
+ the pending result of each operation. The {@code IoFuture} can be used to poll
+ or wait for the result of the operation. Asynchronous I/O operations can also 
+ specify a {@link com.sun.sgs.nio.channels.CompletionHandler} to invoke when 
+ the operation completes. A completion handler is user provided code that is
  executed to consume the result of I/O operation.
  <p>
  This package defines asynchronous-channel classes that are connected to 
@@ -69,8 +75,8 @@
  for asynchronous reading, writing, and manipulating a file. As with the
  {@code FileChannel} it supports operations to truncate the file
  to a specific size, force updates to the file to be written to the storage 
- device, or acquire locks on the whole file or on a specific region of the file. 
- Unlike the {@code FileChannel} it does not define methods for mapping a 
+ device, or acquire locks on the whole file or on a specific region of the 
+ file. Unlike the {@code FileChannel} it does not define methods for mapping a 
  region of the file directly into memory. Where memory mapped I/O is required,
  then a {@code FileChannel} can be used.]]
  <p>

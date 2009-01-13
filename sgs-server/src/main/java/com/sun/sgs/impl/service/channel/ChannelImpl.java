@@ -32,6 +32,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
@@ -41,7 +42,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -979,17 +979,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private static long getLocalNodeId() {
 	return ChannelServiceImpl.getLocalNodeId();
-    }
-
-    /**
-     * Returns {@code true} if the node with the associated {@code nodeId}
-     * is alive, otherwise returns {@code false}.
-     *
-     * This method must be called from outside a transaction or an
-     * {@code IllegalStateException} will be thrown.
-     */
-    private static boolean isAlive(long nodeId) {
-	return ChannelServiceImpl.getChannelService().isAlive(nodeId);
     }
 
     /**

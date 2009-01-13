@@ -804,6 +804,16 @@ public class DataStoreImpl
 	DbTransaction dbTxn = null;
 	boolean done = false;
 	try {
+	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
+            if (!directoryFile.exists()) {
+                logger.log(Level.INFO, "Creating database directory : " +
+                           directoryFile.getAbsolutePath());
+                if (!directoryFile.mkdirs()) {
+                    throw new DataStoreException("Unable to create database " +
+                                                 "directory : " +
+                                                 directoryFile.getName());
+                }
+	    }
 	    env = DbEnvironmentFactory.getEnvironment(
 		directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);

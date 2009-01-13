@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
@@ -57,9 +58,9 @@ public final class TransactionCoordinatorImpl
 {
     /** The next transaction ID. */
     private AtomicLong nextTid = new AtomicLong(1);
-
-    /** The optional collector for reporting participant details. */
-    private final ProfileCollector collector;
+    
+    /** The collectorHandle for reporting participant details. */
+    private final ProfileCollectorHandle collectorHandle;
 
     /** The value for bounded timeout. */
     private final long boundedTimeout;
@@ -85,13 +86,15 @@ public final class TransactionCoordinatorImpl
 
 	/**
 	 * Creates a transaction with the specified ID, timeout, 
-         * prepareAndCommit optimization boolean, and collector.
+         * prepareAndCommit optimization boolean, and collectorHandle.
 	 */
 	TransactionHandleImpl(long tid, long timeout,
                               boolean disablePrepareAndCommitOpt,
-			      ProfileCollector collector) {
+			      ProfileCollectorHandle collectorHandle) 
+        {
 	    txn = new TransactionImpl(tid, timeout, 
-                                      disablePrepareAndCommitOpt, collector);
+                                      disablePrepareAndCommitOpt, 
+                                      collectorHandle);
 	}
 
 	public String toString() {
@@ -114,20 +117,21 @@ public final class TransactionCoordinatorImpl
      * properties.
      *
      * @param	properties the properties for configuring this service
-     * @param	collector the <code>ProfileCollector</code> used to report
-     *       	participant detail
+     * @param	collectorHandle the {@code ProfileCollectorHandle} used 
+     *          to report participant detail
      * @throws	IllegalArgumentException if the bounded or
      *		unbounded timeout properties are less than {@code 1}
      */
     public TransactionCoordinatorImpl(Properties properties,
-				      ProfileCollector collector) {
+                                      ProfileCollectorHandle collectorHandle) 
+    {
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
 	}
-        if (collector == null) {
-	    throw new NullPointerException("Collector must not be null");
+        if (collectorHandle == null) {
+	    throw new NullPointerException("Collector handle must not be null");
 	}
-	this.collector = collector;
+        this.collectorHandle = collectorHandle;
 
 	PropertiesWrapper props = new PropertiesWrapper(properties);
 	this.boundedTimeout =
@@ -151,12 +155,12 @@ public final class TransactionCoordinatorImpl
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     unboundedTimeout, 
                                              disablePrepareAndCommitOpt,
-                                             collector);
+                                             collectorHandle);
 	} else {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
 					     boundedTimeout, 
                                              disablePrepareAndCommitOpt,
-                                             collector);
+                                             collectorHandle);
 	}
     }
 }
