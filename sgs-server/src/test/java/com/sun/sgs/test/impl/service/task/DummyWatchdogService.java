@@ -167,5 +167,4 @@ public class DummyWatchdogService implements WatchdogService {
 	// Don't do anything for now
     }
 
-    
 }

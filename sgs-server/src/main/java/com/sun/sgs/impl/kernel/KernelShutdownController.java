@@ -13,4 +13,5 @@ public interface KernelShutdownController {
      * a shutdown to the otherwise non-visible method.
      */
     void shutdownNode();
+
 }

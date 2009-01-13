@@ -19,18 +19,10 @@
 
 package com.sun.sgs.test.impl.util;
 
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.Properties;
-import java.util.logging.Logger;
-
-import junit.framework.TestCase;
-
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -39,6 +31,13 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.util.Properties;
+import java.util.logging.Logger;
+import junit.framework.TestCase;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 /** Test the AbstractService class. */
 public class TestAbstractService extends TestCase {
@@ -246,8 +245,6 @@ public class TestAbstractService extends TestCase {
 	assertEquals(ioTask.runCount, 1);
     }
 
-    
-    
     public void testReportingLocalFailure() throws Exception {
 	final DummyServiceFailureReporter service = 
 	    new DummyServiceFailureReporter(serviceProps, 
@@ -300,7 +297,6 @@ public class TestAbstractService extends TestCase {
 	}
 	
     }
-    
     
     private static class MyRuntimeException extends RuntimeException {
 	private static final long serialVersionUID = 1L;

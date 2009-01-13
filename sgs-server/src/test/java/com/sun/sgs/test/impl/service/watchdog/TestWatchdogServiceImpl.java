@@ -19,26 +19,6 @@
 
 package com.sun.sgs.test.impl.service.watchdog;
 
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-
-import java.io.File;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.net.BindException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import junit.framework.TestCase;
-
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
@@ -58,6 +38,25 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.net.BindException;
+import static com.sun.sgs.test.util.UtilProperties.createProperties;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import junit.framework.TestCase;
 
 public class TestWatchdogServiceImpl extends TestCase {
     /** The name of the WatchdogServerImpl class. */
@@ -126,6 +125,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     protected void setUp(Properties props, boolean clean) throws Exception {
+	
         serverNode = new SgsTestNode("TestWatchdogServiceImpl", 
 				     null, null, props, clean);
         txnProxy = serverNode.getProxy();
@@ -154,15 +154,16 @@ public class TestWatchdogServiceImpl extends TestCase {
         // Create the other nodes
         additionalNodes = new SgsTestNode[num];
         System.err.println("..1");
-        
+
         for (int i = 0; i < num; i++) {
-            SgsTestNode node = new SgsTestNode(serverNode, null, props);
+            SgsTestNode node = new SgsTestNode(serverNode, null, props); 
             System.err.println("..2");
             additionalNodes[i] = node;
             System.err.println("..3");
             System.err.println("watchdog service id: " +
                                    node.getWatchdogService().getLocalNodeId());
             System.err.println("..4");
+
         }
     }
 

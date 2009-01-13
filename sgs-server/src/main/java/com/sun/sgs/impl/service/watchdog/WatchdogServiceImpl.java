@@ -19,20 +19,6 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Properties;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
@@ -48,99 +34,124 @@ import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /*
- * TBD: Modify implementation to not accept calls before service is ready. The
- * server should not service incoming remote calls (registerNode, etc.) until
- * it receives the 'ready' invocation (or finishes construction successfully).
- * Some of the fields used in registerNode aren't initialized until after the
- * server is exported, so it can cause problems if the server receives an
- * incoming request before it has completed initializing. In practice, this
- * flaw is not a problem so long as the server is started first before
- * starting other nodes.
+ * TBD: Modify implementation to not accept calls before service is ready.
+ * The server should not service incoming remote calls (registerNode, etc.)
+ * until it receives the 'ready' invocation (or finishes construction
+ * successfully).  Some of the fields used in registerNode aren't initialized
+ * until after the server is exported, so it can cause problems if the server
+ * receives an incoming request before it has completed initializing.  In
+ * practice, this flaw is not a problem so long as the server is started first
+ * before starting other nodes.
  */
 
 /**
- * The {@link WatchdogService} implementation.
- * <p>
+ * The {@link WatchdogService} implementation. <p>
+ *
  * The {@link #WatchdogServiceImpl constructor} supports the following
- * properties:
- * <p>
+ * properties: <p>
+ *
  * <dl style="margin-left: 1em">
+ *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.start
  *	</b></code><br>
- * <i>Default:</i> the value of the {@code com.sun.sgs.server.start}
- * property, if present, else {@code true} <br>
- * Specifies whether the watchdog server should be started by this service. If
- * {@code true}, the watchdog server is started. If this property value is
- * {@code true}, then the properties supported by the
- * {@link WatchdogServerImpl} class should be specified.
- * <p>
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
+ *	property, if present, else {@code true} <br>
+ *	Specifies whether the watchdog server should be started by this service.
+ *	If {@code true}, the watchdog server is started.  If this property value
+ *	is {@code true}, then the properties supported by the
+ *	{@link WatchdogServerImpl} class should be specified.<p>
+ *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.host
  *	</b></code><br>
- * <i>Default:</i> the value of the {@code com.sun.sgs.server.host} property,
- * if present, or {@code localhost} if this node is starting the server <br>
- * <br>
- * <dd style="padding-top: .5em"> Specifies the host name for the watchdog
- * server that this service contacts. If the {@code
- * com.sun.sgs.impl.service.watchdog.server.start} property is {@code true},
- * then this property's default is used (since the watchdog server to contact
- * will be the one started on the local host).
+ *	<i>Default:</i> the value of the {@code com.sun.sgs.server.host}
+ *	property, if present, or {@code localhost} if this node is starting the 
+ *      server <br> <br>
+ *
+ * <dd style="padding-top: .5em">
+ *	Specifies the host name for the watchdog server that this service
+ *	contacts.  If the {@code
+ *	com.sun.sgs.impl.service.watchdog.server.start} property
+ *	is {@code true}, then this property's default is used (since
+ *	the watchdog server to contact will be the one started on
+ *	the local host).
+ *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.server.port
  *	</b></code><br>
- * <i>Default:</i> {@code 44533} <br>
- * <dd style="padding-top: .5em"> Specifies the network port for the watchdog
- * server that this service contacts (and, optionally, starts). If the {@code
- * com.sun.sgs.impl.service.watchdog.server.start} property is {@code true},
- * then the value must be greater than or equal to {@code 0} and no greater
- * than {@code 65535}, otherwise the value must be greater than {@code 0},
- * and no greater than {@code 65535}.
- * <p>
+ *	<i>Default:</i> {@code 44533} <br>
+ *
+ * <dd style="padding-top: .5em">
+ *	Specifies the network port for the watchdog server that this service
+ *	contacts (and, optionally, starts).  If the {@code
+ *	com.sun.sgs.impl.service.watchdog.server.start} property
+ *	is {@code true}, then the value must be greater than or equal to
+ *	{@code 0} and no greater than {@code 65535}, otherwise the value
+ *	must be greater than {@code 0}, and no greater than {@code 65535}.<p>
+ * 
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.client.host
  *	</b></code><br>
- * <i>Default:</i> the local host name <br>
- * <dd style="padding-top: .5em"> Specifies the host name for the watchdog
- * client used when registering the node with the watchdog service.
+ *	<i>Default:</i> the local host name <br>
+ *
+ * <dd style="padding-top: .5em">
+ *	Specifies the host name for the watchdog client used when
+ *	registering the node with the watchdog service.
+ *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.watchdog.client.port
  *	</b></code><br>
- * <i>Default:</i> {@code 0} (anonymous port) <br>
- * <dd style="padding-top: .5em"> Specifies the network port for this watchdog
- * service for receiving node status change notifications from the watchdog
- * server. The value must be greater than or equal to {@code 0} and no greater
- * than {@code 65535}.
- * <p>
- * </dl>
- * <p>
+ *	<i>Default:</i> {@code 0} (anonymous port) <br>
+ *
+ * <dd style="padding-top: .5em">
+ *	Specifies the network port for this watchdog service for receiving
+ *	node status change notifications from the watchdog server.  The value
+ *	must be greater than or equal to {@code 0} and no greater than
+ *	{@code 65535}.<p>
+ * </dl> <p>
  */
-public final class WatchdogServiceImpl extends AbstractService implements
-	WatchdogService {
+public final class WatchdogServiceImpl
+    extends AbstractService
+    implements WatchdogService
+{
 
-    /** The name of this class. */
+    /**  The name of this class. */
     private static final String CLASSNAME =
-	    WatchdogServiceImpl.class.getName();
+	WatchdogServiceImpl.class.getName();
 
     /** The package name. */
-    private static final String PKG_NAME =
-	    "com.sun.sgs.impl.service.watchdog";
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.watchdog";
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	    new LoggerWrapper(Logger.getLogger(PKG_NAME + ".service"));
+	new LoggerWrapper(
+	    Logger.getLogger(PKG_NAME + ".service"));
 
     /** The name of the version key. */
     private static final String VERSION_KEY = PKG_NAME + ".service.version";
 
     /** The major version. */
     private static final int MAJOR_VERSION = 1;
-
+    
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
-
+    
     /** The prefix for server properties. */
     private static final String SERVER_PROPERTY_PREFIX = PKG_NAME + ".server";
 
@@ -149,27 +160,27 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
     /** The property to specify that the watchdog server should be started. */
     private static final String START_SERVER_PROPERTY =
-	    SERVER_PROPERTY_PREFIX + ".start";
+	SERVER_PROPERTY_PREFIX + ".start";
 
     /** The property name for the watchdog server host. */
     private static final String HOST_PROPERTY =
-	    SERVER_PROPERTY_PREFIX + ".host";
+	SERVER_PROPERTY_PREFIX +  ".host";
 
     /** The property name for the watchdog server port. */
     private static final String SERVER_PORT_PROPERTY =
-	    WatchdogServerImpl.PORT_PROPERTY;
+	WatchdogServerImpl.PORT_PROPERTY;
 
     /** The default value of the server port. */
     private static final int DEFAULT_SERVER_PORT =
-	    WatchdogServerImpl.DEFAULT_PORT;
+	WatchdogServerImpl.DEFAULT_PORT;
 
     /** The property name for the watchdog client host. */
     private static final String CLIENT_HOST_PROPERTY =
-	    CLIENT_PROPERTY_PREFIX + ".host";
-
+	CLIENT_PROPERTY_PREFIX + ".host";
+    
     /** The property name for the watchdog client port. */
     private static final String CLIENT_PORT_PROPERTY =
-	    CLIENT_PROPERTY_PREFIX + ".port";
+	CLIENT_PROPERTY_PREFIX + ".port";
 
     /** The default value of the client port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
@@ -194,14 +205,15 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
     /** The name of the local host. */
     final String localHost;
-
+    
     /** The application port. */
     final int appPort;
-
-    /**
-     * A flag indicating that this watchdog lives on the core server node
-     */
+    
+    /** A flag indicating that this watchdog lives on the core server node */
     final boolean isCoreServerNode;
+
+    /** The controller which enables node shutdown */
+    private final KernelShutdownController shutdownController;
 
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
@@ -214,174 +226,164 @@ public final class WatchdogServiceImpl extends AbstractService implements
 
     /** The set of node listeners for all nodes. */
     private final ConcurrentMap<NodeListener, NodeListener> nodeListeners =
-	    new ConcurrentHashMap<NodeListener, NodeListener>();
+	new ConcurrentHashMap<NodeListener, NodeListener>();
 
     /** The set of recovery listeners for this node. */
-    private final ConcurrentMap<RecoveryListener, RecoveryListener> recoveryListeners =
+    private final ConcurrentMap<RecoveryListener, RecoveryListener>
+	recoveryListeners =
 	    new ConcurrentHashMap<RecoveryListener, RecoveryListener>();
 
     /** The queues of RecoveryCompleteFutures, keyed by node being recovered. */
-    private final ConcurrentMap<Node, Queue<RecoveryCompleteFuture>> recoveryFutures =
+    private final ConcurrentMap<Node, Queue<RecoveryCompleteFuture>>
+	recoveryFutures =
 	    new ConcurrentHashMap<Node, Queue<RecoveryCompleteFuture>>();
 
     /** The lock for {@code isAlive} field. */
     private final Object lock = new Object();
-
-    /** The controller which enables node shutdown */
-    private final KernelShutdownController shutdownController;
-
-    /**
-     * If {@code true}, this node is alive; initially, the field is {@code
+    
+    /** If {@code true}, this node is alive; initially, the field is {@code
      * true}. Accesses to this field should be protected by {@code lock}.
      */
     private boolean isAlive = true;
-
+    
     /**
-     * Constructs an instance of this class with the specified properties. See
-     * the {@link WatchdogServiceImpl class documentation} for a list of
-     * supported properties.
-     * 
-     * @param properties service (and server) properties
-     * @param systemRegistry system registry
-     * @param txnProxy transaction proxy
-     * @throws Exception if a problem occurs constructing the service/server
+     * Constructs an instance of this class with the specified properties.
+     * See the {@link WatchdogServiceImpl class documentation} for a list
+     * of supported properties.
+     *
+     * @param	properties service (and server) properties
+     * @param	systemRegistry system registry
+     * @param	txnProxy transaction proxy
+     * @throws	Exception if a problem occurs constructing the service/server
      */
     public WatchdogServiceImpl(Properties properties,
 	    ComponentRegistry systemRegistry, TransactionProxy txnProxy,
-	    KernelShutdownController ctrl) throws Exception {
-
+	    KernelShutdownController ctrl) 
+	throws Exception
+    {
 	super(properties, systemRegistry, txnProxy, logger);
-	
-	logger.log(Level.CONFIG,
-		"Creating WatchdogServiceImpl properties:{0}", properties);
+	logger.log(Level.CONFIG, "Creating WatchdogServiceImpl properties:{0}",
+		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	// Setup the KernelShutdownController object
 	shutdownController = ctrl;
 	
 	try {
-	    isCoreServerNode =
-		    wrappedProps.getBooleanProperty(START_SERVER_PROPERTY,
-			    wrappedProps.getBooleanProperty(
-				    StandardProperties.SERVER_START, true));
+	    isCoreServerNode = wrappedProps.getBooleanProperty(
+ 		START_SERVER_PROPERTY,
+		wrappedProps.getBooleanProperty(
+		    StandardProperties.SERVER_START, true));
 	    localHost = InetAddress.getLocalHost().getHostName();
+           
+             String finalService =
+                properties.getProperty(StandardProperties.FINAL_SERVICE);
+             StandardService finalStandardService = null;
+             boolean isFullStack = true;
+             if (finalService == null) {
+                 finalStandardService = StandardService.LAST_SERVICE;
+                 isFullStack = true;
+             } else {
+                 finalStandardService =
+                    Enum.valueOf(StandardService.class, finalService);
+                 isFullStack = 
+                    !(properties.getProperty(StandardProperties.APP_LISTENER)
+                     .equals(StandardProperties.APP_LISTENER_NONE));
+             }
+        
+	    int clientPort = wrappedProps.getIntProperty(
+		CLIENT_PORT_PROPERTY, DEFAULT_CLIENT_PORT, 0, 65535);
+            
+	    String clientHost = wrappedProps.getProperty(
+		CLIENT_HOST_PROPERTY, localHost);
 
-	    String finalService =
-		    properties.getProperty(StandardProperties.FINAL_SERVICE);
-	    StandardService finalStandardService = null;
-	    boolean isFullStack = true;
-	    if (finalService == null) {
-		finalStandardService = StandardService.LAST_SERVICE;
-		isFullStack = true;
-	    } else {
-		finalStandardService =
-			Enum.valueOf(StandardService.class, finalService);
-		isFullStack =
-			!(properties
-				.getProperty(StandardProperties.APP_LISTENER)
-				.equals(StandardProperties.APP_LISTENER_NONE));
-	    }
-
-	    int clientPort =
-		    wrappedProps.getIntProperty(CLIENT_PORT_PROPERTY,
-			    DEFAULT_CLIENT_PORT, 0, 65535);
-
-	    String clientHost =
-		    wrappedProps.getProperty(CLIENT_HOST_PROPERTY, localHost);
-	    
-	    // If we're running on a full stack (the usual case), or a
-	    // partial stack that includes the client session service,
-	    // insist that a valid port number be specfied.
-	    // The client session service will attempt to open that port.
-	    //
-	    // Otherwise, no port is needed or required, and we simply use
-	    // -1 as a placeholder for the port number.
-	    if (isFullStack ||
-		    (StandardService.ClientSessionService.ordinal() <= finalStandardService
-			    .ordinal())) {
-		appPort =
-			wrappedProps.getRequiredIntProperty(
-				StandardProperties.APP_PORT, 1, 65535);
-	    } else {
-		appPort = -1;
-	    }
+            // If we're running on a full stack (the usual case), or a
+            // partial stack that includes the client session service,
+            // insist that a valid port number be specfied.
+            // The client session service will attempt to open that port.
+            //
+            // Otherwise, no port is needed or required, and we simply use
+            // -1 as a placeholder for the port number.
+            if (isFullStack || 
+                (StandardService.ClientSessionService.ordinal() <=
+                    finalStandardService.ordinal())) {
+                appPort = wrappedProps.getRequiredIntProperty(
+                    StandardProperties.APP_PORT, 1, 65535);
+            } else {
+                appPort = -1;
+            }
 
 	    /*
 	     * Check service version.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable(
-		    "CheckServiceVersion") {
-		public void run() {
-		    checkServiceVersion(VERSION_KEY, MAJOR_VERSION,
-			    MINOR_VERSION);
-		}
-	    }, taskOwner);
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    } },  taskOwner);
 
 	    clientImpl = new WatchdogClientImpl();
 	    exporter = new Exporter<WatchdogClient>(WatchdogClient.class);
 	    exporter.export(clientImpl, clientPort);
 	    clientProxy = exporter.getProxy();
-	    
+            
 	    String host;
 	    int serverPort;
 	    if (isCoreServerNode) {
-		serverImpl =
-			new WatchdogServerImpl(properties, systemRegistry,
-				txnProxy, clientHost, appPort, clientProxy,
-				isFullStack);
+		serverImpl = new WatchdogServerImpl(
+		    properties, systemRegistry, txnProxy, 
+		    clientHost, appPort, clientProxy, isFullStack);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
-		host =
-			wrappedProps.getProperty(HOST_PROPERTY, wrappedProps
-				.getProperty(StandardProperties.SERVER_HOST));
-		if (host == null) {
-		    throw new IllegalArgumentException(
-			    "A server host must be specified");
-		}
-		serverPort =
-			wrappedProps.getIntProperty(SERVER_PORT_PROPERTY,
-				DEFAULT_SERVER_PORT, 1, 65535);
+		host = wrappedProps.getProperty(
+		    HOST_PROPERTY,
+		    wrappedProps.getProperty(
+			StandardProperties.SERVER_HOST));
+                if (host == null) {
+                    throw new IllegalArgumentException(
+                                           "A server host must be specified");
+                }
+		serverPort = wrappedProps.getIntProperty(
+		    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	    }
-	    
-	    Registry rmiRegistry =
-		    LocateRegistry.getRegistry(host, serverPort);
-	    serverProxy =
-		    (WatchdogServer) rmiRegistry
-			    .lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 
-	    if (isCoreServerNode) {
-		localNodeId = serverImpl.localNodeId;
-		renewInterval = serverImpl.renewInterval;
-	    } else {
-		long[] values =
-			serverProxy.registerNode(clientHost, appPort,
-				clientProxy);
-		if (values == null || values.length < 2) {
-		    setFailedThenNotify(false);
-		    throw new IllegalArgumentException(
-			    "registerNode returned improper array: " +
-				    Arrays.toString(values));
-		}
-		localNodeId = values[0];
-		renewInterval = values[1];
-	    }
-	    
-	    renewThread.start();
+	    Registry rmiRegistry = LocateRegistry.getRegistry(host, serverPort);
+	    serverProxy = (WatchdogServer)
+		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 
+            if (isCoreServerNode) {
+                localNodeId = serverImpl.localNodeId;
+                renewInterval = serverImpl.renewInterval;
+            } else {
+                long[] values = serverProxy.registerNode(clientHost, appPort, 
+                                                         clientProxy);
+                if (values == null || values.length < 2) {
+                    setFailedThenNotify(false);
+                    throw new IllegalArgumentException(
+                        "registerNode returned improper array: " +
+			Arrays.toString(values));
+                }
+                localNodeId = values[0];
+                renewInterval = values[1];
+            }
+            renewThread.start();
+            
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			"node registered, host:{0}, port:{1} "
-				+ "localNodeId:{2}", clientHost, appPort,
-			localNodeId);
+			   "node registered, host:{0}, port:{1} " +
+			   "localNodeId:{2}",
+			   clientHost, appPort, localNodeId);
 	    }
-
+	    
 	} catch (Exception e) {
 	    System.err.println("-- FAILED! " + e.getLocalizedMessage() + "\n**************");
 	    e.printStackTrace();
-	    
-	    logger.logThrow(Level.CONFIG, e,
-		    "Failed to create WatchdogServiceImpl");
+
+	    logger.logThrow(
+		Level.CONFIG, e,
+		"Failed to create WatchdogServiceImpl");
 
 	    // Issue a shutdown
 	    doShutdown();
@@ -393,20 +395,22 @@ public final class WatchdogServiceImpl extends AbstractService implements
     /* -- Implement AbstractService -- */
 
     /** {@inheritDoc} */
-    protected void handleServiceVersionMismatch(Version oldVersion,
-	    Version currentVersion) {
-	throw new IllegalStateException("unable to convert version:" +
-		oldVersion + " to current version:" + currentVersion);
+    protected void handleServiceVersionMismatch(
+	Version oldVersion, Version currentVersion)
+    {
+	throw new IllegalStateException(
+	    "unable to convert version:" + oldVersion +
+	    " to current version:" + currentVersion);
     }
-
+    
     /** {@inheritDoc} */
     protected void doReady() {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
 	// chance to register.
-	if (serverImpl != null) {
-	    serverImpl.ready();
-	}
+        if (serverImpl != null) {
+            serverImpl.ready();
+        }
     }
 
     /** {@inheritDoc} */
@@ -429,7 +433,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    serverImpl.shutdown();
 	}
     }
-
+	
     /* -- Implement WatchdogService -- */
 
     /** {@inheritDoc} */
@@ -467,7 +471,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	checkState();
 	return getIsAlive();
     }
-
+    
     /** {@inheritDoc} */
     public Iterator<Node> getNodes() {
 	checkState();
@@ -496,8 +500,10 @@ public final class WatchdogServiceImpl extends AbstractService implements
     /** {@inheritDoc} */
     public Node getBackup(long nodeId) {
 	NodeImpl node = (NodeImpl) getNode(nodeId);
-	return (node != null && node.hasBackup()) ? getNode(node
-		.getBackupId()) : null;
+	return
+	    (node != null && node.hasBackup()) ?
+	    getNode(node.getBackupId()) :
+	    null;
     }
 
     /** {@inheritDoc} */
@@ -610,9 +616,10 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	}
 
 	/**
-	 * Registers the node with the watchdog server, and sends periodic
-	 * renew requests. This thread terminates if the node is no longer
-	 * considered alive or if the watchdog service is shutdown.
+	 * Registers the node with the watchdog server, and sends
+	 * periodic renew requests.  This thread terminates if the
+	 * node is no longer considered alive or if the watchdog
+	 * service is shutdown.
 	 */
 	public void run() {
 	    long startRenewInterval = renewInterval / 2;
@@ -646,17 +653,17 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		    }
 		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
-
+		    
 		} catch (IOException e) {
 		    /*
-		     * Adjust renew interval in order to renew with server
-		     * again before the renew interval expires.
+		     * Adjust renew interval in order to renew with
+		     * server again before the renew interval expires.
 		     */
-		    logger.logThrow(Level.INFO, e,
-			    "renewing with watchdog server throws");
+		    logger.logThrow(
+			Level.INFO, e,
+			"renewing with watchdog server throws");
 		    nextRenewInterval =
-			    Math.max(nextRenewInterval / 2,
-				    MIN_RENEW_INTERVAL);
+			Math.max(nextRenewInterval / 2, MIN_RENEW_INTERVAL);
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
@@ -673,14 +680,14 @@ public final class WatchdogServiceImpl extends AbstractService implements
     /* -- other methods -- */
 
     /**
-     * Returns the server. This method is used for testing.
-     * 
-     * @return the server
+     * Returns the server.  This method is used for testing.
+     *
+     * @return	the server
      */
     public WatchdogServerImpl getServer() {
 	return serverImpl;
     }
-
+    
     /**
      * Throws {@code IllegalStateException} if this service is shutting down.
      */
@@ -692,8 +699,8 @@ public final class WatchdogServiceImpl extends AbstractService implements
     }
 
     /**
-     * Returns the local alive status: {@code true} if this node is considered
-     * alive.
+     * Returns the local alive status: {@code true} if this node is
+     * considered alive.
      */
     private boolean getIsAlive() {
 	synchronized (lock) {
@@ -702,16 +709,16 @@ public final class WatchdogServiceImpl extends AbstractService implements
     }
 
     /**
-     * Sets the local alive status of this node to {@code false}, and if
-     * {@code notify} is {@code true}, notifies appropriate registered node
-     * listeners of this node's failure. This method is called when this node
-     * is no longer considered alive. Subsequent calls to
-     * {@link #isAlive isAlive} will return {@code false}. If this node's
-     * local alive status was already set to {@code false}, then this method
-     * does nothing.
-     * 
-     * @param notify if {@code true}, notifies appropriate registered node
-     * listeners of this node's failure
+     * Sets the local alive status of this node to {@code false}, and
+     * if {@code notify} is {@code true}, notifies appropriate
+     * registered node listeners of this node's failure.  This method
+     * is called when this node is no longer considered alive.
+     * Subsequent calls to {@link #isAlive isAlive} will return {@code
+     * false}.  If this node's local alive status was already set to
+     * {@code false}, then this method does nothing.
+     *
+     * @param	notify	if {@code true}, notifies appropriate registered
+     *		node listeners of this node's failure
      */
     private void setFailedThenNotify(boolean notify) {
 	synchronized (lock) {
@@ -734,74 +741,79 @@ public final class WatchdogServiceImpl extends AbstractService implements
     }
 
     /**
-     * Notifies the appropriate registered node listeners of the status change
-     * of the specified {@code node}. If invoking
-     * {@link Node#isAlive isAlive} on the {@code node} returns {@code false},
-     * the {@code NodeListener#nodeFailed nodeFailed} method is invoked on
-     * each node listener, otherwise the {@code NodeListener#nodeStarted
-     * nodeStarted} method is invoked on each node listener.
-     * 
-     * @param node a node
-     * @throws IllegalStateException if this service is shutting down
+     * Notifies the appropriate registered node listeners of the
+     * status change of the specified {@code node}.  If invoking
+     * {@link Node#isAlive isAlive} on the {@code node} returns
+     * {@code false}, the {@code NodeListener#nodeFailed nodeFailed}
+     * method is invoked on each node listener, otherwise the {@code
+     * NodeListener#nodeStarted nodeStarted} method is invoked on each
+     * node listener.
+     *
+     * @param	node a node
+     * @throws  IllegalStateException if this service is shutting down
      */
     private void notifyNodeListeners(final Node node) {
 
 	for (NodeListener listener : nodeListeners.keySet()) {
 	    final NodeListener nodeListener = listener;
-	    taskScheduler.scheduleTask(new AbstractKernelRunnable(
-		    "NotifyNodeListeners") {
-		public void run() {
-		    if (!shuttingDown() && isLocalNodeAliveNonTransactional()) {
-			if (node.isAlive()) {
-			    nodeListener.nodeStarted(node);
-			} else {
-			    nodeListener.nodeFailed(node);
+	    taskScheduler.scheduleTask(
+		new AbstractKernelRunnable("NotifyNodeListeners") {
+		    public void run() {
+			if (!shuttingDown() &&
+                            isLocalNodeAliveNonTransactional()) 
+			{
+			    if (node.isAlive()) {
+				nodeListener.nodeStarted(node);
+			    } else {
+				nodeListener.nodeFailed(node);
+			    }
 			}
 		    }
-		}
-	    }, taskOwner);
+		}, taskOwner);
 	}
     }
 
     /**
      * Notifies the registered recovery listeners that the specified
      * {@code node} needs to be recovered.
-     * 
-     * @param node a node
+     *
+     * @param	node a node	
      */
     private void notifyRecoveryListeners(final Node node) {
 	if (logger.isLoggable(Level.INFO)) {
 	    logger.log(Level.INFO, "Node:{0} recovering for node:{1}",
-		    localNodeId, node.getId());
+		       localNodeId, node.getId());
 	}
 	Queue<RecoveryCompleteFuture> futureQueue =
-		new ConcurrentLinkedQueue<RecoveryCompleteFuture>();
+	    new ConcurrentLinkedQueue<RecoveryCompleteFuture>();
 	if (recoveryFutures.putIfAbsent(node, futureQueue) != null) {
 	    // recovery for node already being handled
 	    return;
 	}
-
+	
 	for (RecoveryListener listener : recoveryListeners.keySet()) {
 	    final RecoveryListener recoveryListener = listener;
 	    final RecoveryCompleteFuture future =
-		    new RecoveryCompleteFutureImpl(node, listener);
+		new RecoveryCompleteFutureImpl(node, listener);
 	    futureQueue.add(future);
-	    taskScheduler.scheduleTask(new AbstractKernelRunnable(
-		    "NotifyRecoveryListeners") {
-		public void run() {
-		    try {
-			if (!shuttingDown() &&
-				isLocalNodeAliveNonTransactional()) {
-			    recoveryListener.recover(node, future);
-			}
-		    } catch (Exception e) {
-			logger.logThrow(Level.WARNING, e,
-				"Notifying recovery listener on node:{0} "
-					+ "with node:{1}, future:{2} throws",
+	    taskScheduler.scheduleTask(
+		new AbstractKernelRunnable("NotifyRecoveryListeners") {
+		    public void run() {
+			try {
+			    if (!shuttingDown() &&
+				isLocalNodeAliveNonTransactional())
+			    {
+				recoveryListener.recover(node, future);
+			    }
+			} catch (Exception e) {
+			    logger.logThrow(
+			        Level.WARNING, e,
+				"Notifying recovery listener on node:{0} " +
+				"with node:{1}, future:{2} throws",
 				localNodeId, node, future);
+			}
 		    }
-		}
-	    }, taskOwner);
+		}, taskOwner);
 	}
     }
 
@@ -812,12 +824,14 @@ public final class WatchdogServiceImpl extends AbstractService implements
     private final class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
-	public void nodeStatusChanges(long[] ids, String[] hosts,
-		int[] ports, boolean[] status, long[] backups) {
+	public void nodeStatusChanges(
+ 	    long[] ids, String[] hosts, int[] ports, 
+            boolean[] status, long[] backups)
+	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
-		    status.length != backups.length) {
-		throw new IllegalArgumentException(
-			"array lengths don't match");
+		status.length != backups.length)
+	    {
+		throw new IllegalArgumentException("array lengths don't match");
 	    }
 	    for (int i = 0; i < ids.length; i++) {
 		if (ids[i] == localNodeId && status[i]) {
@@ -825,8 +839,8 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		    continue;
 		}
 		Node node =
-			new NodeImpl(ids[i], hosts[i], ports[i], status[i],
-				backups[i]);
+		    new NodeImpl(ids[i], hosts[i], ports[i], 
+                                 status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (!status[i] && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
@@ -859,15 +873,16 @@ public final class WatchdogServiceImpl extends AbstractService implements
     }
 
     /**
-     * The {@code RecoveryCompleteFuture} implementation. When {@code done} is
-     * invoked, the future instance is removed from the recovery future queue
-     * for the associated node. If a given future is the last one to be
-     * removed from a node's queue, then recovery is complete for that node,
-     * and the data store is updated to clean up recovery information for that
-     * node.
+     * The {@code RecoveryCompleteFuture} implementation.  When {@code
+     * done} is invoked, the future instance is removed from the recovery
+     * future queue for the associated node.  If a given future is the
+     * last one to be removed from a node's queue, then recovery is
+     * complete for that node, and the data store is updated to clean
+     * up recovery information for that node.
      */
-    private final class RecoveryCompleteFutureImpl implements
-	    RecoveryCompleteFuture {
+    private final class RecoveryCompleteFutureImpl
+	implements RecoveryCompleteFuture
+    {
 	/** The failed node. */
 	private final Node node;
 	/** The recovery listener for this future (currently unused). */
@@ -876,8 +891,8 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	private boolean isDone = false;
 
 	/**
-	 * Constructs an instance with the specified {@code node} and recovery
-	 * {@code listener}.
+	 * Constructs an instance with the specified {@code node} and
+	 * recovery {@code listener}.
 	 */
 	RecoveryCompleteFutureImpl(Node node, RecoveryListener listener) {
 	    this.node = node;
@@ -894,7 +909,7 @@ public final class WatchdogServiceImpl extends AbstractService implements
 	    }
 
 	    Queue<RecoveryCompleteFuture> futureQueue =
-		    recoveryFutures.get(node);
+		recoveryFutures.get(node);
 	    assert futureQueue != null;
 	    futureQueue.remove(this);
 	    if (futureQueue.isEmpty()) {
@@ -903,14 +918,14 @@ public final class WatchdogServiceImpl extends AbstractService implements
 		if (recoveryFutures.remove(node) != null) {
 		    try {
 			if (isLocalNodeAliveNonTransactional()) {
-			    serverProxy.recoveredNode(node.getId(),
-				    localNodeId);
+			    serverProxy.recoveredNode(
+				node.getId(), localNodeId);
 			}
 		    } catch (Exception e) {
-			logger.logThrow(Level.WARNING, e,
-				"Problem invoking WatchdogServer.recoveredNode "
-					+ "for node:{0} backup:{1}", node,
-				localNodeId);
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "Problem invoking WatchdogServer.recoveredNode " +
+			    "for node:{0} backup:{1}",  node, localNodeId);
 		    }
 		}
 	    }
