@@ -86,4 +86,10 @@ public class IdentityImpl implements Identity, Serializable
         return name.hashCode();
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+	return getClass().getName() + "[" + name + "]";
+    }
 }

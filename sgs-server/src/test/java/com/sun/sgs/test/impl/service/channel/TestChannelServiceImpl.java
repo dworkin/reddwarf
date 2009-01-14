@@ -1,4 +1,4 @@
- /*
+/*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
@@ -677,6 +677,10 @@ public class TestChannelServiceImpl extends TestCase {
 		    Iterator<ClientSession> iter = channel.getSessions();
 		    while (iter.hasNext()) {
 			ClientSession session = iter.next();
+			if (!(session instanceof ClientSessionWrapper)) {
+			    fail("session not ClientSessionWrapper instance: " +
+				 session);
+			}
 			String name = session.getName();
 			if (! users.contains(name)) {
 			    fail("unexpected channel member: " + name);
@@ -692,6 +696,11 @@ public class TestChannelServiceImpl extends TestCase {
 	} finally {
 	    group.disconnect(false);
 	}
+    }
+
+    public void testChannelGetSessionsMultipleNodes() throws Exception {
+	addNodes("a", "b");
+	testChannelGetSessionsWithSessionsJoined();
     }
 
     public void testChannelGetSessionsClosedChannel() throws Exception {
@@ -772,15 +781,17 @@ public class TestChannelServiceImpl extends TestCase {
 	String channelName = "joinTest";
 	ClientGroup group = new ClientGroup(someUsers);
 	Thread.sleep(1000);
+	printServiceBindings("before channel create");
 	int count = getObjectCount();
 	createChannel(channelName);
 	
 	try {
 	    joinUsers(channelName, someUsers);
 	    checkUsersJoined(channelName, someUsers);
-	    printServiceBindings();
+	    printServiceBindings("before close");
 	    closeChannel(channelName);
 	    Thread.sleep(1000);
+	    printServiceBindings("after close");
 	    assertEquals(count, getObjectCount());
 	} finally {
 	    group.disconnect(false);
@@ -913,6 +924,8 @@ public class TestChannelServiceImpl extends TestCase {
 			(ClientSession) dataService.getBinding("larry");
 		    
 		    Set<ClientSession> sessions = getSessions(channel);
+		    System.err.println(
+			"sessions set (should only have moe): " + sessions);
 		    if (sessions.size() != 1) {
 			fail("Expected 1 session, got " +
 			     sessions.size());
@@ -929,7 +942,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.disconnect(false);
 	}
     }
-    
+
     public void testChannelLeave() throws Exception {
 	final String channelName = "leaveTest";
 	createChannel(channelName);
@@ -1112,18 +1125,18 @@ public class TestChannelServiceImpl extends TestCase {
 	String channelName = "test";
 	createChannel(channelName);
 	int count = getObjectCount();
-	ClientGroup group1 = new ClientGroup(sevenDwarfs);
-	joinUsers(channelName, sevenDwarfs);
+	printServiceBindings("after channel create");
+	List<String> users =  sevenDwarfs;
+	ClientGroup group1 = new ClientGroup(users);
+	joinUsers(channelName, users);
 	sendMessagesToChannel(channelName, group1, 3);
-	printServiceBindings();
+	printServiceBindings("after users joined");
 	System.err.println("simulate watchdog server crash...");
 	tearDown(false);
 	setUp(false);
-	//	Thread.sleep(WAIT_TIME);
-	printServiceBindings();
 	addNodes("ay", "bee", "sea");
 	int afterCount = getObjectCount();
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < 2; i++) {
 	    // Make sure that previous sessions were cleaned up.
 	    if (count == afterCount) {
 		break;
@@ -1131,15 +1144,18 @@ public class TestChannelServiceImpl extends TestCase {
 		Thread.sleep(1000);
 		afterCount = getObjectCount();
 	    }
+	    System.err.println("retry: count: " + count +
+			       ", afterCount: " + afterCount);
 	}
-	ClientGroup group2 = new ClientGroup(someUsers);
+	printServiceBindings("after recovery");
+	users =  someUsers;
+	ClientGroup group2 = new ClientGroup(users);
 	try {
-	    joinUsers(channelName, someUsers);
+	    joinUsers(channelName, users);
 	    sendMessagesToChannel(channelName, group2, 2);
 	    group1.checkMembership(channelName, false);
 	    assertEquals(count, afterCount);
 	} finally {
-	    printServiceBindings();
 	    group2.disconnect(false);
 	}
     }
@@ -1163,7 +1179,7 @@ public class TestChannelServiceImpl extends TestCase {
 		joinUsers(channelName, sevenDwarfs);
 		sendMessagesToChannel(channelName, group, 2);
 	    }
-	    printServiceBindings();
+	    printServiceBindings("after users joined");
 	    // nuke non-coordinator node
 	    System.err.println("shutting down node: " + otherHost);
 	    shutdownNode(otherHost);
@@ -1185,7 +1201,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	    
 	} finally {
-	    printServiceBindings();
+	    printServiceBindings("before group disconnect");
 	    group.disconnect(false);
 	}
     }
@@ -1208,7 +1224,7 @@ public class TestChannelServiceImpl extends TestCase {
 		joinUsers(channelName, sevenDwarfs);
 		sendMessagesToChannel(channelName, group, 2);
 	    }
-	    printServiceBindings();
+	    printServiceBindings("after users joined");
 	    // nuke coordinator node
 	    System.err.println("shutting down node: " + coordinatorHost);
 	    shutdownNode(coordinatorHost);
@@ -1230,7 +1246,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	    
 	} finally {
-	    printServiceBindings();
+	    printServiceBindings("before group disconnect");
 	    group.disconnect(false);
 	}
     }
@@ -1494,7 +1510,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelClose() throws Exception {
 	final String channelName = "closeTest";
 	createChannel(channelName);
-	printServiceBindings();
+	printServiceBindings("after channel create");
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		Channel channel = getChannel(channelName);
@@ -1510,7 +1526,7 @@ public class TestChannelServiceImpl extends TestCase {
 		}
 	    }
 	}, taskOwner);
-	printServiceBindings();
+	printServiceBindings("after channel close");
     }
 
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
@@ -1521,7 +1537,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	try {
 	    joinUsers(channelName, someUsers);
-	    Thread.sleep(100);
+	    Thread.sleep(500);
 	    group.checkMembership(channelName, true);
 	    group.disconnect(true);
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
@@ -1531,7 +1547,7 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
-	    printServiceBindings();
+	    printServiceBindings("after exception");
 	    fail("unexpected failure: " + e);
 	} finally {
 	    group.disconnect(false);
@@ -1546,9 +1562,9 @@ public class TestChannelServiceImpl extends TestCase {
 	
 	try {
 	    joinUsers(channelName, someUsers);
-	    Thread.sleep(100);
+	    Thread.sleep(500);
 	    group.checkMembership(channelName, true);
-	    printServiceBindings();
+	    printServiceBindings("after users joined");
 
 	    // simulate crash
 	    System.err.println("simulate watchdog server crash...");
@@ -1558,71 +1574,17 @@ public class TestChannelServiceImpl extends TestCase {
 	    Thread.sleep(WAIT_TIME); // await recovery actions
 	    group.checkMembership(channelName, false);
 	    assertEquals(count, getObjectCount());
-	    printServiceBindings();
+	    printServiceBindings("after recovery");
 
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
 	    fail("unexpected failure: " + e);
 	} finally {
-	    printServiceBindings();
+	    printServiceBindings("before group disconnect");
 	    group.disconnect(false);
 	}
 	
-    }
-
-    public void testRemoveObsoleteChannelSets() throws Exception {
-	String otherHost = "otherNode";
-	addNodes(otherHost);
-	DummyClient client = newClient();
-	final String name = "dummy";
-	long nodeId = additionalNodes.get(otherHost).getNodeId();
-
-	Class cl =
-	    Class.forName("com.sun.sgs.impl.service.channel.ChannelImpl$ChannelSet");
-	@SuppressWarnings("unchecked")
-	final Constructor constr =
-	    cl.getConstructor(DataService.class, ClientSession.class);
-	constr.setAccessible(true);
-	final String prefix =
-	    "com.sun.sgs.impl.service.channel.set." + nodeId + ".";
-	
-	int beforeCount = getChannelServiceBindingCount();
-	System.err.println("beforeCount: " + beforeCount);
-	// Add some obsolete channel sets
-
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	    public void run() throws Exception {
-
-		ClientSession session =
-		    unwrapSession(getClientSession(name));
-		for (int i = 0; i < 10; i++) {
-		    ManagedObject obj = (ManagedObject)
-			constr.newInstance(dataService, session);
-		    String key = prefix + Integer.toString(i);
-		    dataService.setServiceBinding(key, obj);
-		}
-	    }
-	    }, taskOwner);
-
-	int afterCount = getChannelServiceBindingCount();
-	assertEquals(beforeCount + 10, afterCount);
-	System.err.println("afterCount: " + afterCount);
-	printServiceBindings();
-
-	try {
-	    // shutdown node
-	    shutdownNode(otherHost);
-	    // start another node to force channel service recovery and
-	    // removal of obsolete channel sets
-	    addNodes("yetAnotherNode");
-	    // Give node a chance to recover.
-	    Thread.sleep(3000);
-	    assertEquals(beforeCount, getChannelServiceBindingCount());
-	} finally {
-	    printServiceBindings();
-	    client.disconnect();
-	}
     }
 
     // -- END TEST CASES --
@@ -1758,10 +1720,11 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    private void printServiceBindings() throws Exception {
+    private void printServiceBindings(final String message) throws Exception {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
-		System.err.println("Service bindings----------");
+		System.err.println("Service bindings <<" + message +
+				   ">>----------");
 		Iterator<String> iter =
 		    BoundNamesUtil.getServiceBoundNamesIterator(
 			dataService, "com.sun.sgs.impl.service.channel.");
@@ -1983,7 +1946,7 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
-	    printServiceBindings();
+	    printServiceBindings("afte exception");
 	    fail("unexpected failure: " + e);
 	}
     }
@@ -2636,20 +2599,16 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    private static ClientSession unwrapSession(ClientSession session) {
-	if (session instanceof ClientSessionWrapper) {
-	    return ((ClientSessionWrapper) session).getClientSession();
-	} else {
-	    return session;
-	}
-    }
-
     public static class DummyAppListener implements AppListener, Serializable {
 
 	private final static long serialVersionUID = 1L;
 
 	public ClientSessionListener loggedIn(ClientSession session) {
 
+	    if (!(session instanceof ClientSessionWrapper)) {
+		fail("session not ClientSessionWrapper instance: " +
+		     session);
+	    }
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
 	    DataManager dataManager = AppContext.getDataManager();

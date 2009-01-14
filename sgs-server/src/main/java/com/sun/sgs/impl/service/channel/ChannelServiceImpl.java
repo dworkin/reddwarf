@@ -458,18 +458,27 @@ public final class ChannelServiceImpl
 	 * missed, then send the appropriate CHANNEL_JOIN or CHANNEL_LEAVE
 	 * protocol message to the effected session(s).
 	 */
-	public void refresh(String name, BigInteger channelRefId) {
+	public void refresh(String name, final BigInteger channelRefId) {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "refreshing channelId:{0}",
 			   HexDumper.toHexString(channelRefId.toByteArray()));
 	    }
 	    try {
-		GetLocalMembersTask getMembersTask =
-		    new GetLocalMembersTask(channelRefId);
+		/*
+		 * Read list of local members of the channel.
+		 */
+		final Set<BigInteger> newLocalMembers =
+		    Collections.synchronizedSet(new HashSet<BigInteger>());
 		try {
 		    transactionScheduler.runTask(
-			getMembersTask, taskOwner);
+			new AbstractKernelRunnable("getNewLocalMembers") {
+			    public void run() {
+				newLocalMembers.addAll(
+				    ChannelImpl.getSessionRefIdsForNode(
+					channelRefId, localNodeId));
+			    }}, taskOwner);
+
 		} catch (Exception e) {
 		    // FIXME: what is the right thing to do here?
 		    logger.logThrow(
@@ -477,8 +486,7 @@ public final class ChannelServiceImpl
 			"obtaining members of channel:{0} throws",
 			HexDumper.toHexString(channelRefId.toByteArray()));
 		}
-		Set<BigInteger> newLocalMembers = Collections.synchronizedSet(
-		    getMembersTask.getLocalMembers());
+
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "newLocalMembers for channel:{0}",
 			       HexDumper.toHexString(channelRefId.toByteArray()));
@@ -755,36 +763,6 @@ public final class ChannelServiceImpl
 		callFinished();
 	    }
 	}
-    }
-
-    private class GetLocalMembersTask extends AbstractKernelRunnable {
-
-	private final BigInteger channelRefId;
-	private Set<BigInteger> localMembers = null;
-	
-	/**
-	 * Constructs an instance with the given {@code nodeId}.
-	 */
-	GetLocalMembersTask(BigInteger channelRefId) {
-	    super(null);
-	    this.channelRefId = channelRefId;
-	}
-
-	/** {@inheritDoc} */
-	public synchronized void run() {
-	    localMembers = ChannelImpl.getSessionRefIdsForNode(
-		dataService, channelRefId, localNodeId);
-	}
-
-	/**
-	 * Returns the session IDs for local members of the channel
-	 * specified during construction, or {@code null}, if the
-	 * {@code run} method has not successfully completed.
-	 */
-	synchronized Set<BigInteger> getLocalMembers() {
-	    return localMembers;
-	}
-	
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -1135,14 +1113,6 @@ public final class ChannelServiceImpl
 			     */
 			    taskService.scheduleTask(
 				new RemoveChannelServerProxyTask(nodeId));
-
-			    /*
-			     * Remove any obsolete channel sets left over
-			     * from previous ChannelServiceImpl version.
-			     */
-			    taskService.scheduleTask(
-				new ChannelImpl.
-				    RemoveObsoleteChannelSetsTask(nodeId));
 			}
 		    },
 		    taskOwner);
