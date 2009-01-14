@@ -35,6 +35,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -297,7 +298,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Properties props =
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
-		    "com.sun.sgs.impl.protocol.simple.disconnect.delay", "199");
+                    SimpleSgsProtocolAcceptor.DISCONNECT_DELAY_PROPERTY, "199");
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());

@@ -2514,7 +2514,6 @@ public class TestChannelServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.CHANNEL_JOIN: {
 		    String channelName = buf.getString();
-		    byte channelDelivery = buf.getByte();
 		    BigInteger channelId = new BigInteger(1,
 			buf.getBytes(buf.limit() - buf.position()));
 		    synchronized (lock) {
