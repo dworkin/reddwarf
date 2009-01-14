@@ -30,27 +30,42 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.projectdarkstar.maven.plugin.sgs;
+package com.projectdarkstar.maven.plugin.sgs.util;
 
-import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.shared.artifact.filter.collection.ProjectTransitivityFilter;
+import org.apache.maven.artifact.Artifact;
+import org.codehaus.plexus.util.StringUtils;
 
-import java.io.File;
+import java.util.Set;
+import java.util.Iterator;
 
 /**
- * Deploys a jar or jar files into a Project Darkstar server installation.
- *
- * @goal deploy
+ * Provided as a workaround due to a bug in {@code ProjectTransitivityFilter}
  */
-public class DeployMojo extends AbstractDeployMojo {
+public class TransitivityFilter extends ProjectTransitivityFilter {
     
-    /**
-     * The jar files to deploy into the Project Darkstar server.
-     * 
-     * @parameter
-     */
-    private File[] files;
+    private Set directDependencies;
     
-    public File[] getFiles() throws MojoExecutionException {
-        return files;
+    public TransitivityFilter(Set directDependencies, boolean excludeTransitive) {
+        super(directDependencies, excludeTransitive);
+        this.directDependencies = directDependencies;
     }
+    
+    public boolean artifactIsADirectDependency(Artifact artifact) {
+        boolean result = false;
+        Iterator iterator = this.directDependencies.iterator();
+        while (iterator.hasNext()) {
+            Artifact dependency = (Artifact) iterator.next();
+
+            if (StringUtils.equals(dependency.getGroupId(), artifact.getGroupId()) &&
+                    StringUtils.equals(dependency.getArtifactId(), artifact.getArtifactId()) &&
+                    StringUtils.equals(dependency.getClassifier(), artifact.getClassifier()) &&
+                    StringUtils.equals(dependency.getType(), artifact.getType())) {
+                result = true;
+                break;
+            }
+        }
+        return result;
+    }
+
 }
