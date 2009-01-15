@@ -47,6 +47,7 @@ import java.io.IOException;
  */
 public class ConfigureMojo extends AbstractSgsMojo
 {
+    private static String CONF = "conf";
     private static String SGS_BOOT = "sgs-boot.properties";
     private static String SGS_SERVER = "sgs-server.properties";
     private static String SGS_LOGGING = "sgs-logging.properties";
@@ -81,7 +82,7 @@ public class ConfigureMojo extends AbstractSgsMojo
     {
         
         this.checkConfig();
-        File confDirectory = new File(sgsHome, "conf");
+        File confDirectory = new File(sgsHome, CONF);
         this.checkDirectory(confDirectory);
 
         try {

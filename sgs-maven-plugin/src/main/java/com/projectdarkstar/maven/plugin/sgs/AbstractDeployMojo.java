@@ -70,6 +70,8 @@ public abstract class AbstractDeployMojo extends AbstractSgsMojo {
      * Component used for acquiring unpacking utilities.
      *
      * @component
+     * @readonly
+     * @required
      */
     protected ArchiverManager archiverManager;
 
