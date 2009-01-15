@@ -1124,6 +1124,7 @@ public class TestChannelServiceImpl extends TestCase {
 	addNodes("one", "two", "three");
 	String channelName = "test";
 	createChannel(channelName);
+	Thread.sleep(1000);
 	int count = getObjectCount();
 	printServiceBindings("after channel create");
 	List<String> users =  sevenDwarfs;
@@ -1135,6 +1136,7 @@ public class TestChannelServiceImpl extends TestCase {
 	tearDown(false);
 	setUp(false);
 	addNodes("ay", "bee", "sea");
+	Thread.sleep(1000);
 	int afterCount = getObjectCount();
 	for (int i = 0; i < 2; i++) {
 	    // Make sure that previous sessions were cleaned up.
@@ -2716,12 +2718,14 @@ public class TestChannelServiceImpl extends TestCase {
                 // any given service (e.g., the task service) may accumulate
                 // managed objects, so a more general way to exclude these from
                 // the count would be nice but for now the specific types that
-                // are accumulated get excluded from the count
+                // are accumulated get excluded from the count.
 		ManagedReference ref =
 		    dataService.createReferenceForId(next);
 		Object obj = ref.get();
                 String name = obj.getClass().getName();
-                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
+                if (! name.equals("com.sun.sgs.impl.service.task.PendingTask") &&
+		    ! name.equals("com.sun.sgs.impl.service.nodemap.IdentityMO"))
+		{
 		    /*
 		    System.err.print(count + "[" + obj.getClass().getName() + "]:");
 		    try {

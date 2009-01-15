@@ -64,13 +64,12 @@ public interface ManagedObjectValueMap<K, V> extends Map<K, V> {
      * the {@link DataManager}.
      *
      * @param	key a key
-     * @param	value a value
      *
      * @return	{@code true} if the key was previously mapped, and {@code
      *		false} otherwise
      *
-     * @throws IllegalArgumentException if either {@code key} or {@code value}
-     *	       is not {@code null} and does not implement {@code Serializable}
+     * @throws IllegalArgumentException if {@code key} is not {@code null}
+     *	       and does not implement {@code Serializable} 
      */
     boolean removeOverride(K key);
 }

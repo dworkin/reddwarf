@@ -314,7 +314,7 @@ public class BindingKeyedHashMap<K, V>
 	}
     }
 
-    /** {@inheritDoc) */
+    /** {@inheritDoc} */
     public Collection<V> values() {
         return new Values<K, V>(keyPrefix);
     }

@@ -134,11 +134,6 @@ public class BindingKeyedHashSet<E>
     private static final long serialVersionUID = 1;
 
     /**
-     * The internal marker for whether an object is present in the set.
-     */
-    private static final Marker PRESENT = new Marker();
-
-    /**
      * The minor version number, which can be modified to note a compatible
      * change to the data structure.  Incompatible changes should be marked by
      * a change to the serialVersionUID.
@@ -152,14 +147,14 @@ public class BindingKeyedHashSet<E>
      *
      * @serial
      */
-    private final ManagedReference<BindingKeyedHashMap<E, Marker>> map;
+    private final ManagedReference<BindingKeyedHashMap<E, E>> map;
 
     /**
      * Creates an empty set.
      */
     public BindingKeyedHashSet() {
 	map = AppContext.getDataManager().
-                createReference(new BindingKeyedHashMap<E, Marker>());
+                createReference(new BindingKeyedHashMap<E, E>());
     }
 
     /**
@@ -188,7 +183,7 @@ public class BindingKeyedHashSet<E>
      *	       does not implement {@code Serializable}
      */
     public boolean add(E e) {
-	return map.get().put(e, PRESENT) == null;
+	return map.get().put(e, e) == null;
     }
 
     /**
@@ -236,7 +231,8 @@ public class BindingKeyedHashSet<E>
      * @return {@code true} if the element was initially present in this set
      */
     public boolean remove(Object o) {
-	return PRESENT.equals(map.get().remove(o));
+	Object removed = map.get().remove(o);
+	return removed != null &&  o.equals(removed);
     }
 
     /**
@@ -287,22 +283,5 @@ public class BindingKeyedHashSet<E>
     public void removingObject() {
 	AppContext.getDataManager().removeObject(
 	    map.get());
-    }
-
-    /**
-     * An internal marker class for storing as the value in the backing map.
-     * All marker objects are equivalent to ensure equality after
-     * deserialization without the added cost of write replacement.
-     */
-    private static final class Marker implements Serializable {
-	private static final long serialVersionUID = 1;
-
-	public int hashCode() {
-	    return 0;
-	}
-
-	public boolean equals(Object o) {
-	    return o != null && o instanceof Marker;
-	}
     }
 }
