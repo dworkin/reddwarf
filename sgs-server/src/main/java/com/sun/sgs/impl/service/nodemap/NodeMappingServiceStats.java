@@ -47,20 +47,17 @@ class NodeMappingServiceStats implements NodeMappingServiceMXBean {
 
         ProfileLevel level = ProfileLevel.MAX;
         ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
-        // These two methods are never called in a transaction, no need to
-        // report them to tasks.
+
         addNodeMappingListenerOp = (AggregateProfileOperation)
-            consumer.createOperation("addNodeMappingListener", 
-                                       ProfileDataType.AGGREGATE, level);
+            consumer.createOperation("addNodeMappingListener", type, level);
         assignNodeOp =
-            consumer.createOperation("assignNode", 
-                                       ProfileDataType.AGGREGATE, level);
+            consumer.createOperation("assignNode", type, level);
         getIdentitiesOp = 
             consumer.createOperation("getIdentities", type, level);
         getNodeOp =
             consumer.createOperation("getNode", type, level);
         setStatusOp =
-            consumer.createOperation("schedulePeriodicTask", type, level);
+            consumer.createOperation("setStatus", type, level);
     }
     
     /** {@inheritDoc} */

@@ -27,6 +27,7 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.management.MBeanNotificationInfo;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
@@ -56,6 +57,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
      */
     private boolean startupLatch = true;
     private final AtomicInteger firstTasks = new AtomicInteger(20);
+    
     /** 
      * Smoothing factor for exponential smoothing, between 0 and 1.
      * A value closer to one provides less smoothing of the data, and
@@ -66,9 +68,29 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
      */
     private double smoothingFactor = 0.01;
 
-    private long seqNumber = 1;
+    // Notification information - we do not yet emit notifications for 
+    // this MBean.  We do not yet document these notification types, as 
+    // they aren't used yet.
     
+    /** Description of the notifications. */
+    private static MBeanNotificationInfo[] notificationInfo =
+        new MBeanNotificationInfo[] {
+            new MBeanNotificationInfo(
+                    new String[] {"com.sun.sgs.task.queue.behind"},
+                    Notification.class.getName(),
+                    "Task queue is not keeping up") };
+    /** The sequence number for notifications */
+    private AtomicLong seqNumber = new AtomicLong();
+    
+    /**
+     * Creates an MXBean object for gathering task data in the system.
+     * 
+     * @param collector the system profile collector
+     * @param name the name of the profile consumer created to support this 
+     *              object
+     */
     TaskAggregateStats(ProfileCollector collector, String name) {
+        super(notificationInfo);
         ProfileConsumer consumer = collector.getConsumer(name);
 
         // We could determine that some of these statistics need to be
@@ -111,26 +133,12 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     void notifyTaskQueue() {
         sendNotification(
                 new Notification("com.sun.sgs.task.queue.behind",
-                                 this,
+                                 this.MXBEAN_NAME,
+                                 seqNumber.incrementAndGet(),
                                  System.currentTimeMillis(),
-                                 seqNumber++));
+                                 "Task queue is behind"));
     }
     
-    /*
-     * Implement NotificationEmitter.
-     */
-    
-    /** {@inheritDoc} */
-    @Override
-    public MBeanNotificationInfo[] getNotificationInfo() {
-         String[] types = {"com.sun.sgs.task.queue.behind"};
-         String name = Notification.class.getName();
-         String description = "Task queue is not keeping up";
-         MBeanNotificationInfo info =
-             new MBeanNotificationInfo(types, name, description);
-         return new MBeanNotificationInfo[] {info};
-     }
-
     /*
      * Implement MBean.
      */
@@ -170,7 +178,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     }
 
     /** {@inheritDoc} */
-    public double getTaskFailureRate() {
+    public double getTaskFailurePercentage() {
         return (getTaskFailureCount() * 100) / (double) getTaskCount();
     }
 
@@ -228,7 +236,9 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
             } 
         } else {
             numTasks.incrementCount();
-            numTransactionalTasks.incrementCount();
+            if (trans) {
+                numTransactionalTasks.incrementCount();
+            }
             readyCount.addSample(ready);
         }
     }

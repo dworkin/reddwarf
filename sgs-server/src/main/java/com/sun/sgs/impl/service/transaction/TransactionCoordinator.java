@@ -49,7 +49,7 @@ public interface TransactionCoordinator {
     TransactionHandle createTransaction(boolean unbounded);
     
     /**
-     * Gets the transaction timeout, in milliseconds.
+     * Gets the transaction timeout for standard transactions, in milliseconds.
      * 
      * @return the transaction timeout
      */

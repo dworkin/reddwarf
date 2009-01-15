@@ -666,19 +666,19 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
      public void setServiceBinding(String name, Object object) {
-         serviceStats.setBindingOp.report();
+         serviceStats.setServiceBindingOp.report();
 	 setBindingInternal(name, object, true);
     }
 
     /** {@inheritDoc} */
     public void removeServiceBinding(String name) {
-       serviceStats.removeBindingOp.report();
+       serviceStats.removeServiceBindingOp.report();
        removeBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
     public String nextServiceBoundName(String name) {
-        serviceStats.nextBoundNameOp.report();
+        serviceStats.nextServiceBoundNameOp.report();
 	return nextBoundNameInternal(name, true);
     }
 

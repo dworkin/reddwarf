@@ -91,7 +91,7 @@ class DataStoreStats implements DataStoreStatsMXBean {
      * @param collector the profile collector used to create profiling
      *     objects and register the MBean with JMX
      */
-    public DataStoreStats(ProfileCollector collector) {
+    DataStoreStats(ProfileCollector collector) {
         ProfileConsumer consumer = 
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX 
                                   + "DataStore");

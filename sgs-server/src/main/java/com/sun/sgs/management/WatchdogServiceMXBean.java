@@ -101,4 +101,11 @@ public interface WatchdogServiceMXBean {
      *         has been called
      */
     long getIsLocalNodeAliveNonTransactionalCalls();
+    
+    /**
+     * Returns status information about this node.
+     * 
+     * @return status information about this node
+     */
+    NodeInfo getStatusInfo();
 }

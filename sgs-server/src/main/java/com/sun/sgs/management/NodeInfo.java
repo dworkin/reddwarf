@@ -30,7 +30,6 @@ public class NodeInfo implements Serializable {
     private static final long serialVersionUID = 1L;
     
     private String host;
-    private int port;
     private long id;
     private boolean live;
     private long backup;
@@ -44,22 +43,25 @@ public class NodeInfo implements Serializable {
     // time booted/time failed?
     // method to shut down the node?
     
+    // A note about jmxPort - it would be nice if we could add a jmxHost,
+    // as well, allowing for a clean separation of a management network
+    // from a client network.  We're not sure how to support that with
+    // JMX, so this issue can be examined later.
+    
     /**
      * Creates a NodeInfo object.
      * 
      * @param host the host name of the machine
-     * @param port the port for client connections
-     * @param id   the unique identifer for this node
+     * @param id   the unique identifier for this node
      * @param live {@code true} if the node is live
      * @param backup the backup node for this node
      * @param jmxPort the port for JMX remote connections
      */
-    @ConstructorProperties({"host", "port", "id", "live", "backup", "JMXPort" })
-    public NodeInfo(String host, int port, long id, boolean live, long backup, 
+    @ConstructorProperties({"host", "id", "live", "backup", "jmxPort" })
+    public NodeInfo(String host, long id, boolean live, long backup, 
                     int jmxPort) 
     {
         this.host = host;
-        this.port = port;
         this.id = id;
         this.live = live;
         this.backup = backup;
@@ -72,16 +74,6 @@ public class NodeInfo implements Serializable {
      */
     public String getHost() {
         return host;
-    }
-    
-    /**
-     * Returns the port the application is listening on for client connections.
-     * FIXME:  needs to be updated for pluggable protocol.
-     * 
-     * @return the port the application is listening on for client connections.
-     */
-    public int getPort() {
-        return port;
     }
     
     /**
@@ -105,7 +97,7 @@ public class NodeInfo implements Serializable {
     }
     
     /**
-     * The node id of the backup node for this node, or {@code -1} if
+     * Returns the node id of the backup node for this node, or {@code -1} if
      * no backup is assigned.
      * 
      * @return the node id of the backup node, or {@code -1} if no backup
@@ -116,18 +108,18 @@ public class NodeInfo implements Serializable {
     }
     
     /**
-     * The port JMX is listening on for remote connections, or {@code -1}
-     * if only local JMX connections are allowed.
+     * Returns the port JMX is listening on for remote connections, or 
+     * {@code -1} if only local JMX connections are allowed.
      * 
      * @return the port JMX is listening on for remote connections, or 
      *         {@code -1} if only local JMX connections are allowed
      */
-    public int getJMXPort() {
+    public int getJmxPort() {
         return jmxPort;
     }
     
     /** {@inheritDoc} */
     public String toString() { 
-        return host + ":" + port;
+        return host + ":" + id;
     }
 }

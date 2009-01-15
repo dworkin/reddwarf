@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.management.WatchdogServiceMXBean;
 import com.sun.sgs.profile.AggregateProfileOperation;
 import com.sun.sgs.profile.ProfileCollector;
@@ -33,6 +34,9 @@ import com.sun.sgs.profile.ProfileOperation;
  * The Statistics MBean object for the watchdog service.
  */
 class WatchdogServiceStats implements WatchdogServiceMXBean {
+    // the backing watchdog service
+    final WatchdogServiceImpl watchdog;
+    
     // the profiled operations
     final ProfileOperation addNodeListenerOp;
     final ProfileOperation addRecoveryListenerOp;
@@ -43,7 +47,9 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     final ProfileOperation isLocalNodeAliveOp;
     final ProfileOperation isLocalNodeAliveNonTransOp;
     
-    WatchdogServiceStats(ProfileCollector collector) {
+    WatchdogServiceStats(ProfileCollector collector, WatchdogServiceImpl wdog) {
+        watchdog = wdog;
+        
         ProfileConsumer consumer = 
             collector.getConsumer(ProfileCollectorImpl.CORE_CONSUMER_PREFIX + 
                                   "WatchdogService");
@@ -53,8 +59,7 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
         addNodeListenerOp =
             consumer.createOperation("addNodeListener", type, level);
         addRecoveryListenerOp =
-            consumer.createOperation("addRecoveryListener", 
-                                      ProfileDataType.AGGREGATE, level);
+            consumer.createOperation("addRecoveryListener", type, level);
         getBackupOp = 
             consumer.createOperation("getBackup", type, level);
         getLocalNodeIdOp =
@@ -109,5 +114,10 @@ class WatchdogServiceStats implements WatchdogServiceMXBean {
     public long getIsLocalNodeAliveNonTransactionalCalls() {
         return ((AggregateProfileOperation) isLocalNodeAliveNonTransOp).
                 getCount();
+    }
+    
+    /** {@inheritDoc} */
+    public NodeInfo getStatusInfo() {
+        return watchdog.getNodeStatusInfo();
     }
 }

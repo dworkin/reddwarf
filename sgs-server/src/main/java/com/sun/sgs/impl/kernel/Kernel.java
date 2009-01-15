@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.internal.InternalContext;
@@ -82,8 +83,8 @@ import javax.management.JMException;
  * <p>
  * By default, the minimal amount of profiling which is used internally by
  * the system is enabled.  To enable more profiling, the kernel property
- * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY} must be set to 
- * a valid level for {@link 
+ * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LEVEL_PROPERTY} must be set
+ * to a valid level for {@link 
  * com.sun.sgs.profile.ProfileCollector#setDefaultProfileLevel(ProfileLevel)}.
  * By default, no profile listeners are enabled.  Set the 
  * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
@@ -97,7 +98,7 @@ class Kernel {
         new LoggerWrapper(Logger.getLogger(Kernel.class.getName()));
 
     // the property for setting profiling levels
-    public static final String PROFILE_PROPERTY =
+    public static final String PROFILE_LEVEL_PROPERTY =
         "com.sun.sgs.impl.kernel.profile.level";
     // the property for setting the profile listeners
     public static final String PROFILE_LISTENERS =
@@ -167,7 +168,7 @@ class Kernel {
 
         try {
             // See if we're doing any profiling.
-            String level = appProperties.getProperty(PROFILE_PROPERTY,
+            String level = appProperties.getProperty(PROFILE_LEVEL_PROPERTY,
                     ProfileLevel.MIN.name());
             ProfileLevel profileLevel;
             try {
@@ -256,7 +257,8 @@ class Kernel {
 
             // create the configuration MBean and register it
             ConfigManager config =
-                new ConfigManager(appProperties, transactionCoordinator);
+                new ConfigManager(appProperties, 
+                              transactionCoordinator.getTransactionTimeout());
             try {
                 profileCollector.registerMBean(config, 
                                                ConfigManager.MXBEAN_NAME);
@@ -729,14 +731,14 @@ class Kernel {
             String value = properties.getProperty(StandardProperties.NODE_TYPE);
             if (value == null) {
                 // Default is single node
-                value = StandardProperties.NodeType.singleNode.name();
+                value = NodeType.singleNode.name();
             }
 
-            StandardProperties.NodeType type;
+            NodeType type;
             // Throws IllegalArgumentException if not one of the enum types
             // but let's improve the error message
             try {
-                type = StandardProperties.NodeType.valueOf(value);
+                type = NodeType.valueOf(value);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Illegal value for " +
                         StandardProperties.NODE_TYPE);
@@ -963,7 +965,7 @@ class Kernel {
         
         // if an argument is specified on the command line, use it
         // for the value of the filename
-        Properties appProperties = null;
+        Properties appProperties;
         if (args.length == 1) {
             appProperties = findProperties(args[0]);
         } else {

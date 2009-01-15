@@ -20,7 +20,10 @@
 /**
  * Provides the Project Darkstar management interfaces exposed via JMX.
  * <p>
- * By convention, only one of these objects will be registered with the 
+ * These interfaces should not be considered stable;  they will evolve
+ * as we gather more experience using JMX with Project Darkstar.
+ * <p>
+ * By convention, only one of each of these objects will be registered with the 
  * platform MBean server.  The {@code ObjectName} for uniquely identifying 
  * MBeans in this package is the field {@code MXBEAN_NAME} within each MBean.
  * <p>

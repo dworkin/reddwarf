@@ -41,38 +41,43 @@ public interface ProfileControllerMXBean {
     // Maybe add a way to add/remove listeners?
     
     /**
-     * Get the default profile level for all newly created consumers.
+     * Gets the default profile level for all newly created consumers.
+     * 
      * @return the default profile level for consumer creation
      */
     ProfileLevel getDefaultProfileLevel();
     
     /**
-     * Set the default profile level for all newly created consumers.
+     * Sets the default profile level for all newly created consumers.
+     * 
      * @param level the default profile level for consumer creation
      */
     void setDefaultProfileLevel(ProfileLevel level);
     
     /**
-     * Get the names of all profile consumers in the system.
+     * Gets the names of all profile consumers in the system.
      * 
      * @return the names of all the profile consumers
      */
     String[] getProfileConsumers();
     
     /**
-     * Get the current profile level of the named consumer.
+     * Gets the current profile level of the named consumer.
      * 
      * @param consumer the consumer name
      *
      * @return the profile level for the named consumer
+     * @throws IllegalArgumentException if the consumer has not been created
      */
     ProfileLevel getConsumerLevel(String consumer);
     
     /**
-     * Set the current profile level of the named consumer.
+     * Sets the current profile level of the named consumer.
      * 
      * @param consumer the consumer name
      * @param level the profile level
+     * 
+     * @throws IllegalArgumentException if the consumer has not been created
      */
     void setConsumerLevel(String consumer, ProfileLevel level);
 }

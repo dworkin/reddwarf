@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.management.ConfigMXBean;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -32,7 +32,7 @@ import java.util.Properties;
  */
 class ConfigManager implements ConfigMXBean {
 
-    private final String nodeType;
+    private final NodeType nodeType;
     private final String appName;
     private final String appRoot;
     private final String appListener;
@@ -40,20 +40,23 @@ class ConfigManager implements ConfigMXBean {
     private final int appPort;
     private final String serverHost;
     private final int jmxPort;
-    private long txnTimeout;
+    private long standardTxnTimeout;
 
     /** 
-     * Create a config manager instance.
+     * Creates a config manager instance.
      * @param props  properties
-     * @param coord  transaction coordinator
+     * @param standardTimeout the standard (not unbounded) timeout value
      */
-    public ConfigManager(Properties props, TransactionCoordinator coord) {
-        String type = props.getProperty(StandardProperties.NODE_TYPE);
-        if (type == null) {
+    public ConfigManager(Properties props, long standardTimeout) {
+        String value = props.getProperty(StandardProperties.NODE_TYPE);
+        if (value == null) {
             // Default is single node
-            nodeType = StandardProperties.NodeType.singleNode.name();
+            // Note - this default is specified by the implementation
+            // of the Kernel, in the static method filterProperties.
+            // It'd be better if the code wasn't duplicated here.
+            nodeType = NodeType.singleNode;
         } else {
-            nodeType = type;
+            nodeType = NodeType.valueOf(value);
         }
         
         appName = props.getProperty(StandardProperties.APP_NAME);
@@ -64,9 +67,10 @@ class ConfigManager implements ConfigMXBean {
         appListener = props.getProperty(StandardProperties.APP_LISTENER);
         serverHost = props.getProperty(StandardProperties.SERVER_HOST, "none");
         // Optional property
-        String jmx = props.getProperty("com.sun.management.jmxremote.port");
+        String jmx = 
+                props.getProperty(StandardProperties.SYSTEM_JMX_REMOTE_PORT);
         jmxPort = (jmx == null) ? -1 : Integer.parseInt(jmx);
-        txnTimeout = coord.getTransactionTimeout();
+        standardTxnTimeout = standardTimeout;
         String name;
         try {
             name = InetAddress.getLocalHost().getHostName();
@@ -77,7 +81,7 @@ class ConfigManager implements ConfigMXBean {
     }
 
     /** {@inheritDoc} */
-    public String getNodeType() {
+    public NodeType getNodeType() {
         return nodeType;
     }
 
@@ -112,12 +116,12 @@ class ConfigManager implements ConfigMXBean {
     }
     
     /** {@inheritDoc} */
-    public int getJMXPort() {
+    public int getJmxPort() {
         return jmxPort;
     }
     
     /** {@inheritDoc} */
-    public long getTxnTimeout() {
-        return txnTimeout;
+    public long getStandardTxnTimeout() {
+        return standardTxnTimeout;
     }
 }

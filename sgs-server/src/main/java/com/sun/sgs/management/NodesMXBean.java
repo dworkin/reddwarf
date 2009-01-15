@@ -47,11 +47,11 @@ public interface NodesMXBean {
     /** The type for node failed notifications. */
     String NODE_FAILED_NOTIFICATION = "com.sun.sgs.node.failed";
     
-    // Maybe add method to shut down node?  Need Rob's node shutdown
+    // Maybe add method to shut down node?  Need the node shutdown
     // work to tell the watchdog we need the node shut down.
     
     /** 
-     * Information about the nodes in the system.
+     * Returns information about the nodes in the system.
      * @return information about the nodes in the system
      */
     NodeInfo[] getNodes();

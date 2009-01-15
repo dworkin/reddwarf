@@ -19,8 +19,10 @@
 
 package com.sun.sgs.management;
 
+import com.sun.sgs.kernel.NodeType;
+
 /**
- * The immutable management information for this node's configuration.
+ * The immutable management information containing this node's configuration.
  * <p>
  * An instance implementing this MBean can be obtained from the from the 
  * {@link java.lang.management.ManagementFactory.html#getPlatformMBeanServer() 
@@ -32,18 +34,15 @@ package com.sun.sgs.management;
  */
 public interface ConfigMXBean {
     /** The name for uniquely identifying this MBean. */
-    String MXBEAN_NAME = "com.sun.sgs:type=Config";
-    
-    // Maybe combine this object with the NodeInfo data?
+    String MXBEAN_NAME = "com.sun.sgs:type=Config";   
     
     /**
-     * Return the type of this node, one of {@code singleNode}, 
-     * {@code coreServerNode}, or {@code appNode}.
+     * Returns the type of this node.
      * 
      * @return the node type
      * 
      */
-    String getNodeType();
+    NodeType getNodeType();
 
     /**
      * Returns the application name.
@@ -94,12 +93,13 @@ public interface ConfigMXBean {
      * @return the port JMX is listening on for remote connections, or 
      *         {@code -1} if no remote JMX connections are supported
      */
-    int getJMXPort();
+    int getJmxPort();
     
     /**
-     * Returns the transaction timeout, in milliseconds.
+     * Returns the standard transaction timeout, in milliseconds.
      * 
-     * @return the transaction timeout, in milliseconds
+     * @return the standard transaction timeout, in milliseconds
      */
-    long getTxnTimeout();
+    long getStandardTxnTimeout();
+    
 }

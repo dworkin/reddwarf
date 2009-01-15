@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -47,6 +48,7 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -315,7 +317,7 @@ public final class WatchdogServerImpl
         
         // register our local id
         int jmxPort = wrappedProps.getIntProperty(
-                    "com.sun.management.jmxremote.port", -1);
+                    StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
         long[] values = registerNode(host, port, client, jmxPort);
         localNodeId = values[0];
 
@@ -402,7 +404,7 @@ public final class WatchdogServerImpl
 	failedNodesExceptMe.remove(aliveNodes.get(localNodeId));
 	notifyClients(failedNodesExceptMe, failedNodes);
         
-        for (Long nodeId : aliveNodes.keySet()) {
+        for (long nodeId : aliveNodes.keySet()) {
             nodeMgr.notifyNodeFailed(nodeId);
         }
 	aliveNodes.clear();
@@ -923,7 +925,7 @@ public final class WatchdogServerImpl
     }
     
     // Management support
-    NodeInfo[] getAllNodeInfo() {
+    private NodeInfo[] getAllNodeInfo() {
         final Set<NodeInfo> nodes = new HashSet<NodeInfo>();
         try {
             transactionScheduler.runTask(
@@ -932,15 +934,7 @@ public final class WatchdogServerImpl
                         Iterator<Node> iter = NodeImpl.getNodes(dataService);
                         while (iter.hasNext()) {
                             NodeImpl node = (NodeImpl) iter.next();
-                            NodeInfo info = new NodeInfo(
-                                    node.getHostName(),
-                                    node.getPort(),
-                                    node.getId(),
-                                    node.isAlive(),
-                                    node.getBackupId(),
-                                    node.getJMXPort()
-                                    );
-                            nodes.add(info);
+                            nodes.add(node.getNodeInfo());
                         }
 		}
             },  taskOwner);
@@ -955,11 +949,13 @@ public final class WatchdogServerImpl
     /**
      * Private class for JMX information.
      */
-    static class NodeManager extends NotificationBroadcasterSupport
+    private static class NodeManager extends NotificationBroadcasterSupport
             implements NodesMXBean 
     {
         /** The watchdog server we'll use to get the node info. */
         private WatchdogServerImpl watchdog;
+        
+        private AtomicLong seqNumber = new AtomicLong();
         
         /** Description of the notifications. */
         private static MBeanNotificationInfo[] notificationInfo =
@@ -970,7 +966,7 @@ public final class WatchdogServerImpl
                         Notification.class.getName(), 
                         "A node has started or failed") };
         /**
-         * Create an instance of the manager.
+         * Creates an instance of the manager.
          * @param watchdog  the watchdog server
          */
         NodeManager(WatchdogServerImpl watchdog) {
@@ -988,25 +984,27 @@ public final class WatchdogServerImpl
          */
                
         /**
-         * Send JMX notification that a node started.
+         * Sends JMX notification that a node started.
          * @param nodeId the identifier of the newly started node
          */
         void notifyNodeStarted(long nodeId) {
             sendNotification(
                     new Notification(NODE_STARTED_NOTIFICATION,
-                                     this,
+                                     this.MXBEAN_NAME,
+                                     seqNumber.incrementAndGet(),
                                      System.currentTimeMillis(),
                                      "Node started: " + nodeId));
         }
         
         /**
-         * Send JMX notification that a node failed.
+         * Sends JMX notification that a node failed.
          * @param nodeId the identifier of the failed node
          */
         void notifyNodeFailed(long nodeId) {
             sendNotification(
                     new Notification(NODE_FAILED_NOTIFICATION,
-                                     this,
+                                     this.MXBEAN_NAME,
+                                     seqNumber.incrementAndGet(),
                                      System.currentTimeMillis(),
                                      "Node failed:  " + nodeId));
         }

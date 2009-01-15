@@ -50,7 +50,7 @@ public interface ClientSessionServiceMXBean {
      */
     long getRegisterSessionDisconnectListenerCalls();
     
-        /**
+    /**
      * Returns the number of times {@link 
      * ClientSessionService#sendProtocolMessageNonTransactional 
      * sendProtocolMessageNonTransactional} has been called.

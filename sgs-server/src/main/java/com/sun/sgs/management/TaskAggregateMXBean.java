@@ -59,7 +59,7 @@ public interface TaskAggregateMXBean {
      * Returns the percentage of failed tasks to total tasks.
      * @return the percentage of failed tasks to total tasks
      */
-    double getTaskFailureRate();
+    double getTaskFailurePercentage();
       
     /**
      * Returns the average number of tasks which are ready to run in
@@ -117,7 +117,7 @@ public interface TaskAggregateMXBean {
     void setSmoothingFactor(double newFactor);
     
     /**
-     * Clear all data values.
+     * Clears all data values.
      */
     void clear();
 }

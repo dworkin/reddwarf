@@ -46,7 +46,6 @@ import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.EmptyStackException;
 import java.util.List;
 import java.util.Map;
@@ -527,12 +526,6 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         } else {
             taskStats.taskFinishedFail(trans, profileReport.readyCount);
         }
-
-//        if (runtime == 0) {
-//            Date now = new Date(profileReport.actualStartTime);
-//            System.out.println("JANE ZERO RUNTIME " + 
-//                profileReport.getTask() + " started: "  + now);
-//        }
     }
 
     /**

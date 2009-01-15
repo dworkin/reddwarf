@@ -585,8 +585,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
         private final Queue<Long> samples =
                 new ConcurrentLinkedQueue<Long>();
         private final AtomicInteger roughSize = new AtomicInteger();
-	private int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;       
-        private double smoothingFactor = DEFAULT_SAMPLE_AGGREGATE_SMOOTHING;
+	private volatile int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;   
+        private volatile double smoothingFactor = 
+                        DEFAULT_SAMPLE_AGGREGATE_SMOOTHING;
         private long minSampleValue = Long.MAX_VALUE;
         private long maxSampleValue = Long.MIN_VALUE;
         private final ExponentialAverage avgSampleValue = 
@@ -606,7 +607,7 @@ class ProfileConsumerImpl implements ProfileConsumer {
             }
             
             if (capacity > 0) {
-                if (samples.size() == capacity) {
+                if (samples.size() >= capacity) {
                     samples.remove(); // remove oldest
                 } else {
                     roughSize.incrementAndGet();

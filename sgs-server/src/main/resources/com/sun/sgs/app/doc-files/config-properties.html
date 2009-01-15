@@ -372,9 +372,13 @@ typically useful for production deployments.
 <h2>Monitoring and Management Properties</h2>
 
 The Project Darkstar Server exposes internal data through standard
-Java Management Extensions (JMX) MXBeans.  In order to enable monitoring
-on a remote machine, the standard JMX system properties should be used
-when the Project Darkstar Server node is started.
+Java Management Extensions (JMX) MXBeans.  The following properties
+are system properties, and must be specified on the command line when
+a Project Darkstar Server node is started, rather than in the application 
+configuration properties file.
+<p>
+In order to enable monitoring on a remote machine, the following properties
+must be used.  By default, only local monitoring is enabled.
 
 <dl>
 <dt>com.sun.management.jmxremote.port

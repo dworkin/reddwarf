@@ -204,6 +204,22 @@ public class TestProfileDataAggregateImpl {
    }
    
    @Test
+   public void testSetSmoothingFactor() throws Exception {
+       ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final AggregateProfileSample samp =
+                (AggregateProfileSample) 
+                    cons1.createSample("bar", testType, ProfileLevel.MIN);
+        double smooth = 0.5;
+        samp.setSmoothingFactor(smooth);
+        assertTrue(smooth == samp.getSmoothingFactor());
+        
+        smooth = 0.9;
+        samp.setSmoothingFactor(smooth);
+        assertTrue(smooth == samp.getSmoothingFactor());
+   }
+   
+   @Test
    public void testAggregateProfileSample() throws Exception {
         final String name = "sample";
         ProfileCollector collector = getCollector(serverNode);

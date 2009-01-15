@@ -24,6 +24,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -214,6 +215,7 @@ public class TestMBeans {
         assertEquals(0, proxy.getSomething());
     }
     
+    @Test
     public void testRegisterMXBean() throws Exception {
         TestMXBean bean1 = new TestMXImpl();
         String beanName = "com.sun.sgs:type=Test";
@@ -410,10 +412,11 @@ public class TestMBeans {
         String hostName = (String) mbsc.getAttribute(name, "HostName");
         int appPort = (Integer) mbsc.getAttribute(name, "AppPort");
         String appRoot = (String) mbsc.getAttribute(name, "AppRoot");
-        int jmxPort = (Integer) mbsc.getAttribute(name, "JMXPort");
-        String type = (String) mbsc.getAttribute(name, "NodeType");
+        int jmxPort = (Integer) mbsc.getAttribute(name, "JmxPort");
+        NodeType type = NodeType.valueOf(
+                (String) mbsc.getAttribute(name, "NodeType"));
         String serverHost = (String) mbsc.getAttribute(name, "ServerHostName");
-        long timeout = (Long) mbsc.getAttribute(name, "TxnTimeout");
+        long timeout = (Long) mbsc.getAttribute(name, "StandardTxnTimeout");
         
         System.out.println("This node's data:");
         System.out.println("  node type: " + type);
@@ -435,20 +438,20 @@ public class TestMBeans {
         assertEquals(hostName, proxy.getHostName());
         assertEquals(appPort, proxy.getAppPort());
         assertEquals(appRoot, proxy.getAppRoot());
-        assertEquals(jmxPort, proxy.getJMXPort());
+        assertEquals(jmxPort, proxy.getJmxPort());
         assertEquals(type, proxy.getNodeType());
         assertEquals(serverHost, proxy.getServerHostName());
-        assertEquals(timeout, proxy.getTxnTimeout());
+        assertEquals(timeout, proxy.getStandardTxnTimeout());
         
         assertEquals(appListener, bean.getAppListener());
         assertEquals(appName, bean.getAppName());
         assertEquals(hostName, bean.getHostName());
         assertEquals(appPort, bean.getAppPort());
         assertEquals(appRoot, bean.getAppRoot());
-        assertEquals(jmxPort, bean.getJMXPort());
+        assertEquals(jmxPort, bean.getJmxPort());
         assertEquals(type, bean.getNodeType());
         assertEquals(serverHost, bean.getServerHostName());
-        assertEquals(timeout, bean.getTxnTimeout());
+        assertEquals(timeout, bean.getStandardTxnTimeout());
     }
     
     @Test
@@ -513,7 +516,8 @@ public class TestMBeans {
         assertTrue(getClassId <= proxy.getGetClassIdCalls());
         assertTrue(getClassInfo <= proxy.getGetClassInfoCalls());
         assertTrue(getObject <= proxy.getGetObjectCalls());
-        assertTrue(getObjectForUpdateCalls <= proxy.getGetObjectForUpdateCalls());
+        assertTrue(getObjectForUpdateCalls <= 
+                    proxy.getGetObjectForUpdateCalls());
         assertTrue(markForUpdate <= proxy.getMarkForUpdateCalls());
         assertTrue(nextBoundName <= proxy.getNextBoundNameCalls());
         assertTrue(nextObjectId <= proxy.getNextObjectIdCalls());
@@ -533,6 +537,11 @@ public class TestMBeans {
         assertTrue(createObject < proxy.getCreateObjectCalls());
         assertTrue(writtenBytes < proxy.getWrittenBytesCount());
         assertTrue(writtenObjs < proxy.getWrittenObjectsCount());
+        
+        // The proxy is for the bean, so the bean should also match.
+        assertTrue(createObject < bean.getCreateObjectCalls());
+        assertTrue(writtenBytes < bean.getWrittenBytesCount());
+        assertTrue(writtenObjs < bean.getWrittenObjectsCount());
     }
     
     
@@ -597,7 +606,9 @@ public class TestMBeans {
         assertTrue(setBinding <= proxy.getSetBindingCalls());
         assertTrue(setServiceBinding <= proxy.getSetServiceBindingCalls());
         
-
+        // We might have some service calls in between creating the 
+        // objects and using the bean.
+        // The proxy should really be a stand-in for the original bean.
         assertTrue(createRef <= bean.getCreateReferenceCalls());
         assertTrue(createRefForId <= bean.getCreateReferenceForIdCalls());
         assertTrue(getBinding <= bean.getGetBindingCalls());
@@ -656,6 +667,12 @@ public class TestMBeans {
                 (Long) mbsc.getAttribute(name, 
                                 "IsLocalNodeAliveNonTransactionalCalls");
         
+        // Note that if we want to get the NodeInfo, which is a composite type,
+        // from an attribute, its type is CompositeData.  This is why using
+        // proxies are the real way to go.
+        CompositeData getStatusInfo =
+                (CompositeData) mbsc.getAttribute(name, "StatusInfo");
+        
         // Create the proxy for the object
         WatchdogServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, WatchdogServiceMXBean.class);
@@ -671,7 +688,7 @@ public class TestMBeans {
         assertTrue(isLocalNodeAlive <= proxy.getIsLocalNodeAliveCalls());
         assertTrue(isLocalNodeAliveNonTransactional <= 
                     proxy.getIsLocalNodeAliveNonTransactionalCalls());
-
+        
         assertTrue(addNodeListener <= bean.getAddNodeListenerCalls());
         assertTrue(addRecoveryListener <= bean.getAddRecoveryListenerCalls());
         assertTrue(getBackup <= bean.getGetBackupCalls());
@@ -681,6 +698,12 @@ public class TestMBeans {
         assertTrue(isLocalNodeAlive <= bean.getIsLocalNodeAliveCalls());
         assertTrue(isLocalNodeAliveNonTransactional <= 
                     bean.getIsLocalNodeAliveNonTransactionalCalls());
+        
+        // And to get the data from the CompositeData, we use more 
+        // reflection... another argument for clients using proxies.
+        assertTrue((Boolean) getStatusInfo.get("live"));
+        assertTrue(proxy.getStatusInfo().isLive());
+        assertTrue(bean.getStatusInfo().isLive());
         
         // Test one of the APIs
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -925,6 +948,32 @@ public class TestMBeans {
 		}}, taskOwner);
         assertTrue(dataProxy.getSetBindingCalls() > 0);
     }
+    
+    @Test(expected=IllegalArgumentException.class)
+    public void testProfileControllerMXBeanBadGetLevel() throws Exception {
+
+        // Create a proxy
+        ProfileControllerMXBean proxy = (ProfileControllerMXBean)
+            JMX.newMXBeanProxy(mbsc, 
+                new ObjectName(ProfileControllerMXBean.MXBEAN_NAME), 
+                ProfileControllerMXBean.class);
+        
+        ProfileLevel level = proxy.getConsumerLevel("noSuchConsumer");
+    }
+    
+    
+    @Test(expected=IllegalArgumentException.class)
+    public void testProfileControllerMXBeanBadSetLevel() throws Exception {
+
+        // Create a proxy
+        ProfileControllerMXBean proxy = (ProfileControllerMXBean)
+            JMX.newMXBeanProxy(mbsc, 
+                new ObjectName(ProfileControllerMXBean.MXBEAN_NAME), 
+                ProfileControllerMXBean.class);
+        
+        proxy.setConsumerLevel("notFound", ProfileLevel.MIN);
+    }
+    
     /**
      * A simple object implementing an MBean interface.
      */

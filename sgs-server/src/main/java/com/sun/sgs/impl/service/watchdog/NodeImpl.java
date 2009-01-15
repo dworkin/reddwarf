@@ -22,7 +22,9 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.Serializable;
@@ -371,8 +373,21 @@ class NodeImpl
       * 
       * @return the port used for remote JMX monitoring of this node
       */
-    int getJMXPort() {
+    private int getJmxPort() {
         return jmxPort;
+    }
+    
+    /**
+     * Returns the management information for this node.
+     * 
+     * @return the management information for this node
+     */
+    NodeInfo getNodeInfo() {
+        return new NodeInfo(getHostName(),
+                            getId(),
+                            isAlive(),
+                            getBackupId(),
+                            getJmxPort());
     }
      
     /**
@@ -488,7 +503,7 @@ class NodeImpl
      * Node} instance with the specified {@code nodeId}.
      *
      * @param	a node ID
-     * @return	a key for acessing the {@code Node} instance
+     * @return	a key for accessing the {@code Node} instance
      */
     private static String getNodeKey(long nodeId) {
 	return NODE_PREFIX + "." + nodeId;

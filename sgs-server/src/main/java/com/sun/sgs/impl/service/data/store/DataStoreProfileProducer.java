@@ -44,7 +44,7 @@ public class DataStoreProfileProducer
         "com.sun.sgs.impl.service.data.store.DataStoreProfileProducer";
 
      /** The logger for this class. */
-    static final LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(CLASSNAME));
     
     /** The associated data store. */

@@ -57,13 +57,22 @@ class ProfileController extends StandardMBean
 
     /** {@inheritDoc} */
     public ProfileLevel getConsumerLevel(String consumer) {
-        ProfileConsumer cons = collector.getConsumer(consumer);
+        ProfileConsumer cons = collector.getConsumers().get(consumer);
+        if (cons == null) {
+            throw new IllegalArgumentException(
+                    "no consumer found named " + consumer);
+        }
+        
         return cons.getProfileLevel();
     }
 
     /** {@inheritDoc} */
     public void setConsumerLevel(String consumer, ProfileLevel level) {
-        ProfileConsumer cons = collector.getConsumer(consumer);
+        ProfileConsumer cons = collector.getConsumers().get(consumer);
+        if (cons == null) {
+            throw new IllegalArgumentException(
+                    "no consumer found named " + consumer);
+        }
         cons.setProfileLevel(level);
     }
 
