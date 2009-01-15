@@ -48,6 +48,9 @@ class HelloEchoSessionListener
 
     /** The session this {@code ClientSessionListener} is listening to. */
     private final ManagedReference<ClientSession> sessionRef;
+    
+    /** The name of the {@code ClientSession} for this listener. */
+    private final String sessionName;
 
     /**
      * Creates a new {@code HelloEchoSessionListener} for the given session.
@@ -59,6 +62,7 @@ class HelloEchoSessionListener
             throw new NullPointerException("null session");
 
         sessionRef = AppContext.getDataManager().createReference(session);
+        sessionName = session.getName();
     }
 
     /**
@@ -79,7 +83,7 @@ class HelloEchoSessionListener
     public void receivedMessage(ByteBuffer message) {
         ClientSession session = getSession();
 
-        logger.log(Level.INFO, "Message from {0}", session.getName());
+        logger.log(Level.INFO, "Message from {0}", sessionName);
 
         // Echo message back to sender
         session.send(message);
@@ -97,7 +101,7 @@ class HelloEchoSessionListener
 
         logger.log(Level.INFO,
                    "User {0} has logged out {1}",
-                   new Object[] { session.getName(), grace }
+                   new Object[] { sessionName, grace }
         );
     }
 }

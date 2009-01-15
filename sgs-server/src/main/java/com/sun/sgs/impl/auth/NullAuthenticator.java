@@ -68,10 +68,11 @@ public class NullAuthenticator implements IdentityAuthenticator {
     public Identity authenticateIdentity(IdentityCredentials credentials)
         throws CredentialException
     {
-        if (! (credentials instanceof NamePasswordCredentials))
+        if (!(credentials instanceof NamePasswordCredentials)) {
             throw new CredentialException("unsupported credentials type");
-        return new IdentityImpl(((NamePasswordCredentials)credentials).
-                                getName());
+        }
+        return new IdentityImpl(((NamePasswordCredentials) credentials).
+                getName());
     }
 
 }

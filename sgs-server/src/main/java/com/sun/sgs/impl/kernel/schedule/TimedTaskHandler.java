@@ -51,8 +51,9 @@ class TimedTaskHandler {
      *                 the task when its time comes, causing it to be executed
      */
     TimedTaskHandler(TimedTaskListener listener) {
-        if (listener == null)
+        if (listener == null) {
             throw new NullPointerException("Listener cannot be null");
+        }
 
         this.listener = listener;
         timer = new Timer();
@@ -71,20 +72,22 @@ class TimedTaskHandler {
     boolean runDelayed(ScheduledTask task) {
         // see if this is far enough in the future that it's worth handling
         if (task.getStartTime() < (System.currentTimeMillis() +
-                                   FUTURE_THRESHOLD))
+                                   FUTURE_THRESHOLD)) {
             return false;
+        }
 
         TimerTask tt = new TimerTaskImpl(task);
 
         // if this task is recurring, set the timer task if it's still active
         if (task.isRecurring()) {
             RecurringTaskHandleImpl handle =
-                (RecurringTaskHandleImpl)(task.getRecurringTaskHandle());
+                    (RecurringTaskHandleImpl) (task.getRecurringTaskHandle());
             synchronized (handle) {
                 // if the recurring task is cancelled, then say that we're
                 // handling it, which has the effect of the task being dropped
-                if (handle.isCancelled())
+                if (handle.isCancelled()) {
                     return true;
+                }
                 handle.setTimerTask(tt);
             }
         }
@@ -112,7 +115,7 @@ class TimedTaskHandler {
         }
         /** {@inheritDoc} */
         public synchronized boolean cancel() {
-            if (! cancelled) {
+            if (!cancelled) {
                 cancelled = true;
                 return true;
             }
@@ -124,8 +127,9 @@ class TimedTaskHandler {
         }
         /** {@inheritDoc} */
         public synchronized void run() {
-            if (! cancelled)
+            if (!cancelled) {
                 listener.timedTaskReady(task);
+            }
             cancelled = true;
         }
     }

@@ -42,8 +42,9 @@ public class IdentityImpl implements Identity, Serializable
      * @param name the name of this identity
      */
     public IdentityImpl(String name) {
-        if (name == null)
+        if (name == null) {
             throw new NullPointerException("Null names are not allowed");
+        }
 
         this.name = name;
     }
@@ -73,10 +74,10 @@ public class IdentityImpl implements Identity, Serializable
      * {@inheritDoc}
      */
     public boolean equals(Object o) {
-        if ((o == null) || (! (o instanceof IdentityImpl)))
+        if ((o == null) || (!(o instanceof IdentityImpl))) {
             return false;
-
-        return ((IdentityImpl)o).name.equals(name);
+        }
+        return ((IdentityImpl) o).name.equals(name);
     }
 
     /**

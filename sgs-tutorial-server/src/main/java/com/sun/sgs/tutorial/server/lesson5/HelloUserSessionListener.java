@@ -47,6 +47,9 @@ class HelloUserSessionListener
 
     /** The session this {@code ClientSessionListener} is listening to. */
     private final ManagedReference<ClientSession> sessionRef;
+    
+    /** The name of the {@code ClientSession} for this listener. */
+    private final String sessionName;
 
     /**
      * Creates a new {@code HelloUserSessionListener} for the given session.
@@ -58,6 +61,7 @@ class HelloUserSessionListener
             throw new NullPointerException("null session");
 
         sessionRef = AppContext.getDataManager().createReference(session);
+        sessionName = session.getName();
     }
 
     /**
@@ -76,7 +80,7 @@ class HelloUserSessionListener
      * Logs when data arrives from the client.
      */
     public void receivedMessage(ByteBuffer message) {
-        logger.log(Level.INFO, "Message from {0}", getSession().getName());
+        logger.log(Level.INFO, "Message from {0}", sessionName);
     }
 
     /**
@@ -88,7 +92,7 @@ class HelloUserSessionListener
         String grace = graceful ? "graceful" : "forced";
         logger.log(Level.INFO,
                    "User {0} has logged out {1}",
-                   new Object[] { getSession().getName(), grace }
+                   new Object[] { sessionName, grace }
         );
     }
 }
