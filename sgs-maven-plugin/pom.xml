@@ -63,12 +63,20 @@
 	</exclusion>
       </exclusions>
     </dependency>
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.maven.shared</groupId>
+      <artifactId>maven-plugin-testing-harness</artifactId>
+      <version>${maven-plugin-testing-harness.version}</version>
+      <scope>test</scope>
+    </dependency>
+
   </dependencies>
 
   <properties>
@@ -76,6 +84,8 @@
     <maven-common-artifact-filters.version>1.1</maven-common-artifact-filters.version>
     <plexus-utils.version>1.5.6</plexus-utils.version>
     <plexus-archiver.version>1.0-alpha-11</plexus-archiver.version>
+
     <junit.version>4.5</junit.version>
+    <maven-plugin-testing-harness.version>1.1</maven-plugin-testing-harness.version>
   </properties>
 </project>
