@@ -92,6 +92,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * The version of the Project Darkstar server distribution.
      * 
      * @parameter
+     * @required
      */
     private String version;
     

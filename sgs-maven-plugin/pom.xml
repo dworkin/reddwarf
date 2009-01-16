@@ -4,12 +4,21 @@
   <groupId>com.projectdarkstar.maven.plugin</groupId>
   <artifactId>sgs-maven-plugin</artifactId>
   <packaging>maven-plugin</packaging>
-  <version>0.1-SNAPSHOT</version>
+  <version>1.0-alpha-1-SNAPSHOT</version>
   <name>Project Darkstar Maven Plugin</name>
   <url>https://sgs-maven-plugin.dev.java.net</url>
+  <description>
+    This plugin provides the ability to control a Project Darkstar server
+    installation from Maven.  Capabilities include: installation of the server
+    distribution itself, deploying application JAR files into the server,
+    configuring the server, booting up the server, or shutting down the server.
+    This plugin is compatible with Project Darkstar server version 0.9.8 or
+    later.
+  </description>
   
   <build>
     <plugins>
+
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
 	<artifactId>maven-compiler-plugin</artifactId>
@@ -19,8 +28,42 @@
 	  <target>1.5</target>
 	</configuration>
       </plugin>
+
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-remote-resources-plugin</artifactId>
+	<configuration>
+	  <properties>
+	    <projectYear>${projectYear}</projectYear>
+	  </properties>
+	</configuration>
+	<executions>
+	  <execution>
+	    <id>include-bsd-license</id>
+	    <goals>
+	      <goal>process</goal>
+	    </goals>
+	    <phase></phase>
+	    <configuration>
+	      <resourceBundles>
+		<resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
+	      </resourceBundles>
+	    </configuration>
+	  </execution>
+	</executions>
+      </plugin>
+      
     </plugins>
   </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-plugin-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </reporting>
 
   <dependencies>
     <dependency>
@@ -80,6 +123,8 @@
   </dependencies>
 
   <properties>
+    <projectYear>2009</projectYear>
+
     <maven.version>2.0.9</maven.version>
     <maven-common-artifact-filters.version>1.1</maven-common-artifact-filters.version>
     <plexus-utils.version>1.5.6</plexus-utils.version>

@@ -1,0 +1,17 @@
+<project>
+  <skin>
+    <groupId>org.apache.maven.skins</groupId>
+    <artifactId>maven-stylus-skin</artifactId>
+  </skin>
+
+  <version position="left"/>
+
+  <body>
+    <menu name="Overview">
+      <item name="Introduction" href="index.html"/>
+      <item name="Goals" href="plugin-info.html"/>
+      <item name="Examples" href="examples.html"/>
+    </menu>
+    <menu ref="reports"/>
+  </body>
+</project>

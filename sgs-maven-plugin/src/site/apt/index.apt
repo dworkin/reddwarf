@@ -1,0 +1,39 @@
+ ------
+ Index
+ ------
+ Owen Kellett
+ <owen.kellett@sun.com>
+ ------
+ January 16, 2009
+ ------
+
+Project Darkstar Maven Plugin
+
+* Overview
+
+  This plugin provides the ability to control a Project Darkstar server installation.
+  Capabilities include: installation of the server distribution itself, deploying 
+  application JAR files into the server, configuring the server, booting up the server,
+  or shutting down the server. This plugin is compatible with Project Darkstar server 
+  version 0.9.8 or later.
+
+  Since the plugin also can install Project Darkstar server directly from the distribution
+  zip file (resolved and downloaded from the Maven repository), there are generally two
+  ways to use this plugin:
+
+  * To install the server, deploy and configure an application, and then boot it up for
+    testing or one-off executions
+
+  * To deploy and configure an application into an existing Project Darkstar server
+    installation (for actual production deployments)
+
+* Goals
+
+  The {{{plugin-info.html}Goals}} section gives complete documentation of what
+  how to use this plugin.
+
+* Examples
+
+  A few examples of what can be done with the Project Darkstar Maven Plugin
+  can be found in the {{{examples.html}Examples}} section.
+

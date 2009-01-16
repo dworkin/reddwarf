@@ -1,0 +1,159 @@
+ ------
+ Usage
+ ------
+ Owen Kellett
+ <owen.kellett@sun.com>
+ ------
+ January 16, 2009
+ ------
+
+Examples
+
+  This plugin provides the ability to control a Project Darkstar server installation.
+  Since the plugin also can install Project Darkstar server directly from the distribution
+  zip file (resolved and downloaded from the Maven repository), there are generally two
+  ways to use this plugin:
+
+  * To install the server, deploy and configure an application, and then boot it up for
+    testing or one-off executions
+
+  * To deploy and configure an application into an existing Project Darkstar server
+    installation (for actual production deployments)
+
+  []
+
+  These are just examples of what can be done with the Project Darkstar Maven Plugin.
+  Please see the {{{plugin-info.html}Goals}} section for more information about its
+  full potential.
+
+* Install, Configure, Deploy, and Boot
+
+  This example binds a single execution of four goals, <<<install>>>, <<<configure>>>,
+  <<<deploy>>>, and <<<boot>>> to the integration-test phase.  When executed,
+  Project Darkstar server version 0.9.8 will be installed by default into the
+  the <<<${project.build.directory}>>>.  The resulting <<<sgsHome>>> then becomes
+  <<<${project.build.directory}/sgs-server-dist-${sgs.version}>>> as seen in the
+  configuration.  The given <<<sgsBoot>>> and <<<sgsServer>>> properties files will
+  be overlayed into the <<<conf>>> directory of the installation, and then the 
+  project's main artifact will be deployed, by default, into the <<<deploy>>> directory
+  of the installation.  Finally, the server will be booted up.
+
++------------------------------------------+
+<project>
+  ...
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <artifactId>sgs-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>sgs-run</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>install</goal>
+              <goal>configure</goal>
+              <goal>deploy</goal>
+              <goal>boot</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <version>0.9.8</version>
+          <sgsHome>${project.build.directory}/sgs-server-dist-${sgs.version}</sgsHome>
+          <sgsBoot>${basedir}/src/test/properties/my.boot</sgsBoot>
+          <sgsServer>${basedir}/src/test/properties/my.properties</sgsServer>
+          <files>
+            <file>${project.artifact.file}</file>
+          </files>
+        </configuration>
+      </plugin>
+      ...
+    </plugins>
+    ...
+  </build>
+  ...
+</project>
++------------------------------------------+
+
+
+* Production Deployment
+
+  This example shows what one might do if using this plugin to deploy into a production
+  Project Darkstar server installation.
+
++------------------------------------------+
+<project>
+  ...
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <artifactId>sgs-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>sgs-run</id>
+            <phase>deploy</phase>
+            <goals>
+              <goal>deploy</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <sgsHome>/path/to/production/installation</sgsHome>
+          <files>
+            <file>${project.artifact.file}</file>
+          </files>
+        </configuration>
+      </plugin>
+      ...
+    </plugins>
+    ...
+  </build>
+  ...
+</project>
++------------------------------------------+
+
+* Deploy Dependencies
+
+  The <<<deploy-dependencies>>> goal can deploy artifacts directly from project dependencies.
+  It (as well as the <<<deploy>>> goal) also has the ability to unpack those dependencies
+  directly into the Project Darkstar server installation's deploy directory.  This example
+  will take all of a project's direct dependencies (excluding transitives), will unpack
+  them into the Project Darkstar server's deploy directory, and then will boot the server.
+  This is useful if, for example, an application's deployable JAR files are bundled into
+  a zip artifact.
+
++------------------------------------------+
+<project>
+  ...
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.projectdarkstar.maven.plugin</groupId>
+        <artifactId>sgs-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>sgs-run</id>
+            <phase>deploy</phase>
+            <goals>
+	      <goal>install</goal>
+              <goal>deploy</goal>
+              <goal>boot</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <version>0.9.8</version>
+          <sgsHome>${project.build.directory}/sgs-server-dist-${sgs.version}</sgsHome>
+          <excludeTransitive>true</excludeTransitive>
+        </configuration>
+      </plugin>
+      ...
+    </plugins>
+    ...
+  </build>
+  ...
+</project>
++------------------------------------------+
+
