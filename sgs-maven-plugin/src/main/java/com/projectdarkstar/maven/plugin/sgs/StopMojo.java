@@ -47,8 +47,8 @@ import java.io.File;
  */
 public class StopMojo extends AbstractSgsMojo {
     
-    private static String BIN = "bin";
-    private static String STOPJAR = "sgs-stop.jar";
+    static final String BIN = "bin";
+    static final String STOPJAR = "sgs-stop.jar";
     
     /**
      * Optional parameter to specify a boot properties file to feed on the

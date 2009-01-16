@@ -48,7 +48,7 @@ import java.io.IOException;
  */
 public abstract class AbstractDeployMojo extends AbstractSgsMojo {
     
-    private static String DEPLOY = "deploy";
+    static final String DEPLOY = "deploy";
     
     /**
      * The deploy directory of the Project Darkstar installation.

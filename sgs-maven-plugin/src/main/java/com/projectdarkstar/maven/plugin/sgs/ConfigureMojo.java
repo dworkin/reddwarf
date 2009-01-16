@@ -47,10 +47,10 @@ import java.io.IOException;
  */
 public class ConfigureMojo extends AbstractSgsMojo
 {
-    private static String CONF = "conf";
-    private static String SGS_BOOT = "sgs-boot.properties";
-    private static String SGS_SERVER = "sgs-server.properties";
-    private static String SGS_LOGGING = "sgs-logging.properties";
+    static final String CONF = "conf";
+    static final String SGS_BOOT = "sgs-boot.properties";
+    static final String SGS_SERVER = "sgs-server.properties";
+    static final String SGS_LOGGING = "sgs-logging.properties";
     
     
     /**
@@ -107,7 +107,7 @@ public class ConfigureMojo extends AbstractSgsMojo
                 File targetSgsLogging = new File(confDirectory, SGS_LOGGING);
                 this.getLog().info("Copying " + sgsLogging + 
                                    " to " + targetSgsLogging);
-                FileUtils.copyFile(sgsServer,
+                FileUtils.copyFile(sgsLogging,
                                    new File(confDirectory, SGS_LOGGING));
             }
         } catch (IOException e) {

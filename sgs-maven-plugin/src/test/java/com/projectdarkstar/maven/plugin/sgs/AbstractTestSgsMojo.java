@@ -69,8 +69,11 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
     @Test
     public void testCheckConfigOk() throws Exception {
         AbstractSgsMojo mojo = buildEmptyMojo();
-        File dummyHome = new File(getBasedir(), 
-                "src" + File.separator + "test" + File.separator + "files");
+        File dummyHome = new File(getBasedir(),
+                                  "target" + File.separator +
+                                  "test-classes" + File.separator +
+                                  "unit" + File.separator +
+                                  "dummy.home");
         this.setVariableValueToObject(mojo, "sgsHome", dummyHome);
         mojo.checkConfig();
     }
@@ -90,17 +93,22 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
     @Test(expected=MojoExecutionException.class)
     public void testCheckDirectoryNotDirectory() throws Exception {
         AbstractSgsMojo mojo = buildEmptyMojo();
-        File dummyFile = new File(getBasedir(), 
-                "src" + File.separator + "test" + File.separator + "files" +
-                File.separator + "dummy.properties");
+        File dummyFile = new File(getBasedir(),
+                                  "target" + File.separator +
+                                  "test-classes" + File.separator +
+                                  "unit" + File.separator +
+                                  "dummy.properties");
         mojo.checkDirectory(dummyFile);
     }
     
     @Test
     public void testCheckDirectoryOk() throws Exception {
         AbstractSgsMojo mojo = buildEmptyMojo();
-        File dummyHome = new File(getBasedir(), 
-                "src" + File.separator + "test" + File.separator + "files");
+        File dummyHome = new File(getBasedir(),
+                                  "target" + File.separator +
+                                  "test-classes" + File.separator +
+                                  "unit" + File.separator +
+                                  "dummy.home");
         mojo.checkDirectory(dummyHome);
     }
     
@@ -119,17 +127,22 @@ public abstract class AbstractTestSgsMojo extends AbstractMojoTestCase {
     @Test(expected=MojoExecutionException.class)
     public void testCheckFileNotFile() throws Exception {
         AbstractSgsMojo mojo = buildEmptyMojo();
-        File dummyHome = new File(getBasedir(), 
-                "src" + File.separator + "test" + File.separator + "files");
+        File dummyHome = new File(getBasedir(),
+                                  "target" + File.separator +
+                                  "test-classes" + File.separator +
+                                  "unit" + File.separator +
+                                  "dummy.home");
         mojo.checkFile(dummyHome);
     }
     
     @Test
     public void testCheckFileOk() throws Exception {
         AbstractSgsMojo mojo = buildEmptyMojo();
-        File dummyFile = new File(getBasedir(), 
-                "src" + File.separator + "test" + File.separator + "files" +
-                File.separator + "dummy.properties");
+        File dummyFile = new File(getBasedir(),
+                                  "target" + File.separator +
+                                  "test-classes" + File.separator +
+                                  "unit" + File.separator +
+                                  "dummy.properties");
         mojo.checkFile(dummyFile);
     }
 

@@ -47,8 +47,8 @@ import java.io.File;
  */
 public class BootMojo extends AbstractSgsMojo {
     
-    private static String BIN = "bin";
-    private static String BOOTJAR = "sgs-boot.jar";
+    static final String BIN = "bin";
+    static final String BOOTJAR = "sgs-boot.jar";
     
     /**
      * Optional parameter to specify a boot properties file to feed on the
