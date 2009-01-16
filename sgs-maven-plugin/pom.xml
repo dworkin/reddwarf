@@ -7,6 +7,7 @@
   <version>1.0-alpha-1-SNAPSHOT</version>
   <name>Project Darkstar Maven Plugin</name>
   <url>https://sgs-maven-plugin.dev.java.net</url>
+  <inceptionYear>2009</inceptionYear>
   <description>
     This plugin provides the ability to control a Project Darkstar server
     installation from Maven.  Capabilities include: installation of the server
@@ -43,7 +44,7 @@
 	    <goals>
 	      <goal>process</goal>
 	    </goals>
-	    <phase></phase>
+	    <phase>generate-resources</phase>
 	    <configuration>
 	      <resourceBundles>
 		<resourceBundle>com.projectdarkstar.tools.build:sgs-jar-resources-bsd:${sgs-jar-resources-bsd.version}</resourceBundle>
@@ -153,6 +154,7 @@
 
   <properties>
     <projectYear>2009</projectYear>
+    <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
     <maven.version>2.0.9</maven.version>
     <maven-common-artifact-filters.version>1.1</maven-common-artifact-filters.version>
