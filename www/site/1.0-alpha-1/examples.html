@@ -1,0 +1,290 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+
+
+
+
+
+
+
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>Project Darkstar Maven Plugin - Usage</title>
+    <style type="text/css" media="all">
+      @import url("./css/maven-base.css");
+      @import url("./css/maven-theme.css");
+      @import url("./css/site.css");
+    </style>
+    <link rel="stylesheet" href="./css/print.css" type="text/css" media="print" />
+          <meta name="author" content="Owen Kellett
+owen.kellett@sun.com" />
+        <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+      </head>
+  <body class="composite">
+    <div id="banner">
+                    <span id="bannerLeft">
+    
+            Project Darkstar Maven Plugin
+    
+            </span>
+                    <div class="clear">
+        <hr/>
+      </div>
+    </div>
+    <div id="breadcrumbs">
+          
+  
+
+  
+    
+            
+  
+    
+            <div class="xleft">
+        Last Published: 2009-01-16
+                  &nbsp;| Version: 1.0-alpha-1
+                      </div>
+            <div class="xright">      
+  
+
+  
+    
+            
+  
+    
+  </div>
+      <div class="clear">
+        <hr/>
+      </div>
+    </div>
+    <div id="leftColumn">
+      <div id="navcolumn">
+           
+  
+
+  
+    
+            
+  
+    
+                   <h5>Overview</h5>
+            <ul>
+              
+    <li class="none">
+                    <a href="index.html">Introduction</a>
+          </li>
+              
+    <li class="none">
+                    <a href="plugin-info.html">Goals</a>
+          </li>
+              
+    <li class="none">
+              <strong>Examples</strong>
+        </li>
+          </ul>
+              <h5>Project Documentation</h5>
+            <ul>
+              
+                
+              
+      
+            
+      
+            
+      
+            
+      
+            
+      
+            
+      
+            
+      
+            
+      
+              
+        <li class="collapsed">
+                    <a href="project-info.html">Project Information</a>
+                </li>
+              
+                
+              
+      
+              
+        <li class="collapsed">
+                    <a href="project-reports.html">Project Reports</a>
+                </li>
+          </ul>
+                                           <a href="http://maven.apache.org/" title="Built by Maven" class="poweredBy">
+            <img alt="Built by Maven" src="./images/logos/maven-feather.png"></img>
+          </a>
+                       
+  
+
+  
+    
+            
+  
+    
+        </div>
+    </div>
+    <div id="bodyColumn">
+      <div id="contentBox">
+        <div class="section"><h2>Examples</h2>
+<p>This plugin provides the ability to control a Project Darkstar server installation. Since the plugin also can install Project Darkstar server directly from the distribution zip file (resolved and downloaded from the Maven repository), there are generally two ways to use this plugin:</p>
+<ul><li>To install the server, deploy and configure an application, and then boot it up for testing or one-off executions</li>
+<li>To deploy and configure an application into an existing Project Darkstar server installation (for actual production deployments)</li>
+</ul>
+<p>These are just examples of what can be done with the Project Darkstar Maven Plugin. Please see the <a href="plugin-info.html">Goals</a>
+ section for more information about its full potential.</p>
+<div class="section"><h3>Install, Configure, Deploy, and Boot</h3>
+<p>This example binds a single execution of four goals, <tt>install</tt>
+, <tt>configure</tt>
+, <tt>deploy</tt>
+, and <tt>boot</tt>
+ to the integration-test phase. When executed, Project Darkstar server version 0.9.8 will be installed by default into the the <tt>$<a name="project.build.directory">project.build.directory</a>
+</tt>
+. The resulting <tt>sgsHome</tt>
+ then becomes <tt>$<a name="project.build.directory">project.build.directory</a>
+/sgs-server-dist-$<a name="sgs.version">sgs.version</a>
+</tt>
+ as seen in the configuration. The given <tt>sgsBoot</tt>
+ and <tt>sgsServer</tt>
+ properties files will be overlayed into the <tt>conf</tt>
+ directory of the installation, and then the project's main artifact will be deployed, by default, into the <tt>deploy</tt>
+ directory of the installation. Finally, the server will be booted up.</p>
+<div class="source"><pre>&lt;project&gt;
+  ...
+  &lt;build&gt;
+    &lt;plugins&gt;
+      &lt;plugin&gt;
+        &lt;groupId&gt;com.projectdarkstar.maven.plugin&lt;/groupId&gt;
+        &lt;artifactId&gt;sgs-maven-plugin&lt;/artifactId&gt;
+        &lt;executions&gt;
+          &lt;execution&gt;
+            &lt;id&gt;sgs-run&lt;/id&gt;
+            &lt;phase&gt;pre-integration-test&lt;/phase&gt;
+            &lt;goals&gt;
+              &lt;goal&gt;install&lt;/goal&gt;
+              &lt;goal&gt;configure&lt;/goal&gt;
+              &lt;goal&gt;deploy&lt;/goal&gt;
+              &lt;goal&gt;boot&lt;/goal&gt;
+            &lt;/goals&gt;
+          &lt;/execution&gt;
+        &lt;/executions&gt;
+        &lt;configuration&gt;
+          &lt;version&gt;0.9.8&lt;/version&gt;
+          &lt;sgsHome&gt;${project.build.directory}/sgs-server-dist-${sgs.version}&lt;/sgsHome&gt;
+          &lt;sgsBoot&gt;${basedir}/src/test/properties/my.boot&lt;/sgsBoot&gt;
+          &lt;sgsServer&gt;${basedir}/src/test/properties/my.properties&lt;/sgsServer&gt;
+          &lt;files&gt;
+            &lt;file&gt;${project.artifact.file}&lt;/file&gt;
+          &lt;/files&gt;
+        &lt;/configuration&gt;
+      &lt;/plugin&gt;
+      ...
+    &lt;/plugins&gt;
+    ...
+  &lt;/build&gt;
+  ...
+&lt;/project&gt;</pre>
+</div>
+</div>
+<div class="section"><h3>Production Deployment</h3>
+<p>This example shows what one might do if using this plugin to deploy into a production Project Darkstar server installation.</p>
+<div class="source"><pre>&lt;project&gt;
+  ...
+  &lt;build&gt;
+    &lt;plugins&gt;
+      &lt;plugin&gt;
+        &lt;groupId&gt;com.projectdarkstar.maven.plugin&lt;/groupId&gt;
+        &lt;artifactId&gt;sgs-maven-plugin&lt;/artifactId&gt;
+        &lt;executions&gt;
+          &lt;execution&gt;
+            &lt;id&gt;sgs-run&lt;/id&gt;
+            &lt;phase&gt;deploy&lt;/phase&gt;
+            &lt;goals&gt;
+              &lt;goal&gt;deploy&lt;/goal&gt;
+            &lt;/goals&gt;
+          &lt;/execution&gt;
+        &lt;/executions&gt;
+        &lt;configuration&gt;
+          &lt;sgsHome&gt;/path/to/production/installation&lt;/sgsHome&gt;
+          &lt;files&gt;
+            &lt;file&gt;${project.artifact.file}&lt;/file&gt;
+          &lt;/files&gt;
+        &lt;/configuration&gt;
+      &lt;/plugin&gt;
+      ...
+    &lt;/plugins&gt;
+    ...
+  &lt;/build&gt;
+  ...
+&lt;/project&gt;</pre>
+</div>
+</div>
+<div class="section"><h3>Deploy Dependencies</h3>
+<p>The <tt>deploy-dependencies</tt>
+ goal can deploy artifacts directly from project dependencies. It (as well as the <tt>deploy</tt>
+ goal) also has the ability to unpack those dependencies directly into the Project Darkstar server installation's deploy directory. This example will take all of a project's direct dependencies (excluding transitives), will unpack them into the Project Darkstar server's deploy directory, and then will boot the server. This is useful if, for example, an application's deployable JAR files are bundled into a zip artifact.</p>
+<div class="source"><pre>&lt;project&gt;
+  ...
+  &lt;build&gt;
+    &lt;plugins&gt;
+      &lt;plugin&gt;
+        &lt;groupId&gt;com.projectdarkstar.maven.plugin&lt;/groupId&gt;
+        &lt;artifactId&gt;sgs-maven-plugin&lt;/artifactId&gt;
+        &lt;executions&gt;
+          &lt;execution&gt;
+            &lt;id&gt;sgs-run&lt;/id&gt;
+            &lt;phase&gt;deploy&lt;/phase&gt;
+            &lt;goals&gt;
+              &lt;goal&gt;install&lt;/goal&gt;
+              &lt;goal&gt;deploy&lt;/goal&gt;
+              &lt;goal&gt;boot&lt;/goal&gt;
+            &lt;/goals&gt;
+          &lt;/execution&gt;
+        &lt;/executions&gt;
+        &lt;configuration&gt;
+          &lt;version&gt;0.9.8&lt;/version&gt;
+          &lt;sgsHome&gt;${project.build.directory}/sgs-server-dist-${sgs.version}&lt;/sgsHome&gt;
+          &lt;excludeTransitive&gt;true&lt;/excludeTransitive&gt;
+        &lt;/configuration&gt;
+      &lt;/plugin&gt;
+      ...
+    &lt;/plugins&gt;
+    ...
+  &lt;/build&gt;
+  ...
+&lt;/project&gt;</pre>
+</div>
+</div>
+</div>
+
+      </div>
+    </div>
+    <div class="clear">
+      <hr/>
+    </div>
+    <div id="footer">
+      <div class="xright">&#169;  
+          2009
+    
+          
+  
+
+  
+    
+            
+  
+    
+   - <a href="http://maven.apache.org/privacy-policy.html">Privacy Policy</a></div>
+      <div class="clear">
+        <hr/>
+      </div>
+    </div>
+  </body>
+</html>
