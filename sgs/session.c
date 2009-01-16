@@ -322,7 +322,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             else offset += readlen;
             
             /* Now, get the channel id*/
-            readlen = sgs_msg_read_id(&msg, offset, 1, &channel_id);
+            readlen = sgs_msg_read_id(&msg, offset, 0, &channel_id);
             if (readlen < 0)
                 return -1;
 
@@ -355,7 +355,8 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 
         case SGS_OPCODE_CHANNEL_LEAVE:
             /** field 1: channel-id */
-            channel_id = sgs_id_create(msg_data + offset, msg_datalen - offset);
+            offset +=2;
+            readlen = sgs_msg_read_id(&msg, offset, 0, &channel_id);
             if (channel_id == NULL) return -1;
 
             channel = sgs_map_get(session->channels, channel_id);
