@@ -37,9 +37,9 @@
 extern "C" {
 #endif
 
-#include "sgs/config.h"
-#include "sgs/connection.h"
-#include "sgs/socket.h"
+#include "../config.h"
+#include "../connection.h"
+#include "../socket.h"
 
 typedef struct sgs_connection_impl sgs_connection_impl;
 
@@ -56,16 +56,16 @@ typedef enum {
 struct sgs_connection_impl {
     /** File descriptor for the network socket to the server. */
     sgs_socket_t socket_fd;
-  
+
     /** The current state of the connection. */
     sgs_connection_state state;
-  
+
     /** The login context (contains all callback functions). */
     sgs_context_impl* ctx;
-  
+
     /** The session with the server (once connected). */
     sgs_session_impl* session;
-  
+
     /** Reusable I/O buffers for reading/writing from/to the network
      * connection. */
     sgs_buffer* inbuf;

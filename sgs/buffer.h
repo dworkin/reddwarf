@@ -41,7 +41,7 @@
 extern "C" {
 #endif
 
-#include "sgs/config.h"
+#include "config.h"
 
 typedef struct sgs_buffer_impl sgs_buffer;
 

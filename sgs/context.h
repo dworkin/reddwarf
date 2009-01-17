@@ -41,15 +41,15 @@
 extern "C" {
 #endif
 
-#include "sgs/config.h"
+#include "config.h"
+#include "channel.h"
+#include "id.h"
+#include "connection.h"
+#include "session.h"
+#include "socket.h"
 
 typedef struct sgs_context_impl sgs_context;
 
-#include "sgs/channel.h"
-#include "sgs/id.h"
-#include "sgs/connection.h"
-#include "sgs/session.h"
-#include "sgs/socket.h"
 
 /*
  * function: sgs_ctx_destroy()
@@ -69,7 +69,7 @@ void sgs_ctx_destroy(sgs_context* ctx);
  *    reg_fd: a callback function used by a sgs_connection (when created with
  *            this sgs_context) to register interest in a file descriptor
  *  unreg_fd: a callback function used by a sgs_connection (when created with
- *            this sgs_context) to unregister interest in a file descriptor 
+ *            this sgs_context) to unregister interest in a file descriptor
  *
  * arguments to reg_fd and unreg_fd:
  *   sgs_connection*: the connection making this callback

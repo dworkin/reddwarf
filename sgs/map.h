@@ -41,7 +41,7 @@
 extern "C" {
 #endif
 
-#include "sgs/config.h"
+#include "config.h"
 
 typedef struct sgs_linked_list_map sgs_map;
 
@@ -95,7 +95,7 @@ sgs_map* sgs_map_create(int (*comparator)(const void*, const void*));
  * Inserts a new element into the map associated with the specified key/value
  * pair.  If an element already exists in the map with the specified key,
  * that element is replaced.
- * 
+ *
  * returns:
  *    1: success (element was inserted into the list; did not previously exist)
  *    0: success (element was inserted into the list; replaced existing element)

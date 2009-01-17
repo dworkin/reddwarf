@@ -40,8 +40,8 @@
  *  specific error code.
  */
 
-#include "sgs/config.h"
-#include "sgs/socket.h"
+#include "config.h"
+#include "socket.h"
 
 #ifdef WIN32
 /*

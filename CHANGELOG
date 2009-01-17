@@ -1,3 +1,3 @@
-Version 0.9.8:
-- Removed reference to chatclient in Make file
-- Functionally equivalent to 0.9.7
+Version 0.9.9:
+- Fixed issue 8; error in parsing channel join messages
+- cleaned up include statements

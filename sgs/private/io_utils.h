@@ -37,9 +37,9 @@
 extern "C" {
 #endif
 
-#include "sgs/config.h"
-#include "sgs/buffer.h"
-#include "sgs/socket.h"
+#include "../config.h"
+#include "../buffer.h"
+#include "../socket.h"
 
 /*
  * function: sgs_impl_read_from_fd()

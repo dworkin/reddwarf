@@ -42,7 +42,7 @@
 extern "C" {
 #endif
 
-#include "sgs/config.h"
+#include "config.h"
 
 /*
  * function: bytestohex()

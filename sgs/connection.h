@@ -42,10 +42,10 @@
 extern "C" {
 #endif
 
-typedef struct sgs_connection_impl sgs_connection;
+#include "config.h"
+#include "context.h"
 
-#include "sgs/config.h"
-#include "sgs/context.h"
+typedef struct sgs_connection_impl sgs_connection;
 
 /*
  * function: sgs_connection_create()

@@ -34,9 +34,9 @@
  * This file provides an implementation of a circular byte-buffer.
  */
 
-#include "sgs/config.h"
-#include "sgs/private/io_utils.h"
-#include "sgs/private/buffer_impl.h"
+#include "config.h"
+#include "private/io_utils.h"
+#include "private/buffer_impl.h"
 
 /*
  * sgs_impl_read_from_fd()
@@ -44,21 +44,21 @@
 ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, sgs_socket_t fd) {
     ssize_t result, total = 0;
     ssize_t writable = writable_len(buffer);
-    
+
     while (writable > 0) {
         result = sgs_socket_read(fd, buffer->buf + tailpos(buffer), writable);
         if (result == -1) return -1;  /* error */
-        
+
         if (result == 0) {   /* EOF */
             return total;
         }
-        
+
         total += result;
         buffer->size += result;
         if (result != writable) return total;  /* partial read */
         writable = writable_len(buffer);
     }
-  
+
     return total;  /* buffer is full */
 }
 
@@ -68,7 +68,7 @@ ssize_t sgs_impl_read_from_fd(sgs_buffer_impl *buffer, sgs_socket_t fd) {
 ssize_t sgs_impl_write_to_fd(sgs_buffer_impl *buffer, sgs_socket_t fd) {
     ssize_t result, total = 0;
     ssize_t readable = readable_len(buffer);
-  
+
     while (readable > 0) {
         result = sgs_socket_write(fd, buffer->buf + buffer->position, readable);
         if (result == -1) return -1;  /* error */
@@ -78,6 +78,6 @@ ssize_t sgs_impl_write_to_fd(sgs_buffer_impl *buffer, sgs_socket_t fd) {
         if (result != readable) return total;  /* partial write */
         readable = readable_len(buffer);
     }
-  
+
     return total;  /* buffer is empty */
 }
