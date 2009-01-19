@@ -39,12 +39,12 @@
  *  specific error code.
  */
 
-#include "config.h"
-#include "error_codes.h"
-#include "id.h"
-#include "private/message.h"
-#include "private/channel_impl.h"
-#include "private/session_impl.h"
+#include "sgs/config.h"
+#include "sgs/error_codes.h"
+#include "sgs/id.h"
+#include "sgs/private/message.h"
+#include "sgs/private/channel_impl.h"
+#include "sgs/private/session_impl.h"
 
 #include <wchar.h>
 
@@ -64,24 +64,24 @@ int sgs_channel_send(sgs_channel_impl *channel, const uint8_t *data,
     int result;
     sgs_session_impl *session = channel->session;
     sgs_message msg;
-
+    
     /** Initialize static fields of message. */
-    result = sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf),
+    result = sgs_msg_init(&msg, session->msg_buf, sizeof(session->msg_buf), 
 						  SGS_OPCODE_CHANNEL_MESSAGE);
     if (result < 0)
         return -1;
-
+    
     /** Add channel-id data field to message. */
     if (sgs_msg_add_id(&msg, channel->id, 1) == -1)
         return -1;
-
-
+	
+    
     /** Add message payload to message. */
     if (sgs_msg_add_arb_content(&msg, data, datalen) == -1) return -1;
-
+    
     /** Done assembling message; tell session to send it. */
     if (sgs_session_impl_send_msg(session) == -1) return -1;
-
+    
     return 0;
 }
 
@@ -121,7 +121,7 @@ sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
     channel->session = session;
     channel->id = id;
     channel->name = malloc(sizeof(wchar_t) * (namelen + 1));
-
+    
     if (channel->name == NULL)
     {
         sgs_channel_impl_destroy(channel);
@@ -130,7 +130,7 @@ sgs_channel_impl* sgs_channel_impl_create(sgs_session_impl *session,
 
     mbstowcs(channel->name, namebytes, namelen);
     channel->name[namelen] = '\0';
-
+    
     return channel;
 }
 

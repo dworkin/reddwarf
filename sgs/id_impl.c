@@ -40,7 +40,8 @@
  *  specific error code.
  */
 
-#include "config.h"
+#include "sgs/config.h"
+#include "sgs/id.h"
 #include "id.h"
 
 
@@ -50,10 +51,10 @@
 int sgs_id_compare(const sgs_id* a, const sgs_id* b) {
     if (a->buf_len < b->buf_len)
         return -1;
-
+  
     if (a->buf_len > b->buf_len)
         return 1;
-
+  
     /** else, a->buf_len == b->buf_len */
     return memcmp(a->buf, b->buf, a->buf_len);
 }

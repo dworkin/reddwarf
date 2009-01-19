@@ -39,11 +39,12 @@
  *  success and -1 upon failure, while also setting errno to the specific error
  *  code.
  */
-#include "config.h"
-#include "id.h"
-#include "error_codes.h"
-#include "protocol.h"
-#include "buffer.h"
+#include "sgs/config.h"
+#include "sgs/id.h"
+#include "sgs/error_codes.h"
+#include "sgs/private/message.h"
+#include "sgs/protocol.h"
+#include "sgs/buffer.h"
 #include "private/message.h"
 
 
@@ -64,14 +65,14 @@ int sgs_msg_init(sgs_message* pmsg, uint8_t* buffer, size_t buflen,
 
     if (buflen > SGS_MSG_MAX_LENGTH)
         return -1;
-
+   	
     pmsg->buf = buffer;
     pmsg->capacity = buflen;
     pmsg->len = 1;
 
     pmsg->buf[SGS_OPCODE_OFFSET] = opcode;
     update_msg_len(pmsg);
-
+  
     return 0;
 }
 
@@ -83,26 +84,26 @@ int sgs_msg_add_arb_content(sgs_message *pmsg, const uint8_t *content,
     size_t clen)
 {
     size_t new_size = pmsg->len + clen;
-
+  
     /** check that this won't make the message too long */
     if (new_size > SGS_MSG_MAX_LENGTH) {
         errno = EMSGSIZE;
         return -1;
     }
-
+  
     /** check that this message has enough room allocated */
     if (new_size > pmsg->capacity) {
         errno = ENOBUFS;
         return -1;
     }
-
+  
     /** copy the content over, accounting for the first two bytes for the length*/
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, content, clen);
-
+  
     /** update the message size fields (both in the struct and in the data) */
     pmsg->len += clen;
     update_msg_len(pmsg);
-
+  
     return 0;
 }
 
@@ -114,24 +115,24 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
 {
     size_t new_size = pmsg->len + clen + 2;  /** 2 bytes for length field */
     uint16_t _uint16_tmp;
-
+  
     if (clen > SGS_MSG_MAX_LENGTH) {
         errno = SGS_ERR_SIZE_ARG_TOO_LARGE;
         return -1;
     }
-
+  
     /** check that this won't make the message too long */
     if (new_size > SGS_MSG_MAX_LENGTH) {
         errno = EMSGSIZE;
         return -1;
     }
-
+  
     /** check that this message has enough room allocated */
     if (new_size > pmsg->capacity) {
         errno = ENOBUFS;
         return -1;
     }
-
+  
     /** copy the content's length over, and update the length */
     _uint16_tmp = htons(clen);
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, &_uint16_tmp, 2);
@@ -139,10 +140,10 @@ int sgs_msg_add_fixed_content(sgs_message *pmsg, const uint8_t *content,
     /** copy the content over, and update the length */
     memcpy(pmsg->buf + pmsg->len + SGS_MSG_LENGTH_OFFSET, content, clen);
     pmsg->len += clen;
-
+    
     /*update the overall length of the message*/
     update_msg_len(pmsg);
-
+  
     return 0;
 }
 
@@ -182,7 +183,7 @@ int sgs_msg_add_uint32(sgs_message *pmsg, uint32_t val) {
  */
 int sgs_msg_add_string(sgs_message *pmsg, const char *content){
     int16_t stringlen;
-
+    
     stringlen = strlen(content);
     return(sgs_msg_add_fixed_content(pmsg, (uint8_t *)content, stringlen));
 }
@@ -192,23 +193,23 @@ int sgs_msg_add_string(sgs_message *pmsg, const char *content){
  */
 int sgs_msg_deserialize(sgs_message* pmsg, uint8_t *buffer, size_t buflen) {
     uint32_t net_len;
-
+    
     /** read message-length-field (first 2 bytes). This is the payload
      *  length, not the length of the entire buffer*/
     net_len = *((uint16_t*)buffer);
     pmsg->len = ntohs(net_len);
+  
 
-
-
+  
     /** check if buffer is long enough to contain this whole message. */
     if (buflen < pmsg->len) {
         errno = EINVAL;
         return -1;
     }
-
+  
     pmsg->buf = buffer;
     pmsg->capacity = buflen;
-
+  
     return pmsg->len;
 }
 
@@ -242,7 +243,7 @@ uint8_t sgs_msg_get_opcode(const sgs_message *pmsg) {
 
 /*
  * sgs_msg_get_size()
- *
+ * 
  */
 uint16_t sgs_msg_get_size(const sgs_message *pmsg) {
     return pmsg->len + SGS_MSG_INIT_LEN;
@@ -267,7 +268,7 @@ int sgs_msg_read_uint32(const sgs_message *pmsg, const uint16_t start, uint32_t 
     if (start + 2 > pmsg->len){
         return -1;
     }
-    memcpy(result, pmsg->buf + start, 4);
+    memcpy(result, pmsg->buf + start, 4);    
     *result = ntohl(*result);
     return 4;
 }
@@ -323,13 +324,13 @@ int sgs_msg_read_string(const sgs_message *pmsg, const uint16_t start, char **re
  */
 int sgs_msg_read_bytes(const sgs_message *pmsg, const uint16_t start, uint8_t **result, uint16_t count){
     int retcount;
-
+    
 
     *result = malloc(count);
     if (*result == NULL){
         return -1;
     }
-    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))?
+    retcount = ((pmsg->len + SGS_MSG_INIT_LEN) < (start + count ))? 
         (pmsg->len + SGS_MSG_INIT_LEN) - start : count;
     memcpy(*result, pmsg->buf + start, retcount);
     return retcount;

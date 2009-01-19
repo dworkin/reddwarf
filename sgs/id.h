@@ -41,7 +41,7 @@
 extern "C" {
 #endif
 
-#include "config.h"
+#include "sgs/config.h"
 
 
 typedef struct sgs_id {

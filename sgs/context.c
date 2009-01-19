@@ -35,13 +35,13 @@
  * functions declared in sgs_context.h.
  */
 
-#include "config.h"
+#include "sgs/config.h"
 
-#include "channel.h"
-#include "connection.h"
-#include "id.h"
-#include "session.h"
-#include "private/context_impl.h"
+#include "sgs/channel.h"
+#include "sgs/connection.h"
+#include "sgs/id.h"
+#include "sgs/private/context_impl.h"
+#include "sgs/session.h"
 
 /*
  * sgs_ctx_destroy()
@@ -53,16 +53,16 @@ void sgs_ctx_destroy(sgs_context_impl *ctx) {
 /*
  * sgs_ctx_create()
  * Note that this function assumes that the first argument, hostname, points
- * to a null-terminated character array.
+ * to a null-terminated character array. 
  */
 sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
     void (*unreg_fd)(sgs_connection*, sgs_socket_t, short))
 {
     int name_len;
-
+    
     sgs_context_impl *ctx = NULL;
-
+  
     ctx = malloc(sizeof(struct sgs_context_impl));
     if (ctx == NULL) return NULL;
 
@@ -74,15 +74,15 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     }
 
     strncpy(ctx->hostname, hostname, name_len);
-
+	
     ctx->port = port;
-
+  
     ctx->reg_fd_cb = reg_fd;
     ctx->unreg_fd_cb = unreg_fd;
-
+  
     /* initialize all callback functions to NULL */
     sgs_ctx_unset_all_cbs(ctx);
-
+  
     return ctx;
 }
 
@@ -104,7 +104,7 @@ void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
     ctx->channel_left_cb = callback;
 }
 
-/*
+/* 
  * sgs_ctx_set_channel_recv_msg_cb()
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl *ctx,

@@ -41,11 +41,11 @@
 extern "C" {
 #endif
 
-#include "config.h"
-#include "id.h"
+#include "sgs/config.h"
 
 typedef struct sgs_session_impl sgs_session;
 
+#include "sgs/id.h"
 
 /*
  * function: sgs_session_direct_send()

@@ -47,7 +47,7 @@ extern "C" {
  *  specific error code.
  */
 
-#include "config.h"
+#include "sgs/config.h"
 
 /*
  * The type sgs_socket_t provides an abstraction around a socket descriptor.
@@ -77,7 +77,7 @@ typedef int sgs_socket_t;
  * function: sgs_socket_create()
  *
  * Creates a new socket of the specified address family and type.  The socket
- * is created in blocking mode. Returns SGS_SOCKET_INVALID on error, while also
+ * is created in blocking mode. Returns SGS_SOCKET_INVALID on error, while also 
  * setting errno to the specific error code.
  *
  * This is a wrapper around the standard sockets function socket.

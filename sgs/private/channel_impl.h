@@ -37,21 +37,22 @@
 extern "C" {
 #endif
 
-#include "../config.h"
-#include "session_impl.h"
-#include "../error_codes.h"
-#include "../id.h"
-#include "message.h"
+#include "sgs/config.h"
 
 typedef struct sgs_channel_impl sgs_channel_impl;
+
+#include "sgs/private/session_impl.h"
+#include "sgs/error_codes.h"
+#include "sgs/id.h"
+#include "sgs/private/message.h"
 
 struct sgs_channel_impl {
     /* The underlying server session. */
     sgs_session_impl* session;
-
+  
     /* Server-assigned unique ID for this channel. */
     sgs_id* id;
-
+    
     /* Name of this channel. */
     wchar_t* name;
 };

@@ -48,10 +48,11 @@
 extern "C" {
 #endif
 
-#include "config.h"
-#include "id.h"
+#include "sgs/config.h"
 
 typedef struct sgs_channel_impl sgs_channel;
+
+#include "sgs/id.h"
 
 /*
  * function: sgs_channel_name()

@@ -37,13 +37,13 @@
 extern "C" {
 #endif
 
-#include "../config.h"
-#include "../context.h"
-#include "../connection.h"
-#include "../id.h"
-#include "../session.h"
-#include "../channel.h"
-#include "../socket.h"
+#include "sgs/config.h"
+#include "sgs/context.h"
+#include "sgs/connection.h"
+#include "sgs/id.h"
+#include "sgs/session.h"
+#include "sgs/channel.h"
+#include "sgs/socket.h"
 
 typedef struct sgs_context_impl sgs_context_impl;
 
@@ -51,11 +51,11 @@ struct sgs_context_impl {
     /** Hostname and port number (of server) to connect to: */
     char *hostname;
     int port;
-
+  
     /** function pointers to callbacks: */
     void (*reg_fd_cb)(sgs_connection*, sgs_socket_t, short);
     void (*unreg_fd_cb)(sgs_connection*, sgs_socket_t, short);
-
+  
     void (*channel_joined_cb)(sgs_connection*, sgs_channel*);
     void (*channel_left_cb)(sgs_connection*, sgs_channel*);
     void (*channel_recv_msg_cb)(sgs_connection*, sgs_channel*, const uint8_t*, size_t);

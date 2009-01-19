@@ -35,8 +35,8 @@
  * structure.  Implements functions declared in sgs_map.h.
  */
 
-#include "config.h"
-#include "map.h"
+#include "sgs/config.h"
+#include "sgs/map.h"
 
 /* have to do some magic here to declare a self-referential struct */
 typedef struct sgs_linked_list_map_elt sgs_linked_list_map_elt;
@@ -59,15 +59,15 @@ typedef struct sgs_linked_list_map sgs_linked_list_map;
  */
 int sgs_map_contains(const sgs_linked_list_map *map, const void *key) {
     sgs_linked_list_map_elt *ptr = map->head;
-
+    
     while (ptr != NULL) {
         if (map->compare_keys(ptr->key, key) == 0) {
             return 1;
         }
-
+        
         ptr = ptr->next;
     }
-
+    
     return 0;
 }
 
@@ -93,15 +93,15 @@ void sgs_map_destroy(sgs_linked_list_map *map) {
  */
 void *sgs_map_get(const sgs_linked_list_map *map, const void *key) {
     sgs_linked_list_map_elt *ptr = map->head;
-
+    
     while (ptr != NULL) {
         if (map->compare_keys(ptr->key, key) == 0) {
             return ptr->value;
         }
-
+        
         ptr = ptr->next;
     }
-
+    
     return NULL;
 }
 
@@ -112,10 +112,10 @@ sgs_linked_list_map *
 sgs_map_create(int (*comparator)(const void*, const void*))
 {
     sgs_linked_list_map *this_map;
-
+    
     this_map = (sgs_linked_list_map*)malloc(sizeof(sgs_linked_list_map));
     if (this_map == NULL) return NULL;
-
+    
     this_map->compare_keys = comparator;
     this_map->head = NULL;
     return this_map;
@@ -127,7 +127,7 @@ sgs_map_create(int (*comparator)(const void*, const void*))
 int sgs_map_put(sgs_linked_list_map *map, const void *key, void *value) {
     sgs_linked_list_map_elt *ptr = map->head;
     sgs_linked_list_map_elt *prev = NULL;
-
+    
     /** Iterate through list looking for specified key. */
     while (ptr != NULL) {
         if (map->compare_keys(ptr->key, key) == 0) {
@@ -136,31 +136,31 @@ int sgs_map_put(sgs_linked_list_map *map, const void *key, void *value) {
             ptr->value = value;
             return 0;
         }
-
+        
         prev = ptr;
         ptr = ptr->next;
     }
-
+  
     /** No elements exist with this key; create a new one and add to the end. */
     if (prev == NULL) {
         map->head = (sgs_linked_list_map_elt *)
             malloc(sizeof(sgs_linked_list_map_elt));
-
+    
         ptr = map->head;
     }
     else {
         prev->next = (sgs_linked_list_map_elt *)
             malloc(sizeof(sgs_linked_list_map_elt));
-
+    
         ptr = prev->next;
     }
-
+  
     if (ptr == NULL) return -1;  /** malloc() failed */
-
+  
     ptr->key = key;
     ptr->value = value;
     ptr->next = NULL;
-
+  
     return 1;
 }
 
@@ -170,7 +170,7 @@ int sgs_map_put(sgs_linked_list_map *map, const void *key, void *value) {
 int sgs_map_remove(sgs_linked_list_map *map, const void *key) {
     sgs_linked_list_map_elt *ptr = map->head;
     sgs_linked_list_map_elt *prev = NULL;
-
+  
     while (ptr != NULL) {
         if (map->compare_keys(ptr->key, key) == 0) {
             /**
@@ -181,18 +181,18 @@ int sgs_map_remove(sgs_linked_list_map *map, const void *key) {
                 map->head = ptr->next;
             else
                 prev->next = ptr->next;
-
+            
             /** delete this element */
             ptr->key = NULL;
             ptr->value = NULL;
             free(ptr);
-
+            
             return 0;
         }
-
+        
         prev = ptr;
         ptr = ptr->next;
     }
-
+    
     return -1;
 }
