@@ -1,3 +1,4 @@
 Version 0.9.9:
 - Fixed issue 8; error in parsing channel join messages
 - deleted hex_utils.c and hex_utils.h; these are not used
+- Eliminated duplicate include statements

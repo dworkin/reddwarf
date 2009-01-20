@@ -43,16 +43,15 @@
 
 #include "sgs/config.h"
 #include "sgs/channel.h"
-#include "sgs/private/channel_impl.h"
 #include "sgs/error_codes.h"
 #include "sgs/id.h"
 #include "sgs/map.h"
-#include "sgs/private/message.h"
-#include "sgs/private/session_impl.h"
 #include "sgs/protocol.h"
-#include "private/session_impl.h"
-#include "private/connection_impl.h"
-#include "private/context_impl.h"
+#include "sgs/private/session_impl.h"
+#include "sgs/private/connection_impl.h"
+#include "sgs/private/context_impl.h"
+#include "sgs/private/channel_impl.h"
+#include "sgs/private/message.h"
 
 
 /*
@@ -215,14 +214,14 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 
     //sgs_msg_dump(&msg);
 
-    /** Get the length of the payload, and a pointer to the beginning of the 
+    /** Get the length of the payload, and a pointer to the beginning of the
      *  payload. The payload includes the opcode, so we will have to set an
-     *  offset to insure that we pass in the beginning of the part of the 
+     *  offset to insure that we pass in the beginning of the part of the
      *  buffer that we need read to the appropriate functions
      */
     msg_datalen = sgs_msg_get_datalen(&msg);
     msg_data = sgs_msg_get_data(&msg);
-    
+
     /* set the offset to account for the opcode, which is the first byte
      * of the payload
      */
@@ -230,7 +229,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
 
     switch (sgs_msg_get_opcode(&msg)) {
         case SGS_OPCODE_LOGIN_SUCCESS:
-            /** reconnection-key; the key is a byte[] and, since it is the only 
+            /** reconnection-key; the key is a byte[] and, since it is the only
              *  payload, the length of the array is the same as the payload length
              */
             readlen = sgs_msg_read_id(&msg,offset + 2, 0,
@@ -249,7 +248,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
              * tries to login again */
             old_connection = session->connection;
             sgs_connection_impl_disconnect(old_connection);
-            
+
             /** error string (first 2 bytes = length of string) */
             if (session->connection->ctx->login_failed_cb != NULL)
                 session->connection->ctx->login_failed_cb(session->connection,
@@ -267,7 +266,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
                 return -1;
             else offset += readlen;
 
-            readlen = sgs_msg_read_uint32(&msg, offset, 
+            readlen = sgs_msg_read_uint32(&msg, offset,
                     &(session->connection->ctx->port));
             if (readlen < 0)
                 return -1;
@@ -305,7 +304,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
         case SGS_OPCODE_LOGOUT_SUCCESS:
             session->connection->expecting_disconnect = 1;
             /* Since the other connection data structures could be
-             * reused on a new login, we will only shut down the 
+             * reused on a new login, we will only shut down the
              * socket from which we disconnected */
             old_connection = session->connection;
             sgs_connection_impl_disconnect(old_connection);
@@ -315,12 +314,12 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             /*first, get the channel name; bump the offset since we
              * are using the msg buffer rather than the data_buf
              */
-            offset += 2; 
+            offset += 2;
             readlen = sgs_msg_read_string(&msg, offset, &namebuffer);
             if (readlen < 0)
                 return -1;
             else offset += readlen;
-            
+
             /* Now, get the channel id*/
             readlen = sgs_msg_read_id(&msg, offset, 0, &channel_id);
             if (readlen < 0)
@@ -379,7 +378,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             return 0;
 
         case SGS_OPCODE_CHANNEL_MESSAGE:
-            /** field 1: channel-id 
+            /** field 1: channel-id
              *  The first two bytes are the length of the byte array containing
              *  the ID, and the remainder is the id itself
              */
@@ -387,7 +386,7 @@ int sgs_session_impl_recv_msg(sgs_session_impl *session) {
             if (readlen < 0)
                 return -1;
             else offset += readlen;
-            
+
             channel = sgs_map_get(session->channels, channel_id);
             sgs_id_destroy(channel_id);
 
