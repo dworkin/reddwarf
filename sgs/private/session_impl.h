@@ -48,19 +48,19 @@ typedef struct sgs_session_impl sgs_session_impl;
 struct sgs_session_impl {
     /** The underlying network connection. */
     sgs_connection_impl* connection;
-        
+
     /** Server-assigned key used to reconnect after disconnect. */
     sgs_id* reconnect_key;
-    
+
     /** Map of channels to which this session is currently a member. */
     sgs_map* channels;
-	
+
 	/** login information for this session. This is kept so that reconnect
 	 *  can occur transparently for the user.
 	 */
 	char *login;
 	char *password;
-    
+
     /**
      * Used as the backing array for any sgs_messages (more efficient to just
      * declare once and keep it around than to malloc() every time we need one).
