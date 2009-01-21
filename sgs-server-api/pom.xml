@@ -61,25 +61,6 @@
   <reporting>
     <plugins>
 
-      <!-- Configure checkstyle to run during site lifecycle -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<configuration>
-	  <linkXRef>false</linkXRef>
-	  <consoleOutput>true</consoleOutput>
-	  <enableRulesSummary>false</enableRulesSummary>
-	  <configLocation>${checkstyle.config}</configLocation>
-	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
-	  <packageNamesLocation>
-	    ${checkstyle.packageNames}
-	  </packageNamesLocation>
-	  <propertyExpansion>
-	    checkstyle.unusedImports=${checkstyle.unusedImports}
-	  </propertyExpansion>
-        </configuration>
-      </plugin>
-
       <!-- Configure findbugs to run during site lifecycle -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
