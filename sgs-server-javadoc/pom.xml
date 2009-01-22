@@ -198,5 +198,22 @@
     </plugins>
   </build>
 
+  <reporting>
+    <plugins>
+      <!-- Disable the findbugs plugin by configuring an
+	   empty reportSet. -->
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>findbugs-maven-plugin</artifactId>
+	<reportSets>
+          <reportSet>
+            <reports>
 
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
+  
 </project>
