@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>11</version>
+  <version>12</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -45,37 +45,6 @@
           </configuration>
 	</plugin>
 	
-	<!-- The berkeleydb binary package must be retrieved and unpacked
-	     Before the test phase so that they are available during
-	     runtime of the unit tests.
-	     To enable this dependency unpack, activate the unpack-bdb-binaries
-	     execution id in the child POM -->
-	<plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-dependency-plugin</artifactId>
-          <executions>
-            <execution>
-              <id>unpack-bdb-binaries</id>
-              <goals>
-		<goal>unpack</goal>
-              </goals>
-              <configuration>
-		<artifactItems>
-                  <artifactItem>
-                    <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-                    <artifactId>db-binaries</artifactId>
-		    <type>zip</type>
-                    <overWrite>false</overWrite>
-                    <outputDirectory>
-		      ${project.build.directory}/
-		    </outputDirectory>
-                  </artifactItem>
-		</artifactItems>
-              </configuration>
-            </execution>
-          </executions>
-	</plugin>
-
 	<!-- A sources jar can be attached by enabling
 	     the attach-sources execution id of this plugin -->
 	<plugin>
@@ -99,7 +68,6 @@
 	  <configuration>
             <links>
               <link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
-	      <link>http://mina.apache.org/report/1.1/apidocs/</link>
             </links>
           </configuration>
 	  <executions>
@@ -222,6 +190,45 @@
 
   </build>
 
+  <reporting>
+    <plugins>
+      
+      <!-- Configure checkstyle to run during site lifecycle -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+	<configuration>
+	  <linkXRef>false</linkXRef>
+	  <consoleOutput>true</consoleOutput>
+	  <enableRulesSummary>false</enableRulesSummary>
+	  <configLocation>${checkstyle.config}</configLocation>
+	  <headerLocation>${checkstyle.header.file}</headerLocation>
+	  <packageNamesLocation>
+	    ${checkstyle.packageNames}
+	  </packageNamesLocation>
+	  <propertyExpansion>
+	    checkstyle.unusedImports=${checkstyle.unusedImports}
+	  </propertyExpansion>
+        </configuration>
+      </plugin>
+
+      <!-- Configure findbugs to run during site lifecycle -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>findbugs-maven-plugin</artifactId>
+	<configuration>
+	  <effort>Max</effort>
+	  <threshold>Low</threshold>
+	  <xmlOutput>true</xmlOutput>
+	  <findbugsXmlOutput>true</findbugsXmlOutput>
+	  <findbugsXmlWithMessages>true</findbugsXmlWithMessages>
+	</configuration>
+      </plugin>
+
+    </plugins>
+  </reporting>
+
+
   <!-- Library of dependencies used in any sub module of this project
        Define versions of dependencies in this file only to maintain
        consistency -->
@@ -240,43 +247,6 @@
 	<scope>test</scope>
       </dependency>
 
-      <dependency>
-	<groupId>org.apache.mina</groupId>
-	<artifactId>mina-core</artifactId>
-	<version>${org.apache.mina.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>org.slf4j</groupId>
-	<artifactId>slf4j-api</artifactId>
-	<version>${slf4j-api.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>org.slf4j</groupId>
-	<artifactId>slf4j-jdk14</artifactId>
-	<version>${slf4j-jdk14.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-	<artifactId>db</artifactId>
-	<version>${bdb.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>com.sleepycat</groupId>
-	<artifactId>je</artifactId>
-	<version>${bdb.je.version}</version>
-      </dependency>
-
-      <dependency>
-	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-	<artifactId>db-binaries</artifactId>
-	<version>${bdb.version}</version>
-	<type>zip</type>
-      </dependency>
-
       <!-- for the sgs-build-utilities -->
       <dependency>
 	<groupId>checkstyle</groupId>
@@ -285,178 +255,6 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
-
-  <!-- Profiles activated based on platform to set BDB properties
-       The profile that is activated sets the bdb.lib.dir property 
-       to the directory name of the bdb libraries in the bdb
-       binary package for the platform in use.
-       Note that these profiles are activated as configured for
-       all children inheriting from this POM -->
-  <profiles>
-    <profile>
-      <id>macosx-ppc</id>
-      <properties>
-	<bdb.lib.dir>macosx-ppc</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>mac</family>
-	  <arch>ppc</arch>
-	</os>
-      </activation>
-    </profile>
-
-    <profile>
-      <id>macosx-x86</id>
-      <properties>
-	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>mac</family>
-	  <arch>i386</arch>
-	</os>
-      </activation>
-    </profile>
-
-    <profile>
-      <id>macosx-x86_64</id>
-      <properties>
-	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>mac</family>
-	  <arch>x86_64</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>solaris-x86</id>
-      <properties>
-	<bdb.lib.dir>solaris-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>SunOS</name>
-	  <arch>x86</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>solaris-sparc</id>
-      <properties>
-	<bdb.lib.dir>solaris-sparc</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>SunOS</name>
-	  <arch>sparc</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>linux-x86</id>
-      <properties>
-	<bdb.lib.dir>linux-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>Linux</name>
-	  <arch>i386</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>linux-x86_64</id>
-      <properties>
-	<bdb.lib.dir>linux-x86_64</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <name>Linux</name>
-	  <arch>x86_64</arch>
-	</os>
-      </activation>
-    </profile>
-    
-    <profile>
-      <id>win32-x86</id>
-      <properties>
-	<bdb.lib.dir>win32-x86</bdb.lib.dir>
-      </properties>
-      <activation>
-	<os>
-	  <family>windows</family>
-	</os>
-      </activation>
-    </profile>
-
-    <!-- profile enabled to test with BDB Java edition.
-	 This will set the run.bdb.env property to the BDB Java edition
-	 class rather than the native class.  It will also
-	 blank out the run.javapath and ensure that the BDB Java
-	 edition dependency is declared BEFORE the BDB native edition
-	 dependency.  The reason for this is so that we can ensure
-	 that BDB Java edition appears first on the classpath to avoid
-	 incompatible classes available in both editions. -->
-    <profile>
-      <id>bdb-java</id>
-      <properties>
-	<run.bdb.env>
-	  com.sun.sgs.impl.service.data.store.db.je.JeEnvironment
-	</run.bdb.env>
-	<run.javapath></run.javapath>	  
-      </properties>
-      <dependencies>
-	<dependency>
-	  <groupId>com.sleepycat</groupId>
-	  <artifactId>je</artifactId>
-	</dependency>
-	<dependency>
-	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-	  <artifactId>db</artifactId>
-	</dependency>
-      </dependencies>
-    </profile>
-
- 
-    <!-- profile enabled to test with BDB native edition.
-	 This will set the run.bdb.env property to the BDB native
-	 class rather than the Java edition class.  It will also
-	 set the run.javapath to the appropriate native library
-	 location and ensure that the BDB native edition dependency
-	 is declared BEFORE the BDB Java edition dependency.
-	 The reason for this is so that we can ensure
-	 that BDB native edition appears first on the classpath to avoid
-	 incompatible classes available in both editions. -->
-    <profile>
-      <id>bdb</id>
-      <properties>
-	<run.bdb.env>
-	  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
-	</run.bdb.env>
-	<run.javapath>
-	  target/bdb-${bdb.version}/${bdb.lib.dir}/
-	</run.javapath>	  
-      </properties>
-      <dependencies>
-	<dependency>
-	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-	  <artifactId>db</artifactId>
-	</dependency>
-	<dependency>
-	  <groupId>com.sleepycat</groupId>
-	  <artifactId>je</artifactId>
-	</dependency>
-      </dependencies>
-    </profile>
-    
-  </profiles>
 
   <!-- Release artifacts should be deployed to the java.net
        Maven2 repository
@@ -497,19 +295,14 @@
        across all children POMS -->
   <properties>
     
-    <projectYear>2008</projectYear>
+    <projectYear>2009</projectYear>
     
     <sgs-build-utilities.version>1.0</sgs-build-utilities.version>
     <sgs-jar-resources-gpl.version>1.0</sgs-jar-resources-gpl.version>
     <sgs-jar-resources-bsd.version>1.0</sgs-jar-resources-bsd.version>
 
-    <bdb.version>4.5.20</bdb.version>
-    <bdb.je.version>3.3.75</bdb.je.version>
     <junit.version>4.5</junit.version>
     <easymock.version>2.4</easymock.version>
-    <org.apache.mina.version>1.1.0</org.apache.mina.version>
-    <slf4j-api.version>1.4.0</slf4j-api.version>
-    <slf4j-jdk14.version>1.4.0</slf4j-jdk14.version>
 
     <checkstyle.version>4.4</checkstyle.version>
     <!-- Locations of checkstyle files
@@ -524,13 +317,16 @@
     <checkstyle.header.gpl>
       com/sun/sgs/tools/checkstyle/GPLv2.txt
     </checkstyle.header.gpl>
+    <checkstyle.header.file>
+      ${checkstyle.header.gpl}
+    </checkstyle.header.file>
     <checkstyle.packageNames>
       com/sun/sgs/tools/checkstyle/packageNames.xml
     </checkstyle.packageNames>
     <!-- Checkstyle report level for unused imports
-	 You can suppress these warnings altogether by setting the value
-         to ignore. -->
-    <checkstyle.unusedImports>warning</checkstyle.unusedImports>
+	 You can enable the unused imports check by setting the value
+	 to warning. -->
+    <checkstyle.unusedImports>ignore</checkstyle.unusedImports>
 
     <surefire.version>2.4.3</surefire.version>
 
@@ -539,11 +335,6 @@
     <test.jvm.args>${test.assertions} ${test.max.heap}</test.jvm.args>
     <test.output.hide>true</test.output.hide>
     <test.bdb.cache.size>1000000</test.bdb.cache.size>
-
-    <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
-    <run.bdb.env>
-      com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
-    </run.bdb.env>
 
   </properties>
 
