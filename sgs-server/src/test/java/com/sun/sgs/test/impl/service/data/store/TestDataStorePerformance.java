@@ -22,6 +22,8 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
+import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -230,12 +232,21 @@ public class TestDataStorePerformance extends TestCase {
 	    System.err.println("Skipping");
 	    return;
 	}
+	/*
+	 * JE caches the environment object it uses for a given database and
+	 * only decaches that, and rereads configuration properties, when the
+	 * database is created afresh.  Deleting the directory allows us to set
+	 * the flush-to-disk property to its non-default value.
+	 */
+	cleanDirectory(directory);
 	testWriteIdsInternal(true);
     }
 
     void testWriteIdsInternal(boolean flush) throws Exception {
 	props.setProperty(
-	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
+	    BdbEnvironment.FLUSH_TO_DISK_PROPERTY, String.valueOf(flush));
+	props.setProperty(
+	    JeEnvironment.FLUSH_TO_DISK_PROPERTY, String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
@@ -339,5 +350,25 @@ public class TestDataStorePerformance extends TestCase {
 	}
 	directory = dir.getPath();
 	return directory;
+    }
+
+    /** Insures an empty version of the directory exists. */
+    private static void cleanDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
+	}
     }
 }
