@@ -201,7 +201,10 @@
   <reporting>
     <plugins>
       <!-- Disable the findbugs plugin by configuring an
-	   empty reportSet. -->
+	   empty reportSet.  This is necessary because of a bug
+	   in findbugs when it re-runs through the compile lifecycle.
+	   Since findbugs is not needed for this module, and it is
+	   enabled in the parent master POM, we are disabling it here. -->
       <plugin>
 	<groupId>org.codehaus.mojo</groupId>
 	<artifactId>findbugs-maven-plugin</artifactId>
