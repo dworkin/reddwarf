@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.impl.kernel.KernelShutdownController;
+import com.sun.sgs.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -208,9 +208,6 @@ public final class WatchdogServiceImpl
     
     /** The application port. */
     final int appPort;
-    
-    /** A flag indicating that this watchdog lives on the core server node */
-    final boolean isCoreServerNode;
 
     /** The controller which enables node shutdown */
     private final KernelShutdownController shutdownController;
@@ -270,7 +267,7 @@ public final class WatchdogServiceImpl
 	shutdownController = ctrl;
 	
 	try {
-	    isCoreServerNode = wrappedProps.getBooleanProperty(
+	    boolean startServer = wrappedProps.getBooleanProperty(
  		START_SERVER_PROPERTY,
 		wrappedProps.getBooleanProperty(
 		    StandardProperties.SERVER_START, true));
@@ -330,7 +327,7 @@ public final class WatchdogServiceImpl
             
 	    String host;
 	    int serverPort;
-	    if (isCoreServerNode) {
+	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
 		    clientHost, appPort, clientProxy, isFullStack);
@@ -353,7 +350,7 @@ public final class WatchdogServiceImpl
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 
-            if (isCoreServerNode) {
+            if (startServer) {
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
@@ -378,16 +375,14 @@ public final class WatchdogServiceImpl
 	    }
 	    
 	} catch (Exception e) {
-	    System.err.println("-- FAILED! " + e.getLocalizedMessage() + "\n**************");
-	    e.printStackTrace();
-
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
 
-	    // Issue a shutdown
-	    doShutdown();
-	    shutdownController.shutdownNode();
+	    // Issue a node shutdown
+	    //reportFailure(this.getClass().getName(), 
+            //        WatchdogService.FailureLevel.SEVERE);
+            shutdownController.shutdownNode();
 	    throw e;
 	}
     }
@@ -444,23 +439,16 @@ public final class WatchdogServiceImpl
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
-	System.err.println("1) start");
 	checkState();
-	System.err.println("2) checked state");
 	if (!getIsAlive()) {
-	    System.err.println("3) local node not alive");
 	    return false;
 	} else {
-	    System.err.println("3) trying to get node");
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
-	    System.err.println("4) got node");
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
-		System.err.println("... called from isLocalNodeAlive()");
 		reportFailure(this.getClass().toString(), FailureLevel.MEDIUM);
 		return false;
 	    } else {
-		System.err.println("5) node is alive	");
 		return true;
 	    }
 	}
@@ -523,84 +511,70 @@ public final class WatchdogServiceImpl
      * {@code reportFailure(getLocalNodeId(), className, severity)}.
      */
     public void reportFailure(String className, FailureLevel severity) {
-	try {
-	    reportFailure(getLocalNodeId(), className, severity);
-	} catch (IOException ioe) {
-	    System.err.println("... reportFailure IOException");
-	    logger.log(Level.WARNING, "Unexpected exception thrown:" +
-		    ioe.getLocalizedMessage());
-	}
+        try {
+            reportFailure(getLocalNodeId(), className, severity);
+        } catch (IOException ioe) {
+            // Should never get here
+            logger.log(Level.WARNING, "Local reportFailure exception thrown:" +
+                    ioe.getLocalizedMessage());
+        }
     }
 
     /**
      * {@inheritDoc}
      */
-    public void reportFailure(long nodeId, String className,
-	    FailureLevel severity) throws IOException {
-	
-	System.err.println("a) entered reportFailure(1,2,3)");
+    public void reportFailure(long nodeId, String className, 
+            FailureLevel severity) throws IOException {
 
-	// If the node is shutting down or is not alive, then
-	// we won't do anything
-	if (shuttingDown() || !isAlive) {
-	    System.err.println("b) shutting down or was alive");
-	    return;
-	}
+        // If the node is shutting down or is not alive, then
+        // we won't do anything
+        if (shuttingDown() || !isAlive) {
+            return;
+        }
 
-	/*
-	 * Depending on the severity, decide what action to perform. In the
-	 * future, we may want to differentiate the type of action to perform.
-	 * For now, default all behavior to the same action: node shutdown.
-	 */
-	switch (severity) {
-	    case FATAL:
-	    case SEVERE:
-	    case MEDIUM:
-	    case MINOR:
+        /*
+         * Depending on the severity, decide what action to perform. In the
+         * future, we may want to differentiate the type of action to perform.
+         * For now, default all behavior to the same action: node shutdown.
+         */
+        switch (severity) {
+            case FATAL:
+            case SEVERE:
+            case MEDIUM:
+            case MINOR:
 
-		/*
-		 * Check if the node ID matches this node and that this node
-		 * is not the application node; shutdown this node if so.
-		 * Otherwise, find the node which should be shutdown instead
-		 */
-		if (nodeId == getLocalNodeId()) {
-		    logger.log(Level.SEVERE, "{0} reported failure",
-			    className);
+                /*
+                 * Check if the node ID matches this node and that this node
+                 * is not the application node; shutdown this node if so.
+                 * Otherwise, find the node which should be shutdown instead
+                 */
+                if (nodeId == getLocalNodeId()) {
+                    logger.log(Level.WARNING, "{1} reported failure in local " +
+                            "node with id: {0}", nodeId, className);
 
-		    /*
-		     * Try to report failure to the watchdog server. Since it
-		     * is possible that the failure is because of a broken
-		     * connection to the watchdog server, catch an IOException
-		     * that may be thrown as a result.
-		     */
-		    try {
-			serverProxy.setNodeAsFailed(nodeId);
-			System.err.println("-- reportFailure: successfully contacted server");
-		    } catch (IOException ioe) {
-			System.err.println("-- reportFailure: threw an IOException");
-			logger.log(Level.SEVERE,
-				"Cannot report failure to Watchdog Server: " +
-					ioe.getLocalizedMessage());
-		    } /* temporary */
-		    catch (Exception e) {
-			System.err.println("-- reportFailure: exception caught");
-			e.printStackTrace();
-		    }
-		    setFailedThenNotify(true);
-		    System.err.println("-- reportFailure: successfully setFailedThenNotify()");
-
-		} else {
-
-		    System.err.println("-- reportFailure: remote node case");
-		    // Inform the server to shutdown the remote node.
-		    // Note that this call may throw an IOException
-		    serverProxy.setNodeAsFailed(nodeId, className, severity,
-			    AbstractService.DEFAULT_MAX_IO_ATTEMPTS);
-		    System.err.println("-- reportFailure: no remote exception thrown");
-		}
-		System.err.println("-- reportFailure: finishing..");
-	}
-	System.err.println("-- ........");
+                    /*
+                     * Try to report failure to the watchdog server. Since it
+                     * is possible that the failure is because of a broken
+                     * connection to the watchdog server, catch an IOException
+                     * that may be thrown as a result.
+                     */
+                    try {
+                        serverProxy.setNodeAsFailed(nodeId);
+                    } catch (IOException ioe) {
+                        logger.log(Level.SEVERE,
+                                "Cannot report failure to Watchdog Server: " +
+                                ioe.getLocalizedMessage());
+                    }
+                    setFailedThenNotify(true);
+                } else {
+                    logger.log(Level.WARNING, "{1} reported failure in remote" +
+                            " node with id {0}", nodeId, className);
+                    // Inform the server to shutdown the remote node.
+                    // Note that this call may throw an IOException
+                    serverProxy.setNodeAsFailed(nodeId, className, severity,
+                            DEFAULT_MAX_IO_ATTEMPTS);
+                }
+        }
     }
 
     /**
@@ -643,11 +617,9 @@ public final class WatchdogServiceImpl
 		    return;
 		}
 
-		// Try to renew the node
 		boolean renewed = false;
 		try {
 		    if (!serverProxy.renewNode(localNodeId)) {
-			System.err.println("... called from RenewThread.run()");
 			setFailedThenNotify(true);
 			return;
 		    }
@@ -693,7 +665,6 @@ public final class WatchdogServiceImpl
      */
     private void checkState() {
 	if (shuttingDown()) {
-	    System.err.println("... throwing illegal state exception");
 	    throw new IllegalStateException("service shutting down");
 	}
     }
@@ -733,11 +704,11 @@ public final class WatchdogServiceImpl
 	    notifyNodeListeners(node);
 	}
 
-	logger.log(Level.SEVERE,
-		" Node forced to shutdown due to service failure");
+        logger.log(Level.SEVERE,
+                "Node forced to shutdown due to service failure");
 
-	// use controller to issue a shutdown
-	shutdownController.shutdownNode();
+        // use controller to issue a shutdown
+        shutdownController.shutdownNode();
     }
 
     /**
@@ -855,21 +826,6 @@ public final class WatchdogServiceImpl
 	    setFailedThenNotify(true);
 	}
 
-    }
-
-    /**
-     * Implements the WatchdogClient that receives callbacks from the
-     * WatchdogServer.
-     */
-    private final class ComponentWatchdogClientImpl /* implements
-	    ComponentWatchdogClient */ {
-
-	/**
-	 * {@inheritDoc}
-	 */
-	public void reportComponentFailure(String name, FailureLevel severity) {
-	    reportFailure(name, severity);
-	}
     }
 
     /**
