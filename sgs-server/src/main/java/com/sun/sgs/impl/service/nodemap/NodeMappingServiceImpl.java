@@ -484,6 +484,10 @@ public class NodeMappingServiceImpl
                     // This is very bad.
                     logger.logThrow(Level.CONFIG, ex,
                             "Failed to contact server");
+                    
+                    //Issue a node shutdown
+                    watchdogService.reportFailure(this.getClass().getName(),
+                            WatchdogService.FailureLevel.SEVERE);
                     throw new RuntimeException(ex);
                 }
             }

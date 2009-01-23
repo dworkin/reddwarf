@@ -160,7 +160,7 @@ public class DummyWatchdogService implements WatchdogService {
 
     public void reportFailure(String className, FailureLevel severity) {
 	// Don't do anything for now
-    }
+}
 
     public void reportFailure(long nodeId, String className,
 	    FailureLevel severity) throws IOException {

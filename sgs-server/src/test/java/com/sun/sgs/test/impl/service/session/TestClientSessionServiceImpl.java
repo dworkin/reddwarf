@@ -995,6 +995,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	buf.position(1);
 	sendBufferToClient(buf, msgString);
     }
+    
+    public void testReportFailureAfterLosingConnectionToServer()
+            throws Exception
+    {
+        //TODO:
+    }
 
     private void sendBufferToClient(final ByteBuffer buf,
 				    final String expectedMsgString)

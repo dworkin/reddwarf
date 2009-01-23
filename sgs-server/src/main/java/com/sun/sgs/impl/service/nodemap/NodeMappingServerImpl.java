@@ -618,22 +618,16 @@ public final class NodeMappingServerImpl
                             " node {0} that {1} has been removed", 
                             oldClient, id);
 
-                    // Try to shutdown the node corresponding to oldClient
-                    WatchdogService watchdogSvc =
-                        txnProxy.getService(WatchdogService.class);
-
                     try {
-                        watchdogSvc.reportFailure(oldNode.getId(), this
-                        .getClass().toString(),
-                        WatchdogService.FailureLevel.MEDIUM);
+                        // Try to shutdown the node corresponding to oldClient
+                        watchdogService.reportFailure(oldNode.getId(), 
+                                this.getClass().toString(), 
+                                WatchdogService.FailureLevel.MEDIUM);
                     } catch (IOException ioe) {
-
-                        // TODO: see if this needs to be dealt with better
                         logger.logThrow(Level.WARNING, ex,
                             "A communication error occured while " +
                             "trying to report a failure to the " +
-                            "watchdog service:" +
-                            ioe.getLocalizedMessage());
+                            "watchdog service:" + ioe.getLocalizedMessage());
                     }
                 }
             }
@@ -648,6 +642,18 @@ public final class NodeMappingServerImpl
                     logger.logThrow(Level.WARNING, ex, 
                             "A communication error occured while notifying" +
                             " node {0} that {1} has been added", newClient, id);
+                    
+                    try {
+                        // Try to shutdown the node corresponding to newClient
+                        watchdogService.reportFailure(newNode.getId(), 
+                                this.getClass().toString(), 
+                                WatchdogService.FailureLevel.MEDIUM);
+                    } catch (IOException ioe) {
+                        logger.logThrow(Level.WARNING, ex,
+                            "A communication error occured while " +
+                            "trying to report a failure to the " +
+                            "watchdog service:" + ioe.getLocalizedMessage());
+                    }
                 }
             }
         }

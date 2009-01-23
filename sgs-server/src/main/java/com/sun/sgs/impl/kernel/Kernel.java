@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.kernel.KernelShutdownController;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.internal.InternalContext;
@@ -537,14 +538,7 @@ class Kernel {
         throws Exception
     {
         Class<?> serviceClass = Class.forName(className);
-        Service service;
-        
-        // Check if we are dealing with the watchdog service
-        if (isWatchdogService(serviceClass)) {
-            service = createWatchdogService(serviceClass);
-        } else {
-            service = createService(serviceClass);
-        }
+        Service service = createService(serviceClass);
         startupContext.addService(service);
     }
 
@@ -593,37 +587,31 @@ class Kernel {
      * no manager, based on fully qualified class names.
      */
     private Service createService(Class<?> serviceClass)
-        throws Exception
-    {
-	    Constructor<?> serviceConstructor;
-	    
-	// If the service is the watchdog, then attach a special
-	// object that enables call-back for node shutdown.
-	// Otherwise, construct the service as usual.
-	if (isWatchdogService(serviceClass)) {
-	    System.err.println(" --- found watchdog service! ");
-	    serviceConstructor =
-		    serviceClass.getConstructor(Properties.class,
-			    ComponentRegistry.class, TransactionProxy.class,
-			    KernelShutdownController.class);
+            throws Exception {
+        Constructor<?> serviceConstructor;
 
-	    // return a new instance using the four-argument constructor
-	    KernelShutdownController ctrl =
-		    new KernelShutdownControllerImpl(this);
- 	    return (Service) (serviceConstructor.newInstance(appProperties,
-		    systemRegistry, proxy, ctrl));
+        // check if we are dealing with the watchdog service
+        if (isWatchdogService(serviceClass)) {
+            // get a four-argument constructor instead
+            serviceConstructor =
+                    serviceClass.getConstructor(Properties.class,
+                    ComponentRegistry.class, TransactionProxy.class,
+                    KernelShutdownController.class);
 
-	} else {
-        // find the appropriate constructor
-	    serviceConstructor =
-            serviceClass.getConstructor(Properties.class,
-                                        ComponentRegistry.class,
-                                        TransactionProxy.class);
+            // return a new instance
+            return (Service) (serviceConstructor.newInstance(appProperties,
+                    systemRegistry, proxy, 
+                    new KernelShutdownControllerImpl(this)));
+        } else {
+            // find the appropriate constructor
+            serviceConstructor =
+                    serviceClass.getConstructor(Properties.class,
+                    ComponentRegistry.class, TransactionProxy.class);
 
-        // return a new instance
-        return (Service) (serviceConstructor.
-                          newInstance(appProperties, systemRegistry, proxy));
-	}
+            // return a new instance
+            return (Service) (serviceConstructor.
+                    newInstance(appProperties, systemRegistry, proxy));
+        }
     }
 
     /** Start the application, throwing an exception if there is a problem. */
@@ -666,6 +654,7 @@ class Kernel {
      * Shut down all services (in reverse order) and the schedulers.
      */
     void shutdown() {
+        logger.log(Level.FINE, "Kernel.shutdown() called");
         if (application != null) {
             application.shutdownServices();
         }
@@ -894,46 +883,14 @@ class Kernel {
      * and {@code false} otherwise
      */
     private boolean isWatchdogService(Class<?> serviceClass) {
-    	
-    //FIXME: getting property always seems to fail, so this does not work
-	//	String watchdogServiceProperty = appProperties.getProperty(
-	//		StandardProperties.WATCHDOG_SERVICE);
-	//	if (watchdogServiceProperty == null) { 
-	//	    System.err.println("returned false!!");
-	//	    return false;
-	//	}
-	//	int index = watchdogServiceProperty.lastIndexOf(".");
-	//	String watchdogServiceClassName = watchdogServiceProperty.
-	//		substring(index).toUpperCase();
-	//	
-	//	return serviceClass.getName().toUpperCase().contains(
-	//		watchdogServiceClassName);
+        String watchdogServiceProperty = appProperties.getProperty(
+                StandardProperties.WATCHDOG_SERVICE, DEFAULT_WATCHDOG_SERVICE);
+        int index = watchdogServiceProperty.lastIndexOf(".");
+        String watchdogServiceClassName = watchdogServiceProperty.
+                substring(index).toUpperCase();
 
-    	//FIXME: this method is not great since implementation can change
-    	//       the serviceClass should be an interface
-    	return serviceClass.getName().equals(WatchdogServiceImpl.class.getName());
-    }
-    
-    /**
-     * Private helper that creates an instance of the <code>WatchdogService</code> with
-     * no manager, based on the fully qualified class name.
-     */
-    private Service createWatchdogService(Class<?> serviceClass) 
-        throws Exception
-    {
-	    Constructor<?> serviceConstructor;
-	    
-	    System.err.println(" --- found watchdog service! ");
-	    serviceConstructor =
-		    serviceClass.getConstructor(Properties.class,
-			    ComponentRegistry.class, TransactionProxy.class,
-			    KernelShutdownController.class);
-
-	    // return a new instance using the four-argument constructor
-	    KernelShutdownController ctrl =
-		    new KernelShutdownControllerImpl(this);
- 	    return (Service) (serviceConstructor.newInstance(appProperties,
-		    systemRegistry, proxy, ctrl));
+        return serviceClass.getName().toUpperCase().contains(
+                watchdogServiceClassName);
     }
     
     /**

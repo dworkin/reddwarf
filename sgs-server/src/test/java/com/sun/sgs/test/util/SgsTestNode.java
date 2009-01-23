@@ -174,7 +174,8 @@ public class SgsTestNode {
     }
 
     /**
-     * Creates additional SgsTestNode instances in this VM.
+     * Creates additional SgsTestNode instances in this VM. This node will be
+     * part of the same cluster as the node specified in the firstNode parameter.
      *
      * @param firstNode  the first {@code SgsTestNode} created in this VM
      * @param listenerClass the class of the listener object, or null if a
@@ -425,9 +426,7 @@ public class SgsTestNode {
 	    StandardProperties.APP_LISTENER,
 	        (listenerClass != null ?
 		 listenerClass.getName() :
-		 StandardProperties.APP_LISTENER_NONE),
-		 StandardProperties.WATCHDOG_SERVICE,
-		                WatchdogServiceImpl.class.getName()
+		 StandardProperties.APP_LISTENER_NONE)
         );
 
         return retProps;

@@ -246,56 +246,57 @@ public class TestAbstractService extends TestCase {
     }
 
     public void testReportingLocalFailure() throws Exception {
-	final DummyServiceFailureReporter service = 
-	    new DummyServiceFailureReporter(serviceProps, 
-		    serverNode.getSystemRegistry(),
-			serverNode.getProxy(), logger);
-	
-	txnScheduler.runTask(new TestAbstractKernelRunnable() {
-	public void run() {
-	    // Report a failure on ourselves and check
-	    // that we are not alive
-	    service.reportLocalFailure();
-	    assertFalse(service.isAlive());
-	}}, taskOwner);
+        final DummyServiceFailureReporter service =
+                new DummyServiceFailureReporter(serviceProps,
+                serverNode.getSystemRegistry(), serverNode.getProxy(), logger);
+        
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() {
+                // Report a failure on ourselves and check if we are alive
+                service.reportLocalFailure();
+                try {
+                    service.isAlive();
+                    fail("Expected IllegalStateException");
+                } catch (IllegalStateException e) {
+                    // Expected, and we do not want to shutdown the node 
+                    // a second time in tearDown()
+                    serverNode = null;
+                } catch (Exception e) {
+                    fail("Expected IllegalStateException");
+                }
+            }
+        }, taskOwner);
     }
     
-    private static class DummyServiceFailureReporter extends 
-    AbstractService {
-
-	/*-- empty declarations; not needed for the test --*/
-	protected void doReady() { }
-	protected void doShutdown() { }
-	protected void handleServiceVersionMismatch(Version oldVersion,
-		Version currentVersion) { }
-	/*-- begin custom implementation --*/
-	
-	public DummyServiceFailureReporter(
-        	    Properties properties,
-        	    ComponentRegistry systemRegistry,
-        	    TransactionProxy txnProxy,
-        	    LoggerWrapper logger)
-        {
-	    super(properties, systemRegistry, txnProxy, logger);
+    private static class DummyServiceFailureReporter extends AbstractService {
+        
+        /*-- empty declarations; not needed for the test --*/
+        protected void doReady() {}
+        protected void doShutdown() {}
+        protected void handleServiceVersionMismatch(Version oldVersion,
+                Version currentVersion) {}
+        
+        /*-- begin custom implementation --*/
+        public DummyServiceFailureReporter(Properties properties,
+                ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+                LoggerWrapper logger) {
+            super(properties, systemRegistry, txnProxy, logger);
         }
-	
-	public boolean isAlive() {
-	    // get the watchdog service to check if the
-	    // node is alive
-	    WatchdogService svc = txnProxy.getService(WatchdogService.class);
-	    return svc.isLocalNodeAlive();
-	}
-	
-	public void reportLocalFailure() {
-	    super.notifyWatchdogOfFailure(
-		    WatchdogService.FailureLevel.FATAL);
-	}
-	
-	public void reportRemoteFailure(long nodeId) throws IOException {
-	    super.notifyWatchdogOfRemoteFailure(nodeId,
-		    WatchdogService.FailureLevel.FATAL);
-	}
-	
+
+        public boolean isAlive() {
+            // get the watchdog service to check if the node is alive
+            WatchdogService svc = txnProxy.getService(WatchdogService.class);
+            return svc.isLocalNodeAlive();
+        }
+
+        public void reportLocalFailure() {
+            super.notifyWatchdogOfFailure(WatchdogService.FailureLevel.FATAL);
+        }
+
+        public void reportRemoteFailure(long nodeId) throws IOException {
+            super.notifyWatchdogOfRemoteFailure(nodeId, 
+                    WatchdogService.FailureLevel.FATAL);
+        }
     }
     
     private static class MyRuntimeException extends RuntimeException {

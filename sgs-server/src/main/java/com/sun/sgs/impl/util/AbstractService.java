@@ -57,12 +57,6 @@ public abstract class AbstractService implements Service {
      * IoRunnable} in the {@code runIoTask} method. */ 
     private static final int WAIT_TIME_BEFORE_RETRY = 100;
 
-    /** The number of attempts to try renewing during an {@code IOException} */
-    private final int MAX_IO_ATTEMPTS = 5;
-
-    /** The number of I/O resolution attempts performed so far */
-    private int attempts = MAX_IO_ATTEMPTS;
-
     /** Service state. */
     protected static enum State {
         /** The service is initialized. */
@@ -195,8 +189,8 @@ public abstract class AbstractService implements Service {
 	    case SHUTTING_DOWN:
 	    case SHUTDOWN:
 		throw new IllegalStateException("service shutting down");
-	    //default:
-		//throw new AssertionError();
+	    default:
+		throw new AssertionError();
 	    }
 	}
 	doReady();
@@ -258,8 +252,8 @@ public abstract class AbstractService implements Service {
 	    case SHUTDOWN:
 		return true;
 
-	    //default:
-		//throw new AssertionError();
+	    default:
+		throw new AssertionError();
 	    }
 	}
 
@@ -419,33 +413,35 @@ public abstract class AbstractService implements Service {
     }
     
     /**
-     * Notifies the {@code Watchdog} of a problem with the service, enabling
+     * Notifies the {@code Watchdog} of a problem with this service, enabling
      * the {@code Watchdog} to shut down the node.
      * 
-     * @param severity the severity of the failure; values can be
-     * {@code FAILURE_MINOR},{@code FAILURE_MEDIUM}, {@code FAILURE_SEVERE},
-     * or {@code FAILURE_FATAL}
+     * @param severity the severity of the failure
      */
-    protected void notifyWatchdogOfFailure(
-	    WatchdogService.FailureLevel severity) {
-	// Get the watchdog and report the problem
-	WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
-	watchdog.reportFailure(this.getClass().toString(), severity);
+    protected void notifyWatchdogOfFailure(WatchdogService.FailureLevel severity) 
+    {
+        // Get the watchdog and report the problem
+        WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
+        try {
+            notifyWatchdogOfRemoteFailure(watchdog.getLocalNodeId(), severity);
+        }
+        catch (IOException ioe) {
+            // This should never happen since the call is local
+        }
     }
 
     /**
-     * Notifies the {@code Watchdog} of a problem with the service, enabling
-     * the {@code Watchdog} to shut down the node.
+     * Notifies the {@code Watchdog} of a problem with a remote service,
+     * enabling the {@code Watchdog} to shut down the node.
      * 
-     * @param severity the severity of the failure; values can be
-     * {@code FAILURE_MINOR},{@code FAILURE_MEDIUM}, {@code FAILURE_SEVERE},
-     * or {@code FAILURE_FATAL}
+     * @param nodeId the id of the node that is being reported 
+     * @param severity the severity of the failure
      */
     protected void notifyWatchdogOfRemoteFailure(long nodeId,
-	    WatchdogService.FailureLevel severity) throws IOException {
-	// Get the watchdog and report the problem
-	WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
-	watchdog.reportFailure(nodeId, this.getClass().toString(), severity);
+            WatchdogService.FailureLevel severity) throws IOException {
+        // Get the watchdog and report the problem
+        WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
+        watchdog.reportFailure(nodeId, this.getClass().toString(), severity);
     }
 
     /**
@@ -511,7 +507,7 @@ public abstract class AbstractService implements Service {
      * 		transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
-	runIoTask(ioTask, nodeId, DEFAULT_MAX_IO_ATTEMPTS);
+        runIoTask(ioTask, nodeId, DEFAULT_MAX_IO_ATTEMPTS);
     }
 
     /**
@@ -532,31 +528,29 @@ public abstract class AbstractService implements Service {
      * transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId, int maxAttempts) {
-	checkNonTransactionalContext();
-	boolean hasNotified = false;
-	do {
-	    try {
-		ioTask.run();
-		return;
-	    } catch (IOException e) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.logThrow(
-			Level.FINEST, e,
-			"IoRunnable {0} throws", ioTask);
-		}
-		// If the maximum number of attempts have been tried,
-		// then we are forced to shutdown
-		if (!hasNotified && --maxAttempts == 0) {
-		    notifyWatchdogOfFailure(WatchdogService.FailureLevel.MEDIUM);
-		    hasNotified = true;
-		}
-		try {
-		    // TBD: what back-off policy do we want here?
-		    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
-		} catch (InterruptedException ie) {
-		}
-	    }
-	} while (isAlive(nodeId));
+        checkNonTransactionalContext();
+        boolean hasNotified = false;
+        do {
+            try {
+                ioTask.run();
+                return;
+            } catch (IOException e) {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.logThrow(Level.FINEST, e,
+                            "IoRunnable {0} throws", ioTask);
+                }
+                // If the maximum number of attempts have been tried,
+                // then we are forced to shutdown
+                if (!hasNotified && --maxAttempts == 0) {
+                    notifyWatchdogOfFailure(WatchdogService.FailureLevel.MEDIUM);
+                    hasNotified = true;
+                }
+                try {
+                    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
+                } catch (InterruptedException ie) {
+                }
+            }
+        } while (isAlive(nodeId));
     }
     
     /**

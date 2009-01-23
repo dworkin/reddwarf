@@ -394,14 +394,13 @@ public final class WatchdogServerImpl
      * this method
      */
     Collection<NodeImpl> processNodeFailures(Collection<NodeImpl> nodesToFail) {
-	Collection<NodeImpl> aliveNodesToFail =
-		new ArrayList<NodeImpl>(nodesToFail);
+        Collection<NodeImpl> aliveNodesToFail = new ArrayList<NodeImpl>();
 
 	// Try to declare the nodes as failed unless they have been
 	// reported to be failed already
 	for (NodeImpl node : nodesToFail) {
 	    if (disqualifyAsAlive(node)) {
-		aliveNodesToFail.remove(node);
+                aliveNodesToFail.add(node);
 	    }
 	}
 
@@ -464,8 +463,8 @@ public final class WatchdogServerImpl
      * @param node the node that has failed
      */
     void runFailedNodeProcess(NodeImpl node) {
-	setFailed(node);
-	recoveringNodes.put(node.getId(), node);
+        setFailed(node);
+        recoveringNodes.put(node.getId(), node);
     }
 
     /**
@@ -614,81 +613,79 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public void setNodeAsFailed(long nodeId, String className,
-	    FailureLevel severity, final int maxNumberOfAttempts)
-	    throws IOException {
+            FailureLevel severity, final int maxNumberOfAttempts)
+            throws IOException {
 
-	// Handle the race condition just in case two different
-	// processes interested in reporting a node failure. If
-	// the node is already being handled, then we do nothing.
-	if (!aliveNodes.containsKey(nodeId)) {
-	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
-		    "' is already reported as failed");
-	    return;
-	}
-	int count = maxNumberOfAttempts;
-	NodeImpl remoteNode = aliveNodes.get(nodeId);
-	if (remoteNode == null) {
-	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
-		    "' is already reported as failed");
-	    return;
-	}
-	// Run the methods which declare the node as failed
-	processNodeFailure(remoteNode);
+        // Handle the race condition just in case two different
+        // processes interested in reporting a node failure. If
+        // the node is already being handled, then we do nothing.
+        if (!aliveNodes.containsKey(nodeId)) {
+            logger.log(Level.FINEST, "Node with ID '" + nodeId +
+                    "' is already reported as failed");
+            return;
+        }
+        int count = maxNumberOfAttempts;
+        NodeImpl remoteNode = aliveNodes.get(nodeId);
+        if (remoteNode == null) {
+            logger.log(Level.FINEST, "Node with ID '" + nodeId +
+                    "' is already reported as failed");
+            return;
+        }
+        // Run the methods which declare the node as failed
+        processNodeFailure(remoteNode);
 
-	// Now that the node is not considered alive,
-	// try to report the failure to the watchdog
-	// so that the node can be shutdown. Just in case
-	// we run into an IOException, try a few times.
-	while (--count > 0) {
-	    try {
-		remoteNode.getWatchdogClient().reportFailure(className,
-			severity);
+        // Now that the node is not considered alive,
+        // try to report the failure to the watchdog
+        // so that the node can be shutdown. Just in case
+        // we run into an IOException, try a few times.
+        while (--count > 0) {
+            try {
+                remoteNode.getWatchdogClient().reportFailure(className,
+                        severity);
 
-	    } catch (IOException ioe) {
-		// Try again
+            } catch (IOException ioe) {
+                // Try again
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Unexpected exception thrown: {0}" +
+                        e.getLocalizedMessage(), nodeId);
+            }
+        }
 
-	    } catch (Exception e) {
-		logger.log(Level.WARNING, "Unexpected exception thrown: {0}" +
-			e.getLocalizedMessage(), nodeId);
-	    }
-	}
-
-	// Report if we weren't able to get the watchdog client.
-	// We may want to throw an exception forcing the server
-	// to address this issue.
-	if (count == 0) {
-	    final String msg =
-		    "Could not retrieve watchdog client given " +
-			    maxNumberOfAttempts + " attempt(s)";
-	    logger.log(Level.WARNING, msg);
-	    // throw new IOException(msg);
-	}
+        // Report if we weren't able to get the watchdog client.
+        // We may want to throw an exception forcing the server
+        // to address this issue.
+        if (count == 0) {
+            final String msg = "Could not retrieve watchdog client given " + 
+                    maxNumberOfAttempts + " attempt(s)";
+            logger.log(Level.WARNING, msg);
+        // throw new IOException(msg);
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void setNodeAsFailed(final long nodeId) throws IOException {
-	// We will only process if it is not being processed already
-	if (!aliveNodes.containsKey(nodeId)) {
-	    logger.log(Level.FINEST, "Node with ID '" + nodeId +
-		    "' is already reported as failed");
-	    return;
-	}
+        // We will only process if it is not being processed already
+        if (!aliveNodes.containsKey(nodeId)) {
+            logger.log(Level.FINEST, "Node with ID '" + nodeId +
+                    "' is already reported as failed");
+            return;
+        }
 
-	try {
-	    final String instanceName = "ProcessingFailure";
-	    transactionScheduler.runTask(new AbstractKernelRunnable(
-		    instanceName) {
-		public void run() throws Exception {
-		    NodeImpl remoteNode =
-			    NodeImpl.getNode(dataService, nodeId);
-		    processNodeFailure(remoteNode);
-		}
-	    }, taskOwner);
-	} catch (Exception e) {
-	    logger.log(Level.FINEST, "Node could not be processed as failed");
-	}
+        try {
+            final String instanceName = "ProcessingFailure";
+            transactionScheduler.runTask(new AbstractKernelRunnable(
+                    instanceName) {
+
+                public void run() throws Exception {
+                    NodeImpl remoteNode = NodeImpl.getNode(dataService, nodeId);
+                    processNodeFailure(remoteNode);
+                }
+            }, taskOwner);
+        } catch (Exception e) {
+            logger.log(Level.FINEST, "Node could not be processed as failed");
+        }
     }
 
     /**
@@ -786,9 +783,10 @@ public final class WatchdogServerImpl
 		 * Perform the node failure procedure
 		 */
 		if (!expiredNodes.isEmpty()) {
-		    Collection<NodeImpl> processed =
-			    processNodeFailures(expiredNodes);
-		    statusChangedNodes.addAll(expiredNodes);
+                    Collection<NodeImpl> processed = 
+                            processNodeFailures(expiredNodes);
+		    statusChangedNodes.addAll(processed);
+                    processed.clear();
 		    expiredNodes.clear();
 		    
 		}

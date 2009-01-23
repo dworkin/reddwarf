@@ -1,4 +1,4 @@
-package com.sun.sgs.impl.kernel;
+package com.sun.sgs.kernel;
 
 /**
  * An interface which defines the {@code Kernel.shutdown} hook for the
@@ -13,5 +13,4 @@ public interface KernelShutdownController {
      * a shutdown to the otherwise non-visible method.
      */
     void shutdownNode();
-
 }
