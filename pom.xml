@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>5</version>
+    <version>12</version>
   </parent>
 
   <groupId>com.projectdarkstar.example.request</groupId>
@@ -57,7 +57,26 @@
 
   </build>
 
-
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+	<groupId>com.projectdarkstar.server</groupId>
+	<artifactId>sgs-server-api</artifactId>
+	<scope>provided</scope>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.client</groupId>
+	<artifactId>sgs-client-api</artifactId>
+	<version>${sgs.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <repositories>
     <repository>
@@ -75,8 +94,7 @@
   </repositories>
 
   <properties>
-    <sgs.version>0.9.7</sgs.version>
-    <sgs-shared.version>1.0</sgs-shared.version>
+    <sgs.version>0.9.8</sgs.version>
   </properties>
 
 </project>
