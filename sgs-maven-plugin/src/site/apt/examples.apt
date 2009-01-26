@@ -60,7 +60,7 @@ Examples
         </executions>
         <configuration>
           <version>0.9.8</version>
-          <sgsHome>${project.build.directory}/sgs-server-dist-${sgs.version}</sgsHome>
+          <sgsHome>${project.build.directory}/sgs-server-dist-0.9.8</sgsHome>
           <sgsBoot>${basedir}/src/test/properties/my.boot</sgsBoot>
           <sgsServer>${basedir}/src/test/properties/my.properties</sgsServer>
           <files>
@@ -145,7 +145,7 @@ Examples
         </executions>
         <configuration>
           <version>0.9.8</version>
-          <sgsHome>${project.build.directory}/sgs-server-dist-${sgs.version}</sgsHome>
+          <sgsHome>${project.build.directory}/sgs-server-dist-0.9.8</sgsHome>
           <excludeTransitive>true</excludeTransitive>
         </configuration>
       </plugin>

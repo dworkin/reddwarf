@@ -58,6 +58,7 @@ public class ConfigureMojo extends AbstractSgsMojo
      * file of the Project Darkstar server.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private File sgsBoot;
     
@@ -66,6 +67,7 @@ public class ConfigureMojo extends AbstractSgsMojo
      * file of the Project Darkstar server.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private File sgsServer;
     
@@ -74,6 +76,7 @@ public class ConfigureMojo extends AbstractSgsMojo
      * file of the Project Darkstar server.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private File sgsLogging;
 

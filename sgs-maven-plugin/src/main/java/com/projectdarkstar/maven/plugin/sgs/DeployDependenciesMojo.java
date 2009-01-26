@@ -62,6 +62,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * @parameter expression="${project}"
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     protected MavenProject project;
 
@@ -72,6 +73,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * are deployed.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] includeArtifactIds;
     
@@ -80,6 +82,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * included.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] includeClassifiers;
     
@@ -87,6 +90,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * A list of types to include.  By default, all types are included.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] includeTypes;
     
@@ -94,6 +98,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * A list of scopes to include.  By default, all scopes are included.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] includeScopes;
     
@@ -103,6 +108,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * are deployed.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] excludeArtifactIds;
     
@@ -110,6 +116,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * A list of classifiers to exclude.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] excludeClassifiers;
     
@@ -117,6 +124,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * A list of types to exclude.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] excludeTypes;
     
@@ -124,6 +132,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * A list of scopes to exclude.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String[] excludeScopes;
     
@@ -131,6 +140,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      * Exclude transitive dependencies.  Default value is false.
      * 
      * @parameter default-value="false"
+     * @since 1.0-alpha-1
      */
     private boolean excludeTransitive;
     

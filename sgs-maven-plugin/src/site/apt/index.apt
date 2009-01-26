@@ -29,11 +29,10 @@ Project Darkstar Maven Plugin
 
 * Goals
 
-  The {{{plugin-info.html}Goals}} section gives complete documentation of what
+  The {{{plugin-info.html}Goals}} section gives complete documentation of
   how to use this plugin.
 
 * Examples
 
   A few examples of what can be done with the Project Darkstar Maven Plugin
   can be found in the {{{examples.html}Examples}} section.
-

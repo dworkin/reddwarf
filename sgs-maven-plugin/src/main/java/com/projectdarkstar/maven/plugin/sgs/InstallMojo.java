@@ -43,9 +43,11 @@ import org.codehaus.plexus.archiver.UnArchiver;
 import org.codehaus.plexus.archiver.ArchiverException;
 import org.codehaus.plexus.archiver.manager.ArchiverManager;
 import org.codehaus.plexus.archiver.manager.NoSuchArchiverException;
+import org.codehaus.plexus.util.FileUtils;
 
 import java.util.List;
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Installs a Project Darkstar server
@@ -60,6 +62,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * 
      * @parameter default-value="com.projectdarkstar.server"
      * @required
+     * @since 1.0-alpha-1
      */
     private String groupId;
     
@@ -69,6 +72,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * 
      * @parameter default-value="sgs-server-dist"
      * @required
+     * @since 1.0-alpha-1
      */
     private String artifactId;
     
@@ -77,6 +81,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * Default value is zip.
      * 
      * @parameter default-value="zip"
+     * @since 1.0-alpha-1
      */
     private String type;
     
@@ -85,6 +90,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * Default is no classifier
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private String classifier;
     
@@ -93,6 +99,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * 
      * @parameter
      * @required
+     * @since 1.0-alpha-1
      */
     private String version;
     
@@ -101,8 +108,20 @@ public class InstallMojo extends AbstractSgsMojo {
      * distribution.  Default value is ${project.build.directory}
      * 
      * @parameter expression="${project.build.directory}"
+     * @required
+     * @since 1.0-alpha-1
      */
     private File outputDirectory;
+    
+    /**
+     * If true, remove the given sgsHome directory which is presumably
+     * the resulting installation after installing.  Otherwise, if a previous
+     * installation exists, it is preserved, and the install is skipped.
+     * 
+     * @parameter default-value="false"
+     * @since 1.0-alpha-2
+     */
+    private boolean cleanSgsHome;
     
 
     /** 
@@ -111,6 +130,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * @component
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     private ArtifactFactory artifactFactory;
 
@@ -120,6 +140,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * @component
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     private ArtifactResolver resolver;
 
@@ -129,6 +150,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * @parameter expression="${localRepository}"
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     private ArtifactRepository localRepository;
 
@@ -138,6 +160,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * @parameter expression="${project.remoteArtifactRepositories}" 
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     private List remoteRepositories;
     
@@ -147,6 +170,7 @@ public class InstallMojo extends AbstractSgsMojo {
      * @component
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     protected ArchiverManager archiverManager;
     
@@ -163,6 +187,24 @@ public class InstallMojo extends AbstractSgsMojo {
             throw new MojoExecutionException("Unable to resolve artifact", are);
         } catch (ArtifactNotFoundException anfe) {
             throw new MojoExecutionException("Artifact not found", anfe);
+        }
+        
+        //check for previous installation
+        if(sgsHome.exists() && sgsHome.isDirectory()) {
+            if(cleanSgsHome) {
+                try {
+                    this.getLog().info("Removing previous Project Darkstar " +
+                                       "installation at " + sgsHome);
+                    FileUtils.deleteDirectory(sgsHome);
+                } catch(IOException e) {
+                    throw new MojoExecutionException("Unable to delete " + 
+                                                     sgsHome, e);
+                }
+            } else {
+                this.getLog().info("Previous Project Darkstar installation " +
+                                   "found.  Skipping install.");
+                return;
+            }
         }
         
         //unpack dependency into target outputDirectory

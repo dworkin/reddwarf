@@ -55,6 +55,7 @@ public abstract class AbstractDeployMojo extends AbstractSgsMojo {
      * Defaults to the "deploy" subdirectory under sgsHome.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     protected File deployDir;
     
@@ -63,6 +64,7 @@ public abstract class AbstractDeployMojo extends AbstractSgsMojo {
      * Otherwise, they will simply be copied.  Defaults to "false"
      * 
      * @parameter default-value="false"
+     * @since 1.0-alpha-1
      */
     protected boolean unpack;
     
@@ -72,6 +74,7 @@ public abstract class AbstractDeployMojo extends AbstractSgsMojo {
      * @component
      * @readonly
      * @required
+     * @since 1.0-alpha-1
      */
     protected ArchiverManager archiverManager;
 

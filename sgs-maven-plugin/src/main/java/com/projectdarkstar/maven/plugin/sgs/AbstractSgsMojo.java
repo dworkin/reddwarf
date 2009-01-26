@@ -48,6 +48,7 @@ public abstract class AbstractSgsMojo extends AbstractMojo {
      * 
      * @parameter
      * @required
+     * @since 1.0-alpha-1
      */
     protected File sgsHome;
 

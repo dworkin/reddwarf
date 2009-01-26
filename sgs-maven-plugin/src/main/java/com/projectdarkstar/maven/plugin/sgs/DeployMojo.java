@@ -47,6 +47,7 @@ public class DeployMojo extends AbstractDeployMojo {
      * The jar files to deploy into the Project Darkstar server.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private File[] files;
     

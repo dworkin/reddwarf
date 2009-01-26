@@ -56,6 +56,7 @@ public class StopMojo extends AbstractSgsMojo {
      * Project Darkstar server installation conf directory is used.
      * 
      * @parameter
+     * @since 1.0-alpha-1
      */
     private File alternateBoot;
     
