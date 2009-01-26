@@ -584,6 +584,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 				    SimpleSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
+		synchronized (writeLock) {
+		    pendingWrites.clear();
+		}
 		disconnect();
             }
         }

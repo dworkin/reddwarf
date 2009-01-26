@@ -608,6 +608,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int port = serverNode.getAppPort();
 	try {
 	    client1.connect(port).login();
+	    Thread.sleep(100);
 	    client2.connect(port).login();
 	    client1.checkDisconnectedCallback(false);
 	    assertTrue(client2.isConnected());
@@ -1706,6 +1707,12 @@ public class TestClientSessionServiceImpl extends TestCase {
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
 
+	    if (!(session instanceof ClientSessionWrapper)) {
+		throw new IllegalArgumentException(
+		    "session not instance of ClientSessionWrapper:" +
+		    session);
+	    }
+
 	    String name = session.getName();
 	    DummyClientSessionListener listener;
 	    
@@ -1766,7 +1773,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
-	private final BigInteger sessionRefId;
+	private final ManagedReference<ClientSession> sessionRef;
 	private BigInteger reconnectKey;
 	private final boolean disconnectedThrowsException;
 
@@ -1776,9 +1783,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    boolean disconnectedThrowsException)
 	{
 	    this.name = name;
-	    session = ((ClientSessionWrapper) session).getClientSession();
-	    this.sessionRefId =
-		AppContext.getDataManager().createReference(session).getId();
+	    this.sessionRef =
+		AppContext.getDataManager().createReference(session);
 	    this.disconnectedThrowsException = disconnectedThrowsException;
 	}
 
@@ -1786,16 +1792,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
-	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.markForUpdate(this);
+	    AppContext.getDataManager().removeObject(sessionRef.get());
 	    DummyClient client = dummyClients.get(reconnectKey);
-	    ClientSession session = (ClientSession)
-		dataManager.getBinding(name);
-	    dataManager.removeObject(session);
-	    client.receivedDisconnectedCallback = true;
-	    client.graceful = graceful;
-	    synchronized (client.disconnectedCallbackLock) {
-		client.disconnectedCallbackLock.notifyAll();
+	    if (client != null) {
+		client.receivedDisconnectedCallback = true;
+		client.graceful = graceful;
+		synchronized (client.disconnectedCallbackLock) {
+		    client.disconnectedCallbackLock.notifyAll();
+		}
 	    }
 	    if (disconnectedThrowsException) {
 		throw new RuntimeException(

@@ -159,7 +159,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		Level.WARNING,
 		"session message received before login completed:{0}",
 		this);
-	    return future.done();
+	    future.done();
+	    return future;
 	}
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("NotifyListenerMessageReceived") {
@@ -192,7 +193,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		Level.WARNING,
 		"channel message received before login completed:{0}",
 		this);
-	    return future.done();
+	    future.done();
+	    return future;
 	}
 
 	taskQueue.addTask(
@@ -223,7 +225,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	scheduleHandleDisconnect(isConnected(), false);
 
 	// Enable protocol message channel to read immediately
-	return (new CompletionFutureImpl()).done();
+	CompletionFutureImpl future = new CompletionFutureImpl();
+	future.done();
+	return future;
     }
 
     /** {@inheritDoc} */
@@ -231,7 +235,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	scheduleHandleDisconnect(false, true);
 	
 	// TBD: should we wait to notify until client disconnects connection?
-	return (new CompletionFutureImpl()).done();
+	CompletionFutureImpl future = new CompletionFutureImpl();
+	future.done();
+	return future;
     }
 
     /* -- Instance methods -- */
@@ -586,10 +592,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @param	node a node
      */
-    private void loginRedirect( Node node) {
+    private void loginRedirect(Node node) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    loginCompletionFuture.loginRedirect(node);
+	    Collection<ProtocolDescriptor> descriptors =
+		ClientSessionServiceImpl.getInstance().
+		    getProtocolDescriptors(node.getId());
+	    loginCompletionFuture.setException(
+ 		new LoginRedirectException(node, descriptors));
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -603,7 +613,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	synchronized (lock) {
 	    checkConnectedState();
 	    loggedIn = true;
-	    loginCompletionFuture.loginSuccess();
+	    loginCompletionFuture.done();
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -616,12 +626,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * @param	exception the login failure exception
      */
     void loginFailure(LoginFailureException exception) {
-	if (exception == null) {
-	    throw new NullPointerException("null exception");
-	}
+	checkNull("exception", exception);
 	synchronized (lock) {
 	    checkConnectedState();
-	    loginCompletionFuture.loginFailure(exception);
+	    loginCompletionFuture.setException(exception);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -825,10 +833,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * This future is returned from {@link SessionProtocolHandler}
-     * operations.
+     * This future is an abstract implementation for the futures
+     * returned by {@code ProtocolListener} and {@code SessionProtocolHandler}.
      */
-    private static class CompletionFutureImpl implements CompletionFuture {
+    private static abstract class AbstractCompletionFuture<T> {
 
 	/**
 	 * Indicates whether the operation associated with this future
@@ -840,8 +848,21 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	private Object lock = new Object();
 	
 	/** Constructs an instance. */
-	CompletionFutureImpl() {
+	protected AbstractCompletionFuture() {
 	}
+
+	/**
+	 * Returns the value associated with this future, or throws
+	 * {@code ExecutionException} if there is a problem
+	 * processing the operation associated with this future.
+	 *
+	 * @return	the value for this future
+	 * @throws	ExecutionException if there is a problem processing
+	 *		the operation associated with this future
+	 */
+	protected abstract T getValue()
+	    throws ExecutionException;
+
 
 	/** {@inheritDoc} */
 	public boolean cancel(boolean mayInterruptIfRunning) {
@@ -849,106 +870,17 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	/** {@inheritDoc} */
-	public Void get() throws InterruptedException {
+	public T get() throws InterruptedException, ExecutionException {
 	    synchronized (lock) {
 		while (!done) {
 		    lock.wait();
 		}
 	    }
-	    return null;
+	    return getValue();
 	}
 
 	/** {@inheritDoc} */
-	public Void get(long timeout, TimeUnit unit)
-	    throws InterruptedException, TimeoutException
-	{
-	    synchronized (lock) {
-		if (!done) {
-		    unit.timedWait(lock, timeout);
-		}
-		if (!done) {
-		    throw new TimeoutException();
-		}
-	    }
-	    return null;
-	}
-
-	/** {@inheritDoc} */
-	public boolean isCancelled() {
-	    return false;
-	}
-
-	/** {@inheritDoc} */
-	public boolean isDone() {
-	    synchronized (lock) {
-		return done;
-	    }
-	}
-
-	/**
-	 * Indicates that the operation associated with this future
-	 * is complete. Subsequent invocations to {@link #isDone
-	 * isDone} will return {@code true}.
-	 */
-	CompletionFuture done() {
-	    synchronized (lock) {
-		done = true;
-		lock.notifyAll();
-	    }
-	    return this;
-	}
-    }
-
-    /**
-     * This future is returned from {@link SessionProtocolHandler}
-     * operations.
-     */
-    private static class LoginCompletionFutureImpl
-	implements LoginCompletionFuture
-    {
-	/** Lock for accessing this object's fields. */
-	private Object lock = new Object();
-	
-	/**
-	 * Indicates whether the operation associated with this future
-	 * is complete.
-	 */
-	private boolean done = false;
-
-	/** A session protocol handler. */
-	private final SessionProtocolHandler handler;
-
-	/** An exception cause, or {@code null}. */
-	private Throwable exceptionCause = null;
-
-	/** Constructs an instance. */
-	LoginCompletionFutureImpl(SessionProtocolHandler handler) {
-	    this.handler = handler;
-	}
-
-	/** {@inheritDoc} */
-	public boolean cancel(boolean mayInterruptIfRunning) {
-	    return false;
-	}
-
-	/** {@inheritDoc} */
-	public SessionProtocolHandler get()
-	    throws InterruptedException, ExecutionException
-	{
-	    synchronized (lock) {
-		while (!done) {
-		    lock.wait();
-		}
-		if (exceptionCause != null) {
-		    throw new ExecutionException(exceptionCause);
-		} else {
-		    return handler;
-		}
-	    }
-	}
-
-	/** {@inheritDoc} */
-	public SessionProtocolHandler get(long timeout, TimeUnit unit)
+	public T get(long timeout, TimeUnit unit)
 	    throws InterruptedException, ExecutionException, TimeoutException
 	{
 	    synchronized (lock) {
@@ -957,11 +889,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		}
 		if (!done) {
 		    throw new TimeoutException();
-		} else if (exceptionCause != null) {
-		    throw new ExecutionException(exceptionCause);
-		} else {
-		    return handler;
 		}
+		return getValue();
 	    }
 	}
 
@@ -982,36 +911,87 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 * is complete. Subsequent invocations to {@link #isDone
 	 * isDone} will return {@code true}.
 	 */
-	void loginSuccess() {
+	void done() {
 	    synchronized (lock) {
-		done = true;
-		lock.notifyAll();
-	    }
-	}
-
-	void loginRedirect(Node node) {
-	    if (node == null) {
-		throw new NullPointerException("null node");
-	    }
-
-	    Collection<ProtocolDescriptor> descriptors =
-		ClientSessionServiceImpl.getInstance().
-		    getProtocolDescriptors(node.getId());
-	    synchronized (lock) {
-		exceptionCause = new LoginRedirectException(node, descriptors);
-		done = true;
-		lock.notifyAll();
-	    }
-	}
-	void loginFailure(LoginFailureException loginFailureException) {
-	    synchronized (lock) {
-		exceptionCause = loginFailureException;
 		done = true;
 		lock.notifyAll();
 	    }
 	}
     }
-    
+
+
+    /**
+     * This future is returned from {@link SessionProtocolHandler}
+     * operations.
+     */
+    private static class CompletionFutureImpl
+	extends AbstractCompletionFuture<Void>
+	implements CompletionFuture
+    {
+	/** {@inheritDoc} */
+	protected Void getValue() {
+	    return null;
+	}
+    }
+
+    /**
+     * This future is returned from the {@code ProtocolListener}'s
+     * {@code newLogin} method.
+     */
+    private static class LoginCompletionFutureImpl
+	extends AbstractCompletionFuture<SessionProtocolHandler>
+	implements LoginCompletionFuture
+    {
+	/** A session protocol handler. */
+	private final SessionProtocolHandler handler;
+
+	/** An exception cause, or {@code null}. */
+	private volatile Throwable exceptionCause = null;
+
+	/**
+	 * Constructs an instance with the specified {@code Handler}..
+	 *
+	 * @param	handler a session protocol handler
+	 */
+	LoginCompletionFutureImpl(SessionProtocolHandler handler) {
+	    super();
+	    this.handler = handler;
+	}
+
+	/** {@inheritDoc} */
+	protected SessionProtocolHandler getValue()
+	    throws ExecutionException
+	{
+	    if (exceptionCause != null) {
+		throw new ExecutionException(exceptionCause);
+	    } else {
+		return handler;
+	    }
+	}
+
+	/**
+	 * Sets the exception cause for this future to the specified
+	 * {@code throwable}.  The given exception will be used as
+	 * the cause of the {@code ExecutionException} thrown by
+	 * this future's {@code get} methods.
+	 *
+	 * @param	throwable an exception cause
+	 */
+	void setException(Throwable throwable) {
+	    checkNull("throwable", throwable);
+	    exceptionCause = throwable;
+	    done();
+	}
+    }
+
+    /**
+     * Throws a {@code NullPointerException} if the specified
+     * {@code var} is null.  The exception's detail message will
+     * include the specified variable's name, {@code varName}.
+     *
+     * @param	varName the variable's name
+     * @param	var the variable to check
+     */
     private static void checkNull(String varName, Object var) {
 	if (var == null) {
 	    throw new NullPointerException("null " + varName);

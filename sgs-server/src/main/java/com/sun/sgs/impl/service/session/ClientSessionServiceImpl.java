@@ -61,8 +61,6 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.Serializable;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -149,10 +147,6 @@ public final class ClientSessionServiceImpl
     /** The protocol acceptor property name. */
     private static final String PROTOCOL_ACCEPTOR_PROPERTY =
 	PKG_NAME + ".protocol.acceptor";
-
-    /** The default protocol acceptor class. */
-    private static final String DEFAULT_PROTOCOL_ACCEPTOR =
-	SimpleSgsProtocolAcceptor.class.getName();
 
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
@@ -323,24 +317,24 @@ public final class ClientSessionServiceImpl
 		taskOwner);
 
 	    /*
-	     * Create the protocol acceptor.
+	     * Create the protocol listener and acceptor.
 	     */
 	    protocolListener = new ProtocolListenerImpl();
-	    String acceptorClassName = wrappedProps.getProperty(
-		PROTOCOL_ACCEPTOR_PROPERTY, DEFAULT_PROTOCOL_ACCEPTOR);
-	    Class<?> acceptorClass =
-		Class.forName(acceptorClassName);
-	    Constructor<?> acceptorConstr =
-		acceptorClass.getConstructor(
-		    Properties.class, ComponentRegistry.class,
-		    TransactionProxy.class);
-	    try {
-		protocolAcceptor = (ProtocolAcceptor)
-		    acceptorConstr.newInstance(
-			properties, systemRegistry, txnProxy);
-	    } catch (InvocationTargetException ite) {
-		throw (Exception) ite.getCause();
-	    }
+
+	    ProtocolAcceptor newAcceptor =
+		wrappedProps.getClassInstanceProperty(
+		    PROTOCOL_ACCEPTOR_PROPERTY,
+		    ProtocolAcceptor.class,
+		    new Class[] {
+			Properties.class, ComponentRegistry.class,
+			TransactionProxy.class },
+		    properties, systemRegistry, txnProxy);
+	    
+	    protocolAcceptor =
+		newAcceptor != null ?
+		newAcceptor :
+		new SimpleSgsProtocolAcceptor(
+		    properties, systemRegistry, txnProxy);
             
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

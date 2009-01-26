@@ -39,7 +39,13 @@ public interface SessionProtocolHandler {
     /**
      * Processes a message sent by the associated client and returns a
      * future for determining when this handler has completed processing
-     * the session message.
+     * the session message.  The message starts at the buffer's current
+     * position and ends at the buffer's limit.  The buffer's position is
+     * not modified by this operation.
+     * 
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message supplied to this method.
      *
      * @param	message a message
      * @return	future a future for the result
@@ -50,7 +56,13 @@ public interface SessionProtocolHandler {
      * Processes a channel message sent by the associated client on the
      * channel with the specified {@code channelId}, and returns a future
      * for determining when this handler has completed processing the
-     * channel message.
+     * channel message.  The message starts at the buffer's current
+     * position and ends at the buffer's limit.  The buffer's position is
+     * not modified by this operation.
+     * 
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message supplied to this method.
      *
      * @param	channelId a channel ID
      * @param	message a message
