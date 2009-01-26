@@ -23,4 +23,11 @@
     <Bug pattern="REC_CATCH_EXCEPTION"/>
   </Match>
 
+  <!-- Allow exposure of internal buffer array since MessageBuffer is just
+       a wrapper of that particular array. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.sharedutil.MessageBuffer"/>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+  </Match>
+
 </FindBugsFilter>

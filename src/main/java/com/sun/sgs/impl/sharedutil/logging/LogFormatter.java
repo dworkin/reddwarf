@@ -72,11 +72,11 @@ import java.util.logging.LogRecord;
  * stack traces, put the following text in the logging configuration file:
  *
  * <pre>
- *   .level = INFO
- *   handlers = java.util.logging.ConsoleHandler
- *   java.util.logging.ConsoleHandler.formatter = com.sun.sgs.impl.sharedutil.logging.LogFormatter
- *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.time.format = %tQ
- *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.print.stack = false
+ *   .level=INFO
+ *   handlers=java.util.logging.ConsoleHandler
+ *   java.util.logging.ConsoleHandler.formatter=com.sun.sgs.impl.sharedutil.logging.LogFormatter
+ *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.time.format=%tQ
+ *   com.sun.sgs.impl.sharedutil.logging.LogFormatter.print.stack=false
  * </pre>
  */
 public class LogFormatter extends java.util.logging.Formatter {

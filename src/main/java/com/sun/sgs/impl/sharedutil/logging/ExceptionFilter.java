@@ -74,12 +74,12 @@ import java.util.logging.LogRecord;
  * file:
  *
  * <pre>
- *   .level = FINEST
- *   handlers = java.util.logging.ConsoleHandler
- *   java.util.logging.ConsoleHandler.level = FINEST
- *   java.util.logging.ConsoleHandler.filter = com.sun.sgs.impl.sharedutil.logging.ExceptionFilter
- *   com.sun.sgs.impl.sharedutil.logging.ExceptionFilter.exception = com.sun.sgs.app.TransactionAbortedException
- *   com.sun.sgs.impl.sharedutil.logging.ExceptionFilter.level = WARNING
+ *   .level=FINEST
+ *   handlers=java.util.logging.ConsoleHandler
+ *   java.util.logging.ConsoleHandler.level=FINEST
+ *   java.util.logging.ConsoleHandler.filter=com.sun.sgs.impl.sharedutil.logging.ExceptionFilter
+ *   com.sun.sgs.impl.sharedutil.logging.ExceptionFilter.exception=com.sun.sgs.app.TransactionAbortedException
+ *   com.sun.sgs.impl.sharedutil.logging.ExceptionFilter.level=WARNING
  * </pre>
  */
 public class ExceptionFilter implements Filter {

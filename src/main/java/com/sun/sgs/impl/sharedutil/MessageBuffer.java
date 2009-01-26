@@ -217,7 +217,7 @@ public class MessageBuffer {
      * buffer would overflow the buffer
      */
     public MessageBuffer putChar(int v) {
-	if (pos+2 > capacity) {
+        if (pos + 2 > capacity) {
 	    throw new IndexOutOfBoundsException();
 	}
 	putByte((v >>> 8) & 0xFF);	
@@ -236,7 +236,7 @@ public class MessageBuffer {
      * buffer would overflow the buffer
      */
     public MessageBuffer putShort(int v) {
-	if (pos+2 > capacity) {
+        if (pos + 2 > capacity) {
 	    throw new IndexOutOfBoundsException();
 	}
 	putByte((v >>> 8) & 0xFF);	
@@ -255,7 +255,7 @@ public class MessageBuffer {
      * buffer would overflow the buffer
      */
     public MessageBuffer putInt(int v) {
-	if (pos+4 > capacity) {
+        if (pos + 4 > capacity) {
 	    throw new IndexOutOfBoundsException();
 	}
 	putByte((v >>> 24) & 0xff);
@@ -276,7 +276,7 @@ public class MessageBuffer {
      * buffer would overflow the buffer
      */
     public MessageBuffer putLong(long v) {
-	if (pos+8 > capacity) {
+        if (pos + 8 > capacity) {
 	    throw new IndexOutOfBoundsException();
 	}
 	putByte((byte) (v >>> 56));
@@ -306,7 +306,7 @@ public class MessageBuffer {
 	// Note: code adapted from java.io.DataOutputStream.writeUTF
 	
 	int size = getSize(str);
-	if (pos+size > capacity) {
+        if (pos + size > capacity) {
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -324,11 +324,13 @@ public class MessageBuffer {
 	
         for (i = 0; i < strlen; i++) {
            char c = str.charAt(i);
-           if (!((c >= 0x0001) && (c <= 0x007F))) break;
+            if (!((c >= 0x0001) && (c <= 0x007F))) {
+                break;
+            }
            buf[pos++] = (byte) c;
         }
 	
-	for (;i < strlen; i++){
+        for (; i < strlen; i++) {
             char c = str.charAt(i);
 	    if ((c >= 0x0001) && (c <= 0x007F)) {
 		buf[pos++] = (byte) c;
@@ -397,7 +399,7 @@ public class MessageBuffer {
      * be reached as a result of getting the specified number of bytes
      */
     public byte[] getBytes(int size) {
-	if (pos+size > limit) {
+        if (pos + size > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -418,7 +420,7 @@ public class MessageBuffer {
      * be reached as a result of getting the next two bytes
      */
     public short getShort() {
-	if (pos+2 > limit) {
+        if (pos + 2 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
 	
@@ -436,7 +438,7 @@ public class MessageBuffer {
      * be reached as a result of getting the next two bytes
      */
     public int getUnsignedShort() {
-        if (pos+2 > limit) {
+        if (pos + 2 > limit) {
             throw new IndexOutOfBoundsException();
         }
         
@@ -453,7 +455,7 @@ public class MessageBuffer {
      * be reached as a result of getting the next four bytes
      */
     public int getInt() {
-	if (pos+4 > limit) {
+        if (pos + 4 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -474,7 +476,7 @@ public class MessageBuffer {
      * be reached as a result of getting the next eight bytes
      */
     public long getLong() {
-	if (pos+8 > limit) {
+        if (pos + 8 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -499,7 +501,7 @@ public class MessageBuffer {
      * be reached as a result of getting the next two bytes
      */
     public char getChar() {
-	if (pos+2 > limit) {
+        if (pos + 2 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -519,7 +521,7 @@ public class MessageBuffer {
 
 	// Note: code adapted from java.io.DataInputStream.readUTF
 	
-	if (pos+2 > limit) {
+        if (pos + 2 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -544,7 +546,9 @@ public class MessageBuffer {
 
         while (pos < utfEnd) {
             c = buf[pos] & 0xff;      
-            if (c > 127) break;
+            if (c > 127) {
+                break;
+            }
             pos++;
             chars[index++] = (char) c;
         }
@@ -568,7 +572,7 @@ public class MessageBuffer {
                         throw new UTFDataFormatException(
 			    "malformed input: partial character at end");
 		    }
-                    char2 = buf[pos-1];
+                    char2 = buf[pos - 1];
                     if ((char2 & 0xC0) != 0x80) {
                         throw new UTFDataFormatException(
 			    "malformed input around byte " + pos);
@@ -584,11 +588,11 @@ public class MessageBuffer {
                         throw new UTFDataFormatException(
 			    "malformed input: partial character at end");
 		    }
-                    char2 = buf[pos-2];
-                    char3 = buf[pos-1];
+                    char2 = buf[pos - 2];
+                    char3 = buf[pos - 1];
                     if (((char2 & 0xC0) != 0x80) || ((char3 & 0xC0) != 0x80)) {
                         throw new UTFDataFormatException(
-			    "malformed input around byte " + (pos-1));
+                                "malformed input around byte " + (pos - 1));
 		    }
                     chars[index++] =
 			(char) (((c & 0x0F) << 12) |

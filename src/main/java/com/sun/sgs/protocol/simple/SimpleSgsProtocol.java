@@ -80,22 +80,29 @@ package com.sun.sgs.protocol.simple;
  * in the <a href="../../../../../overview-summary.html"> overview</a> for the 
  * implementation.
  */
-public interface SimpleSgsProtocol {
+public class SimpleSgsProtocol {
+    
+    /**
+     * This class should not be instantiated.
+     */
+    protected SimpleSgsProtocol() {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * The maximum length of a protocol message:
      * {@value #MAX_MESSAGE_LENGTH} bytes.
      */
-    final int MAX_MESSAGE_LENGTH = 65535;
+    public static final int MAX_MESSAGE_LENGTH = 65535;
 
     /**
      * The maximum payload length:
      * {@value #MAX_PAYLOAD_LENGTH} bytes.
      */
-    final int MAX_PAYLOAD_LENGTH = 65532;
+    public static final int MAX_PAYLOAD_LENGTH = 65532;
 
     /** The version number, currently {@code 0x04}. */
-    final byte VERSION = 0x04;
+    public static final byte VERSION = 0x04;
 
     final String TYPE = "SimpleSGSv" + VERSION;
     
@@ -142,7 +149,7 @@ public interface SimpleSgsProtocol {
      * LOGIN_REQUEST is not defined by the protocol, but is an
      * implementation-dependent detail of the server. 
      */
-    final byte LOGIN_REQUEST = 0x10;
+    public static final byte LOGIN_REQUEST = 0x10;
 
     /**
      * Login success. Server response to a client's {@link #LOGIN_REQUEST}.
@@ -157,7 +164,7 @@ public interface SimpleSgsProtocol {
      * reconnect to the server with the same identity using a
      * {@link #RECONNECT_REQUEST}.
      */
-    final byte LOGIN_SUCCESS = 0x11;
+    public static final byte LOGIN_SUCCESS = 0x11;
 
     /**
      * Login failure. Server response to a client's {@link #LOGIN_REQUEST}.
@@ -178,7 +185,7 @@ public interface SimpleSgsProtocol {
      * </ul>
      * 
      */
-    final byte LOGIN_FAILURE = 0x12;
+    public static final byte LOGIN_FAILURE = 0x12;
 
     /**
      * Login redirect. Server response to a client's {@link #LOGIN_REQUEST}.
@@ -197,7 +204,7 @@ public interface SimpleSgsProtocol {
      * the node to which it has been redirected by sending a
      * {@link #LOGIN_REQUEST} to that node.
      */
-    final byte LOGIN_REDIRECT = 0x13;
+    public static final byte LOGIN_REDIRECT = 0x13;
 
     /**
      * Reconnection request. Client requesting reconnect to a server. <br>
@@ -218,8 +225,7 @@ public interface SimpleSgsProtocol {
      * If the client receives a {@code RECONNECT_FAILURE} message, the client
      * should disconnect from the server.
      */
-
-    final byte RECONNECT_REQUEST = 0x20;
+    public static final byte RECONNECT_REQUEST = 0x20;
 
     /**
      * Reconnect success. Server response to a client's
@@ -234,7 +240,7 @@ public interface SimpleSgsProtocol {
      * subsequent reconnect requests from the client. Reciept of this message
      * indicates that the client session has been re-established. 
      */
-    final byte RECONNECT_SUCCESS = 0x21;
+    public static final byte RECONNECT_SUCCESS = 0x21;
 
     /**
      * Reconnect failure. Server response to a client's
@@ -253,7 +259,7 @@ public interface SimpleSgsProtocol {
      * discard the session state). The string returned details the reason for
      * the denial of reconnection. 
      */
-    final byte RECONNECT_FAILURE = 0x22;
+    public static final byte RECONNECT_FAILURE = 0x22;
 
     /**
      * Session message. May be sent by the client or the server. Maximum length
@@ -271,7 +277,7 @@ public interface SimpleSgsProtocol {
      * mechanisms for constructing and parsing these messages is an
      * application-level task. 
      */
-    final byte SESSION_MESSAGE = 0x30;
+    public static final byte SESSION_MESSAGE = 0x30;
 
     /**
      * Logout request from a client to a server. 
@@ -286,7 +292,7 @@ public interface SimpleSgsProtocol {
      * message will be ignored, and any message will need to be sent on a new
      * connection to the server.
      */
-    final byte LOGOUT_REQUEST = 0x40;
+    public static final byte LOGOUT_REQUEST = 0x40;
 
     /**
      * Logout success.  Server response to a client's {@link #LOGOUT_REQUEST}.
@@ -301,7 +307,7 @@ public interface SimpleSgsProtocol {
      * should shut down any networking resources that are used to communicate
      * with the server.
      */
-    final byte LOGOUT_SUCCESS = 0x41;
+    public static final byte LOGOUT_SUCCESS = 0x41;
 
     /**
      * Channel join.  Server notifying a client that it has joined a channel.
@@ -317,7 +323,7 @@ public interface SimpleSgsProtocol {
      * client has been added to the channel identified by the {@code channel 
      * name} and {@code channel ID} contained in the message. 
      */
-    final byte CHANNEL_JOIN = 0x50;
+    public static final byte CHANNEL_JOIN = 0x50;
 
     /**
      * Channel leave. Server notifying a client that the client has left a
@@ -333,12 +339,12 @@ public interface SimpleSgsProtocol {
      * client has been removed from the channel with the indicated {@code 
      * channel ID}. The client can no longer send messages on the channel.
      */
-    final byte CHANNEL_LEAVE = 0x51;
+    public static final byte CHANNEL_LEAVE = 0x51;
 
     /**
      * Channel message. May be sent by the client or the server. Maximum length
      * is {@value #MAX_PAYLOAD_LENGTH} bytes minus the sum of the {@code 
-     * channel ID} size and two bytes (the size of the unsigned short indicating 
+     * channel ID} size and two bytes (the size of the unsigned short indicating
      * the {@code channel Id} size). Larger messages require fragmentation and 
      * reassembly above this protocol layer. 
      * <br>
@@ -356,6 +362,6 @@ public interface SimpleSgsProtocol {
      * server may also refuse to send the message, or alter the message, because
      * of application-specific logic.
      */
-    final byte CHANNEL_MESSAGE = 0x52;
+    public static final byte CHANNEL_MESSAGE = 0x52;
 }
 
