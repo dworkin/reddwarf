@@ -23,11 +23,11 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
-import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
@@ -326,7 +326,7 @@ public final class ClientSessionServiceImpl
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
-	    /* Export the ClientSessionServer. */
+            /* Export the ClientSessionServer. */
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    serverImpl = new SessionServerImpl();
@@ -436,7 +436,14 @@ public final class ClientSessionServiceImpl
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
-
+            
+            ConfigManager config = (ConfigManager)
+                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            if (config == null) {
+                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
+            } else {
+                config.setAppPort(appPort);
+            }
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(

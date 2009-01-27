@@ -23,6 +23,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
@@ -94,8 +95,14 @@ public class TestTransactionCoordinatorImpl {
 
     @BeforeClass
     public static void first() throws Exception {
-        collector = new ProfileCollectorImpl(ProfileLevel.MIN, null, null);
-        collectorHandle =new ProfileCollectorHandleImpl(collector);
+        Properties props = System.getProperties();
+        collector = new ProfileCollectorImpl(ProfileLevel.MIN, props, null);
+        collectorHandle = new ProfileCollectorHandleImpl(collector);
+        
+        // Create and register the ConfigManager, which is used
+        // by the TaskAggregateStats at the end of each transaction
+        ConfigManager config = new ConfigManager(props);
+        collector.registerMBean(config, ConfigManager.MXBEAN_NAME);
     }
     
     @AfterClass

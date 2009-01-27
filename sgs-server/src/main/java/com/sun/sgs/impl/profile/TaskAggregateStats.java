@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.profile;
 
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.management.TaskAggregateMXBean;
 import com.sun.sgs.profile.AggregateProfileCounter;
 import com.sun.sgs.profile.AggregateProfileSample;
@@ -26,7 +27,6 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.management.MBeanNotificationInfo;
 import javax.management.Notification;
@@ -39,6 +39,8 @@ import javax.management.NotificationBroadcasterSupport;
 public class TaskAggregateStats extends NotificationBroadcasterSupport
         implements TaskAggregateMXBean
 {
+    private final double DEFAULT_SMOOTHING_FACTOR = 0.01;
+    
     /* Task counts */
     private final AggregateProfileCounter numTasks;
     private final AggregateProfileCounter numTransactionalTasks;
@@ -52,12 +54,6 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     private final AggregateProfileSample lagtime;
     private final AggregateProfileSample latency;
     
-    /* We're going to ignore the first few tasks, because they are run
-     * during startup, with an infinite timeout.
-     */
-    private boolean startupLatch = true;
-    private final AtomicInteger firstTasks = new AtomicInteger(20);
-    
     /** 
      * Smoothing factor for exponential smoothing, between 0 and 1.
      * A value closer to one provides less smoothing of the data, and
@@ -66,8 +62,32 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
      * <p>
      * There's a lot of data coming through here, so we want a lot of smoothing.
      */
-    private double smoothingFactor = 0.01;
+    private double smoothingFactor = DEFAULT_SMOOTHING_FACTOR;
 
+    /**
+     * The last time {@link #clear} was called, or when this object
+     * was created if {@code clear} has not been called.
+     */
+    private long lastClear = System.currentTimeMillis();
+
+    /**
+     * The standard transaction timeout, used to determine if a successful
+     * task was unbounded or not.  We don't count the unbounded tasks in
+     * our statistics.
+     */
+    private volatile long standardTimeout;
+        
+    /** 
+     * Our profile collector, used to lazily set the standardTimeout.
+     */
+    private final ProfileCollector collector;
+    
+    /**
+     * A latch for the first task, so we can lazily retrieve the
+     * standard transaction timeout.
+     */
+    private boolean firstTask = true;
+    
     // Notification information - we do not yet emit notifications for 
     // this MBean.  We do not yet document these notification types, as 
     // they aren't used yet.
@@ -91,12 +111,17 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
      */
     TaskAggregateStats(ProfileCollector collector, String name) {
         super(notificationInfo);
+        this.collector = collector;
         ProfileConsumer consumer = collector.getConsumer(name);
-
+        
         // We could determine that some of these statistics need to be
         // on all the time (level MIN) so we can use them for load balancing
         // or because they are extremely useful.
+        // 
+        // Note that if the counters are all on the time, we could just
+        // as easily use AtomicLongs rather than AggregateProfileCounters.
         ProfileLevel level = ProfileLevel.MEDIUM;
+        
         // These statistics are reported to the profile reports
         // directly, with the ProfileCollector.
         // They should not be reported as TASK_AND_AGGREGATE because,
@@ -133,7 +158,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     void notifyTaskQueue() {
         sendNotification(
                 new Notification("com.sun.sgs.task.queue.behind",
-                                 this.MXBEAN_NAME,
+                                 MXBEAN_NAME,
                                  seqNumber.incrementAndGet(),
                                  System.currentTimeMillis(),
                                  "Task queue is behind"));
@@ -199,6 +224,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
 
     /** {@inheritDoc} */
     public void clear() {
+        lastClear = System.currentTimeMillis();
         numTasks.clearCount();
         numTransactionalTasks.clearCount();
         numFailedTasks.clearCount();
@@ -208,39 +234,40 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
         latency.clearSamples();
     }
     
+    /** {@inheritDoc} */
+    public long getLastClearTime() {
+        return lastClear;
+    }
+    
     // Methods used by ProfileCollector to update our values when
     // tasks complete
     void taskFinishedSuccess(boolean trans, long ready, long run, long lag) {
-        taskFinishedCommon(trans, ready);  
-        if (startupLatch) {
+        taskFinishedCommon(trans, ready);
+        if (firstTask) {
+            firstTask = false;
+            ConfigManager config = (ConfigManager) 
+                collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            standardTimeout = config.getStandardTxnTimeout();
+        }
+        if (run > standardTimeout) {
             return;
         }
         runtime.addSample(run);
         lagtime.addSample(lag);
         latency.addSample(run + lag);
-
     }
+    
     void taskFinishedFail(boolean trans, long ready) {
         taskFinishedCommon(trans, ready);
-        if (startupLatch) {
-            return;
-        }
         numFailedTasks.incrementCount();
     }
+    
     void taskFinishedCommon(boolean trans, long ready) {
-        // We throw out the first several tasks, because they occur during
-        // startup and can be arbitrarily long.
-        if (startupLatch) {
-            if (firstTasks.decrementAndGet() < 0) {
-                startupLatch = false;
-            } 
-        } else {
-            numTasks.incrementCount();
-            if (trans) {
-                numTransactionalTasks.incrementCount();
-            }
-            readyCount.addSample(ready);
+        numTasks.incrementCount();
+        if (trans) {
+            numTransactionalTasks.incrementCount();
         }
+        readyCount.addSample(ready);
     }
     
     /**

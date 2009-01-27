@@ -138,6 +138,11 @@ public class TestMBeans {
     public void setUp() throws Exception {
         Properties props = 
                 SgsTestNode.getDefaultProperties(APP_NAME, null, null);
+        // Use the platform mbean server, as this is the default for the
+        // product.  Most tests create their own mbean server to allow
+        // multiple nodes to be created in one VM.
+        props.setProperty(ProfileCollectorImpl.CREATE_MBEAN_SERVER_PROPERTY,
+                          "false");
         serverNode = new SgsTestNode(APP_NAME, null, props);
         profileCollector = getCollector(serverNode);
         systemRegistry = serverNode.getSystemRegistry();

@@ -25,6 +25,7 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
@@ -64,6 +65,7 @@ import javax.management.InstanceNotFoundException;
 import javax.management.JMException;
 import javax.management.MBeanRegistrationException;
 import javax.management.MBeanServer;
+import javax.management.MBeanServerFactory;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 
@@ -71,7 +73,21 @@ import javax.management.ObjectName;
 /**
  * This is the implementation of {@code ProfileCollector} used by the
  * kernel to collect and report profiling data. It uses a single thread to
- * consume and report profiling data.
+ * consume and report profiling data to {@code ProfileListeners}.
+ * <p>
+ * The {@link #ProfileCollector constructor} supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.profile.create.mbeanserver
+ *	</b></code><br>
+ *	<i>Default:</i> {@code false} <br>
+ *      Specifies whether a new {@code MBeanServer} should be created, rather
+ *      than using the existing platform {@code MBeanServer}. <p>
+ * 
+ * </dl> <p>
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
 
@@ -84,6 +100,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(ProfileCollectorImpl.
                                            class.getName()));
+    
+    // The property telling us whether we should use the default platform
+    // MBeanServer or create a new one
+    public static final String CREATE_MBEAN_SERVER_PROPERTY = 
+            "com.sun.sgs.impl.profile.create.mbeanserver";
     
     // A map from profile consumer name to profile consumer object
     private final ConcurrentHashMap<String, ProfileConsumerImpl> consumers;
@@ -120,7 +141,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     private final ComponentRegistry systemRegistry;
     
     // The MBeans registered for this node.
-    private ConcurrentMap<String, Object> registeredMBeans;
+    private final ConcurrentMap<String, Object> registeredMBeans;
+    
+    // Our MBeanServer
+    private final MBeanServer mbeanServer;
     
     // The statistics MBean for tasks
     private final TaskAggregateStats taskStats;
@@ -149,6 +173,15 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         
         registeredMBeans = new ConcurrentHashMap<String, Object>();
 
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(appProperties);
+        boolean createServer = 
+           wrappedProps.getBooleanProperty(CREATE_MBEAN_SERVER_PROPERTY, false);
+        if (createServer) {
+            mbeanServer = MBeanServerFactory.createMBeanServer();
+        } else {
+            mbeanServer = ManagementFactory.getPlatformMBeanServer();
+        }
+        
         // Create the task aggregator MBean and register it, as well as
         // the profile controller MBean.
         taskStats = new TaskAggregateStats(this,
@@ -188,11 +221,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
         
         // attempt to unregister all our registered MBeans
-        MBeanServer platServer = ManagementFactory.getPlatformMBeanServer();
         Set<String> keys = registeredMBeans.keySet();
         for (String name : keys) {
             try {
-                platServer.unregisterMBean(new ObjectName(name));
+                mbeanServer.unregisterMBean(new ObjectName(name));
             } catch (MalformedObjectNameException ex) {
                 logger.logThrow(Level.WARNING, ex,
                                 "Could not unregister MBean {0}", name);
@@ -319,12 +351,9 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     public void registerMBean(Object mBean, String mBeanName)
         throws JMException
     {
-        // Register beans with Platform MBeanServer
-        MBeanServer platServer = ManagementFactory.getPlatformMBeanServer();
-
         try {
             ObjectName name = new ObjectName(mBeanName);
-            platServer.registerMBean(mBean, name);
+            mbeanServer.registerMBean(mBean, name);
 
             registeredMBeans.putIfAbsent(mBeanName, mBean);
             logger.log(Level.CONFIG, "Registered MBean {0}", name);

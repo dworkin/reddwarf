@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -128,7 +129,7 @@ import javax.management.JMException;
  *	{@code 65535}.<p>
  * 
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.management.jmxreport.port
+ *	com.sun.management.jmxremote.port
  *	</b></code><br>
  *	<i>Default:</i> None <br>
  *
@@ -360,12 +361,12 @@ public final class WatchdogServiceImpl
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 
+            int jmxPort = wrappedProps.getIntProperty(
+                    StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
             if (startServer) {
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                int jmxPort = wrappedProps.getIntProperty(
-                    StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
                 long[] values = serverProxy.registerNode(clientHost, appPort, 
                                                          clientProxy, jmxPort);
                 if (values == null || values.length < 2) {
@@ -388,6 +389,14 @@ public final class WatchdogServiceImpl
                                         WatchdogServiceStats.MXBEAN_NAME);
             } catch (JMException e) {
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            // set our data in the ConfigMXBean
+            ConfigManager config = (ConfigManager)
+                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            if (config == null) {
+                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
+            } else {
+                config.setJmxPort(jmxPort);
             }
             
 	    if (logger.isLoggable(Level.CONFIG)) {

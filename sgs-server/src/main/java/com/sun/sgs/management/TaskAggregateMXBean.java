@@ -120,4 +120,10 @@ public interface TaskAggregateMXBean {
      * Clears all data values.
      */
     void clear();
+    
+    /**
+     * Returns the time of the last call to {@link #clear}, or the time
+     * this MBean was created {@code clear} has never been called.
+     */
+    long getLastClearTime();
 }

@@ -26,28 +26,29 @@ import java.net.UnknownHostException;
 import java.util.Properties;
 
 /**
- * The configuration manager for this node.  This object is immutable
- * and contains various configuration values used when this node was
- * started up.
+ * The configuration manager for this node.  This object contains
+ * various configuration values. Services and components fill in
+ * portions of this object with their defaults or overridden values.
+ * <p>
+ * The ConfigMXBean presented to JMX clients is immutable.
  */
-class ConfigManager implements ConfigMXBean {
+public class ConfigManager implements ConfigMXBean {
 
     private final NodeType nodeType;
     private final String appName;
     private final String appRoot;
     private final String appListener;
     private final String hostName;
-    private final int appPort;
+    private int appPort = -1;   // default is no app port
     private final String serverHost;
-    private final int jmxPort;
+    private int jmxPort;
     private long standardTxnTimeout;
 
     /** 
      * Creates a config manager instance.
      * @param props  properties
-     * @param standardTimeout the standard (not unbounded) timeout value
      */
-    public ConfigManager(Properties props, long standardTimeout) {
+    public ConfigManager(Properties props) {
         String value = props.getProperty(StandardProperties.NODE_TYPE);
         if (value == null) {
             // Default is single node
@@ -61,16 +62,8 @@ class ConfigManager implements ConfigMXBean {
         
         appName = props.getProperty(StandardProperties.APP_NAME);
         appRoot = props.getProperty(StandardProperties.APP_ROOT);
-        // Optional property
-        String port = props.getProperty(StandardProperties.APP_PORT);
-        appPort = (port == null) ? -1 : Integer.parseInt(port);
         appListener = props.getProperty(StandardProperties.APP_LISTENER);
         serverHost = props.getProperty(StandardProperties.SERVER_HOST, "none");
-        // Optional property
-        String jmx = 
-                props.getProperty(StandardProperties.SYSTEM_JMX_REMOTE_PORT);
-        jmxPort = (jmx == null) ? -1 : Integer.parseInt(jmx);
-        standardTxnTimeout = standardTimeout;
         String name;
         try {
             name = InetAddress.getLocalHost().getHostName();
@@ -123,5 +116,33 @@ class ConfigManager implements ConfigMXBean {
     /** {@inheritDoc} */
     public long getStandardTxnTimeout() {
         return standardTxnTimeout;
+    }
+    
+    /**
+     * Sets the standard timeout value.
+     * 
+     * @param timeout the standard timeout
+     */
+    public void setStandardTxnTimeout(long timeout) {
+        standardTxnTimeout = timeout;
+    }
+    
+    /**
+     * Sets the jmxPort value.
+     * 
+     * @param jmxPort the port JMX is listening on
+     */
+    public void setJmxPort(int jmxPort) {
+        this.jmxPort = jmxPort;
+    }
+    
+    /**
+     * Sets the application port number when it is known by
+     * the client session service.
+     * TODO:  will change with the pluggable I/O
+     * @param appPort the application port
+     */
+    public void setAppPort(int appPort) {
+        this.appPort = appPort;
     }
 }

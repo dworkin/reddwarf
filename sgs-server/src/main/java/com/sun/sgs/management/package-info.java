@@ -20,8 +20,13 @@
 /**
  * Provides the Project Darkstar management interfaces exposed via JMX.
  * <p>
+ * <b>
  * These interfaces should not be considered stable;  they will evolve
- * as we gather more experience using JMX with Project Darkstar.
+ * as we gather more experience using JMX with Project Darkstar.  In
+ * particular, more data and statistics might be exposed and notifications
+ * might be added, and some might be removed if we find they are not
+ * generally useful.
+ * </b>
  * <p>
  * By convention, only one of each of these objects will be registered with the 
  * platform MBean server.  The {@code ObjectName} for uniquely identifying 

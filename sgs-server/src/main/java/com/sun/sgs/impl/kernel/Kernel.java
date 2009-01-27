@@ -193,6 +193,16 @@ class Kernel {
             ProfileCollectorHandle profileCollectorHandle = 
                     new ProfileCollectorHandleImpl(profileCollector);
 
+            // Create the configuration MBean and register it.  This is
+            // used during the construction of later components.
+            ConfigManager config = new ConfigManager(appProperties);
+            try {
+                profileCollector.registerMBean(config, 
+                                               ConfigManager.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+
             // create the authenticators and identity coordinator
             ArrayList<IdentityAuthenticator> authenticators =
                 new ArrayList<IdentityAuthenticator>();
@@ -254,17 +264,6 @@ class Kernel {
             // do this until we've finished adding components to the
             // system registry, as some listeners use those components.
             loadProfileListeners(profileCollector);
-
-            // create the configuration MBean and register it
-            ConfigManager config =
-                new ConfigManager(appProperties, 
-                              transactionCoordinator.getTransactionTimeout());
-            try {
-                profileCollector.registerMBean(config, 
-                                               ConfigManager.MXBEAN_NAME);
-            } catch (JMException e) {
-                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
-            }
             
             if (logger.isLoggable(Level.INFO)) {
                 logger.log(Level.INFO, "The Kernel is ready, version: {0}",
