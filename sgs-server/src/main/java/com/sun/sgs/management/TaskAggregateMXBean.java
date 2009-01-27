@@ -124,6 +124,8 @@ public interface TaskAggregateMXBean {
     /**
      * Returns the time of the last call to {@link #clear}, or the time
      * this MBean was created {@code clear} has never been called.
+     * 
+     * @return the time of the last call to {@code clear}
      */
     long getLastClearTime();
 }

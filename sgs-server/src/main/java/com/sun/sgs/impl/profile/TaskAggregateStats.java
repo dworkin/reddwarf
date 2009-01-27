@@ -39,7 +39,7 @@ import javax.management.NotificationBroadcasterSupport;
 public class TaskAggregateStats extends NotificationBroadcasterSupport
         implements TaskAggregateMXBean
 {
-    private final double DEFAULT_SMOOTHING_FACTOR = 0.01;
+    private static final double DEFAULT_SMOOTHING_FACTOR = 0.01;
     
     /* Task counts */
     private final AggregateProfileCounter numTasks;

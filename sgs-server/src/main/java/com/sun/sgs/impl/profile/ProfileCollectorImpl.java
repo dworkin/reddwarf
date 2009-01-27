@@ -101,8 +101,10 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 	new LoggerWrapper(Logger.getLogger(ProfileCollectorImpl.
                                            class.getName()));
     
-    // The property telling us whether we should use the default platform
-    // MBeanServer or create a new one
+    /**
+     * The property telling us whether we should use the default platform
+     * MBeanServer or create a new one.
+     */ 
     public static final String CREATE_MBEAN_SERVER_PROPERTY = 
             "com.sun.sgs.impl.profile.create.mbeanserver";
     

@@ -86,9 +86,9 @@ public class SampleJMXListener implements ProfileListener {
         // This means we don't have to enable a default profiling level
         // through a property at start-up.
         Map<String, ProfileConsumer> consumers = collector.getConsumers();
-        for (String key : consumers.keySet()) {
-            if (key.contains("TaskAggregate")) {
-                ProfileConsumer taskConsumer = consumers.get(key);
+        for (Map.Entry<String, ProfileConsumer> entry : consumers.entrySet()) {
+            if (entry.getKey().contains("TaskAggregate")) {
+                ProfileConsumer taskConsumer = entry.getValue();
                 taskConsumer.setProfileLevel(ProfileLevel.MAX);
                 break;
             }
