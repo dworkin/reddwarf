@@ -437,9 +437,6 @@ public final class ClientSessionServiceImpl
 		    "Failed to create ClientSessionServiceImpl");
 	    }
 	    doShutdown();
-            //Issue a node shutdown
-            //watchdogService.reportFailure(this.getClass().getName(), 
-            //        WatchdogService.FailureLevel.SEVERE);
 	    throw e;
 	}
     }

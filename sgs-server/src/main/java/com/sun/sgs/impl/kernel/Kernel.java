@@ -59,6 +59,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 
+import com.sun.sgs.service.WatchdogService;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
@@ -148,6 +149,12 @@ class Kernel {
     
     // collector of profile information
     private final ProfileCollectorImpl profileCollector;
+    
+    // shutdown controller that can be passed to components who need to be able 
+    // to issue a Kernel shutdown. the watchdog also constains a reference for
+    // service shutdown.
+    private final KernelShutdownControllerImpl shutdownCtrl = 
+            new KernelShutdownControllerImpl(this);
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -597,11 +604,15 @@ class Kernel {
                     serviceClass.getConstructor(Properties.class,
                     ComponentRegistry.class, TransactionProxy.class,
                     KernelShutdownController.class);
-
+            
+            WatchdogService watchdogService = (WatchdogService)
+                    (serviceConstructor.newInstance(appProperties,
+                    systemRegistry, proxy, shutdownCtrl));
+            // set watchdog service to allow shutdowns
+            shutdownCtrl.setWatchdogHandle(watchdogService);
+            
             // return a new instance
-            return (Service) (serviceConstructor.newInstance(appProperties,
-                    systemRegistry, proxy, 
-                    new KernelShutdownControllerImpl(this)));
+            return watchdogService;
         } else {
             // find the appropriate constructor
             serviceConstructor =
@@ -653,8 +664,8 @@ class Kernel {
     /**
      * Shut down all services (in reverse order) and the schedulers.
      */
-    void shutdown() {
-        logger.log(Level.FINE, "Kernel.shutdown() called");
+    synchronized void shutdown() {
+        logger.log(Level.WARNING, "Kernel.shutdown() called");
         if (application != null) {
             application.shutdownServices();
         }
@@ -910,31 +921,56 @@ class Kernel {
      * information.
      */
     private final class KernelShutdownControllerImpl implements
-	    KernelShutdownController {
+            KernelShutdownController {
 
-	/**
-	 * A reference to the {@code Kernel} used for call-back of the
-	 * {@code Kernel.shutdown()} method
-	 */
-	private final Kernel kernel;
+        /**
+         * A reference to the {@code Kernel} used for call-back of the
+         * {@code Kernel.shutdown()} method
+         */
+        private final Kernel kernel;
+        private WatchdogService watchdogSvc = null;
+        private boolean shutdownQueued = false;
 
-	/**
-	 * Private constructor called by the {@code Kernel} to create an
-	 * instance of the {@code KernelShutdownController}.
-	 * 
-	 * @param kernelRef the {@code Kernel} reference
-	 */
-	private KernelShutdownControllerImpl(Kernel kernel) {
-	    this.kernel = kernel;
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	public void shutdownNode() {
-	    kernel.shutdown();
-	}
-
+        /**
+         * Private constructor called by the {@code Kernel} to create an
+         * instance of the {@code KernelShutdownController}.
+         *
+         * @param kernelRef the {@code Kernel} reference
+         */
+        private KernelShutdownControllerImpl(Kernel kernel) {
+            this.kernel = kernel;
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        public void shutdownNode() {
+            if (watchdogSvc != null) {
+                kernel.shutdown();
+            } else {
+                // If the watchdog has not been created yet, queue the request
+                shutdownQueued = true;
+            }
+        }
+        
+        /**
+         * This method passes a {@code WatchdogService} to the shutdown 
+         * controller. It must be called by components before a shutdown can 
+         * proceed in order to streamline to process of service and component 
+         * shutdown through the watchdog service. This ensures that the servers 
+         * are properly notified when a node needs to be shut down.
+         */
+        public void setWatchdogHandle(WatchdogService watchdogSvc) {
+            if (this.watchdogSvc != null) {
+                return; // throw exception?
+            }
+            this.watchdogSvc = watchdogSvc;
+            if (shutdownQueued == true) {
+                // If a request was already queued (from a component), then
+                // shutdown the node immediately
+                shutdownNode();
+            }
+        }
     }
     
     /**

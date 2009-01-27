@@ -237,8 +237,8 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
             additionalNodes = null;
         }
-        serverNode.shutdown(clean);
-        serverNode = null;
+            serverNode.shutdown(clean);
+            serverNode = null;
     }
 
     // -- Test constructor --
@@ -994,12 +994,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
 	buf.position(1);
 	sendBufferToClient(buf, msgString);
-    }
-    
-    public void testReportFailureAfterLosingConnectionToServer()
-            throws Exception
-    {
-        //TODO:
     }
 
     private void sendBufferToClient(final ByteBuffer buf,

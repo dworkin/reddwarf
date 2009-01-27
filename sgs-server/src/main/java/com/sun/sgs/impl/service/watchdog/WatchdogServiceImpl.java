@@ -378,11 +378,7 @@ public final class WatchdogServiceImpl
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
-
-	    // Issue a node shutdown
-	    //reportFailure(this.getClass().getName(), 
-            //        WatchdogService.FailureLevel.SEVERE);
-            shutdownController.shutdownNode();
+            doShutdown();
 	    throw e;
 	}
     }
@@ -612,20 +608,20 @@ public final class WatchdogServiceImpl
 			return;
 		    }
 		}
-
+                
 		if (shuttingDown()) {
 		    return;
 		}
 
 		boolean renewed = false;
 		try {
-		    if (!serverProxy.renewNode(localNodeId)) {
-			setFailedThenNotify(true);
+    		    if (!serverProxy.renewNode(localNodeId)) {
+                        setFailedThenNotify(true);
 			return;
 		    }
 		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
-		    
+                    
 		} catch (IOException e) {
 		    /*
 		     * Adjust renew interval in order to renew with
@@ -639,8 +635,8 @@ public final class WatchdogServiceImpl
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
-		    setFailedThenNotify(true);
-		    break;
+                    setFailedThenNotify(true);
+                    break;
 		}
 		if (renewed) {
 		    lastRenewTime = now;
@@ -705,10 +701,17 @@ public final class WatchdogServiceImpl
 	}
 
         logger.log(Level.SEVERE,
-                "Node forced to shutdown due to service failure");
+                "Node forced to shutdown due to service failure.");
 
-        // use controller to issue a shutdown
-        shutdownController.shutdownNode();
+        // Issue a node shutdown using the provided shutdown controller.
+        // This is run in a different thread to prevent possible deadlocks
+        // due to a service or component's doShutdown() method  waiting for the 
+        // thread it was issued from to shutdown, such as the RenewThread.
+        new Thread(new Runnable() {
+            public void run() {
+                shutdownController.shutdownNode();
+            }
+        }).start();
     }
 
     /**

@@ -1318,7 +1318,8 @@ public class TestWatchdogServiceImpl extends Assert {
             } catch (Exception e) {
                 fail("Not expecting an Exception: " + e.getLocalizedMessage());
             }
-
+            
+            Thread.sleep(1000); // Let it shutdown
             // The shutdown controller should be incremented as a result of the 
             // failure being reported
             assertEquals(1, dummyCtrl.getShutdownCount());
@@ -1474,7 +1475,6 @@ public class TestWatchdogServiceImpl extends Assert {
                     } catch (IllegalStateException ise) {
                         // Expected
                     } catch (Exception e) {
-                        System.err.println(e.getClass().getName());
                         e.printStackTrace();
                         fail("Unexpected Exception");
                     }

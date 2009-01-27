@@ -255,6 +255,7 @@ public class TestAbstractService extends TestCase {
                 // Report a failure on ourselves and check if we are alive
                 service.reportLocalFailure();
                 try {
+                    Thread.sleep(1000); // Let it shutdown
                     service.isAlive();
                     fail("Expected IllegalStateException");
                 } catch (IllegalStateException e) {
@@ -290,11 +291,14 @@ public class TestAbstractService extends TestCase {
         }
 
         public void reportLocalFailure() {
-            super.notifyWatchdogOfFailure(WatchdogService.FailureLevel.FATAL);
+            WatchdogService svc = txnProxy.getService(WatchdogService.class);
+            svc.reportFailure(this.getClass().getName(), 
+                    WatchdogService.FailureLevel.FATAL);
         }
 
         public void reportRemoteFailure(long nodeId) throws IOException {
-            super.notifyWatchdogOfRemoteFailure(nodeId, 
+            WatchdogService svc = txnProxy.getService(WatchdogService.class);
+            svc.reportFailure(nodeId, this.getClass().getName(), 
                     WatchdogService.FailureLevel.FATAL);
         }
     }

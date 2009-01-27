@@ -41,7 +41,6 @@ import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -644,17 +643,10 @@ public class ClientSessionImpl
 		/*
 		 * If the ClientSessionServer for this session has been
 		 * removed, then this session's node has failed and the
-		 * session has been disconnected, so the node should be
-                 * shut down. The event queue will be
+		 * session has been disconnected.  The event queue will be
 		 * cleaned up eventually, so there is no need to flag an
 		 * error here.
 		 */
-                
-                // Shutdown the current node
-                sessionService.watchdogService.reportFailure(
-                        ClientSessionImpl.class.toString(), 
-                        WatchdogService.FailureLevel.SEVERE);
-                
 		return;
 	    }
 	    sessionService.scheduleNonTransactionalTask(
@@ -662,10 +654,14 @@ public class ClientSessionImpl
 		    public void run() {
 			sessionService.runIoTask(
 			    new IoRunnable() {
-				public void run() throws IOException {
-				    sessionServer.serviceEventQueue(idBytes);
-				} },
-			    nodeId);
+				public void run() {
+                                    try {
+                                        sessionServer.serviceEventQueue(idBytes);
+                                    } catch (IOException ioe) {
+                                        // connection lost?
+                                    }
+				}
+                        }, nodeId);
 		    }
 		}, identity);
 	}

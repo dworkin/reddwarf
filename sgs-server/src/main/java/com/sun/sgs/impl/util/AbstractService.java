@@ -253,7 +253,7 @@ public abstract class AbstractService implements Service {
 		return true;
 
 	    default:
-		throw new AssertionError();
+	        throw new AssertionError();
 	    }
 	}
 
@@ -411,38 +411,6 @@ public abstract class AbstractService implements Service {
             return state == State.INITIALIZED;
         }
     }
-    
-    /**
-     * Notifies the {@code Watchdog} of a problem with this service, enabling
-     * the {@code Watchdog} to shut down the node.
-     * 
-     * @param severity the severity of the failure
-     */
-    protected void notifyWatchdogOfFailure(WatchdogService.FailureLevel severity) 
-    {
-        // Get the watchdog and report the problem
-        WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
-        try {
-            notifyWatchdogOfRemoteFailure(watchdog.getLocalNodeId(), severity);
-        }
-        catch (IOException ioe) {
-            // This should never happen since the call is local
-        }
-    }
-
-    /**
-     * Notifies the {@code Watchdog} of a problem with a remote service,
-     * enabling the {@code Watchdog} to shut down the node.
-     * 
-     * @param nodeId the id of the node that is being reported 
-     * @param severity the severity of the failure
-     */
-    protected void notifyWatchdogOfRemoteFailure(long nodeId,
-            WatchdogService.FailureLevel severity) throws IOException {
-        // Get the watchdog and report the problem
-        WatchdogService watchdog = txnProxy.getService(WatchdogService.class);
-        watchdog.reportFailure(nodeId, this.getClass().toString(), severity);
-    }
 
     /**
      * Runs a transactional task to query the status of the node with the
@@ -542,7 +510,11 @@ public abstract class AbstractService implements Service {
                 // If the maximum number of attempts have been tried,
                 // then we are forced to shutdown
                 if (!hasNotified && --maxAttempts == 0) {
-                    notifyWatchdogOfFailure(WatchdogService.FailureLevel.MEDIUM);
+                    // Report failure to watchdog who issues a Kernel.shutdown()
+                    txnProxy.getService(WatchdogService.class).reportFailure(
+                            this.getClass().toString(),
+                            WatchdogService.FailureLevel.MEDIUM);
+                    
                     hasNotified = true;
                 }
                 try {
