@@ -24,6 +24,31 @@
     </dependency>
   </dependencies>
 
+  <!-- The profiles below are used to launch the wanderer server with
+       various different configurations.  For example, the default
+       will use the sgs-maven-plugin to launch the wanderer server in single
+       node mode using bdb :
+
+       mvn verify -Prun
+
+       There are also explicit profiles to specify the db type, and the node
+       type that can be matched up:
+
+       mvn verify -Prun,je,multi-node-server-core
+
+       Additionally, the run.jvm.args, and run.jvm.args.add properties can be
+       overridden to send command line arguments to the resulting server:
+
+       mvn verify -Prun -Drun.jvm.args.add="-Dcom.sun.sgs.app.name=NewName"
+
+       When running multiple app nodes on the same machine, the shutdown.port
+       property must be different for each app node:
+
+       mvn verify -Prun,multi-node-server-app -Dshutdown.port=1137
+       mvn verify -Prun,multi-node-server-app -Dshutdown.port=1136
+       ...
+
+    -->
   <profiles>
 
     <profile>
@@ -35,11 +60,11 @@
 	  <plugin>
 	    <groupId>com.projectdarkstar.maven.plugin</groupId>
 	    <artifactId>sgs-maven-plugin</artifactId>
-	    <version>1.0-alpha-2-SNAPSHOT</version>
+	    <version>1.0-alpha-2</version>
 	    <executions>
 	      <execution>
 		<id>sgs-run</id>
-		<phase>pre-integration-test</phase>
+		<phase>integration-test</phase>
 		<goals>
 		  <goal>install</goal>
                   <goal>configure</goal>
