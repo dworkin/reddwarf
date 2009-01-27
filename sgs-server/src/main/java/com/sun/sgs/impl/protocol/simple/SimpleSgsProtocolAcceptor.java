@@ -40,7 +40,6 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
-import com.sun.sgs.transport.TransportFactory;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
@@ -62,12 +61,13 @@ import javax.security.auth.login.LoginException;
  *	<i>Default:</i> {@value #DEFAULT_TRANSPORT}
  *
  * <dd style="padding-top: .5em">Specifies the transport. The
- *      specified transport must support RELIABLE delivery..<p>
+ *      specified transport must support {@link Delivery#RELIABLE}.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	{@value #READ_BUFFER_SIZE_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_READ_BUFFER_SIZE}<br>
+ *      <i>Minimum:</i> {@value #MIN_READ_BUFFER_SIZE}<br>
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies the read buffer size.<p>
@@ -76,6 +76,7 @@ import javax.security.auth.login.LoginException;
  *	{@value #DISCONNECT_DELAY_PROPERTY}
  *	</b></code><br>
  *	<i>Default:</i> {@value #DEFAULT_DISCONNECT_DELAY}<br>
+ *      <i>Minimum:</i> {@value #MIN_DISCONNECT_DELAY}<br>
  *
  * <dd style="padding-top: .5em"> 
  *	Specifies the disconnect delay (in milliseconds) for disconnecting
@@ -87,15 +88,15 @@ public class SimpleSgsProtocolAcceptor
     implements ProtocolAcceptor
 {
     /** The package name. */
-    public static final String PKG_NAME = "com.sun.sgs.impl.protocol.simple";
+    private static final String PKG_NAME = "com.sun.sgs.impl.protocol.simple";
     
     /** The logger for this class. */
     private static final LoggerWrapper staticLogger =
-	new LoggerWrapper(Logger.getLogger(PKG_NAME + "acceptor"));
+	new LoggerWrapper(Logger.getLogger(PKG_NAME + ".acceptor"));
 
     /** The name of the read buffer size property. */
     public static final String READ_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.read.max";
+        PKG_NAME + ".read.buffer.size";
 
     /**
      * The transport property. The specified transport must support
@@ -111,6 +112,9 @@ public class SimpleSgsProtocolAcceptor
     /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
     public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
+    /** The minimum read buffer size value. */
+    public static final int MIN_READ_BUFFER_SIZE = 8192;
+    
     /** The name of the disconnect delay property. */
     public static final String DISCONNECT_DELAY_PROPERTY =
 	PKG_NAME + ".disconnect.delay";
@@ -119,6 +123,9 @@ public class SimpleSgsProtocolAcceptor
      * allowed before this service forcibly disconnects it.
      */
     public static final long DEFAULT_DISCONNECT_DELAY = 1000;
+    
+    /** The minimum disconnect delay value. */
+    public static final long MIN_DISCONNECT_DELAY = 200;
 
     /** The logger for this instance. */
     private  final LoggerWrapper logger;
@@ -134,9 +141,6 @@ public class SimpleSgsProtocolAcceptor
     
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
     private final long disconnectDelay;
-
-    /** The protocol listener. */
-    protected volatile ProtocolListener protocolListener;
 
     /** The protocol descriptor. */
     private ProtocolDescriptor protocolDesc;
@@ -172,7 +176,7 @@ public class SimpleSgsProtocolAcceptor
 
     /**
      * Constructs an instance with the specified {@code properties},
-     * {@code systemRegistry}, and {@code txnProxy}.
+     * {@code systemRegistry}, {@code txnProxy}, and {@code logger}.
      *
      * @param	properties the configuration properties
      * @param	systemRegistry the system registry
@@ -190,28 +194,36 @@ public class SimpleSgsProtocolAcceptor
 	super(properties, systemRegistry, txnProxy, logger);
 	this.logger = logger;
 	logger.log(Level.CONFIG,
-		   "Creating SimpleSgsProtcolAcceptor properties:{0}",
+		   "Creating SimpleSgsProtocolAcceptor properties:{0}",
 		   properties);
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
             readBufferSize = wrappedProps.getIntProperty(
                 READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
-                8192, Integer.MAX_VALUE);
+                MIN_READ_BUFFER_SIZE, Integer.MAX_VALUE);
 	    disconnectDelay = wrappedProps.getLongProperty(
 		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
-		200, Long.MAX_VALUE);
+		MIN_DISCONNECT_DELAY, Long.MAX_VALUE);
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
             
-            String transportClassName =
-                    wrappedProps.getProperty(TRANSPORT_PROPERTY,
-                                             DEFAULT_TRANSPORT);
+//            String transportClassName =
+//                    wrappedProps.getProperty(TRANSPORT_PROPERTY,
+//                                             DEFAULT_TRANSPORT);
             
-            transport = TransportFactory.newTransport(transportClassName,
+            transport =
+                wrappedProps.getClassInstanceProperty(TRANSPORT_PROPERTY,
+                                                      DEFAULT_TRANSPORT,
+                                                      Transport.class,
+                                                      new Class[] {
+                                                            Properties.class},
                                                       properties);
+//            transport = TransportFactory.newTransport(transportClassName,
+//                                                      properties);
             
-            if (!transport.getDescriptor().canSupport(Delivery.RELIABLE)) {
+            if (!transport.getDescriptor().supportsDelivery(Delivery.RELIABLE))
+            {
                 transport.shutdown();
                 throw new IllegalArgumentException(
                         "transport must support RELIABLE delivery");
@@ -232,7 +244,7 @@ public class SimpleSgsProtocolAcceptor
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
 		    Level.CONFIG, e,
-		    "Failed to create SimpleSgsProtcolAcceptor");
+		    "Failed to create SimpleSgsProtocolAcceptor");
 	    }
 	    throw e;
 	}
@@ -280,12 +292,8 @@ public class SimpleSgsProtocolAcceptor
     }
     
     /** {@inheritDoc} */
-    public void accept(ProtocolListener protocolListener) {
-	if (protocolListener == null) {
-	    throw new NullPointerException("null protocolListener");
-	}
-	this.protocolListener = protocolListener;
-        transport.accept(new ConnectionHandlerImpl());
+    public void accept(ProtocolListener protocolListener) throws IOException {
+        transport.accept(new ConnectionHandlerImpl(protocolListener));
     }
 
     /** {@inheritDoc} */
@@ -298,6 +306,15 @@ public class SimpleSgsProtocolAcceptor
      */
     private class ConnectionHandlerImpl implements ConnectionHandler {
 
+        private final ProtocolListener protocolListener;
+
+        ConnectionHandlerImpl(ProtocolListener protocolListener) {
+            if (protocolListener == null) {
+                throw new NullPointerException("null protocolListener");
+            }
+            this.protocolListener = protocolListener;
+        }
+        
         /** {@inheritDoc} */
         @Override
         public void newConnection(AsynchronousByteChannel byteChannel,
@@ -311,8 +328,6 @@ public class SimpleSgsProtocolAcceptor
         }
     }
     
-    /* -- Package access methods -- */
-
     /**
      * Returns the authenticated identity for the specified {@code name} and
      * {@code password}.

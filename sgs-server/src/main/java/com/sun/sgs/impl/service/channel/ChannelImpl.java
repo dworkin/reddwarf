@@ -42,7 +42,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
@@ -135,6 +134,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private boolean isClosed = false;
 
     /**
+     * The maximum channel message length supported by sessions joined to this
+     * channel.
+     */
+    private int maxMessageLength = Integer.MAX_VALUE;
+    
+    /**
      * The maximum number of message bytes that can be queued for delivery on
      * this channel.
      */
@@ -193,11 +198,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     static Channel newInstance(String name,
 			       ChannelListener listener,
 			       Delivery delivery,
-			       int writeBufferCapacity)
+                               int writeBufferCapacity)
     {
 	// TBD: create other channel types depending on delivery.
 	return new OrderedUnreliableChannelImpl(
-	    name, listener, delivery, writeBufferCapacity).getWrappedChannel();
+            name, listener, delivery, writeBufferCapacity).getWrappedChannel();
     }
 
     /**
@@ -314,7 +319,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Throws {@code IllegalArgumentException} if: the specified {@code
+     * Throws {@code IllegalArgumentException} if the specified {@code
      * session} does not support this channel's delivery requirement or
      * {@code Delivery.RELIABLE}.
      *
@@ -338,7 +343,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * session object that it hands out to the application.  The channel
      * service implementation relies on the assumption that a client
      * session's {@code ManagedObject} ID is the client session's ID (used
-     * for identifiying the client session, e.g. for sending messages to
+     * for identifying the client session, e.g. for sending messages to
      * the client session).  This method is invoked by the {@code join} and
      * {@code leave} methods in order to access the underlying {@code
      * ClientSession} so that the correct client session ID can be obtained.
@@ -498,10 +503,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		throw new NullPointerException("null message");
 	    }
 	    message = message.asReadOnlyBuffer();
-            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
+            
+            if (message.remaining() > maxMessageLength) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
+                    maxMessageLength);
             }
 	    /*
 	     * Enqueue send request.
@@ -819,6 +825,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
 
+        if (session.getMaxMessageLength() > maxMessageLength) {
+            maxMessageLength = session.getMaxMessageLength();
+        }
 	return true;
     }
 

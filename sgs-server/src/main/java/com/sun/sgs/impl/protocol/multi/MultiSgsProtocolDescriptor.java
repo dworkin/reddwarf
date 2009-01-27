@@ -66,8 +66,8 @@ class MultiSgsProtocolDescriptor extends SimpleSgsProtocolDescriptor {
         MultiSgsProtocolDescriptor desc =
 	    (MultiSgsProtocolDescriptor) descriptor;
         
-        return transportDesc.isCompatibleWith(desc.transportDesc) &&
-               secondaryDesc.isCompatibleWith(desc.secondaryDesc);
+        return transportDesc.supportsTransport(desc.transportDesc) &&
+               secondaryDesc.supportsTransport(desc.secondaryDesc);
     }
 
     /**

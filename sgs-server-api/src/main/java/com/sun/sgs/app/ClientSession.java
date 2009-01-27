@@ -85,6 +85,12 @@ public interface ClientSession extends ManagedObject {
     Set<Delivery> supportedDeliveries();
     
     /**
+     * Return the maximum message length supported by this session.
+     * @return the maximum message length.
+     */
+    int getMaxMessageLength();
+    
+    /**
      * Sends a message contained in the specified {@link ByteBuffer} to
      * this session's client. The message starts at the buffer's current
      * position and ends at the buffer's limit.  The buffer's position is
@@ -99,11 +105,8 @@ public interface ClientSession extends ManagedObject {
      * @return	this client session
      *
      * @throws	IllegalStateException if this session is disconnected
-     * @throws	IllegalArgumentException if the message exceeds the allowed
-     *		payload length defined by the constant 
-     * {@link com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
-     *		whose value is 
-     * {@value com.sun.sgs.protocol.simple.SimpleSgsProtocol#MAX_PAYLOAD_LENGTH}
+     * @throws  IllegalArgumentException if the specified message length
+     *          exceeds {@link #getMaxMessageLength}
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of

@@ -20,7 +20,6 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.protocol.LoginFailureException.FailureReason;
-import java.math.BigInteger;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +38,7 @@ public interface LoginCompletionFuture extends Future<SessionProtocolHandler> {
      * login request. If login fails, this method will throw {@link
      * ExecutionException} with a <i>cause</i> that indicates the
      * exceptional condition that occurred.  The {@link Throwable#getCause
-     * getCause} method may return one of the following exceptions: <ul>
+     * getCause} method will return one of the following exceptions: <ul>
      *
      * <li>{@code LoginRedirectException}: indicates that the login should
      * be redirected to the node returned by the exception's {@link

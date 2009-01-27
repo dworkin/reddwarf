@@ -1,3 +1,6 @@
+Version 0.9.9
+- Add pluggable client session protocol and transport layers (issue #26)
+
 Version 0.9.8:
 - Add ScalableDeque and ScalableList implementations
 - Add object access and contention tracking capabilities

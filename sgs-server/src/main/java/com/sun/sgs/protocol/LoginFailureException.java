@@ -47,11 +47,11 @@ public class LoginFailureException extends Exception {
     /** The serial version for this class. */
     private static final long serialVersionUID = 1L;
 
-    /** The reason for the failure, or {@code null}. */
+    /** The reason for the failure */
     private final FailureReason reason;
 
     /**
-     * Constructs and instance with the specified detail {@code message}
+     * Constructs an instance with the specified detail {@code message}
      * and {@code reason}.
      *
      * @param	message a detail message, or {@code null}

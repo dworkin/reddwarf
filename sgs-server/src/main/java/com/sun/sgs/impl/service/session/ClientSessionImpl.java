@@ -103,6 +103,8 @@ public class ClientSessionImpl
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
+    private final int maxMessageLength;
+    
     /** The capacity of the write buffer, in bytes. */
     private final int writeBufferCapacity;
 
@@ -113,9 +115,8 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}, {@code identity}, supported {@code deliveries} and
-     * the local node ID, and stores this instance with the following
-     * bindings:<p>
+     * sessionService}, {@code identity}, and supported {@code deliveries},
+     * and stores this instance with the following bindings:<p>
      *
      * <pre>
      * com.sun.sgs.impl.service.session.impl.&lt;idBytes&gt;
@@ -130,7 +131,8 @@ public class ClientSessionImpl
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
-		      Identity identity, Set<Delivery> deliveries)
+		      Identity identity, Set<Delivery> deliveries,
+                      int maxMessageLength)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
@@ -143,6 +145,7 @@ public class ClientSessionImpl
 	this.identity = identity;
 	this.deliveries = deliveries;
 	this.nodeId = sessionService.getLocalNodeId();
+        this.maxMessageLength = maxMessageLength;
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
 	ManagedReference<ClientSessionImpl> sessionRef =
@@ -175,6 +178,11 @@ public class ClientSessionImpl
     }
     
     /** {@inheritDoc} */
+    public int getMaxMessageLength() {
+        return maxMessageLength;
+    }
+    
+    /** {@inheritDoc} */
     public boolean isConnected() {
 	return connected;
     }
@@ -187,7 +195,16 @@ public class ClientSessionImpl
 	try {
             if (!isConnected())
 		throw new IllegalStateException("client session not connected");
-
+            
+            if (message == null) {
+		throw new NullPointerException("null message");
+	    }
+            if (message.remaining() > maxMessageLength) {
+                throw new IllegalArgumentException(
+                    "message too long: " + message.remaining() + " > " +
+                    maxMessageLength);
+            }
+            
             /*
              * TBD: Possible optimization: if we have passed our own special
              * buffer to the app, we can detect that here and possibly avoid a

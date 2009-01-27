@@ -54,6 +54,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -122,7 +123,7 @@ public final class ChannelServiceImpl
     
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.write.max";
+        PKG_NAME + ".write.buffer.size";
 
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
@@ -196,7 +197,7 @@ public final class ChannelServiceImpl
     private final Map<BigInteger, TaskQueue> channelTaskQueues =
 	new HashMap<BigInteger, TaskQueue>();
 
-    /** The maximum number of channel events to sevice per transaction. */
+    /** The maximum number of channel events to service per transaction. */
     final int eventsPerTxn;
 
     /**
@@ -435,7 +436,7 @@ public final class ChannelServiceImpl
 	 * Reads the local membership list for the specified
 	 * {@code channelId}, and updates the local membership cache
 	 * for that channel.  If any join or leave notifications were
-	 * missed, then send the appropriate channel join or channel join
+	 * missed, then send the appropriate channel join or channel leave
 	 * message to the effected session(s).
 	 */
 	public void refresh(String name, byte[] channelId, Delivery delivery) {
@@ -500,7 +501,13 @@ public final class ChannelServiceImpl
 			SessionProtocol protocol =
 			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
-			    protocol.channelJoin(name, channelRefId, delivery);
+                            try {
+                                protocol.channelJoin(name, channelRefId,
+                                                     delivery);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ioe,
+                                                "channelJoin throws");
+                            }
 			}
 		    }
 		}
@@ -509,7 +516,12 @@ public final class ChannelServiceImpl
 			SessionProtocol protocol =
 			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
-			    protocol.channelLeave(channelRefId);
+                            try {
+                                protocol.channelLeave(channelRefId);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ioe,
+                                                "channelLeave throws");
+                            }
 			}
 		    }
 		}
@@ -571,7 +583,12 @@ public final class ChannelServiceImpl
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
 		if (protocol != null) {
-		    protocol.channelJoin(name, channelRefId, delivery);
+                    try {
+                        protocol.channelJoin(name, channelRefId, delivery);
+                    } catch (IOException ioe) {
+                        logger.logThrow(Level.WARNING, ioe,
+                                        "channelJoin throws");
+                    }
 		}
 
 	    } finally {
@@ -617,7 +634,12 @@ public final class ChannelServiceImpl
 		SessionProtocol protocol =
 		    sessionService.getSessionProtocol(sessionRefId);
 		if (protocol != null) {
-		    protocol.channelLeave(channelRefId);
+                    try {
+                        protocol.channelLeave(channelRefId);
+                    } catch (IOException ioe) {
+                        logger.logThrow(Level.WARNING, ioe,
+                                        "channelLeave throws");
+                    }
 		}
 		
 	    } finally {
@@ -646,7 +668,12 @@ public final class ChannelServiceImpl
 			SessionProtocol protocol =
 			    sessionService.getSessionProtocol(sessionRefId);
 			if (protocol != null) {
-			    protocol.channelLeave(channelRefId);
+                            try {
+                                protocol.channelLeave(channelRefId);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ioe,
+                                                "channelLeave throws");
+                            }
 			}
 		    }
 		}
@@ -692,9 +719,14 @@ public final class ChannelServiceImpl
 		    SessionProtocol protocol =
 			sessionService.getSessionProtocol(sessionRefId);
 		    if (protocol != null) {
-			protocol.channelMessage(
-			    channelRefId, ByteBuffer.wrap(message),
-			    Delivery.RELIABLE);
+                        try {
+                            protocol.channelMessage(channelRefId,
+                                                    ByteBuffer.wrap(message),
+                                                    Delivery.RELIABLE);
+                        } catch (IOException ioe) {
+                            logger.logThrow(Level.WARNING, ioe,
+                                            "channelMessage throws");
+                        }
 		    }
 		}
 

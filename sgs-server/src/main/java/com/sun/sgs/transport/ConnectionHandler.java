@@ -23,20 +23,18 @@ import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 
 /**
  * Interface implemented by objects implementing a connection handler. A
- * connection handler is passed to
- * {@link TransportFactory#newTransport TransportFactory.newTransport} when
- * creating a new transport.
+ * connection handler is passed to {@link Transport#accept Transport.accept}.
  * When a new connection is received by the transport,
  * {@link #newConnection newConnection} is invoked with the new I/O channel
  * for that connection.
- * 
- * @see TransportFactory
  */
 public interface ConnectionHandler {
     
     /**
      * Notify the handler that a new connection has been initiated. If an
-     * exception is thrown the connection will be refused.
+     * exception is thrown the connection will be refused. The implementation
+     * of this method should return in a timely manner, starting a separate
+     * thread if necessary to perform any IO on the {@code channel}.
      * 
      * @param channel on which the new connection can communicate.
      * @param descriptor for the transport on which the connection was made

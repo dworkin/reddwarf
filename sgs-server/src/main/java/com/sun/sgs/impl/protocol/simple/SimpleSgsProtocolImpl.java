@@ -45,7 +45,6 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -80,7 +79,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     private static final int DEFAULT_RECONNECT_KEY_LENGTH = 16;
 
     /** A random number generator for reconnect keys. */
-    private static SecureRandom random = new SecureRandom();
+    private static final SecureRandom random = new SecureRandom();
     
     /**
      * The underlying channel (possibly another layer of abstraction,
@@ -112,7 +111,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The completion handler for writing to the I/O channel. */
     private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
 
-    /** A lock for {@code loggedIn} and {@code messageQueue} fields. */
+    /** A lock for {@code loginHandled} and {@code messageQueue} fields. */
     private Object lock = new Object();
 
     /** Indicates whether the client's login ack has been sent. */
@@ -177,8 +176,19 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
     
     /** {@inheritDoc} */
+    public int getMaxMessageLength() {
+        // largest message size is max for channel messages
+        return SimpleSgsProtocol.MAX_MESSAGE_LENGTH // max message
+                                    - 1             // Opcode
+                                    - 2             // channel ID size
+                                    - 8;            // (max) channel ID bytes
+    }
+    
+    /** {@inheritDoc} */
     public void sessionMessage(ByteBuffer message) {
-	ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
+        final int messageLength = 1 + message.remaining();
+        assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
+	ByteBuffer buf = ByteBuffer.wrap(new byte[messageLength]);
 	buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
 	    put(message).
 	    flip();
@@ -192,7 +202,6 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	byte[] channelIdBytes = channelId.toByteArray();
 	MessageBuffer buf =
 	    new MessageBuffer(1 + MessageBuffer.getSize(name) +
-			      1 +
 			      channelIdBytes.length);
 	buf.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 	    putString(name).
@@ -226,9 +235,11 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                                Delivery delivery)
     {
 	byte[] channelIdBytes = channelId.toByteArray();
+        final int messageLength = 3 + channelIdBytes.length +
+                                  message.remaining();
+        assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf =
-	    ByteBuffer.allocate(3 + channelIdBytes.length +
-				message.remaining());
+	    ByteBuffer.allocate(messageLength);
 	buf.put(SimpleSgsProtocol.CHANNEL_MESSAGE).
 	    putShort((short) channelIdBytes.length).
 	    put(channelIdBytes).
@@ -256,14 +267,11 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void disconnect(DisconnectReason reason) {
+    public void disconnect(DisconnectReason reason) throws IOException {
 	// TBD: The SimpleSgsProtocol does not yet support sending a
 	// message to the client in the case of session termination or
 	// preemption, so just close the connection for now.
-	try {
-	    close();
-	} catch (IOException e) {
-	}
+        close();
     }
     
     /* -- Private methods for sending protocol messages -- */
@@ -283,14 +291,14 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /**
      * Notifies the associated client that it should redirect its login to
      * the specified {@code node} with the specified protocol {@code
-     * descriptors} .
+     * descriptors}.
      *
      * @param	node a node to redirect the login
-     * @param	descriptors a collection of protocol descriptors supported
+     * @param	descriptors a set of protocol descriptors supported
      *		by {@code node}
      */
     private void loginRedirect(
-	Node node, Collection<ProtocolDescriptor> descriptors)
+	Node node, Set<ProtocolDescriptor> descriptors)
     {
         for (ProtocolDescriptor descriptor : descriptors) {
             if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
@@ -309,7 +317,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
         }
         loginFailure("redirect failed", null);
         logger.log(Level.SEVERE,
-                   "redirect node {0} does not support a compatable transport",
+                   "redirect node {0} does not support a compatable protocol",
                    node);
     }
 
@@ -380,8 +388,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Writes a message to the write handler if login has not handled yet,
-     * otherwise enqueues the message to be sent when the login has been
+     * Writes a message to the write handler if login has been handled,
+     * otherwise enqueues the message to be sent when the login has not yet been
      * handled.
      *
      * @param	buf a buffer containing a complete protocol message
@@ -409,7 +417,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "sendProtocolMessage session:{0} throws", this);
+		    "writeToWriteHandler session:{0} throws", this);
 	    }
 	}
     }
@@ -431,14 +439,15 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      * Method to disconnect the connection.
      */
     private void disconnect() {
+        // If there is a handler it is up to them to close
+        // the connection
 	if (protocolHandler != null) {
 	    protocolHandler.disconnect();
 	} else {
-	    try {
-		close();
-	    } catch (IOException ignore) {
-	    }
-	}
+            try {
+                close();
+            } catch (IOException ignore) {}
+        }
     }
     
     /**
@@ -807,9 +816,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 			"unknown opcode 0x{0}",
 			Integer.toHexString(opcode));
 		}
-		if (protocolHandler != null) {
-		    protocolHandler.disconnect();
-		}
+		disconnect();
 		break;
 	    }
 	}
@@ -851,15 +858,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    // redirect
 		    LoginRedirectException redirectException =
 			(LoginRedirectException) cause;
-		    Node node = redirectException.getNode();
-		    Collection<ProtocolDescriptor> descriptors =
-			redirectException.getProtocolDescriptors();
-		    if (descriptors != null) {
-			loginRedirect(node, descriptors);
-		    } else {
-			loginFailure(
-			    "unable to redirect to node: " + node, cause);
-		    }
+		    
+                    loginRedirect(redirectException.getNode(),
+                                  redirectException.getProtocolDescriptors());
+		    
 		} else if (cause instanceof LoginFailureException) {
 		    loginFailure(cause.getMessage(), cause.getCause());
 		} else {

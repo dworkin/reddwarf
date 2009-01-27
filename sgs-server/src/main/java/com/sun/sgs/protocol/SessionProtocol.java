@@ -20,11 +20,10 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.service.Node;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -37,8 +36,6 @@ import java.util.Set;
  * that a caller may request that other messages be sent before a login
  * acknowledgment, and if the protocol requires, these messages should be
  * enqueued until the login acknowledgment has been sent to the client.
- *
- * <p>TBD: should these methods throw IOException?
  */
 public interface SessionProtocol extends Channel {
 
@@ -61,11 +58,28 @@ public interface SessionProtocol extends Channel {
     Set<Delivery> supportedDeliveries();
     
     /**
+     * Returns the maximum length, in bytes, of the buffers passed as the
+     * {@code message} parameters to the
+     * {@link #sessionMessage sessionMessage} and
+     * {@link #channelMessage channelMessage} methods.
+     * 
+     * @return the maximum message length
+     */
+    int getMaxMessageLength();
+    
+    /**
      * Sends the associated client the specified {@code message}.
      *
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message sent to the client by this invocation.
+     * 
      * @param	message a message
+     * 
+     * @throws IllegalArgumentException if the {@code message} size is
+     *          greater than {@link #getMaxMessageLength}
      */
-    void sessionMessage(ByteBuffer message);
+    void sessionMessage(ByteBuffer message) throws IOException;
     
     /**
      * Notifies the associated client that it is joined to the channel
@@ -77,22 +91,30 @@ public interface SessionProtocol extends Channel {
      *
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} requirement is not supported by this protocol
+     * @throws IOException If an I/O error occurs
      */
-    void channelJoin(String name, BigInteger channelId, Delivery delivery);
+    void channelJoin(String name, BigInteger channelId, Delivery delivery)
+            throws IOException;
 
     /**
      * Notifies the associated client that it is no longer a member of
      * the channel with the specified {@code channelId}.
      *
      * @param	channelId a channel ID
+     * 
+     * @throws IOException If an I/O error occurs
      *
      */
-    void channelLeave(BigInteger channelId);
+    void channelLeave(BigInteger channelId) throws IOException;
 
     /**
      * Sends the associated client the specified channel {@code
      * message} sent on the channel with the specified {@code channelId}
      * and {@code delivery} requirement.
+     * 
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * returns.  Changes made to the buffer after this method returns will
+     * have no effect on the message sent to the client by this invocation.
      *
      * @param	channelId a channel ID
      * @param	message a channel message
@@ -100,9 +122,13 @@ public interface SessionProtocol extends Channel {
      *
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} requirement is not supported by this protocol
+     * @throws IllegalArgumentException if the {@code message} size is
+     *          greater than {@link #getMaxMessageLength}
+     * @throws IOException If an I/O error occurs
      */
     void channelMessage(
-	BigInteger channelId, ByteBuffer message, Delivery delivery);
+	BigInteger channelId, ByteBuffer message, Delivery delivery)
+        throws IOException;
 
 
     /**
@@ -113,6 +139,8 @@ public interface SessionProtocol extends Channel {
      * closed in a timely fashion.
      
      * @param	reason	the reason for disconnection
+     * 
+     * @throws IOException If an I/O error occurs
      */
-    void disconnect(DisconnectReason reason);
+    void disconnect(DisconnectReason reason) throws IOException;
 }

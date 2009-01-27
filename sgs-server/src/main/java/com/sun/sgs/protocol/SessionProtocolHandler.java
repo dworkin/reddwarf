@@ -21,14 +21,13 @@ package com.sun.sgs.protocol;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
 
 /**
  * A handler for session and channel protocol messages for an associated
  * client session.
  *
  * Each operation returns a {@code Future} that indicates when the
- * request has been processed .  A caller may need to know when an
+ * request has been processed.  A caller may need to know when an
  * operation has completed so that it can throttle incoming messages (for
  * example only resuming reading when the handler completes processing a
  * request), and/or can control the number of clients connected at any given

@@ -25,7 +25,7 @@ import java.io.Serializable;
  * A communication protocol descriptor. Classes that implement {@code
  * ProtocolDescriptor} must also implement {@link Serializable}, and must
  * <i>not</i> implement {@code ManagedObject} or contain any objects that
- * implement {@code ManagedObject}.  An instances of {@code
+ * implement {@code ManagedObject}. An instance of {@code
  * ProtocolDescriptor} should also be immutable.
  */
 public interface ProtocolDescriptor {

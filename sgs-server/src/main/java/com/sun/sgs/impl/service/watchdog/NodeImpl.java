@@ -407,7 +407,6 @@ class NodeImpl
 	NodeImpl node = null;
 	try {
 	    node = (NodeImpl) dataService.getServiceBinding(key);
-            	// update non-final fields before
 	    dataService.markForUpdate(node);
 	} catch (NameNotBoundException e) {
 	}

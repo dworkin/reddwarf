@@ -40,6 +40,7 @@ import java.nio.channels.Channel;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -82,7 +83,7 @@ class SecondaryChannel implements Channel {
     /** Messages enqueued to be sent after a login ack is sent. */
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
-    private final Delivery[] supportedDelivery;
+    private final Set<Delivery> supportedDelivery;
     
     /**
      * Creates a new instance of this class with the given byte channel
@@ -92,7 +93,7 @@ class SecondaryChannel implements Channel {
      * @param	protocolImpl protocol impl
      * @param	readBufferSize the number of bytes in the read buffer
      */
-    SecondaryChannel(Delivery[] supportedDelivery,
+    SecondaryChannel(Set<Delivery> supportedDelivery,
                      MultiSgsProtocolAcceptor acceptor,
                      AsynchronousByteChannel byteChannel,
                      int readBufferSize)

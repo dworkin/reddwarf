@@ -24,6 +24,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.nio.AttachedFuture;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
@@ -33,6 +34,7 @@ import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SgsTestNode.DummyAppListener;
@@ -42,11 +44,15 @@ import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.EnumSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -99,6 +105,18 @@ public class TestSimpleSgsProtocol {
         close();
     }
     
+    @Test(expected=IllegalArgumentException.class)
+    public void testUnreliableTransport() throws Exception {
+        final Properties props = new Properties();
+        props.setProperty(StandardProperties.APP_NAME, APP_NAME);
+        props.setProperty(SimpleSgsProtocolAcceptor.TRANSPORT_PROPERTY,
+                          DummyTransport.class.getName());
+        props.setProperty("UnreliableDelivery", "true");
+        acceptor = new SimpleSgsProtocolAcceptor(props,
+                                                 serverNode.getSystemRegistry(),
+                                                 serverNode.getProxy());
+    }
+    
     @Test
     public void testAcceptNPE() throws Exception {
         final Properties props = new Properties();
@@ -130,6 +148,24 @@ public class TestSimpleSgsProtocol {
         close();
     }
     
+//    @Test
+//    public void testSessionMessage() throws Exception {
+//        final Properties props = new Properties();
+//        props.setProperty(StandardProperties.APP_NAME, APP_NAME);
+//        props.setProperty(SimpleSgsProtocolAcceptor.TRANSPORT_PROPERTY,
+//                          DummyTransport.class.getName());
+// 
+//        acceptor = new SimpleSgsProtocolAcceptor(props,
+//                                                 serverNode.getSystemRegistry(),
+//                                                 serverNode.getProxy());
+//        DummyListener listener = new DummyListener();
+//        acceptor.accept(listener);
+//        System.err.println("proto?..." + listener.protocol);
+//        Thread.sleep(10);
+//        listener.protocol.sessionMessage(ByteBuffer.allocate(1));
+//        close();
+//    }
+        
     private void close() throws IOException {
         if (acceptor != null) {
             acceptor.close();
@@ -146,7 +182,7 @@ public class TestSimpleSgsProtocol {
         public LoginCompletionFuture newLogin(Identity identity,
                                               SessionProtocol protocol)
         {
-            System.out.println("newLogn "+ identity + "  " + protocol);
+            System.err.println("ProtocolListener.newLogin called...");
             if (identity == null || protocol == null)
                 throw new RuntimeException("identity or protocol are null");
             this.identity = identity;
@@ -190,7 +226,34 @@ public class TestSimpleSgsProtocol {
 
             @Override
             public CompletionFuture sessionMessage(ByteBuffer message) {
-                throw new UnsupportedOperationException();
+                System.err.println("***** sessionMessage called..." + message.remaining());
+                return new CompletionFuture() {
+
+                    @Override
+                    public boolean cancel(boolean arg0) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isCancelled() {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isDone() {
+                        return true;
+                    }
+
+                    @Override
+                    public Void get() throws InterruptedException, ExecutionException {
+                        return null;
+                    }
+
+                    @Override
+                    public Void get(long arg0, TimeUnit arg1) throws InterruptedException, ExecutionException, TimeoutException {
+                        return null;
+                    }
+                };
             }
 
             @Override
@@ -213,22 +276,25 @@ public class TestSimpleSgsProtocol {
             
     static public class DummyTransport implements Transport {
 
-        public DummyTransport(Properties properties) {}
+        private final TransportDescriptor descriptor;
+        
+        public DummyTransport(Properties properties) {
+            descriptor = new DummyDescriptor(properties);
+        }
         
         @Override
         public TransportDescriptor getDescriptor() {
-            return new DummyDescriptor();
+            return descriptor;
         }
 
         @Override
         public void accept(ConnectionHandler handler) {
-            System.err.println("DummyTrabsport.accept " + handler);
             if (handler == null)
                 throw new IllegalArgumentException(
                                 "Transport.accept called with null handler");
             try {
-                handler.newConnection(new DummyChannel(),
-                                      new DummyDescriptor());
+                System.err.println("Transport.accept called...");
+                handler.newConnection(new DummyChannel(), descriptor);
             } catch (Exception ex) {
                 throw new RuntimeException(
                         "Unexpected exception from newConnection", ex);
@@ -236,103 +302,168 @@ public class TestSimpleSgsProtocol {
         }
 
         @Override
-        public void shutdown() {
-            throw new UnsupportedOperationException();
-        }
+        public void shutdown() {}
         
         private class DummyChannel implements AsynchronousByteChannel {
 
-            @Override
+            private boolean loggedIn = false;
+            private ByteBuffer message;
+            CompletionHandler handler = null;
+            
+            DummyChannel() {
+                final MessageBuffer msg =
+                        new MessageBuffer(4 +
+                                          MessageBuffer.getSize("username") +
+                                          MessageBuffer.getSize("password"));
+                msg.putShort(msg.capacity() - 2);
+                msg.putByte(SimpleSgsProtocol.LOGIN_REQUEST);
+                msg.putByte(SimpleSgsProtocol.VERSION);
+                msg.putString("username");
+                msg.putString("password");
+                message = ByteBuffer.allocate(msg.capacity());
+                message.put(msg.getBuffer());
+                message.flip();
+            }
+            
             public <A> IoFuture<Integer, A> read(ByteBuffer dst,
                                                  A attachment,
                                   CompletionHandler<Integer, ? super A> handler)
             {
-                System.err.println("DummyChannel.read ");
-                return AttachedFuture.wrap(new Future<Integer>() {
-
-                    @Override
-                    public boolean cancel(boolean arg0) {
-                        return true;}
-
-                    @Override
-                    public boolean isCancelled() {
-                        return false;
-                    }
-
-                    @Override
-                    public boolean isDone() {
-                        System.err.println("FU.isDone");
-                        return true;
-                    }
-
-                    @Override
-                    public Integer get() throws InterruptedException,
-                                                ExecutionException
-                    {
-                        System.err.println("FU.get");
-                       throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public Integer get(long arg0, TimeUnit arg1)
-                            throws InterruptedException,
-                                   ExecutionException,
-                                   TimeoutException
-                    {
-                        System.err.println("FU.get");
-                       throw new UnsupportedOperationException();
-                    }
-                }, attachment);
+                System.err.println("**Read called: buff= " + dst.capacity() + " loggedin= " + loggedIn);
+                IoFuture<Integer, A> result;
+                if (message != null) {
+                    dst.put(message);
+                    result =
+                        AttachedFuture.wrap(new DummyFuture(message.capacity()),
+                                            attachment);
+                    message = null;
+                    callCompletion(handler, attachment, result);
+                } else {
+                    result =
+                            AttachedFuture.wrap(new DummyFuture(0), attachment);
+                    this.handler = handler;
+                }
+                return result;
             }
 
-            @Override
             public <A> IoFuture<Integer, A> read(ByteBuffer dst,
                                   CompletionHandler<Integer, ? super A> handler)
             {
                 return read(dst, null, handler);
             }
 
-            @Override
             public <A> IoFuture<Integer, A> write(ByteBuffer src, A attachment,
                                   CompletionHandler<Integer, ? super A> handler)
             {
-                throw new UnsupportedOperationException();
+                message = ByteBuffer.allocate(src.remaining());
+                message.put(src);
+                if (handler != null) {
+                    callCompletion(handler, null,
+                                   new DummyFuture(message.capacity()));
+                    handler = null;
+                }
+                System.err.println("write: " + src.remaining());
+                return AttachedFuture.wrap(new DummyFuture(src.remaining()),
+                                           attachment);
             }
 
-            @Override
             public <A> IoFuture<Integer, A> write(ByteBuffer src,
                                   CompletionHandler<Integer, ? super A> handler)
             {
-                throw new UnsupportedOperationException();
+                return write(src, null, handler);
             }
 
-            @Override
             public boolean isOpen() {
                 return true;
             }
 
-            @Override
             public void close() throws IOException {}
+            
+            // Terrible hack to get around some generics weirdness. Note that
+            // the CompletionHandler parameter type no longer includes the
+            // "? super" that the read method does above. This removes a
+            // complier error when calling handler.completed. Turns out this
+            // is what happens in the bowels of the sgs nio implementation, either
+            // by design or by accident. I'm not inclined to rip the nio code
+            // apart to fix it.
+            //
+            private <R, A> void callCompletion(CompletionHandler<R, A> handler,
+                                               A attachment,
+                                               Future<R> future)
+            {
+                try {
+                    System.err.println("calling completion size= " + future.get());
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(TestSimpleSgsProtocol.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (ExecutionException ex) {
+                    Logger.getLogger(TestSimpleSgsProtocol.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                handler.completed(AttachedFuture.wrap(future, attachment));
+            }
+            
+            private class DummyFuture implements Future<Integer> {
+
+                // size of message or 0 to indicate "not done"
+                private final int bytes;
+                
+                DummyFuture(int bytes) {
+                    this.bytes = bytes;
+                }
+                
+                public boolean cancel(boolean arg0) {
+                    System.err.println("**cancel called");
+                    return true;}
+
+                public boolean isCancelled() {
+                    System.err.println("**iscancled called");
+                    return false;
+                }
+
+                public boolean isDone() {
+                    System.err.println("**isdone called " +(bytes != 0));
+                    return bytes != 0;
+                }
+
+                public Integer get() throws InterruptedException,
+                                            ExecutionException
+                {
+                   return bytes;
+                }
+
+                public Integer get(long arg0, TimeUnit arg1)
+                        throws InterruptedException,
+                               ExecutionException,
+                               TimeoutException
+                {
+                   return bytes;
+                }
+            }
+                        
         }
         
         private class DummyDescriptor implements TransportDescriptor {
+            private Set<Delivery> delivery;
 
-            @Override
-            public Delivery[] getSupportedDelivery() {
-                return Delivery.values();
+            DummyDescriptor(Properties properties) {
+                delivery =
+                    properties.getProperty("UnreliableDelivery") != null ?
+                                        EnumSet.of(Delivery.UNRELIABLE) :
+                                        EnumSet.allOf(Delivery.class);
+            }
+            
+            public Set<Delivery> supportedDeliveries() {
+                System.err.println("get delivery: " + delivery.size() + " " + delivery);
+                return delivery;
             }
 
-            @Override
-            public boolean canSupport(Delivery required) {
+            public boolean supportsDelivery(Delivery requested) {
+                return delivery.contains(requested);
+            }
+
+            public boolean supportsTransport(TransportDescriptor descriptor) {
                 return true;
             }
 
-            @Override
-            public boolean isCompatibleWith(TransportDescriptor descriptor) {
-                return true;
-            }
-
-            @Override
             public byte[] getConnectionData() {
                 throw new UnsupportedOperationException();
             }

@@ -21,19 +21,18 @@ package com.sun.sgs.impl.transport.tcp;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.transport.ConnectionHandler;
-import com.sun.sgs.transport.Transport;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
 import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
 import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.transport.ConnectionHandler;
+import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.util.Properties;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -80,7 +79,7 @@ import java.util.logging.Logger;
  */
 public class TcpTransport implements Transport {
  
-    public static final String PKG_NAME = "com.sun.sgs.impl.transport.tcp";
+    private static final String PKG_NAME = "com.sun.sgs.impl.transport.tcp";
     
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME));
@@ -100,6 +99,9 @@ public class TcpTransport implements Transport {
     /** The default port: {@value #DEFAULT_PORT} */
     public static final int DEFAULT_PORT = 62964;
     
+    /** The listen address. */
+    final InetSocketAddress listenAddress;
+    
     /** The name of the acceptor backlog property. */
     public static final String ACCEPTOR_BACKLOG_PROPERTY =
         PKG_NAME + ".acceptor.backlog";
@@ -113,24 +115,23 @@ public class TcpTransport implements Transport {
     private final AsynchronousChannelGroup asyncChannelGroup;
 
     /** The acceptor for listening for new connections. */
-    private final AsynchronousServerSocketChannel acceptor;
+    final AsynchronousServerSocketChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
-    private volatile IoFuture<?, ?> acceptFuture = null;
+    volatile IoFuture<?, ?> acceptFuture = null;
     
     /** The connection handler. */
-    private ConnectionHandler handler = null;
+    ConnectionHandler handler = null;
     
     /** The transport descriptor */
-    private final TcpDescriptor descriptor;
+    final TcpDescriptor descriptor;
 
     /**
      * Constructs an instance of this class with the specified properties.
      *
-     * @param properties
-     * @throws java.lang.Exception
+     * @param properties transport properties
      */
-    public TcpTransport(Properties properties) throws Exception {
+    public TcpTransport(Properties properties) {
         
         if (properties == null) {
             throw new NullPointerException("properties is null");
@@ -152,7 +153,7 @@ public class TcpTransport implements Transport {
             // If no host address is supplied, default to listen on all
             // interfaces on the local host.
             //
-            InetSocketAddress listenAddress =
+            listenAddress =
                         host == null ?
                                 new InetSocketAddress(port) :
                                 new InetSocketAddress(host, port);
@@ -202,31 +203,28 @@ public class TcpTransport implements Transport {
     /* -- implement Transport -- */
     
     /** {@inheritDoc} */
-    @Override
     public synchronized void accept(ConnectionHandler handler) {
-        if (!acceptor.isOpen())
-            throw new IllegalStateException("transport has been shutdown");
-        
         if (handler == null) {
-            throw new NullPointerException("handler is null");
+            throw new NullPointerException("null handler");
         }
-        
-        if (this.handler == null) {
-            this.handler = handler;
-            assert acceptFuture == null;
-            acceptFuture = acceptor.accept(new AcceptorListener());
-            logger.log(Level.FINEST, "transport accepting connections");
+        if (!acceptor.isOpen()) {
+            throw new IllegalStateException("transport has been shutdown");
         }
+        if (this.handler != null) {
+            throw new IllegalStateException("accept already called");
+        }
+        this.handler = handler;
+        assert acceptFuture == null;
+        acceptFuture = acceptor.accept(new AcceptorListener());
+        logger.log(Level.CONFIG, "transport accepting connections");
     }
             
     /** {@inheritDoc} */
-    @Override
     public TransportDescriptor getDescriptor() {
         return descriptor;
     }
 
     /** {@inheritDoc} */
-    @Override
     public synchronized void shutdown() {
 	final IoFuture<?, ?> future = acceptFuture;
 	acceptFuture = null;
@@ -275,7 +273,6 @@ public class TcpTransport implements Transport {
     {
 
 	/** Handle new connection or report failure. */
-        @Override
         public void completed(IoFuture<AsynchronousSocketChannel, Void> result)
         {
             try {
@@ -295,14 +292,8 @@ public class TcpTransport implements Transport {
                 logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
                 //ignore
             } catch (Throwable e) {
-                SocketAddress addr = null;
-                try {
-                    addr = acceptor.getLocalAddress();
-                } catch (IOException ioe) {
-                    // ignore
-                }
                 logger.logThrow(
-		    Level.SEVERE, e, "acceptor error on {0}", addr);
+		    Level.SEVERE, e, "acceptor error on {0}", listenAddress);
 
                 // TBD: take other actions, such as restarting acceptor?
             }

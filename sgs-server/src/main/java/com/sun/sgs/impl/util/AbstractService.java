@@ -272,7 +272,7 @@ public abstract class AbstractService implements Service {
     /**
      * Performs shutdown operations.  This method is invoked by the
      * {@link #shutdown shutdown} method only once so that the
-     * subclass can perfom any operations necessary to shutdown the
+     * subclass can perform any operations necessary to shutdown the
      * service.
      */
     protected abstract void doShutdown();
@@ -517,23 +517,12 @@ public abstract class AbstractService implements Service {
      * true}.
      *
      * @param	e an exception
-     * @return	{@code true} if the specified exception is retryable, annd
+     * @return	{@code true} if the specified exception is retryable, and
      *		{@code false} otherwise
      */
     public static boolean isRetryableException(Exception e) {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
-    }
-    
-    /**
-     * Avoids warnings about unchecked casts.
-     *
-     * @param	object the object to cast
-     * @return	the object, cast without warnings
-     */
-    @SuppressWarnings("unchecked")
-    public static <T> T uncheckedCast(Object object) {
-        return (T) object;
     }
      
    /**

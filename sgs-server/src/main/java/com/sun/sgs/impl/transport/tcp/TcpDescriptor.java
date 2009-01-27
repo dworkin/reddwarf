@@ -23,6 +23,8 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
+import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * TCP transport descriptor.
@@ -39,33 +41,41 @@ class TcpDescriptor implements TransportDescriptor, Serializable {
      * @param listeningPort port transport is listening on
      */
     TcpDescriptor(String hostName, int listeningPort) {
-        assert hostName != null;
+        if (hostName == null) {
+            throw new NullPointerException("null hostName");
+        }
         this.hostName = hostName;
         this.listeningPort = listeningPort;
     }
 
-    @Override
-    public Delivery[] getSupportedDelivery() {
-        return Delivery.values();
+    /** {@inheritDoc} */
+    public Set<Delivery> supportedDeliveries() {
+        return EnumSet.allOf(Delivery.class);
     }
         
-    @Override
-    public boolean canSupport(Delivery required) {
-        if (required == null) {
-            throw new NullPointerException("required is null");
+    /** {@inheritDoc} */
+    public boolean supportsDelivery(Delivery delivery) {
+        if (delivery == null) {
+            throw new NullPointerException("null delivery");
         }
         return true; // optimization, TCP supports all
     }
 
-    @Override
-    public boolean isCompatibleWith(TransportDescriptor descriptor) {
-        if (descriptor == null) {
-            throw new NullPointerException("descriptor is null");
-        }
-        return descriptor instanceof TcpDescriptor;
+    /** {@inheritDoc} */
+    public boolean supportsTransport(TransportDescriptor descriptor) {
+        return descriptor == null ? false : descriptor instanceof TcpDescriptor;
     }
     
-    @Override
+    /**
+     * {@inheritDoc}
+     *     
+     * This method will return a {@code byte} array that contains the
+     * following data:
+     * <ul>
+     * <li> (String) hostname
+     * <li> (int) port
+     * </ul>
+     */
     public byte[] getConnectionData() {
         MessageBuffer buf =
                 new MessageBuffer(MessageBuffer.getSize(hostName) + 4);

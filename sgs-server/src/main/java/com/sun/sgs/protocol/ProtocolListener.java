@@ -20,7 +20,6 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.auth.Identity;
-import java.math.BigInteger;
 import java.util.concurrent.ExecutionException;
 
 /**

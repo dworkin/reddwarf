@@ -1774,7 +1774,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final static long serialVersionUID = 1L;
 	private final String name;
 	private final ManagedReference<ClientSession> sessionRef;
-	private BigInteger reconnectKey;
+	private BigInteger reconnectKey = null;
 	private final boolean disconnectedThrowsException;
 
 
@@ -1793,7 +1793,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
 	    AppContext.getDataManager().removeObject(sessionRef.get());
-	    DummyClient client = dummyClients.get(reconnectKey);
+	    DummyClient client =
+                    reconnectKey == null ? null :
+                                           dummyClients.get(reconnectKey);
 	    if (client != null) {
 		client.receivedDisconnectedCallback = true;
 		client.graceful = graceful;

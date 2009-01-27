@@ -47,23 +47,23 @@ public class AsynchronousMessageChannel implements Channel {
     public static final int PREFIX_LENGTH = 2;
 
     /** The logger for this class. */
-    private static final LoggerWrapper logger = new LoggerWrapper(
+    static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(AsynchronousMessageChannel.class.getName()));
 
     /**
      * The underlying channel (possibly another layer of abstraction,
      * e.g. compression, retransmission...)
      */
-    private final AsynchronousByteChannel channel;
+    final AsynchronousByteChannel channel;
 
     /** Whether there is a read underway. */
-    private final AtomicBoolean readPending = new AtomicBoolean();
+    final AtomicBoolean readPending = new AtomicBoolean();
 
     /** Whether there is a write underway. */
-    private final AtomicBoolean writePending = new AtomicBoolean();
+    final AtomicBoolean writePending = new AtomicBoolean();
 
     /** The read buffer. */
-    private final ByteBuffer readBuffer;
+    final ByteBuffer readBuffer;
 
     /**
      * Creates a new instance of this class with the given channel and read

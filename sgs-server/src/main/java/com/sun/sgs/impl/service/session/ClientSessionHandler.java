@@ -42,7 +42,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -101,14 +101,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /** The connection state. */
     private State state = State.CONNECTED;
 
-    private final LoginCompletionFutureImpl loginCompletionFuture =
-	new LoginCompletionFutureImpl(this);
-
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
+    
+    /** Login completion future for this handler. */
+    private final LoginCompletionFutureImpl loginCompletionFuture =
+	new LoginCompletionFutureImpl(this);
 
     /** The queue of tasks for notifying listeners of received messages. */
     private volatile TaskQueue taskQueue = null;
@@ -462,7 +463,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /**
      * Invokes the {@code setStatus} method on the node mapping service
-     * with the given {@code inactiveIdentity} and {@code false} to mark
+     * with {@code false} to mark
      * the identity as inactive.  This method is invoked when a login is
      * redirected and also when a this client session is disconnected.
      */
@@ -574,13 +575,21 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    "from nodeId:{1} to node:{2}",
 		    identity, sessionService.getLocalNodeId(), node);
 	    }
-	    // TBD: identity may be null. Fix to pass a non-null identity
-	    // when scheduling the task.
+	    
 	    scheduleNonTransactionalTask(
 	        new AbstractKernelRunnable("SendLoginRedirectMessage") {
 		    public void run() {
-			loginRedirect(node);
-			handleDisconnect(false, false);
+			try {
+                            try {
+                                loginRedirect(node);
+                            } catch (Exception ex) {
+                                loginFailure(
+                                    new LoginFailureException("Redirect failed",
+                                                              ex));
+                            }
+                        } finally {
+                            handleDisconnect(false, false);
+                        }
 		    } });
 	}
     }
@@ -595,7 +604,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private void loginRedirect(Node node) {
 	synchronized (lock) {
 	    checkConnectedState();
-	    Collection<ProtocolDescriptor> descriptors =
+	    Set<ProtocolDescriptor> descriptors =
 		ClientSessionServiceImpl.getInstance().
 		    getProtocolDescriptors(node.getId());
 	    loginCompletionFuture.setException(
@@ -653,7 +662,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
 
-        /**
+    /**
      * Sends a login failure message to the client and
      * disconnects the client session.
      *
@@ -666,8 +675,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("SendLoginFailureMessage") {
 		public void run() {
-		    loginFailure(exception);
-		    handleDisconnect(false, false);
+		    try {
+                        loginFailure(exception);
+                    } finally {
+                        handleDisconnect(false, false);
+                    }
 		} });
     }
     
@@ -724,7 +736,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    ClientSessionImpl sessionImpl =
                     new ClientSessionImpl(sessionService,
                                           identity,
-                                          protocol.supportedDeliveries());
+                                          protocol.supportedDeliveries(),
+                                          protocol.getMaxMessageLength());
 	    sessionRefId = sessionImpl.getId();
 	}
     }
@@ -790,18 +803,17 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
 		sessionService.addLoginResult(sessionImpl, true, null);
 		
-		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
 		    new AbstractKernelRunnable("NotifyLoggedIn") {
 			public void run() {
 			    logger.log(
 			        Level.FINE,
 				"calling notifyLoggedIn on identity:{0}",
-				thisIdentity);
+				identity);
 			    // notify that this identity logged in,
 			    // whether or not this session is connected at
 			    // the time of notification.
-			    thisIdentity.notifyLoggedIn();
+			    identity.notifyLoggedIn();
 			} });
 		
 	    } else {
@@ -918,7 +930,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	}
     }
-
 
     /**
      * This future is returned from {@link SessionProtocolHandler}

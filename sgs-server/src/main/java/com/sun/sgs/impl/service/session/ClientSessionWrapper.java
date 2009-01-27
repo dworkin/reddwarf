@@ -74,6 +74,11 @@ public class ClientSessionWrapper
     }
     
     /** {@inheritDoc} */
+    public int getMaxMessageLength() {
+        return getClientSession().getMaxMessageLength();
+    }
+    
+    /** {@inheritDoc} */
     public boolean isConnected() {
 	try {
 	    return sessionRef.get().isConnected();

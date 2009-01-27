@@ -43,7 +43,9 @@ public class SimpleSgsProtocolDescriptor
      * @param	transportDesc transport descriptor
      */
     public SimpleSgsProtocolDescriptor(TransportDescriptor transportDesc) {
-        assert transportDesc != null;
+        if (transportDesc == null) {
+            throw new NullPointerException("null transportDesc");
+        }
         this.transportDesc = transportDesc;
     }
 
@@ -54,7 +56,6 @@ public class SimpleSgsProtocolDescriptor
      * underlying transport descriptor is compatible with the specified
      * {@code descriptor}'s transport descriptor.
      */
-    @Override
     public boolean supportsProtocol(ProtocolDescriptor descriptor) {
         if (!(descriptor instanceof SimpleSgsProtocolDescriptor)) {
             return false;
@@ -63,9 +64,13 @@ public class SimpleSgsProtocolDescriptor
         SimpleSgsProtocolDescriptor desc =
 	    (SimpleSgsProtocolDescriptor) descriptor;
         
-        return transportDesc.isCompatibleWith(desc.transportDesc);
+        return transportDesc.supportsTransport(desc.transportDesc);
     }
 
+    /**
+     * Return the transport specific connection data as a byte array.
+     * @return the connection data
+     */
     public byte[] getRedirectionData() {
 	return transportDesc.getConnectionData();
     }

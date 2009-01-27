@@ -20,7 +20,7 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.service.Node;
-import java.util.Collection;
+import java.util.Set;
 
 /**
  * An exception that indicates a login should be redirected to the node
@@ -37,7 +37,7 @@ public class LoginRedirectException extends Exception {
     private final Node node;
 
     /** The protocol descriptors for the {@code node}. */
-    private final Collection<ProtocolDescriptor> descriptors;
+    private final Set<ProtocolDescriptor> descriptors;
 
     /**
      * Constructs and instance with the specified {@code node} and
@@ -48,7 +48,7 @@ public class LoginRedirectException extends Exception {
      *		supported by the specified {@code node}, or {@code null}
      */
     public LoginRedirectException(
-	Node node, Collection<ProtocolDescriptor> descriptors)
+	Node node, Set<ProtocolDescriptor> descriptors)
     {
 	this(node, descriptors, null);
     }
@@ -63,7 +63,7 @@ public class LoginRedirectException extends Exception {
      * @param	message a detail message, or {@code null}
      */
     public LoginRedirectException(
-	Node node, Collection<ProtocolDescriptor> descriptors,
+	Node node, Set<ProtocolDescriptor> descriptors,
 	String message)
     {
 	this(node, descriptors, message, null);
@@ -80,13 +80,15 @@ public class LoginRedirectException extends Exception {
      * @param	cause the cause of this exception, or {@code null}
      */
     public LoginRedirectException(
-	Node node, Collection<ProtocolDescriptor> descriptors,
+	Node node, Set<ProtocolDescriptor> descriptors,
 	String message, Throwable cause)
     {
 	super(message, cause);
 	if (node == null) {
 	    throw new NullPointerException("null node");
-	}
+	} else if (descriptors == null) {
+            throw new NullPointerException("null descriptors");
+        }
 	this.node = node;
 	this.descriptors = descriptors;
     }
@@ -102,12 +104,11 @@ public class LoginRedirectException extends Exception {
     
     /**
      * Returns a collection of protocol descriptors supported by
-     * the node returned by {@link #getNode getNode}, or {@code
-     * null} if the node has no protocol descriptors
+     * the node returned by {@link #getNode getNode}.
      *
-     * @return	a collection of protocol descriptors, or {@code null}
+     * @return	a {@code Set} of protocol descriptors
      */
-    public Collection<ProtocolDescriptor> getProtocolDescriptors() {
+    public Set<ProtocolDescriptor> getProtocolDescriptors() {
 	return descriptors;
     }
 }

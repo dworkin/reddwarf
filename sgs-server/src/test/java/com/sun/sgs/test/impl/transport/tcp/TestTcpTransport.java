@@ -73,7 +73,7 @@ public class TestTcpTransport {
     }
     
     @Test
-    public void testShutdown() throws Exception {
+    public void testShutdownAfterShutdown() throws Exception {
         transport = new TcpTransport(new Properties());
         transport.shutdown();
         shutdown();
@@ -98,6 +98,13 @@ public class TestTcpTransport {
         transport = new TcpTransport(new Properties());
         transport.accept(new DummyHandler());
         shutdown();
+    }
+    
+    @Test(expected=IllegalStateException.class)
+    public void testMultipleAccept() throws Exception {
+        transport = new TcpTransport(new Properties());
+        transport.accept(new DummyHandler());
+        transport.accept(new DummyHandler());
     }
     
     @Test
@@ -164,7 +171,6 @@ public class TestTcpTransport {
 
         AsynchronousByteChannel channel;
         
-        @Override
         public void newConnection(AsynchronousByteChannel channel,
                                   TransportDescriptor descriptor)
             throws Exception
@@ -260,15 +266,12 @@ public class TestTcpTransport {
             return connected;
         }
         
-        @Override
         public String toString() {
 	    return "[" + name + "]";
 	}
     
         private class Listener implements ConnectionListener {
 
-            /** {@inheritDoc} */
-            @Override
 	    public void connected(Connection conn) {
 		System.err.println("DummyClient.Listener.connected");
 		if (connection != null) {
@@ -284,8 +287,6 @@ public class TestTcpTransport {
 		}
 	    }
 
-            /** {@inheritDoc} */
-            @Override
 	    public void disconnected(Connection conn) {
                 System.err.println("DummyClient.Listener.disconnected");
                 synchronized (lock) {
@@ -294,15 +295,12 @@ public class TestTcpTransport {
                 }
 	    }
 	    
-            /** {@inheritDoc} */
-            @Override
 	    public void exceptionThrown(Connection conn, Throwable exception) {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
 		exception.printStackTrace();
 	    }
 
-            @Override
             public void bytesReceived(Connection arg0, byte[] arg1) {
                 throw new UnsupportedOperationException();
             }

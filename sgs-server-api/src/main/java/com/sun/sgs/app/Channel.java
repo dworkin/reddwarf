@@ -139,7 +139,7 @@ public interface Channel extends ManagedObject {
      *
      * @throws IllegalStateException if this channel is closed
      * @throws IllegalArgumentException if the session does not support the
-     * 	       minimum delivery requirement of this channel
+     * 	       delivery requirement of this channel
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
      * @throws TransactionException if the operation failed because of
@@ -219,6 +219,10 @@ public interface Channel extends ManagedObject {
      * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the channel by this invocation.
+     * 
+     * <p>The maximum length of a message that can be sent over the channel is
+     * dependent on the maximum message length supported by all joined client
+     * sessions. (See: {@link ClientSession#getMaxMessageLength})
      *
      * @param	sender the sending client session, or {@code null}
      * @param	message a message
@@ -226,6 +230,8 @@ public interface Channel extends ManagedObject {
      * @return	this channel
      *
      * @throws	IllegalStateException if this channel is closed
+     * @throws  IllegalArgumentException if the channel would be unable
+     *          to send the specified message because it exceeds a size limit 
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of

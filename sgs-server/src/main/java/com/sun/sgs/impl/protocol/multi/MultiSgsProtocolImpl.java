@@ -28,6 +28,7 @@ import com.sun.sgs.protocol.ProtocolListener;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
@@ -87,10 +88,10 @@ class MultiSgsProtocolImpl extends SimpleSgsProtocolImpl {
      *
      * @param	channel a secondary channel
      * @param	supportedDelivery an array of supported delivery requirements
-     * @return	the sesssion protocol handler for this instance
+     * @return	the session protocol handler for this instance
      */
     SessionProtocolHandler attach(SecondaryChannel channel,
-                                  Delivery[] supportedDelivery)
+                                  Set<Delivery> supportedDelivery)
     {
         if (protocolHandler != null) {
         

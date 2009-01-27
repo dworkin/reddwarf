@@ -31,7 +31,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
-import com.sun.sgs.transport.TransportFactory;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Map;
 import java.util.Properties;
@@ -60,11 +60,11 @@ public class MultiSgsProtocolAcceptor
     extends SimpleSgsProtocolAcceptor
 {
     /** The package name. */
-    public static final String PKG_NAME = "com.sun.sgs.impl.protocol.multi";
+    private static final String PKG_NAME = "com.sun.sgs.impl.protocol.multi";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(PKG_NAME + "acceptor"));
+	new LoggerWrapper(Logger.getLogger(PKG_NAME + ".acceptor"));
 
 //    /**
 //     * The primary transport property. The primary transport must
@@ -122,14 +122,21 @@ public class MultiSgsProtocolAcceptor
 
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	try {
-            String transportClassName =
-                wrappedProps.getProperty(SECONDARY_TRANSPORT_PROPERTY,
-					 DEFAULT_SECONDARY_TRANSPORT);
+//            String transportClassName =
+//                wrappedProps.getProperty(SECONDARY_TRANSPORT_PROPERTY,
+//					 DEFAULT_SECONDARY_TRANSPORT);
             
             try {
                 secondaryTransport =
-                        TransportFactory.newTransport(transportClassName,
-						      properties);
+                    wrappedProps.getClassInstanceProperty(
+                                                SECONDARY_TRANSPORT_PROPERTY,
+                                                DEFAULT_SECONDARY_TRANSPORT,
+                                                Transport.class,
+                                                new Class[] {
+                                                    Properties.class},
+                                                properties);
+//                        TransportFactory.newTransport(transportClassName,
+//						      properties);
             } catch (Exception e) {
                 transport.shutdown();
                 throw e;
@@ -170,12 +177,8 @@ public class MultiSgsProtocolAcceptor
     
     /** {@inheritDoc} */
     @Override
-    public void accept(ProtocolListener protocolListener) {
-	if (protocolListener == null) {
-	    throw new NullPointerException("null protocolListener");
-	}
-	this.protocolListener = protocolListener;
-        transport.accept(new PrimaryHandlerImpl());
+    public void accept(ProtocolListener protocolListener) throws IOException {
+        transport.accept(new PrimaryHandlerImpl(protocolListener));
         secondaryTransport.accept(new SecondaryHandlerImpl());
     }
 
@@ -184,6 +187,15 @@ public class MultiSgsProtocolAcceptor
      */
     private class PrimaryHandlerImpl implements ConnectionHandler {
 
+        private final ProtocolListener protocolListener;
+
+        PrimaryHandlerImpl(ProtocolListener protocolListener) {
+            if (protocolListener == null) {
+                throw new NullPointerException("null protocolListener");
+            }
+            this.protocolListener = protocolListener;
+        }
+        
         /** {@inheritDoc} */
         @Override
         public void newConnection(AsynchronousByteChannel byteChannel,
@@ -208,7 +220,7 @@ public class MultiSgsProtocolAcceptor
                                   TransportDescriptor descriptor)
             throws Exception
         {
-            new SecondaryChannel(descriptor.getSupportedDelivery(),
+            new SecondaryChannel(descriptor.supportedDeliveries(),
 				 MultiSgsProtocolAcceptor.this,
                                     byteChannel,
                                     readBufferSize);

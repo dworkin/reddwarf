@@ -26,12 +26,12 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -64,7 +64,6 @@ import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -111,10 +110,10 @@ public final class ClientSessionServiceImpl
 
     /** The name of the key for the protocol descriptors map. */
     private static final String PROTOCOL_DESCRIPTORS_MAP_KEY =
-	PKG_NAME + ".service.protocolDescriptorsMap";
+	PKG_NAME + ".service.protocol.descriptors.map";
 
     /** The major version. */
-    private static final int MAJOR_VERSION = 1;
+    private static final int MAJOR_VERSION = 2;
     
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
@@ -147,6 +146,10 @@ public final class ClientSessionServiceImpl
     /** The protocol acceptor property name. */
     private static final String PROTOCOL_ACCEPTOR_PROPERTY =
 	PKG_NAME + ".protocol.acceptor";
+
+    /** The default protocol acceptor class. */
+    private static final String DEFAULT_PROTOCOL_ACCEPTOR =
+	"com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor";
 
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
@@ -216,7 +219,7 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
-    /** The maximum number of session events to sevice per transaction. */
+    /** The maximum number of session events to service per transaction. */
     final int eventsPerTxn;
 
     /** The flag that indicates how to handle same user logins.  If {@code
@@ -321,21 +324,18 @@ public final class ClientSessionServiceImpl
 	     */
 	    protocolListener = new ProtocolListenerImpl();
 
-	    ProtocolAcceptor newAcceptor =
+	    protocolAcceptor =
 		wrappedProps.getClassInstanceProperty(
 		    PROTOCOL_ACCEPTOR_PROPERTY,
+                    DEFAULT_PROTOCOL_ACCEPTOR,
 		    ProtocolAcceptor.class,
 		    new Class[] {
 			Properties.class, ComponentRegistry.class,
 			TransactionProxy.class },
 		    properties, systemRegistry, txnProxy);
 	    
-	    protocolAcceptor =
-		newAcceptor != null ?
-		newAcceptor :
-		new SimpleSgsProtocolAcceptor(
-		    properties, systemRegistry, txnProxy);
-            
+	    assert protocolAcceptor != null;
+
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -493,15 +493,16 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Records the login result in the current context for delivery to the specified
-     * client {@code session} when the context commits.  If {@code success} is
-     * {@code false}, the specified {@code exception} will be used as the cause of
-     * the {@code ExecutionException} in the associated session's {@link
-     * LoginCompletionFuture} and no subsequent session messages will be forwarded
-     * to the session, even if they have been enqueued during the current
-     * transaction.  If success is {@code true}, then the session's associated
-     * {@code LoginCompletionFuture}'s {@link LoginCompletionFuture#get get} method
-     * will return the appropriate {@link SessionProtocolHandler} for the session.
+     * Records the login result in the current context for delivery to the
+     * specified client {@code session} when the context commits.  If
+     * {@code success} is {@code false}, the specified {@code exception} will
+     * be used as the cause of the {@code ExecutionException} in the associated
+     * session's {@link LoginCompletionFuture} and no subsequent session
+     * messages will be forwarded to the session, even if they have been
+     * enqueued during the current transaction.  If success is {@code true},
+     * then the session's associated {@code LoginCompletionFuture}'s
+     * {@link LoginCompletionFuture#get get} method will return the appropriate
+     * {@link SessionProtocolHandler} for the session.
      *
      * <p>When the transaction commits, the {@code LoginCompletionFuture} is
      * notified of the login result, and if {@code success} is
@@ -589,7 +590,7 @@ public final class ClientSessionServiceImpl
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addLoginAck success:{0} session:{1}",
+			"Context.addLoginResult success:{0} session:{1}",
 			success, session);
 		}
 		checkPrepared();
@@ -835,7 +836,12 @@ public final class ClientSessionServiceImpl
 		SessionProtocol protocol = handler.getSessionProtocol();
 		if (protocol != null) {
 		    for (byte[] message : messages) {
-			protocol.sessionMessage(ByteBuffer.wrap(message));
+                        try {
+                            protocol.sessionMessage(ByteBuffer.wrap(message));
+                        } catch (IOException ioe) {
+                            logger.logThrow(Level.WARNING, ioe,
+                                            "sessionMessage throws");
+                        }
 		    }
 		}
 	    } else {
@@ -1272,11 +1278,11 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Returns a collection of protocol descriptors for the specified
+     * Returns a set of protocol descriptors for the specified
      * {@code nodeId}, or {@code null} if there are no descriptors
      * for the node.  This method must be run outside a transaction.
      */
-    Collection<ProtocolDescriptor> getProtocolDescriptors(long nodeId) {
+    Set<ProtocolDescriptor> getProtocolDescriptors(long nodeId) {
 	checkNonTransactionalContext();
 	GetProtocolDescriptorsTask protocolDescriptorsTask =
 	    new GetProtocolDescriptorsTask(nodeId);
@@ -1284,6 +1290,9 @@ public final class ClientSessionServiceImpl
 	    transactionScheduler.runTask(protocolDescriptorsTask, taskOwner);
 	    return protocolDescriptorsTask.descriptors;
 	} catch (Exception e) {
+            logger.logThrow(Level.WARNING, e,
+                            "GetProtocolDescriptorsTask for node:{0} throws",
+                            nodeId);
 	    return null;
 	}
     }
@@ -1295,7 +1304,7 @@ public final class ClientSessionServiceImpl
 	extends AbstractKernelRunnable
     {
 	private final long nodeId;
-	volatile Collection<ProtocolDescriptor> descriptors = null;
+	volatile Set<ProtocolDescriptor> descriptors = null;
 
 	/** Constructs an instance with the specified {@code nodeId}. */
 	GetProtocolDescriptorsTask(long nodeId) {
@@ -1314,17 +1323,17 @@ public final class ClientSessionServiceImpl
      * stores the map if it doesn't already exist.  This method must be run
      * within a transaction.
      */
-    private static Map<Long, Collection<ProtocolDescriptor>>
+    private static Map<Long, Set<ProtocolDescriptor>>
 	getProtocolDescriptorsMap()
     {
 	DataService dataService = getDataService();
-	Map<Long, Collection<ProtocolDescriptor>> protocolDescriptorsMap;
+	Map<Long, Set<ProtocolDescriptor>> protocolDescriptorsMap;
 	try {
-	    protocolDescriptorsMap = uncheckedCast(
+	    protocolDescriptorsMap = Objects.uncheckedCast(
 		dataService.getServiceBinding(PROTOCOL_DESCRIPTORS_MAP_KEY));
 	} catch (NameNotBoundException e) {
 	    protocolDescriptorsMap =
-		new ScalableHashMap<Long, Collection<ProtocolDescriptor>>();
+		new ScalableHashMap<Long, Set<ProtocolDescriptor>>();
 	    dataService.setServiceBinding(PROTOCOL_DESCRIPTORS_MAP_KEY,
 					  protocolDescriptorsMap);
 	}
