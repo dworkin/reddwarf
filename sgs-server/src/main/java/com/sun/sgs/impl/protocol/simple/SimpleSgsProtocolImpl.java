@@ -574,7 +574,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		ByteBuffer resetMessage = message.duplicate();
 		resetMessage.reset();
                 logger.log(Level.FINEST,
-			   "completed write session:{0} message:{1}",
+			   "completed write protocol:{0} message:{1}",
 			   SimpleSgsProtocolImpl.this,
 			   HexDumper.format(resetMessage, 0x50));
             }
@@ -589,7 +589,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		 */
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(Level.FINE, e,
-				    "write session:{0} message:{1} throws",
+				    "write protocol:{0} message:{1} throws",
 				    SimpleSgsProtocolImpl.this,
 				    HexDumper.format(message, 0x50));
                 }
