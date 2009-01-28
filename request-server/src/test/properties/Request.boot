@@ -107,4 +107,4 @@ SHUTDOWN_PORT = ${shutdown.port}
 # By default, the JAVA_OPTS property is empty and is NOT equal
 # to the value shown below.
 #
-JAVA_OPTS = ${run.jvm.args} ${run.jvm.args.add}
+JAVA_OPTS = ${jvm.args} ${jvm.args.extra}

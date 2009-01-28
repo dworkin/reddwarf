@@ -63,17 +63,17 @@
 	<groupId>com.projectdarkstar.server</groupId>
 	<artifactId>sgs-server-api</artifactId>
 	<scope>provided</scope>
-	<version>${sgs.version}</version>
+	<version>${sgs-server.version}</version>
       </dependency>
       <dependency>
 	<groupId>com.projectdarkstar.client</groupId>
 	<artifactId>sgs-client</artifactId>
-	<version>${sgs.version}</version>
+	<version>${sgs-client.version}</version>
       </dependency>
       <dependency>
 	<groupId>com.projectdarkstar.client</groupId>
 	<artifactId>sgs-client-api</artifactId>
-	<version>${sgs.version}</version>
+	<version>${sgs-client.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -93,8 +93,18 @@
     </repository>
   </repositories>
 
+  <pluginRepositories>
+    <pluginRepository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </pluginRepository>
+  </pluginRepositories>
+
   <properties>
-    <sgs.version>0.9.8</sgs.version>
+    <sgs-server.version>0.9.8</sgs-server.version>
+    <sgs-client.version>0.9.8</sgs-client.version>
   </properties>
 
 </project>

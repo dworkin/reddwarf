@@ -29,30 +29,31 @@
        will use the sgs-maven-plugin to launch the wanderer server in single
        node mode using bdb :
 
-       mvn verify -Prun
+       mvn verify -Prun-server
 
        There are also explicit profiles to specify the db type, and the node
        type that can be matched up:
 
-       mvn verify -Prun,je,multi-node-server-core
+       mvn verify -Prun-server,je,multi-node-server-core
 
-       Additionally, the run.jvm.args, and run.jvm.args.add properties can be
+       Additionally, the jvm.args, and jvm.args.extra properties can be
        overridden to send command line arguments to the resulting server:
 
-       mvn verify -Prun -Drun.jvm.args.add="-Dcom.sun.sgs.app.name=NewName"
+       mvn verify -Prun-server -Djvm.args.extra="-Dcom.sun.sgs.app.name=NewName"
 
        When running multiple app nodes on the same machine, the shutdown.port
-       property must be different for each app node:
+       property must be different for each app node.  The app.port must also
+       be different:
 
-       mvn verify -Prun,multi-node-server-app -Dshutdown.port=1137
-       mvn verify -Prun,multi-node-server-app -Dshutdown.port=1136
+       mvn verify -Prun-server,multi-node-server-app -Dshutdown.port=1137 -Dapp.port=11469
+       mvn verify -Prun-server,multi-node-server-app -Dshutdown.port=1136 -Dapp.port=11470
        ...
 
     -->
   <profiles>
 
     <profile>
-      <id>run</id>
+      <id>run-server</id>
       
       <build>
 	<plugins>
@@ -74,15 +75,14 @@
               </execution>
 	    </executions>
 	    <configuration>
-	      <version>${sgs.version}</version>
-	      <sgsHome>${project.build.directory}/sgs-server-dist-${sgs.version}</sgsHome>
+	      <version>${sgs-server.version}</version>
+	      <sgsHome>${project.build.directory}/sgs-server-dist-${sgs-server.version}</sgsHome>
               <sgsBoot>${project.build.directory}/test-classes/Request.boot</sgsBoot>
 	      <sgsServer>${project.build.directory}/test-classes/${node.type}.properties</sgsServer>
-	      <sgsLogging>${project.build.directory}/test-classes/logging.properties</sgsLogging>
+	      <sgsLogging>${logging.properties}</sgsLogging>
 	      <files>
 		<file>${project.artifact.file}</file>
 	      </files>
-	      <excludeTransitive>true</excludeTransitive>
 	    </configuration>
 	  </plugin>
 	  
@@ -123,6 +123,7 @@
       <properties>
 	<node.type>RequestApp</node.type>
 	<shutdown.port>1137</shutdown.port>
+	<app.port>11469</app.port>
       </properties>
     </profile>
 
@@ -150,12 +151,14 @@
   </build>
 
   <properties>
-    <run.jvm.args>-Xmx1g</run.jvm.args>
-    <run.jvm.args.add></run.jvm.args.add>
+    <jvm.args>-Xmx1g</jvm.args>
+    <jvm.args.extra></jvm.args.extra>
+    <logging.properties>${project.build.directory}/test-classes/logging.properties</logging.properties>
 
     <db.type>db</db.type>
     <node.type>RequestSingle</node.type>
     <shutdown.port>1138</shutdown.port>
+    <app.port>11469</app.port>
   </properties>
 
 </project>
