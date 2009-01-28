@@ -689,8 +689,7 @@ normally necessary)\n");
             return;
         }
 
-        if (sgs_channel_send(channel, (uint8_t*)strbuf, strlen(strbuf),
-                recipient) == -1) {
+        if (sgs_channel_send(channel, (uint8_t*)strbuf, strlen(strbuf)) == -1) {
             perror("Error in sgs_session_channel_send()");
             sgs_id_destroy(recipient);
             return;
