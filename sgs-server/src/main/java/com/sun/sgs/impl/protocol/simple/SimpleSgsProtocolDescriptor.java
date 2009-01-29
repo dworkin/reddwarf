@@ -68,10 +68,12 @@ public class SimpleSgsProtocolDescriptor
     }
 
     /**
-     * Return the transport specific connection data as a byte array.
+     * Return the protocol specific connection data as a byte array. The data
+     * can be used by a client to connect to a server. The format of the data
+     * may be dependent on the transport configured with this protocol.
      * @return the connection data
      */
-    public byte[] getRedirectionData() {
+    public byte[] getConnectionData() {
 	return transportDesc.getConnectionData();
     }
     

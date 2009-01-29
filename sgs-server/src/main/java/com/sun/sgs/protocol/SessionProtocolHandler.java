@@ -21,6 +21,7 @@ package com.sun.sgs.protocol;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Future;
 
 /**
  * A handler for session and channel protocol messages for an associated
@@ -49,7 +50,7 @@ public interface SessionProtocolHandler {
      * @param	message a message
      * @return	future a future for the result
      */
-    CompletionFuture sessionMessage(ByteBuffer message);
+    Future<Void> sessionMessage(ByteBuffer message);
 
     /**
      * Processes a channel message sent by the associated client on the
@@ -67,7 +68,7 @@ public interface SessionProtocolHandler {
      * @param	message a message
      * @return	future a future for the result
      */
-    CompletionFuture channelMessage(BigInteger channelId, ByteBuffer message);
+    Future<Void> channelMessage(BigInteger channelId, ByteBuffer message);
     
     /**
      * Processes a logout request from the associated client and returns a
@@ -76,7 +77,7 @@ public interface SessionProtocolHandler {
      *
      * @return	future a future for the result
      */
-    CompletionFuture logoutRequest();
+    Future<Void> logoutRequest();
 
     /**
      * Notifies this handler that a non-graceful client disconnection has
@@ -85,5 +86,5 @@ public interface SessionProtocolHandler {
      *
      * @return	future a future for the result
      */
-    CompletionFuture disconnect();
+    Future<Void> disconnect();
 }

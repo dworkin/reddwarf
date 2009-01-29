@@ -103,6 +103,7 @@ public class ClientSessionImpl
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
+    /** Maximum message length for session messages. */
     private final int maxMessageLength;
     
     /** The capacity of the write buffer, in bytes. */
@@ -127,6 +128,7 @@ public class ClientSessionImpl
      * @param	sessionService a client session service
      * @param	identity the session's identity
      * @param	deliveries the session's supported delivery requirements
+     * @param  maxMessageLenght the maximum session message length
      * @throws TransactionException if there is a problem with the
      * 		current transaction
      */

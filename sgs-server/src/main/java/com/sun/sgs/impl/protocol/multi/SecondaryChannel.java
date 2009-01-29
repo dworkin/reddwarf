@@ -30,7 +30,6 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
-import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.IOException;
@@ -42,6 +41,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -89,9 +89,10 @@ class SecondaryChannel implements Channel {
      * Creates a new instance of this class with the given byte channel
      * and read buffer size.
      * 
-     * @param	byteChannel a byte channel
-     * @param	protocolImpl protocol impl
-     * @param	readBufferSize the number of bytes in the read buffer
+     * @param supportedDelivery the delivery for this channel
+     * @param acceptor the parent acceptor
+     * @param byteChannel the channels IO path
+     * @param readBufferSize the read buffer size
      */
     SecondaryChannel(Set<Delivery> supportedDelivery,
                      MultiSgsProtocolAcceptor acceptor,
@@ -499,8 +500,9 @@ class SecondaryChannel implements Channel {
                         new BigInteger(1, msg.getBytes(msg.getShort()));
                     ByteBuffer channelMessage =
                         ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-                    CompletionFuture channelMessageFuture =
-                            handler.channelMessage(channelRefId, channelMessage);
+                    Future<Void> channelMessageFuture =
+                                       handler.channelMessage(channelRefId,
+                                                              channelMessage);
 
                     // Wait for channel message to be processed before
                     // resuming reading.
@@ -509,11 +511,12 @@ class SecondaryChannel implements Channel {
                     } catch (InterruptedException ignore) {
                     } catch (ExecutionException e) {
                         if (logger.isLoggable(Level.FINE)) {
-                            logger.logThrow(Level.FINE, e,
-                                            "Processing channel message:{0} " +
-                                            "for protocol:{1} throws",
-                                            HexDumper.format(channelMessage, 0x50),
-                                            SecondaryChannel.this);
+                            logger.logThrow(
+                                    Level.FINE, e,
+                                    "Processing channel message:{0} " +
+                                    "for protocol:{1} throws",
+                                    HexDumper.format(channelMessage, 0x50),
+                                    SecondaryChannel.this);
                         }
                     }
                 }

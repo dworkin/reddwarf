@@ -232,7 +232,7 @@ public class MultiSgsProtocolAcceptor
     /**
      * Record a successful login.
      * @param key the reconnect key
-     * @param connection the session connection
+     * @param protocol the protocol instance
      */
     void successfulLogin(byte[] key, MultiSgsProtocolImpl protocol) {
         logins.put(new BigInteger(1, key), protocol);

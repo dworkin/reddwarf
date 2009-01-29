@@ -1102,22 +1102,24 @@ public class TestWatchdogServiceImpl extends TestCase {
 			  String.valueOf(SgsTestNode.getNextUniquePort()));
 	props.setProperty("com.sun.sgs.impl.service.watchdog.client.port",
 			  String.valueOf(SgsTestNode.getNextUniquePort()));
+        props.setProperty("com.sun.sgs.impl.service.session.server.port",
+                          String.valueOf(SgsTestNode.getNextUniquePort()));
         SgsTestNode node = null;
         try {
             node = new SgsTestNode(serverNode, null, props);
-            fail("Expected ExportException");
+            fail("Expected BindException");
         } catch (InvocationTargetException e) {
-            System.err.println(e);
             Throwable target = e.getTargetException();
             // The kernel constructs the services through reflection, and the
             // SgsTestNode creates the kernel through reflection - burrow down
             // to the root cause to be sure it's of the expected type.
-            while (target instanceof InvocationTargetException) {
+            while ((target instanceof InvocationTargetException) ||
+                   (target instanceof RuntimeException)) {
                 System.err.println("unwrapping target exception");
-                target = ((InvocationTargetException) target).getTargetException();
+                target = target.getCause();
             }
-            if (!(target instanceof ExportException)) {
-                fail("Expected ExportException, got " + target);
+            if (!(target instanceof BindException)) {
+                fail("Expected BindException, got " + target);
             }
         } finally {
             if (node != null) {
@@ -1146,7 +1148,6 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    node1 = new SgsTestNode(appName, null, props1, true);
             fail ("Expected BindException");
         } catch (InvocationTargetException e) {
-            System.err.println(e);
             Throwable target = e.getTargetException();
             // We wrap our exceptions a bit in the kernel....
             while ((target instanceof InvocationTargetException) ||

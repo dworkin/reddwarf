@@ -63,7 +63,7 @@ class TcpDescriptor implements TransportDescriptor, Serializable {
 
     /** {@inheritDoc} */
     public boolean supportsTransport(TransportDescriptor descriptor) {
-        return descriptor == null ? false : descriptor instanceof TcpDescriptor;
+        return descriptor instanceof TcpDescriptor;
     }
     
     /**

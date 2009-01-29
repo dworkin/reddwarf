@@ -407,15 +407,12 @@ public final class WatchdogServerImpl
 	    }
 	    final NodeImpl node = new NodeImpl(nodeId, host, client);
             
-            synchronized (aliveNodes) {
-                assert ! aliveNodes.containsKey(nodeId);
-
-                if (aliveNodes.containsValue(node))
-                    throw new IllegalArgumentException(
-                                    "configuration error: node on host "
-                                    + host +
-                                    " already exists");
-                aliveNodes.put(nodeId, node);
+            if (aliveNodes.putIfAbsent(nodeId, node) != null) {
+                logger.log(Level.SEVERE,
+                           "Duplicate node ID generated for node on {0}",
+                           host);
+                throw new NodeRegistrationFailedException(
+		    "Duplicate node ID generated");
             }
             
 	    // Persist node

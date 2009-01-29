@@ -57,7 +57,6 @@ class MultiSgsProtocolDescriptor extends SimpleSgsProtocolDescriptor {
      * compatible with (respectively) the specified {@code descriptor}'s
      * primary and secondary transport descriptors.
      */
-    @Override
     public boolean supportsProtocol(ProtocolDescriptor descriptor) {
         if (!(descriptor instanceof MultiSgsProtocolDescriptor)) {
             return false;
@@ -73,8 +72,7 @@ class MultiSgsProtocolDescriptor extends SimpleSgsProtocolDescriptor {
     /**
      * {@inheritDoc}
      */
-    @Override
-    public byte[] getRedirectionData() {
+    public byte[] getConnectionData() {
 	byte[] primaryData = transportDesc.getConnectionData();
 	byte[] secondaryData = secondaryDesc.getConnectionData();
 	byte[] redirectionData =

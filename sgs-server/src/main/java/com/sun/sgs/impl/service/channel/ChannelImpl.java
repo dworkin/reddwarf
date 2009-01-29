@@ -825,7 +825,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
 
-        if (session.getMaxMessageLength() > maxMessageLength) {
+        if (session.getMaxMessageLength() < maxMessageLength) {
             maxMessageLength = session.getMaxMessageLength();
         }
 	return true;

@@ -70,7 +70,8 @@ public interface SessionProtocol extends Channel {
     /**
      * Sends the associated client the specified {@code message}.
      *
-     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * <p>The {@code ByteBuffer} is not modified and may be reused immediately
+     * after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the client by this invocation.
      * 
@@ -78,6 +79,7 @@ public interface SessionProtocol extends Channel {
      * 
      * @throws IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
+     * @throws IOException if an I/O error occurs
      */
     void sessionMessage(ByteBuffer message) throws IOException;
     
@@ -91,7 +93,7 @@ public interface SessionProtocol extends Channel {
      *
      * @throws	DeliveryNotSupportedException if the specified {@code
      *		delivery} requirement is not supported by this protocol
-     * @throws IOException If an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     void channelJoin(String name, BigInteger channelId, Delivery delivery)
             throws IOException;
@@ -102,8 +104,7 @@ public interface SessionProtocol extends Channel {
      *
      * @param	channelId a channel ID
      * 
-     * @throws IOException If an I/O error occurs
-     *
+     * @throws IOException if an I/O error occurs
      */
     void channelLeave(BigInteger channelId) throws IOException;
 
@@ -112,7 +113,8 @@ public interface SessionProtocol extends Channel {
      * message} sent on the channel with the specified {@code channelId}
      * and {@code delivery} requirement.
      * 
-     * <p>The {@code ByteBuffer} may be reused immediately after this method
+     * <p>The {@code ByteBuffer} is not modified and may be reused immediately
+     * after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the client by this invocation.
      *
@@ -124,7 +126,7 @@ public interface SessionProtocol extends Channel {
      *		delivery} requirement is not supported by this protocol
      * @throws IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
-     * @throws IOException If an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     void channelMessage(
 	BigInteger channelId, ByteBuffer message, Delivery delivery)
@@ -140,7 +142,7 @@ public interface SessionProtocol extends Channel {
      
      * @param	reason	the reason for disconnection
      * 
-     * @throws IOException If an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     void disconnect(DisconnectReason reason) throws IOException;
 }

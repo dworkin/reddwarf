@@ -44,7 +44,7 @@ public interface Transport {
      * Start accepting connections. The transport will invoke the specified
      * {@code handler}'s {@link ConnectionHandler#newConnection newConnection}
      * method when a connection is received. Once {@code accept} has
-     * been called, subsequent invocations will have throw an
+     * been called, subsequent invocations will throw an
      * {@code IllegalStateException}. If
      * {@link #shutdown} has been called this method will throw an
      * {@code IllegalStateException}.
@@ -53,7 +53,7 @@ public interface Transport {
      * 
      * @throws IllegalStateException if the transport has been shutdown or
      *          {@code accept} has been called.
-     * @throws IOException If an I/O error occurs
+     * @throws IOException if an I/O error occurs
      */
     void accept(ConnectionHandler handler) throws IOException;
     

@@ -28,7 +28,6 @@ import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
@@ -178,7 +177,6 @@ public class TestSimpleSgsProtocol {
         Identity identity = null;
         SessionProtocol protocol = null;
         
-        @Override
         public LoginCompletionFuture newLogin(Identity identity,
                                               SessionProtocol protocol)
         {
@@ -187,36 +185,32 @@ public class TestSimpleSgsProtocol {
                 throw new RuntimeException("identity or protocol are null");
             this.identity = identity;
             this.protocol = protocol;
-            return new Future(new SessionHandler());
+            return new LCFuture(new SessionHandler());
         }
         
-        private class Future implements LoginCompletionFuture {
+        private class LCFuture implements LoginCompletionFuture {
             private final SessionProtocolHandler handler;
             
-            Future(SessionProtocolHandler handler) {
+            LCFuture(SessionProtocolHandler handler) {
                 this.handler = handler;
             }
-            @Override
+
             public SessionProtocolHandler get() {
                 return handler;
             }
 
-            @Override
             public SessionProtocolHandler get(long timeout, TimeUnit unit) {
                 return handler;
             }
 
-            @Override
             public boolean cancel(boolean arg0) {
                 throw new UnsupportedOperationException();
             }
 
-            @Override
             public boolean isCancelled() {
                 throw new UnsupportedOperationException();
             }
 
-            @Override
             public boolean isDone() {
                 throw new UnsupportedOperationException();
             }
@@ -224,52 +218,42 @@ public class TestSimpleSgsProtocol {
         
         private class SessionHandler implements SessionProtocolHandler {
 
-            @Override
-            public CompletionFuture sessionMessage(ByteBuffer message) {
+            public Future<Void> sessionMessage(ByteBuffer message) {
                 System.err.println("***** sessionMessage called..." + message.remaining());
-                return new CompletionFuture() {
+                return new Future<Void>() {
 
-                    @Override
                     public boolean cancel(boolean arg0) {
                         return true;
                     }
 
-                    @Override
                     public boolean isCancelled() {
                         return false;
                     }
 
-                    @Override
                     public boolean isDone() {
                         return true;
                     }
 
-                    @Override
                     public Void get() throws InterruptedException, ExecutionException {
                         return null;
                     }
 
-                    @Override
                     public Void get(long arg0, TimeUnit arg1) throws InterruptedException, ExecutionException, TimeoutException {
                         return null;
                     }
                 };
             }
 
-            @Override
-            public CompletionFuture channelMessage(BigInteger channelId,
-                                                   ByteBuffer message) {
-                throw new UnsupportedOperationException();
+            public Future<Void> channelMessage(BigInteger channelId, ByteBuffer message) {
+                throw new UnsupportedOperationException("Not supported yet.");
             }
 
-            @Override
-            public CompletionFuture logoutRequest() {
-                throw new UnsupportedOperationException();
+            public Future<Void> logoutRequest() {
+                throw new UnsupportedOperationException("Not supported yet.");
             }
 
-            @Override
-            public CompletionFuture disconnect() {
-                throw new UnsupportedOperationException();
+            public Future<Void> disconnect() {
+                throw new UnsupportedOperationException("Not supported yet.");
             }
         }
     }
@@ -282,12 +266,10 @@ public class TestSimpleSgsProtocol {
             descriptor = new DummyDescriptor(properties);
         }
         
-        @Override
         public TransportDescriptor getDescriptor() {
             return descriptor;
         }
 
-        @Override
         public void accept(ConnectionHandler handler) {
             if (handler == null)
                 throw new IllegalArgumentException(

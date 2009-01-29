@@ -30,7 +30,6 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
-import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
@@ -52,6 +51,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -120,7 +120,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** Messages enqueued to be sent after a login ack is sent. */
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
-    /** The immutable set of supported delivery requirements. */
+    /** The set of supported delivery requirements. */
     protected final Set<Delivery> deliverySet = new HashSet<Delivery>();
 
 
@@ -304,7 +304,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
             if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
 		byte[] redirectionData =
 		    ((SimpleSgsProtocolDescriptor) descriptor).
-		        getRedirectionData();
+		        getConnectionData();
 		MessageBuffer buf =
 		    new MessageBuffer(1 + redirectionData.length);
 		buf.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
@@ -417,7 +417,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "writeToWriteHandler session:{0} throws", this);
+		    "writeToWriteHandler protocol:{0} throws", this);
 	    }
 	}
     }
@@ -784,7 +784,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    return;
 		}
 		
-		CompletionFuture channelMessageFuture =
+		Future<Void> channelMessageFuture =
 		    protocolHandler.channelMessage(
 			channelRefId, channelMessage);
 		acceptor.scheduleNonTransactionalTask(
@@ -880,14 +880,14 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     private class RequestCompletionTask extends AbstractKernelRunnable {
 
 	/** The completion future. */
-	private final CompletionFuture future;
+	private final Future<Void> future;
 	
 	/**
 	 * Constructs an instance with the given completion {@code future}.
 	 *
 	 * @param future a completion future to wait on
 	 */
-	RequestCompletionTask(CompletionFuture future) {
+	RequestCompletionTask(Future<Void> future) {
 	    super(RequestCompletionTask.class.getName());
 	    this.future = future;
 	}
@@ -916,7 +916,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     private class LogoutCompletionTask extends AbstractKernelRunnable {
 
 	/** The completion future. */
-	private final CompletionFuture future;
+	private final Future<Void> future;
 
 	/**
 	 * Constructs an instance with the specified login completion
@@ -924,7 +924,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	 *
 	 * @param future a login completion future to wait on.
 	 */
-	LogoutCompletionTask(CompletionFuture future) {
+	LogoutCompletionTask(Future<Void> future) {
 	    super(LoginCompletionTask.class.getName());
 	    this.future = future;
 	}

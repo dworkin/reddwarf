@@ -28,7 +28,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.CompletionFuture;
 import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginFailureException.FailureReason;
@@ -44,6 +43,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
@@ -153,7 +153,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /* -- Implement SessionProtocolHandler -- */
     
     /** {@inheritDoc} */
-    public CompletionFuture sessionMessage(final ByteBuffer message) {
+    public Future<Void> sessionMessage(final ByteBuffer message) {
 	CompletionFutureImpl future = new CompletionFutureImpl();
 	if (!loggedIn) {
 	    logger.log(
@@ -185,8 +185,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /** {@inheritDoc} */
-    public CompletionFuture channelMessage(final BigInteger channelId,
-					   final ByteBuffer message)
+    public Future<Void> channelMessage(final BigInteger channelId,
+                                       final ByteBuffer message)
     {
 	CompletionFutureImpl future = new CompletionFutureImpl();
 	if (!loggedIn) {
@@ -222,7 +222,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /** {@inheritDoc} */
-    public CompletionFuture logoutRequest() {
+    public Future<Void> logoutRequest() {
 	scheduleHandleDisconnect(isConnected(), false);
 
 	// Enable protocol message channel to read immediately
@@ -232,7 +232,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /** {@inheritDoc} */
-    public CompletionFuture disconnect() {
+    public Future<Void> disconnect() {
 	scheduleHandleDisconnect(false, true);
 	
 	// TBD: should we wait to notify until client disconnects connection?
@@ -348,10 +348,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
 		assert !closeConnection;
-		// TBD: does anything special need to be done here?
-		// Bypass sendProtocolMessage method which prevents sending
-		// messages to disconnecting sessions.
-		//protocol.logoutSuccess();
 	    }
 
 	    if (closeConnection) {
@@ -848,7 +844,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * This future is an abstract implementation for the futures
      * returned by {@code ProtocolListener} and {@code SessionProtocolHandler}.
      */
-    private static abstract class AbstractCompletionFuture<T> {
+    private static abstract class AbstractCompletionFuture<T>
+            implements Future<T>
+    {
 
 	/**
 	 * Indicates whether the operation associated with this future
@@ -936,8 +934,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * operations.
      */
     private static class CompletionFutureImpl
-	extends AbstractCompletionFuture<Void>
-	implements CompletionFuture
+            extends AbstractCompletionFuture<Void>
     {
 	/** {@inheritDoc} */
 	protected Void getValue() {

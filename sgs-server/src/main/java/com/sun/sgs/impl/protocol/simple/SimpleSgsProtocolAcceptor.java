@@ -153,7 +153,7 @@ public class SimpleSgsProtocolAcceptor
 	    new ConcurrentSkipListMap<Long, SessionProtocol>();
 
     /** The handle for the task that monitors disconnecting client sessions. */
-    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
+    final private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
 
     /**
      * Constructs an instance with the specified {@code properties},
@@ -207,11 +207,7 @@ public class SimpleSgsProtocolAcceptor
 		MIN_DISCONNECT_DELAY, Long.MAX_VALUE);
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
-            
-//            String transportClassName =
-//                    wrappedProps.getProperty(TRANSPORT_PROPERTY,
-//                                             DEFAULT_TRANSPORT);
-            
+               
             transport =
                 wrappedProps.getClassInstanceProperty(TRANSPORT_PROPERTY,
                                                       DEFAULT_TRANSPORT,
@@ -219,8 +215,6 @@ public class SimpleSgsProtocolAcceptor
                                                       new Class[] {
                                                             Properties.class},
                                                       properties);
-//            transport = TransportFactory.newTransport(transportClassName,
-//                                                      properties);
             
             if (!transport.getDescriptor().supportsDelivery(Delivery.RELIABLE))
             {
@@ -268,15 +262,7 @@ public class SimpleSgsProtocolAcceptor
     /** {@inheritDoc} */
     public void doShutdown() {
         transport.shutdown();
-
-	if (monitorDisconnectingSessionsTaskHandle != null) {
-	    try {
-		monitorDisconnectingSessionsTaskHandle.cancel();
-	    } finally {
-		monitorDisconnectingSessionsTaskHandle = null;
-	    }
-	}
-	    
+        monitorDisconnectingSessionsTaskHandle.cancel(); 
 	disconnectingHandlersMap.clear();
     }
 
