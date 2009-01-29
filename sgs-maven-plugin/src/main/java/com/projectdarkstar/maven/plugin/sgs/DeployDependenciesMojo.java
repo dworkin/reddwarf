@@ -37,6 +37,12 @@ import com.projectdarkstar.maven.plugin.sgs.util.TransitivityFilter;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.resolver.ArtifactResolver;
+import org.apache.maven.artifact.resolver.ArtifactResolutionException;
+import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
+import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.metadata.ArtifactMetadataSource;
 import org.apache.maven.shared.artifact.filter.collection.FilterArtifacts;
 import org.apache.maven.shared.artifact.filter.collection.ArtifactIdFilter;
 import org.apache.maven.shared.artifact.filter.collection.ClassifierFilter;
@@ -48,6 +54,7 @@ import org.codehaus.plexus.util.StringUtils;
 import java.io.File;
 import java.util.Set;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Deploys a jar or jar files into a Project Darkstar server installation.
@@ -144,7 +151,103 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
      */
     private boolean excludeTransitive;
     
+    /**
+     * If true, any dependencies that are transitive dependencies whose 
+     * non-transitive parent dependencies have been excluded, 
+     * should also be excluded.
+     * 
+     * @parameter default-value="true"
+     * @since 1.0-alpha-3
+     */
+    private boolean excludeOrphanTransitive;
+    
+    /** 
+     * Componented used for resolving Maven Artifacts.
+     * 
+     * @component
+     * @readonly
+     * @required
+     * @since 1.0-alpha-3
+     */
+    private ArtifactResolver resolver;
+
+    /**
+     * The local Maven repository.
+     * 
+     * @parameter expression="${localRepository}"
+     * @readonly
+     * @required
+     * @since 1.0-alpha-3
+     */
+    private ArtifactRepository localRepository;
+
+    /** 
+     * The available remote Maven repositories.
+     * 
+     * @parameter expression="${project.remoteArtifactRepositories}" 
+     * @readonly
+     * @required
+     * @since 1.0-alpha-3
+     */
+    private List remoteRepositories;
+    
+    /**
+     * Component used to resolve artifacts.
+     * 
+     * @component
+     * @readonly
+     * @required
+     * @since 1.0-alpha-3
+     */
+    private ArtifactMetadataSource artifactMetadataSource;
+    
     public File[] getFiles() throws MojoExecutionException {
+        
+        FilterArtifacts filter = buildFilter();
+        Set baseArtifacts = null;
+        if(excludeOrphanTransitive) {
+            Set dependencyArtifacts = project.getDependencyArtifacts();
+            try {
+                ArtifactResolutionResult result =
+                        resolver.resolveTransitively(filter.filter(dependencyArtifacts),
+                                                     project.getArtifact(),
+                                                     remoteRepositories,
+                                                     localRepository,
+                                                     artifactMetadataSource);
+                baseArtifacts = result.getArtifacts();
+            } catch (ArtifactResolutionException are) {
+                throw new MojoExecutionException("Failure resolving dependencies", are);
+            } catch (ArtifactNotFoundException anfe) {
+                throw new MojoExecutionException("Failure to locate artifact", anfe);
+            } catch (ArtifactFilterException afe) {
+                throw new MojoExecutionException("Failture filtering artifacts", afe);
+            }
+        } else {
+            baseArtifacts = project.getArtifacts();
+        }
+        
+        try {
+            
+            Set artifacts = filter.filter(baseArtifacts);
+            File[] files = new File[artifacts.size()];
+            
+            Iterator a = artifacts.iterator();
+            for(int i = 0; a.hasNext(); i++) {
+                files[i] = ((Artifact) a.next()).getFile();
+            }
+            
+            return files;
+        } catch (ArtifactFilterException e) {
+            throw new MojoExecutionException("Failure filtering artifacts", e);
+        }
+
+    }
+    
+    private FilterArtifacts buildFilter() {
+        //default to using dependencies with scope compile
+        if(includeScopes == null) {
+            includeScopes = new String[]{"compile"};
+        }
         
         FilterArtifacts f = new FilterArtifacts();
         f.addFilter(new ArtifactIdFilter(safeJoin(includeArtifactIds, ","),
@@ -158,21 +261,7 @@ public class DeployDependenciesMojo extends AbstractDeployMojo {
         f.addFilter(new TransitivityFilter(project.getDependencyArtifacts(),
                                            excludeTransitive));
         
-        try {
-            
-            Set artifacts = f.filter(project.getArtifacts());
-            File[] files = new File[artifacts.size()];
-            
-            Iterator a = artifacts.iterator();
-            for(int i = 0; a.hasNext(); i++) {
-                files[i] = ((Artifact) a.next()).getFile();
-            }
-            
-            return files;
-        } catch (ArtifactFilterException e) {
-            throw new MojoExecutionException("Failure filtering artifacts", e);
-        }
-
+        return f;
     }
     
     private String safeJoin(String[] strings, String delimiter) {
