@@ -125,7 +125,7 @@ public class SampleJMXListener implements ProfileListener {
     
     /** {@inheritDoc} */
     public void shutdown() {
-        // Unused
+        handle.cancel();
     }
     
     /**

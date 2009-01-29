@@ -34,7 +34,9 @@ import javax.management.NotificationBroadcasterSupport;
 
 /**
  * The central location to aggregate information on tasks run through the
- * system.
+ * system.  Only bounded transactions are aggregated.  Successful
+ * transactions that take longer than the standard transaction timeout
+ * are typically used for application startup tasks, and are not included.
  */
 public class TaskAggregateStats extends NotificationBroadcasterSupport
         implements TaskAggregateMXBean
@@ -68,7 +70,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
      * The last time {@link #clear} was called, or when this object
      * was created if {@code clear} has not been called.
      */
-    private long lastClear = System.currentTimeMillis();
+    private volatile long lastClear = System.currentTimeMillis();
 
     /**
      * The standard transaction timeout, used to determine if a successful
@@ -242,7 +244,7 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
     // Methods used by ProfileCollector to update our values when
     // tasks complete
     void taskFinishedSuccess(boolean trans, long ready, long run, long lag) {
-        taskFinishedCommon(trans, ready);
+        // Don't include unbounded tasks in our statistics.
         if (firstTask) {
             firstTask = false;
             ConfigManager config = (ConfigManager) 
@@ -252,6 +254,9 @@ public class TaskAggregateStats extends NotificationBroadcasterSupport
         if (run > standardTimeout) {
             return;
         }
+        
+        taskFinishedCommon(trans, ready);
+        
         runtime.addSample(run);
         lagtime.addSample(lag);
         latency.addSample(run + lag);
