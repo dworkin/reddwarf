@@ -93,6 +93,15 @@ public class SimpleSgsProtocolAcceptor
     /** The logger for this class. */
     private static final LoggerWrapper staticLogger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + ".acceptor"));
+    
+    /** The name of the version key. */
+    private static final String VERSION_KEY = PKG_NAME + ".service.version";
+
+    /** The major version. */
+    private static final int MAJOR_VERSION = 1;
+    
+    /** The minor version. */
+    private static final int MINOR_VERSION = 0;
 
     /** The name of the read buffer size property. */
     public static final String READ_BUFFER_SIZE_PROPERTY =
@@ -125,7 +134,7 @@ public class SimpleSgsProtocolAcceptor
     public static final long DEFAULT_DISCONNECT_DELAY = 1000;
     
     /** The minimum disconnect delay value. */
-    public static final long MIN_DISCONNECT_DELAY = 200;
+    public static final long MIN_DISCONNECT_DELAY = 1000;
 
     /** The logger for this instance. */
     private  final LoggerWrapper logger;
@@ -229,10 +238,18 @@ public class SimpleSgsProtocolAcceptor
 		taskScheduler.scheduleRecurringTask(
  		    new MonitorDisconnectingSessionsTask(),
 		    taskOwner, System.currentTimeMillis(),
-		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
+		    disconnectDelay);
 	    monitorDisconnectingSessionsTaskHandle.start();
 	    
-	    // TBD: check service version?
+	    /*
+	     * Check service version.
+	     */
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
+		    public void run() {
+			checkServiceVersion(
+			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
+		    } },  taskOwner);
 	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

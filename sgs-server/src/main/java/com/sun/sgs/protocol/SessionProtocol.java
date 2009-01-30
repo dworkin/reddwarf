@@ -29,8 +29,16 @@ import java.util.Set;
 /**
  * A protocol for sending session messages and channel messages to
  * a client.
+ * 
+ * <p>The implementation of the protocol is only responsible for the formating
+ * and sending of messages to the client. Unless otherwise noted, the
+ * implementation is not required to perform validity checks on method
+ * arguments. For calls that result in messages sent to a client, is up to
+ * the caller to make sure arguments contain valid information.  It is up
+ * to the client to decide what it wants to do if it receives messages that
+ * seem nonsensical.
  *
- * <p>Note: If a protocol specification requires that a login
+ * <p>If a protocol specification requires that a login
  * acknowledgment be delivered to a client before any other protocol
  * messages, the protocol must implement this requirement.  It is possible
  * that a caller may request that other messages be sent before a login

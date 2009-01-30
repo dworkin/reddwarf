@@ -455,7 +455,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      *
      * @return the next reconnect key
      */
-    private static synchronized byte[] getNextReconnectKey() {
+    private static byte[] getNextReconnectKey() {
 	byte[] key = new byte[DEFAULT_RECONNECT_KEY_LENGTH];
 	random.nextBytes(key);
 	return key;

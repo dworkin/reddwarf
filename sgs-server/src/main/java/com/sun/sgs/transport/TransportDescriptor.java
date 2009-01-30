@@ -49,8 +49,7 @@ public interface TransportDescriptor {
      * Check if the specified transport is compatible with the transport this
      * descriptor represents.
      * @param descriptor to compare
-     * @return {@code true} if the specified descriptor is not {@code null}
-     * and represents a transport
+     * @return {@code true} if the specified descriptor represents a transport
      * compatible with the transport this descriptor represents, and
      * {@code false} otherwise
      */
