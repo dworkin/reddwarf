@@ -80,8 +80,7 @@ static fd_set* fd_copy(fd_set* from, fd_set* to) {
 static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel);
 static void channel_left_cb(sgs_connection *conn, sgs_channel *channel);
 static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
-    const sgs_id *sender_id, const uint8_t *msg,
-    size_t msglen);
+    const uint8_t *msg, size_t msglen);
 static void disconnected_cb(sgs_connection *conn);
 static void logged_in_cb(sgs_connection *conn, sgs_session *session);
 static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
@@ -99,7 +98,8 @@ static void bye(int exitval);
 static int concatstr(const char *prefix, const char *suffix, char *buf,
     size_t buflen);
 static void process_user_cmd(char *cmd);
-
+static int bytestohex(const uint8_t *ba, const int len, char *hexstr);
+static int hextobytes(const char *hexstr, uint8_t *ba);
 /*
  * STATIC GLOBAL VARIABLES
  *
@@ -353,7 +353,7 @@ static void channel_left_cb(sgs_connection *conn, sgs_channel *channel) {
  * channel_recv_msg_cb()
  */
 static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
-    const sgs_id *sender_id, const uint8_t *msg, size_t msglen)
+    const uint8_t *msg, size_t msglen)
 {
     char msgstr[msglen + 1];
     const wchar_t *channel_name = sgs_channel_name(channel);
@@ -362,25 +362,11 @@ static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
     memcpy(msgstr, msg, msglen);
     msgstr[msglen] = '\0';
 
-    if (sender_id == NULL) {
-        sender_desc = "Server";
-    }
-    else {
-        sender_desc = (char *)malloc(sgs_id_get_byte_len(sender_id)*2 + 1);
 
-        if (sender_desc == NULL) {
-            printf("Error: malloc failed in channel_recv_msg_cb().");
-            return;
-        }
 
-        bytestohex(sgs_id_get_bytes(sender_id), sgs_id_get_byte_len(sender_id),
-            sender_desc);
-    }
+    printf(" - Callback -   Received message on channel %ls: %s\n",
+        channel_name, msgstr);
 
-    printf(" - Callback -   Received message on channel %ls from %s: %s\n",
-        channel_name, sender_desc, msgstr);
-
-    if (sender_id != NULL) free(sender_desc);
 }
 
 /*
@@ -792,3 +778,65 @@ normally necessary)\n");
         printf("Unrecognized command.  Try \"help\"\n");
     }
 }
+
+/*
+ * bytestohex()
+ */
+static int bytestohex(const uint8_t *ba, const int len, char *hexstr) {
+    int i;
+
+    /** leading zeros are important! */
+    for (i=0; i < len; i++)
+        sprintf(hexstr + i*2, "%02X", ba[i]);
+
+    hexstr[len*2] = '\0';
+
+    return 0;
+}
+
+
+/*
+ * hextoi()
+ */
+static int hextoi(char c) {
+    if (c >= '0' && c <= '9')
+        return c - '0';
+
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+
+    return -1;
+}
+
+
+/*
+ * hextobytes()
+ */
+static int hextobytes(const char *hexstr, uint8_t *ba) {
+    int i, hi, lo, hexlen;
+
+    hexlen = strlen(hexstr);
+
+    if ((hexlen & 1) == 1) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    for (i=0; i < hexlen/2; i++) {
+        hi = hextoi(hexstr[2*i]);
+        lo = hextoi(hexstr[2*i+1]);
+
+        if (hi == -1 || lo == -1) {
+            errno = EINVAL;
+            return -1;
+        }
+
+        ba[i] = hi*16 + lo;
+    }
+
+    return 0;
+}
+
