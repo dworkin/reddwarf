@@ -381,21 +381,10 @@ static void disconnected_cb(sgs_connection *conn) {
  * logged_in_cb()
  */
 static void logged_in_cb(sgs_connection *conn, sgs_session *session) {
-    const sgs_id *session_id = sgs_session_get_id(session);
-    char *session_desc = (char *)malloc(sgs_id_get_byte_len(session_id)*2 + 1);
 
-    if (session_desc == NULL) {
-        printf("Error: malloc failed in logged_in_cb().");
-        return;
-    }
-
-    bytestohex(sgs_id_get_bytes(session_id), sgs_id_get_byte_len(session_id),
-        session_desc);
-
-    printf(" - Callback -   Logged in with sessionId %s.\n", session_desc);
+    printf(" - Callback -   Logged in to session \n");
 
     g_session = session;
-    free(session_desc);
 }
 
 /*
