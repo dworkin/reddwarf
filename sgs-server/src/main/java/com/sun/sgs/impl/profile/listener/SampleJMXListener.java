@@ -85,6 +85,9 @@ public class SampleJMXListener implements ProfileListener {
         // Ensure that the taskBean statistics are being generated.
         // This means we don't have to enable a default profiling level
         // through a property at start-up.
+        // Because consumer names aren't publically declared in a way that
+        // makes them easy to find programmatically, we make a best guess
+        // search here.
         Map<String, ProfileConsumer> consumers = collector.getConsumers();
         for (Map.Entry<String, ProfileConsumer> entry : consumers.entrySet()) {
             if (entry.getKey().contains("TaskAggregate")) {
