@@ -25,9 +25,13 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 
+import com.sun.sgs.management.ProfileControllerMXBean;
+
+import com.sun.sgs.management.TaskAggregateMXBean;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileConsumer;
@@ -37,6 +41,8 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 
 import java.beans.PropertyChangeEvent;
 
+import java.lang.management.ManagementFactory;
+
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
@@ -45,24 +51,48 @@ import java.util.EmptyStackException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.Stack;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.management.InstanceNotFoundException;
+import javax.management.JMException;
+import javax.management.MBeanRegistrationException;
+import javax.management.MBeanServer;
+import javax.management.MBeanServerFactory;
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+
 
 /**
  * This is the implementation of {@code ProfileCollector} used by the
  * kernel to collect and report profiling data. It uses a single thread to
- * consume and report profiling data.
+ * consume and report profiling data to {@code ProfileListeners}.
+ * <p>
+ * The {@link #ProfileCollector constructor} supports the following
+ * properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.profile.create.mbeanserver
+ *	</b></code><br>
+ *	<i>Default:</i> {@code false} <br>
+ *      Specifies whether a new {@code MBeanServer} should be created, rather
+ *      than using the existing platform {@code MBeanServer}. <p>
+ * 
+ * </dl> <p>
  */
 public final class ProfileCollectorImpl implements ProfileCollector {
 
     /**
-     * the standard prefix for consumer names created by core packages
+     * The standard prefix for consumer names created by core packages.
      */
     public static final String CORE_CONSUMER_PREFIX = "com.sun.sgs.";
     
@@ -70,6 +100,13 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(ProfileCollectorImpl.
                                            class.getName()));
+    
+    /**
+     * The property telling us whether we should use the default platform
+     * MBeanServer or create a new one.
+     */ 
+    public static final String CREATE_MBEAN_SERVER_PROPERTY = 
+            "com.sun.sgs.impl.profile.create.mbeanserver";
     
     // A map from profile consumer name to profile consumer object
     private final ConcurrentHashMap<String, ProfileConsumerImpl> consumers;
@@ -105,6 +142,15 @@ public final class ProfileCollectorImpl implements ProfileCollector {
     // The system registry, used to instantiate {@code ProfileListener}s
     private final ComponentRegistry systemRegistry;
     
+    // The MBeans registered for this node.
+    private final ConcurrentMap<String, Object> registeredMBeans;
+    
+    // Our MBeanServer
+    private final MBeanServer mbeanServer;
+    
+    // The statistics MBean for tasks
+    private final TaskAggregateStats taskStats;
+
     /**
      * Creates an instance of {@code ProfileCollectorImpl}.
      * @param level the default system profiling level
@@ -127,6 +173,31 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
         defaultProfileLevel = level;
         
+        registeredMBeans = new ConcurrentHashMap<String, Object>();
+
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(appProperties);
+        boolean createServer = 
+           wrappedProps.getBooleanProperty(CREATE_MBEAN_SERVER_PROPERTY, false);
+        if (createServer) {
+            mbeanServer = MBeanServerFactory.createMBeanServer();
+        } else {
+            mbeanServer = ManagementFactory.getPlatformMBeanServer();
+        }
+        
+        // Create the task aggregator MBean and register it, as well as
+        // the profile controller MBean.
+        taskStats = new TaskAggregateStats(this,
+                CORE_CONSUMER_PREFIX + "TaskAggregateStats");
+        try {
+            registerMBean(taskStats, TaskAggregateMXBean.MXBEAN_NAME);
+            registerMBean(new ProfileController(this),
+                          ProfileControllerMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            // Continue on if we couldn't register this bean, although
+            // it's probably a very bad sign
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
+
         // start a long-lived task to consume the other end of the queue
         reporterThread = new CollectorThread();
         reporterThread.start();
@@ -150,8 +221,27 @@ public final class ProfileCollectorImpl implements ProfileCollector {
                 entry.getKey().shutdown();
             }
         }
+        
+        // attempt to unregister all our registered MBeans
+        Set<String> keys = registeredMBeans.keySet();
+        for (String name : keys) {
+            try {
+                mbeanServer.unregisterMBean(new ObjectName(name));
+            } catch (MalformedObjectNameException ex) {
+                logger.logThrow(Level.WARNING, ex,
+                                "Could not unregister MBean {0}", name);
+            } catch (InstanceNotFoundException ex) {
+                logger.logThrow(Level.WARNING, ex,
+                                "Could not unregister MBean {0}", name);
+            } catch (MBeanRegistrationException ex) {
+                logger.logThrow(Level.WARNING, ex,
+                                "Could not unregister MBean {0}", name);
+            } finally {
+                registeredMBeans.remove(name);
+            }
+        }
     }
-
+    
     /** {@inheritDoc} */
     public ProfileLevel getDefaultProfileLevel() {
         return defaultProfileLevel;
@@ -175,11 +265,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
 
         ProfileConsumerImpl oldpc = consumers.putIfAbsent(name, pc);
         if (oldpc != null) {
-            logger.log(Level.INFO, 
+            logger.log(Level.FINE, 
                    "Found consumer {0} already created", name);
             return oldpc;
         } else {
-            logger.log(Level.INFO, "Created consumer named {0}", name);
+            logger.log(Level.FINE, "Created consumer named {0}", name);
             return pc;
         }
     }
@@ -257,6 +347,28 @@ public final class ProfileCollectorImpl implements ProfileCollector {
             listeners.remove(listener);
             listener.shutdown();
         }
+    }
+
+    /** {@inheritDoc} */
+    public void registerMBean(Object mBean, String mBeanName)
+        throws JMException
+    {
+        try {
+            ObjectName name = new ObjectName(mBeanName);
+            mbeanServer.registerMBean(mBean, name);
+
+            registeredMBeans.putIfAbsent(mBeanName, mBean);
+            logger.log(Level.CONFIG, "Registered MBean {0}", name);
+        } catch (JMException ex) {
+            logger.logThrow(Level.CONFIG, ex,
+                            "Could not register MBean {0}", mBeanName);
+            throw ex;
+        }
+    }
+
+    /** {@inheritDoc} */
+    public Object getRegisteredMBean(String mBeanName) {
+        return registeredMBeans.get(mBeanName);
     }
 
     /* -- Methods to support ProfileCollectorHandle -- */
@@ -416,9 +528,11 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         }
 
         // collect the final details about the report
-        profileReport.runningTime = stopTime - profileReport.actualStartTime;
+        long runtime = stopTime - profileReport.actualStartTime;    
+        profileReport.runningTime = runtime;
         profileReport.tryCount = tryCount;
-        profileReport.succeeded = t == null;
+        boolean successful = t == null;
+        profileReport.succeeded = successful;
         profileReport.throwable = t;
         
         // if this was a nested report, then merge all of the collected
@@ -432,6 +546,17 @@ public final class ProfileCollectorImpl implements ProfileCollector {
         
         // queue up the report to be reported to our listeners
         queue.offer(profileReport);
+        
+        // Update the task aggregate data 
+        boolean trans = profileReport.wasTaskTransactional();
+        if (successful) {
+            long lagtime = profileReport.actualStartTime -
+                           profileReport.scheduledStartTime;
+            taskStats.taskFinishedSuccess(trans, profileReport.readyCount, 
+                                          runtime, lagtime);
+        } else {
+            taskStats.taskFinishedFail(trans, profileReport.readyCount);
+        }
     }
 
     /**

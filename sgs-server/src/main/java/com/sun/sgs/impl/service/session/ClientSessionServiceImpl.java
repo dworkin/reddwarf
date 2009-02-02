@@ -27,6 +27,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCoordinator;
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
@@ -49,6 +50,7 @@ import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -85,6 +87,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Manages client sessions. <p>
@@ -280,6 +283,9 @@ public final class ClientSessionServiceImpl
      */
     final boolean allowNewLogin;
 
+    /** Our JMX exposed statistics. */
+    final ClientSessionServiceStats serviceStats;
+
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -289,21 +295,18 @@ public final class ClientSessionServiceImpl
      * @throws Exception if a problem occurs when creating the service
      */
     public ClientSessionServiceImpl(Properties properties,
-				    ComponentRegistry systemRegistry,
+                                    ComponentRegistry systemRegistry,
 				    TransactionProxy txnProxy)
 	throws Exception
     {
-	super(properties, systemRegistry, txnProxy, logger);
-	
+	super(properties, systemRegistry, txnProxy, logger);	
 	logger.log(Level.CONFIG,
 		   "Creating ClientSessionServiceImpl properties:{0}",
 		   properties);
-	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);	
 	try {
             appPort = wrappedProps.getRequiredIntProperty(
                 StandardProperties.APP_PORT, 1, 65535);
-
 	    /*
 	     * Get the property for controlling session event processing
 	     * and connection disconnection.
@@ -323,9 +326,7 @@ public final class ClientSessionServiceImpl
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
-	    /*
-	     * Export the ClientSessionServer.
-	     */
+            /* Export the ClientSessionServer. */
 	    int serverPort = wrappedProps.getIntProperty(
 		SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 0, 65535);
 	    serverImpl = new SessionServerImpl();
@@ -335,9 +336,8 @@ public final class ClientSessionServiceImpl
 		int port = exporter.export(serverImpl, serverPort);
 		serverProxy = exporter.getProxy();
 		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(
-			Level.CONFIG, "export successful. port:{0,number,#}",
-			port);
+		    logger.log(Level.CONFIG, 
+                            "export successful. port:{0,number,#}", port);
 		}
 	    } catch (Exception e) {
 		try {
@@ -347,9 +347,7 @@ public final class ClientSessionServiceImpl
 		throw e;
 	    }
 
-	    /*
-	     * Get services and check service version.
-	     */
+	    /* Get services and check service version. */
 	    identityManager =
 		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
@@ -369,9 +367,7 @@ public final class ClientSessionServiceImpl
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
 		    } },  taskOwner);
 	    
-	    /*
-	     * Store the ClientSessionServer proxy in the data store.
-	     */
+	    /* Store the ClientSessionServer proxy in the data store. */
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreClientSessionServiceProxy") {
 		    public void run() {
@@ -429,7 +425,25 @@ public final class ClientSessionServiceImpl
 		    taskOwner, System.currentTimeMillis(),
 		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
 	    monitorDisconnectingSessionsTaskHandle.start();
-
+            
+            /* Create our service profiling info and register our MBean */
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new ClientSessionServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats,
+                                        ClientSessionServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            
+            ConfigManager config = (ConfigManager)
+                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            if (config == null) {
+                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
+            } else {
+                config.setAppPort(appPort);
+            }
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -587,6 +601,7 @@ public final class ClientSessionServiceImpl
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
+        serviceStats.registerSessionDisconnectListenerOp.report();
         sessionDisconnectListeners.add(listener);
     }
     
@@ -594,6 +609,7 @@ public final class ClientSessionServiceImpl
     public void sendProtocolMessageNonTransactional(
 	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
     {
+        serviceStats.sendProtocolMessageNonTransactionalOp.report();
 	ClientSessionHandler handler = handlers.get(sessionRefId);
 	/*
 	 * If a local handler exists, forward message to local handler
