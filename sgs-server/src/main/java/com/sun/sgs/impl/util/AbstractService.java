@@ -497,6 +497,7 @@ public abstract class AbstractService implements Service {
      * transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
+        int maxAttempts = maxIOAttempts;
         checkNonTransactionalContext();
         do {
             try {
@@ -509,7 +510,6 @@ public abstract class AbstractService implements Service {
                 }
                 // If the maximum number of attempts have been tried,
                 // then we are forced to shutdown
-                int maxAttempts = maxIOAttempts;
                 if (--maxAttempts == 0) {
                     // Report failure of remote node to watchdog. If reporting
                     // the failure fails, then the local node will be marked
