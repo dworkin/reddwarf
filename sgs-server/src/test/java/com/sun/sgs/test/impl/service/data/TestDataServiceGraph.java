@@ -164,18 +164,21 @@ public class TestDataServiceGraph {
     /** A serializable value to store within an element. */
     private static class Value implements Serializable {
 	private static final long serialVersionUID = 1;
-	private final int x;
-	private final int y;
-	private transient int z;
 	private final String s;
+	private final String t;
+	private transient String u;
+	private final Value next;
 	Value() {
-	    x = random.nextInt();
-	    y = random.nextInt();
-	    z = random.nextInt();
+	    this(4);
+	}
+	Value(int count) {
 	    s = randomString();
+	    t = randomString();
+	    u = randomString();
+	    next = (count > 0) ? new Value(count - 1) : null;
 	}
 	private void readObject(ObjectInputStream in) {
-	    z = random.nextInt();
+	    u = randomString();
 	}
     }
 
