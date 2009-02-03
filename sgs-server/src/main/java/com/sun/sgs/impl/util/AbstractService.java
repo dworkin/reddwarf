@@ -27,6 +27,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -53,9 +54,9 @@ import java.util.logging.Level;
  */
 public abstract class AbstractService implements Service {
 
-    /** The time (in milliseconds) to wait before retrying an (@code
-     * IoRunnable} in the {@code runIoTask} method. */ 
-    private static final int WAIT_TIME_BEFORE_RETRY = 100;
+    // The default IO attempts and retries
+    private static final int DEFAULT_RETRY_WAIT_TIME = 100;
+    private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
 
     /** Service state. */
     protected static enum State {
@@ -101,6 +102,16 @@ public abstract class AbstractService implements Service {
 
     /** Thread for shutting down the server. */
     private volatile Thread shutdownThread;
+    
+    /** The time (in milliseconds) to wait between retries for IO 
+     * operations. */ 
+    protected final int retryWaitTime;
+    
+    /** The maximum number of retry attempts for IO operations. */
+    protected final int maxIOAttempts;
+    
+    /** Indicates whether the service has already been shutdown **/
+    private boolean isShutdown = false;
 
     /**
      * Constructs an instance with the specified {@code properties}, {@code
@@ -144,7 +155,13 @@ public abstract class AbstractService implements Service {
 	    throw new IllegalArgumentException(
 		"The " + StandardProperties.APP_NAME +
 		" property must be specified");
-	}	
+	}
+
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        retryWaitTime = wrappedProps.getIntProperty(
+                StandardProperties.IO_WAIT_TIME, DEFAULT_RETRY_WAIT_TIME);
+        maxIOAttempts = wrappedProps.getIntProperty(
+                StandardProperties.IO_RETRIES, DEFAULT_MAX_IO_ATTEMPTS);
 	
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -226,6 +243,11 @@ public abstract class AbstractService implements Service {
      * re-initiate shutdown.
      */
     public boolean shutdown() {
+        if (isShutdown) {
+            return true;
+        }
+        isShutdown = true;
+
 	logger.log(Level.FINEST, "shutdown");
 	
 	synchronized (lock) {
@@ -457,47 +479,25 @@ public abstract class AbstractService implements Service {
 	return transactionScheduler.createTaskQueue();
     }
 
-    /**
-     * Executes the specified {@code ioTask} by invoking its {@link
-     * IoRunnable#run run} method.  If the specified task throws an
-     * {@code IOException}, this method will retry the task while the
-     * node with the given {@code nodeId} is alive until the task
-     * completes successfully. This method will provide a default value from the
-     * {@code com.sun.sgs.service.Service} interface which supplies the
-     * maximum IO attempts to perform before declaring that the service has
-     * failed.
-     * <p>This method must be called from outside a transaction or {@code
-     * IllegalStateException} will be thrown.
-     *
-     * @param	ioTask a task with IO-related operations
-     * @param	nodeId the node that is the target of the IO operations
-     * @throws	IllegalStateException if this method is invoked within a
-     * 		transactional context
-     */
-    public void runIoTask(IoRunnable ioTask, long nodeId) {
-        runIoTask(ioTask, nodeId, DEFAULT_MAX_IO_ATTEMPTS);
-    }
 
     /**
      * Executes the specified {@code ioTask} by invoking its {@link
      * IoRunnable#run run} method. If the specified task throws an
-     * {@code IOException}, this method will retry the task while the node
+     * {@code IOException}, this method will retry the task for a fixed 
+     * number of times, which is configurable, while the node
      * with the given {@code nodeId} is alive until the task completes
      * successfully.
      * <p>
      * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
-     * 
+     *
      * @param ioTask a task with IO-related operations
      * @param nodeId the node that is the target of the IO operations
-     * @param maxAttempts the maximum number of IO attempts to perform before
-     * issuing a service failure
      * @throws IllegalStateException if this method is invoked within a
      * transactional context
      */
-    public void runIoTask(IoRunnable ioTask, long nodeId, int maxAttempts) {
+    public void runIoTask(IoRunnable ioTask, long nodeId) {
         checkNonTransactionalContext();
-        boolean hasNotified = false;
         do {
             try {
                 ioTask.run();
@@ -509,16 +509,28 @@ public abstract class AbstractService implements Service {
                 }
                 // If the maximum number of attempts have been tried,
                 // then we are forced to shutdown
-                if (!hasNotified && --maxAttempts == 0) {
-                    // Report failure to watchdog who issues a Kernel.shutdown()
-                    txnProxy.getService(WatchdogService.class).reportFailure(
-                            this.getClass().toString(),
-                            WatchdogService.FailureLevel.MEDIUM);
-                    
-                    hasNotified = true;
+                int maxAttempts = maxIOAttempts;
+                if (--maxAttempts == 0) {
+                    // Report failure of remote node to watchdog. If reporting
+                    // the failure fails, then the local node will be marked
+                    // as failed.
+                    try {
+                        txnProxy.getService(WatchdogService.class).
+                                reportFailure(nodeId, this.getClass().
+                                toString(), 
+                                WatchdogService.FailureLevel.MEDIUM);
+                        break;
+                    }
+                    catch (IOException ioe) {
+                        logger.logThrow(Level.FINEST, e,
+                                "Failed to report remote node failure " +
+                                "after failing an IO task.");
+                        // node should be shutting down already
+                    }
                 }
                 try {
-                    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
+                    // TBD: what back-off policy do we want here?
+                    Thread.sleep(retryWaitTime);
                 } catch (InterruptedException ie) {
                 }
             }

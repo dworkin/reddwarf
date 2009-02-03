@@ -22,7 +22,7 @@ package com.sun.sgs.test.impl.service.watchdog;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.kernel.KernelShutdownController;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -1308,9 +1308,8 @@ public class TestWatchdogServiceImpl extends Assert {
                     txnProxy, dummyCtrl);
 
             // Report a failure, which should shutdown the node
-            
-            watchdogService.reportFailure(appName,
-                    WatchdogService.FailureLevel.FATAL);
+            watchdogService.reportFailure(watchdogService.getLocalNodeId(), 
+                    appName, WatchdogService.FailureLevel.FATAL);
 
             // Node should not be alive since we reported a failure
             try {
@@ -1340,13 +1339,12 @@ public class TestWatchdogServiceImpl extends Assert {
         serverNode.shutdown(true);
         serverNode = null;
 
-        // Wait for the shutdown to process and the renew to fail
+        // Wait for the renew to fail and the shutdown to begin
         Thread.sleep(2000);
 
         try {
             // The node should be shut down
-            System.err.println("Is node alive? " + node.getWatchdogService().
-                    isLocalNodeAliveNonTransactional());
+            node.getWatchdogService().isLocalNodeAliveNonTransactional();
             fail("Expecting an IllegalStateException");
         } catch (IllegalStateException ise) {
             // Expected
@@ -1488,13 +1486,50 @@ public class TestWatchdogServiceImpl extends Assert {
     }
     
     /**
+     * Check that if two concurrent shutdowns are issued for a node, the second 
+     * shutdown will fail quietly.
+     */
+    @Test public void testConcurrentShutdowns() throws Exception {
+        final SgsTestNode appNode = new SgsTestNode(serverNode, null, null);
+        // issue a shutdown which will run in a thread
+        appNode.getWatchdogService().reportFailure(appNode.getNodeId(),
+                appNode.getClass().getName(),
+                WatchdogService.FailureLevel.SEVERE);
+        // try to shutdown the node a second time
+        appNode.shutdown(true);
+    }
+    
+    /**
+     * Check if a node shutdown can be issued from a component successfully
+     */
+    @Test public void testComponentShutdown() throws Exception {
+        final SgsTestNode node = new SgsTestNode(serverNode, null, null);
+        
+        // Simulate shutdown being called from a component by passing a
+        // a component object
+        node.shutdownCtrl.shutdownNode(node.getSystemRegistry().
+                getComponent(TransactionScheduler.class));
+        
+        Thread.sleep(2000);
+        
+        try {
+            // The node should be shut down
+            node.getWatchdogService().isLocalNodeAliveNonTransactional();
+            fail("Expecting an IllegalStateException");
+        } catch (IllegalStateException ise) {
+            // Expected
+        }
+    }
+    
+    
+    /**
      * Fakes out a KernelShutdownController for test purposes
      */
     private static class DummyKernelShutdownController implements
 	    KernelShutdownController {
 	private int shutdownCount = 0;
 
-	public void shutdownNode() {
+	public void shutdownNode(Object caller) {
 	    shutdownCount++;
 	}
 

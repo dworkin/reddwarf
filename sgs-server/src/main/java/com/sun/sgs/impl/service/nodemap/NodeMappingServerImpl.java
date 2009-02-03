@@ -607,27 +607,34 @@ public final class NodeMappingServerImpl
         logger.log(Level.FINEST, "In notifyListeners, identity: {0}, " +
                                "oldNode: {1}, newNode: {2}", 
                                id, oldNode, newNode);
+        int retries = maxIOAttempts;
         if (oldNode != null) {
             NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {
-                try {
-                    oldClient.removed(id, newNode);
-                } catch (IOException ex) {
-                    logger.logThrow(Level.WARNING, ex, 
-                            "A communication error occured while notifying" +
-                            " node {0} that {1} has been removed", 
-                            oldClient, id);
-
+                // retry a number of times
+                while (retries-- > 0) {
                     try {
-                        // Try to shutdown the node corresponding to oldClient
-                        watchdogService.reportFailure(oldNode.getId(), 
-                                this.getClass().toString(), 
-                                WatchdogService.FailureLevel.MEDIUM);
-                    } catch (IOException ioe) {
-                        logger.logThrow(Level.WARNING, ex,
-                            "A communication error occured while " +
-                            "trying to report a failure to the " +
-                            "watchdog service:" + ioe.getLocalizedMessage());
+                        oldClient.removed(id, newNode);
+                        break;
+                    } catch (IOException ex) {
+                        // report failure if we run out of retries
+                        if (retries == 0) {
+                            logger.logThrow(Level.WARNING, ex,
+                                    "A communication error occured while " +
+                                    "notifying node {0} that {1} has " +
+                                    "been removed", oldClient, id);
+                            try {
+                                // Try to shutdown the node
+                                watchdogService.reportFailure(oldNode.getId(),
+                                        this.getClass().toString(),
+                                        WatchdogService.FailureLevel.MEDIUM);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ex,
+                                        "A communication error occured when " +
+                                        "trying to report a failure to the " +
+                                        "watchdog service.");
+                            }
+                        }
                     }
                 }
             }

@@ -247,4 +247,16 @@ public final class StandardProperties {
      * running the servers associated with services.
      */
     public static final String SERVER_HOST = NS + "server.host";
+    
+    /**
+     * An optional property that specifies the maximum number of retries for 
+     * IO tasks in services.
+     */
+    public static final String IO_RETRIES = NS + "io.retries";
+    
+    /**
+     * An optional property that specifies the wait time between successive 
+     * IO task retries.
+     */
+    public static final String IO_WAIT_TIME = NS + "io.wait.time";
 }

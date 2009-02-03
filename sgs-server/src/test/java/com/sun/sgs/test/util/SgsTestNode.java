@@ -22,6 +22,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -68,6 +69,8 @@ public class SgsTestNode {
     private static Field kernelProxy;
     /** system registry */
     private static Field kernelReg;
+    /** shutdown controller */
+    private static Field kernelShutdownCtrl;
 
     static {
         try {
@@ -86,6 +89,9 @@ public class SgsTestNode {
 
             kernelReg = kernelClass.getDeclaredField("systemRegistry");
             kernelReg.setAccessible(true);
+            
+            kernelShutdownCtrl = kernelClass.getDeclaredField("shutdownCtrl");
+            kernelShutdownCtrl.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -131,6 +137,9 @@ public class SgsTestNode {
     private final TaskService taskService;
     private final ClientSessionService sessionService;
     private final ChannelManager channelService;
+    
+    /** Shutdown controller. */
+    public final KernelShutdownController shutdownCtrl;
 
     /** The listen port for the client session service. */
     private int appPort;
@@ -253,6 +262,9 @@ public class SgsTestNode {
         taskService = getService(TaskService.class);
         sessionService = getService(ClientSessionService.class);
         channelService = getService(ChannelServiceImpl.class);
+
+        shutdownCtrl = (KernelShutdownController)
+                kernelShutdownCtrl.get(kernel);
 
 	if (sessionService != null) {
 	    appPort =

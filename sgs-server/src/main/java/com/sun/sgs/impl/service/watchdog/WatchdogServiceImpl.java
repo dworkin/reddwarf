@@ -19,7 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
-import com.sun.sgs.kernel.KernelShutdownController;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -246,11 +246,13 @@ public final class WatchdogServiceImpl
     /**
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServiceImpl class documentation} for a list
-     * of supported properties.
+     * of supported properties. The Watchdog service is given the ability to
+     * shutdown a node with the {@link KernelShutdownController}.
      *
      * @param	properties service (and server) properties
      * @param	systemRegistry system registry
      * @param	txnProxy transaction proxy
+     * @param   ctrl shutdown controller
      * @throws	Exception if a problem occurs constructing the service/server
      */
     public WatchdogServiceImpl(Properties properties,
@@ -378,7 +380,7 @@ public final class WatchdogServiceImpl
 	    logger.logThrow(
 		Level.CONFIG, e,
 		"Failed to create WatchdogServiceImpl");
-            doShutdown();
+	    doShutdown();
 	    throw e;
 	}
     }
@@ -442,7 +444,13 @@ public final class WatchdogServiceImpl
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
-		reportFailure(this.getClass().toString(), FailureLevel.MEDIUM);
+                try {
+                    reportFailure(getLocalNodeId(), CLASSNAME, 
+                            FailureLevel.MEDIUM);
+                } catch (IOException ioe) {
+                    // local call; if it gets here, the node will be shutting 
+                    // down already
+                }
 		return false;
 	    } else {
 		return true;
@@ -501,23 +509,6 @@ public final class WatchdogServiceImpl
 
     /**
      * {@inheritDoc}
-     * <p>
-     * This method is designed to be called locally without any need to supply
-     * the node's own ID. Therefore, it is equivalent to the call
-     * {@code reportFailure(getLocalNodeId(), className, severity)}.
-     */
-    public void reportFailure(String className, FailureLevel severity) {
-        try {
-            reportFailure(getLocalNodeId(), className, severity);
-        } catch (IOException ioe) {
-            // Should never get here
-            logger.log(Level.WARNING, "Local reportFailure exception thrown:" +
-                    ioe.getLocalizedMessage());
-        }
-    }
-
-    /**
-     * {@inheritDoc}
      */
     public void reportFailure(long nodeId, String className, 
             FailureLevel severity) throws IOException {
@@ -538,6 +529,7 @@ public final class WatchdogServiceImpl
             case SEVERE:
             case MEDIUM:
             case MINOR:
+            default:
 
                 /*
                  * Check if the node ID matches this node and that this node
@@ -545,8 +537,8 @@ public final class WatchdogServiceImpl
                  * Otherwise, find the node which should be shutdown instead
                  */
                 if (nodeId == getLocalNodeId()) {
-                    logger.log(Level.WARNING, "{1} reported failure in local " +
-                            "node with id: {0}", nodeId, className);
+                    logger.log(Level.WARNING, "{1} reported failure in local " 
+                            + "node with id: {0}", nodeId, className);
 
                     /*
                      * Try to report failure to the watchdog server. Since it
@@ -555,20 +547,20 @@ public final class WatchdogServiceImpl
                      * that may be thrown as a result.
                      */
                     try {
-                        serverProxy.setNodeAsFailed(nodeId);
+                        serverProxy.setNodeAsFailed(nodeId, true, CLASSNAME, 
+                                FailureLevel.SEVERE, maxIOAttempts);
                     } catch (IOException ioe) {
-                        logger.log(Level.SEVERE,
-                                "Cannot report failure to Watchdog Server: " +
-                                ioe.getLocalizedMessage());
+                        logger.logThrow(Level.SEVERE, ioe,
+                                "Cannot report failure to Watchdog Server");
                     }
                     setFailedThenNotify(true);
                 } else {
-                    logger.log(Level.WARNING, "{1} reported failure in remote" +
-                            " node with id {0}", nodeId, className);
+                    logger.log(Level.WARNING, "{1} reported failure in remote"
+                            + " node with id {0}", nodeId, className);
                     // Inform the server to shutdown the remote node.
                     // Note that this call may throw an IOException
-                    serverProxy.setNodeAsFailed(nodeId, className, severity,
-                            DEFAULT_MAX_IO_ATTEMPTS);
+                    serverProxy.setNodeAsFailed(nodeId, false,
+                            className, severity, maxIOAttempts);
                 }
         }
     }
@@ -608,7 +600,7 @@ public final class WatchdogServiceImpl
 			return;
 		    }
 		}
-                
+
 		if (shuttingDown()) {
 		    return;
 		}
@@ -616,12 +608,14 @@ public final class WatchdogServiceImpl
 		boolean renewed = false;
 		try {
     		    if (!serverProxy.renewNode(localNodeId)) {
+                        // server has already marked node as failed, so we can
+                        // go directly to removing this node
                         setFailedThenNotify(true);
 			return;
 		    }
 		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
-                    
+		    
 		} catch (IOException e) {
 		    /*
 		     * Adjust renew interval in order to renew with
@@ -635,6 +629,8 @@ public final class WatchdogServiceImpl
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
+                    // server has already marked node as failed, so we can
+                    // go directly to removing this node
                     setFailedThenNotify(true);
                     break;
 		}
@@ -703,15 +699,7 @@ public final class WatchdogServiceImpl
         logger.log(Level.SEVERE,
                 "Node forced to shutdown due to service failure.");
 
-        // Issue a node shutdown using the provided shutdown controller.
-        // This is run in a different thread to prevent possible deadlocks
-        // due to a service or component's doShutdown() method  waiting for the 
-        // thread it was issued from to shutdown, such as the RenewThread.
-        new Thread(new Runnable() {
-            public void run() {
-                shutdownController.shutdownNode();
-            }
-        }).start();
+        shutdownController.shutdownNode(this);
     }
 
     /**

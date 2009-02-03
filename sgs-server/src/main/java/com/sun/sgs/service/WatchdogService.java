@@ -32,16 +32,16 @@ import com.sun.sgs.app.TransactionException;
 public interface WatchdogService extends Service {
 
     /**
-     * Failure constants to use when reporting issues to the Watchdog
+     * Failure constants to use when reporting issues to the Watchdog.
      */
     public enum FailureLevel {
-	/** Fatal error which should prompt the shutdown of the node */
+	/** Fatal error which should prompt the shutdown of the node. */
 	FATAL,
-	/** A severe error which likely requires the node to shutdown */
+	/** A severe error which likely requires the node to shutdown. */
 	SEVERE,
-	/** A medium error which might require the node to shutdown (I/O?) */
+	/** A medium error which might require the node to shutdown (I/O?). */
 	MEDIUM,
-	/** A minor error that may not require node shutdown */
+	/** A minor error that may not require node shutdown. */
 	MINOR
     }
 
@@ -154,33 +154,18 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
     
     /**
-     * A hook for services to call when there is a known problem that requires
-     * the watchdog to shut down the node.
-     * 
-     * @param className the class name of the service that failed
-     * @param severity the severity of the failure; values can be
-     * {@code FailureLevel.MINOR}, {@code FailureLevel.FAILURE_MEDIUM},
-     * {@code FailureLevel.FAILURE_SEVERE}, or
-     * {@code FailureLevel.FAILURE_FATAL}
-     */
-    void reportFailure(String className, FailureLevel severity);
-
-    /**
-     * A hook for servers to call when there is a known problem on a remote
-     * node that requires the watchdog to shut down the node. This method is
-     * called through the {@code WatchdogService} interface when the node is
-     * known to be remote.
+     * Informs the watchdog that a problem has occured in a service. Depending 
+     * on the {@code severity} passed in, the watchdog may choose to shut down 
+     * the node. Currently, the severity is ignored and this method will always
+     * issue a node shutdown. This method is called through the 
+     * {@code WatchdogService} interface when the node is known to be remote. 
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed
-     * @param severity the severity of the failure; values can be
-     * {@code FailureLevel.MINOR}, {@code FailureLevel.FAILURE_MEDIUM},
-     * {@code FailureLevel.FAILURE_SEVERE}, or
-     * {@code FailureLevel.FAILURE_FATAL}
+     * @param severity the severity of the failure
      * @throws IOException if there is a problem with the watchdog server
      * communicating to the (remote) node with ID {@code nodeId}
      */
     void reportFailure(long nodeId, String className, FailureLevel severity)
 	    throws IOException;
-    
 }

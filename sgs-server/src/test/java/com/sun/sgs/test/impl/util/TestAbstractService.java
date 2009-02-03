@@ -253,7 +253,11 @@ public class TestAbstractService extends TestCase {
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 // Report a failure on ourselves and check if we are alive
-                service.reportLocalFailure();
+                try {
+                    service.reportLocalFailure();
+                } catch (IOException ioe) {
+                    fail("Unexpected IOException");
+                }
                 try {
                     Thread.sleep(1000); // Let it shutdown
                     service.isAlive();
@@ -290,9 +294,9 @@ public class TestAbstractService extends TestCase {
             return svc.isLocalNodeAlive();
         }
 
-        public void reportLocalFailure() {
+        public void reportLocalFailure() throws IOException {
             WatchdogService svc = txnProxy.getService(WatchdogService.class);
-            svc.reportFailure(this.getClass().getName(), 
+            svc.reportFailure(svc.getLocalNodeId(), this.getClass().getName(), 
                     WatchdogService.FailureLevel.FATAL);
         }
 

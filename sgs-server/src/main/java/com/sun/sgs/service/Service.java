@@ -53,10 +53,6 @@ package com.sun.sgs.service;
  * it may do so by calling {@code TransactionScheduler.runTask}.
  */
 public interface Service {
-    /** The default number of attempts to try renewing during an 
-     * {@code IOException} */
-    static final int DEFAULT_MAX_IO_ATTEMPTS = 5; 
-
     /**
      * Returns the name used to identify this service.
      *

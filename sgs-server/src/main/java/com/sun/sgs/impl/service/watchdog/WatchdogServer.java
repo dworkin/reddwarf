@@ -99,31 +99,22 @@ public interface WatchdogServer extends Remote {
 
     /**
      * Notifies the node with the given ID that it has failed and should
-     * shutdown. This notification is a result of a server running into
-     * difficulty communicating with a remote node, so the server's watchdog
-     * service is responsible for notifying the watchdog server in order to
-     * issue the shutdown.
+     * shutdown. If the given node is a remote node, this notification is a 
+     * result of a server running into difficulty communicating with a remote 
+     * node, so the server's watchdog service is responsible for notifying the 
+     * watchdog service in order to issue the shutdown.
      * 
      * @param nodeId the failed node's ID
+     * @param isLocal specifies if the node is reporting a failure on itself or
+     * a remote node
      * @param className the class issuing the failure
      * @param severity the severity of the failure
      * @param maxNumberOfAttempts the maximum number of attempts to try and
      * resolve an {@code IOException}
+     * @throws IOException if a communication error occurs while trying to set
+     * the node as failed
      */
-    void setNodeAsFailed(long nodeId, String className,
+    void setNodeAsFailed(long nodeId, boolean isLocal, String className,
 	    WatchdogService.FailureLevel severity, int maxNumberOfAttempts)
 	    throws IOException;
-
-    /**
-     * Notifies the data store that the node has failed. This method is called
-     * if the watchdog service is aware that the node corresponding to
-     * {@code nodeId} is its own node.
-     * <p>
-     * Conversely, if the node is known to be a remote node, then the
-     * three-argument method should be called instead.
-     * 
-     * @param nodeId the failed node's ID
-     * @throws
-     */
-    void setNodeAsFailed(long nodeId) throws IOException;
 }

@@ -654,14 +654,10 @@ public class ClientSessionImpl
 		    public void run() {
 			sessionService.runIoTask(
 			    new IoRunnable() {
-				public void run() {
-                                    try {
-                                        sessionServer.serviceEventQueue(idBytes);
-                                    } catch (IOException ioe) {
-                                        // connection lost?
-                                    }
-				}
-                        }, nodeId);
+				public void run() throws IOException {
+				    sessionServer.serviceEventQueue(idBytes);
+				} },
+			    nodeId);
 		    }
 		}, identity);
 	}
