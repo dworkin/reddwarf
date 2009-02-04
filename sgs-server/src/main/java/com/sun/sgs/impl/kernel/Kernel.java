@@ -359,6 +359,9 @@ class Kernel {
         taskScheduler.setContext(application);
         ContextResolver.setTaskState(application, owner);
 
+        // tell the AppContext how to find the managers
+        InternalContext.setManagerLocator(new ManagerLocatorImpl());
+        
         try {
             fetchServices((StartupKernelContext) application);
         } catch (Exception e) {
@@ -375,9 +378,6 @@ class Kernel {
         taskScheduler.setContext(application);
         ContextResolver.setTaskState(application, owner);
         
-        // tell the AppContext how to find the managers
-        InternalContext.setManagerLocator(new ManagerLocatorImpl());
-
         // notify all of the services that the application state is ready
         try {
             application.notifyReady();
