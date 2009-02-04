@@ -25,7 +25,9 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedReference;
 
 /**
- *
+ * A self rescheduling task that sums up the values of the given list
+ * of {@link ManagedInteger}s and sets this value on the single associated
+ * {@link ManagedInteger} object.
  */
 public class SumTask implements Task, Serializable {
     

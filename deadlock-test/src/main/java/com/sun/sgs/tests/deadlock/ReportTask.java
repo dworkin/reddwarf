@@ -26,7 +26,8 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.ManagedReference;
 
 /**
- *
+ * A self rescheduling task that reports the successful update rate
+ * of a single {@link ManagedInteger} object.
  */
 public class ReportTask implements Task, Serializable {
     

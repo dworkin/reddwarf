@@ -20,25 +20,20 @@
 package com.sun.sgs.tests.deadlock;
 
 import java.util.Random;
-import java.util.logging.Logger;
 import java.io.Serializable;
 import com.sun.sgs.app.ManagedObject;
 
 /**
- *
+ * A toy {@code ManagedObject} that keeps track of a single integer value.
  */
 public class ManagedInteger implements Serializable, ManagedObject {
     
-    private static Logger logger = Logger.getLogger(
-            ManagedInteger.class.getName());
-
     /** 
      * The version of the serialized form.
      */
     private static final long serialVersionUID = 1;
     
     private static int MAX = 100;
-    private static int CHECK = 100;
 
     private Random random;
     private int value;
@@ -53,19 +48,38 @@ public class ManagedInteger implements Serializable, ManagedObject {
         updates = 0;
     }
     
+    /**
+     * Returns the value of this object.
+     * @return
+     */
     public int getValue() {
         return value;
     }
     
+    /**
+     * Sets the internal value of this object to a random integer between
+     * {@code 0} and {@value MAX}.
+     */
     public void setValue() {
         value = random.nextInt(MAX);
         updates++;
     }
     
+    /**
+     * Set the sum 
+     * 
+     * @param sum
+     */
     public void setSum(int sum) {
         this.sum = sum;
     }
     
+    /**
+     * Returns the number of times this object's value has been updated
+     * since it was created.
+     * 
+     * @return the number of updates since creation
+     */
     public int getUpdates() {
         return updates;
     }

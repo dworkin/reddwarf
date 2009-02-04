@@ -34,12 +34,16 @@ import com.sun.sgs.app.AppContext;
  * them.
  * <p>
  * The application contains a list of {@link ManagedInteger} references
- * and there is a task associated with each {@code ManagedInteger} in the
- * list.  Each task attempts to sum up the values of all of the integers,
+ * and there is a {@link SumTask} associated with each {@code ManagedInteger}
+ * in the list.  Each task attempts to sum up the values of all of the integers,
  * and record this sum in the state of the associated integer.  Operating
  * concurrently, this causes significant contention as every task is trying
  * to acquire an exclusive write lock one one of the integers, while also
  * acquiring a read lock on all of the other integers.
+ * <p>
+ * A single, self-replicating {@link ReportTask} is also scheduled which tracks
+ * and reports on the successful update rate of a single {@code ManagedInteger}
+ * in the list of {@code ManagedInteger}s.
  */
 public class Deadlock implements AppListener, Serializable {
     
