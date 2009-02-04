@@ -1,0 +1,188 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                      http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.projectdarkstar.test</groupId>
+  <artifactId>deadlock-test</artifactId>
+  <version>0.1-SNAPSHOT</version>
+  <name>Deadlock Test</name>
+  <packaging>jar</packaging>
+  <description>
+    Test a pathological deadlock case
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-api</artifactId>
+      <version>${sgs-server.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      
+      <!-- Use 1.6 for source and target during compile -->
+      <plugin>
+	<groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-compiler-plugin</artifactId>
+	<configuration>
+	  <source>1.6</source>
+	  <target>1.6</target>
+	</configuration>
+      </plugin>
+
+      <!-- Use version 2.3 of the resources plugin 
+	   to pickup a needed filtering bugfix -->
+      <plugin>                
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>2.3</version>
+      </plugin>
+
+    </plugins>
+
+    <!-- Enable filtering of the properties files -->
+    <testResources>
+      <testResource>
+	<directory>src/test/properties</directory>
+	<filtering>true</filtering>
+      </testResource>
+    </testResources>
+  </build>
+
+  <!-- The profiles below are used to launch the server with
+       various different configurations.  For example, the default
+       will use the sgs-maven-plugin to launch the server in single
+       node mode using bdb :
+
+       mvn verify -Prun-server
+
+       There are also explicit profiles to specify the db type, and the node
+       type that can be matched up:
+
+       mvn verify -Prun-server,je,multi-node-server-core
+
+       Additionally, the jvm.args, and jvm.args.extra properties can be
+       overridden to send command line arguments to the resulting server:
+
+       mvn verify -Prun-server -Djvm.args.extra="-Dcom.sun.sgs.app.name=NewName"
+
+       When running multiple app nodes on the same machine, the shutdown.port
+       property must be different for each app node.  The app.port must also
+       be different:
+
+       mvn verify -Prun-server,multi-node-server-app -Dshutdown.port=1137 -Dapp.port=11469
+       mvn verify -Prun-server,multi-node-server-app -Dshutdown.port=1136 -Dapp.port=11470
+       ...
+
+    -->
+  <profiles>
+    <profile>
+      <id>run-server</id>
+
+      <build>
+	<plugins>
+
+	  <plugin>
+	    <groupId>com.projectdarkstar.maven.plugin</groupId>
+	    <artifactId>sgs-maven-plugin</artifactId>
+	    <version>1.0-alpha-3</version>
+	    <executions>
+	      <execution>
+		<id>sgs-run</id>
+		<phase>pre-integration-test</phase>
+		<goals>
+		  <goal>install</goal>
+                  <goal>configure</goal>
+                  <goal>deploy</goal>
+		  <goal>boot</goal>
+		</goals>
+              </execution>
+	    </executions>
+	    <configuration>
+	      <version>${sgs-server.version}</version>
+	      <sgsHome>${project.build.directory}/sgs-server-dist-${sgs-server.version}</sgsHome>
+              <sgsBoot>${project.build.directory}/test-classes/deadlock.boot</sgsBoot>
+	      <sgsServer>${project.build.directory}/test-classes/${node.type}.properties</sgsServer>
+	      <files>
+		<file>${project.artifact.file}</file>
+	      </files>
+	    </configuration>
+	  </plugin>
+	  
+	</plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>db</id>
+      <properties>
+	<db.type>db</db.type>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>je</id>
+      <properties>
+	<db.type>je</db.type>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>single-node-server</id>
+      <properties>
+	<node.type>single</node.type>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>multi-node-server-core</id>
+      <properties>
+	<node.type>core</node.type>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>multi-node-server-app</id>
+      <properties>
+	<node.type>app</node.type>
+	<shutdown.port>1137</shutdown.port>
+	<app.port>1139</app.port>
+      </properties>
+    </profile>
+
+  </profiles>
+
+  <properties>
+    <sgs-server.version>0.9.8</sgs-server.version>
+    <jvm.args>-server -XX:+AggressiveOpts -XX:+UseParallelOldGC -Xmx768M -XX:NewRatio=1</jvm.args>
+    <jvm.args.extra></jvm.args.extra>
+    <logging.properties>${project.build.directory}/test-classes/logging.properties</logging.properties>
+
+    <db.type>db</db.type>
+    <node.type>single</node.type>
+    <shutdown.port>1138</shutdown.port>
+    <app.port>1139</app.port>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>java.net</id>
+      <name>java.net Maven2 Repository</name>
+      <url>http://download.java.net/maven/2/</url>
+      <layout>default</layout>
+    </pluginRepository>
+  </pluginRepositories>
+
+</project>
