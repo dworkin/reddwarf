@@ -130,7 +130,6 @@ class ShutdownHandler implements Runnable {
      * @throws IllegalStateException if no {@code Process} has been set via
      *         the {@link #setProcess(java.lang.Process)} method.
      */
-    @Override
     public void run() {
         synchronized (this) {
             if (p == null) {
@@ -177,7 +176,6 @@ class ShutdownHandler implements Runnable {
          * server and initiates a complete shutdown of the Project Darkstar
          * server.
          */
-        @Override
         public void run() {
             BufferedReader in = null;
             try {
