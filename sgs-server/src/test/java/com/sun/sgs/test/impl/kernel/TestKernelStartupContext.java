@@ -22,6 +22,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.internal.InternalContext;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.Service;
@@ -29,6 +30,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import java.util.Properties;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -39,9 +41,12 @@ import org.junit.runner.RunWith;
  */
 @RunWith(NameRunner.class)
 public class TestKernelStartupContext {
-    // It's important to this test that we only create one SgsTestNode.
-    // We're testing the effect of setting a static variable, managerLocator,
-    // in InternalContext.
+    @Before
+    public void clearManagerLocator() {
+        // Ensure that the manager locator has not been set before
+        // running the tests.
+        InternalContext.setManagerLocator(null);
+    } 
     
     @Test 
     public void startupContext() throws Exception {
