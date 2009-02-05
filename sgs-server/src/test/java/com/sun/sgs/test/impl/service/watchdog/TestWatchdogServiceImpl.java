@@ -112,7 +112,8 @@ public class TestWatchdogServiceImpl extends Assert {
     private WatchdogServiceImpl watchdogService;
     
     /** A dummy shutdown controller */
-    private static DummyKernelShutdownController dummyShutdownCtrl;
+    private static DummyKernelShutdownController dummyShutdownCtrl = 
+            new DummyKernelShutdownController();
 
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -130,9 +131,8 @@ public class TestWatchdogServiceImpl extends Assert {
 
     /** Test setup. */
     @Before public void setUp() throws Exception {
-        dummyShutdownCtrl = new DummyKernelShutdownController();
+        dummyShutdownCtrl.reset();
         Properties props = new Properties();
-	props.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "2000");
         setUp(null, true);
     }
 
@@ -238,12 +238,26 @@ public class TestWatchdogServiceImpl extends Assert {
         WatchdogServiceImpl watchdog = null;
 	try {
 	    watchdog =
-                    new WatchdogServiceImpl(serviceProps, systemRegistry, null, null);
+                    new WatchdogServiceImpl(serviceProps, systemRegistry, null, dummyShutdownCtrl);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	} finally {
             if (watchdog != null) watchdog.shutdown();
+        }
+    }
+    
+    @Test public void testConstructorNullShutdownCtrl() throws Exception {
+        WatchdogServiceImpl watchdog = null;
+        try {
+            watchdog = new WatchdogServiceImpl(serviceProps, systemRegistry, txnProxy, null);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            System.err.println(e);
+        } finally {
+            if (watchdog != null) {
+                watchdog.shutdown();
+            }
         }
     }
 
@@ -1301,11 +1315,9 @@ public class TestWatchdogServiceImpl extends Assert {
 
             // Create a dummy shutdown controller to log calls to the shutdown
             // method. NOTE: The controller does not actually shutdown the node
-            DummyKernelShutdownController dummyCtrl = 
-                    new DummyKernelShutdownController();
             WatchdogServiceImpl watchdogService = 
                     new WatchdogServiceImpl(properties, systemRegistry, 
-                    txnProxy, dummyCtrl);
+                    txnProxy, dummyShutdownCtrl);
 
             // Report a failure, which should shutdown the node
             watchdogService.reportFailure(watchdogService.getLocalNodeId(), 
@@ -1318,10 +1330,9 @@ public class TestWatchdogServiceImpl extends Assert {
                 fail("Not expecting an Exception: " + e.getLocalizedMessage());
             }
             
-            Thread.sleep(1000); // Let it shutdown
             // The shutdown controller should be incremented as a result of the 
             // failure being reported
-            assertEquals(1, dummyCtrl.getShutdownCount());
+            assertEquals(1, dummyShutdownCtrl.getShutdownCount());
 
         } catch (Exception e) {
             fail("Not expecting an Exception");
@@ -1340,7 +1351,7 @@ public class TestWatchdogServiceImpl extends Assert {
         serverNode = null;
 
         // Wait for the renew to fail and the shutdown to begin
-        Thread.sleep(2000);
+        Thread.sleep(renewTime*2);
 
         try {
             // The node should be shut down
@@ -1380,10 +1391,7 @@ public class TestWatchdogServiceImpl extends Assert {
             Identity own = server.getProxy().getCurrentOwner();
             sched.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
-                    if (!server.getWatchdogService().isLocalNodeAlive()) {
-                        fail("Expected watchdogService.isLocalNodeAlive() " +
-                                "to return true");
-                    }
+                    assertTrue(server.getWatchdogService().isLocalNodeAlive());
                 }
             }, own);
 
@@ -1460,9 +1468,9 @@ public class TestWatchdogServiceImpl extends Assert {
                     appNode.getNodeMappingService());
             exporter.unexport();
             
-            Thread.sleep(1000); // Let it shutdown
+            Thread.sleep(renewTime); // Let it shutdown
             nodeMappingServer.canRemove(id); // Remove the identity
-            Thread.sleep(1000); // Wait for RemoveThread to run on server
+            Thread.sleep(renewTime); // Wait for RemoveThread to run on server
             
             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
@@ -1487,15 +1495,15 @@ public class TestWatchdogServiceImpl extends Assert {
     
     /**
      * Check that if two concurrent shutdowns are issued for a node, the second 
-     * shutdown will fail quietly.
+     * shutdown will fail quietly without throwing any exceptions.
      */
     @Test public void testConcurrentShutdowns() throws Exception {
         final SgsTestNode appNode = new SgsTestNode(serverNode, null, null);
-        // issue a shutdown which will run in a thread
+        // issue a shutdown; this shutdown runs in a seperate thread
         appNode.getWatchdogService().reportFailure(appNode.getNodeId(),
                 appNode.getClass().getName(),
                 WatchdogService.FailureLevel.SEVERE);
-        // try to shutdown the node a second time
+        // issue another shutdown
         appNode.shutdown(true);
     }
     
@@ -1509,11 +1517,10 @@ public class TestWatchdogServiceImpl extends Assert {
         // a component object
         node.shutdownCtrl.shutdownNode(node.getSystemRegistry().
                 getComponent(TransactionScheduler.class));
-        
-        Thread.sleep(2000);
+        Thread.sleep(renewTime); // let it shutdown
         
         try {
-            // The node should be shut down
+            // The node should be shutting down or shut down
             node.getWatchdogService().isLocalNodeAliveNonTransactional();
             fail("Expecting an IllegalStateException");
         } catch (IllegalStateException ise) {
@@ -1536,6 +1543,10 @@ public class TestWatchdogServiceImpl extends Assert {
 	int getShutdownCount() {
 	    return shutdownCount;
 	}
+        
+        void reset() {
+            shutdownCount = 0;
+        }
     }
 
     /** Creates node properties with a db directory based on the app name. */

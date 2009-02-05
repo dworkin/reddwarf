@@ -1022,36 +1022,20 @@ public final class DataServiceImpl implements DataService {
     /* -- Other methods -- */
 
     /** 
-     * Attempts to shut down this service, returning a value indicating whether
-     * the attempt was successful.  The call will throw {@link
-     * IllegalStateException} if a call to this method has already completed
-     * with a return value of <code>true</code>. <p>
-     *
-     * This implementation will refuse to accept calls associated with
-     * transactions that were not joined prior to the <code>shutdown</code>xs
-     * call by throwing an <code>IllegalStateException</code>, and will wait
-     * for already joined transactions to commit or abort before returning.  It
-     * will also return <code>false</code> if {@link Thread#interrupt
-     * Thread.interrupt} is called on a thread that is currently blocked within
-     * a call to this method. <p>
-     *
-     * @return	<code>true</code> if the shut down was successful, else
-     *		<code>false</code>
-     * @throws	IllegalStateException if the <code>shutdown</code> method has
-     *		already been called and returned <code>true</code>
+     * {@inheritDoc}
      */
-    public boolean shutdown() {
+    public void shutdown() {
 	synchronized (stateLock) {
 	    while (state == State.SHUTTING_DOWN) {
 		try {
 		    stateLock.wait();
 		} catch (InterruptedException e) {
-		    return false;
+                    // signal incomplete shutdown
+                    throw new IllegalStateException("Interrupted");
 		}
 	    }
 	    if (state == State.SHUTDOWN) {
-		throw new IllegalStateException(
-		    "Service is already shut down");
+                return; // fail silently
 	    }
 	    state = State.SHUTTING_DOWN;
 	}
@@ -1063,10 +1047,10 @@ public final class DataServiceImpl implements DataService {
 		    stateLock.notifyAll();
 		}
 		done = true;
-		return true;
 	    } else {
-		return false;
-	    }
+                // signal incomplete shutdown
+                throw new IllegalStateException("Interrupted");
+            }
 	} finally {
 	    if (!done) {
 		synchronized (stateLock) {

@@ -109,9 +109,6 @@ public abstract class AbstractService implements Service {
     
     /** The maximum number of retry attempts for IO operations. */
     protected final int maxIOAttempts;
-    
-    /** Indicates whether the service has already been shutdown **/
-    private boolean isShutdown = false;
 
     /**
      * Constructs an instance with the specified {@code properties}, {@code
@@ -162,6 +159,11 @@ public abstract class AbstractService implements Service {
                 StandardProperties.IO_WAIT_TIME, DEFAULT_RETRY_WAIT_TIME);
         maxIOAttempts = wrappedProps.getIntProperty(
                 StandardProperties.IO_RETRIES, DEFAULT_MAX_IO_ATTEMPTS);
+        if (maxIOAttempts < 1) {
+            throw new IllegalArgumentException("The " +
+                    StandardProperties.IO_RETRIES +
+                    " property must be larger than 0");
+        }
 	
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -223,31 +225,20 @@ public abstract class AbstractService implements Service {
     /**
      * {@inheritDoc}
      *
-     * <p>If this service is in the {@code INITIALIZED} state, this
-     * method throws {@code IllegalStateException}.  If this service
-     * is in the {@code READY} state, this method sets the state to
+     * <p>If this service is in the {@code INITIALIZED} state or
+     * {@code READY} state, this method sets the state to
      * {@code SHUTTING_DOWN}, waits for all calls in progress to
-     * complete, then starts a thread to invoke the {@link #doShutdown
+     * complete, starts a thread to invoke the {@link #doShutdown
      * doShutdown} method, waits for that thread to complete, and
-     * returns {@code true}.  If the service is in the {@code
-     * SHUTTING_DOWN} state, this method waits for the shutdown thread
-     * to complete, and returns {@code true}.  If this service is in
-     * the {@code SHUTDOWN} state, then this method returns {@code
-     * true}.
+     * returns. If this service is in the {@code SHUTTING_DOWN}
+     * state, this method will block until the shutdown is complete. If
+     * this service is in the {@code SHUTDOWN} state, then it will
+     * return immediately. Any retries or interruption handling should be
+     * done in the service's implementation of the
+     * {@link #doShutdown() doShutdown} method.
      *
-     * <p>If the current thread is interrupted while waiting for calls
-     * to complete or while waiting for the shutdown thread to finish,
-     * this method returns {@code false}.
-     *
-     * TODO: If shutdown is interrupted, it should be possible to
-     * re-initiate shutdown.
      */
-    public boolean shutdown() {
-        if (isShutdown) {
-            return true;
-        }
-        isShutdown = true;
-
+    public void shutdown() {
 	logger.log(Level.FINEST, "shutdown");
 	
 	synchronized (lock) {
@@ -261,7 +252,7 @@ public abstract class AbstractService implements Service {
 		    try {
 			lock.wait();
 		    } catch (InterruptedException e) {
-			return false;
+                        return;
 		    }
 		}
 		shutdownThread = new ShutdownThread();
@@ -272,7 +263,7 @@ public abstract class AbstractService implements Service {
 		break;
 		
 	    case SHUTDOWN:
-		return true;
+                return;
 
 	    default:
 	        throw new AssertionError();
@@ -282,10 +273,8 @@ public abstract class AbstractService implements Service {
 	try {
 	    shutdownThread.join();
 	} catch (InterruptedException e) {
-	    return false;
+            return;
 	}
-
-	return true;
     }
 
     /**
@@ -511,22 +500,12 @@ public abstract class AbstractService implements Service {
                 // If the maximum number of attempts have been tried,
                 // then we are forced to shutdown
                 if (--maxAttempts == 0) {
-                    // Report failure of remote node to watchdog. If reporting
-                    // the failure fails, then the local node will be marked
-                    // as failed.
-                    try {
-                        txnProxy.getService(WatchdogService.class).
-                                reportFailure(nodeId, this.getClass().
-                                toString(), 
-                                WatchdogService.FailureLevel.MEDIUM);
-                        break;
-                    }
-                    catch (IOException ioe) {
-                        logger.logThrow(Level.FINEST, e,
-                                "Failed to report remote node failure " +
-                                "after failing an IO task.");
-                        // node should be shutting down already
-                    }
+                    // Report failure of remote node since are having trouble
+                    // contacting it.
+                    txnProxy.getService(WatchdogService.class).
+                            reportFailure(nodeId, this.getClass().toString(),
+                            WatchdogService.FailureLevel.MEDIUM);
+                    break;
                 }
                 try {
                     // TBD: what back-off policy do we want here?

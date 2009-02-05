@@ -222,7 +222,11 @@ class KernelContext {
         }
         Collections.reverse(list);
         for (Object service : list) {
-            ((Service) service).shutdown();
+            try {
+                ((Service) service).shutdown();
+            } catch (Exception ex) {
+                // ignore any exceptions so kernel shutdown is not interrupted
+            }
         }
     }
     

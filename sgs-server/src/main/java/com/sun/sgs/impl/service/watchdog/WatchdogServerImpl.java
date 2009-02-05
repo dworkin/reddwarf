@@ -568,8 +568,8 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
-            FailureLevel severity, int maxNumberOfAttempts)
-            throws IOException {
+            FailureLevel severity, int maxNumberOfAttempts) throws IOException
+    {
 
         // Handle the race condition just in case two different
         // processes interested in reporting a node failure. If
@@ -591,23 +591,19 @@ public final class WatchdogServerImpl
         if (isLocal) {
             processNodeFailures(Arrays.asList(remoteNode));
         } else {
-            // Try to report the failure to the watchdog
-            // so that the node can be shutdown. Just in case
-            // we run into an IOException, try a few times.
+            // Try to report the failure to the watchdog so that the node can 
+            // be shutdown. Try a few times if we run into an IOException.
             while (count-- > 0) {
                 try {
                     remoteNode.getWatchdogClient().reportFailure(className,
                             severity);
                     break;
                 } catch (IOException ioe) {
-                    // Try again until we have no retries left
                     if (count == 0) {
-                        if (count == 0) {
-                            logger.log(Level.WARNING, "Could not retrieve " +
-                                    "watchdog client given " + 
-                                    maxNumberOfAttempts + " attempt(s)");
-                            processNodeFailures(Arrays.asList(remoteNode));
-                        }
+                        logger.log(Level.WARNING, "Could not retrieve " +
+                                "watchdog client given " +
+                                maxNumberOfAttempts + " attempt(s)");
+                        processNodeFailures(Arrays.asList(remoteNode));
                     }
                 } catch (Exception e) {
                     logger.logThrow(Level.WARNING, e, "Unexpected exception " +

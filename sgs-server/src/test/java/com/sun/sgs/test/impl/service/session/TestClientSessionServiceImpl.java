@@ -237,8 +237,8 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
             additionalNodes = null;
         }
-            serverNode.shutdown(clean);
-            serverNode = null;
+        serverNode.shutdown(clean);
+        serverNode = null;
     }
 
     // -- Test constructor --

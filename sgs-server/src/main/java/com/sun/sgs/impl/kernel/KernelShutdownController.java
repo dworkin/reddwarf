@@ -8,10 +8,10 @@ package com.sun.sgs.impl.kernel;
 public interface KernelShutdownController {
 
     /**
-     * Instructs the {@code Kernel} to shutdown the node, as a
-     * result of a failure reported to the {@code WatchdogService}. If this
-     * method is called during startup, it may be delayed until the Kernel
-     * is completely booted.
+     * Instructs the {@code Kernel} to shutdown the node, as a result of a
+     * failure detected in a service or a component. If this method is called 
+     * during startup, it may be delayed until the Kernel is completely booted.
+     * 
      * @param caller the class that called the shutdown. this is to
      * differentiate between being called from a service and being called from
      * a component.

@@ -909,46 +909,6 @@ class Kernel {
         private boolean isReady = false;
         
         /**
-         * {@inheritDoc}
-         */
-        public void shutdownNode(Object caller) {
-            if (isReady && watchdogSvc != null) {
-                // service shutdown; we have already gone through notifying the
-                // server, so shutdown the node right now
-                if (caller instanceof WatchdogService) {
-                    /**
-                     * Shutdown the node. This is run in a different thread to 
-                     * prevent possible a possible deadlock due to a service or
-                     * component's doShutdown() method waiting for the thread
-                     * it was issued from to shutdown. For example, the 
-                     * watchdog service would block if called from RenewThread.
-                     */
-                    new Thread(new Runnable() {
-                        public void run() {
-                            shutdown();
-                        }
-                    }).start();
-                    
-                    // spawn another thread that waits for a timeout
-                    // then calls System.exit(0)?
-                } else {
-                    // component shutdown; we need to go through the watchdog to
-                    // cleaup and notify the server first
-                    try {
-                        watchdogSvc.reportFailure(watchdogSvc.getLocalNodeId(), 
-                                caller.getClass().toString(), 
-                                WatchdogService.FailureLevel.SEVERE);
-                    } catch (IOException ioe) {
-                        shutdown();
-                    }
-                }
-            } else {
-                // Queue the request if the Kernel is not ready
-                shutdownQueued = true;
-            }
-        }
-        
-        /**
          * This method flags the controller as being ready to issue shutdowns.
          * If a shutdown was previously queued, then shutdown the node now.
          */
@@ -972,6 +932,49 @@ class Kernel {
                 return; // do not allow overwriting the watchdog once it's set
             }
             this.watchdogSvc = watchdogSvc;
+        }
+        
+                /**
+         * {@inheritDoc}
+         */
+        public void shutdownNode(Object caller) {
+            if (isReady) {
+                // service shutdown; we have already gone through notifying the
+                // server, so shutdown the node right now
+                if (caller instanceof WatchdogService) {
+                    runShutdown();
+                    // spawn another thread that waits for a timeout
+                    // then calls System.exit(0)?
+                } else {
+                    // component shutdown; we go through the watchdog (if it
+                    // has been assigned) to cleaup and notify the server first
+                    if (watchdogSvc != null) {
+                        watchdogSvc.reportFailure(watchdogSvc.getLocalNodeId(),
+                                caller.getClass().toString(),
+                                WatchdogService.FailureLevel.SEVERE);
+                    } else {
+                        runShutdown();
+                    }
+                }
+            } else {
+                // Queue the request if the Kernel is not ready
+                shutdownQueued = true;
+            }
+        }
+        
+        /**
+         * Shutdown the node. This is run in a different thread to 
+         * prevent possible a possible deadlock due to a service or
+         * component's doShutdown() method waiting for the thread
+         * it was issued from to shutdown. For example, the 
+         * watchdog service would block if called from RenewThread.
+         */
+        private void runShutdown() {
+            new Thread(new Runnable() {
+                public void run() {
+                    shutdown();
+                }
+            }).start();
         }
     }
     

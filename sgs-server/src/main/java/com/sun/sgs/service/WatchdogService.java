@@ -19,7 +19,6 @@
 
 package com.sun.sgs.service;
 
-import java.io.IOException;
 import java.util.Iterator;
 import com.sun.sgs.app.TransactionException;
 
@@ -154,18 +153,15 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
     
     /**
-     * Informs the watchdog that a problem has occured in a service. Depending 
+     * Informs the watchdog that a problem has occured in a service. Depending
      * on the {@code severity} passed in, the watchdog may choose to shut down 
      * the node. Currently, the severity is ignored and this method will always
      * issue a node shutdown. This method is called through the 
-     * {@code WatchdogService} interface when the node is known to be remote. 
+     * {@code WatchdogService} interface when the node is known to be remote.
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed
      * @param severity the severity of the failure
-     * @throws IOException if there is a problem with the watchdog server
-     * communicating to the (remote) node with ID {@code nodeId}
      */
-    void reportFailure(long nodeId, String className, FailureLevel severity)
-	    throws IOException;
+    void reportFailure(long nodeId, String className, FailureLevel severity);
 }

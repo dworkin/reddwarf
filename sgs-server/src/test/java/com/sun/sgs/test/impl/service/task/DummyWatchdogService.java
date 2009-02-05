@@ -81,13 +81,12 @@ public class DummyWatchdogService implements WatchdogService {
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    public void shutdown() {
         isAlive = false;
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
             listener.nodeFailed(localNode);
-        return true;
     }
 
     /** {@inheritDoc} */
@@ -159,13 +158,8 @@ public class DummyWatchdogService implements WatchdogService {
         }
     }
 
-    public void reportFailure(String className, FailureLevel severity) {
-	// Don't do anything for now
-}
-
-    public void reportFailure(long nodeId, String className,
-	    FailureLevel severity) throws IOException {
-	// Don't do anything for now
+    public void reportFailure(long nodeId, String className, 
+            FailureLevel severity) {
+        // Don't do anything for now
     }
-
 }

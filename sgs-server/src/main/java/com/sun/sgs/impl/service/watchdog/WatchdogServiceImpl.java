@@ -266,6 +266,9 @@ public final class WatchdogServiceImpl
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
 	// Setup the KernelShutdownController object
+        if (ctrl == null) {
+            throw new NullPointerException("null shutdown controller");
+        }
 	shutdownController = ctrl;
 	
 	try {
@@ -444,13 +447,8 @@ public final class WatchdogServiceImpl
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
-                try {
-                    reportFailure(getLocalNodeId(), CLASSNAME, 
-                            FailureLevel.MEDIUM);
-                } catch (IOException ioe) {
-                    // local call; if it gets here, the node will be shutting 
-                    // down already
-                }
+                reportFailure(getLocalNodeId(), CLASSNAME, 
+                        FailureLevel.MEDIUM);
 		return false;
 	    } else {
 		return true;
@@ -510,15 +508,23 @@ public final class WatchdogServiceImpl
     /**
      * {@inheritDoc}
      */
-    public void reportFailure(long nodeId, String className, 
-            FailureLevel severity) throws IOException {
-
+    public synchronized void reportFailure(long nodeId, String className, 
+            FailureLevel severity) 
+    {
         // If the node is shutting down or is not alive, then
         // we won't do anything
-        if (shuttingDown() || !isAlive) {
+        if (shuttingDown() || !getIsAlive()) {
             return;
         }
-
+        
+        long localNodeId = 0;
+        try {
+            localNodeId = getLocalNodeId();
+        } catch (IllegalStateException ex) {
+            logger.logThrow(Level.FINE, ex, 
+                    "node shutdown has already been issued");
+        }
+        
         /*
          * Depending on the severity, decide what action to perform. In the
          * future, we may want to differentiate the type of action to perform.
@@ -536,7 +542,7 @@ public final class WatchdogServiceImpl
                  * is not the application node; shutdown this node if so.
                  * Otherwise, find the node which should be shutdown instead
                  */
-                if (nodeId == getLocalNodeId()) {
+                if (nodeId == localNodeId) {
                     logger.log(Level.WARNING, "{1} reported failure in local " 
                             + "node with id: {0}", nodeId, className);
 
@@ -544,23 +550,40 @@ public final class WatchdogServiceImpl
                      * Try to report failure to the watchdog server. Since it
                      * is possible that the failure is because of a broken
                      * connection to the watchdog server, catch an IOException
-                     * that may be thrown as a result.
+                     * that may be thrown as a result. Retry a few times.
                      */
-                    try {
-                        serverProxy.setNodeAsFailed(nodeId, true, CLASSNAME, 
-                                FailureLevel.SEVERE, maxIOAttempts);
-                    } catch (IOException ioe) {
-                        logger.logThrow(Level.SEVERE, ioe,
-                                "Cannot report failure to Watchdog Server");
+                    int retries = maxIOAttempts;
+                    while (retries-- > 0) {
+                        try {
+                            serverProxy.setNodeAsFailed(nodeId, true, className,
+                                    FailureLevel.SEVERE, maxIOAttempts);
+                            break;
+                        } catch (IOException ioe) {
+                            if (retries == 0) {
+                                logger.log(Level.SEVERE, "Cannot report " +
+                                        "local failure to Watchdog server");
+                            }
+                        }
                     }
                     setFailedThenNotify(true);
                 } else {
                     logger.log(Level.WARNING, "{1} reported failure in remote"
                             + " node with id {0}", nodeId, className);
-                    // Inform the server to shutdown the remote node.
-                    // Note that this call may throw an IOException
-                    serverProxy.setNodeAsFailed(nodeId, false,
-                            className, severity, maxIOAttempts);
+                    // Inform the server to shutdown the remote node. If an
+                    // IOException occurs, retry a number of times.
+                    int retries = maxIOAttempts;
+                    while (retries-- > 0) {
+                        try {
+                            serverProxy.setNodeAsFailed(nodeId, false,
+                                    className, severity, maxIOAttempts);
+                            break;
+                        } catch (IOException ioe) {
+                            if (retries == 0) {
+                                logger.log(Level.SEVERE, "Cannot report " +
+                                        "remote failure to Watchdog server");
+                            }
+                        }
+                    }
                 }
         }
     }

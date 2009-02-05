@@ -259,7 +259,7 @@ public class TestAbstractService extends TestCase {
                     fail("Unexpected IOException");
                 }
                 try {
-                    Thread.sleep(1000); // Let it shutdown
+                    Thread.sleep(500); // Let it shutdown
                     service.isAlive();
                     fail("Expected IllegalStateException");
                 } catch (IllegalStateException e) {

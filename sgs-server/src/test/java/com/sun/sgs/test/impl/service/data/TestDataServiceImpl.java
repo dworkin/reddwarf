@@ -4443,7 +4443,12 @@ public class TestDataServiceImpl{
             this.service = service;
         }
 	protected Boolean action() throws Exception {
-	    return service.shutdown();
+	    try {
+                service.shutdown();
+                return true;
+            } catch (IllegalStateException ex) {
+                return false;
+            }
 	}
     }
 
