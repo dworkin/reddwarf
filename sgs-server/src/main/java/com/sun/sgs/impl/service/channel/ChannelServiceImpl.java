@@ -305,7 +305,7 @@ public final class ChannelServiceImpl
 		logger.logThrow(
 		    Level.CONFIG, e, "Failed to create ChannelServiceImpl");
 	    }
-	    doShutdown();          
+	    doShutdown();
 	    throw e;
 	}
     }

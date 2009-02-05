@@ -568,9 +568,8 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
-            FailureLevel severity, int maxNumberOfAttempts) throws IOException
+            FailureLevel severity, int maxNumberOfAttempts)
     {
-
         // Handle the race condition just in case two different
         // processes interested in reporting a node failure. If
         // the node is already being handled, then we do nothing.
@@ -605,9 +604,6 @@ public final class WatchdogServerImpl
                                 maxNumberOfAttempts + " attempt(s)");
                         processNodeFailures(Arrays.asList(remoteNode));
                     }
-                } catch (Exception e) {
-                    logger.logThrow(Level.WARNING, e, "Unexpected exception " +
-                            "thrown: {0}" + e.getLocalizedMessage(), nodeId);
                 }
             }
         }

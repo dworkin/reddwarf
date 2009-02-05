@@ -581,6 +581,9 @@ public final class WatchdogServiceImpl
                             if (retries == 0) {
                                 logger.log(Level.SEVERE, "Cannot report " +
                                         "remote failure to Watchdog server");
+                                // The local node has a connection problem
+                                reportFailure(localNodeId, className, 
+                                        severity);
                             }
                         }
                     }
