@@ -483,7 +483,7 @@ public final class ClientSessionServiceImpl
      * transaction.
      *
      * @param	session	a client session
-     * @param	message a complete protocol message
+     * @param	message a message
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
@@ -733,7 +733,7 @@ public final class ClientSessionServiceImpl
 	}
 	
 	/**
-	 * Sends all protocol messages enqueued during this context's
+	 * Sends all message enqueued during this context's
 	 * transaction (via the {@code addMessage} and {@code
 	 * addMessageFirst} methods), and disconnects any session
 	 * whose disconnection was requested via the {@code
@@ -770,7 +770,7 @@ public final class ClientSessionServiceImpl
 	/** The login exception. */
 	private LoginFailureException loginException;
 	
-	/** List of protocol messages to send on commit. */
+	/** List of messages to send on commit. */
 	private List<byte[]> messages = new ArrayList<byte[]>();
 
 	/** If true, disconnect after sending messages. */

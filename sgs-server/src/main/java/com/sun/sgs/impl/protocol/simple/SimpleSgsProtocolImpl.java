@@ -937,6 +937,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    } catch (InterruptedException e) {
 		// reschedule interrupted execution
 		acceptor.scheduleNonTransactionalTask(this);
+		return;
 	    } catch (Exception ignore) {
 	    }
 	    // always report success

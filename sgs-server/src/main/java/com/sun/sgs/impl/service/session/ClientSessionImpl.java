@@ -128,8 +128,8 @@ public class ClientSessionImpl
      * @param	sessionService a client session service
      * @param	identity the session's identity
      * @param	deliveries the session's supported delivery requirements
-     * @param  maxMessageLenght the maximum session message length
-     * @throws TransactionException if there is a problem with the
+     * @param	maxMessageLength the maximum session message length
+     * @throws	TransactionException if there is a problem with the
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
@@ -195,13 +195,11 @@ public class ClientSessionImpl
      */
     public ClientSession send(ByteBuffer message) {
 	try {
-            if (!isConnected())
+            if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
-            
-            if (message == null) {
+            } else if (message == null) {
 		throw new NullPointerException("null message");
-	    }
-            if (message.remaining() > maxMessageLength) {
+	    } else if (message.remaining() > maxMessageLength) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
                     maxMessageLength);

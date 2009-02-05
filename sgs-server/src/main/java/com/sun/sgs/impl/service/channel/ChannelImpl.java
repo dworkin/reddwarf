@@ -329,7 +329,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     void checkDelivery(ClientSession session) {
 	Set<Delivery> deliveries = session.supportedDeliveries();
-	if (!deliveries.contains(delivery) ||
+	if (!deliveries.contains(delivery) &&
 	    !deliveries.contains(Delivery.RELIABLE))
 	{
 	    throw new IllegalArgumentException(
