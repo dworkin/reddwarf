@@ -1677,13 +1677,23 @@ public class TestTransactionCoordinatorImpl {
 
     @Test
     public void testRegisterListenerCommit() throws Exception {
-	DummyTransactionListener listener = new DummyTransactionListener();
-	txn.registerListener(listener);
-	/* Check that registering twice has no effect */
-	txn.registerListener(listener);
-	listener.assertCalled(false, CalledAfter.NO);
+	DummyTransactionListener[] listeners = {
+	    new DummyTransactionListener(),
+	    new DummyTransactionListener(),
+	    new DummyTransactionListener()
+	};
+	for (DummyTransactionListener listener : listeners) {
+	    txn.registerListener(listener);
+	    /* Check that registering twice has no effect */
+	    txn.registerListener(listener);
+	}
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(false, CalledAfter.NO);
+	}
 	handle.commit();
-	listener.assertCalled(true, CalledAfter.COMMIT);
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(true, CalledAfter.COMMIT);
+	}
     }
 
     @Test
@@ -1828,6 +1838,7 @@ public class TestTransactionCoordinatorImpl {
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
+	listener.assertCalled(false, CalledAfter.NO);
     }
 
     @Test
@@ -1928,18 +1939,19 @@ public class TestTransactionCoordinatorImpl {
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
+	listener.assertCalled(false, CalledAfter.NO);
     }
 
     @Test
     public void testRegisterListenerBeforeCompletion() throws Exception {
+	final DummyTransactionListener lateListener =
+	    new DummyTransactionListener();
 	DummyTransactionListener[] listeners = {
 	    new DummyTransactionListener(),
 	    new DummyTransactionListener() {
 		public void beforeCompletion() {
 		    super.beforeCompletion();
-		    DummyTransactionListener anotherListener =
-			new DummyTransactionListener();
-		    txn.registerListener(anotherListener);
+		    txn.registerListener(lateListener);
 		}
 	    },
 	    new DummyTransactionListener()
@@ -1951,6 +1963,11 @@ public class TestTransactionCoordinatorImpl {
 	for (DummyTransactionListener listener : listeners) {
 	    listener.assertCalled(true, CalledAfter.COMMIT);
 	}
+	/*
+	 * Since there is no guarantee of listener order, don't check if the
+	 * late-added listener's beforeCompletion method was called.
+	 */
+	lateListener.assertCalledAfter(CalledAfter.COMMIT);
     }
 
     @Test
