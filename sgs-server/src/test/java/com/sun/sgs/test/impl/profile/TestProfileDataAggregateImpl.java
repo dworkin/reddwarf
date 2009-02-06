@@ -55,8 +55,9 @@ public class TestProfileDataAggregateImpl {
     
     @Parameterized.Parameters
     public static Collection data() {
-        return Arrays.asList(new Object[][] {{ProfileDataType.AGGREGATE}, 
-                                             {ProfileDataType.TASK_AND_AGGREGATE}});
+        return Arrays.asList(
+                new Object[][] {{ProfileDataType.AGGREGATE}, 
+                                {ProfileDataType.TASK_AND_AGGREGATE}});
     }
     /** A test server node */
     private SgsTestNode serverNode;  
@@ -182,6 +183,42 @@ public class TestProfileDataAggregateImpl {
         assertEquals(1, op.getCount());
    }
    
+   @Test(expected=IllegalArgumentException.class)
+   public void testAggregateProfileNegSmoothing() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final AggregateProfileSample samp =
+                (AggregateProfileSample) 
+                    cons1.createSample("foo", testType, ProfileLevel.MIN);
+        samp.setSmoothingFactor(-1.1);
+   }
+   
+   @Test(expected=IllegalArgumentException.class)
+   public void testAggregateProfileBadSmoothing() throws Exception {
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final AggregateProfileSample samp =
+                (AggregateProfileSample) 
+                    cons1.createSample("foo", testType, ProfileLevel.MIN);
+        samp.setSmoothingFactor(5.0);
+   }
+   
+   @Test
+   public void testSetSmoothingFactor() throws Exception {
+       ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final AggregateProfileSample samp =
+                (AggregateProfileSample) 
+                    cons1.createSample("bar", testType, ProfileLevel.MIN);
+        double smooth = 0.5;
+        samp.setSmoothingFactor(smooth);
+        assertTrue(smooth == samp.getSmoothingFactor());
+        
+        smooth = 0.9;
+        samp.setSmoothingFactor(smooth);
+        assertTrue(smooth == samp.getSmoothingFactor());
+   }
+   
    @Test
    public void testAggregateProfileSample() throws Exception {
         final String name = "sample";
@@ -196,13 +233,19 @@ public class TestProfileDataAggregateImpl {
             assertNull(sample);
         }
         
+
         final long[] testData = {4, 8, 2, -1, 5, 9, 11, 14};
+        // capacity defaults to zero, so size should be zero
+        samp.addSample(3);
+        testStatistics(samp, /*size*/0, /*min*/3, /*max*/3, testData);
+        
+        samp.setCapacity(100);
         
         samp.addSample(testData[0]);
-        testStatistics(samp, /*size*/1, /*min*/4, /*max*/4, testData);
+        testStatistics(samp, /*size*/1, /*min*/3, /*max*/4, testData);
        
         samp.addSample(testData[1]);
-        testStatistics(samp, 2, 4, 8, testData);
+        testStatistics(samp, 2, 3, 8, testData);
         
         samp.addSample(testData[2]);
         testStatistics(samp, 3, 2, 8, testData);
@@ -242,7 +285,8 @@ public class TestProfileDataAggregateImpl {
         final AggregateProfileSample samp1 =
                 (AggregateProfileSample) 
                     cons1.createSample("s1", testType, ProfileLevel.MIN);
-        assertEquals(1000, samp1.getCapacity());
+        // default capacity is zero
+        assertEquals(0, samp1.getCapacity());
         
         final AggregateProfileSample samp2 =
                 (AggregateProfileSample) 
@@ -261,6 +305,16 @@ public class TestProfileDataAggregateImpl {
         final long[] expectedData = {2, 3, 4, 5, 6};
         samp2.addSample(6);
         testStatistics(samp2, 5, 1, 6, expectedData);
+        
+        final long[] emptyData = {};
+        samp2.clearSamples();
+        samp2.setCapacity(0);
+        for (int i = 0; i < testData.length; i++) {
+            samp2.addSample(testData[i]);
+        }
+        testStatistics(samp2, /*size*/0, /*min*/1, /*max*/5, emptyData);
+        samp2.addSample(6);
+        testStatistics(samp2, 0, 1, 6, emptyData);
    }
    
    private void testStatistics(AggregateProfileSample samp, 

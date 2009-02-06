@@ -19,16 +19,15 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.management.DataStoreStatsMXBean;
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
-import com.sun.sgs.profile.ProfileCounter;
 import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Implements a {@link DataStore} that reports profiling information about data
@@ -40,6 +39,14 @@ import com.sun.sgs.service.TransactionParticipant;
 public class DataStoreProfileProducer
     implements DataStore, TransactionParticipant
 {
+    /** The name of this class. */
+    private static final String CLASSNAME =
+        "com.sun.sgs.impl.service.data.store.DataStoreProfileProducer";
+
+     /** The logger for this class. */
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(CLASSNAME));
+    
     /** The associated data store. */
     private final DataStore dataStore;
 
@@ -47,51 +54,7 @@ public class DataStoreProfileProducer
     private final TransactionParticipant participant;
 
     /* -- Profile operations for the DataStore API -- */
-
-    private final ProfileOperation createObjectOp;
-    private final ProfileOperation markForUpdateOp;
-    private final ProfileOperation getObjectOp;
-    private final ProfileOperation getObjectForUpdateOp;
-    private final ProfileOperation setObjectOp;
-    private final ProfileOperation setObjectsOp;
-    private final ProfileOperation removeObjectOp;
-    private final ProfileOperation getBindingOp;
-    private final ProfileOperation setBindingOp;
-    private final ProfileOperation removeBindingOp;
-    private final ProfileOperation nextBoundNameOp;
-    private final ProfileOperation getClassIdOp;
-    private final ProfileOperation getClassInfoOp;
-    private final ProfileOperation nextObjectIdOp;
-
-    /** Records the number of bytes read by the getObject method. */
-    private final ProfileCounter readBytesCounter;
-
-    /** Records the number of objects read by the getObject method. */
-    private final ProfileCounter readObjectsCounter;
-
-    /**
-     * Records the number of bytes written by the setObject and setObjects
-     * methods.
-     */
-    private final ProfileCounter writtenBytesCounter;
-
-    /**
-     * Records the number of objects written by the setObject and setObjects
-     * methods.
-     */
-    private final ProfileCounter writtenObjectsCounter;
-
-    /**
-     * Records a list of the number of bytes read by calls to the getObject
-     * method.
-     */
-    private final ProfileSample readBytesSample;
-
-    /**
-     * Records a list of the number of bytes written by calls to the setObject
-     * and setObjects methods.
-     */
-    private final ProfileSample writtenBytesSample;
+    private final DataStoreStats stats;
 
     /**
      * Creates an instance that delegates all {@link DataStore} and {@link
@@ -115,40 +78,13 @@ public class DataStoreProfileProducer
 	}
 	this.dataStore = dataStore;
 	participant = (TransactionParticipant) dataStore;
-        ProfileConsumer consumer = collector.getConsumer(
-                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "DataStore");
-        ProfileLevel level = ProfileLevel.MAX;
-        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
-	createObjectOp = consumer.createOperation("createObject", type, level);
-	markForUpdateOp = 
-            consumer.createOperation("markForUpdate", type, level);
-	getObjectOp = consumer.createOperation("getObject", type, level);
-	getObjectForUpdateOp =
-	    consumer.createOperation("getObjectForUpdate", type, level);
-	setObjectOp = consumer.createOperation("setObject", type, level);
-	setObjectsOp = consumer.createOperation("setObjects", type, level);
-	removeObjectOp = consumer.createOperation("removeObject", type, level);
-	getBindingOp = consumer.createOperation("getBinding", type, level);
-	setBindingOp = consumer.createOperation("setBinding", type, level);
-	removeBindingOp = 
-            consumer.createOperation("removeBinding", type, level);
-	nextBoundNameOp = 
-            consumer.createOperation("nextBoundName", type, level);
-	getClassIdOp = consumer.createOperation("getClassId", type, level);
-	getClassInfoOp = consumer.createOperation("getClassInfo", type, level);
-	nextObjectIdOp = 
-            consumer.createOperation("nextObjectIdOp", type, level);
-	readBytesCounter = consumer.createCounter("readBytes", type, level);
-	readObjectsCounter =
-	    consumer.createCounter("readObjects", type, level);
-	writtenBytesCounter =
-	    consumer.createCounter("writtenBytes", type, level);
-	writtenObjectsCounter =
-	    consumer.createCounter("writtenObjects", type, level);
-	readBytesSample = 
-            consumer.createSample("readBytes", ProfileDataType.TASK, level);
-	writtenBytesSample = 
-            consumer.createSample("writtenBytes", ProfileDataType.TASK, level);
+
+        stats = new DataStoreStats(collector);
+        try {
+            collector.registerMBean(stats, DataStoreStatsMXBean.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
     }
 
     /* -- Implement DataStore -- */
@@ -164,14 +100,14 @@ public class DataStoreProfileProducer
     /** {@inheritDoc} */
     public long createObject(Transaction txn) {
 	long result = dataStore.createObject(txn);
-	createObjectOp.report();
+	stats.createObjectOp.report();
 	return result;
     }
 
     /** {@inheritDoc} */
     public void markForUpdate(Transaction txn, long oid) {
 	dataStore.markForUpdate(txn, oid);
-	markForUpdateOp.report();
+	stats.markForUpdateOp.report();
 	/*
 	 * Note that the DataStore's implementation of markForUpdate may
 	 * actually read the contents of the object, so we might want to
@@ -184,63 +120,64 @@ public class DataStoreProfileProducer
     /** {@inheritDoc} */
     public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
 	byte[] result = dataStore.getObject(txn, oid, forUpdate);
-	ProfileOperation op = forUpdate ? getObjectForUpdateOp : getObjectOp;
+	ProfileOperation op = 
+                forUpdate ? stats.getObjectForUpdateOp : stats.getObjectOp;
 	op.report();
-	readBytesCounter.incrementCount(result.length);
-	readObjectsCounter.incrementCount();
-	readBytesSample.addSample(result.length);
+	stats.readBytesCounter.incrementCount(result.length);
+	stats.readObjectsCounter.incrementCount();
+	stats.readBytesSample.addSample(result.length);
 	return result;
     }
 
     /** {@inheritDoc} */
     public void setObject(Transaction txn, long oid, byte[] data) {
 	dataStore.setObject(txn, oid, data);
-	setObjectOp.report();
-	writtenBytesCounter.incrementCount(data.length);
-	writtenObjectsCounter.incrementCount();
-	writtenBytesSample.addSample(data.length);
+	stats.setObjectOp.report();
+	stats.writtenBytesCounter.incrementCount(data.length);
+	stats.writtenObjectsCounter.incrementCount();
+	stats.writtenBytesSample.addSample(data.length);
     }
 
     /** {@inheritDoc} */
     public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
 	dataStore.setObjects(txn, oids, dataArray);
-	setObjectsOp.report();
+	stats.setObjectsOp.report();
 	for (byte[] data : dataArray) {
-	    writtenBytesCounter.incrementCount(data.length);
-	    writtenObjectsCounter.incrementCount();
-	    writtenBytesSample.addSample(data.length);
+	    stats.writtenBytesCounter.incrementCount(data.length);
+	    stats.writtenObjectsCounter.incrementCount();
+	    stats.writtenBytesSample.addSample(data.length);
 	}
     }
 
     /** {@inheritDoc} */
     public void removeObject(Transaction txn, long oid) {
 	dataStore.removeObject(txn, oid);
-	removeObjectOp.report();
+	stats.removeObjectOp.report();
     }
 
     /** {@inheritDoc} */
     public long getBinding(Transaction txn, String name) {
 	long result = dataStore.getBinding(txn, name);
-	getBindingOp.report();
+	stats.getBindingOp.report();
 	return result;
     }
 
     /** {@inheritDoc} */
     public void setBinding(Transaction txn, String name, long oid) {
 	dataStore.setBinding(txn, name, oid);
-	setBindingOp.report();
+	stats.setBindingOp.report();
     }
 
     /** {@inheritDoc} */
     public void removeBinding(Transaction txn, String name) {
 	dataStore.removeBinding(txn, name);
-	removeBindingOp.report();
+	stats.removeBindingOp.report();
     }
 
     /** {@inheritDoc} */
     public String nextBoundName(Transaction txn, String name) {
 	String result = dataStore.nextBoundName(txn, name);
-	nextBoundNameOp.report();
+	stats.nextBoundNameOp.report();
 	return result;
     }
 
@@ -253,7 +190,7 @@ public class DataStoreProfileProducer
     /** {@inheritDoc} */
     public int getClassId(Transaction txn, byte[] classInfo) {
 	int result = dataStore.getClassId(txn, classInfo);
-	getClassIdOp.report();
+	stats.getClassIdOp.report();
 	return result;
     }
 
@@ -262,14 +199,14 @@ public class DataStoreProfileProducer
 	throws ClassInfoNotFoundException
     {
 	byte[] result = dataStore.getClassInfo(txn, classId);
-	getClassInfoOp.report();
+	stats.getClassInfoOp.report();
 	return result;
     }
 
     /** {@inheritDoc} */
     public long nextObjectId(Transaction txn, long oid) {
 	long result = dataStore.nextObjectId(txn, oid);
-	nextObjectIdOp.report();
+	stats.nextObjectIdOp.report();
 	return result;
     }
 

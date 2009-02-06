@@ -367,6 +367,38 @@ typically useful for production deployments.
   increase game latency.
 
 </dl>
+
+<a name="MonitoringProperties"></a>
+<h2>Monitoring and Management Properties</h2>
+
+The Project Darkstar Server exposes internal data through standard
+Java Management Extensions (JMX) MXBeans.  The following properties
+are system properties, and must be specified on the command line when
+a Project Darkstar Server node is started, rather than in the application 
+configuration properties file.
+<p>
+In order to enable monitoring on a remote machine, the following properties
+must be used.  By default, only local monitoring is enabled.
+
+<dl>
+<dt>com.sun.management.jmxremote.port
+<span class="nodefault"/>
+<dd>The port number through which JMX RMI connections are enabled.
+
+</dl>
+
+Remote management requires security.  To disable <b>all</b> security, useful
+for testing only, set the following properties to false:
+<pre>com.sun.management.jmxremote.authenticate=false
+com.sun.management.jmxremote.ssl=false</pre>
+
+For more information, please refer to the <a
+href="http://java.sun.com/javase/6/docs/technotes/guides/management/toc.html">
+Java SE Monitoring and Management Guide</a>, especially Chapter 2, 
+Monitoring and Management Using JMX Technology.
+
+
+
 <hr>
 <font size="-1">
   Copyright &copy; 2007-2008 Sun Microsystems, Inc. All rights reserved
