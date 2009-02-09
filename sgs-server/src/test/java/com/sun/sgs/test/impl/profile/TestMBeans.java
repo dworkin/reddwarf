@@ -268,10 +268,11 @@ public class TestMBeans {
         // Ensure that registered MBeans are cleared after profile
         // collector shutdown
         TestMXBean bean1 = new TestMXImpl();
+        TestMXBean bean2 = new TestMXImpl();
         String beanName = "com.sun.sgs:type=Test";
         String otherName = "com.sun.sgs:type=AnotherName";
         profileCollector.registerMBean(bean1, beanName);
-        profileCollector.registerMBean(bean1, otherName);
+        profileCollector.registerMBean(bean2, otherName);
         
         TestMXBean proxy1 = JMX.newMXBeanProxy(mbsc, 
                                                new ObjectName(beanName), 
@@ -280,8 +281,9 @@ public class TestMBeans {
                                                new ObjectName(otherName), 
                                                TestMXBean.class);
         proxy1.setSomething(55);
+        proxy2.setSomething(56);
         assertEquals(55, bean1.getSomething());
-        assertEquals(55, proxy2.getSomething());
+        assertEquals(56, proxy2.getSomething());
         
         profileCollector.shutdown();
         Object o = profileCollector.getRegisteredMBean(beanName);
