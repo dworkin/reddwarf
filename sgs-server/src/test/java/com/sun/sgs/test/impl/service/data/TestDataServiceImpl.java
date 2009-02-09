@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -3252,13 +3253,9 @@ public class TestDataServiceImpl{
 	ShutdownAction action = new ShutdownAction();
         try {
 	    action.waitForDone();
-            fail("Expected InvocationTargetException");
-        } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof IllegalStateException) {
-                System.err.println(e);
-            } else {
-                fail("Expected IllegalStateException");
-            }
+            // the expected behavior of a second shutdown is to return silently.
+        } catch (Exception e) {
+            fail("Unexpected exception");
         } finally {
             // ensure that the next test will run
             serverNode = null;
@@ -4442,11 +4439,19 @@ public class TestDataServiceImpl{
 	ShutdownServiceAction(DataService service) {
             this.service = service;
         }
+        
 	protected Boolean action() throws Exception {
-	    try {
-                service.shutdown();
-                return true;
-            } catch (IllegalStateException ex) {
+            service.shutdown();
+
+            // the shutdown was succesful if the service ends up in the
+            // SHUTDOWN state; use reflection to determine this
+            try {
+                Field stateVarF = DataServiceImpl.class.
+                        getDeclaredField("state");
+                stateVarF.setAccessible(true);
+                return stateVarF.get(service).toString().equals("SHUTDOWN");
+            } catch (NullPointerException e) {
+                // if we could not find the field, something went wrong.
                 return false;
             }
 	}

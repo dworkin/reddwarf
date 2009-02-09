@@ -907,23 +907,13 @@ class Kernel {
         private WatchdogService watchdogSvc = null;
         private boolean shutdownQueued = false;
         private boolean isReady = false;
-        
+        private final Object shutdownQueueLock = new Object();
+
         /**
-         * This method flags the controller as being ready to issue shutdowns.
-         * If a shutdown was previously queued, then shutdown the node now.
-         */
-        public void setReady() {
-            isReady = true;
-            if (shutdownQueued) {
-                shutdownNode(this);
-            }
-        }
-        
-        /**
-         * This method gives the shutdown controller a handle to the 
-         * {@code WatchdogService}. Components will use this handle to report a 
+         * This method gives the shutdown controller a handle to the
+         * {@code WatchdogService}. Components will use this handle to report a
          * failure to the watchdog service instead of shutting down directly.
-         * This which ensures that the server is properly notified when a node 
+         * This which ensures that the server is properly notified when a node
          * needs to be shut down. This handle can only be set once, any call
          * after that will be ignored.
          */
@@ -934,40 +924,55 @@ class Kernel {
             this.watchdogSvc = watchdogSvc;
         }
         
-                /**
-         * {@inheritDoc}
+        /**
+         * This method flags the controller as being ready to issue shutdowns.
+         * If a shutdown was previously queued, then shutdown the node now.
          */
-        public void shutdownNode(Object caller) {
-            if (isReady) {
-                // service shutdown; we have already gone through notifying the
-                // server, so shutdown the node right now
-                if (caller instanceof WatchdogService) {
-                    runShutdown();
-                    // spawn another thread that waits for a timeout
-                    // then calls System.exit(0)?
-                } else {
-                    // component shutdown; we go through the watchdog (if it
-                    // has been assigned) to cleaup and notify the server first
-                    if (watchdogSvc != null) {
-                        watchdogSvc.reportFailure(watchdogSvc.getLocalNodeId(),
-                                caller.getClass().toString(),
-                                WatchdogService.FailureLevel.SEVERE);
-                    } else {
-                        runShutdown();
-                    }
+        public void setReady() {
+            synchronized (shutdownQueueLock) {
+                isReady = true;
+                if (shutdownQueued) {
+                    shutdownNode(this);
                 }
-            } else {
-                // Queue the request if the Kernel is not ready
-                shutdownQueued = true;
             }
         }
         
         /**
-         * Shutdown the node. This is run in a different thread to 
-         * prevent possible a possible deadlock due to a service or
-         * component's doShutdown() method waiting for the thread
-         * it was issued from to shutdown. For example, the 
-         * watchdog service would block if called from RenewThread.
+         * {@inheritDoc}
+         */
+        public void shutdownNode(Object caller) {
+            synchronized (shutdownQueueLock) {
+                if (isReady) {
+                    // service shutdown; we have already gone through notifying
+                    // the server, so shutdown the node right now
+                    if (caller instanceof WatchdogService) {
+                        runShutdown();
+                    } else {
+                        // component shutdown; we go through the watchdog to
+                        // cleanup and notify the server first
+                        if (watchdogSvc != null) {
+                            watchdogSvc.reportFailure(watchdogSvc.
+                                    getLocalNodeId(),
+                                    caller.getClass().toString(),
+                                    WatchdogService.FailureLevel.SEVERE);
+                        } else {
+                            // shutdown directly if watchdog has not been setup
+                            runShutdown();
+                        }
+                    }
+                } else {
+                    // queue the request if the Kernel is not ready
+                    shutdownQueued = true;
+                }
+            }
+        }
+        
+        /**
+         * Shutdown the node. This is run in a different thread to prevent a 
+         * possible deadlock due to a service or component's doShutdown()
+         * method waiting for the thread it was issued from to shutdown.
+         * For example, the watchdog service's shutdown method would block if
+         * a Kernel shutdown was called from RenewThread.
          */
         private void runShutdown() {
             new Thread(new Runnable() {
@@ -975,6 +980,8 @@ class Kernel {
                     shutdown();
                 }
             }).start();
+            // spawn another thread that waits for a timeout
+            // then calls System.exit(0)?
         }
     }
     

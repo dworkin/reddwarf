@@ -139,7 +139,7 @@ public class SgsTestNode {
     private final ChannelManager channelService;
     
     /** Shutdown controller. */
-    public final KernelShutdownController shutdownCtrl;
+    private final KernelShutdownController shutdownCtrl;
 
     /** The listen port for the client session service. */
     private int appPort;
@@ -376,6 +376,13 @@ public class SgsTestNode {
      */
     public Properties getServiceProperties() {
         return props;
+    }
+
+    /**
+     * Returns the shutdown controller for this node.
+     */
+    public KernelShutdownController getShutdownCtrl() {
+        return shutdownCtrl;
     }
 
     /**

@@ -51,12 +51,31 @@ import java.util.logging.Level;
  * <p>The {@link #getName getName} method invokes the instance's {@code
  * toString} method, so a concrete subclass of {@code AbstractService}
  * should provide an implementation of the {@code toString} method.
+ * 
+ * An {@link #AbstractService} supports the following properties: <p>
+ *
+ * Property: com.sun.sgs.io.retries
+ * Default: 5 retries
+ * Specifies how many times an IO task should be retried before performing
+ * failure procedures.
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.io.retries
+ *	</b></code><br>
+ *	<i>Default:</i> 5 retries <br>
+ *	Specifies how many times an {@link IoRunnable IoRunnable} task should be retried
+ *      before performing failure procedures.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.io.wait.time
+ *	</b></code><br>
+ *	<i>Default:</i> 100 milliseconds <br>
+ *      Specifies the wait time between {@link IoRunnable IoRunnable} task retries.
+ *
  */
 public abstract class AbstractService implements Service {
-
-    // The default IO attempts and retries
-    private static final int DEFAULT_RETRY_WAIT_TIME = 100;
-    private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
 
     /** Service state. */
     protected static enum State {
@@ -102,6 +121,12 @@ public abstract class AbstractService implements Service {
 
     /** Thread for shutting down the server. */
     private volatile Thread shutdownThread;
+
+    /** The default number of IO task retries **/
+    private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
+    
+    /** The default time interval to wait between IO task retries **/
+    private static final int DEFAULT_RETRY_WAIT_TIME = 100;
     
     /** The time (in milliseconds) to wait between retries for IO 
      * operations. */ 

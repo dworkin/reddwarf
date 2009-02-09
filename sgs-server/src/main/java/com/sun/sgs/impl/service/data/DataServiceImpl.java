@@ -1030,12 +1030,11 @@ public final class DataServiceImpl implements DataService {
 		try {
 		    stateLock.wait();
 		} catch (InterruptedException e) {
-                    // signal incomplete shutdown
-                    throw new IllegalStateException("Interrupted");
+                    return; // incomplete shutdown
 		}
 	    }
 	    if (state == State.SHUTDOWN) {
-                return; // fail silently
+                return; // finished
 	    }
 	    state = State.SHUTTING_DOWN;
 	}
@@ -1047,10 +1046,7 @@ public final class DataServiceImpl implements DataService {
 		    stateLock.notifyAll();
 		}
 		done = true;
-	    } else {
-                // signal incomplete shutdown
-                throw new IllegalStateException("Interrupted");
-            }
+	    }
 	} finally {
 	    if (!done) {
 		synchronized (stateLock) {

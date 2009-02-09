@@ -385,44 +385,6 @@ public final class WatchdogServerImpl
     /* -- Implement WatchdogServer -- */
 
     /**
-     * Processes the nodes which have failed by calling the failure methods
-     * for each node in the collection. They processes are separated into two
-     * for-loops so that a failed node is not mistakenly chosen as a backup
-     * while this operation is occurring.
-     * 
-     * @param c the collection of failed nodes
-     * @return a subset of {@code nodesToFail} that were marked as failed from
-     * this method
-     */
-    Collection<NodeImpl> processNodeFailures(Collection<NodeImpl> nodesToFail) {
-        Collection<NodeImpl> aliveNodesToFail = new ArrayList<NodeImpl>();
-
-	// Declare the nodes as failed only if it has not be reported to be 
-        // be failed already to prevent a failed node from being assigned as a 
-        // backup. It should be noted that nodes that are removed from the set 
-        // of {@code aliveNodes} are never added back.
-	for (NodeImpl node : nodesToFail) {
-            if (aliveNodes.remove(node.getId()) != null) {
-                removeHostPortMapEntry(node);
-                aliveNodesToFail.add(node);
-            }
-	}
-
-	// Iterate through the nodes known to still be alive
-	for (NodeImpl node : aliveNodesToFail) {
-            /**
-             * Mark the node as failed, assign it a backup, and update the
-             * data store. Add the node to the list of recovering nodes. The
-             * node will be removed from the list and from the data store in the
-             * 'recoveredNode' callback.
-             */
-            setFailed(node);
-            recoveringNodes.put(node.getId(), node);
-	}
-	return aliveNodesToFail;
-    }
-
-    /**
      * {@inheritDoc}
      */
     public long[] registerNode(final String host, 
@@ -570,16 +532,6 @@ public final class WatchdogServerImpl
     public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
             FailureLevel severity, int maxNumberOfAttempts)
     {
-        // Handle the race condition just in case two different
-        // processes interested in reporting a node failure. If
-        // the node is already being handled, then we do nothing.
-        if (!aliveNodes.containsKey(nodeId)) {
-            logger.log(Level.FINEST, "Node with ID '" + nodeId +
-                    "' is already reported as failed");
-            return;
-        }
-        
-        int count = maxNumberOfAttempts;
         NodeImpl remoteNode = aliveNodes.get(nodeId);
         if (remoteNode == null) {
             logger.log(Level.FINEST, "Node with ID '" + nodeId +
@@ -592,13 +544,15 @@ public final class WatchdogServerImpl
         } else {
             // Try to report the failure to the watchdog so that the node can 
             // be shutdown. Try a few times if we run into an IOException.
-            while (count-- > 0) {
+            int retries = maxNumberOfAttempts;
+            while (retries-- > 0) {
+
                 try {
                     remoteNode.getWatchdogClient().reportFailure(className,
                             severity);
                     break;
                 } catch (IOException ioe) {
-                    if (count == 0) {
+                    if (retries == 0) {
                         logger.log(Level.WARNING, "Could not retrieve " +
                                 "watchdog client given " +
                                 maxNumberOfAttempts + " attempt(s)");
@@ -610,6 +564,44 @@ public final class WatchdogServerImpl
     }
 
     /* -- other methods -- */
+
+    /**
+     * Processes the nodes which have failed by calling the failure methods
+     * for each node in the collection. The processes are separated into two
+     * for-loops so that a failed node is not mistakenly chosen as a backup
+     * while this operation is occurring.
+     *
+     * @param c the collection of failed nodes
+     * @return a subset of {@code nodesToFail} that were marked as failed from
+     * this method
+     */
+    Collection<NodeImpl> processNodeFailures(Collection<NodeImpl> nodesToFail) {
+        Collection<NodeImpl> aliveNodesToFail = new ArrayList<NodeImpl>();
+
+	// Declare the nodes as failed only if it has not be reported to be
+        // be failed already to prevent a failed node from being assigned as a
+        // backup. It should be noted that nodes that are removed from the set
+        // of {@code aliveNodes} are never added back.
+	for (NodeImpl node : nodesToFail) {
+            if (aliveNodes.remove(node.getId()) != null) {
+                removeHostPortMapEntry(node);
+                aliveNodesToFail.add(node);
+            }
+	}
+
+	// Iterate through the nodes known to still be alive
+	for (NodeImpl node : aliveNodesToFail) {
+            /**
+             * Mark the node as failed, assign it a backup, and update the
+             * data store. Add the node to the list of recovering nodes. The
+             * node will be removed from the list and from the data store in
+             * the 'recoveredNode' callback.
+             */
+            setFailed(node);
+            recoveringNodes.put(node.getId(), node);
+	}
+	return aliveNodesToFail;
+    }
 
     /**
      * Returns the port being used for this server.

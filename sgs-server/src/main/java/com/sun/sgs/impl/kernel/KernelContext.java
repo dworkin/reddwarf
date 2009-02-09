@@ -225,7 +225,8 @@ class KernelContext {
             try {
                 ((Service) service).shutdown();
             } catch (Exception ex) {
-                // ignore any exceptions so kernel shutdown is not interrupted
+                // ignore any exceptions to not interrupt kernel shutdown
+                service = null;
             }
         }
     }

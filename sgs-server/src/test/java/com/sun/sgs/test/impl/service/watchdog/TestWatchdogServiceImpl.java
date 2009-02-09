@@ -1351,7 +1351,7 @@ public class TestWatchdogServiceImpl extends Assert {
         serverNode = null;
 
         // Wait for the renew to fail and the shutdown to begin
-        Thread.sleep(renewTime*2);
+        Thread.sleep(renewTime*4);
 
         try {
             // The node should be shut down
@@ -1503,8 +1503,9 @@ public class TestWatchdogServiceImpl extends Assert {
         appNode.getWatchdogService().reportFailure(appNode.getNodeId(),
                 appNode.getClass().getName(),
                 WatchdogService.FailureLevel.SEVERE);
-        // issue another shutdown
-        appNode.shutdown(true);
+        // issue another shutdown; set clean = false since we do not want this
+        // test case to fail due to an error trying to delete a missing file
+        appNode.shutdown(false);
     }
     
     /**
@@ -1515,7 +1516,7 @@ public class TestWatchdogServiceImpl extends Assert {
         
         // Simulate shutdown being called from a component by passing a
         // a component object
-        node.shutdownCtrl.shutdownNode(node.getSystemRegistry().
+        node.getShutdownCtrl().shutdownNode(node.getSystemRegistry().
                 getComponent(TransactionScheduler.class));
         Thread.sleep(renewTime); // let it shutdown
         

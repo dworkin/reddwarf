@@ -447,8 +447,7 @@ public final class WatchdogServiceImpl
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
-                reportFailure(getLocalNodeId(), CLASSNAME, 
-                        FailureLevel.MEDIUM);
+                reportFailure(localNodeId, CLASSNAME, FailureLevel.MEDIUM);
 		return false;
 	    } else {
 		return true;
@@ -517,14 +516,6 @@ public final class WatchdogServiceImpl
             return;
         }
         
-        long localNodeId = 0;
-        try {
-            localNodeId = getLocalNodeId();
-        } catch (IllegalStateException ex) {
-            logger.logThrow(Level.FINE, ex, 
-                    "node shutdown has already been issued");
-        }
-        
         /*
          * Depending on the severity, decide what action to perform. In the
          * future, we may want to differentiate the type of action to perform.
@@ -538,8 +529,7 @@ public final class WatchdogServiceImpl
             default:
 
                 /*
-                 * Check if the node ID matches this node and that this node
-                 * is not the application node; shutdown this node if so.
+                 * Shutdown this node if the nodeId matches the local node id.
                  * Otherwise, find the node which should be shutdown instead
                  */
                 if (nodeId == localNodeId) {
@@ -582,8 +572,7 @@ public final class WatchdogServiceImpl
                                 logger.log(Level.SEVERE, "Cannot report " +
                                         "remote failure to Watchdog server");
                                 // The local node has a connection problem
-                                reportFailure(localNodeId, className, 
-                                        severity);
+                                setFailedThenNotify(true);
                             }
                         }
                     }
