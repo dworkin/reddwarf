@@ -25,7 +25,9 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
+import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.math.BigInteger;
 import java.util.IdentityHashMap;
@@ -33,7 +35,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Stores information for a specific transaction. */
-final class Context extends TransactionContext {
+final class Context extends TransactionContext implements TransactionListener {
 
     /** The logger for the data service class. */
     private static final LoggerWrapper logger =
@@ -83,6 +85,9 @@ final class Context extends TransactionContext {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /** The proxy for notifying of object accesses. */
+    final AccessReporter<BigInteger> oidAccesses;
+
     /**
      * A map that records all managed objects that are currently having
      * ManagedObjectRemoval.removingObject called on them, to detect recursion,
@@ -97,17 +102,20 @@ final class Context extends TransactionContext {
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
-	    ClassesTable classesTable)
+	    ClassesTable classesTable,
+	    AccessReporter<BigInteger> oidAccesses)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
-	    classesTable != null;
+	    classesTable != null && oidAccesses != null;
 	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	this.oidAccesses = oidAccesses;
 	classSerial = classesTable.createClassSerialization(this.txn);
+	txn.registerListener(this);
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
 		       getTxnId(), Thread.currentThread().getName());
@@ -123,7 +131,7 @@ final class Context extends TransactionContext {
     final class TxnTrampoline implements Transaction {
 
 	/** The original transaction. */
-	private final Transaction originalTxn;
+	final Transaction originalTxn;
 
 	/** Whether this transaction is inactive. */
 	private boolean inactive;
@@ -178,6 +186,10 @@ final class Context extends TransactionContext {
 
 	public Throwable getAbortCause() {
 	    return originalTxn.getAbortCause();
+	}
+
+	public void registerListener(TransactionListener listener) {
+	    originalTxn.registerListener(listener);
 	}
 
 	/* -- Object methods -- */
@@ -274,7 +286,6 @@ final class Context extends TransactionContext {
 	try {
 	    isPrepared = true;
 	    txn.setInactive();
-	    ManagedReferenceImpl.flushAll(this);
 	    boolean result;
 	    if (storeParticipant == null) {
 		isCommitted = true;
@@ -322,7 +333,6 @@ final class Context extends TransactionContext {
 	try {
 	    isCommitted = true;
 	    txn.setInactive();
-	    ManagedReferenceImpl.flushAll(this);
 	    if (storeParticipant != null) {
 		storeParticipant.prepareAndCommit(txn);
 	    }
@@ -360,6 +370,27 @@ final class Context extends TransactionContext {
 	    throw e;
 	}
     }
+
+    /* -- Implement TransactionListener -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation flushes managed references and marks the transaction
+     * inactive so that we'll notice if other beforeCompletion methods attempt
+     * to call the data service.
+     */
+    public void beforeCompletion() {
+	txn.setInactive();
+	ManagedReferenceImpl.flushAll(this);
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation does nothing.
+     */
+    public void afterCompletion(boolean commit) { }
 
     /* -- Other methods -- */
 
@@ -400,5 +431,10 @@ final class Context extends TransactionContext {
     /** Returns the ID of the associated transaction as a BigInteger. */
     BigInteger getTxnId() {
 	return new BigInteger(1, txn.getId());
+    }
+
+    /** Returns whether to delay write locking until commit time. */
+    boolean optimisticWriteLocks() {
+	return service.optimisticWriteLocks;
     }
 }

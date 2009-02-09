@@ -138,21 +138,25 @@ class AsyncSocketChannelImpl
     public AsyncSocketChannelImpl bind(SocketAddress local)
         throws IOException
     {
-        if ((local != null) && (!(local instanceof InetSocketAddress)))
+        if ((local != null) && (!(local instanceof InetSocketAddress))) {
             throw new UnsupportedAddressTypeException();
+        }
 
         InetSocketAddress inetLocal = (InetSocketAddress) local;
-        if ((inetLocal != null) && inetLocal.isUnresolved())
+        if ((inetLocal != null) && inetLocal.isUnresolved()) {
             throw new UnresolvedAddressException();
+        }
 
         final Socket socket = channel.socket();
         try {
             socket.bind(inetLocal);
         } catch (SocketException e) {
-            if (socket.isBound())
+            if (socket.isBound()) {
                 throw Util.initCause(new AlreadyBoundException(), e);
-            if (socket.isClosed())
+            }
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
         return this;
@@ -172,11 +176,13 @@ class AsyncSocketChannelImpl
     public AsyncSocketChannelImpl setOption(SocketOption name, Object value)
         throws IOException
     {
-        if (! (name instanceof StandardSocketOption))
+        if (!(name instanceof StandardSocketOption)) {
             throw new IllegalArgumentException("Unsupported option " + name);
+        }
 
-        if (value == null || !name.type().isAssignableFrom(value.getClass()))
+        if (value == null || !name.type().isAssignableFrom(value.getClass())) {
             throw new IllegalArgumentException("Bad parameter for " + name);
+        }
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final Socket socket = channel.socket();
@@ -184,23 +190,23 @@ class AsyncSocketChannelImpl
         try {
             switch (stdOpt) {
             case SO_SNDBUF:
-                socket.setSendBufferSize(((Integer)value).intValue());
+                socket.setSendBufferSize(((Integer) value).intValue());
                 break;
 
             case SO_RCVBUF:
-                socket.setReceiveBufferSize(((Integer)value).intValue());
+                socket.setReceiveBufferSize(((Integer) value).intValue());
                 break;
 
             case SO_KEEPALIVE:
-                socket.setKeepAlive(((Boolean)value).booleanValue());
+                socket.setKeepAlive(((Boolean) value).booleanValue());
                 break;
 
             case SO_REUSEADDR:
-                socket.setReuseAddress(((Boolean)value).booleanValue());
+                socket.setReuseAddress(((Boolean) value).booleanValue());
                 break;
 
             case TCP_NODELAY:
-                socket.setTcpNoDelay(((Boolean)value).booleanValue());
+                socket.setTcpNoDelay(((Boolean) value).booleanValue());
                 break;
 
             default:
@@ -208,8 +214,9 @@ class AsyncSocketChannelImpl
                     "Unsupported option " + name);
             }
         } catch (SocketException e) {
-            if (socket.isClosed())
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
         return this;
@@ -219,8 +226,9 @@ class AsyncSocketChannelImpl
      * {@inheritDoc}
      */
     public Object getOption(SocketOption name) throws IOException {
-        if (! (name instanceof StandardSocketOption))
+        if (!(name instanceof StandardSocketOption)) {
             throw new IllegalArgumentException("Unsupported option " + name);
+        }
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final Socket socket = channel.socket();
@@ -242,11 +250,13 @@ class AsyncSocketChannelImpl
                 return socket.getTcpNoDelay();
 
             default:
-                throw new IllegalArgumentException("Unsupported option " + name);
+                throw new IllegalArgumentException("Unsupported option " 
+                                                   + name);
             }
         } catch (SocketException e) {
-            if (socket.isClosed())
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
     }
@@ -268,22 +278,24 @@ class AsyncSocketChannelImpl
         final Socket socket = channel.socket();
         try {
             if (how == ShutdownType.READ  || how == ShutdownType.BOTH) {
-                if (! socket.isInputShutdown()) {
+                if (!socket.isInputShutdown()) {
                     socket.shutdownInput();
                     key.selected(OP_READ);
                 }
             }
             if (how == ShutdownType.WRITE || how == ShutdownType.BOTH) {
-                if (! socket.isOutputShutdown()) {
+                if (!socket.isOutputShutdown()) {
                     socket.shutdownOutput();
                     key.selected(OP_WRITE);
                 }
             }
         } catch (SocketException e) {
-            if (! socket.isConnected())
+            if (!socket.isConnected()) {
                 throw Util.initCause(new NotYetConnectedException(), e);
-            if (socket.isClosed())
+            }
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
         return this;
@@ -355,7 +367,7 @@ class AsyncSocketChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -378,7 +390,7 @@ class AsyncSocketChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -394,10 +406,12 @@ class AsyncSocketChannelImpl
             A attachment,
             CompletionHandler<Long, ? super A> handler)
     {
-        if ((offset < 0) || (offset >= dsts.length))
+        if ((offset < 0) || (offset >= dsts.length)) {
             throw new IllegalArgumentException("offset out of range");
-        if ((length < 0) || (length > (dsts.length - offset)))
+        }
+        if ((length < 0) || (length > (dsts.length - offset))) {
             throw new IllegalArgumentException("length out of range");
+        }
 
         return key.execute(OP_READ, attachment, handler, timeout, unit,
             new Callable<Long>() {
@@ -408,7 +422,7 @@ class AsyncSocketChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -431,7 +445,7 @@ class AsyncSocketChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 
     /**
@@ -447,10 +461,12 @@ class AsyncSocketChannelImpl
             A attachment,
            CompletionHandler<Long, ? super A> handler)
     {
-        if ((offset < 0) || (offset >= srcs.length))
+        if ((offset < 0) || (offset >= srcs.length)) {
             throw new IllegalArgumentException("offset out of range");
-        if ((length < 0) || (length > (srcs.length - offset)))
+        }
+        if ((length < 0) || (length > (srcs.length - offset))) {
             throw new IllegalArgumentException("length out of range");
+        }
 
         return key.execute(OP_WRITE, attachment, handler, timeout, unit,
             new Callable<Long>() {
@@ -461,6 +477,6 @@ class AsyncSocketChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 }

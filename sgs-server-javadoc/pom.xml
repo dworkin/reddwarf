@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.7-SNAPSHOT</version>
+    <version>0.9.9-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-javadoc</artifactId>
@@ -32,13 +32,10 @@
       <artifactId>sgs-server</artifactId>
       <classifier>sources</classifier>
     </dependency>
-
-    <!-- Included in the classpath since it is not a
-	 transitive dependency -->
     <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-      <artifactId>je</artifactId>
-      <scope>provided</scope>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-api</artifactId>
+      <classifier>sources</classifier>
     </dependency>
   </dependencies>
 
@@ -46,8 +43,8 @@
   <build>
     <plugins>
 
-      <!-- Retrieve the sources artifacts of each of the two
-	   core source packages (sgs-shared, sgs-server)
+      <!-- Retrieve the sources artifacts of each of the
+	   core source packages (sgs-shared, sgs-server, sgs-server-api)
 	   and unpack them -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -105,8 +102,7 @@
 	    </goals>
 	    <configuration>
 	      <links>
-		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
-		<link>http://mina.apache.org/report/1.1/apidocs/</link>
+		<link>http://java.sun.com/javase/6/docs/api/</link>
               </links>
 	      <show>package</show>
 	      <author>false</author>
@@ -138,8 +134,7 @@
 	    </goals>
 	    <configuration>
 	      <links>
-		<link>http://java.sun.com/j2se/1.5.0/docs/api/</link>
-		<link>http://mina.apache.org/report/1.1/apidocs/</link>
+		<link>http://java.sun.com/javase/6/docs/api/</link>
               </links>
 	      <show>public</show>
 	      <author>false</author>
@@ -159,7 +154,7 @@
                 Inc. All rights reserved</font>]]>
 	      </bottom>
 	      <finalName>api</finalName>
-	      <subpackages>com.sun.sgs.app:com.sun.sgs.protocol.simple</subpackages>
+	      <subpackages>com.sun.sgs.app:com.sun.sgs.internal:com.sun.sgs.protocol.simple</subpackages>
 	      <outputDirectory>${project.build.directory}/api-docs</outputDirectory>
 	    </configuration>
 	  </execution>
@@ -203,5 +198,25 @@
     </plugins>
   </build>
 
+  <reporting>
+    <plugins>
+      <!-- Disable the findbugs plugin by configuring an
+	   empty reportSet.  This is necessary because of a bug
+	   in findbugs when it re-runs through the compile lifecycle.
+	   Since findbugs is not needed for this module, and it is
+	   enabled in the parent master POM, we are disabling it here. -->
+      <plugin>
+	<groupId>org.codehaus.mojo</groupId>
+	<artifactId>findbugs-maven-plugin</artifactId>
+	<reportSets>
+          <reportSet>
+            <reports>
 
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+    </plugins>
+  </reporting>
+  
 </project>

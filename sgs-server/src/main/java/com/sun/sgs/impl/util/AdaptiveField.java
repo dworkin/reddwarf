@@ -21,6 +21,7 @@ package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.util.ManagedSerializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;

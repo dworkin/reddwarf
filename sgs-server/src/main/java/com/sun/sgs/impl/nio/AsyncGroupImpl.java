@@ -58,8 +58,9 @@ abstract class AsyncGroupImpl
     {
         super(provider);
 
-        if (executor == null)
+        if (executor == null) {
             throw new NullPointerException("null executor");
+        }
 
         this.executor = executor;
     }
@@ -110,13 +111,13 @@ abstract class AsyncGroupImpl
      * @param <T> the type of the exception
      * @param exception the exception
      */
-    private <T extends Throwable> void
-    uncaught(T exception) {
+    private <T extends Throwable> void uncaught(T exception) {
         try {
-            final Thread.UncaughtExceptionHandler ueh = uncaughtHandler;                
+            final Thread.UncaughtExceptionHandler ueh =  uncaughtHandler;
 
-            if (ueh != null)
+            if (ueh != null) {
                 ueh.uncaughtException(Thread.currentThread(), exception);
+            }
 
         } catch (Throwable ignore) {
             // Ignore all throwables here, even Errors, as specified

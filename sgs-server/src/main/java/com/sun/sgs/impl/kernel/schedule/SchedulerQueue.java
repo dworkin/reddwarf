@@ -44,7 +44,7 @@ public interface SchedulerQueue {
      *
      * @return the number of tasks ready to run
      */
-    public int getReadyCount();
+    int getReadyCount();
 
     /**
      * Returns the next task to run, blocking if {@code wait} is {@code true}.
@@ -57,7 +57,7 @@ public interface SchedulerQueue {
      * @throws InterruptedException if the thread is interrupted while
      *                              waiting for a task
      */
-    public ScheduledTask getNextTask(boolean wait) throws InterruptedException;
+    ScheduledTask getNextTask(boolean wait) throws InterruptedException;
 
     /**
      * Places at most the next {@code max} tasks available into
@@ -79,7 +79,7 @@ public interface SchedulerQueue {
      *
      * @return the number of tasks provided
      */
-    public int getNextTasks(Collection<ScheduledTask> tasks, int max);
+    int getNextTasks(Collection<ScheduledTask> tasks, int max);
 
     /**
      * Reserves a space for a task.
@@ -91,7 +91,7 @@ public interface SchedulerQueue {
      * @throws TaskRejectedException if a reservation cannot be made, or if
      *                               the task is recurring
      */
-    public TaskReservation reserveTask(ScheduledTask task);
+    TaskReservation reserveTask(ScheduledTask task);
 
     /**
      * Adds a task to the scheduler. This task is executed only once, but
@@ -108,7 +108,7 @@ public interface SchedulerQueue {
      *
      * @throws TaskRejectedException if the task cannot be added
      */
-    public void addTask(ScheduledTask task);
+    void addTask(ScheduledTask task);
 
     /**
      * Creates a {@code RecurringTaskHandle} for the associated task. The
@@ -126,7 +126,7 @@ public interface SchedulerQueue {
      * @throws IllegalArgumentException if the task has already been scheduled
      *                                  as a recurring task
      */
-    public RecurringTaskHandle createRecurringTaskHandle(ScheduledTask task);
+    RecurringTaskHandle createRecurringTaskHandle(ScheduledTask task);
     
     /**
      * Notifies the scheduler that the given task has been cancelled. An
@@ -136,11 +136,11 @@ public interface SchedulerQueue {
      *
      * @param task the {@code ScheduledTask} that has been cancelled
      */
-    public void notifyCancelled(ScheduledTask task);
+    void notifyCancelled(ScheduledTask task);
 
     /**
      * Tells this {@code SchedulerQueue} to shutdown.
      */
-    public void shutdown();
+    void shutdown();
 
 }

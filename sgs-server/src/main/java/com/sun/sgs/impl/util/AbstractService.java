@@ -22,6 +22,7 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -104,8 +105,9 @@ public abstract class AbstractService implements Service {
     /**
      * Constructs an instance with the specified {@code properties}, {@code
      * systemRegistry}, {@code txnProxy}, and {@code logger}.  It initializes
-     * the {@code appName} field to the value of the {@code com.sun.sgs.app.name}
-     * property and sets this service's state to {@code INITIALIZED}.
+     * the {@code appName} field to the value of the {@code
+     * com.sun.sgs.app.name} property and sets this service's state to {@code
+     * INITIALIZED}.
      *
      * @param	properties service properties
      * @param	systemRegistry system registry
@@ -187,6 +189,8 @@ public abstract class AbstractService implements Service {
 	    case SHUTTING_DOWN:
 	    case SHUTDOWN:
 		throw new IllegalStateException("service shutting down");
+	    default:
+		throw new AssertionError();
 	    }
 	}
 	doReady();
@@ -247,6 +251,9 @@ public abstract class AbstractService implements Service {
 		
 	    case SHUTDOWN:
 		return true;
+
+	    default:
+		throw new AssertionError();
 	    }
 	}
 
@@ -302,7 +309,7 @@ public abstract class AbstractService implements Service {
 	    Version oldVersion = (Version)
 		dataService.getServiceBinding(versionKey);
 	    
-	    if (! currentVersion.equals(oldVersion)) {
+	    if (!currentVersion.equals(oldVersion)) {
 		try {
 		    handleServiceVersionMismatch(oldVersion, currentVersion);
 		    dataService.removeObject(oldVersion);
@@ -325,8 +332,8 @@ public abstract class AbstractService implements Service {
     /**
      * Handles conversion from the {@code oldVersion} to the {@code
      * currentVersion}.  This method is invoked by {@link #checkServiceVersion
-     * checkServiceVersion} if a version mismatch is detected and is invoked from
-     * within a transaction.
+     * checkServiceVersion} if a version mismatch is detected and is invoked
+     * from within a transaction.
      *
      * @param	oldVersion the old version
      * @param	currentVersion the current version
@@ -441,7 +448,11 @@ public abstract class AbstractService implements Service {
 	return false;
     } 
 
-    /** Creates a {@code TaskQueue} for dependent, transactional tasks. */
+    /**
+     * Creates a {@code TaskQueue} for dependent, transactional tasks.
+     *
+     * @return	the task queue
+     */
     public TaskQueue createTaskQueue() {
 	return transactionScheduler.createTaskQueue();
     }
@@ -487,7 +498,7 @@ public abstract class AbstractService implements Service {
      *
      * @return the data service relevant to the current context
      */
-    public synchronized static DataService getDataService() {
+    public static synchronized DataService getDataService() {
 	if (txnProxy == null) {
 	    throw new IllegalStateException("Service not initialized");
 	} else {
@@ -577,8 +588,8 @@ public abstract class AbstractService implements Service {
         @Override
         public int hashCode() {
             int result = 17;
-            result = 37*result + majorVersion;
-            result = 37*result + minorVersion;
+            result = 37 * result + majorVersion;
+            result = 37 * result + minorVersion;
             return result;              
         }
     }
@@ -619,6 +630,7 @@ public abstract class AbstractService implements Service {
 
 	/** Constructs an instance with the specified {@code nodeId}. */
 	CheckNodeStatusTask(long nodeId) {
+	    super(null);
 	    this.nodeId = nodeId;
 	}
 

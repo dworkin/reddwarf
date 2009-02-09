@@ -22,7 +22,6 @@ package com.sun.sgs.test.impl.util;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.IoRunnable;
@@ -30,6 +29,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -201,7 +201,7 @@ public class TestAbstractService extends TestCase {
 	final DummyService service = createDummyService();
 	final IoRunnableImpl ioTask = new IoRunnableImpl(0);
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    service.runIoTask(ioTask, serverNode.getNodeId());
 		}}, taskOwner);
@@ -314,7 +314,7 @@ public class TestAbstractService extends TestCase {
 	    this.handleServiceVersionMismatchInvoked = false;
 	    this.e = e;
 	    transactionScheduler.runTask(
-		new AbstractKernelRunnable() {
+		new TestAbstractKernelRunnable() {
 		    public void run() {
 			checkServiceVersion(versionKey, major,  minor);
 		    }}, taskOwner);

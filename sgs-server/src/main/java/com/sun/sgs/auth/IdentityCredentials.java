@@ -37,6 +37,6 @@ public interface IdentityCredentials
      *
      * @return an identifier for the type of credentials
      */
-    public String getCredentialsType();
+    String getCredentialsType();
 
 }

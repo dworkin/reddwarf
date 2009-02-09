@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -27,7 +28,10 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.management.NodeInfo;
+import com.sun.sgs.management.NodesMXBean;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,8 +48,13 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
+import javax.management.MBeanNotificationInfo;
+import javax.management.Notification;
+import javax.management.NotificationBroadcasterSupport;
 
 /**
  * The {@link WatchdogServer} implementation. <p>
@@ -210,6 +219,9 @@ public final class WatchdogServerImpl
     /** The thread for checking node expiration times and checking if
      * recovering nodes need backups assigned.. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
+    
+    /** The JMX MXBean to expose nodes in the system. */
+    private final NodeManager nodeMgr;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -251,11 +263,12 @@ public final class WatchdogServerImpl
 	/*
 	 * Check service version.
 	 */
-	transactionScheduler.runTask(new AbstractKernelRunnable() {
+	transactionScheduler.runTask(
+	    new AbstractKernelRunnable("CheckServiceVersion") {
 		public void run() {
 		    checkServiceVersion(
 			VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
-		}},  taskOwner);
+		} },  taskOwner);
 	
 	int requestedPort = wrappedProps.getIntProperty(
  	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
@@ -290,10 +303,24 @@ public final class WatchdogServerImpl
 	    recoveringNodes.put(failedNode.getId(), failedNode);
 	}
  
-        // register our local id
-        long[] values = registerNode(host, port, client);
-        localNodeId = values[0];
+                
+        // Create the node manager MBean and register it.  This must be
+        // done before regiseterNode is called.
+        ProfileCollector collector = 
+            systemRegistry.getComponent(ProfileCollector.class);
+        nodeMgr = new NodeManager(this);
+        try {
+            collector.registerMBean(nodeMgr, NodeManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
         
+        // register our local id
+        int jmxPort = wrappedProps.getIntProperty(
+                    StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
+        long[] values = registerNode(host, port, client, jmxPort);
+        localNodeId = values[0];
+
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	this.port = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
@@ -305,7 +332,14 @@ public final class WatchdogServerImpl
 
     /** Calls NodeImpl.markAllNodesFailed. */
     private class FailedNodesRunnable extends AbstractKernelRunnable {
-	Collection<NodeImpl> nodes;
+	Collection<NodeImpl> nodes = null;
+
+	/** Constructs an instance. */
+	FailedNodesRunnable() {
+	    super(null);
+	}
+
+	/** {@inheritDoc} */
 	public void run() {
 	    nodes = NodeImpl.markAllNodesFailed(dataService);
 	}
@@ -324,7 +358,7 @@ public final class WatchdogServerImpl
     
     /** {@inheritDoc} */
     protected void doReady() {
-        assert(!notifyClientsThread.isAlive());
+        assert !notifyClientsThread.isAlive();
         // Don't notify clients until other services have had a chance
         // to register themselves with the watchdog.
         notifyClientsThread.start();      
@@ -352,12 +386,13 @@ public final class WatchdogServerImpl
 	// of failure.
 	final Collection<NodeImpl> failedNodes = aliveNodes.values();
 	try {
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+	      new AbstractKernelRunnable("MarkAllNodesFailed") {
 		public void run() {
 		    for (NodeImpl node : failedNodes) {
 			node.setFailed(dataService, null);
 		    }
-		}}, taskOwner);
+		} }, taskOwner);
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.WARNING, e,
@@ -368,6 +403,10 @@ public final class WatchdogServerImpl
 	    new HashSet<NodeImpl>(failedNodes);
 	failedNodesExceptMe.remove(aliveNodes.get(localNodeId));
 	notifyClients(failedNodesExceptMe, failedNodes);
+        
+        for (long nodeId : aliveNodes.keySet()) {
+            nodeMgr.notifyNodeFailed(nodeId);
+        }
 	aliveNodes.clear();
     }
 
@@ -378,7 +417,8 @@ public final class WatchdogServerImpl
      */
     public long[] registerNode(final String host, 
                                final int port, 
-                               WatchdogClient client)
+                               WatchdogClient client,
+                               int jmxPort)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
@@ -408,8 +448,9 @@ public final class WatchdogServerImpl
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, host, port, client);
-	    assert ! aliveNodes.containsKey(nodeId);
+	    final NodeImpl node = 
+                    new NodeImpl(nodeId, host, port, jmxPort, client);
+	    assert !aliveNodes.containsKey(nodeId);
 	          
             synchronized (aliveNodeHostPortMap) {
                 Set<Long> ports = null;
@@ -430,10 +471,11 @@ public final class WatchdogServerImpl
             
 	    // Persist node
 	    try {
-		transactionScheduler.runTask(new AbstractKernelRunnable() {
+		transactionScheduler.runTask(
+		  new AbstractKernelRunnable("StoreNewNode") {
 		    public void run() {
 			node.putNode(dataService);
-		    }}, taskOwner);
+		    } }, taskOwner);
 	    } catch (Exception e) {
                 removeHostPortMapEntry(node);
 		throw new NodeRegistrationFailedException(
@@ -443,6 +485,7 @@ public final class WatchdogServerImpl
 	    // Put node in set, sorted by expiration.
 	    node.setExpiration(calculateExpiration());
 	    aliveNodes.put(nodeId, node);
+            nodeMgr.notifyNodeStarted(nodeId);
 
 	    // TBD: use a ConcurrentSkipListSet?
 	    expirationSet.add(node);
@@ -469,7 +512,7 @@ public final class WatchdogServerImpl
 
 	try {
 	    NodeImpl node = aliveNodes.get(nodeId);
-	    if (node == null || ! node.isAlive() || node.isExpired()) {
+	    if (node == null || !node.isAlive() || node.isExpired()) {
 		return false;
 	    }
 
@@ -497,10 +540,11 @@ public final class WatchdogServerImpl
 		// TBD: should the node be removed if the current
 		// backup ID for the node with the given node ID
 		// is not the given backup ID?
-		transactionScheduler.runTask(new AbstractKernelRunnable() {
+		transactionScheduler.runTask(
+		  new AbstractKernelRunnable("RemoveRecoveredNode") {
 		    public void run() {
 			NodeImpl.removeNode(dataService,  nodeId);
-		    }}, taskOwner);
+		    } }, taskOwner);
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.WARNING, e,
@@ -574,14 +618,14 @@ public final class WatchdogServerImpl
 
 	    Collection<NodeImpl> expiredNodes = new ArrayList<NodeImpl>();
 	    
-	    while (! shuttingDown()) {
+	    while (!shuttingDown()) {
 		/*
 		 * Determine which nodes have failed because they
 		 * haven't renewed before their expiration time.
 		 */
 		long now = System.currentTimeMillis();
 		synchronized (expirationSet) {
-		    while (! expirationSet.isEmpty()) {
+		    while (!expirationSet.isEmpty()) {
 			NodeImpl node = expirationSet.first();
 			if (node.getExpiration() > now) {
 			    break;
@@ -591,14 +635,15 @@ public final class WatchdogServerImpl
 		    }
 		}
 		
-		if (! expiredNodes.isEmpty()) {
+		if (!expiredNodes.isEmpty()) {
 		    /*
 		     * Remove failed nodes from map of "alive" nodes so
 		     * that a failed node won't be assigned as a backup.
                      * Also, clean up the host port map entry.
 		     */
-		    for (NodeImpl node: expiredNodes) {
+		    for (NodeImpl node : expiredNodes) {
 			aliveNodes.remove(node.getId());
+                        nodeMgr.notifyNodeFailed(node.getId());
                         removeHostPortMapEntry(node);
 		    }
                     
@@ -623,9 +668,9 @@ public final class WatchdogServerImpl
 		 * node doesn't have a backup, assign it a backup if
 		 * an "alive" node is available to serve as one.
 		 */
-		if (! recoveringNodes.isEmpty()) {
+		if (!recoveringNodes.isEmpty()) {
 		    for (NodeImpl recoveringNode : recoveringNodes.values()) {
-			if (! recoveringNode.hasBackup()) {
+			if (!recoveringNode.hasBackup()) {
 			    NodeImpl backup = chooseBackup(recoveringNode);
 			    if (backup != null) {
 				assignBackup(recoveringNode, backup);
@@ -641,7 +686,7 @@ public final class WatchdogServerImpl
 		/*
 		 * Notify thread to send out node status change notifications.
 		 */
-		if (! statusChangedNodes.isEmpty()) {
+		if (!statusChangedNodes.isEmpty()) {
 		    synchronized (notifyClientsLock) {
 			notifyClientsLock.notifyAll();
 		    }
@@ -759,13 +804,14 @@ public final class WatchdogServerImpl
 	 */
 	private void assignBackup(final NodeImpl node, final NodeImpl backup) {
 	    try {
-		transactionScheduler.runTask(new AbstractKernelRunnable() {
+		transactionScheduler.runTask(
+		    new AbstractKernelRunnable("SetNodeFailed") {
 			public void run() {
 			    node.setFailed(dataService, backup);
 			    if (backup != null) {
 				backup.addPrimary(dataService, node.getId());
 			    }
-			}}, taskOwner);
+			} }, taskOwner);
 	    } catch (Exception e) {
 		logger.logThrow(
 		    Level.SEVERE, e,
@@ -876,5 +922,91 @@ public final class WatchdogServerImpl
 		    notifyNode.getId());
 	    }
 	}
+    }
+    
+    // Management support
+    private NodeInfo[] getAllNodeInfo() {
+        final Set<NodeInfo> nodes = new HashSet<NodeInfo>();
+        try {
+            transactionScheduler.runTask(
+                new AbstractKernelRunnable("GetNodeInfo") {
+                    public void run() {
+                        Iterator<Node> iter = NodeImpl.getNodes(dataService);
+                        while (iter.hasNext()) {
+                            NodeImpl node = (NodeImpl) iter.next();
+                            nodes.add(node.getNodeInfo());
+                        }
+		}
+            },  taskOwner);
+        } catch (Exception e) {
+            logger.logThrow(Level.INFO, e,
+                    "Could not retrieve node information");
+            return new NodeInfo[0];
+        }
+        return nodes.toArray(new NodeInfo[nodes.size()]);
+    }
+    
+    /**
+     * Private class for JMX information.
+     */
+    private static class NodeManager extends NotificationBroadcasterSupport
+            implements NodesMXBean 
+    {
+        /** The watchdog server we'll use to get the node info. */
+        private WatchdogServerImpl watchdog;
+        
+        private AtomicLong seqNumber = new AtomicLong();
+        
+        /** Description of the notifications. */
+        private static MBeanNotificationInfo[] notificationInfo =
+            new MBeanNotificationInfo[] {
+                new MBeanNotificationInfo(
+                        new String[] {NODE_STARTED_NOTIFICATION, 
+                                      NODE_FAILED_NOTIFICATION }, 
+                        Notification.class.getName(), 
+                        "A node has started or failed") };
+        /**
+         * Creates an instance of the manager.
+         * @param watchdog  the watchdog server
+         */
+        NodeManager(WatchdogServerImpl watchdog) {
+            super(notificationInfo);
+            this.watchdog = watchdog;
+        }
+
+        /** {@inheritDoc} */
+        public NodeInfo[] getNodes() {
+            return watchdog.getAllNodeInfo();
+        }
+ 
+        /*
+         * Package private methods.
+         */
+               
+        /**
+         * Sends JMX notification that a node started.
+         * @param nodeId the identifier of the newly started node
+         */
+        void notifyNodeStarted(long nodeId) {
+            sendNotification(
+                    new Notification(NODE_STARTED_NOTIFICATION,
+                                     this.MXBEAN_NAME,
+                                     seqNumber.incrementAndGet(),
+                                     System.currentTimeMillis(),
+                                     "Node started: " + nodeId));
+        }
+        
+        /**
+         * Sends JMX notification that a node failed.
+         * @param nodeId the identifier of the failed node
+         */
+        void notifyNodeFailed(long nodeId) {
+            sendNotification(
+                    new Notification(NODE_FAILED_NOTIFICATION,
+                                     this.MXBEAN_NAME,
+                                     seqNumber.incrementAndGet(),
+                                     System.currentTimeMillis(),
+                                     "Node failed:  " + nodeId));
+        }
     }
 }

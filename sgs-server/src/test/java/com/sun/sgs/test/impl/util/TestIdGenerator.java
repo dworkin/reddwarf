@@ -21,11 +21,11 @@ package com.sun.sgs.test.impl.util;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import junit.framework.TestCase;
 
 
@@ -121,7 +121,7 @@ public class TestIdGenerator extends TestCase {
 
     public void testNextWithTransaction() throws Exception {
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     doNextTest(IdGenerator.MIN_BLOCK_SIZE, 4);
                 }
@@ -134,7 +134,7 @@ public class TestIdGenerator extends TestCase {
 
     public void testNextBytesWithTransaction() throws Exception {
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     doNextBytesTest(1024, 8);
                 }

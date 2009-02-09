@@ -33,6 +33,8 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskReservation;
+import com.sun.sgs.management.NodeMappingServiceMXBean;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
@@ -56,6 +58,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Maps Identities to Nodes.
@@ -307,7 +310,7 @@ public class NodeMappingServiceImpl
     /** The number of times we should try to contact the backend before
      *  giving up. 
      */
-    private final static int MAX_RETRY = 5;
+    private static final int MAX_RETRY = 5;
     
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
@@ -375,6 +378,9 @@ public class NodeMappingServiceImpl
     private final List<TaskReservation> pendingNotifications =
                 new ArrayList<TaskReservation>();
     
+    /** Our service statistics */
+    private final NodeMappingServiceStats serviceStats;
+    
     /**
      * Constructs an instance of this class with the specified properties.
      * <p>
@@ -408,13 +414,14 @@ public class NodeMappingServiceImpl
             /*
 	     * Check service version.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
 			checkServiceVersion(
 			    NodeMapUtil.VERSION_KEY, 
                             NodeMapUtil.MAJOR_VERSION, 
                             NodeMapUtil.MINOR_VERSION);
-		    }},  taskOwner);
+		    } },  taskOwner);
                     
             // Find or create our server.   
             boolean instantiateServer =
@@ -422,7 +429,8 @@ public class NodeMappingServiceImpl
 		    SERVER_START_PROPERTY,
 		    wrappedProps.getBooleanProperty(
 			StandardProperties.SERVER_START, true));
-            String localHost = InetAddress.getLocalHost().getHostName();            
+            String localHost = 
+                    InetAddress.getLocalHost().getHostName();            
             String host;
             int port;
             
@@ -452,8 +460,8 @@ public class NodeMappingServiceImpl
             // TODO This code assumes that the server has already been started.
             // Perhaps it'd be better to block until the server is available?
             Registry registry = LocateRegistry.getRegistry(host, port);
-            server = (NodeMappingServer) 
-                      registry.lookup(NodeMappingServerImpl.SERVER_EXPORT_NAME);	    
+            server = (NodeMappingServer) registry.lookup(
+                         NodeMappingServerImpl.SERVER_EXPORT_NAME);	    
             
             // Export our client object for server callbacks.
             int clientPort = wrappedProps.getIntProperty(
@@ -490,6 +498,17 @@ public class NodeMappingServiceImpl
                        ", clientPort:" + clientPort + 
                        ", fullStack:" + fullStack + "]";
             
+            // create our profiling info and register our MBean
+            ProfileCollector collector =
+                systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new NodeMappingServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats, 
+                                        NodeMappingServiceMXBean.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+
 	} catch (Exception e) {
             logger.logThrow(Level.SEVERE, e, 
                             "Failed to create NodeMappingServiceImpl");
@@ -520,7 +539,7 @@ public class NodeMappingServiceImpl
         // At this point, we should never be adding to the pendingNotifications
         // list, as our state is RUNNING.
         synchronized (lock) {
-            for (TaskReservation pending: pendingNotifications) {
+            for (TaskReservation pending : pendingNotifications) {
                 pending.use();
             }
         }
@@ -579,6 +598,8 @@ public class NodeMappingServiceImpl
             throw new NullPointerException("null identity");
         }
         
+        serviceStats.assignNodeOp.report();
+        
         // We could check here to see if there's already a mapping, 
         // saving a remote call.  However, it makes the logic here
         // more complicated, and it means we duplicate some of the
@@ -618,6 +639,8 @@ public class NodeMappingServiceImpl
             throw new NullPointerException("null identity");
         }       
 
+        serviceStats.setStatusOp.report();
+        
         SetStatusTask stask = 
                 new SetStatusTask(identity, service.getName(), active);
         try {
@@ -650,15 +673,16 @@ public class NodeMappingServiceImpl
      * whether the identity is considered dead by this node.
      */
     private class SetStatusTask extends AbstractKernelRunnable {
-        final private boolean active;
-        final private String idKey;
-        final private String removeKey;
-        final private String statusKey;
+        private final boolean active;
+        private final String idKey;
+        private final String removeKey;
+        private final String statusKey;
         
         /** return value, true if reference count goes to zero */
         private boolean canRemove = false;
 
         SetStatusTask(Identity id, String serviceName, boolean active) {
+	    super(null);
             this.active = active;
             idKey = NodeMapUtil.getIdentityKey(id);
             removeKey = NodeMapUtil.getPartialStatusKey(id);
@@ -697,6 +721,9 @@ public class NodeMappingServiceImpl
         if (id == null) {
             throw new NullPointerException("null identity");
         }
+        
+        serviceStats.getNodeOp.report();
+
         Context context = contextFactory.joinTransaction();
         Node node = context.get(id);
         logger.log(Level.FINEST, "getNode id:{0} returns {1}", id, node);
@@ -708,6 +735,8 @@ public class NodeMappingServiceImpl
         throws UnknownNodeException 
     {
         checkState();
+        serviceStats.getIdentitiesOp.report();
+
         // Verify that the nodeId is valid.
         Node node = watchdogService.getNode(nodeId);
         if (node == null) {
@@ -751,12 +780,13 @@ public class NodeMappingServiceImpl
     }
     
     /** {@inheritDoc} */
-    public void addNodeMappingListener(NodeMappingListener listener) 
-    {
+    public void addNodeMappingListener(NodeMappingListener listener) {
         checkState();
         if (listener == null) {
             throw new NullPointerException("null listener");
         }
+        serviceStats.addNodeMappingListenerOp.report();
+
         nodeChangeListeners.add(listener);
         logger.log(Level.FINEST, "addNodeMappingListener successful");
     }
@@ -775,15 +805,18 @@ public class NodeMappingServiceImpl
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
             // in this case, and will use them when ready() has been called.
-            synchronized(lock) {
+            synchronized (lock) {
                 if (isInInitializedState()) {
                     logger.log(Level.FINEST, 
                                "Queuing remove notification for " +
-                               "identity: {0}, " + "newNode: {1}}", 
+                               "identity: {0}, " + 
+                               "newNode: {1}}", 
                                id, newNode);
-                    for (NodeMappingListener listener : nodeChangeListeners) {     
+                    for (NodeMappingListener listener : 
+                         nodeChangeListeners) 
+                    {     
                         TaskReservation res =
-                            taskScheduler.reserveTask( 
+                            taskScheduler.reserveTask(
                                 new MapRemoveTask(listener, id, newNode),
                                 taskOwner);
                         pendingNotifications.add(res);
@@ -794,7 +827,7 @@ public class NodeMappingServiceImpl
             
             // The normal case.
             for (NodeMappingListener listener : nodeChangeListeners) {
-                taskScheduler.scheduleTask( 
+                taskScheduler.scheduleTask(
                     new MapRemoveTask(listener, id, newNode), taskOwner);
             }
         }
@@ -803,7 +836,7 @@ public class NodeMappingServiceImpl
             // Check to see if we've been constructed but are not yet
             // completely running.  We reserve tasks for the notifications
             // in this case, and will use them when ready() has been called.
-            synchronized(lock) {
+            synchronized (lock) {
                 if (isInInitializedState()) {
                     logger.log(Level.FINEST, 
                                "Queuing added notification for " +
@@ -813,7 +846,7 @@ public class NodeMappingServiceImpl
                          nodeChangeListeners) 
                     {
                         TaskReservation res =
-                            taskScheduler.reserveTask( 
+                            taskScheduler.reserveTask(
                                 new MapAddTask(listener, id, oldNode),
                                 taskOwner);
                         pendingNotifications.add(res);
@@ -839,8 +872,8 @@ public class NodeMappingServiceImpl
         final NodeMappingListener listener;
         final Identity id;
         final Node newNode;
-        MapRemoveTask(NodeMappingListener listener, Identity id, Node newNode) 
-        {
+        MapRemoveTask(NodeMappingListener listener, Identity id, Node newNode) {
+	    super(null);
             this.listener = listener;
             this.id = id;
             this.newNode = newNode;
@@ -859,8 +892,8 @@ public class NodeMappingServiceImpl
         final NodeMappingListener listener;
         final Identity id;
         final Node oldNode;
-        MapAddTask(NodeMappingListener listener, Identity id, Node oldNode) 
-        {
+        MapAddTask(NodeMappingListener listener, Identity id, Node oldNode) {
+	    super(null);
             this.listener = listener;
             this.id = id;
             this.oldNode = oldNode;
@@ -875,8 +908,7 @@ public class NodeMappingServiceImpl
      *
      * @return	a string representation of this instance
      */
-    @Override
-    public String toString() {
+    @Override public String toString() {
 	return fullName;
     }
  

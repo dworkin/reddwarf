@@ -23,13 +23,21 @@ package com.sun.sgs.impl.service.transaction;
 public interface TransactionCoordinator {
 
     /** The property used to specify the timeout value for transactions. */
-    public static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txn.timeout";
+    String TXN_TIMEOUT_PROPERTY = "com.sun.sgs.txn.timeout";
 
     /** The property used to specify the value for unbounded timeout. */
-    public static final String TXN_UNBOUNDED_TIMEOUT_PROPERTY =
+    String TXN_UNBOUNDED_TIMEOUT_PROPERTY =
 	"com.sun.sgs.txn.timeout.unbounded";
 
+    /** 
+     * A property used to control whether we allow the prepareAndCommit
+     * optimization, where the final participant has prepareAndCommit called
+     * (one call) rather than prepare(), and at some later point commit().
+     * <p>
+     * The flag defaults to false.
+     */
+    String TXN_DISABLE_PREPAREANDCOMMIT_OPT_PROPERTY =
+            "com.sun.sgs.txn.disable.prepareandcommit.optimization";
     /**
      * Creates a new transaction, and returns a handle for managing it.
      * 

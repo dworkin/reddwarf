@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.7-SNAPSHOT</version>
+    <version>0.9.9-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server-dist</artifactId>
@@ -24,11 +24,15 @@
   <dependencies>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-server</artifactId>
+      <artifactId>sgs-boot</artifactId>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
-      <artifactId>sgs-shared</artifactId>
+      <artifactId>sgs-stop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server</artifactId>
     </dependency>
     <dependency>
       <groupId>com.projectdarkstar.server</groupId>
@@ -40,31 +44,27 @@
       <artifactId>sgs-tutorial-server-dist</artifactId>
       <type>zip</type>
     </dependency>
-    <dependency>
-      <groupId>org.apache.mina</groupId>
-      <artifactId>mina-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-jdk14</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
-      <artifactId>db-binaries</artifactId>
-      <type>zip</type>
-    </dependency>
   </dependencies>
 
 
-  <!-- Zip artifact is generated with the assembly plugin
-       and assembled according to the dist.xml assembly descriptor -->
   <build>
     <plugins>
+
+    <!-- Unpack the Berkeley DB binaries first so that they are
+	 available for use by the assembly plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+	<artifactId>maven-dependency-plugin</artifactId>
+	<executions>
+	  <execution>
+	    <id>unpack-bdb-binaries</id>
+	    <phase>generate-resources</phase>
+	  </execution>
+	</executions>
+      </plugin>
+
+      <!-- Zip artifact is generated with the assembly plugin
+	   and assembled according to the dist.xml assembly descriptor -->
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
         <configuration>

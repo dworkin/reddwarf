@@ -22,6 +22,8 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
+import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
+import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -165,6 +167,62 @@ public class TestDataStorePerformance extends TestCase {
 	}
     }
 
+    public void testReadIdsForUpdate() throws Exception {
+	byte[] data = new byte[itemSize];
+	data[0] = 1;
+	store = getDataStore();
+	DummyTransaction txn = new DummyTransaction(1000);
+	long[] ids = new long[items];
+	for (int i = 0; i < items; i++) {
+	    ids[i] = store.createObject(txn);
+	    store.setObject(txn, ids[i], data);
+	}
+	txn.commit();
+	for (int r = 0; r < repeat; r++) {
+	    long start = System.currentTimeMillis();
+	    for (int c = 0; c < count; c++) {
+		txn = new DummyTransaction(1000);
+		for (int i = 0; i < items; i++) {
+		    store.getObject(txn, ids[i], true);
+		}
+		txn.commit();
+	    }
+	    long stop = System.currentTimeMillis();
+	    System.err.println(
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
+	}
+    }
+
+
+    public void testMarkIdsForUpdate() throws Exception {
+	byte[] data = new byte[itemSize];
+	data[0] = 1;
+	store = getDataStore();
+	DummyTransaction txn = new DummyTransaction(1000);
+	long[] ids = new long[items];
+	for (int i = 0; i < items; i++) {
+	    ids[i] = store.createObject(txn);
+	    store.setObject(txn, ids[i], data);
+	}
+	txn.commit();
+	for (int r = 0; r < repeat; r++) {
+	    long start = System.currentTimeMillis();
+	    for (int c = 0; c < count; c++) {
+		txn = new DummyTransaction(1000);
+		for (int i = 0; i < items; i++) {
+		    store.getObject(txn, ids[i], false);
+		    store.markForUpdate(txn, ids[i]);
+		}
+		txn.commit();
+	    }
+	    long stop = System.currentTimeMillis();
+	    System.err.println(
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
+	}
+    }
+
     public void testWriteIds() throws Exception {
 	testWriteIdsInternal(false);
     }	
@@ -174,12 +232,21 @@ public class TestDataStorePerformance extends TestCase {
 	    System.err.println("Skipping");
 	    return;
 	}
+	/*
+	 * JE caches the environment object it uses for a given database and
+	 * only decaches that, and rereads configuration properties, when the
+	 * database is created afresh.  Deleting the directory allows us to set
+	 * the flush-to-disk property to its non-default value.
+	 */
+	cleanDirectory(directory);
 	testWriteIdsInternal(true);
     }
 
     void testWriteIdsInternal(boolean flush) throws Exception {
 	props.setProperty(
-	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
+	    BdbEnvironment.FLUSH_TO_DISK_PROPERTY, String.valueOf(flush));
+	props.setProperty(
+	    JeEnvironment.FLUSH_TO_DISK_PROPERTY, String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
@@ -266,7 +333,7 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props), DummyProfileCoordinator.getRegistrar());
+	    new DataStoreImpl(props), DummyProfileCoordinator.getCollector());
         DummyProfileCoordinator.startProfiling();
 	return store;
     }
@@ -283,5 +350,25 @@ public class TestDataStorePerformance extends TestCase {
 	}
 	directory = dir.getPath();
 	return directory;
+    }
+
+    /** Insures an empty version of the directory exists. */
+    private static void cleanDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
+	}
     }
 }

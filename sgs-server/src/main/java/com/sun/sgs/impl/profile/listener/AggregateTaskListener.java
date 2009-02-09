@@ -31,7 +31,6 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 
 import java.beans.PropertyChangeEvent;
@@ -80,7 +79,7 @@ public class AggregateTaskListener implements ProfileListener {
     private static final String PERIOD_PROPERTY = PROP_BASE + ".report.period";
     private static final long DEFAULT_PERIOD = 10000;
 
-    private HashMap<String,TaskDetail> map;
+    private HashMap<String, TaskDetail> map;
 
     /**
      * Creates an instance of {@code AggregateTaskListener}.
@@ -100,7 +99,7 @@ public class AggregateTaskListener implements ProfileListener {
     {
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
-        map = new HashMap<String,TaskDetail>();
+        map = new HashMap<String, TaskDetail>();
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port);
@@ -129,7 +128,7 @@ public class AggregateTaskListener implements ProfileListener {
     public void report(ProfileReport profileReport) {
         if (profileReport.wasTaskSuccessful()) {
             String name = profileReport.getTask().getBaseTaskType();
-            if (! name.startsWith("com.sun.sgs.impl.kernel")) {
+            if (!name.startsWith("com.sun.sgs.impl.kernel")) {
                 synchronized (map) {
                     TaskDetail detail = map.get(name);
                     if (detail == null) {
@@ -141,12 +140,13 @@ public class AggregateTaskListener implements ProfileListener {
                     detail.opCount +=
                         profileReport.getReportedOperations().size();
                     detail.retries += profileReport.getRetryCount();
-		    for (ProfileOperation op :
-                              profileReport.getReportedOperations()) {
-			 Long l = detail.ops.get(op);
-			 detail.ops.put(
+		    for (String op :
+                              profileReport.getReportedOperations()) 
+                    {
+                        Long l = detail.ops.get(op);
+			detail.ops.put(
 			     op, Long.valueOf(l == null ? 1 : l + 1));
-		     }
+		    }
                 }
             }
         }
@@ -164,24 +164,25 @@ public class AggregateTaskListener implements ProfileListener {
         long time = 0;
         long opCount = 0;
         long retries = 0;
-	Map<ProfileOperation,Long> ops = new HashMap<ProfileOperation,Long>();
+	Map<String, Long> ops = new HashMap<String, Long>();
 	
 
         public String toString() {
-            double avgTime = (double)time / (double)count;
-            double avgOps = (double)opCount / (double)count;
+            double avgTime = (double) time / (double) count;
+            double avgOps = (double) opCount / (double) count;
 	    Formatter formatter = new Formatter();
 	    formatter.format(" avgTime=%2.2fms", avgTime);
 	    formatter.format(" avgOps=%2.2f", avgOps);
 	    formatter.format(" avgRetries=%2.2f",
-			     (double)retries / (double)count);
-            if (opCount > 0)
+			     (double) retries / (double) count);
+            if (opCount > 0) {
                 formatter.format("%n  ");
-	    for (ProfileOperation op : ops.keySet()) {
+            }
+	    for (String op : ops.keySet()) {
 		formatter.format(
 		    "%s=%2.2f%% ", op,
-		    100.0 * (double)(ops.get(op).longValue()) /
-		    (double)opCount);
+		    100.0 * (double) (ops.get(op).longValue()) /
+		    (double) opCount);
 	    }
 	    
             return formatter.toString();
@@ -199,9 +200,10 @@ public class AggregateTaskListener implements ProfileListener {
         public void run() throws Exception {
             Formatter reportStr = new Formatter();
             synchronized (map) {
-                for (Entry<String,TaskDetail> entry : map.entrySet())
+                for (Entry<String, TaskDetail> entry : map.entrySet()) {
                     reportStr.format(
 			"%s%s%n", entry.getKey(), entry.getValue());
+                }
             }
             reportStr.format("%n");
             networkReporter.report(reportStr.toString());

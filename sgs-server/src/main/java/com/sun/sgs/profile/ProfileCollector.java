@@ -19,11 +19,9 @@
 
 package com.sun.sgs.profile;
 
-import com.sun.sgs.auth.Identity;
-
-import com.sun.sgs.kernel.KernelRunnable;
 import java.util.List;
 import java.util.Map;
+import javax.management.JMException;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -40,10 +38,9 @@ import java.util.Map;
 public interface ProfileCollector {
 
     /**
-     *  The valid choices for
-     * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.
+     *  The profiling levels.
      */
-    public enum ProfileLevel {
+    enum ProfileLevel {
         /** 
          * Collect minimal profiling data, used by the system internally.
          * This is the default profiling level.  This level of profiling 
@@ -65,44 +62,41 @@ public interface ProfileCollector {
     }
     
     /** 
-     * The default system profiling level, which is the default level
-     * for any newly created {@code ProfileConsumer} and can be set at
-     * startup with the property 
-     * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.  
+     * Gets the default system profiling level, which is the default level
+     * for any newly created {@code ProfileConsumer}.  
      * 
      * @return the default profiling level
      */
-    public ProfileLevel getDefaultProfileLevel();
+    ProfileLevel getDefaultProfileLevel();
 
     /**
-     * Set the default profile level, used as the initial level when creating
+     * Sets the default profile level, used as the initial level when creating
      * new {@code ProfileConsumer}s.
      * 
      * @param level the new default profile level
      */
-    public void setDefaultProfileLevel(ProfileLevel level);
+    void setDefaultProfileLevel(ProfileLevel level);
     
     /** 
      * Shuts down the ProfileCollector, reclaiming resources as necessary.
      */
-    
-    public void shutdown();
+    void shutdown();
     
     /**
      * Adds a <code>ProfileListener</code> as a listener for
      * profiling data reports. The listener is immediately updated on
      * the current set of operations and the number of scheduler
      * threads. The listener can be marked as unable to be removed by
-     * {@link #removeListener} or shutdown by {@link #shutdown};  if these
-     * operations are performed on a listener that does not allow them, they
-     * are silently ignored.
+     * {@link #removeListener removeListener} or shutdown by {@link #shutdown};
+     * if these operations are performed on a listener that does not allow them,
+     * they are silently ignored.
      *
      * @param listener the {@code ProfileListener} to add
      * @param canRemove {@code true} if this listener can be removed or 
      *                  shut down by the {@code ProfileCollector}.  This 
      *                  parameter should usually be set to {@code true}.
      */
-    public void addListener(ProfileListener listener, boolean canRemove);
+    void addListener(ProfileListener listener, boolean canRemove);
        
     /**
      * Instantiates and adds a {@code ProfileListener}. The listener must
@@ -116,10 +110,9 @@ public interface ProfileCollector {
      * @param listenerClassName the fully qualified class name of the 
      *                          listener to instantiate and add.
      * 
-     * @throws any exception generated during instantiation
+     * @throws Exception if any were generated during instantiation
      */
-    public void addListener(String listenerClassName) throws Exception;
-    
+    void addListener(String listenerClassName) throws Exception;
 
     /**
      * Returns a read-only list of {@code ProfileListener}s which have been
@@ -127,100 +120,67 @@ public interface ProfileCollector {
      * 
      * @return the list of listeners
      */
-    public List<ProfileListener> getListeners();
+    List<ProfileListener> getListeners();
 
     /**
      * Removes a {@code ProfileListener} and calls
      * {@link ProfileListener#shutdown} on the listener.  If the
-     * {@code listener} has never been added with {@link #addListener}, no
-     * action is taken.
+     * {@code listener} has never been added with 
+     * {@link #addListener addListener}, no action is taken.
      *
      * @param listener the listener to remove
      */
-    public void removeListener(ProfileListener listener);
+    void removeListener(ProfileListener listener);
+    
+    /**
+     * Returns the named {@code ProfileConsumer}, or creates a new one with
+     * that name.  
+     * <p>
+     * Note that the name must be unique for a new {@code ProfileConsumer} to 
+     * be created. Consumers created by the core server packages have a prefix
+     * of {@value 
+     * com.sun.sgs.impl.profile.ProfileCollectorImpl#CORE_CONSUMER_PREFIX}
+     * to distinguish their namespace. Consumers created by code outside of the
+     * core server packages should create their own unique namespace.
+     * <p>
+     * Calling {@link #getConsumers} will return a map keyed by names already 
+     * in use.
+     *
+     * @param name the unique name of the profile consumer
+     *
+     * @return a {@code ProfileConsumer} with the given name
+     */
+    ProfileConsumer getConsumer(String name);
     
     /**
      * Returns a read-only map of {@code ProfileConsumer} names to the 
-     * {@code ProfileConsumer}s which have been registered through a call to 
-     * {@link ProfileRegistrar#registerProfileProducer}.
+     * {@code ProfileConsumer}s which have been created through a call to 
+     * {@link #getConsumer getConsumer}.
      * 
      * @return the map of names to consumers
      */
-    public Map<String, ProfileConsumer> getConsumers();
+    Map<String, ProfileConsumer> getConsumers();
     
     /**
-     * Notifies the collector that a thread has been added to the scheduler.
+     * Registers the given MBean with the current VM's platform MBean server,
+     * allowing it to be monitored by tools like JConsole.
+     * 
+     * @param mBean the MBean or MXBean to be registered
+     * @param mBeanName the name under which it should be registered
+     * 
+     * @throws JMException if there were any problems reported
+     *    by the JMX system during registration, including if an object
+     *    has already been registered with the {@code mBeanName}
      */
-    public void notifyThreadAdded();
-
+    void registerMBean(Object mBean, String mBeanName) throws JMException;
+    
     /**
-     * Notifies the collector that a thread has been removed from the
-     * scheduler.
+     * Returns the object registered under the given name, or {@code null}
+     * if no object has been registered with that name.
+     * 
+     * @param mBeanName the name the object was registered under
+     * @return the object passed into {@link #registerMBean(Object, String)
+     *         registerMBean} with the given {@code mBeanName}
      */
-    public void notifyThreadRemoved();
-
-    /**
-     * Tells the collector that a new task is starting in the context of
-     * the calling thread. If another task was alrady being profiled in the
-     * context of the calling thread then that profiling data is pushed
-     * onto a stack until the new task finishes from a call to
-     * <code>finishTask</code>.
-     *
-     * @param task the <code>KernelRunnable</code> that is starting
-     * @param owner the <code>Identity</code> of the task owner
-     * @param scheduledStartTime the requested starting time for the task
-     * @param readyCount the number of ready tasks at the scheduler
-     */
-    public void startTask(KernelRunnable task, Identity owner,
-                          long scheduledStartTime, int readyCount);
-
-    /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is
-     * transactional. This does not mean that all operations of the task
-     * are transactional, but that at least some of the task is run in a
-     * transactional context.
-     *
-     * @throws IllegalStateException if no task is bound to this thread
-     */
-    public void noteTransactional();
-
-    /**
-     * Tells the collector about a participant of a transaction when that
-     * participant has finished participating (i.e., has committed, has
-     * prepared read-only, or has aborted). The transaction must be the
-     * current transaction for the current task, and therefore
-     * <code>noteTransactional</code> must first have been called in
-     * the context of the current thread.
-     *
-     * @param participantDetail the detail associated with the participant
-     *
-     * @throws IllegalStateException if no transactional task is bound to
-     *                               this thread
-     */
-    public void addParticipant(ProfileParticipantDetail participantDetail);
-
-    /**
-     * Tells the collector that the current task associated with the
-     * calling thread (as associated by a call to
-     * <code>startTask</code>) has now successfully finished.
-     *
-     * @param tryCount the number of times that the task has tried to run
-     *
-     * @throws IllegalStateException if no task is bound to this thread
-     */
-    public void finishTask(int tryCount);
-
-    /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is now
-     * finished and that an exception occured during its execution.
-     *
-     * @param tryCount the number of times that the task has tried to run
-     * @param t the <code>Throwable</code> thrown during task execution
-     *
-     * @throws IllegalStateException if no task is bound to this thread
-     */
-    public void finishTask(int tryCount, Throwable t);
-
+    Object getRegisteredMBean(String mBeanName);
 }

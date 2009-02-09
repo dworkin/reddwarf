@@ -221,7 +221,6 @@ final class DataStoreHeader {
      */
     private static void upgrade(
 	DbDatabase db, DbTransaction dbTxn, int majorVersion)
-	throws DataStoreException
     {
 	switch (majorVersion) {
 	case 1:
@@ -245,9 +244,7 @@ final class DataStoreHeader {
      * So, just update the major version number and add an entry for the first
      * placeholder.
      */
-    private static void upgrade3to4(DbDatabase db, DbTransaction dbTxn)
-	throws DataStoreException
-    {
+    private static void upgrade3to4(DbDatabase db, DbTransaction dbTxn) {
 	db.put(dbTxn, DataEncoding.encodeLong(MAJOR_KEY),
 	       DataEncoding.encodeShort((short) 4));
 	boolean success = db.putNoOverwrite(

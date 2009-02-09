@@ -101,6 +101,9 @@ class ClientSessionHandler {
     /** The identity for this session. */
     private volatile Identity identity;
 
+    /** The login status. */
+    private volatile boolean loggedIn;
+
     /** The lock for accessing the following fields: {@code state},
      * {@code messageQueue}, {@code disconnectHandled}, and {@code shutdown}.
      */
@@ -124,11 +127,22 @@ class ClientSessionHandler {
     /**
      * Constructs an instance of this class using the provided I/O connection,
      * and starts reading from the connection.
+     *
+     * @param	sessionService the ClientSessionService instance
+     * @param	dataService the DataService instance
+     * @param	sessionConnection the connection associated with this handler
      */
     ClientSessionHandler(ClientSessionServiceImpl sessionService,
 			 DataService dataService,
 			 AsynchronousMessageChannel sessionConnection)
     {
+	if (sessionService == null) {
+	    throw new NullPointerException("null sessionService");
+	} else if (dataService == null) {
+	    throw new NullPointerException("null dataService");
+	} else if (sessionConnection == null) {
+	    throw new NullPointerException("null sessionConnection");
+	}
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.sessionConnection = sessionConnection;
@@ -140,12 +154,12 @@ class ClientSessionHandler {
 	}
 
 	/*
-	 * TODO: It might be a good idea to implement high- and low-water marks
+	 * TBD: It might be a good idea to implement high- and low-water marks
 	 * for the buffers, so they don't go into hysteresis when they get
 	 * full. -JM
 	 */
 
-        readHandler.read();
+	scheduleReadOnReadHandler();
     }
 
     /* -- Instance methods -- */
@@ -167,8 +181,15 @@ class ClientSessionHandler {
     /**
      * Sends the specified login protocol {@code message}, followed by any
      * enqueued messages, and sets the state to LOGIN_HANDLED.
+     *
+     * @param	message the login protocol message
+     * @param	delivery the delivery requirement
+     * @param	success if {@code true}, login is successful
+     *
      */
-    void sendLoginProtocolMessage(byte[] message, Delivery delivery) {
+    void sendLoginProtocolMessage(
+	byte[] message, Delivery delivery, boolean success)
+    {
 	synchronized (lock) {
 	    if (state != State.CONNECTED) {
 		if (logger.isLoggable(Level.WARNING)) {
@@ -180,6 +201,8 @@ class ClientSessionHandler {
 		throw new IllegalStateException("unexpected state: " +
 						state.toString());
 	    }
+
+	    loggedIn = success;
 	    
 	    writeToWriteHandler(ByteBuffer.wrap(message));
 	    state = State.LOGIN_HANDLED;
@@ -188,6 +211,16 @@ class ClientSessionHandler {
 	    }
 	    messageQueue.clear();
 	}
+    }
+
+    /**
+     * Returns {@code true} if the login for this session has been handled,
+     * otherwise returns {@code false}.
+     *
+     * @return	{@code true} if the login for this session has been handled
+     */
+    boolean loginHandled() {
+	return getCurrentState() != State.CONNECTED;
     }
 
     /**
@@ -238,26 +271,38 @@ class ClientSessionHandler {
 
     /**
      * Handles a disconnect request (if not already handled) by doing
-     * the following:
+     * the following: <ol>
      *
-     * a) sending a disconnect acknowledgment (LOGOUT_SUCCESS)
+     * <li> sending a disconnect acknowledgment (LOGOUT_SUCCESS)
      *    if 'graceful' is true
      *
-     * b) closing this session's connection
+     * <li> if {@code closeConnection} is {@code true}, closing this
+     *    session's connection, otherwise monitor the connection's status
+     *    to ensure that the client disconnects it. 
      *
-     * c) submitting a transactional task to call the 'disconnected'
+     * <li> submitting a transactional task to call the 'disconnected'
      *    callback on the listener for this session.
      *
-     * d) notifying the identity (if non-null) that the session has
+     * <li> notifying the identity (if non-null) that the session has
      *    logged out.
      *
-     * e) notifying the node mapping service that the identity (if
+     * <li> notifying the node mapping service that the identity (if
      *    non-null) is no longer active.
+     * </ol>
      *
-     * @param graceful if the disconnection was graceful (i.e., due to
-     * a logout request).
+     * <p>Note:if {@code graceful} is {@code true}, then {@code
+     * closeConnection} must be {@code false} so that the client will receive
+     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * receive the message if the connection is disconnected immediately
+     * after sending the message.
+     *
+     * @param	graceful if {@code true}, the disconnection was graceful
+     *		(i.e., due to a logout request).
+     * @param	closeConnection if {@code true}, close this session's
+     *		connection immediately, otherwise monitor the connection to
+     *		ensure that it is terminated in a timely manner by the client
      */
-    void handleDisconnect(final boolean graceful) {
+    void handleDisconnect(final boolean graceful, boolean closeConnection) {
 
 	logger.log(Level.FINEST, "handleDisconnect handler:{0}", this);
 	
@@ -282,30 +327,28 @@ class ClientSessionHandler {
 	    // also happen even though 'notifyLoggedIn' was not invoked.
 	    // Are these behaviors okay?  -- ann (3/19/07)
 	    final Identity thisIdentity = identity;
-	    scheduleTask(new AbstractKernelRunnable() {
+	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
-		    }});
-
-	    deactivateIdentity(identity);
+		    } });
+	    if (sessionService.removeUserLogin(identity, this)) {
+		deactivateIdentity(identity);
+	    }
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
+		assert !closeConnection;
 	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
-
-	        sendProtocolMessage(msg, Delivery.RELIABLE);
+		// Bypass sendProtocolMessage method which prevents sending
+		// messages to disconnecting sessions.
+		writeToWriteHandler(ByteBuffer.wrap(msg));
 	    }
 
-	    try {
-		sessionConnection.close();
-	    } catch (IOException e) {
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-		    	Level.WARNING, e,
-			"handleDisconnect (close) handle:{0} throws",
-			sessionConnection);
-		}
+	    if (closeConnection) {
+		closeConnection();
+	    } else {
+		sessionService.monitorDisconnection(this);
 	    }
 	}
 
@@ -313,11 +356,12 @@ class ClientSessionHandler {
         writeHandler = new ClosedWriteHandler();
 
 	if (sessionRefId != null) {
-	    scheduleTask(new AbstractKernelRunnable() {
-		public void run() {
+	    scheduleTask(
+	      new AbstractKernelRunnable("NotifyListenerAndRemoveSession") {
+	        public void run() {
 		    ClientSessionImpl sessionImpl = 
 			ClientSessionImpl.getSession(dataService, sessionRefId);
-		    sessionImpl. notifyListenerAndRemoveSession(
+		    sessionImpl.notifyListenerAndRemoveSession(
 			dataService, graceful, true);
 		}
 	    });
@@ -327,19 +371,50 @@ class ClientSessionHandler {
     /**
      * Schedule a non-transactional task for disconnecting the client.
      *
+     * <p>Note:if {@code graceful} is {@code true}, then {@code
+     * closeConnection} must be {@code false} so that the client will receive
+     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * receive the message if the connection is disconnected immediately
+     * after sending the message.
+     *
      * @param	graceful if {@code true}, disconnection is graceful (i.e.,
      * 		a LOGOUT_SUCCESS protocol message is sent before
      * 		disconnecting the client session)
+     * @param	closeConnection if {@code true}, close this session's
+     *		connection immediately, otherwise monitor the connection to
+     *		ensure that it is terminated in a timely manner by the client
      */
-    private void scheduleHandleDisconnect(final boolean graceful) {
+    private void scheduleHandleDisconnect(
+	final boolean graceful, final boolean closeConnection)
+    {
         synchronized (lock) {
-            if (state != State.DISCONNECTED)
+            if (state != State.DISCONNECTED) {
                 state = State.DISCONNECTING;
+	    }
         }
-	scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+	scheduleNonTransactionalTask(
+	  new AbstractKernelRunnable("HandleDisconnect") {
 	    public void run() {
-		handleDisconnect(graceful);
-	    }});
+		handleDisconnect(graceful, closeConnection);
+	    } });
+    }
+
+    /**
+     * Closes the connection associated with this instance.
+     */
+    void closeConnection() {
+	if (sessionConnection.isOpen()) {
+	    try {
+		sessionConnection.close();
+	    } catch (IOException e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"closing connection for handle:{0} throws",
+			sessionConnection);
+		}
+	    }
+	}
     }
 
     /**
@@ -347,19 +422,13 @@ class ClientSessionHandler {
      */
     void shutdown() {
 	synchronized (lock) {
-	    if (shutdown == true) {
+	    if (shutdown) {
 		return;
 	    }
 	    shutdown = true;
 	    disconnectHandled = true;
 	    state = State.DISCONNECTED;
-	    if (sessionConnection != null) {
-		try {
-		    sessionConnection.close();
-		} catch (IOException e) {
-		    // ignore
-		}
-	    }
+	    closeConnection();
 	}
     }
     
@@ -488,7 +557,7 @@ class ClientSessionHandler {
                 processQueue();
             } catch (ExecutionException e) {
                 /*
-		 * TODO: If we're expecting the session to close, don't
+		 * TBD: If we're expecting the session to close, don't
                  * complain.
 		 */
                 if (logger.isLoggable(Level.FINE)) {
@@ -497,7 +566,7 @@ class ClientSessionHandler {
 				    ClientSessionHandler.this,
 				    HexDumper.format(message, 0x50));
                 }
-                scheduleHandleDisconnect(false);
+                scheduleHandleDisconnect(false, true);
             }
         }
     }
@@ -544,8 +613,9 @@ class ClientSessionHandler {
         @Override
         void read() {
             synchronized (readLock) {
-                if (isReading)
+                if (isReading) {
                     throw new ReadPendingException();
+		}
                 isReading = true;
             }
             sessionConnection.read(this);
@@ -559,7 +629,7 @@ class ClientSessionHandler {
             try {
                 ByteBuffer message = result.getNow();
                 if (message == null) {
-                    scheduleHandleDisconnect(false);
+                    scheduleHandleDisconnect(false, true);
                     return;
                 }
                 if (logger.isLoggable(Level.FINEST)) {
@@ -579,7 +649,7 @@ class ClientSessionHandler {
             } catch (Exception e) {
 
                 /*
-		 * TODO: If we're expecting the channel to close, don't
+		 * TBD: If we're expecting the channel to close, don't
                  * complain.
 		 */
 
@@ -588,7 +658,7 @@ class ClientSessionHandler {
                         Level.FINE, e,
                         "Read completion exception {0}", sessionConnection);
                 }
-                scheduleHandleDisconnect(false);
+                scheduleHandleDisconnect(false, true);
             }
         }
 
@@ -607,7 +677,7 @@ class ClientSessionHandler {
 	    
 	    switch (opcode) {
 		
-	    case SimpleSgsProtocol.LOGIN_REQUEST: {
+	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
 	        byte version = msg.getByte();
 	        if (version != SimpleSgsProtocol.VERSION) {
@@ -616,43 +686,50 @@ class ClientSessionHandler {
 	                    "got protocol version:{0}, " +
 	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
 	            }
-	            scheduleHandleDisconnect(false);
+	            scheduleHandleDisconnect(false, true);
 	            break;
 	        }
 
-		String name = msg.getString();
-		String password = msg.getString();
-		handleLoginRequest(name, password);
+		final String name = msg.getString();
+		final String password = msg.getString();
+		scheduleNonTransactionalTask(
+		    new AbstractKernelRunnable("HandleLoginRequest") {
+			public void run() {
+			    handleLoginRequest(name, password);
+			} });
 
                 // Resume reading immediately
 		read();
 
 		break;
-	    }
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		if (identity == null) {
+		if (!loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
-			"session message received before login:{0}", this);
+			"session message received before login completed:{0}",
+			this);
 		    break;
 		}
 		final ByteBuffer clientMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("NotifyListenerMessageReceived") {
 		    public void run() {
 			ClientSessionImpl sessionImpl =
 			    ClientSessionImpl.getSession(
 				dataService, sessionRefId);
 			if (sessionImpl != null) {
 			    if (isConnected()) {
-				sessionImpl.getClientSessionListener(dataService).
-				    receivedMessage(clientMessage.asReadOnlyBuffer());
+				sessionImpl.
+				    getClientSessionListener(dataService).
+				        receivedMessage(clientMessage.
+						            asReadOnlyBuffer());
 			    }
 			} else {
-			    scheduleHandleDisconnect(false);
+			    scheduleHandleDisconnect(false, true);
 			}
-		    }}, identity);
+		    } }, identity);
 
 		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
@@ -660,17 +737,19 @@ class ClientSessionHandler {
 		break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-		if (identity == null) {
+		if (!loggedIn) {
 		    logger.log(
 		    	Level.WARNING,
-			"session message received before login:{0}", this);
+			"channel message received before login completed:{0}",
+			this);
 		    break;
 		}
 		final BigInteger channelRefId =
 		    new BigInteger(1, msg.getBytes(msg.getShort()));
 		final ByteBuffer channelMessage =
 		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("HandleChannelMessage") {
 		    public void run() {
 			ClientSessionImpl sessionImpl =
 			    ClientSessionImpl.getSession(
@@ -684,9 +763,9 @@ class ClientSessionHandler {
 					channelMessage.asReadOnlyBuffer());
 			    }
 			} else {
-			    scheduleHandleDisconnect(false);
+			    scheduleHandleDisconnect(false, true);
 			}
-		    }}, identity);
+		    } }, identity);
 
 		// Wait until processing is complete before resuming reading
 		enqueueReadResume();
@@ -697,7 +776,7 @@ class ClientSessionHandler {
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
-		scheduleHandleDisconnect(isConnected());
+		scheduleHandleDisconnect(isConnected(), false);
 
 		// Resume reading immediately
                 read();
@@ -713,7 +792,7 @@ class ClientSessionHandler {
 		}
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
-		scheduleHandleDisconnect(false);
+		scheduleHandleDisconnect(false, true);
 		break;
 	    }
 	}
@@ -780,8 +859,15 @@ class ClientSessionHandler {
 		 * "addHandler", and schedule a task to perform client
 		 * login (call the AppListener.loggedIn method).
 		 */
-		taskQueue = sessionService.createTaskQueue();
+		if (!sessionService.validateUserLogin(
+			authenticatedIdentity, ClientSessionHandler.this))
+		{
+		    // This login request is not allowed to proceed.
+		    sendLoginFailureAndDisconnect();
+		    return;
+		}
 		identity = authenticatedIdentity;
+		taskQueue = sessionService.createTaskQueue();
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();
 		try {
@@ -812,20 +898,13 @@ class ClientSessionHandler {
 		    getLoginRedirectMessage(node.getHostName(), node.getPort());
 		// TBD: identity may be null. Fix to pass a non-null identity
 		// when scheduling the task.
-		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+		scheduleNonTransactionalTask(
+		  new AbstractKernelRunnable("SendLoginRedirectMessage") {
 		    public void run() {
 			sendLoginProtocolMessage(
-			    loginRedirectMessage, Delivery.RELIABLE);
-                        try {
-                            // FIXME: this is a hack to make sure that 
-                            // the client receives the login redirect 
-                            // message before disconnect. 
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
-                            // ignore
-                        }
-			handleDisconnect(false);
-		    }});
+ 			    loginRedirectMessage, Delivery.RELIABLE, false);
+			handleDisconnect(false, false);
+		    } });
 	    }
 	}
 
@@ -836,30 +915,42 @@ class ClientSessionHandler {
 	private void sendLoginFailureAndDisconnect() {
 	    // TBD: identity may be null. Fix to pass a non-null identity
 	    // when scheduling the task.
-	    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
+	    scheduleNonTransactionalTask(
+	      new AbstractKernelRunnable("SendLoginFailureMessage") {
 		public void run() {
 		    sendLoginProtocolMessage(
-			loginFailureMessage, Delivery.RELIABLE);
-		    handleDisconnect(false);
-		}});
+ 			loginFailureMessage, Delivery.RELIABLE, false);
+		    handleDisconnect(false, false);
+		} });
 	}
     }
 
     /**
-     * Schedule a task to resume reading.  Use this method to delay reading
+     * Schedules a task to resume reading.  Use this method to delay reading
      * until a task resulting from an earlier read request has been completed.
      */
     void enqueueReadResume() {
-        taskQueue.addTask(new AbstractKernelRunnable() {
-            public void run() {
-                logger.log(Level.FINER, "resuming reads session:{0}", this);
-                if (isConnected()) {
-                    readHandler.read();
-                }
-            }
-	}, identity);
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("ScheduleReadOnReadHandler") {
+		public void run() {
+		    scheduleReadOnReadHandler();
+		} }, identity);
     }
 
+    /**
+     * Schedules an asynchronous task to resume reading.
+     */
+    private void scheduleReadOnReadHandler() {
+	scheduleNonTransactionalTask(
+	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
+		public void run() {
+		    logger.log(Level.FINER, "resuming reads session:{0}", this);
+		    if (isConnected()) {
+			readHandler.read();
+		    }
+		} });
+    }
+    
     /* -- other private methods and classes -- */
 
     /**
@@ -929,6 +1020,7 @@ class ClientSessionHandler {
 	private volatile Node node = null;
 
 	GetNodeTask(Identity authenticatedIdentity) {
+	    super(null);
 	    this.authenticatedIdentity = authenticatedIdentity;
 	}
 
@@ -946,7 +1038,13 @@ class ClientSessionHandler {
      * Constructs the ClientSession.
      */
     private class CreateClientSessionTask extends AbstractKernelRunnable {
-	
+
+	/** Constructs and instance. */
+	CreateClientSessionTask() {
+	    super(null);
+	}
+
+	/** {@inheritDoc} */
 	public void run() {
 	    ClientSessionImpl sessionImpl =
 		new ClientSessionImpl(sessionService, identity);
@@ -959,7 +1057,12 @@ class ClientSessionHandler {
      * {@code AppListener} that this session has logged in.
      */
     private class LoginTask extends AbstractKernelRunnable {
-
+	
+	/** Constructs an instance. */
+	LoginTask() {
+	    super(null);
+	}
+	
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}
 	 * callback, which returns a client session listener.  If the
@@ -1017,12 +1120,12 @@ class ClientSessionHandler {
 		sessionImpl.putClientSessionListener(
 		    dataService, returnedListener);
 
-		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE, false);
+		sessionService.sendLoginAck(
+		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE, true);
 		
 		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("NotifyLoggedIn") {
 			public void run() {
 			    logger.log(
 			        Level.FINE,
@@ -1032,7 +1135,7 @@ class ClientSessionHandler {
 			    // whether or not this session is connected at
 			    // the time of notification.
 			    thisIdentity.notifyLoggedIn();
-			}});
+			} });
 		
 	    } else {
 		if (ex == null) {
@@ -1040,7 +1143,7 @@ class ClientSessionHandler {
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
-		} else if (! isRetryableException(ex)) {
+		} else if (!isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +
@@ -1049,8 +1152,8 @@ class ClientSessionHandler {
 		} else {
 		    throw ex;
 		}
-		sessionService.sendProtocolMessageFirst(
-		    sessionImpl, loginFailureMessage, Delivery.RELIABLE, true);
+		sessionService.sendLoginAck(
+		    sessionImpl, loginFailureMessage, Delivery.RELIABLE, false);
 		sessionImpl.disconnect();
 	    }
 	}

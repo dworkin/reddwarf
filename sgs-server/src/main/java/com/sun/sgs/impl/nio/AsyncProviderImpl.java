@@ -181,7 +181,7 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
 
     /** {@inheritDoc} */
     @Override
-    abstract public 
+    public abstract
     AsyncGroupImpl
     openAsynchronousChannelGroup(ExecutorService executor) throws IOException;
     
@@ -217,10 +217,11 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
     @Override
     public UncaughtExceptionHandler getUncaughtExceptionHandler() {
         synchronized (this) {
-            if (defaultGroupInstance != null)
+            if (defaultGroupInstance != null) {
                 return defaultGroupInstance.uncaughtHandler;
-            else
+            } else {
                 return defaultUncaughtHandler;
+            }
         }
     }
 
@@ -228,10 +229,11 @@ abstract class AsyncProviderImpl extends AsynchronousChannelProvider {
     @Override
     public void setUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
         synchronized (this) {
-            if (defaultGroupInstance != null)
+            if (defaultGroupInstance != null) {
                 defaultGroupInstance.uncaughtHandler = eh;
-            else
+            } else {
                 defaultUncaughtHandler = eh;
+            }
         }
     }    
 }

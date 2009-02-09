@@ -38,15 +38,15 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
+import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.AccessReporter;
+import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -56,6 +56,7 @@ import java.math.BigInteger;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Provides an implementation of <code>DataService</code> based on {@link
@@ -102,6 +103,18 @@ import java.util.logging.Logger;
  *	references table.  Note that the number of operations is measured
  *	separately for each transaction.  This property is intended for use in
  *	debugging. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS}
+ *	</b></code><br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to wait until commit time to obtain
+ *	write locks.  If <code>false</code>, which is the default, the service
+ *	acquires write locks as soon as it knows that an object is being
+ *	modified.  If <code>true</code>, the service delays obtaining write
+ *	locks until commit time, which may improve performance in some cases,
+ *	typically when there is low contention.  Note that setting this flag to
+ *	<code>true</code> does not delay write locks when removing objects.<p>
  *
  * </dl> <p>
  *
@@ -166,6 +179,10 @@ public final class DataServiceImpl implements DataService {
     public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
+    /** The property that specifies to use optimistic write locking. */
+    public static final String OPTIMISTIC_WRITE_LOCKS =
+	CLASSNAME + ".optimistic.write.locks";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -176,6 +193,12 @@ public final class DataServiceImpl implements DataService {
 
     /** Synchronize on this object when accessing the contextMap field. */
     private static final Object contextMapLock = new Object();
+
+    /** The proxy for notifying of object accesses */
+    private final AccessReporter<BigInteger> oidAccesses;
+
+    /** The proxy for notifying of bound name accesses */
+    private final AccessReporter<String> boundNameAccesses;
 
     /**
      * The transaction context map, or null if configure has not been called.
@@ -197,6 +220,12 @@ public final class DataServiceImpl implements DataService {
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
 
+    /** Whether to delay obtaining write locks. */
+    final boolean optimisticWriteLocks;
+
+    /** The data service profiling information. */
+    private final DataServiceStats serviceStats;
+    
     /**
      * Synchronize on this object before accessing the state,
      * debugCheckInterval, or detectModifications fields.
@@ -226,9 +255,6 @@ public final class DataServiceImpl implements DataService {
 
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
-
-    /** Our profiling operations. */
-    private final ProfileOperation createReferenceOp;
     
     /**
      * Defines the transaction context map for this class.  This class checks
@@ -279,7 +305,7 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
-		detectModifications, classesTable);
+		detectModifications, classesTable, oidAccesses);
 	}
 	@Override protected TransactionParticipant createParticipant() {
 	    /* Create a durable participant */
@@ -352,10 +378,10 @@ public final class DataServiceImpl implements DataService {
      * @param	systemRegistry the registry of available system components
      * @param	txnProxy the transaction proxy
      * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
-     *		</code> property is not specified, if the value of the <code>
-     *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
-     *		</code> property is not a valid integer, or if the data store
-     *		constructor detects an illegal property value
+     *        </code> property is not specified, if the value of the <code>
+     *        com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+     *	      </code> property is not a valid integer, or if the data store
+     *	      constructor detects an illegal property value
      * @throws	Exception if a problem occurs creating the service
      */
     public DataServiceImpl(Properties properties,
@@ -384,12 +410,27 @@ public final class DataServiceImpl implements DataService {
 		throw new NullPointerException(
 		    "The txnProxy argument must not be null");
 	    }
+
+	    // notify the AccessCoordinator that the DataService is a
+	    // source of contention for ManagedObjects and name
+	    // bindings.
+	    AccessCoordinator accessCoordinator = 
+		systemRegistry.getComponent(AccessCoordinator.class);	    
+	    oidAccesses = 
+                    accessCoordinator.registerAccessSource(
+                    CLASSNAME + ":objects", BigInteger.class);
+	    boundNameAccesses = 
+                    accessCoordinator.registerAccessSource(
+                    CLASSNAME + ":bound-names", String.class);
+
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
 	    detectModifications = wrappedProps.getBooleanProperty(
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
+	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
+		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -408,13 +449,19 @@ public final class DataServiceImpl implements DataService {
 		baseStore = new DataStoreClient(properties);
 	    }
             storeToShutdown = baseStore;
-            ProfileRegistrar registrar = 
-		systemRegistry.getComponent(ProfileRegistrar.class);
-	    store = new DataStoreProfileProducer(baseStore, registrar);
-            ProfileConsumer consumer =
-                registrar.registerProfileProducer(getClass().getName());
-            createReferenceOp = consumer.registerOperation(
-		"createReference", ProfileLevel.MAX);
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+	    store = new DataStoreProfileProducer(baseStore, collector);
+            
+            // create our service profiling info and register our MBean
+            serviceStats = new DataServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats,
+                                        DataServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -426,7 +473,7 @@ public final class DataServiceImpl implements DataService {
 		state = State.RUNNING;
 	    }
 	    systemRegistry.getComponent(TransactionScheduler.class).runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("BindDataServiceHeader") {
 			public void run() {
 			    DataServiceHeader header;
 			    try {
@@ -475,26 +522,31 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public ManagedObject getBinding(String name) {
+        serviceStats.getBindingOp.report();
 	return getBindingInternal(name, false);
     }
 
     /** {@inheritDoc} */
      public void setBinding(String name, Object object) {
+         serviceStats.setBindingOp.report();
 	 setBindingInternal(name, object, false);
     }
 
     /** {@inheritDoc} */
     public void removeBinding(String name) {
+        serviceStats.removeBindingOp.report();
 	removeBindingInternal(name, false);
     }
 
     /** {@inheritDoc} */
     public String nextBoundName(String name) {
+        serviceStats.nextBoundNameOp.report();
 	return nextBoundNameInternal(name, false);
     }
 
     /** {@inheritDoc} */
     public void removeObject(Object object) {
+        serviceStats.removeObjOp.report();
 	Context context = null;
 	ManagedReferenceImpl<?> ref = null;
 	try {
@@ -502,6 +554,10 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
+		// mark that this object has been write locked
+		oidAccesses.reportObjectAccess(ref.getId(), AccessType.WRITE,
+					       object);
+
 		if (object instanceof ManagedObjectRemoval) {
 		    context.removingObject((ManagedObjectRemoval) object);
 		    /*
@@ -534,6 +590,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public void markForUpdate(Object object) {
+        serviceStats.markForUpdateOp.report();
 	Context context = null;
 	ManagedReferenceImpl<?> ref = null;
 	try {
@@ -541,6 +598,10 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    ref = context.findReference(object);
 	    if (ref != null) {
+		// mark that this object has been write locked
+		oidAccesses.reportObjectAccess(ref.getId(), AccessType.WRITE,
+					       object);
+
 		ref.markForUpdate();
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -565,12 +626,16 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public <T> ManagedReference<T> createReference(T object) {
-        createReferenceOp.report();
+        serviceStats.createRefOp.report();
 	Context context = null;
 	try {
 	    checkManagedObject(object);
 	    context = getContext();
 	    ManagedReference<T> result = context.getReference(object);
+	    // mark that this object has been read locked
+	    oidAccesses.reportObjectAccess(result.getId(), AccessType.READ,
+					   object);
+
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -595,26 +660,31 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public ManagedObject getServiceBinding(String name) {
+        serviceStats.getServiceBindingOp.report();
 	return getBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
      public void setServiceBinding(String name, Object object) {
+         serviceStats.setServiceBindingOp.report();
 	 setBindingInternal(name, object, true);
     }
 
     /** {@inheritDoc} */
     public void removeServiceBinding(String name) {
+       serviceStats.removeServiceBindingOp.report();
        removeBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
     public String nextServiceBoundName(String name) {
+        serviceStats.nextServiceBoundNameOp.report();
 	return nextBoundNameInternal(name, true);
     }
 
     /** {@inheritDoc} */
     public ManagedReference<?> createReferenceForId(BigInteger id) {
+        serviceStats.createRefForIdOp.report();
 	Context context = null;
 	try {
 	    context = getContext();
@@ -641,12 +711,23 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public BigInteger nextObjectId(BigInteger objectId) {
+        serviceStats.nextObjIdOp.report();
 	try {
 	    long oid = (objectId == null) ? -1 : getOid(objectId);
+	    if (objectId != null) {
+		oidAccesses.reportObjectAccess(objectId, AccessType.READ);
+	    }
 	    Context context = getContext();
 	    long nextOid = context.nextObjectId(oid);
 	    BigInteger result =
 		(nextOid == -1) ? null : BigInteger.valueOf(nextOid);
+	    if (nextOid != -1) {
+		/* NOTE: really, we are locking all the object Ids
+		 * between the provided one and this one inclusive,
+		 * but we have no way of representing that
+		 * efficiently */
+		oidAccesses.reportObjectAccess(result, AccessType.READ);
+	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "nextObjectId objectId:{0} returns {1}",
@@ -674,9 +755,41 @@ public final class DataServiceImpl implements DataService {
 	    context = getContext();
 	    ManagedObject result;
 	    try {
-		result = context.getBinding(
-		    getInternalName(name, serviceBinding));
-	    } catch (NameNotBoundException e) {
+                String internalName = getInternalName(name, serviceBinding);
+		/* mark that this name has been read locked */
+		boundNameAccesses.
+		    reportObjectAccess(internalName, AccessType.READ);	    
+		result = context.getBinding(internalName);
+		boundNameAccesses.setObjectDescription(internalName, result);
+	    } catch (NameNotBoundException e) {		
+		/* NOTE: future implementations will need to account for
+		 * range-locking on bound names in the event of a probe miss.
+		 * For example, if the provided name was not bound, then we need
+		 * read lock the next bound name after this one for consistency
+		 * purposes.  Any future implementation will need to correctly
+		 * account for the service and applciation namespaces. */
+		
+		/*
+		 * Incomplete implementation left for future referece:
+		 *
+		 * Note that the following implementation does not account for
+		 * the difference between application and service namespaces
+		 *  		 
+		 * String nextBoundName = 
+		 *     nextBoundNameInternal(name, serviceBinding);
+		 * if (nextBoundName == null) {
+		 *     boundNameAccesses.
+		 *         reportObjectAccess(END_OF_NAMESPACE, 
+		 *                            AccessType.READ);
+		 *
+		 * }
+		 * else {
+		 *     // use the internal name for access reporting
+		 *     boundNameAccesses.reportObjectAccess(
+		 *         getInternalName(nextBoundName, serviceBinding), 
+		 *         AccessType.READ);
+		 * }
+		 */
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
 	    }
@@ -714,7 +827,35 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    checkManagedObject(object);
 	    context = getContext();
-	    context.setBinding(getInternalName(name, serviceBinding), object);
+            String internalName = getInternalName(name, serviceBinding);
+	    /* mark that this name has been write locked */
+	    boundNameAccesses.
+                reportObjectAccess(internalName, AccessType.WRITE, object);
+
+	    /* Future implementations will need to correctly account for
+	     * range-locking on bound names.  For example, mark that the next
+	     * name is also write locked.  By write- locking the next name, we
+	     * ensure a consistent view of the name space for any readers.
+	     * However, this will have a severe impact on the concurrency of
+	     * writers */
+	    
+	    /*
+	     * Incomplete implementation left for future reference:
+	     *
+	     * String nextBoundName = nextBoundNameInternal(name,
+             *                                              serviceBinding);
+	     * if (nextBoundName == null) {
+ 	     *     boundNameAccesses.
+	     *         reportObjectAccess(END_OF_NAMESPACE, AccessType.WRITE);
+	     *  }
+	     *  else {
+	     *	    // use the internal name for access reporting 
+	     * 	    boundNameAccesses.reportObjectAccess(
+	     *           getInternalName(nextBoundName, serviceBinding),
+	     *           AccessType.WRITE);		    
+	     *  }
+	     */
+            context.setBinding(internalName, object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -748,7 +889,35 @@ public final class DataServiceImpl implements DataService {
 	    }
 	    context = getContext();
 	    try {
-		context.removeBinding(getInternalName(name, serviceBinding));
+                String internalName = getInternalName(name, serviceBinding);
+		/* mark that this name has been write locked */
+		boundNameAccesses.
+                    reportObjectAccess(internalName, AccessType.WRITE);
+		/* Future implementations will need to correctly account for
+		 * range-locking on bound names.  For example, mark that the
+		 * next name is also write locked.  By write- locking the next
+		 * name, we ensure a consistent view of the name space for any
+		 * readers.  However, this will have a severe impact on the
+		 * concurrency of writers */
+	    
+		/*
+		 * Incomplete implementation left for future reference:
+		 *
+		 * String nextBoundName = 
+		 *     nextBoundNameInternal(name, serviceBinding);
+		 * if (nextBoundName == null) {
+		 *     boundNameAccesses.
+		 *         reportObjectAccess(END_OF_NAMESPACE, 
+		 *                            AccessType.WRITE);
+		 *  }
+		 *  else {
+		 *	// use the internal name for access reporting 
+		 * 	boundNameAccesses.reportObjectAccess(
+		 *          getInternalName(nextBoundName, serviceBinding),
+		 *          AccessType.WRITE);		    
+		 *  }
+		 */
+		context.removeBinding(internalName);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound");
@@ -776,9 +945,38 @@ public final class DataServiceImpl implements DataService {
 	Context context = null;
 	try {
 	    context = getContext();
-	    String result = getExternalName(
-		context.nextBoundName(getInternalName(name, serviceBinding)),
-		serviceBinding);
+	    String internalName = getInternalName(name, serviceBinding);
+	    if (name != null) {
+		boundNameAccesses.
+		    reportObjectAccess(internalName, AccessType.READ);	    
+	    }
+	    String nextBoundName = context.nextBoundName(internalName);
+	    if (nextBoundName != null) {
+		boundNameAccesses.
+		    reportObjectAccess(nextBoundName, AccessType.READ);
+	    }
+	    String result = getExternalName(nextBoundName, serviceBinding);
+	    /* NOTE: Future implementations will need to correctly account for
+	     * range-locking on bound names.  In order to ensure that no
+	     * additional name could be inserted after the provided name and the
+	     * end of the namespace, we will need to read-lock a phantom name
+	     * that isn't actually in the namepace.  Any concurrent writers
+	     * adding a name at the end of the namespace will have to write-lock
+	     * this name, and therefore only one will proceed after conflict
+	     * resolution.  The future implementation should also account for
+	     * the difference in application and service namespaces. */
+	    
+	    /*
+	     * Incomplete implementation left for future reference:
+	     *
+	     * Note that this implementation does not account for the difference
+	     * between application and service namespaces.
+	     *
+	     * if (nextBoundName == null) {
+	     *     boundNameAccesses.reportObjectAccess(END_OF_NAMESPACE,
+	     *      				        AccessType.READ);
+	     * }
+	     */
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "{0} tid:{1,number,#}, name:{2} returns {3}",

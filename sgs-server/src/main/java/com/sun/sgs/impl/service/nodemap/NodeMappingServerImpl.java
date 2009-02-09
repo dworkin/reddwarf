@@ -127,7 +127,7 @@ public final class NodeMappingServerImpl
     static final String SERVER_PORT_PROPERTY = PKG_NAME + ".server.port";
 
     /** The default value of the server port. */
-    // TODO:  does the exporter allow all servers to use the same port?
+    // XXX:  does the exporter allow all servers to use the same port?
     static final int DEFAULT_SERVER_PORT = 44535;
     
     /** The name we export ourselves under. */
@@ -167,7 +167,7 @@ public final class NodeMappingServerImpl
     private final NodeAssignPolicy assignPolicy;
 
     /** The thread that removes inactive identities */
-    // TODO:  should this be a TaskScheduler.scheduleRecurringTask?
+    // XXX:  should this be a TaskScheduler.scheduleRecurringTask?
     private final Thread removeThread;
     
      /** Our watchdog node listener. */
@@ -216,7 +216,8 @@ public final class NodeMappingServerImpl
         super(properties, systemRegistry, txnProxy, logger);
 
         logger.log(Level.CONFIG, 
-                   "Creating NodeMappingServerImpl properties:{0}", properties); 
+                   "Creating NodeMappingServerImpl properties:{0}", 
+                   properties); 
         
         watchdogService = txnProxy.getService(WatchdogService.class);
        
@@ -238,13 +239,15 @@ public final class NodeMappingServerImpl
         /*
          * Check service version.
          */
-        transactionScheduler.runTask(new AbstractKernelRunnable() {
+        transactionScheduler.runTask(
+	    new AbstractKernelRunnable("CheckServiceVersion") {
                 public void run() {
                     checkServiceVersion(
                         NodeMapUtil.VERSION_KEY, 
                         NodeMapUtil.MAJOR_VERSION, 
                         NodeMapUtil.MINOR_VERSION);
-                }},  taskOwner);
+                }
+        },  taskOwner);
         
         // Create and start the remove thread, which removes unused identities
         // from the map.
@@ -309,8 +312,7 @@ public final class NodeMappingServerImpl
      *
      * @return	a string representation of this instance
      */
-    @Override
-    public String toString() {
+    @Override public String toString() {
 	return fullName;
     }
 
@@ -383,6 +385,7 @@ public final class NodeMappingServerImpl
         /** return value, node assignment */
         private Node node;
         CheckTask(Identity id, String serviceName) {
+	    super(null);
             idkey = NodeMapUtil.getIdentityKey(id);
             this.serviceName = serviceName;
             this.id = id;
@@ -526,6 +529,7 @@ public final class NodeMappingServerImpl
         private Node node;
         
         RemoveTask(Identity id) {
+	    super(null);
             this.id = id;
             idkey = NodeMapUtil.getIdentityKey(id);
             statuskey = NodeMapUtil.getPartialStatusKey(id);
@@ -682,7 +686,7 @@ public final class NodeMappingServerImpl
                       long requestingNode) 
         throws NoNodesAvailableException
     {
-        assert(id != null);
+        assert (id != null);
         
         // Choose the node.  This needs to occur outside of a transaction,
         // as it could take a while.  
@@ -691,8 +695,8 @@ public final class NodeMappingServerImpl
         try {
             newNodeId = assignPolicy.chooseNode(id, requestingNode);
         } catch (NoNodesAvailableException ex) {
-            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}"
-                    + " failed because no live nodes are available", 
+            logger.logThrow(Level.FINEST, ex, "mapToNewNode: id {0} from {1}" +
+                    " failed because no live nodes are available", 
                     id, oldNode);
             throw ex;
         }
@@ -725,7 +729,7 @@ public final class NodeMappingServerImpl
         final IdentityMO newidmo = new IdentityMO(id, newNodeId);
         
         try {
-            runTransactionally(new AbstractKernelRunnable() {
+            runTransactionally(new AbstractKernelRunnable("MoveIdentity") {
                 public void run() {                   
                     // First, we clean up any old mappings.
                     if (oldNode != null) {
@@ -781,7 +785,7 @@ public final class NodeMappingServerImpl
                         }
                     }
                     
-                }});
+                } });
                 
             GetNodeTask atask = new GetNodeTask(newNodeId);
             runTransactionally(atask);
@@ -809,6 +813,7 @@ public final class NodeMappingServerImpl
         private final long nodeId;
                             
         GetNodeTask(long nodeId) {
+	    super(null);
             this.nodeId = nodeId; 
         }               
                     
@@ -836,13 +841,13 @@ public final class NodeMappingServerImpl
         }
         
         /** {@inheritDoc} */
-        public void nodeStarted(Node node){
+        public void nodeStarted(Node node) {
             // Do nothing.  We find out about nodes being available when
             // our client services register with us.     
         }
         
         /** {@inheritDoc} */
-        public void nodeFailed(Node node){
+        public void nodeFailed(Node node) {
             long nodeId = node.getId();          
             try {
                 // Remove the service node listener for the node and tell
@@ -918,6 +923,7 @@ public final class NodeMappingServerImpl
         GetIdOnNodeTask(DataService dataService, 
                         String nodekey, LoggerWrapper logger) 
         {
+	    super(null);
             this.dataService = dataService;
             this.nodekey = nodekey;
             this.logger = logger;
@@ -931,12 +937,14 @@ public final class NodeMappingServerImpl
                     idmo = (IdentityMO) dataService.getServiceBinding(key);
                 }
             } catch (Exception e) {
-                // TODO: this kind of check may need to be applied to more
+                // XXX: this kind of check may need to be applied to more
                 // of the exceptions in the class, so all exception handling
                 // should be reviewed
                 if ((e instanceof ExceptionRetryStatus) &&
-                    (((ExceptionRetryStatus)e).shouldRetry()))
+                    (((ExceptionRetryStatus) e).shouldRetry())) 
+                {
                     return;
+                }
                 done = true;
                 logger.logThrow(Level.WARNING, e, 
                         "Failed to get key or binding for {0}", nodekey);
@@ -971,7 +979,7 @@ public final class NodeMappingServerImpl
      * Add a node.  This is useful for server testing, when we
      * haven't instantiated a service.
      * <p>
-     * TODO:  remove this, using a NodeAssignPolicy instead?
+     * XXX:  remove this, using a NodeAssignPolicy instead?
      *
      * @param nodeId the node id of the fake node
      */
@@ -1014,6 +1022,7 @@ public final class NodeMappingServerImpl
          * @param idkey Identitifier key
          */
         GetIdTask(DataService dataService, String idkey) {
+	    super(null);
             this.dataService = dataService;
             this.idkey = idkey;
         }
@@ -1071,6 +1080,7 @@ public final class NodeMappingServerImpl
         private Set<String> foundKeys = new HashSet<String>();
 
         AssertTask(Identity id, DataService dataService) {
+	    super(null);
             this.id = id;
             this.dataService = dataService;
             idkey = NodeMapUtil.getIdentityKey(id);

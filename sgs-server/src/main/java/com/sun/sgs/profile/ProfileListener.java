@@ -21,6 +21,7 @@ package com.sun.sgs.profile;
 
 import java.beans.PropertyChangeEvent;
 
+
 /**
  * This interface is used to listen for profiling data as reported by
  * the system. Unlike the individual operations provided to
@@ -33,7 +34,8 @@ import java.beans.PropertyChangeEvent;
  * <p>
  *
  * In order to create listeners with all of the facilities that they need,
- * all implementations of <code>ProfileListener</code> must
+ * all implementations of <code>ProfileListener</code> specified with
+ * the {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property must
  * implement a constructor of the form (<code>java.util.Properties</code>,
  * <code>com.sun.sgs.kernel.TaskOwner</code>,
  * <code>com.sun.sgs.kernel.ComponentRegistry</code>).
@@ -49,6 +51,14 @@ import java.beans.PropertyChangeEvent;
  */
 public interface ProfileListener {
 
+    /**
+     * The property for defining the number task to summarize for
+     * windowed {@code com.sun.sgs.profile.ProfileListener}
+     * implementations.  The value assigned to the property must be an
+     * integer.
+     */
+    String WINDOW_SIZE_PROPERTY = "com.sun.sgs.profile.listener.window.size";
+    
     /**
      * Notifies this listener of a new change in the system
      * properties.  This method is called for any property that
@@ -85,7 +95,7 @@ public interface ProfileListener {
      *        describing the name of the property, its old and new
      *        values and the source of the change.
      */
-    public void propertyChange(PropertyChangeEvent event);
+    void propertyChange(PropertyChangeEvent event);
 
     /**
      * Reports a completed task that has been run through the scheduler. The
@@ -98,11 +108,11 @@ public interface ProfileListener {
      *
      * @param profileReport the <code>ProfileReport</code> for the task
      */
-    public void report(ProfileReport profileReport);
+    void report(ProfileReport profileReport);
 
     /**
      * Tells this listener that the system is shutting down.
      */
-    public void shutdown();
+    void shutdown();
 
 }

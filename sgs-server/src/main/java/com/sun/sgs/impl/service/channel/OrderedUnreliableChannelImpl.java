@@ -30,7 +30,7 @@ import com.sun.sgs.app.Delivery;
 class OrderedUnreliableChannelImpl extends ChannelImpl {
     
     /** The serialVersionUID for this class. */
-    private final static long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
     /**
      * Constructs an instance with the specified {@code delivery}

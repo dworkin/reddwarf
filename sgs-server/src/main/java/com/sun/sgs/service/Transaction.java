@@ -49,7 +49,7 @@ public interface Transaction {
      *
      * @return the transaction's identifier
      */
-    public byte [] getId();
+    byte[] getId();
 
     /**
      * Returns the time at which this <code>Transaction</code> was created.
@@ -60,7 +60,7 @@ public interface Transaction {
      *
      * @return the creation time-stamp
      */
-    public long getCreationTime();
+    long getCreationTime();
 
     /**
      * Returns the length of time in milliseconds that this
@@ -68,7 +68,7 @@ public interface Transaction {
      *
      * @return the timeout length
      */
-    public long getTimeout();
+    long getTimeout();
 
     /**
      * Checks if this <code>Transaction</code> has timed out, throwing a
@@ -77,7 +77,7 @@ public interface Transaction {
      * @throws TransactionNotActiveException if the transaction is not active
      * @throws TransactionTimeoutException if the transaction has timed out
      */
-    public void checkTimeout();
+    void checkTimeout();
 
     /**
      * Tells the <code>Transaction</code> that the given
@@ -112,7 +112,7 @@ public interface Transaction {
      *         implementation cannot support an additional durable transaction
      *         participant
      */
-    public void join(TransactionParticipant participant);
+    void join(TransactionParticipant participant);
 
     /**
      * Aborts the transaction, specifying the cause. This notifies all
@@ -143,7 +143,7 @@ public interface Transaction {
      *                               prepared and {@link #abort abort} has not
      *                               been called
      */
-    public void abort(Throwable cause);
+    void abort(Throwable cause);
 
     /**
      * Returns information about whether {@link #abort abort} has been called
@@ -153,7 +153,7 @@ public interface Transaction {
      *         transaction, else {@code false}
      *
      */
-    public boolean isAborted();
+    boolean isAborted();
 
     /**
      * Returns the cause supplied in the first call to {@link #abort abort} on
@@ -161,5 +161,36 @@ public interface Transaction {
      *
      * @return the exception that caused the abort or {@code null}
      */
-    public Throwable getAbortCause();
+    Throwable getAbortCause();
+
+    /**
+     * Registers a listener that will be notified just before this transaction
+     * is prepared, and after it commits or aborts. <p>
+     *
+     * The {@code listener}'s {@link TransactionListener#beforeCompletion
+     * beforeCompletion} method will be called after the main work of the
+     * transaction is complete, just before the transaction is prepared.  The
+     * transaction will still be considered active at the time of the call,
+     * although calls should not be made to independent {@link Service}s.  If
+     * the call to {@code beforeCompletion} throws an exception, then this
+     * transaction will be aborted, and the exception will be treated as if it
+     * were thrown by the main body of the transaction.  The {@code listener}'s
+     * {@code beforeCompletion} method will not be called if this transaction
+     * is aborted before it reaches the preparation stage, including if an
+     * earlier call to {@code beforeCompletion} on another listener throws an
+     * exception or aborts this transaction. <p>
+     *
+     * The {@code listener}'s {@link TransactionListener#afterCompletion
+     * afterCompletion} method will be called after this transaction is
+     * committed or aborted. <p>
+     *
+     * Any number of listeners can be registered for this transaction by making
+     * multiple calls to this method.  If multiple listeners are registered,
+     * the order in which the listeners are called is unspecified.
+     *
+     * @param	listener the listener
+     * @throws	TransactionNotActiveException if this transaction is not
+     *		active
+     */
+    void registerListener(TransactionListener listener);
 }

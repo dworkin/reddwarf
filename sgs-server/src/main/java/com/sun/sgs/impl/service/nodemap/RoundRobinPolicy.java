@@ -172,8 +172,8 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                             
                             nextNode.getAndDecrement();
                             
-                            logger.log(Level.FINEST, "Move Identity attempt: "
-                                    + "chose {0} for id {1} on old node {2}",
+                            logger.log(Level.FINEST, "Move Identity attempt: " +
+                                    "chose {0} for id {1} on old node {2}",
                                     newnode, idToMove, node);
                             done = newnode != nodeId;
                         } catch (NoNodesAvailableException e) {
@@ -184,8 +184,8 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                     
                 } catch (Exception ex) {
                     logger.logThrow(Level.WARNING, ex, 
-                            "Unexpected exception while attempting to choose "
-                          + "an identity to move from node id {0}" + nodeId);
+                          "Unexpected exception while attempting to choose " +
+                          "an identity to move from node id {0}" + nodeId);
                 }
             } 
         }
@@ -212,6 +212,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 WatchdogService watchdogService, long nodeId,
                 LoggerWrapper logger) 
         {
+	    super(null);
             this.dataService = dataService;
             this.watchdogService = watchdogService;
             this.nodeId = nodeId;

@@ -23,8 +23,6 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
-
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -34,12 +32,11 @@ import com.sun.sgs.service.TransactionProxy;
 
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicInteger;
-
-import junit.framework.JUnit4TestAdapter;
 
 import org.junit.After;
 import org.junit.Before;
@@ -94,7 +91,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test (expected=NullPointerException.class)
         public void runTaskNullOwner() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {}
             }, null);
     }
@@ -126,7 +123,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void runTaskTransactional() throws Exception {
         final TransactionProxy proxy = serverNode.getProxy();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     proxy.getCurrentTransaction();
                     proxy.getCurrentOwner();
@@ -136,10 +133,10 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void runTransactionInTransaction() throws Exception {
         final TransactionProxy proxy = serverNode.getProxy();
-        KernelRunnable task = new AbstractKernelRunnable() {
+        KernelRunnable task = new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     final Transaction t = proxy.getCurrentTransaction();
-                    txnScheduler.runTask(new AbstractKernelRunnable() {
+                    txnScheduler.runTask(new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
                                 Transaction t2 = proxy.getCurrentTransaction();
                                 assertTrue(t.equals(t2));
@@ -152,7 +149,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void runTransactionFromScheduledTask() throws Exception {
         final RunCountTestRunner countRunner = new RunCountTestRunner(1);
-        KernelRunnable task = new AbstractKernelRunnable() {
+        KernelRunnable task = new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     txnScheduler.runTask(countRunner, taskOwner);
                 }
@@ -170,7 +167,7 @@ public class TestTransactionSchedulerImpl {
         throws Exception
     {
         final AtomicInteger i = new AtomicInteger(0);
-        final KernelRunnable r = new AbstractKernelRunnable() {
+        final KernelRunnable r = new TestAbstractKernelRunnable() {
                 public int runCount = 0;
                 public void run() throws Exception {
                     if (i.getAndIncrement() == 0)
@@ -184,7 +181,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test public void runTransactionInterrupted() throws Exception {
         final AtomicInteger i = new AtomicInteger(0);
-        final KernelRunnable r = new AbstractKernelRunnable() {
+        final KernelRunnable r = new TestAbstractKernelRunnable() {
                 public int runCount = 0;
                 public void run() throws Exception {
                     if (i.getAndIncrement() == 0)
@@ -210,7 +207,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test (expected=RuntimeException.class)
         public void runNonRetriedTask() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     throw new RuntimeException("intentionally thrown");
                 }
@@ -220,7 +217,7 @@ public class TestTransactionSchedulerImpl {
     @Test (expected=RuntimeException.class)
         public void runNonRetriedTaskExplicitAbort() throws Exception {
         final TransactionProxy proxy = serverNode.getProxy();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     RuntimeException re = new RuntimeException("intentional");
                     proxy.getCurrentTransaction().abort(re);
@@ -231,7 +228,7 @@ public class TestTransactionSchedulerImpl {
 
     @Test (expected=Error.class)
         public void testRunTransactionThrowsError() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     throw new Error("intentionally thrown");
                 }
@@ -330,13 +327,4 @@ public class TestTransactionSchedulerImpl {
             isRunning = false;
         }
     }
-
-    /**
-     * Adapter to let JUnit4 tests run in a JUnit3 execution environment.
-     */
-
-    public static junit.framework.Test suite() {
-        return new JUnit4TestAdapter(TestTransactionSchedulerImpl.class);
-    }
-
 }

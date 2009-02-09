@@ -21,28 +21,15 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
+import com.sun.sgs.test.util.ParameterizedNameRunner;
 import java.util.Properties;
-import junit.framework.TestSuite;
+import org.junit.Ignore;
+import org.junit.runner.RunWith;
 
 /** Test the DataStoreService using a networked data store. */
+@SuppressWarnings("hiding")
+@RunWith(ParameterizedNameRunner.class)
 public class TestDataServiceClient extends TestDataServiceImpl {
-
-    /** If this property is set, then only run the single named test method. */
-    private static final String testMethod = System.getProperty("test.method");
-
-    /**
-     * Specify the test suite to include all tests, or just a single method if
-     * specified.
-     */
-    public static TestSuite suite() {
-	if (testMethod == null) {
-	    return new TestSuite(TestDataServiceImpl.class);
-	}
-	TestSuite suite = new TestSuite();
-	suite.addTest(new TestDataServiceClient(testMethod));
-	return suite;
-    }
-
     /**
      * The name of the host running the DataStoreServer, or null to create one
      * locally.
@@ -63,8 +50,8 @@ public class TestDataServiceClient extends TestDataServiceImpl {
 	"com.sun.sgs.impl.service.data.store.net";
 
     /** Creates an instance. */
-    public TestDataServiceClient(String name) {
-	super(name);
+    public TestDataServiceClient(boolean durableParticipant) {
+	super(durableParticipant);
     }
 
     /** Adds client and server properties. */
@@ -91,11 +78,13 @@ public class TestDataServiceClient extends TestDataServiceImpl {
     /* -- Skip these tests -- they don't apply in the network case -- */
 
     @Override
+    @Ignore
     public void testConstructorNoDirectory() {
 	System.err.println("Skipping");
     }
 
     @Override
+    @Ignore
     public void testConstructorNoDirectoryNorRoot() {
 	System.err.println("Skipping");
     }

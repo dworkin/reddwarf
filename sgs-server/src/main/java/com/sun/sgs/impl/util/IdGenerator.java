@@ -115,7 +115,7 @@ public class IdGenerator {
     public byte[] nextBytes() throws Exception {
 	long id = next();
 	byte[] idBytes = new byte[8];
-	for (int i = idBytes.length-1; i >=0; i--) {
+	for (int i = idBytes.length - 1; i >= 0; i--) {
 	    idBytes[i] = (byte) id;
 	    id >>>= 8;
 	}
@@ -131,6 +131,11 @@ public class IdGenerator {
 
 	volatile long firstId;
 	volatile long lastId;
+
+	/** Constructs an instance. */
+	ReserveIdBlockTask() {
+	    super(null);
+	}
 
 	/** {@inheritDoc} */
 	public void run() {

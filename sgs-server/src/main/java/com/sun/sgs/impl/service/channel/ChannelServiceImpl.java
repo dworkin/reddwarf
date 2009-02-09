@@ -28,6 +28,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -36,13 +37,13 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
-import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -70,6 +71,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * ChannelService implementation. <p>
@@ -81,7 +83,7 @@ import java.util.logging.Logger;
  * href="../../../app/doc-files/config-properties.html#ChannelService">
  * properties</a>. <p>
  *
- * <p>TODO: add summary comment about how the implementation works.
+ * <p>TBD: add summary comment about how the implementation works.
  */
 public final class ChannelServiceImpl
     extends AbstractService implements ChannelManager
@@ -112,8 +114,8 @@ public final class ChannelServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
-    /** The property name for the maximum number of events to process in a single
-     * transaction.
+    /** The property name for the maximum number of events to process in a
+     * single transaction.
      */
     private static final String EVENTS_PER_TXN_PROPERTY =
 	PKG_NAME + ".events.per.txn";
@@ -200,6 +202,9 @@ public final class ChannelServiceImpl
     /** The maximum number of channel events to sevice per transaction. */
     final int eventsPerTxn;
 
+    /** Our JMX exposed statistics. */
+    final ChannelServiceStats serviceStats;
+    
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -268,22 +273,24 @@ public final class ChannelServiceImpl
 	    /*
 	     * Check service version.
 	     */
-	    transactionScheduler.runTask(new AbstractKernelRunnable() {
+	    transactionScheduler.runTask(
+		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
 			checkServiceVersion(
 			    VERSION_KEY, MAJOR_VERSION, MINOR_VERSION);
-		    }},  taskOwner);
+		    } },  taskOwner);
 	    
 	    /*
 	     * Store the ChannelServer proxy in the data store.
 	     */
 	    transactionScheduler.runTask(
-		new AbstractKernelRunnable() {
+		new AbstractKernelRunnable("StoreChannelServerProxy") {
 		    public void run() {
 			dataService.setServiceBinding(
 			    getChannelServerKey(localNodeId),
-			    new ManagedSerializable<ChannelServer>(serverProxy));
-		    }},
+			    new ManagedSerializable<ChannelServer>(
+				serverProxy));
+		    } },
 		taskOwner);
 
 	    /*
@@ -298,6 +305,17 @@ public final class ChannelServiceImpl
             sessionService.registerSessionDisconnectListener(
                 new ChannelSessionDisconnectListener());
 
+            /* create our service profiling info and register our MBean */
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new ChannelServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats, 
+                                        ChannelServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -344,6 +362,7 @@ public final class ChannelServiceImpl
 				 ChannelListener listener,
 				 Delivery delivery)
     {
+        serviceStats.createChannelOp.report();
 	try {
 	    Channel channel = ChannelImpl.newInstance(
 		name, listener, delivery, writeBufferSize);
@@ -357,6 +376,7 @@ public final class ChannelServiceImpl
 
     /** {@inheritDoc} */
     public Channel getChannel(String name) {
+        serviceStats.getChannelOp.report();
 	try {
 	    return ChannelImpl.getInstance(name);
 	    
@@ -418,10 +438,11 @@ public final class ChannelServiceImpl
 			taskQueue = newTaskQueue;
 		    }
 		}
-		taskQueue.addTask(new AbstractKernelRunnable() {
+		taskQueue.addTask(
+		  new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
 			ChannelImpl.serviceEventQueue(channelId);
-		    }}, taskOwner);
+		    } }, taskOwner);
 					  
 	    } finally {
 		callFinished();
@@ -456,8 +477,8 @@ public final class ChannelServiceImpl
 			"obtaining members of channel:{0} throws",
 			HexDumper.toHexString(channelId));
 		}
-		Set<BigInteger> newLocalMembers =
-		    Collections.synchronizedSet(getMembersTask.getLocalMembers());
+		Set<BigInteger> newLocalMembers = Collections.synchronizedSet(
+		    getMembersTask.getLocalMembers());
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "newLocalMembers for channel:{0}",
 			       HexDumper.toHexString(channelId));
@@ -489,7 +510,7 @@ public final class ChannelServiceImpl
 			    joiners.add(sessionRefId);
 			}
 		    }
-		    if (! oldLocalMembers.isEmpty()) {
+		    if (!oldLocalMembers.isEmpty()) {
 			leavers = oldLocalMembers;
 		    }
 		}
@@ -630,7 +651,8 @@ public final class ChannelServiceImpl
 		    put(channelId).
 		    flip();
 		    sessionService.sendProtocolMessageNonTransactional(
-		        sessionRefId, msg.asReadOnlyBuffer(), Delivery.RELIABLE);
+		        sessionRefId, msg.asReadOnlyBuffer(),
+			Delivery.RELIABLE);
 	    } finally {
 		callFinished();
 	    }
@@ -746,6 +768,7 @@ public final class ChannelServiceImpl
 	 * Constructs an instance with the given {@code nodeId}.
 	 */
 	GetLocalMembersTask(BigInteger channelRefId) {
+	    super(null);
 	    this.channelRefId = channelRefId;
 	}
 
@@ -833,10 +856,10 @@ public final class ChannelServiceImpl
     {
 	addChannelTask(
 	    channelId,
-	    new AbstractKernelRunnable() {
+	    new AbstractKernelRunnable("RunIoTask") {
 		public void run() {
 		    runIoTask(ioTask, nodeId);
-		}});
+		} });
     }
 
     /**
@@ -896,7 +919,7 @@ public final class ChannelServiceImpl
         public boolean prepare() {
 	    isPrepared = true;
 	    boolean readOnly = internalTaskLists.isEmpty();
-	    if (! readOnly) {
+	    if (!readOnly) {
 		synchronized (contextList) {
 		    contextList.add(this);
 		}
@@ -998,7 +1021,7 @@ public final class ChannelServiceImpl
 		final byte[] sessionIdBytes = sessionRefId.toByteArray();
 		for (final BigInteger channelRefId : channelSet) {
 		    transactionScheduler.scheduleTask(
-			new AbstractKernelRunnable() {
+			new AbstractKernelRunnable("RemoveSessionFromChannel") {
 			    public void run() {
 				ChannelImpl.removeSessionFromChannel(
 				    localNodeId, sessionIdBytes, channelRefId);
@@ -1110,7 +1133,7 @@ public final class ChannelServiceImpl
 		 * Schedule persistent tasks to perform recovery.
 		 */
 		transactionScheduler.runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("ScheduleRecoveryTasks") {
 			public void run() {
 			    /*
 			     * Reassign each failed coordinator to a new node.
@@ -1124,6 +1147,14 @@ public final class ChannelServiceImpl
 			     */
 			    taskService.scheduleTask(
 				new RemoveChannelServerProxyTask(nodeId));
+
+			    /*
+			     * Remove any obsolete channel sets left over
+			     * from previous ChannelServiceImpl version.
+			     */
+			    taskService.scheduleTask(
+				new ChannelImpl.
+				    RemoveObsoleteChannelSetsTask(nodeId));
 			}
 		    },
 		    taskOwner);
@@ -1173,15 +1204,16 @@ public final class ChannelServiceImpl
 		 * locally coordinated channels.
 		 */
 		transactionScheduler.runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable(
+			"ScheduleRemoveFailedSessionsFromLocalChannelsTask")
+		    {
 			public void run() {
 			    taskService.scheduleTask(
 				new ChannelImpl.
 				    RemoveFailedSessionsFromLocalChannelsTask(
 					localNodeId, nodeId));
 			}
-		    },
-		    taskOwner);
+		    }, taskOwner);
 		
 	    } catch (Exception e) {
 		logger.logThrow(
@@ -1241,6 +1273,7 @@ public final class ChannelServiceImpl
 
 	/** Constructs an instance with the specified {@code nodeId}. */
 	GetChannelServerTask(long nodeId) {
+	    super(null);
 	    this.nodeId = nodeId;
 	}
 

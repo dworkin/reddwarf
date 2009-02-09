@@ -19,8 +19,9 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.impl.kernel.ConfigManager;
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
@@ -57,9 +58,9 @@ public final class TransactionCoordinatorImpl
 {
     /** The next transaction ID. */
     private AtomicLong nextTid = new AtomicLong(1);
-
-    /** The optional collector for reporting participant details. */
-    private final ProfileCollector collector;
+    
+    /** The collectorHandle for reporting participant details. */
+    private final ProfileCollectorHandle collectorHandle;
 
     /** The value for bounded timeout. */
     private final long boundedTimeout;
@@ -73,6 +74,9 @@ public final class TransactionCoordinatorImpl
     /** The default for unbounded timeout. */
     public static final long UNBOUNDED_TIMEOUT_DEFAULT = Long.MAX_VALUE;
 
+    /** Should we use prepareAndCommit() or separate calls? */
+    private final boolean disablePrepareAndCommitOpt;
+    
     /** An implementation of TransactionHandle. */
     private static final class TransactionHandleImpl
 	implements TransactionHandle
@@ -81,12 +85,16 @@ public final class TransactionCoordinatorImpl
 	private final TransactionImpl txn;
 
 	/**
-	 * Creates a transaction with the specified ID, timeout, and
-	 * collector.
+	 * Creates a transaction with the specified ID, timeout, 
+         * prepareAndCommit optimization boolean, and collectorHandle.
 	 */
 	TransactionHandleImpl(long tid, long timeout,
-			      ProfileCollector collector) {
-	    txn = new TransactionImpl(tid, timeout, collector);
+                              boolean disablePrepareAndCommitOpt,
+			      ProfileCollectorHandle collectorHandle) 
+        {
+	    txn = new TransactionImpl(tid, timeout, 
+                                      disablePrepareAndCommitOpt, 
+                                      collectorHandle);
 	}
 
 	public String toString() {
@@ -109,20 +117,21 @@ public final class TransactionCoordinatorImpl
      * properties.
      *
      * @param	properties the properties for configuring this service
-     * @param	collector the <code>ProfileCollector</code> used to report
-     *       	participant detail
+     * @param	collectorHandle the {@code ProfileCollectorHandle} used 
+     *          to report participant detail
      * @throws	IllegalArgumentException if the bounded or
      *		unbounded timeout properties are less than {@code 1}
      */
     public TransactionCoordinatorImpl(Properties properties,
-				      ProfileCollector collector) {
+                                      ProfileCollectorHandle collectorHandle) 
+    {
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
 	}
-        if (collector == null) {
-	    throw new NullPointerException("Collector must not be null");
+        if (collectorHandle == null) {
+	    throw new NullPointerException("Collector handle must not be null");
 	}
-	this.collector = collector;
+        this.collectorHandle = collectorHandle;
 
 	PropertiesWrapper props = new PropertiesWrapper(properties);
 	this.boundedTimeout =
@@ -133,16 +142,30 @@ public final class TransactionCoordinatorImpl
 				  TXN_UNBOUNDED_TIMEOUT_PROPERTY,
 				  UNBOUNDED_TIMEOUT_DEFAULT, 1,
 				  Long.MAX_VALUE);
+        this.disablePrepareAndCommitOpt =
+            props.getBooleanProperty(
+                TransactionCoordinator.
+                    TXN_DISABLE_PREPAREANDCOMMIT_OPT_PROPERTY,
+                false);
+        
+        // Set our portion of the ConfigManager MXBean
+        ConfigManager config = (ConfigManager) collectorHandle.getCollector().
+                getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+        config.setStandardTxnTimeout(boundedTimeout);
     }
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction(boolean unbounded) {
 	if (unbounded) {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
-					     unboundedTimeout, collector);
+					     unboundedTimeout, 
+                                             disablePrepareAndCommitOpt,
+                                             collectorHandle);
 	} else {
 	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
-					     boundedTimeout, collector);
+					     boundedTimeout, 
+                                             disablePrepareAndCommitOpt,
+                                             collectorHandle);
 	}
     }
 }

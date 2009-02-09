@@ -22,21 +22,21 @@ package com.sun.sgs.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
+import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -138,8 +138,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     private static final int TXN_ALLOCATION_BLOCK_SIZE = 100;
 
     /**
-     * The name of the undocumented property that controls whether to replace
-     * Java(TM) RMI with an experimental, socket-based facility.
+     * Whether to replace Java(TM) RMI with an experimental, socket-based
+     * facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	PACKAGE + ".no.rmi");
@@ -336,8 +336,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void abort(Throwable cause) {
-	    if (cause == null)
+	    if (cause == null) {
 	        throw new NullPointerException("Cause cannot be null");
+	    }
 	    if (!aborting) {
 		aborting = true;
 		abortCause = cause;
@@ -351,6 +352,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	public Throwable getAbortCause() {
 	    return abortCause;
+	}
+
+	/**
+	 * Don't bother to support transaction listeners for just the data
+	 * store, which doesn't use them.
+	 */
+	public void registerListener(TransactionListener listener) {
+	    throw new UnsupportedOperationException(
+		"DataStoreServerImpl doesn't support transaction listeners");
 	}
 
 	/* -- Other methods -- */
@@ -387,8 +397,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	final SortedMap<Long, Txn> table =
-	    Collections.synchronizedSortedMap(new TreeMap<Long, Txn>());
+	final NavigableMap<Long, Txn> table =
+	    new ConcurrentSkipListMap<Long, Txn>();
 
 	/** Creates an instance. */
 	TxnTable() { }
@@ -446,22 +456,14 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    /* Loop while there is another potentially expired entry */
 	    while (nextId != null) {
 		Txn txn = table.get(nextId);
-		if (txn != null
-		    && txn.getCreationTime() + txn.getTimeout() < now 
-		    && txn.setReaping())
+		if (txn != null &&
+		    txn.getCreationTime() + txn.getTimeout() < now &&
+		    txn.setReaping())
 		{
 		    result.add(txn);
 		}
 		/* Search for the next entry */
-		Long startingId = Long.valueOf(nextId + 1);
-		nextId = null;
-		synchronized (table) {
-		    Iterator<Long> iter =
-			table.tailMap(startingId).keySet().iterator();
-		    if (iter.hasNext()) {
-			nextId = iter.next();
-		    }
-		}
+		nextId = table.higherKey(nextId);
 	    }
 	    return result;
 	}
@@ -634,10 +636,10 @@ public class DataStoreServerImpl implements DataStoreServer {
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if the value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
-     *		property is less than {@code 0} or greater than {@code 65535},
-     *		or if thrown by the {@link
-     *		DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
+     *	      com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
+     *	      property is less than {@code 0} or greater than {@code 65535},
+     *	      or if thrown by the {@link
+     *	      DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
      * @throws	IOException if a network problem occurs
      */
     public DataStoreServerImpl(Properties properties) throws IOException {

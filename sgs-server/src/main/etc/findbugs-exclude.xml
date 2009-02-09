@@ -14,42 +14,6 @@
 
 <FindBugsFilter>
 
-  <!-- Package com.sun.sgs.app.util -->
-
-  <!-- Testing methods to call via reflection. -->
-  <Match>
-    <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
-    <Or>
-      <Method name="getAvgTreeDepth"/>
-      <Method name="getMaxTreeDepth"/>
-      <Method name="getMinTreeDepth"/>
-    </Or>
-    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
-  </Match>
-
-  <!-- OK if version fields are not currently being read, they should
-       still be instance fields. -->
-  <Match>
-    <Or>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
-      <Class name="com.sun.sgs.app.util.ScalableHashSet"/>
-    </Or>
-    <Field name="minorVersion"/>
-    <Bug pattern="SS_SHOULD_BE_STATIC"/>
-  </Match>
-
-  <!-- The root fields of these classes are initialized the the default
-       value (null) and set lazily. -->
-  <Match>
-    <Or>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap$EntrySet"/>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap$KeySet"/>
-      <Class name="com.sun.sgs.app.util.ScalableHashMap$Values"/>
-    </Or>
-    <Field name="root"/>
-    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
-  </Match>
-
   <!-- Package com.sun.sgs.impl.kernel -->
 
   <!-- Currently unused fields. -->
@@ -77,6 +41,18 @@
   <Match>
     <Class name="com.sun.sgs.impl.kernel.TransactionSchedulerImpl$TaskQueueImpl"/>
     <Method name="addTask"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
+  </Match>
+
+  <!-- Return value is intentionally being thrown out. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.AccessCoordinatorImpl"/>
+    <Method name="reportDetail"/>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
+  </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.AccessCoordinatorImpl"/>
+    <Method name="reportDetail"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
   </Match>
 
@@ -155,6 +131,7 @@
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$2"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$EventQueue$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
@@ -284,6 +261,13 @@
   <Match>
     <Class name="com.sun.sgs.impl.service.session.ClientSessionServiceImpl$FlushContextsThread"/>
     <Bug pattern="DM_USELESS_THREAD"/>
+  </Match>
+
+  <!-- OK to ignore exception in ClientSessionWrapper.toString method. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
+    <Method name="toString"/>
+    <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
 
   <!-- Package com.sun.sgs.impl.service.watchdog -->

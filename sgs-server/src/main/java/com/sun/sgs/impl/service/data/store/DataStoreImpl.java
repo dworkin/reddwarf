@@ -349,7 +349,7 @@ public class DataStoreImpl
 	 */
 	void prepare(byte[] gid) {
 	    prepareFreeObjectIds();
-	    maybeCloseCursors();
+	    maybeCloseCursors(false);
 	    dbTxn.prepare(gid);
 	}
 
@@ -359,7 +359,7 @@ public class DataStoreImpl
 	 */
 	void prepareAndCommit() {
 	    prepareFreeObjectIds();
-	    maybeCloseCursors();
+	    maybeCloseCursors(false);
 	    dbTxn.commit();
 	}
 
@@ -414,7 +414,7 @@ public class DataStoreImpl
 	    freeObjectIds.abort(objectIdInfo, emptyObjectIdInfo);
 	    objectIdInfo = null;
 	    emptyObjectIdInfo = null;
-	    maybeCloseCursors();
+	    maybeCloseCursors(true);
 	    dbTxn.abort();
 	}
 
@@ -490,18 +490,40 @@ public class DataStoreImpl
 	/**
 	 * Close the cursors if they are open.  Always null the cursor fields,
 	 * since the Berkeley DB API doesn't permit closing a cursor after an
-	 * attempt to close it.
+	 * attempt to close it.  If forAbort is true, then we are aborting the
+	 * transaction.  In that case, ignore abort exceptions when closing the
+	 * cursors, to make sure we complete the operations needed on abort.
 	 */
-	private void maybeCloseCursors() {
+	private void maybeCloseCursors(boolean forAbort) {
 	    if (namesCursor != null) {
-		DbCursor c = namesCursor;
-		namesCursor = null;
-		c.close();
+		try {
+		    namesCursor.close();
+		} catch (TransactionAbortedException e) {
+		    if (forAbort) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "Exception closing names cursor during abort");
+		    } else {
+			throw e;
+		    }
+		} finally {
+		    namesCursor = null;
+		}
 	    }
 	    if (oidsCursor != null) {
-		DbCursor c = oidsCursor;
-		oidsCursor = null;
-		c.close();
+		try {
+		    oidsCursor.close();
+		} catch (TransactionAbortedException e) {
+		    if (forAbort) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "Exception closing OIDs cursor during abort");
+		    } else {
+			throw e;
+		    }
+		} finally {
+		    oidsCursor = null;
+		}
 	    }
 	}
 
@@ -782,6 +804,16 @@ public class DataStoreImpl
 	DbTransaction dbTxn = null;
 	boolean done = false;
 	try {
+	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
+            if (!directoryFile.exists()) {
+                logger.log(Level.INFO, "Creating database directory : " +
+                           directoryFile.getAbsolutePath());
+                if (!directoryFile.mkdirs()) {
+                    throw new DataStoreException("Unable to create database " +
+                                                 "directory : " +
+                                                 directoryFile.getName());
+                }
+	    }
 	    env = DbEnvironmentFactory.getEnvironment(
 		directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
@@ -975,13 +1007,10 @@ public class DataStoreImpl
 	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	/*
-	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
-	 * without reading or writing, so get the object and ask for a write
-	 * lock.  -tjb@sun.com (10/06/2006)
-	 */
 	try {
-	    getObjectInternal(txn, oid, true);
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    oidsDb.markForUpdate(txnInfo.dbTxn, DataEncoding.encodeLong(oid));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
@@ -1002,8 +1031,14 @@ public class DataStoreImpl
 		       txn, oid, forUpdate);
 	}
 	try {
-	    byte[] result =
-		decodeValue(getObjectInternal(txn, oid, forUpdate));
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    byte[] result = oidsDb.get(
+		txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
+	    if (result == null || isPlaceholderValue(result)) {
+		throw new ObjectNotFoundException("Object not found: " + oid);
+	    }
+	    byte[] decodedResult = decodeValue(result);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -1011,26 +1046,12 @@ public class DataStoreImpl
 		    "returns",
 		    txn, oid, forUpdate);
 	    }
-	    return result;
+	    return decodedResult;
 	} catch (RuntimeException e) {
 	    throw convertException(txn, Level.FINEST, e,
 				   "getObject txn:" + txn + ", oid:" + oid +
 				   ", forUpdate:" + forUpdate);
 	}
-    }
-
-    /** Implement getObject, without logging. */
-    private byte[] getObjectInternal(
-	Transaction txn, long oid, boolean forUpdate)
-    {
-	checkId(oid);
-	TxnInfo txnInfo = checkTxn(txn);
-	byte[] result = oidsDb.get(
-	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
-	if (result == null || isPlaceholderValue(result)) {
-	    throw new ObjectNotFoundException("Object not found: " + oid);
-	}
-	return result;
     }
 
     /** {@inheritDoc} */
@@ -1109,12 +1130,10 @@ public class DataStoreImpl
 	    checkId(oid);
 	    TxnInfo txnInfo = checkTxn(txn);
 	    byte[] key = DataEncoding.encodeLong(oid);
-	    byte[] value = oidsDb.get(txnInfo.dbTxn, key, true);
-	    if (value == null || isPlaceholderValue(value)) {
+	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
+	    if (!found) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    }
-	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
-	    assert found : "Object not found during delete";
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,

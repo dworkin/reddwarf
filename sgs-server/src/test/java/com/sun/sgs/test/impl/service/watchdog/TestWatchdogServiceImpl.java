@@ -24,7 +24,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -36,6 +35,7 @@ import com.sun.sgs.service.RecoveryListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -347,7 +347,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)
 			dataService.getServiceBinding(VERSION_KEY);
@@ -362,7 +362,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
     
     public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
 		    dataService.setServiceBinding(VERSION_KEY, version);
@@ -377,7 +377,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
@@ -393,7 +393,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
@@ -453,7 +453,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     /* -- Test isLocalNodeAlive -- */
 
     public void testIsLocalNodeAlive() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 if (! watchdogService.isLocalNodeAlive()) {
                     fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -473,7 +473,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	final WatchdogServiceImpl watchdog =
 	    new WatchdogServiceImpl(props, systemRegistry, txnProxy);
 	try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (! watchdogService.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -486,7 +486,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    // wait for watchdog's renew to fail...
 	    Thread.sleep(renewTime * 4);
 
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     if (watchdog.isLocalNodeAlive()) {
                         fail("Expected watchdogService.isLocalNodeAlive() " +
@@ -608,7 +608,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     /** 
      * Task to count the number of nodes.
      */
-    private class CountNodesTask extends AbstractKernelRunnable {
+    private class CountNodesTask extends TestAbstractKernelRunnable {
         int numNodes;
         public void run() {
             Iterator<Node> iter = watchdogService.getNodes();
@@ -629,7 +629,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 	    systemRegistry, txnProxy);
 	watchdog.shutdown();
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         watchdog.getNodes();
@@ -658,7 +658,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         for (SgsTestNode node : additionalNodes) {
             WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
                     if (node == null) {
@@ -682,7 +682,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		"TestWatchdogServiceImpl", null, null),
 	    systemRegistry, txnProxy);
 	watchdog.shutdown();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         watchdog.getNode(0);
@@ -704,7 +704,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     }
 
     public void testGetNodeNonexistentNode() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 Node node = watchdogService.getNode(29);
                 System.err.println(node);
@@ -723,7 +723,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 		"TestWatchdogServiceImpl", null, null),
 	    systemRegistry, txnProxy);
 	watchdog.shutdown();
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
                     watchdog.addNodeListener(new DummyNodeListener());
@@ -773,7 +773,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         for (SgsTestNode node : additionalNodes) {
             WatchdogService watchdog = node.getWatchdogService();
             final long id  = watchdog.getLocalNodeId();
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = watchdogService.getNode(id);
                     if (node == null) {
@@ -1317,7 +1317,7 @@ public class TestWatchdogServiceImpl extends TestCase {
         return task.backups;
     }
 
-    private class CheckNodesFailedTask extends AbstractKernelRunnable {
+    private class CheckNodesFailedTask extends TestAbstractKernelRunnable {
 	Set<Node> backups = new HashSet<Node>();
         Collection<Long> ids;
         boolean hasBackup;
@@ -1357,7 +1357,7 @@ public class TestWatchdogServiceImpl extends TestCase {
     private void checkNodesRemoved(final Collection<Long> ids) throws Exception {
 	Thread.sleep(250);
 	System.err.println("Get shutdown nodes (should be removed)...");
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
 	        for (Long longId : ids) {
 	            long id = longId.longValue();
@@ -1374,7 +1374,7 @@ public class TestWatchdogServiceImpl extends TestCase {
 
     private void checkNodesAlive(final Collection<Long> ids) throws Exception {
 	System.err.println("Get live nodes...");
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
 	        for (Long longId : ids) {
 	            long id = longId.longValue();

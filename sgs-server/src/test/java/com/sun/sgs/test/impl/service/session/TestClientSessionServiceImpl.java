@@ -30,6 +30,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.MessageRejectedException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -39,9 +40,7 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
-import com.sun.sgs.impl.util.ManagedSerializable;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -50,6 +49,7 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -57,6 +57,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -65,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -154,8 +156,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** The shared data service. */
     private DataService dataService;
 
-    /** The test clients, keyed by user name. */
-    private static Map<String, DummyClient> dummyClients;
+    /** The test clients, keyed by client session ID. */
+    private static Map<BigInteger, DummyClient> dummyClients;
     
     private static Field getField(Class cl, String name) throws Exception {
 	Field field = cl.getDeclaredField(name);
@@ -173,16 +175,18 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
-        dummyClients = new HashMap<String, DummyClient>();
+        dummyClients = new HashMap<BigInteger, DummyClient>();
         System.err.println("Testcase: " + getName());
-        setUp(true);
+        setUp(null, true);
     }
 
     /** Creates and configures the session service. */
-    protected void setUp(boolean clean) throws Exception {
-        Properties props = 
-            SgsTestNode.getDefaultProperties(APP_NAME, null, 
-                                             DummyAppListener.class);
+    protected void setUp(Properties props, boolean clean) throws Exception {
+	if (props == null) {
+	    props = 
+                SgsTestNode.getDefaultProperties(APP_NAME, null, 
+						 DummyAppListener.class);
+	}
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
 	serverNode = 
@@ -237,7 +241,7 @@ public class TestClientSessionServiceImpl extends TestCase {
         serverNode = null;
     }
 
-    /* -- Test constructor -- */
+    // -- Test constructor --
 
     public void testConstructorNullProperties() throws Exception {
 	try {
@@ -296,8 +300,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructorDisconnectDelayTooSmall() throws Exception {
+	try {
+	    Properties props =
+		createProperties(
+		    StandardProperties.APP_NAME, APP_NAME,
+		    StandardProperties.APP_PORT, "20000",
+		    "com.sun.sgs.impl.service.session.disconnect.delay", "199");
+	    new ClientSessionServiceImpl(
+		props, serverNode.getSystemRegistry(),
+		serverNode.getProxy());
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)
 			dataService.getServiceBinding(VERSION_KEY);
@@ -312,7 +332,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
     
     public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
 		    dataService.setServiceBinding(VERSION_KEY, version);
@@ -324,7 +344,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
@@ -342,7 +362,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
@@ -359,7 +379,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
     
-    /* -- Test connecting, logging in, logging out with server -- */
+    // -- Test connecting, logging in, logging out with server -- 
 
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient("foo");
@@ -439,6 +459,28 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 	
+    }
+    
+    public void testSendBeforeLoginComplete() throws Exception {
+	DummyClient client = new DummyClient("dummy");
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login(false);
+	    client.sendMessagesInSequence(1, 0, null);
+	} finally {
+            client.disconnect();
+	}
+    }
+
+    public void testSendAfterLoginComplete() throws Exception {
+	DummyClient client = new DummyClient("dummy");
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login(true);
+	    client.sendMessagesInSequence(1, 1, null);
+	} finally {
+            client.disconnect();
+	}
     }
 
     public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
@@ -537,6 +579,67 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testLoginTwiceBlockUser() throws Exception {
+	String name = "dummy";
+	DummyClient client1 = new DummyClient(name);
+	DummyClient client2 = new DummyClient(name);
+	int port = serverNode.getAppPort();
+	client1.connect(port).login();
+	try {
+	    client2.connect(port).login();
+	    fail("expected client2 login failure");
+	} catch (RuntimeException e) {
+	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		System.err.println("login refused");
+	    } else {
+		fail("unexpected login failure: " + e);
+	    }
+	} finally {
+	    client1.disconnect();
+	    client2.disconnect();
+	}
+    }
+
+    public void testLoginTwicePreemptUser() throws Exception {
+	// Set up ClientSessionService to preempt user if same user logs in
+	tearDown(false);
+	Properties props =
+	    SgsTestNode.getDefaultProperties(APP_NAME, null,
+					     DummyAppListener.class);
+	props.setProperty(
+ 	    "com.sun.sgs.impl.service.session.allow.new.login", "true");
+	setUp(props, false);
+	String name = "dummy";
+	
+	DummyClient client1 = new DummyClient(name);
+	DummyClient client2 = new DummyClient(name);
+	int port = serverNode.getAppPort();
+	try {
+	    client1.connect(port).login();
+	    client2.connect(port).login();
+	    client1.checkDisconnectedCallback(false);
+	    assertTrue(client2.isConnected());
+	    
+	} finally {
+	    client1.disconnect();
+	    client2.disconnect();
+	}
+    }
+    
+    public void testDisconnectFromServerAfterLogout() throws Exception {
+	final String name = "logout";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login();
+	    client.logout();
+	    assertEquals(client.isConnected(), true);
+	    assertEquals(client.waitForDisconnect(), true);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
     public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	final String name = "logout";
 	DummyClient client = new DummyClient(name);
@@ -545,11 +648,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login();
 	    checkBindings(1);
 	    client.logout();
-	    client.checkDisconnected(true);
+	    client.checkDisconnectedCallback(true);
 	    checkBindings(0);
 	    // check that client session was removed after disconnected callback
 	    // returned 
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
 		    try {
 			dataService.getBinding(name);
@@ -577,7 +680,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.login();
 	    checkBindings(1);
 	    client.logout();
-	    client.checkDisconnected(true);
+	    client.checkDisconnectedCallback(true);
 	    // give scheduled task a chance to clean up...
 	    Thread.sleep(250);
 	    checkBindings(0);	    
@@ -611,7 +714,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	int numClients = 4;
 	try {
@@ -625,15 +727,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    int appPort = serverNode.getAppPort();
 	    for (int i = 0; i < numClients; i++) {
-		/*
-		 * Create half of the clients with a name that starts with
-		 * "badClient" which will cause the associated session's
-		 * ClientSessionListener's 'disconnected' method to throw a
-		 * non-retryable exception.  We want to make sure that all the
-		 * client sessions are cleaned up after a crash, even if
-		 * invoking a session's listener's 'disconnected' callback
-		 * throws a non-retryable exception.
-		 */
+		 // Create half of the clients with a name that starts with
+		 // "badClient" which will cause the associated session's
+		 // ClientSessionListener's 'disconnected' method to throw a
+		 // non-retryable exception.  We want to make sure that all the
+		 // client sessions are cleaned up after a crash, even if
+		 // invoking a session's listener's 'disconnected' callback
+		 // throws a non-retryable exception.
 		String name = (i % 2 == 0) ? "client" : "badClient";
 		DummyClient client = new DummyClient(name + String.valueOf(i));
 		client.connect(appPort).login();
@@ -643,10 +743,10 @@ public class TestClientSessionServiceImpl extends TestCase {
             // Simulate "crash"
             tearDown(false);
 	    String failedNodeKey = nodeKeys.get(0);
-            setUp(false);
+            setUp(null, false);
 
 	    for (DummyClient client : dummyClients.values()) {
-		client.checkDisconnected(false);
+		client.checkDisconnectedCallback(false);
 	    }
 	    
 	    // Wait to make sure that bindings and node key are cleaned up.
@@ -674,71 +774,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /**
-     * Check that the session bindings are the expected number and throw an
-     * exception if they aren't.
-     */
-    private void checkBindings(int numExpected) throws Exception {
-	
-	List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
-	System.err.println("Listener keys: " + listenerKeys);
-	if (listenerKeys.size() != numExpected) {
-	    fail("expected " + numExpected + " listener keys, got " +
-		 listenerKeys.size());
-	}
-	    
-	List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
-	System.err.println("Session keys: " + sessionKeys);
-	if (sessionKeys.size() != numExpected) {
-	    fail("expected " + numExpected + " session keys, got " +
-		 sessionKeys.size());
-	}
-	    
-	List<String> sessionNodeKeys =
-	    getServiceBindingKeys(SESSION_NODE_PREFIX);
-	System.err.println("Session node keys: " + sessionNodeKeys);
-	if (sessionNodeKeys.size() != numExpected) {
-	    fail("expected " + numExpected + " session node keys, got " +
-		 sessionNodeKeys.size());
-	}
-    }
-    
-    private List<String> getServiceBindingKeys(String prefix) throws Exception {
-        GetKeysTask task = new GetKeysTask(prefix);
-        txnScheduler.runTask(task, taskOwner);
-        return task.getKeys();
-    }
-
-    private class GetKeysTask extends AbstractKernelRunnable {
-        private List<String> keys = new ArrayList<String>();
-        private final String prefix;
-        GetKeysTask(String prefix) {
-            this.prefix = prefix;
-        }
-        public void run() throws Exception {
-            String key = prefix;
-            for (;;) {
-                key = dataService.nextServiceBoundName(key);
-                if (key == null ||
-                    ! key.regionMatches(
-                          0, prefix, 0, prefix.length()))
-                {
-                    break;
-                }
-                keys.add(key);
-            }
-        }
-        public List<String> getKeys() { return keys;}
-    }
-
-    /* -- test ClientSession -- */
+    // -- test ClientSession --
 
     public void testClientSessionIsConnected() throws Exception {
 	DummyClient client = new DummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -767,7 +810,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     DummyAppListener appListener = getAppListener();
                     Set<ClientSession> sessions = appListener.getSessions();
@@ -796,7 +839,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient(name);
 	try {
 	    client.connect(serverNode.getAppPort()).login();
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		    public void run() {
 			ClientSession session = (ClientSession)
 			    dataService.getBinding(name);
@@ -831,7 +874,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    private class GetClientSessionTask extends AbstractKernelRunnable {
+    private class GetClientSessionTask extends TestAbstractKernelRunnable {
 	private final String name;
 	volatile ClientSession session;
 
@@ -847,7 +890,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testClientSessionSend() throws Exception {
+    public void testClientSessionSendSequence() throws Exception {
 	final String name = "dummy";
 	DummyClient client = new DummyClient(name);
 	try {
@@ -861,16 +904,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
 	    
-	    /*
-	     * Replace each node's ClientSessionServer, bound in the data
-	     * service, with a wrapped server that delays before sending
-	     * the message.
-	     */
+	    // Replace each node's ClientSessionServer, bound in the data
+	    // service, with a wrapped server that delays before sending
+	    // the message.
 	    final DataService ds = dataService;
 	    TransactionScheduler txnScheduler =
 		serverNode.getSystemRegistry().
 		    getComponent(TransactionScheduler.class);
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		@SuppressWarnings("unchecked")
 		public void run() {
 		    for (SgsTestNode node : nodes) {
@@ -899,7 +940,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			    getComponent(TransactionScheduler.class);
 		    Identity identity = node.getProxy().getCurrentOwner();
 		    localTxnScheduler.scheduleTask(
-		    	  new AbstractKernelRunnable() {
+		    	  new TestAbstractKernelRunnable() {
 			    public void run() {
 				DataManager dataManager =
 				    AppContext.getDataManager();
@@ -920,7 +961,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			identity);
 		}
 	    }
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    AppContext.getDataManager().
 			setBinding(counterName, new Counter());
@@ -933,6 +974,69 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testClientSessionSendSameBuffer() throws Exception {
+	String msgString = "buffer";
+	MessageBuffer msg =
+	    new MessageBuffer(MessageBuffer.getSize(msgString));
+	msg.putString(msgString);
+	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
+	sendBufferToClient(buf, msgString);
+    }
+
+    public void testClientSessionSendSameBufferWithOffset()
+	throws Exception
+    {
+	String msgString = "offset buffer";
+	MessageBuffer msg =
+	    new MessageBuffer(MessageBuffer.getSize(msgString) + 1);
+	msg.putByte(0);
+	msg.putString(msgString);
+	ByteBuffer buf = ByteBuffer.wrap(msg.getBuffer());
+	buf.position(1);
+	sendBufferToClient(buf, msgString);
+    }
+
+    private void sendBufferToClient(final ByteBuffer buf,
+				    final String expectedMsgString)
+	throws Exception
+    {	
+	final String name = "dummy";
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort());
+	    client.login();
+	    final int numMessages = 3;
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    ClientSession session = (ClientSession)
+			AppContext.getDataManager().getBinding(name);
+		    System.err.println("Sending messages");
+		    for (int i = 0; i < numMessages; i++) {
+			session.send(buf);
+		    }
+		}}, taskOwner);
+	
+	    System.err.println("waiting for client to receive messages");
+	    Queue<byte[]> messages =
+		client.waitForClientToRecieveExpectedMessages(numMessages);
+	    for (byte[] message : messages) {
+		if (message.length == 0) {
+		    fail("message buffer emtpy");
+		}
+		String msgString = (new MessageBuffer(message)).getString();
+		if (!msgString.equals(expectedMsgString)) {
+		    fail("expected: " + expectedMsgString + ", received: " +
+			 msgString);
+		} else {
+		    System.err.println("received expected message: " +
+				       msgString);
+		}
+	    }
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     private static class Counter implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
@@ -944,22 +1048,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /**
-     * Test sending from the server to the client session in a transaction that
-     * aborts with a retryable exception to make sure that message buffers are
-     * reclaimed.  Try sending 4K bytes, and have the task abort 100 times with
-     * a retryable exception so the task is retried.  If the buffers are not
-     * being reclaimed then the sends will eventually fail because the buffer
-     * space is used up.  Note that this test assumes that sending 400 KB of
-     * data will surpass the I/O throttling limit.
-     */
+    // Test sending from the server to the client session in a transaction that
+    // aborts with a retryable exception to make sure that message buffers are
+    // reclaimed.  Try sending 4K bytes, and have the task abort 100 times with
+    // a retryable exception so the task is retried.  If the buffers are not
+    // being reclaimed then the sends will eventually fail because the buffer
+    // space is used up.  Note that this test assumes that sending 400 KB of
+    // data will surpass the I/O throttling limit.
     public void testClientSessionSendAbortRetryable() throws Exception {
 	DummyClient client = new DummyClient("clientname");
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
 	    txnScheduler.runTask(
-		new AbstractKernelRunnable() {
+		new TestAbstractKernelRunnable() {
 		    int tryCount = 0;
 		    public void run() {
 			Set<ClientSession> sessions =
@@ -1009,7 +1111,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final ByteBuffer msg = ByteBuffer.allocate(0);
 	long startTime = System.currentTimeMillis();
 	for (int i = 0; i < numIterations; i++) {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    DataManager dataManager = AppContext.getDataManager();
 		    ClientSession session = (ClientSession)
@@ -1022,7 +1124,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 			   ", elapsed time: " + (endTime - startTime) +
 			   " ms.");
     }
+
+    public void testRemoveSessionWhileSessionDisconnects() throws Exception {
+	final String user = "foo";
+	DummyClient client = new DummyClient(user);
+	client.connect(serverNode.getAppPort()).login();
+	client.logout();
+	client.checkDisconnectedCallback(true);
+    }
     
+    /* -- other methods -- */
+
     private void sendMessagesAndCheck(
 	int numMessages, int expectedMessages, RuntimeException exception)
 	throws Exception
@@ -1032,13 +1144,69 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-	    client.sendMessages(numMessages, expectedMessages, exception);
+	    client.sendMessagesInSequence(
+		numMessages, expectedMessages, exception);
 	} finally {
 	    client.disconnect();
 	}
     }
 
-    /* -- other methods -- */
+    /**
+     * Check that the session bindings are the expected number and throw an
+     * exception if they aren't.
+     */
+    private void checkBindings(int numExpected) throws Exception {
+	
+	List<String> listenerKeys = getServiceBindingKeys(LISTENER_PREFIX);
+	System.err.println("Listener keys: " + listenerKeys);
+	if (listenerKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " listener keys, got " +
+		 listenerKeys.size());
+	}
+	    
+	List<String> sessionKeys = getServiceBindingKeys(SESSION_PREFIX);
+	System.err.println("Session keys: " + sessionKeys);
+	if (sessionKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " session keys, got " +
+		 sessionKeys.size());
+	}
+	    
+	List<String> sessionNodeKeys =
+	    getServiceBindingKeys(SESSION_NODE_PREFIX);
+	System.err.println("Session node keys: " + sessionNodeKeys);
+	if (sessionNodeKeys.size() != numExpected) {
+	    fail("expected " + numExpected + " session node keys, got " +
+		 sessionNodeKeys.size());
+	}
+    }
+    
+    private List<String> getServiceBindingKeys(String prefix) throws Exception {
+        GetKeysTask task = new GetKeysTask(prefix);
+        txnScheduler.runTask(task, taskOwner);
+        return task.getKeys();
+    }
+
+    private class GetKeysTask extends TestAbstractKernelRunnable {
+        private List<String> keys = new ArrayList<String>();
+        private final String prefix;
+        GetKeysTask(String prefix) {
+            this.prefix = prefix;
+        }
+        public void run() throws Exception {
+            String key = prefix;
+            for (;;) {
+                key = dataService.nextServiceBoundName(key);
+                if (key == null ||
+                    ! key.regionMatches(
+                          0, prefix, 0, prefix.length()))
+                {
+                    break;
+                }
+                keys.add(key);
+            }
+        }
+        public List<String> getKeys() { return keys;}
+    }
 
     private void printIt(String line) {
 	if (! isPerformanceTest) {
@@ -1056,7 +1224,7 @@ public class TestClientSessionServiceImpl extends TestCase {
      * Dummy client code for testing purposes.
      */
     private class DummyClient {
-
+	
 	private String name;
 	private String password;
 	private Connector<SocketAddress> connector;
@@ -1082,12 +1250,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	volatile RuntimeException throwException;
 	volatile int expectedMessages;
+	// Messages received by this client's associated ClientSessionListener
 	Queue<byte[]> messages = new ConcurrentLinkedQueue<byte[]>();
 	
 
 	DummyClient(String name) {
 	    this.name = name;
-	    dummyClients.put(name, this);
 	}
 
 	DummyClient connect(int port) {
@@ -1144,10 +1312,30 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns {@code true} if login was successful, and returns
-	 * {@code false} if login was redirected.
+	 * Sends a login request and waits for it to be acknowledged,
+	 * returning {@code true} if login was successful, and {@code
+	 * false} if login was redirected.  If the login was not successful
+	 * or redirected, then a {@code RuntimeException} is thrown because
+	 * the login operation timed out before being acknowledged.
 	 */
 	boolean login() {
+	    return login(true);
+	}
+
+	/**
+	 * Sends a login request and if {@code waitForLogin} is {@code
+	 * true} waits for the request to be acknowledged, returning {@code
+	 * true} if login was successful, and {@code false} if login was
+	 * redirected, otherwise a {@code RuntimeException} is thrown
+	 * because the login operation timed out before being acknowldeged.
+	 *
+	 * If {@code waitForLogin} is false, this method returns {@code
+	 * true} if the login is known to be successful (the outcome may
+	 * not yet be known because the login operation is asynchronous),
+	 * otherwise it returns false.  Invoke {@code waitForLogin} to wait
+	 * for an expected successful login.
+	 */
+	boolean login(boolean waitForLogin) {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(toString() + " not connected");
@@ -1168,6 +1356,22 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
+	    if (waitForLogin) {
+		return waitForLogin();
+	    } else {
+		synchronized (lock) {
+		    return loginSuccess;
+		}
+	    }
+	}
+
+	/**
+	 * Waits for a login acknowledgement, and returns {@code true} if
+	 * login was successful, {@code false} if login was redirected,
+	 * otherwise a {@code RuntimeException} is thrown because the login
+	 * operation timed out before being acknowledged.
+	 */
+	boolean waitForLogin() {
 	    synchronized (lock) {
 		try {
 		    if (loginAck == false) {
@@ -1205,11 +1409,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Sends a SESSION_MESSAGE.
+	 * Sends a SESSION_MESSAGE with the specified content.
 	 */
 	void sendMessage(byte[] message) {
-	    checkLoggedIn();
-
 	    MessageBuffer buf =
 		new MessageBuffer(1+ message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
@@ -1221,7 +1423,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 
-	void sendMessages(
+	/**
+	 * From this client, sends the number of messages (each containing a
+	 * monotonically increasing sequence number), then waits for all the
+	 * messages to be received by this client's associated {@code
+	 * ClientSessionListener}, and validates the sequence of messages
+	 * received by the listener.  If {@code throwException} is non-null,
+	 * the {@code ClientSessionListener} will throw the specified
+	 * exception in its {@code receivedMessage} method for only the first
+	 * message it receives.
+	 */
+	void sendMessagesInSequence(
 	    int numMessages, int expectedMessages, RuntimeException re)
 	{
 	    this.expectedMessages = expectedMessages;
@@ -1233,51 +1445,75 @@ public class TestClientSessionServiceImpl extends TestCase {
 		sendMessage(buf.getBuffer());
 	    }
 	    
-	    synchronized (receivedAllMessagesLock) {
-		if (messages.size() != expectedMessages) {
-		    try {
-			receivedAllMessagesLock.wait(WAIT_TIME);
-		    } catch (InterruptedException e) {
-		    }
-		    int receivedMessages = messages.size();
-		    if (receivedMessages != expectedMessages) {
-			fail(toString() + " expected " + expectedMessages +
-			     ", received " + receivedMessages);
-		    }
-		}
-	    }
+	    validateMessageSequence(messages, expectedMessages);
 	}
 
+	/**
+	 * Waits until all messages have been received by this client, and
+	 * validates that the expected number of messages were received by the
+	 * client in the correct sequence.
+	 */
 	void checkMessagesReceived(int expectedMessages) {
-	    this.expectedMessages = expectedMessages;
+	    validateMessageSequence(listener.messageList, expectedMessages);
+	}
 
+	/**
+	 * Waits for this client to receive the number of messages sent from
+	 * the application.
+	 */
+	Queue<byte[]> waitForClientToRecieveExpectedMessages(
+	    int expectedMessages)
+	{
+	    waitForExpectedMessages(listener.messageList, expectedMessages);
+	    return listener.messageList;
+	}
+
+	/**
+	 * Waits for the number of expected messages to be deposited in the
+	 * specified message queue.
+	 */
+	private void waitForExpectedMessages(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    this.expectedMessages = expectedMessages;
 	    synchronized (receivedAllMessagesLock) {
-		if (listener.messageList.size() != expectedMessages) {
+		if (messageQueue.size() != expectedMessages) {
 		    try {
 			receivedAllMessagesLock.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
-
-		    int receivedMessages = listener.messageList.size();
-		    if (receivedMessages != expectedMessages) {
-			fail(toString() + " expected " + expectedMessages +
-			     ", received " + receivedMessages);
-		    }
 		}
 	    }
-
-	    int i = 0;
-	    for (byte[] message : listener.messageList) {
-		MessageBuffer buf = new MessageBuffer(message);
-		int value = buf.getInt();
-		System.err.println(toString() + " received message " + value);
-		if (value != i) {
-		    fail("expected message " + i + ", got " + value);
-		}
-		i++;
+	    int receivedMessages = messageQueue.size();
+	    if (receivedMessages != expectedMessages) {
+		fail(toString() + " expected " + expectedMessages +
+		     ", received " + receivedMessages);
 	    }
 	}
 
+	/**
+	 * Waits for the number of expected messages to be recorded in the
+	 * specified 'list', and validates that the expected number of messages
+	 * were received by the ClientSessionListener in the correct sequence.
+	 */
+	private void validateMessageSequence(
+	    Queue<byte[]> messageQueue, int expectedMessages)
+	{
+	    waitForExpectedMessages(messageQueue, expectedMessages);
+	    if (expectedMessages != 0) {
+		int i = (new MessageBuffer(messageQueue.peek())).getInt();
+		for (byte[] message : messageQueue) {
+		    MessageBuffer buf = new MessageBuffer(message);
+		    int value = buf.getInt();
+		    System.err.println(toString() + " received message " + value);
+		    if (value != i) {
+			fail("expected message " + i + ", got " + value);
+		    }
+		    i++;
+		}
+	    }
+	}
+	
 	void logout() {
             synchronized (lock) {
                 if (connected == false) {
@@ -1312,7 +1548,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             }
 	}
 
-	void checkDisconnected(boolean graceful) throws Exception {
+	void checkDisconnectedCallback(boolean graceful) throws Exception {
 	    synchronized (disconnectedCallbackLock) {
 		if (!receivedDisconnectedCallback) {
 		    disconnectedCallbackLock.wait(WAIT_TIME);
@@ -1327,13 +1563,32 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(toString() + " disconnect successful");
 	}
 
+	boolean isConnected() {
+	    synchronized (lock) {
+		return connected;
+	    }
+	}
+
+	// Returns true if disconnect occurred.
+	boolean waitForDisconnect() {
+	    synchronized(lock) {
+		try {
+		    if (connected == true) {
+			lock.wait(WAIT_TIME);
+		    }
+		} catch (InterruptedException ignore) {
+		}
+		return !connected;
+	    }
+	}
+
 	public String toString() {
 	    return "[" + name + "]";
 	}
 	
 	private class Listener implements ConnectionListener {
 
-	    List<byte[]> messageList = new ArrayList<byte[]>();
+	    Queue<byte[]> messageList = new LinkedList<byte[]>();
 	    
             /** {@inheritDoc} */
 	    public void bytesReceived(Connection conn, byte[] buffer) {
@@ -1352,6 +1607,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
 		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
+		    dummyClients.put(
+			new BigInteger(1, reconnectKey), DummyClient.this);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -1387,7 +1644,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                     synchronized (lock) {
                         logoutAck = true;
                         System.err.println("logout succeeded: " + name);
-                        // let disconnect do the lock notification
+			lock.notifyAll();
                     }
 		    break;
 
@@ -1427,16 +1684,6 @@ public class TestClientSessionServiceImpl extends TestCase {
             /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
                 synchronized (lock) {
-                    // Hack since client might not get last msg
-                    if (awaitGraceful) {
-                        // Pretend they logged out gracefully
-                        logoutAck = true;
-                    } else if (! loginAck) {
-                        // Pretend they got a login failure message
-                        loginAck = true;
-                        loginSuccess = false;
-                        reason = "disconnected before login ack";
-                    }
                     connected = false;
                     lock.notifyAll();
                 }
@@ -1475,9 +1722,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		throw new RuntimeException("loggedIn throwing an exception");
 	    } else if (name.equals(DISCONNECT_THROWS_NONRETRYABLE_EXCEPTION) ||
 		       name.startsWith("badClient")) {
-		listener = new DummyClientSessionListener(name, true);
+		listener = new DummyClientSessionListener(name, session, true);
 	    } else {
-		listener = new DummyClientSessionListener(name, false);
+		listener = new DummyClientSessionListener(name, session, false);
 	    }
 	    DataManager dataManager = AppContext.getDataManager();
 	    ManagedReference<ClientSession> sessionRef =
@@ -1524,14 +1771,18 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
+	private final BigInteger sessionRefId;
 	private final boolean disconnectedThrowsException;
-	private int seq = -1;
 
 
 	DummyClientSessionListener(
-	    String name, boolean disconnectedThrowsException)
+	    String name, ClientSession session,
+	    boolean disconnectedThrowsException)
 	{
 	    this.name = name;
+	    session = ((ClientSessionWrapper) session).getClientSession();
+	    this.sessionRefId =
+		AppContext.getDataManager().createReference(session).getId();
 	    this.disconnectedThrowsException = disconnectedThrowsException;
 	}
 
@@ -1539,8 +1790,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
-	    AppContext.getDataManager().markForUpdate(this);
-	    DummyClient client = dummyClients.get(name);
+	    DataManager dataManager = AppContext.getDataManager();
+	    dataManager.markForUpdate(this);
+	    DummyClient client = dummyClients.get(sessionRefId);
+	    ClientSession session = (ClientSession)
+		dataManager.getBinding(name);
+	    dataManager.removeObject(session);
 	    client.receivedDisconnectedCallback = true;
 	    client.graceful = graceful;
 	    synchronized (client.disconnectedCallbackLock) {
@@ -1556,21 +1811,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void receivedMessage(ByteBuffer message) {
             byte[] bytes = new byte[message.remaining()];
             message.asReadOnlyBuffer().get(bytes);
-	    int num = message.getInt();
-	    DummyClient client = dummyClients.get(name);
-	    System.err.println("receivedMessage: " + num + 
-			       "\nthrowException: " + client.throwException);
-	    if (num <= seq) {
-		throw new RuntimeException(
-		    "expected message greater than " + seq + ", got " + num);
-	    }
-	    AppContext.getDataManager().markForUpdate(this);
-	    client.messages.add(bytes);
-	    seq = num;
+	    DummyClient client = dummyClients.get(sessionRefId);
+	    System.err.println(
+		"receivedMessage: " + HexDumper.toHexString(bytes) + 
+		"\nthrowException: " + client.throwException);
 	    if (client.throwException != null) {
 		RuntimeException re = client.throwException;
 		client.throwException = null;
 		throw re;
+	    } else {
+		AppContext.getDataManager().markForUpdate(this);
+		client.messages.add(bytes);
 	    }
 	    if (client.messages.size() == client.expectedMessages) {
 		synchronized (client.receivedAllMessagesLock) {
