@@ -24,16 +24,18 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.ConfigManager;
-import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
-import com.sun.sgs.service.Transaction;
-import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
+import com.sun.sgs.test.util.DummyTransactionListener;
+import com.sun.sgs.test.util.DummyTransactionListener.CalledAfter;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
 import com.sun.sgs.test.util.NameRunner;
@@ -42,17 +44,17 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 
 @RunWith(NameRunner.class)
 /** Test TransactionCoordinatorImpl */
@@ -1658,6 +1660,339 @@ public class TestTransactionCoordinatorImpl {
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
+	}
+    }
+
+    /* -- Test Transaction.registerListener -- */
+
+    @Test
+    public void testRegisterListenerNull() {
+	try {
+	    txn.registerListener(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testRegisterListenerCommit() throws Exception {
+	DummyTransactionListener[] listeners = {
+	    new DummyTransactionListener(),
+	    new DummyTransactionListener(),
+	    new DummyTransactionListener()
+	};
+	for (DummyTransactionListener listener : listeners) {
+	    txn.registerListener(listener);
+	    /* Check that registering twice has no effect */
+	    txn.registerListener(listener);
+	}
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(false, CalledAfter.NO);
+	}
+	handle.commit();
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(true, CalledAfter.COMMIT);
+	}
+    }
+
+    @Test
+    public void testRegisterListenerCommitBeforeThrows() throws Exception {
+	RuntimeException exception = new RuntimeException();
+	DummyTransactionListener listener = new DummyTransactionListener();
+	txn.registerListener(listener);
+	DummyTransactionListener failingListener =
+	    new DummyTransactionListener(exception, null);
+	txn.registerListener(failingListener);
+	try {
+	    handle.commit();
+	    fail("Expected RuntimeException");
+	} catch (RuntimeException e) {
+	    assertSame(exception, e);
+	}
+	/*
+	 * Don't know which listener's beforeCompletion method was called
+	 * first, so don't check if this one's was called.
+	 */
+	listener.assertCalledAfter(CalledAfter.ABORT);
+	failingListener.assertCalled(true, CalledAfter.ABORT);
+    }
+
+    @Test
+    public void testRegisterListenerCommitAfterThrows() throws Exception {
+	RuntimeException exception = new RuntimeException();
+	DummyTransactionListener[] listeners = {
+	    new DummyTransactionListener(null, exception),
+	    new DummyTransactionListener(null, exception)
+	};
+	for (DummyTransactionListener listener : listeners) {
+	    txn.registerListener(listener);
+	}
+	handle.commit();
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(true, CalledAfter.COMMIT);
+	}
+    }
+
+    @Test
+    public void testRegisterListenerCommitBothThrow() throws Exception {
+	RuntimeException beforeException = new RuntimeException();
+	RuntimeException afterException = new RuntimeException();
+	DummyTransactionListener[] listeners = {
+	    new DummyTransactionListener(beforeException, afterException),
+	    new DummyTransactionListener(beforeException, afterException)
+	};
+	for (DummyTransactionListener listener : listeners) {
+	    txn.registerListener(listener);
+	}
+	try {
+	    handle.commit();
+	    fail("Expected RuntimeException");
+	} catch (RuntimeException e) {
+	    assertSame(beforeException, e);
+	}
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalledAfter(CalledAfter.ABORT);
+	}
+    }
+
+    @Test
+    public void testRegisterListenerAbort() throws Exception {
+	DummyTransactionListener listener = new DummyTransactionListener();
+	txn.registerListener(listener);
+	/* Check that registering twice has no effect. */
+	txn.registerListener(listener);
+	txn.abort(abortXcp);
+	listener.assertCalled(false, CalledAfter.ABORT);
+    }
+
+    @Test
+    public void testRegisterListenerAbortAfterThrows() throws Exception {
+	RuntimeException exception = new RuntimeException();
+	DummyTransactionListener[] listeners = {
+	    new DummyTransactionListener(null, exception),
+	    new DummyTransactionListener(null, exception)
+	};
+	for (DummyTransactionListener listener : listeners) {
+	    txn.registerListener(listener);
+	}
+	txn.abort(abortXcp);
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(false, CalledAfter.ABORT);
+	}
+    }
+
+    @Test
+    public void testRegisterListenerBeforeAborts() throws Exception {
+	final RuntimeException exception = new RuntimeException();
+	DummyTransactionListener listener =
+	    new DummyTransactionListener() {
+		public void beforeCompletion() {
+		    super.beforeCompletion();
+		    txn.abort(exception);
+		}
+	    };
+	txn.registerListener(listener);
+	try {
+	    handle.commit();
+	    fail("Expected TransactionAbortedException");
+	} catch (TransactionAbortedException e) {
+	    System.err.println(e);
+	}
+	listener.assertCalled(true, CalledAfter.ABORT);
+    }
+
+    @Test
+    public void testRegisterListenerAborting() {
+	final DummyTransactionListener listener =
+	    new DummyTransactionListener();
+	final Exception[] exception = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    try {
+			txn.registerListener(listener);
+		    } catch (Exception e) {
+			exception[0] = e;
+		    }
+		    super.abort(txn);
+		}
+	    };
+	txn.join(participant);
+	txn.abort(abortXcp);
+	if (exception[0] instanceof TransactionNotActiveException) {
+	    System.err.println(exception[0]);
+	} else {
+	    fail("Expected TransactionNotActiveException: " + exception[0]);
+	}
+	listener.assertCalled(false, CalledAfter.NO);
+    }
+
+    @Test
+    public void testRegisterListenerAborted() {
+	DummyTransactionListener listener = new DummyTransactionListener();
+	txn.abort(abortXcp);
+	try {
+	    txn.registerListener(listener);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	listener.assertCalled(false, CalledAfter.NO);
+    }
+
+    @Test
+    public void testRegisterListenerPreparing() throws Exception {
+	final DummyTransactionListener listener =
+	    new DummyTransactionListener();
+	final Exception[] exception = { null };
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant() {
+		public boolean prepare(Transaction txn) throws Exception {
+		    try {
+			txn.registerListener(listener);
+		    } catch (Exception e) {
+			exception[0] = e;
+		    }
+		    return super.prepare(txn);
+		}
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (TransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.commit();
+	if (exception[0] instanceof TransactionNotActiveException) {
+	    System.err.println(exception[0]);
+	} else {
+	    fail("Expected TransactionNotActiveException: " + exception[0]);
+	}
+	listener.assertCalled(false, CalledAfter.NO);
+    }
+
+    @Test
+    public void testRegisterListenerPrepareAndCommitting() throws Exception {
+	final DummyTransactionListener listener =
+	    new DummyTransactionListener();
+	final Exception[] exception = { null };
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant() {
+		public void prepareAndCommit(Transaction txn)
+		    throws Exception
+		{
+		    try {
+			txn.registerListener(listener);
+		    } catch (Exception e) {
+			exception[0] = e;
+		    }
+		    super.prepareAndCommit(txn);
+		}
+	    };
+	txn.join(participant);
+	handle.commit();
+	if (exception[0] instanceof TransactionNotActiveException) {
+	    System.err.println(exception[0]);
+	} else {
+	    fail("Expected TransactionNotActiveException: " + exception[0]);
+	}
+	listener.assertCalled(false, CalledAfter.NO);
+    }
+
+    @Test
+    public void testRegisterListenerCommitting() throws Exception {
+	final DummyTransactionListener listener =
+	    new DummyTransactionListener();
+	final Exception[] exception = { null };
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant() {
+		public void commit(Transaction txn) {
+		    try {
+			txn.registerListener(listener);
+		    } catch (Exception e) {
+			exception[0] = e;
+		    }
+		    super.commit(txn);
+		}
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (TransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.commit();
+	if (exception[0] instanceof TransactionNotActiveException) {
+	    System.err.println(exception[0]);
+	} else {
+	    fail("Expected TransactionNotActiveException: " + exception[0]);
+	}
+	listener.assertCalled(false, CalledAfter.NO);
+    }
+
+    @Test
+    public void testRegisterListenerCommitted() throws Exception {
+	DummyTransactionListener listener = new DummyTransactionListener();
+	handle.commit();
+	try {
+	    txn.registerListener(listener);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	listener.assertCalled(false, CalledAfter.NO);
+    }
+
+    @Test
+    public void testRegisterListenerBeforeCompletion() throws Exception {
+	final DummyTransactionListener lateListener =
+	    new DummyTransactionListener();
+	DummyTransactionListener[] listeners = {
+	    new DummyTransactionListener(),
+	    new DummyTransactionListener() {
+		public void beforeCompletion() {
+		    super.beforeCompletion();
+		    txn.registerListener(lateListener);
+		}
+	    },
+	    new DummyTransactionListener()
+	};
+	for (DummyTransactionListener listener : listeners) {
+	    txn.registerListener(listener);
+	}
+	handle.commit();
+	for (DummyTransactionListener listener : listeners) {
+	    listener.assertCalled(true, CalledAfter.COMMIT);
+	}
+	/*
+	 * Since there is no guarantee of listener order, don't check if the
+	 * late-added listener's beforeCompletion method was called.
+	 */
+	lateListener.assertCalledAfter(CalledAfter.COMMIT);
+    }
+
+    @Test
+    public void testRegisterListenerAfterCompletion() throws Exception {
+	final Exception[] exception = { null };
+	final DummyTransactionListener listener =
+	    new DummyTransactionListener() {
+		public void afterCompletion(boolean commited) {
+		    super.afterCompletion(commited);
+		    DummyTransactionListener anotherListener =
+			new DummyTransactionListener();
+		    try {
+			txn.registerListener(anotherListener);
+		    } catch (Exception e) {
+			exception[0] = e;
+		    }
+		}
+	    };
+	txn.registerListener(listener);
+	handle.commit();
+	listener.assertCalled(true, CalledAfter.COMMIT);
+	if (exception[0] instanceof TransactionNotActiveException) {
+	    System.err.println(exception[0]);
+	} else {
+	    fail("Expected TransactionNotActiveException: " + exception[0]);
 	}
     }
 

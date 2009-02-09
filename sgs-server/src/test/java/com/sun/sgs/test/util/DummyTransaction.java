@@ -25,6 +25,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -91,6 +92,10 @@ public class DummyTransaction implements Transaction {
     /** The transaction participants for this transaction. */
     public final Set<TransactionParticipant> participants =
 	new HashSet<TransactionParticipant>();
+
+    /** The registered {@code TransactionListener}s. */
+    private final Set<TransactionListener> listeners =
+	new HashSet<TransactionListener>();
 
     /** Creates an instance of this class that always uses prepareAndCommit. */
     public DummyTransaction() {
@@ -221,6 +226,7 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
 	state = State.ABORTED;
+	notifyListenersAfter(false);
         DummyProfileCoordinator.endTask(false);
     }
 
@@ -232,6 +238,17 @@ public class DummyTransaction implements Transaction {
 	return abortCause;
     }
 
+    /** {@inheritDoc} */
+    public void registerListener(TransactionListener listener) {
+	if (listener == null) {
+	    throw new NullPointerException("The listener must not be null");
+	} else if (state != State.ACTIVE) {
+	    throw new TransactionNotActiveException(
+		"Transaction is not active");
+	}
+	listeners.add(listener);
+    }
+
     /* -- Other methods -- */
 
     public synchronized boolean prepare() throws Exception {
@@ -239,6 +256,7 @@ public class DummyTransaction implements Transaction {
 	if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
 	}
+	notifyListenersBefore();
 	state = State.PREPARING;
 	if (proxy != null) {
 	    proxy.setCurrentTransaction(null);
@@ -286,6 +304,7 @@ public class DummyTransaction implements Transaction {
 	    throw new IllegalStateException(
 		"Transaction not active: " + state);
 	} else if (usePrepareAndCommit && participants.size() == 1) {
+	    notifyListenersBefore();
 	    state = State.PREPARING;
 	    if (proxy != null) {
 		proxy.setCurrentTransaction(null);
@@ -313,6 +332,7 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
 	state = State.COMMITTED;
+	notifyListenersAfter(true);
         DummyProfileCoordinator.endTask(true);
     }
 
@@ -323,5 +343,37 @@ public class DummyTransaction implements Transaction {
 
     public String toString() {
 	return "DummyTransaction[tid:" + id + "]";
+    }
+
+    /** Notify any listeners before preparing the transaction. */
+    private void notifyListenersBefore() {
+	/*
+	 * Copy the listeners to avoid problems if a beforeCompletion method
+	 * registers another listener.
+	 */
+	for (TransactionListener listener :
+		 listeners.toArray(new TransactionListener[listeners.size()]))
+	{
+	    try {
+		listener.beforeCompletion();
+	    } catch (RuntimeException e) {
+		if (state != State.ABORTED) {
+		    abort(e);
+		}
+		throw e;
+	    }
+	}
+    }
+
+    /** Notify any listeners after completing the transaction. */
+    private void notifyListenersAfter(boolean commited) {
+	for (TransactionListener listener : listeners) {
+	    try {
+		listener.afterCompletion(commited);
+	    } catch (RuntimeException e) {
+		logger.logThrow(Level.WARNING, e,
+				"TransactionListener.afterCompletion failed");
+	    }
+	}
     }
 }

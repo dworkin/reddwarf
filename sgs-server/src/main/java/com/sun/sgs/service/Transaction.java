@@ -162,4 +162,35 @@ public interface Transaction {
      * @return the exception that caused the abort or {@code null}
      */
     Throwable getAbortCause();
+
+    /**
+     * Registers a listener that will be notified just before this transaction
+     * is prepared, and after it commits or aborts. <p>
+     *
+     * The {@code listener}'s {@link TransactionListener#beforeCompletion
+     * beforeCompletion} method will be called after the main work of the
+     * transaction is complete, just before the transaction is prepared.  The
+     * transaction will still be considered active at the time of the call,
+     * although calls should not be made to independent {@link Service}s.  If
+     * the call to {@code beforeCompletion} throws an exception, then this
+     * transaction will be aborted, and the exception will be treated as if it
+     * were thrown by the main body of the transaction.  The {@code listener}'s
+     * {@code beforeCompletion} method will not be called if this transaction
+     * is aborted before it reaches the preparation stage, including if an
+     * earlier call to {@code beforeCompletion} on another listener throws an
+     * exception or aborts this transaction. <p>
+     *
+     * The {@code listener}'s {@link TransactionListener#afterCompletion
+     * afterCompletion} method will be called after this transaction is
+     * committed or aborted. <p>
+     *
+     * Any number of listeners can be registered for this transaction by making
+     * multiple calls to this method.  If multiple listeners are registered,
+     * the order in which the listeners are called is unspecified.
+     *
+     * @param	listener the listener
+     * @throws	TransactionNotActiveException if this transaction is not
+     *		active
+     */
+    void registerListener(TransactionListener listener);
 }
