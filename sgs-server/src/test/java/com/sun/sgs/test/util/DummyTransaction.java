@@ -371,6 +371,8 @@ public class DummyTransaction implements Transaction {
 	    try {
 		listener.afterCompletion(commited);
 	    } catch (RuntimeException e) {
+		logger.logThrow(Level.WARNING, e,
+				"TransactionListener.afterCompletion failed");
 	    }
 	}
     }

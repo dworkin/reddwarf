@@ -52,6 +52,8 @@ public interface TransactionListener {
      * reaches the preparation stage, including if an earlier call to this
      * method on another listener throws an exception or aborts the
      * transaction.
+     *
+     * @throws	RuntimeException if the transaction should be aborted
      */
     void beforeCompletion();
 

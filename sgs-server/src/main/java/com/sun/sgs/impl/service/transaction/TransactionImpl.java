@@ -502,9 +502,9 @@ final class TransactionImpl implements Transaction {
 		try {
 		    listener.afterCompletion(commited);
 		} catch (RuntimeException e) {
-		    if (logger.isLoggable(Level.FINEST)) {
+		    if (logger.isLoggable(Level.WARNING)) {
 			logger.logThrow(
-			    Level.FINEST, e,
+			    Level.WARNING, e,
 			    "afterCompletion {0} listener:{1} failed",
 			    this, listener);
 		    }
