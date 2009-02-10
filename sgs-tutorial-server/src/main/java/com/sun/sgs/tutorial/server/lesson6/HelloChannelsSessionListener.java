@@ -64,8 +64,9 @@ class HelloChannelsSessionListener
     public HelloChannelsSessionListener(ClientSession session,
                                         ManagedReference<Channel> channel1)
     {
-        if (session == null)
+        if (session == null) {
             throw new NullPointerException("null session");
+        }
 
         DataManager dataMgr = AppContext.getDataManager();
         sessionRef = dataMgr.createReference(session);
