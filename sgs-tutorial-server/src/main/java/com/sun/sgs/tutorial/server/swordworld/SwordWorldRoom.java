@@ -131,13 +131,13 @@ public class SwordWorldRoom extends SwordWorldObject
         List<SwordWorldPlayer> otherPlayers =
             getPlayersExcluding(looker);
 
-        if (! otherPlayers.isEmpty()) {
+        if (!otherPlayers.isEmpty()) {
             output.append("Also in here are ");
             appendPrettyList(output, otherPlayers);
             output.append(".\n");
         }
 
-        if (! items.isEmpty()) {
+        if (!items.isEmpty()) {
             output.append("On the floor you see:\n");
             for (ManagedReference<SwordWorldObject> itemRef : items) {
                 SwordWorldObject item = itemRef.get();
@@ -159,8 +159,9 @@ public class SwordWorldRoom extends SwordWorldObject
     private void appendPrettyList(StringBuilder builder,
         List<? extends SwordWorldObject> list)
     {
-        if (list.isEmpty())
+        if (list.isEmpty()) {
             return;
+        }
 
         int lastIndex = list.size() - 1;
         SwordWorldObject last = list.get(lastIndex);
@@ -190,16 +191,18 @@ public class SwordWorldRoom extends SwordWorldObject
     private List<SwordWorldPlayer>
             getPlayersExcluding(SwordWorldPlayer player)
     {
-        if (players.isEmpty())
+        if (players.isEmpty()) {
             return Collections.emptyList();
+        }
 
         ArrayList<SwordWorldPlayer> otherPlayers =
             new ArrayList<SwordWorldPlayer>(players.size());
 
         for (ManagedReference<SwordWorldPlayer> playerRef : players) {
             SwordWorldPlayer other = playerRef.get();
-            if (! player.equals(other))
+            if (!player.equals(other)) {
                 otherPlayers.add(other);
+            }
         }
 
         return Collections.unmodifiableList(otherPlayers);
