@@ -65,15 +65,18 @@ import java.util.logging.Level;
  *	com.sun.sgs.io.retries
  *	</b></code><br>
  *	<i>Default:</i> 5 retries <br>
- *	Specifies how many times an {@link IoRunnable IoRunnable} task should be retried
- *      before performing failure procedures.<p>
+ *	Specifies how many times an {@link IoRunnable IoRunnable} task should 
+ *      be retried before performing failure procedures.<p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.io.wait.time
  *	</b></code><br>
  *	<i>Default:</i> 100 milliseconds <br>
- *      Specifies the wait time between {@link IoRunnable IoRunnable} task retries.
+ *      Specifies the wait time between {@link IoRunnable IoRunnable} task
+ *      retries.
  *
+ * </dl> <p>
+ * 
  */
 public abstract class AbstractService implements Service {
 
@@ -528,8 +531,7 @@ public abstract class AbstractService implements Service {
                     // Report failure of remote node since are having trouble
                     // contacting it.
                     txnProxy.getService(WatchdogService.class).
-                            reportFailure(nodeId, this.getClass().toString(),
-                            WatchdogService.FailureLevel.MEDIUM);
+                            reportFailure(nodeId, this.getClass().toString());
                     break;
                 }
                 try {

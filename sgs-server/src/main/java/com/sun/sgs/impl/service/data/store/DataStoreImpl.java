@@ -1262,7 +1262,7 @@ public class DataStoreImpl
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    public void shutdown() {
 	logger.log(Level.FINER, "shutdown");
 	try {
 	    synchronized (txnCountLock) {
@@ -1274,24 +1274,20 @@ public class DataStoreImpl
 				   txnCount);
 			txnCountLock.wait();
 		    } catch (InterruptedException e) {
+                        // loop until shutdown is complete
 			logger.log(Level.FINEST, "shutdown interrupted");
-			break;
 		    }
-		}
-		if (txnCount < 0) {
-		    throw new IllegalStateException("DataStore is shut down");
-		}
-		boolean ok = (txnCount == 0);
-		if (ok) {
-		    infoDb.close();
-		    classesDb.close();
-		    oidsDb.close();
-		    namesDb.close();
-		    env.close();
-		    txnCount = -1;
-		}
-		logger.log(Level.FINER, "shutdown returns {0}", ok);
-		return ok;
+                }
+                if (txnCount < 0) {
+                    return; // return silently
+                }
+
+                infoDb.close();
+                classesDb.close();
+                oidsDb.close();
+                namesDb.close();
+                env.close();
+                txnCount = -1;
 	    }
 	} catch (RuntimeException e) {
 	    throw convertException(null, Level.FINER, e, "shutdown");

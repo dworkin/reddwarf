@@ -447,7 +447,7 @@ public final class WatchdogServiceImpl
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
 		// this will call setFailedThenNotify(true)
-                reportFailure(localNodeId, CLASSNAME, FailureLevel.MEDIUM);
+                reportFailure(localNodeId, CLASSNAME);
 		return false;
 	    } else {
 		return true;
@@ -507,76 +507,62 @@ public final class WatchdogServiceImpl
     /**
      * {@inheritDoc}
      */
-    public synchronized void reportFailure(long nodeId, String className, 
-            FailureLevel severity) 
+    public synchronized void reportFailure(long nodeId, String className)
     {
         // If the node is shutting down or is not alive, then
         // we won't do anything
         if (shuttingDown() || !getIsAlive()) {
             return;
         }
-        
+
         /*
-         * Depending on the severity, decide what action to perform. In the
-         * future, we may want to differentiate the type of action to perform.
-         * For now, default all behavior to the same action: node shutdown.
+         * Shutdown this node if the nodeId matches the local node id.
+         * Otherwise, find the node which should be shutdown instead
          */
-        switch (severity) {
-            case FATAL:
-            case SEVERE:
-            case MEDIUM:
-            case MINOR:
-            default:
+        if (nodeId == localNodeId) {
+            logger.log(Level.WARNING, "{1} reported failure in local " +
+                    "node with id: {0}", nodeId, className);
 
-                /*
-                 * Shutdown this node if the nodeId matches the local node id.
-                 * Otherwise, find the node which should be shutdown instead
-                 */
-                if (nodeId == localNodeId) {
-                    logger.log(Level.WARNING, "{1} reported failure in local " 
-                            + "node with id: {0}", nodeId, className);
-
-                    /*
-                     * Try to report failure to the watchdog server. Since it
-                     * is possible that the failure is because of a broken
-                     * connection to the watchdog server, catch an IOException
-                     * that may be thrown as a result. Retry a few times.
-                     */
-                    int retries = maxIOAttempts;
-                    while (retries-- > 0) {
-                        try {
-                            serverProxy.setNodeAsFailed(nodeId, true, className,
-                                    FailureLevel.SEVERE, maxIOAttempts);
-                            break;
-                        } catch (IOException ioe) {
-                            if (retries == 0) {
-                                logger.log(Level.SEVERE, "Cannot report " +
-                                        "local failure to Watchdog server");
-                            }
-                        }
-                    }
-                    setFailedThenNotify(true);
-                } else {
-                    logger.log(Level.WARNING, "{1} reported failure in remote"
-                            + " node with id {0}", nodeId, className);
-                    // Inform the server to shutdown the remote node. If an
-                    // IOException occurs, retry a number of times.
-                    int retries = maxIOAttempts;
-                    while (retries-- > 0) {
-                        try {
-                            serverProxy.setNodeAsFailed(nodeId, false,
-                                    className, severity, maxIOAttempts);
-                            break;
-                        } catch (IOException ioe) {
-                            if (retries == 0) {
-                                logger.log(Level.SEVERE, "Cannot report " +
-                                        "remote failure to Watchdog server");
-                                // The local node has a connection problem
-                                setFailedThenNotify(true);
-                            }
-                        }
+            /*
+             * Try to report failure to the watchdog server. Since it
+             * is possible that the failure is because of a broken
+             * connection to the watchdog server, catch an IOException
+             * that may be thrown as a result. Retry a few times.
+             */
+            int retries = maxIOAttempts;
+            while (retries-- > 0) {
+                try {
+                    serverProxy.setNodeAsFailed(nodeId, true, className,
+                            maxIOAttempts);
+                    break;
+                } catch (IOException ioe) {
+                    if (retries == 0) {
+                        logger.log(Level.SEVERE, "Cannot report " +
+                                "local failure to Watchdog server");
                     }
                 }
+            }
+            setFailedThenNotify(true);
+        } else {
+            logger.log(Level.WARNING, "{1} reported failure in remote" +
+                    " node with id {0}", nodeId, className);
+            // Inform the server to shutdown the remote node. If an
+            // IOException occurs, retry a number of times.
+            int retries = maxIOAttempts;
+            while (retries-- > 0) {
+                try {
+                    serverProxy.setNodeAsFailed(nodeId, false,
+                            className, maxIOAttempts);
+                    break;
+                } catch (IOException ioe) {
+                    if (retries == 0) {
+                        logger.log(Level.SEVERE, "Cannot report " +
+                                "remote failure to Watchdog server");
+                        // The local node has a connection problem
+                        setFailedThenNotify(true);
+                    }
+                }
+            }
         }
     }
 
@@ -828,7 +814,7 @@ public final class WatchdogServiceImpl
 	/**
 	 * {@inheritDoc}
 	 */
-	public void reportFailure(String className, FailureLevel severity) {
+	public void reportFailure(String className) {
 	    setFailedThenNotify(true);
 	}
 

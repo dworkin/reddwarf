@@ -1,5 +1,6 @@
 Version 0.9.9:
 - Switch to BDB JE 3.3.75 (issue #122)
+- Improve node shutdown mechanism (issue #37 and #112)
 
 Version 0.9.8:
 - Add ScalableDeque and ScalableList implementations

@@ -624,8 +624,7 @@ public final class NodeMappingServerImpl
                                     "been removed", oldClient, id);
                             // shutdown the node corresponding to oldClient
                             watchdogService.reportFailure(oldNode.getId(),
-                                    this.getClass().toString(),
-                                    WatchdogService.FailureLevel.MEDIUM);
+                                    this.getClass().toString());
                         }
                     }
                 }
@@ -647,8 +646,7 @@ public final class NodeMappingServerImpl
 
                         // shutdown the node corresponding to newClient
                         watchdogService.reportFailure(newNode.getId(),
-                                this.getClass().toString(),
-                                WatchdogService.FailureLevel.MEDIUM);
+                                this.getClass().toString());
                     }
                 }
             }

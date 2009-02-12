@@ -1321,7 +1321,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
             // Report a failure, which should shutdown the node
             watchdogService.reportFailure(watchdogService.getLocalNodeId(), 
-                    appName, WatchdogService.FailureLevel.FATAL);
+                    appName);
 
             // Node should not be alive since we reported a failure
             try {
@@ -1351,7 +1351,7 @@ public class TestWatchdogServiceImpl extends Assert {
         serverNode = null;
 
         // Wait for the renew to fail and the shutdown to begin
-        Thread.sleep(renewTime*4);
+        Thread.sleep(renewTime*7);
 
         try {
             // The node should be shut down
@@ -1381,8 +1381,7 @@ public class TestWatchdogServiceImpl extends Assert {
             System.err.println("   new node id: " + node.getNodeId());
 
             server.getWatchdogService().reportFailure(node.getNodeId(), 
-                    WatchdogService.class.getName(), 
-                    WatchdogService.FailureLevel.FATAL);
+                    WatchdogService.class.getName());
 
             // The server node that reported the remote 
             // failure should be unaffected
@@ -1501,8 +1500,7 @@ public class TestWatchdogServiceImpl extends Assert {
         final SgsTestNode appNode = new SgsTestNode(serverNode, null, null);
         // issue a shutdown; this shutdown runs in a seperate thread
         appNode.getWatchdogService().reportFailure(appNode.getNodeId(),
-                appNode.getClass().getName(),
-                WatchdogService.FailureLevel.SEVERE);
+                appNode.getClass().getName());
         // issue another shutdown; set clean = false since we do not want this
         // test case to fail due to an error trying to delete a missing file
         appNode.shutdown(false);

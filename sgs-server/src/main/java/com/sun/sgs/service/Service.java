@@ -72,16 +72,16 @@ public interface Service {
     void ready() throws Exception;
 
     /**
-     * Attempts to shut down this service. Any call to this method will block
+     * Shuts down this service. Any call to this method will block
      * until the shutdown has completed. If a shutdown has been completed
-     * already, it will return immediately.<p>
+     * already, this method will return immediately.<p>
      *
      * This method does not require a transaction, and should not be called
      * from one because this method will typically not succeed if there are
      * outstanding transactions. <p>
      *
-     * When this method returns, it is assumed that the service has already
-     * shutdown as best it can.<p>
+     * When this method returns, it is assumed that the service has been 
+     * shutdown.<p>
      *
      * Callers should assume that, in a worst case, this method may block
      * indefinitely, and so should arrange to take other action (for example,

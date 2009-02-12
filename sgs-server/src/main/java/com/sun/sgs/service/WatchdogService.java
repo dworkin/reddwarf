@@ -31,20 +31,6 @@ import com.sun.sgs.app.TransactionException;
 public interface WatchdogService extends Service {
 
     /**
-     * Failure constants to use when reporting issues to the Watchdog.
-     */
-    public enum FailureLevel {
-	/** Fatal error which should prompt the shutdown of the node. */
-	FATAL,
-	/** A severe error which likely requires the node to shutdown. */
-	SEVERE,
-	/** A medium error which might require the node to shutdown (I/O?). */
-	MEDIUM,
-	/** A minor error that may not require node shutdown. */
-	MINOR
-    }
-
-    /**
      * Returns the node ID for the local node.  The node ID for a node
      * remains fixed for the lifetime of the node (i.e., until it
      * fails).
@@ -153,15 +139,13 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
     
     /**
-     * Informs the watchdog that a problem has occured in a service. Depending
-     * on the {@code severity} passed in, the watchdog may choose to shut down 
-     * the node. Currently, the severity is ignored and this method will always
-     * issue a node shutdown. This method is called through the 
-     * {@code WatchdogService} interface when the node is known to be remote.
+     * Informs the watchdog that a problem has occured in a service or 
+     * component. The watchdog will notify the server of the failure and then
+     * proceeed to shutting down the node. The node specified as the nodeId can
+     * be a local node or a remote node.
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed
-     * @param severity the severity of the failure
      */
-    void reportFailure(long nodeId, String className, FailureLevel severity);
+    void reportFailure(long nodeId, String className);
 }

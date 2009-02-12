@@ -1457,9 +1457,8 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action = new ShutdownAction();
 	try {
 	    action.waitForDone();
-	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
-	    System.err.println(e);
+	    fail("Unexpected IllegalStateException");
 	} finally {
 	    store = null;
 	}
@@ -1469,7 +1468,7 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action = new ShutdownAction();
 	action.assertBlocked();
 	action.interrupt();
-	action.assertResult(false);
+        action.waitForDone();
 	store.setBinding(txn, "foo", id);
 	txn.commit();
 	txn = null;
@@ -1484,10 +1483,10 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	action1.interrupt();
-	action1.assertResult(false);
+        action1.waitForDone();
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	action2.assertResult(true);
+	action2.waitForDone();
 	txn = null;
 	store = null;
     }
@@ -1510,8 +1509,7 @@ public class TestDataStoreImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    result2 = false;
 	}
-	assertTrue(result1 || result2);
-	assertFalse(result1 && result2);
+        assertTrue(result1 && result2);
 	txn = null;
 	store = null;
     }
@@ -2030,7 +2028,7 @@ public class TestDataStoreImpl extends TestCase {
 	    txn.commit();
 	    txn = null;
 	}
-	shutdownAction.assertResult(true);
+	shutdownAction.waitForDone();
 	store = null;
     }
 
@@ -2060,7 +2058,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue("Expected IllegalStateException: " + exception,
 		   exception instanceof IllegalStateException);
 	originalTxn.abort(new RuntimeException("abort"));
-	shutdownAction.assertResult(true);
+	shutdownAction.waitForDone();
 	store = null;
     }
 
@@ -2095,7 +2093,8 @@ public class TestDataStoreImpl extends TestCase {
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = shutdown();
+		shutdown();
+                result = true;
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -2105,8 +2104,8 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 
-	protected boolean shutdown() {
-	    return store.shutdown();
+	protected void shutdown() {
+            store.shutdown();
 	}
 
 	/** Asserts that the shutdown call is blocked. */

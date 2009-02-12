@@ -1025,36 +1025,25 @@ public final class DataServiceImpl implements DataService {
      * {@inheritDoc}
      */
     public void shutdown() {
-	synchronized (stateLock) {
-	    while (state == State.SHUTTING_DOWN) {
-		try {
-		    stateLock.wait();
-		} catch (InterruptedException e) {
-                    return; // incomplete shutdown
-		}
-	    }
-	    if (state == State.SHUTDOWN) {
-                return; // finished
-	    }
-	    state = State.SHUTTING_DOWN;
-	}
-	boolean done = false;
-	try {
-	    if (store.shutdown()) {
-		synchronized (stateLock) {
-		    state = State.SHUTDOWN;
-		    stateLock.notifyAll();
-		}
-		done = true;
-	    }
-	} finally {
-	    if (!done) {
-		synchronized (stateLock) {
-		    state = State.RUNNING;
-		    stateLock.notifyAll();
-		}
-	    }
-	}
+        synchronized (stateLock) {
+            while (state == State.SHUTTING_DOWN) {
+                try {
+                    stateLock.wait();
+                } catch (InterruptedException e) {
+                    // loop until shutdown is complete
+                }
+            }
+            if (state == State.SHUTDOWN) {
+                return; // return silently
+            }
+            state = State.SHUTTING_DOWN;
+        }
+
+        store.shutdown();
+        synchronized (stateLock) {
+            state = State.SHUTDOWN;
+            stateLock.notifyAll();
+        }
     }
 
     /**

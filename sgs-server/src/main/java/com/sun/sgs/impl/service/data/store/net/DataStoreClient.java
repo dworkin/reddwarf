@@ -545,7 +545,7 @@ public final class DataStoreClient
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    public void shutdown() {
 	logger.log(Level.FINER, "shutdown");
 	try {
 	    synchronized (txnCountLock) {
@@ -557,26 +557,19 @@ public final class DataStoreClient
 				   txnCount);
 			txnCountLock.wait();
 		    } catch (InterruptedException e) {
+                        // loop until shutdown is complete
 			logger.log(Level.FINEST, "shutdown interrupted");
-			break;
 		    }
 		}
-		if (txnCount < 0) {
-		    throw new IllegalStateException("DataStore is shut down");
-		}
-		boolean ok = (txnCount == 0);
-		if (ok) {
-		    txnCount = -1;
-		    if (localServer != null) {
-			if (localServer.shutdown()) {
-			    localServer = null;
-			} else {
-			    ok = false;
-			}
-		    }
-		}
-		logger.log(Level.FINER, "shutdown returns {0}", ok);
-		return ok;
+                if (txnCount < 0) {
+                    return; // return silently
+                }
+
+                txnCount = -1;
+                if (localServer != null) {
+                    localServer.shutdown();
+                    localServer = null;
+                }
 	    }
 	} catch (RuntimeException e) {
 	    throw convertException(null, null, Level.FINER, e, "shutdown");

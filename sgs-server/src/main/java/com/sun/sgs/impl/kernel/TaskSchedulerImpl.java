@@ -225,12 +225,11 @@ final class TaskSchedulerImpl implements TaskScheduler {
     /**
      * Tells this scheduler to shutdown.
      *
-     * @throws IllegalStateException if the scheduler is already shutdown
      */
     void shutdown() {
         synchronized (this) {
             if (isShutdown) {
-                throw new IllegalStateException("Already shutdown");
+                return; // return silently
             }
             isShutdown = true;
         }

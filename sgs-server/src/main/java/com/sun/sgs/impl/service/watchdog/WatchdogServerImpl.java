@@ -46,7 +46,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import java.io.IOException;
-import com.sun.sgs.service.WatchdogService.FailureLevel;
 import java.util.Arrays;
 
 /**
@@ -530,7 +529,7 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
-            FailureLevel severity, int maxNumberOfAttempts)
+            int maxNumberOfAttempts)
     {
         NodeImpl remoteNode = aliveNodes.get(nodeId);
         if (remoteNode == null) {
@@ -548,8 +547,7 @@ public final class WatchdogServerImpl
             while (retries-- > 0) {
 
                 try {
-                    remoteNode.getWatchdogClient().reportFailure(className,
-                            severity);
+                    remoteNode.getWatchdogClient().reportFailure(className);
                     break;
                 } catch (IOException ioe) {
                     if (retries == 0) {

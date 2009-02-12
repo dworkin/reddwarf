@@ -296,14 +296,12 @@ public class TestAbstractService extends TestCase {
 
         public void reportLocalFailure() throws IOException {
             WatchdogService svc = txnProxy.getService(WatchdogService.class);
-            svc.reportFailure(svc.getLocalNodeId(), this.getClass().getName(), 
-                    WatchdogService.FailureLevel.FATAL);
+            svc.reportFailure(svc.getLocalNodeId(), this.getClass().getName());
         }
 
         public void reportRemoteFailure(long nodeId) throws IOException {
             WatchdogService svc = txnProxy.getService(WatchdogService.class);
-            svc.reportFailure(nodeId, this.getClass().getName(), 
-                    WatchdogService.FailureLevel.FATAL);
+            svc.reportFailure(nodeId, this.getClass().getName());
         }
     }
     

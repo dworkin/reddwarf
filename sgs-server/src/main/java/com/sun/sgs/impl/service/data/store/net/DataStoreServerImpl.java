@@ -858,20 +858,14 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Other public methods -- */
 
     /**
-     * Attempts to shut down this server, returning a value that specifies
-     * whether the attempt was successful.
+     * Shuts down this server. Calls to this method will block until the
+     * shutdown is complete.
      *
-     * @return	{@code true} if the shut down was successful, else
-     *		{@code false}
-     * @throws	IllegalStateException if the {@code shutdown} method has
-     *		already been called and returned {@code true}
      */
-    public synchronized boolean shutdown() {
-	if (!store.shutdown()) {
-	    return false;
-	}
+    public synchronized void shutdown() {
+        store.shutdown();
 	executor.shutdownNow();
-	return exporter.unexport();
+	exporter.unexport();
     }
 
     /**

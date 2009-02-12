@@ -128,6 +128,9 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
+
+    // default timeout the kernel's shutdown method (15 minutes)
+    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15*60*1000;
     
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
@@ -149,8 +152,8 @@ class Kernel {
     private final ProfileCollectorImpl profileCollector;
     
     // shutdown controller that can be passed to components who need to be able 
-    // to issue a Kernel shutdown. the watchdog also constains a reference for
-    // service shutdown.
+    // to issue a kernel shutdown. the watchdog also constains a reference for
+    // services to call shutdown.
     private final KernelShutdownControllerImpl shutdownCtrl = 
             new KernelShutdownControllerImpl();
     
@@ -660,16 +663,37 @@ class Kernel {
                        application);
         }
     }
-        
+
+    /**
+     * Thread that will call System.exit(1) after a timeout period. This is to
+     * force the process to quit if the node shutdown process takes too long
+     * and is most likely irreparably stuck.
+     */
+    private Thread startShutdownTimeoutThread(final int timeout) {
+        Thread timeoutThread = new Thread() {
+            public void run() {
+                try {
+                    Thread.sleep(timeout);
+                    System.exit(1);
+                } catch (InterruptedException e) {
+                    // shutdown successful
+                }
+            }
+        };
+        timeoutThread.start();
+        return timeoutThread;
+    }
+    
     /**
      * Shut down all services (in reverse order) and the schedulers.
      */
     synchronized void shutdown() {
-        // check if the node is shutdown; silently return if so.
         if (isShutdown) { 
             return;
         }
-        isShutdown = true;
+
+        Thread timeoutThread = startShutdownTimeoutThread(
+                DEFAULT_SHUTDOWN_TIMEOUT);
         
         logger.log(Level.FINE, "Kernel.shutdown() called.");
         if (application != null) {
@@ -685,7 +709,10 @@ class Kernel {
         if (taskScheduler != null) {
             taskScheduler.shutdown();
         }
-        logger.log(Level.FINE, "Node is finished shutting down.");
+        
+        logger.log(Level.FINE, "Node is shut down.");
+        isShutdown = true;
+        timeoutThread.interrupt();
     }
     
     /**
@@ -953,8 +980,7 @@ class Kernel {
                         if (watchdogSvc != null) {
                             watchdogSvc.reportFailure(watchdogSvc.
                                     getLocalNodeId(),
-                                    caller.getClass().toString(),
-                                    WatchdogService.FailureLevel.SEVERE);
+                                    caller.getClass().toString());
                         } else {
                             // shutdown directly if watchdog has not been setup
                             runShutdown();
@@ -975,13 +1001,13 @@ class Kernel {
          * a Kernel shutdown was called from RenewThread.
          */
         private void runShutdown() {
+            logger.log(Level.WARNING, "Controller issued node shutdown.");
+
             new Thread(new Runnable() {
                 public void run() {
                     shutdown();
                 }
             }).start();
-            // spawn another thread that waits for a timeout
-            // then calls System.exit(0)?
         }
     }
     

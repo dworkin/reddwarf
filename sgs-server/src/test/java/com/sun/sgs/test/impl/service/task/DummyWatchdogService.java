@@ -158,8 +158,7 @@ public class DummyWatchdogService implements WatchdogService {
         }
     }
 
-    public void reportFailure(long nodeId, String className, 
-            FailureLevel severity) {
+    public void reportFailure(long nodeId, String className) {
         // Don't do anything for now
     }
 }

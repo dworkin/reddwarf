@@ -515,7 +515,9 @@ public class TestDataStoreServerImpl extends TestCase {
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = shutdown();
+		shutdown();
+                result = true; // this result no longer specifies if the
+                               // shutdown succeeded, it is always true
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -525,8 +527,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	    }
 	}
 
-	protected boolean shutdown() {
-	    return server.shutdown();
+	protected void shutdown() {
+	    server.shutdown();
 	}
 
 	/** Asserts that the shutdown call is blocked. */

@@ -61,10 +61,8 @@ public interface WatchdogClient extends Remote {
      * shutdown procedure.
      * 
      * @param className the class which reported the failure
-     * @param severity the severity of the failure
      * @throws IOException if a communication problem occurs while invoking
      * this method
      */
-    void reportFailure(String className, WatchdogService.FailureLevel severity)
-	    throws IOException;
+    void reportFailure(String className) throws IOException;
 }
