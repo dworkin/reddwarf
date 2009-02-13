@@ -19,7 +19,6 @@
 
 package com.sun.sgs.impl.protocol.multi;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -31,7 +30,6 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Map;
@@ -156,7 +154,6 @@ public class MultiSgsProtocolAcceptor
     /* -- Implement AbstractService -- */
     
     /** {@inheritDoc} */
-    @Override
     public void doShutdown() {
 	super.doShutdown();
         secondaryTransport.shutdown();
@@ -165,7 +162,6 @@ public class MultiSgsProtocolAcceptor
     /* -- Implement ProtocolAcceptor -- */
 
     /** {@inheritDoc} */
-    @Override
     public synchronized ProtocolDescriptor getDescriptor() {
 	if (protocolDesc == null) {
 	    protocolDesc =
@@ -177,7 +173,6 @@ public class MultiSgsProtocolAcceptor
     }
     
     /** {@inheritDoc} */
-    @Override
     public void accept(ProtocolListener protocolListener) throws IOException {
         transport.accept(new PrimaryHandlerImpl(protocolListener));
         secondaryTransport.accept(new SecondaryHandlerImpl());
@@ -198,7 +193,6 @@ public class MultiSgsProtocolAcceptor
         }
         
         /** {@inheritDoc} */
-        @Override
         public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
@@ -206,6 +200,12 @@ public class MultiSgsProtocolAcceptor
                                      MultiSgsProtocolAcceptor.this,
                                      byteChannel,
                                      readBufferSize);
+        }
+        
+        /** {@inheritDoc} */
+        public void shutdown() {
+            logger.log(Level.SEVERE, "primary transport unexpectly shutdown");
+            close();
         }
     }
     
@@ -215,7 +215,6 @@ public class MultiSgsProtocolAcceptor
     private class SecondaryHandlerImpl implements ConnectionHandler {
 
         /** {@inheritDoc} */
-        @Override
         public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
@@ -223,6 +222,12 @@ public class MultiSgsProtocolAcceptor
 				 MultiSgsProtocolAcceptor.this,
                                  byteChannel,
                                  readBufferSize);
+        }
+        
+        /** {@inheritDoc} */
+        public void shutdown() {
+            logger.log(Level.SEVERE, "secondary transport unexpectly shutdown");
+            close();
         }
     }
     

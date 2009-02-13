@@ -116,7 +116,7 @@ public class TcpTransport implements Transport {
     private final AsynchronousChannelGroup asyncChannelGroup;
 
     /** The acceptor for listening for new connections. */
-    final AsynchronousServerSocketChannel acceptor;
+    AsynchronousServerSocketChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
     volatile IoFuture<?, ?> acceptFuture = null;
@@ -125,7 +125,7 @@ public class TcpTransport implements Transport {
     ConnectionHandler handler = null;
     
     /** The transport descriptor */
-    final TcpDescriptor descriptor;
+    private final TcpDescriptor descriptor;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -256,7 +256,7 @@ public class TcpTransport implements Transport {
 		    asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS);
 	    } catch (InterruptedException e) {
 		logger.logThrow(Level.FINEST, e,
-				"shutdown acceptor interrupted");
+				"shutdown async group interrupted");
 		Thread.currentThread().interrupt();
 	    }
 	    if (!groupShutdownCompleted) {
@@ -265,7 +265,7 @@ public class TcpTransport implements Transport {
 		    asyncChannelGroup.shutdownNow();
 		} catch (IOException e) {
 		    logger.logThrow(Level.FINEST, e,
-				    "shutdown acceptor throws");
+				    "shutdown async group throws");
 		    // swallow exception
 		}
 	    }
@@ -273,6 +273,24 @@ public class TcpTransport implements Transport {
 	}
     }
   
+    private synchronized void restart()
+            throws IOException
+    {
+        if (asyncChannelGroup.isShutdown()) {
+            throw new IOException("channel group is shutdown");
+        }
+        try {
+            acceptor.close();
+        } catch (IOException ex) {
+            logger.logThrow(Level.FINEST, ex,
+                            "exception closing acceptor during restart");
+        }
+        acceptor = AsynchronousChannelProvider.provider().
+                openAsynchronousServerSocketChannel(asyncChannelGroup);
+
+        acceptor.bind(listenAddress, acceptorBacklog);
+    }
+            
     /** A completion handler for accepting connections. */
     private class AcceptorListener
         implements CompletionHandler<AsynchronousSocketChannel, Void>
@@ -298,10 +316,19 @@ public class TcpTransport implements Transport {
                 logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
                 //ignore
             } catch (Throwable e) {
-                logger.logThrow(
-		    Level.SEVERE, e, "acceptor error on {0}", listenAddress);
-
-                // TBD: take other actions, such as restarting acceptor?
+                logger.logThrow(Level.SEVERE, e,
+                                "acceptor error on {0}", listenAddress);
+                try {
+                    restart();
+                    
+                    // Resume accepting connections on new acceptor
+                    acceptFuture = acceptor.accept(this);
+                } catch (IOException ioe) {
+                    logger.logThrow(Level.FINEST, ioe,
+                                    "exception during restart");
+                    shutdown();
+                    handler.shutdown();
+                }
             }
 	}
     }

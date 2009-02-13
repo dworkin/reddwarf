@@ -29,7 +29,6 @@ import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -175,6 +174,10 @@ public class TestTcpTransport {
             throws Exception
         {
             this.channel = channel;
+        }
+        
+        public void shutdown() {
+            throw new UnsupportedOperationException("Not supported yet.");
         }
         
         boolean isConnected() {

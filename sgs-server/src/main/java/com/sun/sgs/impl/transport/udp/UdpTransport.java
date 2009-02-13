@@ -297,8 +297,9 @@ public class UdpTransport implements Transport {
             } catch (Throwable e) {
                 logger.logThrow(
 		    Level.SEVERE, e, "acceptor error on {0}", listenAddress);
-
-                // TBD: take other actions, such as restarting acceptor?
+                // TODO: consider restart of acceptor
+                shutdown();
+                handler.shutdown();
             }
             receive(this);
 	}

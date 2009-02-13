@@ -40,4 +40,10 @@ public interface ConnectionHandler {
      * @throws Exception if the handler rejects the connection.
      */
     void newConnection(AsynchronousByteChannel channel) throws Exception;
+    
+    /**
+     * Notify the handler that the transport encountered an unrecoverable
+     * error and has shutdown.
+     */
+    void shutdown();
 }

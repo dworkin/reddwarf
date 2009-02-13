@@ -39,7 +39,6 @@ import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
-import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
@@ -318,7 +317,6 @@ public class SimpleSgsProtocolAcceptor
         }
         
         /** {@inheritDoc} */
-        @Override
         public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
@@ -326,6 +324,12 @@ public class SimpleSgsProtocolAcceptor
                                       SimpleSgsProtocolAcceptor.this,
                                       byteChannel,
                                       readBufferSize);
+        }
+
+        /** {@inheritDoc} */
+        public void shutdown() {
+            logger.log(Level.SEVERE, "transport unexpectly shutdown");
+            close();
         }
     }
     
