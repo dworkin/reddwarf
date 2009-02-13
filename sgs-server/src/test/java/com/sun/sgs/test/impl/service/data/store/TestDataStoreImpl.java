@@ -1456,9 +1456,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.shutdown();
 	ShutdownAction action = new ShutdownAction();
 	try {
-	    action.waitForDone();
-	} catch (IllegalStateException e) {
-	    fail("Unexpected IllegalStateException");
+	    assertTrue(action.waitForDone());
 	} finally {
 	    store = null;
 	}
@@ -1468,7 +1466,7 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action = new ShutdownAction();
 	action.assertBlocked();
 	action.interrupt();
-        action.waitForDone();
+        assertFalse(action.waitForDone());
 	store.setBinding(txn, "foo", id);
 	txn.commit();
 	txn = null;
@@ -1483,10 +1481,11 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	action1.interrupt();
-        action1.waitForDone();
+        action1.assertBlocked(); // should not be interrupted
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	action2.waitForDone();
+        assertTrue(action1.waitForDone());
+	assertTrue(action2.waitForDone());
 	txn = null;
 	store = null;
     }
@@ -1497,19 +1496,8 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	boolean result1;
-	try {
-	    result1 = action1.waitForDone();
-	} catch (IllegalStateException e) {
-	    result1 = false;
-	}
-	boolean result2;
-	try {
-	    result2 = action2.waitForDone();
-	} catch (IllegalStateException e) {
-	    result2 = false;
-	}
-        assertTrue(result1 && result2);
+	assertTrue(action1.waitForDone());
+	assertTrue(action2.waitForDone());
 	txn = null;
 	store = null;
     }
@@ -2028,7 +2016,7 @@ public class TestDataStoreImpl extends TestCase {
 	    txn.commit();
 	    txn = null;
 	}
-	shutdownAction.waitForDone();
+	assertTrue(shutdownAction.waitForDone());
 	store = null;
     }
 
@@ -2058,7 +2046,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue("Expected IllegalStateException: " + exception,
 		   exception instanceof IllegalStateException);
 	originalTxn.abort(new RuntimeException("abort"));
-	shutdownAction.waitForDone();
+	assertTrue(shutdownAction.waitForDone());
 	store = null;
     }
 
@@ -2083,7 +2071,6 @@ public class TestDataStoreImpl extends TestCase {
     protected class ShutdownAction extends Thread {
 	private boolean done;
 	private Throwable exception;
-	private boolean result;
 
 	/** Creates an instance of this class and starts the thread. */
 	protected ShutdownAction() {
@@ -2094,7 +2081,6 @@ public class TestDataStoreImpl extends TestCase {
 	public void run() {
 	    try {
 		shutdown();
-                result = true;
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -2121,25 +2107,12 @@ public class TestDataStoreImpl extends TestCase {
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
-	 */
-	public synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
-	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
-	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
 	/** Wait until done, but give up after a while. */

@@ -509,61 +509,41 @@ public final class WatchdogServiceImpl
      */
     public synchronized void reportFailure(long nodeId, String className)
     {
-        // If the node is shutting down or is not alive, then
-        // we won't do anything
         if (shuttingDown() || !getIsAlive()) {
             return;
         }
 
-        /*
-         * Shutdown this node if the nodeId matches the local node id.
-         * Otherwise, find the node which should be shutdown instead
-         */
-        if (nodeId == localNodeId) {
+        boolean isLocal = (nodeId == localNodeId);
+        if (isLocal) {
             logger.log(Level.WARNING, "{1} reported failure in local " +
                     "node with id: {0}", nodeId, className);
-
-            /*
-             * Try to report failure to the watchdog server. Since it
-             * is possible that the failure is because of a broken
-             * connection to the watchdog server, catch an IOException
-             * that may be thrown as a result. Retry a few times.
-             */
-            int retries = maxIOAttempts;
-            while (retries-- > 0) {
-                try {
-                    serverProxy.setNodeAsFailed(nodeId, true, className,
-                            maxIOAttempts);
-                    break;
-                } catch (IOException ioe) {
-                    if (retries == 0) {
-                        logger.log(Level.SEVERE, "Cannot report " +
-                                "local failure to Watchdog server");
-                    }
-                }
-            }
-            setFailedThenNotify(true);
         } else {
             logger.log(Level.WARNING, "{1} reported failure in remote" +
                     " node with id {0}", nodeId, className);
-            // Inform the server to shutdown the remote node. If an
-            // IOException occurs, retry a number of times.
-            int retries = maxIOAttempts;
-            while (retries-- > 0) {
-                try {
-                    serverProxy.setNodeAsFailed(nodeId, false,
-                            className, maxIOAttempts);
-                    break;
-                } catch (IOException ioe) {
-                    if (retries == 0) {
-                        logger.log(Level.SEVERE, "Cannot report " +
-                                "remote failure to Watchdog server");
-                        // The local node has a connection problem
-                        setFailedThenNotify(true);
-                    }
+        }
+
+        /*
+         * Try to report the failure to the watchdog server. If we cannot 
+         * contact the Watchdog server while reporting a remote failure, then
+         * set the failure as local.
+         */
+        int retries = maxIOAttempts;
+        while (retries-- > 0) {
+            try {
+                serverProxy.setNodeAsFailed(nodeId, isLocal, className,
+                        maxIOAttempts);
+                break;
+            } catch (IOException ioe) {
+                if (retries == 0) {
+                    logger.log(Level.SEVERE, "Cannot report failure to " +
+                            "Watchdog server");
+                    isLocal = true;
                 }
             }
         }
+        
+        if (isLocal)
+            setFailedThenNotify(true);
     }
 
     /**

@@ -538,14 +538,11 @@ public final class WatchdogServerImpl
             return;
         }
 
-        if (isLocal) {
-            processNodeFailures(Arrays.asList(remoteNode));
-        } else {
+        if (!isLocal) {
             // Try to report the failure to the watchdog so that the node can 
             // be shutdown. Try a few times if we run into an IOException.
             int retries = maxNumberOfAttempts;
             while (retries-- > 0) {
-
                 try {
                     remoteNode.getWatchdogClient().reportFailure(className);
                     break;
@@ -554,11 +551,11 @@ public final class WatchdogServerImpl
                         logger.log(Level.WARNING, "Could not retrieve " +
                                 "watchdog client given " +
                                 maxNumberOfAttempts + " attempt(s)");
-                        processNodeFailures(Arrays.asList(remoteNode));
                     }
                 }
             }
         }
+        processNodeFailures(Arrays.asList(remoteNode));
     }
 
     /* -- other methods -- */

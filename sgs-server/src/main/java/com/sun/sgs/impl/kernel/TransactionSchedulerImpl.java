@@ -358,9 +358,10 @@ final class TransactionSchedulerImpl
                 return; // return silently
             }
             isShutdown = true;
+
+            executor.shutdownNow();
+            backingQueue.shutdown();
         }
-        executor.shutdownNow();
-        backingQueue.shutdown();
     }
 
     /*

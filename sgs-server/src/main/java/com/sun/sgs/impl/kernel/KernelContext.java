@@ -46,7 +46,7 @@ class KernelContext {
 
     // the application's name
     private final String applicationName;
-    
+
     // the managers available in this context
     protected final ComponentRegistry managerComponents;
 
@@ -108,7 +108,7 @@ class KernelContext {
             dm = null;
         }
         dataManager = dm;
-        
+
         TaskManager tm;
         try {
             tm = managerComponents.getComponent(TaskManager.class);
@@ -222,15 +222,10 @@ class KernelContext {
         }
         Collections.reverse(list);
         for (Object service : list) {
-            try {
-                ((Service) service).shutdown();
-            } catch (Exception ex) {
-                // ignore any exceptions to not interrupt kernel shutdown
-                service = null;
-            }
+            ((Service) service).shutdown();
         }
     }
-    
+
     /**
      * Returns a unique representation of this context, in this case the
      * name of the application.

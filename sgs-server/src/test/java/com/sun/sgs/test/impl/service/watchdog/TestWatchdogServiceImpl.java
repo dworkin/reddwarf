@@ -1325,7 +1325,7 @@ public class TestWatchdogServiceImpl extends Assert {
 
             // Node should not be alive since we reported a failure
             try {
-                assertFalse(watchdogService.isLocalNodeAlive());
+                assertFalse(watchdogService.isLocalNodeAliveNonTransactional());
             } catch (Exception e) {
                 fail("Not expecting an Exception: " + e.getLocalizedMessage());
             }
@@ -1333,7 +1333,7 @@ public class TestWatchdogServiceImpl extends Assert {
             // The shutdown controller should be incremented as a result of the 
             // failure being reported
             assertEquals(1, dummyShutdownCtrl.getShutdownCount());
-
+            watchdogService.shutdown();
         } catch (Exception e) {
             fail("Not expecting an Exception");
         }
@@ -1351,7 +1351,7 @@ public class TestWatchdogServiceImpl extends Assert {
         serverNode = null;
 
         // Wait for the renew to fail and the shutdown to begin
-        Thread.sleep(renewTime*7);
+        Thread.sleep(renewTime*4);
 
         try {
             // The node should be shut down

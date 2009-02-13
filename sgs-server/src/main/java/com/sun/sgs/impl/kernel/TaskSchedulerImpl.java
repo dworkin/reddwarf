@@ -232,8 +232,8 @@ final class TaskSchedulerImpl implements TaskScheduler {
                 return; // return silently
             }
             isShutdown = true;
+            executor.shutdown();
         }
-        executor.shutdown();
     }
 
     /** Private implementation of {@code TaskReservation}. */

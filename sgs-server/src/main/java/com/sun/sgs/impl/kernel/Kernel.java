@@ -70,6 +70,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Properties;
 
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.LogManager;
@@ -665,23 +667,17 @@ class Kernel {
     }
 
     /**
-     * Thread that will call System.exit(1) after a timeout period. This is to
-     * force the process to quit if the node shutdown process takes too long
-     * and is most likely irreparably stuck.
+     * Timer that will call {@link System#exit System.exit} after a timeout
+     * period to force the process to quit if the node shutdown process takes
+     * too long. The timer is started as a daemon so the task won't be run if
+     * a shutdown completes successfully.
      */
-    private Thread startShutdownTimeoutThread(final int timeout) {
-        Thread timeoutThread = new Thread() {
+    private void startShutdownTimeout(final int timeout) {
+        new Timer(true).schedule(new TimerTask() {
             public void run() {
-                try {
-                    Thread.sleep(timeout);
-                    System.exit(1);
-                } catch (InterruptedException e) {
-                    // shutdown successful
-                }
+                System.exit(1);
             }
-        };
-        timeoutThread.start();
-        return timeoutThread;
+        }, timeout);
     }
     
     /**
@@ -691,10 +687,8 @@ class Kernel {
         if (isShutdown) { 
             return;
         }
+        startShutdownTimeout(DEFAULT_SHUTDOWN_TIMEOUT);
 
-        Thread timeoutThread = startShutdownTimeoutThread(
-                DEFAULT_SHUTDOWN_TIMEOUT);
-        
         logger.log(Level.FINE, "Kernel.shutdown() called.");
         if (application != null) {
             application.shutdownServices();
@@ -712,7 +706,6 @@ class Kernel {
         
         logger.log(Level.FINE, "Node is shut down.");
         isShutdown = true;
-        timeoutThread.interrupt();
     }
     
     /**
