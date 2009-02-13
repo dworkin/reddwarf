@@ -135,18 +135,12 @@ public class Exporter<T extends Remote> {
     }
 
     /**
-     * Removes the server from the network, returning {@code true} if
-     * successful.
-     *
-     * @return	{@code true} if unexport was successful, and {@code false}
-     *		otherwise
-     * @throws	IllegalStateException if the server has already been
-     *		removed from the network
+     * Removes the server from the network. This method will return immediately
+     * if called a second time.
      */
-    public synchronized boolean unexport() {
+    public synchronized void unexport() {
 	if (server == null) {
-	    throw new IllegalStateException(
-		"The server is already shut down");
+	    return; // return silently
 	}
         if (registry != null) {
 	    try {
@@ -155,7 +149,7 @@ public class Exporter<T extends Remote> {
 	    } catch (NoSuchObjectException e) {
 		logger.logThrow(
 		    Level.FINE, e, "Problem unexporting registry");
-		return false;
+		return;
 	    }
 	}
 	try {
@@ -164,9 +158,8 @@ public class Exporter<T extends Remote> {
 	} catch (NoSuchObjectException e) {
 	    logger.logThrow(
 		Level.FINE, e, "Problem unexporting server");
-	    return false;
+	    return;
 	}
-	return true;
     }
     
     /**

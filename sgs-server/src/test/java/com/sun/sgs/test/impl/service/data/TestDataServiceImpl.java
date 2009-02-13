@@ -3270,6 +3270,7 @@ public class TestDataServiceImpl{
                 action1.assertBlocked();
                 action1.interrupt(); // shutdown should not unblock
                 action1.assertBlocked();
+                service.setBinding("dummy", new DummyManagedObject());
             }
         }
         
@@ -4192,17 +4193,20 @@ public class TestDataServiceImpl{
                 shutdownAction = new ShutdownAction();
                 shutdownAction.assertBlocked();
 
-                threadAction = new ThreadAction<Void>() {
+                threadAction = new ThreadAction() {
                     protected void action() {
                         try {
                             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                                 public void run() {
                                     try {
                                         action.run();
-                                        //fail("Expected IllegalStateException");
+                                        fail("Expected IllegalStateException");
                                     } catch (IllegalStateException e) {
-                                        assertEquals("Service is shutting down",
-                                                     e.getMessage());
+                                        if (!e.getMessage().equals("Service " +
+                                                "is shutting down") && !e.
+                                                getMessage().equals("Sevice " +
+                                                "is shut down"))
+                                            fail("Invalid exception message");
                                     }
                             }}, taskOwner);
                         } catch (Exception e) {
@@ -4268,10 +4272,8 @@ public class TestDataServiceImpl{
     /**
      * A utility class for running an operation in a separate thread and
      * insuring that it either completes or blocks.
-     *
-     * @param	<T> the return type of the operation
      */
-    abstract static class ThreadAction<T> extends Thread {
+    abstract static class ThreadAction extends Thread {
 
 	/**
 	 * The number of milliseconds to wait to see if an operation is
@@ -4318,7 +4320,6 @@ public class TestDataServiceImpl{
 	/**
 	 * The operation to be performed.
 	 *
-	 * @return	the result of the operation
 	 * @throws	Exception if the operation fails
 	 */
 	abstract void action() throws Exception;
@@ -4386,7 +4387,7 @@ public class TestDataServiceImpl{
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends ThreadAction<Boolean> {
+    class ShutdownAction extends ThreadAction {
 	ShutdownAction() { }
 	protected void action() throws Exception {
             serverNode.shutdown(false);
@@ -4395,7 +4396,7 @@ public class TestDataServiceImpl{
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownServiceAction extends ThreadAction<Boolean> {
+    class ShutdownServiceAction extends ThreadAction {
         final DataService service;
 	ShutdownServiceAction(DataService service) {
             this.service = service;

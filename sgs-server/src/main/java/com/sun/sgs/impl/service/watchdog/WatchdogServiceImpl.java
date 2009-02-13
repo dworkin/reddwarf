@@ -542,8 +542,9 @@ public final class WatchdogServiceImpl
             }
         }
         
-        if (isLocal)
+        if (isLocal) {
             setFailedThenNotify(true);
+        }
     }
 
     /**

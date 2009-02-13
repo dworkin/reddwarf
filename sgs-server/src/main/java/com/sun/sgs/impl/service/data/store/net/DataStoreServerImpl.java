@@ -601,10 +601,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    remote = new DataStoreServerRemote(server, port);
 	    return remote.getLocalPort();
 	}
-	public boolean unexport() {
+	public void unexport() {
 	    if (remote == null) {
-		throw new IllegalStateException(
-		    "The server is already shut down");
+		return;
 	    }
 	    try {
 		remote.shutdown();
@@ -612,9 +611,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    } catch (IOException e) {
 		logger.logThrow(
 		    Level.FINE, e, "Problem shutting down server");
-		return false;
+		return;
 	    }
-	    return true;
 	}
     }
 

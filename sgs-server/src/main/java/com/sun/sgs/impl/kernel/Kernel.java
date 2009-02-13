@@ -132,7 +132,7 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
 
     // default timeout the kernel's shutdown method (15 minutes)
-    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15*60*1000;
+    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
     
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
