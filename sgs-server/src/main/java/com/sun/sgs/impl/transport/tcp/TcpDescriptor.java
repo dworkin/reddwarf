@@ -19,12 +19,9 @@
 
 package com.sun.sgs.impl.transport.tcp;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
-import java.util.EnumSet;
-import java.util.Set;
 
 /**
  * TCP transport descriptor.
@@ -46,19 +43,6 @@ class TcpDescriptor implements TransportDescriptor, Serializable {
         }
         this.hostName = hostName;
         this.listeningPort = listeningPort;
-    }
-
-    /** {@inheritDoc} */
-    public Set<Delivery> supportedDeliveries() {
-        return EnumSet.allOf(Delivery.class);
-    }
-        
-    /** {@inheritDoc} */
-    public boolean supportsDelivery(Delivery delivery) {
-        if (delivery == null) {
-            throw new NullPointerException("null delivery");
-        }
-        return true; // optimization, TCP supports all
     }
 
     /** {@inheritDoc} */

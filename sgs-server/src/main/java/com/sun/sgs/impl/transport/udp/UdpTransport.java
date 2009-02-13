@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.transport.udp;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.nio.AttachedFuture;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -189,6 +190,11 @@ public class UdpTransport implements Transport {
     }
 
     /** {@inheritDoc} */
+    public Delivery getDeliveryGuarantee() {
+        return Delivery.UNRELIABLE;
+    }
+    
+    /** {@inheritDoc} */
     public synchronized void accept(ConnectionHandler handler) {
         if (handler == null) {
             throw new NullPointerException("null handler");
@@ -315,8 +321,7 @@ public class UdpTransport implements Transport {
             logger.log(Level.FINEST, "Completed connection ");
             try {
                 handler.newConnection(new ChannelWrapper(newChannel,
-                                                         firstMessage),
-                                      descriptor);
+                                                         firstMessage));
 
             } catch (CancellationException e) {               
                 logger.logThrow(Level.FINE, e, "acceptor cancelled"); 

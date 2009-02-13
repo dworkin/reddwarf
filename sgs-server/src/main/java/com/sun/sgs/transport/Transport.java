@@ -19,6 +19,7 @@
 
 package com.sun.sgs.transport;
 
+import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 
 /**
@@ -39,6 +40,12 @@ public interface Transport {
      * @return the descriptor for this transport
      */
     TransportDescriptor getDescriptor();
+    
+    /**
+     * Returns the delivery guarantee for the transport.
+     * @return the delivery guarantee for the transport
+     */
+    Delivery getDeliveryGuarantee();
     
     /**
      * Start accepting connections. The transport will invoke the specified

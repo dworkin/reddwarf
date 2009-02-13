@@ -19,12 +19,9 @@
 
 package com.sun.sgs.impl.transport.udp;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.transport.TransportDescriptor;
 import java.io.Serializable;
-import java.util.EnumSet;
-import java.util.Set;
 
 /**
  * UDP transport descriptor.
@@ -46,19 +43,6 @@ class UdpDescriptor implements TransportDescriptor, Serializable {
         }
         this.hostName = hostName;
         this.listeningPort = listeningPort;
-    }
-
-    /** {@inheritDoc} */
-    public Set<Delivery> supportedDeliveries() {
-        return EnumSet.of(Delivery.UNRELIABLE);
-    }
-
-    /** {@inheritDoc} */
-    public boolean supportsDelivery(Delivery delivery) {
-        if (delivery == null) {
-            throw new NullPointerException("null delivery");
-        }
-        return delivery.equals(Delivery.UNRELIABLE);
     }
     
     /** {@inheritDoc} */

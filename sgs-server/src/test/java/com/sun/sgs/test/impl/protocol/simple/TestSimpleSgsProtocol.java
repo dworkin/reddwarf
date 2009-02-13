@@ -43,9 +43,7 @@ import com.sun.sgs.transport.TransportDescriptor;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.EnumSet;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -219,7 +217,6 @@ public class TestSimpleSgsProtocol {
         private class SessionHandler implements SessionProtocolHandler {
 
             public Future<Void> sessionMessage(ByteBuffer message) {
-                System.err.println("***** sessionMessage called..." + message.remaining());
                 return new Future<Void>() {
 
                     public boolean cancel(boolean arg0) {
@@ -261,22 +258,30 @@ public class TestSimpleSgsProtocol {
     static public class DummyTransport implements Transport {
 
         private final TransportDescriptor descriptor;
+        private final Delivery delivery;
         
         public DummyTransport(Properties properties) {
-            descriptor = new DummyDescriptor(properties);
+            delivery = properties.getProperty("UnreliableDelivery") != null ?
+                                                        Delivery.UNRELIABLE :
+                                                        Delivery.RELIABLE;
+            descriptor = new DummyDescriptor();
         }
         
         public TransportDescriptor getDescriptor() {
             return descriptor;
         }
 
+        public Delivery getDeliveryGuarantee() {
+            return delivery;
+        }
+                
         public void accept(ConnectionHandler handler) {
             if (handler == null)
                 throw new IllegalArgumentException(
                                 "Transport.accept called with null handler");
             try {
                 System.err.println("Transport.accept called...");
-                handler.newConnection(new DummyChannel(), descriptor);
+                handler.newConnection(new DummyChannel());
             } catch (Exception ex) {
                 throw new RuntimeException(
                         "Unexpected exception from newConnection", ex);
@@ -419,28 +424,10 @@ public class TestSimpleSgsProtocol {
                 {
                    return bytes;
                 }
-            }
-                        
+            }           
         }
         
         private class DummyDescriptor implements TransportDescriptor {
-            private Set<Delivery> delivery;
-
-            DummyDescriptor(Properties properties) {
-                delivery =
-                    properties.getProperty("UnreliableDelivery") != null ?
-                                        EnumSet.of(Delivery.UNRELIABLE) :
-                                        EnumSet.allOf(Delivery.class);
-            }
-            
-            public Set<Delivery> supportedDeliveries() {
-                System.err.println("get delivery: " + delivery.size() + " " + delivery);
-                return delivery;
-            }
-
-            public boolean supportsDelivery(Delivery requested) {
-                return delivery.contains(requested);
-            }
 
             public boolean supportsTransport(TransportDescriptor descriptor) {
                 return true;

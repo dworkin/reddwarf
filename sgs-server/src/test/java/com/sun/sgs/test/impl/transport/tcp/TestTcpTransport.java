@@ -171,8 +171,7 @@ public class TestTcpTransport {
 
         AsynchronousByteChannel channel;
         
-        public void newConnection(AsynchronousByteChannel channel,
-                                  TransportDescriptor descriptor)
+        public void newConnection(AsynchronousByteChannel channel)
             throws Exception
         {
             this.channel = channel;

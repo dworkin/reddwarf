@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.protocol.multi;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -87,7 +88,7 @@ public class MultiSgsProtocolAcceptor
     
     /** The secondary transport. */
     private final Transport secondaryTransport;
-    
+        
     /** The protocol descriptor. */
     private ProtocolDescriptor protocolDesc;
   
@@ -198,8 +199,7 @@ public class MultiSgsProtocolAcceptor
         
         /** {@inheritDoc} */
         @Override
-        public void newConnection(AsynchronousByteChannel byteChannel,
-                                  TransportDescriptor descriptor)
+        public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
             new MultiSgsProtocolImpl(protocolListener,
@@ -216,14 +216,13 @@ public class MultiSgsProtocolAcceptor
 
         /** {@inheritDoc} */
         @Override
-        public void newConnection(AsynchronousByteChannel byteChannel,
-                                  TransportDescriptor descriptor)
+        public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
-            new SecondaryChannel(descriptor.supportedDeliveries(),
+            new SecondaryChannel(secondaryTransport.getDeliveryGuarantee(),
 				 MultiSgsProtocolAcceptor.this,
-                                    byteChannel,
-                                    readBufferSize);
+                                 byteChannel,
+                                 readBufferSize);
         }
     }
     

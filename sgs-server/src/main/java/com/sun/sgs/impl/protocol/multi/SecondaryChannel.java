@@ -83,7 +83,7 @@ class SecondaryChannel implements Channel {
     /** Messages enqueued to be sent after a login ack is sent. */
     private List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
 
-    private final Set<Delivery> supportedDelivery;
+    private final Delivery supportedDelivery;
     
     /**
      * Creates a new instance of this class with the given byte channel
@@ -94,7 +94,7 @@ class SecondaryChannel implements Channel {
      * @param byteChannel the channels IO path
      * @param readBufferSize the read buffer size
      */
-    SecondaryChannel(Set<Delivery> supportedDelivery,
+    SecondaryChannel(Delivery supportedDelivery,
                      MultiSgsProtocolAcceptor acceptor,
                      AsynchronousByteChannel byteChannel,
                      int readBufferSize)

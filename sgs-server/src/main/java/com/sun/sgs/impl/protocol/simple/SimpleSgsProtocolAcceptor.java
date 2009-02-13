@@ -225,8 +225,7 @@ public class SimpleSgsProtocolAcceptor
                                                             Properties.class},
                                                       properties);
             
-            if (!transport.getDescriptor().supportsDelivery(Delivery.RELIABLE))
-            {
+            if (!transport.getDeliveryGuarantee().equals(Delivery.RELIABLE)) {
                 transport.shutdown();
                 throw new IllegalArgumentException(
                         "transport must support RELIABLE delivery");
@@ -320,8 +319,7 @@ public class SimpleSgsProtocolAcceptor
         
         /** {@inheritDoc} */
         @Override
-        public void newConnection(AsynchronousByteChannel byteChannel,
-                                  TransportDescriptor descriptor)
+        public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
             new SimpleSgsProtocolImpl(protocolListener,

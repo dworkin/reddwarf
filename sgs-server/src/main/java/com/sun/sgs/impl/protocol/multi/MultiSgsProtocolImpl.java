@@ -91,19 +91,17 @@ class MultiSgsProtocolImpl extends SimpleSgsProtocolImpl {
      * @return	the session protocol handler for this instance
      */
     SessionProtocolHandler attach(SecondaryChannel channel,
-                                  Set<Delivery> supportedDelivery)
+                                  Delivery delivery)
     {
         if (protocolHandler != null) {
         
-            // Set the usePrimary flag to false for any delivery that the
-            // secondary connection can support. Skipping reliable, since
+            // Set the usePrimary flag to false for the delivery that the
+            // secondary connection supports. Skipping reliable, since
             // the primary does that.
             //
-            for (Delivery delivery : supportedDelivery) {
-                if (delivery != Delivery.RELIABLE) {
-                    deliverySet.add(delivery);
-                    usePrimary[delivery.ordinal()] = false;
-                }
+            if (delivery != Delivery.RELIABLE) {
+                deliverySet.add(delivery);
+                usePrimary[delivery.ordinal()] = false;
             }
             secondaryChannel = channel;
             return protocolHandler;

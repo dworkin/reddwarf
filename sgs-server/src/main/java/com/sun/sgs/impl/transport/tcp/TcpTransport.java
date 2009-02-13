@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.transport.tcp;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
@@ -203,6 +204,16 @@ public class TcpTransport implements Transport {
     /* -- implement Transport -- */
     
     /** {@inheritDoc} */
+    public TransportDescriptor getDescriptor() {
+        return descriptor;
+    }
+    
+    /** {@inheritDoc} */
+    public Delivery getDeliveryGuarantee() {
+        return Delivery.RELIABLE;
+    }
+    
+    /** {@inheritDoc} */
     public synchronized void accept(ConnectionHandler handler) {
         if (handler == null) {
             throw new NullPointerException("null handler");
@@ -217,11 +228,6 @@ public class TcpTransport implements Transport {
         assert acceptFuture == null;
         acceptFuture = acceptor.accept(new AcceptorListener());
         logger.log(Level.CONFIG, "transport accepting connections");
-    }
-            
-    /** {@inheritDoc} */
-    public TransportDescriptor getDescriptor() {
-        return descriptor;
     }
 
     /** {@inheritDoc} */
@@ -280,7 +286,7 @@ public class TcpTransport implements Transport {
                     AsynchronousSocketChannel newChannel = result.getNow();
                     logger.log(Level.FINER, "Accepted {0}", newChannel);
 
-                    handler.newConnection(newChannel, descriptor);
+                    handler.newConnection(newChannel);
 
                     // Resume accepting connections
                     acceptFuture = acceptor.accept(this);

@@ -19,9 +19,7 @@
 
 package com.sun.sgs.transport;
 
-import com.sun.sgs.app.Delivery;
 import java.io.Serializable;
-import java.util.Set;
 
 /**
  * Transport descriptor. Classes that implement {@code TransportDescriptor}
@@ -29,21 +27,6 @@ import java.util.Set;
  * persisted.
  */
 public interface TransportDescriptor {
-    
-    /**
-     * Returns the supported delivery guarantees for the transport. Multiple
-     * calls to this method may return the same object.
-     * @return the supported delivery guarantees for the transport
-     */
-    Set<Delivery> supportedDeliveries();
-    
-    /**
-     * Check if the transport supports the requested delivery guarantee.
-     * @param delivery the requested delivery guarantee
-     * @return {@code true} if the transport supports the {@code delivery}
-     * guarantee, and {@code false} otherwise
-     */
-    boolean supportsDelivery(Delivery delivery);
 
     /**
      * Check if the specified transport is compatible with the transport this
