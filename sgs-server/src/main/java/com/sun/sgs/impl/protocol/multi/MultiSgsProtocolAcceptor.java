@@ -64,23 +64,12 @@ public class MultiSgsProtocolAcceptor
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PKG_NAME + ".acceptor"));
-
-//    /**
-//     * The primary transport property. The primary transport must
-//     * support RELIABLE delivery.
-//     */
-//    public static final String PRIMARY_TRANSPORT_PROPERTY =
-//        PKG_NAME + ".transport.primary";
-//    
-//    /** The default primary transport */
-//    public static final String DEFAULT_PRIMARY_TRANSPORT =
-//        "com.sun.sgs.impl.transport.tcp.TcpTransport";
             
     /**  The secondary transport property. */
     public static final String SECONDARY_TRANSPORT_PROPERTY =
         PKG_NAME + ".transport.secondary";
     
-    /** The default primary transport */
+    /** The default secondary transport. */
     public static final String DEFAULT_SECONDARY_TRANSPORT =
         "com.sun.sgs.impl.transport.udp.UdpTransport";
     

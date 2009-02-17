@@ -685,7 +685,7 @@ public final class WatchdogServiceImpl
 	/** {@inheritDoc} */
         @Override
 	public void nodeStatusChanges(long[] ids,
-                                      String hosts[],
+                                      String[] hosts,
                                       boolean[] status,
                                       long[] backups)
 	{

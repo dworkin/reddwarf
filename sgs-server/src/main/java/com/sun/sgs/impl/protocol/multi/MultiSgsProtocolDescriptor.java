@@ -77,7 +77,8 @@ class MultiSgsProtocolDescriptor extends SimpleSgsProtocolDescriptor {
 	byte[] secondaryData = secondaryDesc.getConnectionData();
 	byte[] redirectionData =
 	    new byte[primaryData.length + secondaryData.length];
-	System.arraycopy(primaryData, 0, redirectionData, 0, primaryData.length);
+	System.arraycopy(primaryData, 0, redirectionData,
+			 0, primaryData.length);
 	System.arraycopy(secondaryData, 0, redirectionData,
 			 primaryData.length, secondaryData.length);
 	return redirectionData;

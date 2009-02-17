@@ -30,11 +30,11 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
-import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -150,6 +150,12 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
      *
      * The subclass should invoke {@link #scheduleReadOnReadHandler} after
      * constructing the instance to commence reading.
+     *
+     * @param	listener a protocol listener
+     * @param	acceptor the {@code SimpleSgsProtocol} acceptor
+     * @param	byteChannel a byte channel for the underlying connection
+     * @param	readBufferSize the read buffer size
+     * @param	logger a logger for this instance
      */
     protected  SimpleSgsProtocolImpl(ProtocolListener listener,
 				     SimpleSgsProtocolAcceptor acceptor,
@@ -178,10 +184,11 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** {@inheritDoc} */
     public int getMaxMessageLength() {
         // largest message size is max for channel messages
-        return SimpleSgsProtocol.MAX_MESSAGE_LENGTH // max message
-                                    - 1             // Opcode
-                                    - 2             // channel ID size
-                                    - 8;            // (max) channel ID bytes
+        return
+	    SimpleSgsProtocol.MAX_MESSAGE_LENGTH -
+	    1 -           // Opcode
+	    2 -           // channel ID size
+	    8;            // (max) channel ID bytes
     }
     
     /** {@inheritDoc} */
@@ -442,11 +449,12 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
         // If there is a handler it is up to them to close
         // the connection
 	if (protocolHandler != null) {
-	    protocolHandler.disconnect();
+	    protocolHandler.disconnect(new RequestHandler());
 	} else {
             try {
                 close();
-            } catch (IOException ignore) {}
+            } catch (IOException ignore) {
+	    }
         }
     }
     
@@ -734,11 +742,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    break;
 		}
 
-		LoginCompletionFuture loginCompletionFuture =
-		    listener.newLogin(
-			identity, SimpleSgsProtocolImpl.this);
-		acceptor.scheduleNonTransactionalTask(
- 		    new LoginCompletionTask(loginCompletionFuture));
+		listener.newLogin(
+ 		    identity, SimpleSgsProtocolImpl.this, new LoginHandler());
 		
                 // Resume reading immediately
 		read();
@@ -760,10 +765,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    }
 		    return;
 		}
-		    
-		acceptor.scheduleNonTransactionalTask(
-		    new RequestCompletionTask(
-		    	protocolHandler.sessionMessage(clientMessage)));
+
+		// TBD: schedule a task to process this message?
+		protocolHandler.sessionMessage(clientMessage,
+					       new RequestHandler());
 		break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
@@ -784,11 +789,9 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    return;
 		}
 		
-		Future<Void> channelMessageFuture =
-		    protocolHandler.channelMessage(
-			channelRefId, channelMessage);
-		acceptor.scheduleNonTransactionalTask(
-		    new RequestCompletionTask(channelMessageFuture));
+		// TBD: schedule a task to process this message?
+		protocolHandler.channelMessage(
+		    channelRefId, channelMessage, new RequestHandler());
 		break;
 
 
@@ -800,9 +803,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		    }
 		    return;
 		}
-		acceptor.scheduleNonTransactionalTask(
-		    new LogoutCompletionTask(
-			protocolHandler.logoutRequest()));
+		protocolHandler.logoutRequest(new LogoutHandler());
 
 		// Resume reading immediately
                 read();
@@ -823,34 +824,40 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Task to obtain the result of a login request and send a protocol
-     * message accordingly to the client.
+     * A completion handler that is notified when the associated login
+     * request has completed processing. 
      */
-    private class LoginCompletionTask extends AbstractKernelRunnable {
-
-	/** The login completion future. */
-	private final LoginCompletionFuture future;
-
-	/**
-	 * Constructs an instance with the specified login completion
-	 * {@code future}.
+    private class LoginHandler
+	implements RequestCompletionHandler<SessionProtocolHandler>
+    {
+	/** {@inheritDoc}
 	 *
-	 * @param future a login completion future to wait on.
+	 * <p>This implementation invokes the {@code get} method on the
+	 * specified {@code future} to obtain the session's protocol
+	 * handler.
+	 *
+	 * <p>If the login request completed successfully (without throwing an
+	 * exception), it sends a logout success message to the client.
+	 *
+	 * <p>Otherwise, if the {@code get} invocation throws an {@code
+	 * ExecutionException} and the exception's cause is a {@link
+	 * LoginRedirectException}, it sends a login redirect message to
+	 * the client with the redirection information obtained from the
+	 * exception.  If the {@code ExecutionException}'s cause is a
+	 * {@link LoginFailureException}, it sends a login failure message
+	 * to the client.
+	 *
+	 * <p>If the {@code get} method throws an exception other than
+	 * {@code ExecutionException}, or the {@code ExecutionException}'s
+	 * cause is not either a {@code LoginFailureException} or a {@code
+	 * LoginRedirectException}, then a login failed message is sent to
+	 * the client.
 	 */
-	LoginCompletionTask(LoginCompletionFuture future) {
-	    super(LoginCompletionTask.class.getName());
-	    this.future = future;
-	}
-
-	/** {@inheritDoc} */
-	public void run() {
+	public void completed(Future<SessionProtocolHandler> future) {
 	    try {
 		protocolHandler = future.get();
 		loginSuccess();
 		
-	    } catch (InterruptedException e) {
-		// reschedule interrupted execution
-		acceptor.scheduleNonTransactionalTask(this);
 	    } catch (ExecutionException e) {
 		// login failed
 		Throwable cause = e.getCause();
@@ -874,73 +881,33 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /**
-     * Task to wait for an associated request to complete. Reading is resumed
-     * when request completes.
+     * A completion handler that is notified when its associated request has
+     * completed processing. 
      */
-    private class RequestCompletionTask extends AbstractKernelRunnable {
-
-	/** The completion future. */
-	private final Future<Void> future;
+    private class RequestHandler implements RequestCompletionHandler<Void> {
 	
 	/**
-	 * Constructs an instance with the given completion {@code future}.
+	 * {@inheritDoc}
 	 *
-	 * @param future a completion future to wait on
+	 * <p>This implementation schedules a task to resume reading.
 	 */
-	RequestCompletionTask(Future<Void> future) {
-	    super(RequestCompletionTask.class.getName());
-	    this.future = future;
-	}
-
-	/** {@inheritDoc} */
-	public void run() {
-	    try {
-		future.get();
-	    } catch (InterruptedException ignore) {
-	    } catch (CancellationException ignore) {
-	    } catch (ExecutionException e) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.logThrow(
-			Level.FINE, e,
-			"Request future:{0} for protocol:{1} throws",
-			future, SimpleSgsProtocolImpl.this);
-		}
-	    }
-	    readHandler.read();
+	public void completed(Future<Void> future) {
+	    scheduleReadOnReadHandler();
 	}
     }
-
+    
     /**
-     * Task to wait for a logout request to complete.
+     * A completion handler that is notified when the associated logout
+     * request has completed processing. 
      */
-    private class LogoutCompletionTask extends AbstractKernelRunnable {
+    private class LogoutHandler implements RequestCompletionHandler<Void> {
 
-	/** The completion future. */
-	private final Future<Void> future;
-
-	/**
-	 * Constructs an instance with the specified login completion
-	 * {@code future}.
+	/** {@inheritDoc}
 	 *
-	 * @param future a login completion future to wait on.
+	 * <p>This implementation sends a logout success message to the
+	 * client .
 	 */
-	LogoutCompletionTask(Future<Void> future) {
-	    super(LoginCompletionTask.class.getName());
-	    this.future = future;
-	}
-
-	/** {@inheritDoc} */
-	public void run() {
-	    try {
-		future.get();
-		
-	    } catch (InterruptedException e) {
-		// reschedule interrupted execution
-		acceptor.scheduleNonTransactionalTask(this);
-		return;
-	    } catch (Exception ignore) {
-	    }
-	    // always report success
+	public void completed(Future<Void> future) {
 	    logoutSuccess();
 	}
     }

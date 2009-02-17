@@ -28,11 +28,11 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginFailureException.FailureReason;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
@@ -106,10 +106,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
-    
+
     /** Login completion future for this handler. */
-    private final LoginCompletionFutureImpl loginCompletionFuture =
-	new LoginCompletionFutureImpl(this);
+    private final LoginCompletionFuture loginCompletionFuture;
 
     /** The queue of tasks for notifying listeners of received messages. */
     private volatile TaskQueue taskQueue = null;
@@ -122,11 +121,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * @param	dataService the DataService instance
      * @param	sessionProtocol a session protocol
      * @param	identity an identity
+     * @param	completionHandler a completion handler for the login request
      */
-    ClientSessionHandler(ClientSessionServiceImpl sessionService,
-			 DataService dataService,
-			 SessionProtocol sessionProtocol,
-			 Identity identity)
+    ClientSessionHandler(
+	ClientSessionServiceImpl sessionService,
+	DataService dataService,
+	SessionProtocol sessionProtocol,
+	Identity identity,
+	RequestCompletionHandler<SessionProtocolHandler> completionHandler)
     {
 	checkNull("sessionService", sessionService);
 	checkNull("dataService", dataService);
@@ -136,6 +138,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
         this.dataService = dataService;
 	this.protocol = sessionProtocol;
 	this.identity = identity;
+	loginCompletionFuture =
+	    new LoginCompletionFuture(this, completionHandler);
 	
 	scheduleNonTransactionalTask(
 	    new AbstractKernelRunnable("HandleLoginRequest") {
@@ -153,7 +157,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /* -- Implement SessionProtocolHandler -- */
     
     /** {@inheritDoc} */
-    public Future<Void> sessionMessage(final ByteBuffer message) {
+    public void sessionMessage(
+	final ByteBuffer message,
+	RequestCompletionHandler<Void> completionHandler)
+    {
 	CompletionFutureImpl future = new CompletionFutureImpl();
 	if (!loggedIn) {
 	    logger.log(
@@ -161,7 +168,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		"session message received before login completed:{0}",
 		this);
 	    future.done();
-	    return future;
+	    completionHandler.completed(future);
+	    return;
 	}
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("NotifyListenerMessageReceived") {
@@ -180,13 +188,13 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		} }, identity);
 
 	// Wait until processing is complete before notifying future
-	enqueueCompletionFuture(future);
-	return future;
+	enqueueCompletionNotification(completionHandler, future);
     }
 
     /** {@inheritDoc} */
-    public Future<Void> channelMessage(final BigInteger channelId,
-                                       final ByteBuffer message)
+    public void channelMessage(final BigInteger channelId,
+			       final ByteBuffer message,
+			       RequestCompletionHandler<Void> completionHandler)
     {
 	CompletionFutureImpl future = new CompletionFutureImpl();
 	if (!loggedIn) {
@@ -195,7 +203,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		"channel message received before login completed:{0}",
 		this);
 	    future.done();
-	    return future;
+	    completionHandler.completed(future);
+	    return;
 	}
 
 	taskQueue.addTask(
@@ -217,36 +226,39 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		} }, identity);
 
 	// Wait until processing is complete before notifying future
-	enqueueCompletionFuture(future);
-	return future;
+	enqueueCompletionNotification(completionHandler, future);
     }
 
     /** {@inheritDoc} */
-    public Future<Void> logoutRequest() {
+    public void logoutRequest(
+	RequestCompletionHandler<Void> completionHandler)
+    {
 	scheduleHandleDisconnect(isConnected(), false);
 
 	// Enable protocol message channel to read immediately
 	CompletionFutureImpl future = new CompletionFutureImpl();
 	future.done();
-	return future;
+	completionHandler.completed(future);
     }
 
     /** {@inheritDoc} */
-    public Future<Void> disconnect() {
+    public void disconnect(RequestCompletionHandler<Void> completionHandler) {
 	scheduleHandleDisconnect(false, true);
 	
 	// TBD: should we wait to notify until client disconnects connection?
 	CompletionFutureImpl future = new CompletionFutureImpl();
 	future.done();
-	return future;
+	completionHandler.completed(future);
     }
 
+    /* -- Implement Object -- */
+
+    /** {@inheritDoc} */
+    public String toString() {
+	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
+    }
+    
     /* -- Instance methods -- */
-
-    /** Returns the login completion future for this handler. */
-    LoginCompletionFuture getLoginCompletionFuture() {
-	return loginCompletionFuture;
-    }
 
     /**
      * Returns {@code true} if this handler is connected, otherwise
@@ -263,6 +275,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
+     * Returns the protocol for the associated client session.
+     *
+     * @return	a protocol
+     */
+    SessionProtocol getSessionProtocol() {
+	return protocol;
+    }
+ 
+    /**
      * Returns {@code true} if the login for this session has been handled,
      * otherwise returns {@code false}.
      *
@@ -273,12 +294,33 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Returns the protocol for the associated client session.
-     *
-     * @return	a protocol
+     * Sends a login success message to the client, and sets local state
+     * indicating that the login request has been handled and the client is
+     * logged in.
      */
-    SessionProtocol getSessionProtocol() {
-	return protocol;
+    void loginSuccess() {
+	synchronized (lock) {
+	    checkConnectedState();
+	    loggedIn = true;
+	    loginCompletionFuture.done();
+	    state = State.LOGIN_HANDLED;
+	}
+    }
+	
+    /**
+     * Sends a login failure message for the specified {@code reason} to
+     * the client, and sets local state indicating that the login request
+     * has been handled.
+     *
+     * @param	exception the login failure exception
+     */
+    void loginFailure(LoginFailureException exception) {
+	checkNull("exception", exception);
+	synchronized (lock) {
+	    checkConnectedState();
+	    loginCompletionFuture.setException(exception);
+	    state = State.LOGIN_HANDLED;
+	}
     }
 
     /**
@@ -432,30 +474,27 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
     }
     
-    /* -- Implement Object -- */
-
-    /** {@inheritDoc} */
-    public String toString() {
-	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
-    }
-
+    /* -- other private methods and classes -- */
 
     /**
      * Schedules a task to notify the completion handler.  Use this method
      * to delay notification until a task resulting from an earlier request
      * has been completed.
      *
+     * @param	completionHandler a completion handler
      * @param	future a completion future
      */
-    private void enqueueCompletionFuture(final CompletionFutureImpl future) {
+    private void enqueueCompletionNotification(
+	final RequestCompletionHandler<Void> completionHandler,
+	final CompletionFutureImpl future)
+{
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("ScheduleCompletionNotification") {
 		public void run() {
 		    future.done();
+		    completionHandler.completed(future);
 		} }, identity);
     }
-
-    /* -- other private methods and classes -- */
 
     /**
      * Invokes the {@code setStatus} method on the node mapping service
@@ -494,7 +533,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * the request is completed.
      */
     private void handleLoginRequest() {
-
 	logger.log(
 	    Level.FINEST, 
 	    "handling login request for identity:{0}", identity);
@@ -605,36 +643,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		    getProtocolDescriptors(node.getId());
 	    loginCompletionFuture.setException(
  		new LoginRedirectException(node, descriptors));
-	    state = State.LOGIN_HANDLED;
-	}
-    }
-
-    /**
-     * Sends a login success message to the client, and sets local state
-     * indicating that the login request has been handled and the client is
-     * logged in.
-     */
-    void loginSuccess() {
-	synchronized (lock) {
-	    checkConnectedState();
-	    loggedIn = true;
-	    loginCompletionFuture.done();
-	    state = State.LOGIN_HANDLED;
-	}
-    }
-	
-    /**
-     * Sends a login failure message for the specified {@code reason} to
-     * the client, and sets local state indicating that the login request
-     * has been handled.
-     *
-     * @param	exception the login failure exception
-     */
-    void loginFailure(LoginFailureException exception) {
-	checkNull("exception", exception);
-	synchronized (lock) {
-	    checkConnectedState();
-	    loginCompletionFuture.setException(exception);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -844,10 +852,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * This future is an abstract implementation for the futures
      * returned by {@code ProtocolListener} and {@code SessionProtocolHandler}.
      */
-    private static abstract class AbstractCompletionFuture<T>
+    private abstract static class AbstractCompletionFuture<T>
             implements Future<T>
     {
-
 	/**
 	 * Indicates whether the operation associated with this future
 	 * is complete.
@@ -946,24 +953,32 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * This future is returned from the {@code ProtocolListener}'s
      * {@code newLogin} method.
      */
-    private static class LoginCompletionFutureImpl
+    private static class LoginCompletionFuture
 	extends AbstractCompletionFuture<SessionProtocolHandler>
-	implements LoginCompletionFuture
     {
-	/** A session protocol handler. */
-	private final SessionProtocolHandler handler;
+	/** The session protocol handler. */
+	private final SessionProtocolHandler protocolHandler;
+
+	/** The completion handler for the login request. */
+	private final RequestCompletionHandler<SessionProtocolHandler>
+	    completionHandler;
 
 	/** An exception cause, or {@code null}. */
 	private volatile Throwable exceptionCause = null;
 
 	/**
-	 * Constructs an instance with the specified {@code Handler}..
+	 * Constructs an instance with the specified {@code protocolHandler} and
 	 *
-	 * @param	handler a session protocol handler
+	 * @param	protocolHandler a session protocol handler
+	 * @param	completionHandler a completionHandler
 	 */
-	LoginCompletionFutureImpl(SessionProtocolHandler handler) {
+	LoginCompletionFuture(
+	    SessionProtocolHandler protocolHandler,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
+        {
 	    super();
-	    this.handler = handler;
+	    this.protocolHandler = protocolHandler;
+	    this.completionHandler = completionHandler;
 	}
 
 	/** {@inheritDoc} */
@@ -973,7 +988,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    if (exceptionCause != null) {
 		throw new ExecutionException(exceptionCause);
 	    } else {
-		return handler;
+		return protocolHandler;
 	    }
 	}
 
@@ -989,6 +1004,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    checkNull("throwable", throwable);
 	    exceptionCause = throwable;
 	    done();
+	}
+
+	/**
+	 * Notifies the completion handler that the login request
+	 * processing is complete.
+	 */
+	void done() {
+	    super.done();
+	    completionHandler.completed(this);
 	}
     }
 

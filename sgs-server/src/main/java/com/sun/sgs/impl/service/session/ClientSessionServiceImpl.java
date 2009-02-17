@@ -41,11 +41,11 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
@@ -85,8 +85,8 @@ import java.util.logging.Logger;
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> and <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transports">
- * <code>com.sun.sgs.impl.service.session.transports</code></a> configuration properties and supports
- * these public configuration <a
+ * <code>com.sun.sgs.impl.service.session.transports</code></a> configuration
+ * properties and supports these public configuration <a
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
  */
@@ -464,12 +464,13 @@ public final class ClientSessionServiceImpl
     private class ProtocolListenerImpl implements ProtocolListener {
 
 	/** {@inheritDoc} */
-	public LoginCompletionFuture newLogin(
-	    Identity identity, SessionProtocol protocol)
+	public void newLogin(
+	    Identity identity, SessionProtocol protocol,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
-	    ClientSessionHandler handler = new ClientSessionHandler(
-		ClientSessionServiceImpl.this, dataService, protocol, identity);
-	    return handler.getLoginCompletionFuture();
+	    new ClientSessionHandler(
+		ClientSessionServiceImpl.this, dataService, protocol,
+		identity, completionHandler);
 	}
 	
     }
@@ -493,21 +494,22 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * Records the login result in the current context for delivery to the
-     * specified client {@code session} when the context commits.  If
-     * {@code success} is {@code false}, the specified {@code exception} will
-     * be used as the cause of the {@code ExecutionException} in the associated
-     * session's {@link LoginCompletionFuture} and no subsequent session
-     * messages will be forwarded to the session, even if they have been
-     * enqueued during the current transaction.  If success is {@code true},
-     * then the session's associated {@code LoginCompletionFuture}'s
-     * {@link LoginCompletionFuture#get get} method will return the appropriate
-     * {@link SessionProtocolHandler} for the session.
      *
-     * <p>When the transaction commits, the {@code LoginCompletionFuture} is
-     * notified of the login result, and if {@code success} is
-     * {@code true}, all other enqueued messages will be delivered to the client
-     * session. 
+     * Records the login result in the current context, so that the specified
+     * client {@code session} can be notified when the context commits.  If
+     * {@code success} is {@code false}, the specified {@code exception} will be
+     * used as the cause of the {@code ExecutionException} in the {@code Future}
+     * passed to the {@link RequestCompletionHandler} for the login request, and
+     * no subsequent session messages will be forwarded to the session, even if
+     * they have been enqueued during the current transaction.  If success is
+     * {@code true}, then the {@code Future} passed to the {@code
+     * RequestCompletionHandler} for the login request will contain this {@link
+     * SessionProtocolHandler}.
+     *
+     * <p>When the transaction commits, the session's associated {@code
+     * ClientSessionHandler} is notified of the login result, and if {@code
+     * success} is {@code true}, all enqueued messages will be delivered to
+     * the client session.
      *
      * @param	session	a client session
      * @param	success if {@code true}, login was successful

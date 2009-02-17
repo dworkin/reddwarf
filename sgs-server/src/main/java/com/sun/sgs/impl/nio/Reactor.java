@@ -748,6 +748,11 @@ class Reactor {
                 selector.wakeup();
 
                 // Awaken any and all pending operations
+		// FIXME: This can cause deadlock because a pending
+		// operation may already be locking the 'lock' field of the
+		// DelegatingCompletionHandler and when the pending
+		// operation resumes, it needs to lock the 'selectorLock'
+		// which is already held by this thread.  -- ann (2/10/09)
                 selected(OP_ACCEPT | OP_CONNECT | OP_READ | OP_WRITE);
             }
         }

@@ -30,6 +30,7 @@ import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
+import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import java.io.IOException;
@@ -142,7 +143,8 @@ class SecondaryChannel implements Channel {
         }
         try {
             close();
-        } catch (IOException ignore) {}
+        } catch (IOException ignore) {
+	}
     }
     
     /* -- Methods for reading and writing -- */
@@ -376,7 +378,7 @@ class SecondaryChannel implements Channel {
     private class ConnectedReadHandler extends ReadHandler {
 
         /** The protocol message handler. */
-        volatile SessionProtocolHandler handler;
+        volatile SessionProtocolHandler protocolHandler;
     
 	/** The lock for accessing the {@code isReading} field. The locks
 	 * {@code lock} and {@code readLock} should only be acquired in
@@ -388,7 +390,8 @@ class SecondaryChannel implements Channel {
         private boolean isReading = false;
 
 	/** Creates an instance of this class. */
-        ConnectedReadHandler() {}
+        ConnectedReadHandler() {
+	}
 
 	/** Reads a message from the connection. */
         @Override
@@ -476,11 +479,12 @@ class SecondaryChannel implements Channel {
                 MultiSgsProtocolImpl protocol = acceptor.attach(key);
                 
 		if (protocol != null) {
-                    handler = protocol.attach(SecondaryChannel.this,
-                                              supportedDelivery);
+                    protocolHandler =
+			protocol.attach(SecondaryChannel.this,
+					supportedDelivery);
                 }
                 
-                if (handler == null) {
+                if (protocolHandler == null) {
                     reconnectFailure("authentication failed", null);
                     if (logger.isLoggable(Level.FINE)) {
                         logger.log(Level.FINE,
@@ -495,32 +499,20 @@ class SecondaryChannel implements Channel {
                 break;
 
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-                if (handler != null) {
+                if (protocolHandler != null) {
                     BigInteger channelRefId =
                         new BigInteger(1, msg.getBytes(msg.getShort()));
-                    ByteBuffer channelMessage =
-                        ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-                    Future<Void> channelMessageFuture =
-                                       handler.channelMessage(channelRefId,
-                                                              channelMessage);
+		    ByteBuffer channelMessage =
+			ByteBuffer.wrap(
+			    msg.getBytes(msg.limit() - msg.position()));
+		
+		    // TBD: schedule a task to process this message?
+		    protocolHandler.channelMessage(
+			channelRefId, channelMessage, new RequestHandler());
+		} else {
+		    read();
+		}
 
-                    // Wait for channel message to be processed before
-                    // resuming reading.
-                    try {
-                        channelMessageFuture.get();
-                    } catch (InterruptedException ignore) {
-                    } catch (ExecutionException e) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.logThrow(
-                                    Level.FINE, e,
-                                    "Processing channel message:{0} " +
-                                    "for protocol:{1} throws",
-                                    HexDumper.format(channelMessage, 0x50),
-                                    SecondaryChannel.this);
-                        }
-                    }
-                }
-                read();
 		break;
 		
 	    default:
@@ -532,6 +524,22 @@ class SecondaryChannel implements Channel {
 		disconnect();
 		break;
 	    }
+	}
+    }
+
+    /**
+     * A completion handler that is notified when its associated request has
+     * completed processing. 
+     */
+    private class RequestHandler implements RequestCompletionHandler<Void> {
+	
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>This implementation schedules a task to resume reading.
+	 */
+	public void completed(Future<Void> future) {
+	    scheduleReadOnReadHandler();
 	}
     }
 }

@@ -91,7 +91,7 @@ public class UdpTransport implements Transport {
     public static final String LISTEN_PORT_PROPERTY =
 	PKG_NAME + ".listen.port";
 
-    /** The default port: {@value #DEFAULT_PORT} */
+    /** The default port: {@value #DEFAULT_PORT}. */
     public static final int DEFAULT_PORT = 62964;
     
     /** The listen address. */
@@ -219,7 +219,7 @@ public class UdpTransport implements Transport {
 	    future.cancel(true);
 	}
 
-	if (acceptor.isOpen()) {
+	if (acceptor != null && acceptor.isOpen()) {
 	    try {
 		acceptor.close();
             } catch (IOException e) {
@@ -228,7 +228,7 @@ public class UdpTransport implements Transport {
             }
 	}
 
-	if (!asyncChannelGroup.isShutdown()) {
+	if (asyncChannelGroup != null && !asyncChannelGroup.isShutdown()) {
 	    asyncChannelGroup.shutdown();
 	    boolean groupShutdownCompleted = false;
 	    try {
@@ -331,7 +331,8 @@ public class UdpTransport implements Transport {
                 SocketAddress addr = null;
                 try {
                     addr = newChannel.getLocalAddress();
-                } catch (IOException ignore) {}
+                } catch (IOException ignore) {
+		}
 
                 logger.logThrow(
 		    Level.SEVERE, e, "connect error on {0}", addr);
@@ -354,9 +355,11 @@ public class UdpTransport implements Transport {
             this.firstMessage = firstMessage;
         }
         
-        public <A> IoFuture<Integer, A> read(ByteBuffer dst,
-                                             A attachment,
-                                             CompletionHandler<Integer, ? super A> handler) {
+        public <A> IoFuture<Integer, A> read(
+	    ByteBuffer dst,
+	    A attachment,
+	    CompletionHandler<Integer, ? super A> handler)
+        {
             synchronized (lock) {
                 if (firstMessage != null) {
                     dst.put(firstMessage);
@@ -365,8 +368,8 @@ public class UdpTransport implements Transport {
                     Future<Integer> future =
                             new FirstMessageFuture<Integer>(length);
                     callCompletion(handler, attachment, future);
-                    return AttachedFuture.wrap(new FirstMessageFuture<Integer>(length),
-                                               attachment);
+                    return AttachedFuture.wrap(
+			new FirstMessageFuture<Integer>(length), attachment);
                 }
             }
             return channel.read(dst, attachment, handler);
@@ -387,19 +390,23 @@ public class UdpTransport implements Transport {
             handler.completed(AttachedFuture.wrap(future, attachment));
         }
             
-        public <A> IoFuture<Integer, A> read(ByteBuffer dst,
-                                             CompletionHandler<Integer, ? super A> handler) {
+        public <A> IoFuture<Integer, A> read(
+	    ByteBuffer dst, CompletionHandler<Integer, ? super A> handler)
+        {
             return read(dst, null, handler);
         }
 
-        public <A> IoFuture<Integer, A> write(ByteBuffer src,
-                                              A attachment,
-                                              CompletionHandler<Integer, ? super A> handler) {
+        public <A> IoFuture<Integer, A> write(
+	    ByteBuffer src,
+	    A attachment,
+	    CompletionHandler<Integer, ? super A> handler)
+        {
             return channel.write(src, attachment, handler);
         }
 
-        public <A> IoFuture<Integer, A> write(ByteBuffer src,
-                                              CompletionHandler<Integer, ? super A> handler) {
+        public <A> IoFuture<Integer, A> write(
+	    ByteBuffer src, CompletionHandler<Integer, ? super A> handler)
+        {
             return channel.write(src, handler);
         }
 

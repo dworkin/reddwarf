@@ -28,9 +28,9 @@ import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
 import com.sun.sgs.nio.channels.CompletionHandler;
 import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.protocol.LoginCompletionFuture;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -174,82 +174,46 @@ public class TestSimpleSgsProtocol {
 
         Identity identity = null;
         SessionProtocol protocol = null;
+	RequestCompletionHandler<SessionProtocolHandler> completionHandler;
         
-        public LoginCompletionFuture newLogin(Identity identity,
-                                              SessionProtocol protocol)
+        public void newLogin(
+	    Identity identity, SessionProtocol protocol,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
         {
             System.err.println("ProtocolListener.newLogin called...");
             if (identity == null || protocol == null)
                 throw new RuntimeException("identity or protocol are null");
             this.identity = identity;
             this.protocol = protocol;
-            return new LCFuture(new SessionHandler());
-        }
-        
-        private class LCFuture implements LoginCompletionFuture {
-            private final SessionProtocolHandler handler;
-            
-            LCFuture(SessionProtocolHandler handler) {
-                this.handler = handler;
-            }
-
-            public SessionProtocolHandler get() {
-                return handler;
-            }
-
-            public SessionProtocolHandler get(long timeout, TimeUnit unit) {
-                return handler;
-            }
-
-            public boolean cancel(boolean arg0) {
-                throw new UnsupportedOperationException();
-            }
-
-            public boolean isCancelled() {
-                throw new UnsupportedOperationException();
-            }
-
-            public boolean isDone() {
-                throw new UnsupportedOperationException();
-            }
+	    this.completionHandler = completionHandler;
         }
         
         private class SessionHandler implements SessionProtocolHandler {
 
-            public Future<Void> sessionMessage(ByteBuffer message) {
-                return new Future<Void>() {
-
-                    public boolean cancel(boolean arg0) {
-                        return true;
-                    }
-
-                    public boolean isCancelled() {
-                        return false;
-                    }
-
-                    public boolean isDone() {
-                        return true;
-                    }
-
-                    public Void get() throws InterruptedException, ExecutionException {
-                        return null;
-                    }
-
-                    public Void get(long arg0, TimeUnit arg1) throws InterruptedException, ExecutionException, TimeoutException {
-                        return null;
-                    }
-                };
+            public void sessionMessage(
+		ByteBuffer message,
+		RequestCompletionHandler<Void> completionHandler)
+	    {
+                System.err.println("***** sessionMessage called..." +
+				   message.remaining());
             }
 
-            public Future<Void> channelMessage(BigInteger channelId, ByteBuffer message) {
+            public void channelMessage(
+		BigInteger channelId, ByteBuffer message,
+		RequestCompletionHandler<Void> completionHandler)
+	    {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
-            public Future<Void> logoutRequest() {
+            public void logoutRequest(
+		RequestCompletionHandler<Void> completionHandler)
+	    {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
 
-            public Future<Void> disconnect() {
+            public void disconnect(
+		RequestCompletionHandler<Void> completionHandler)
+	    {
                 throw new UnsupportedOperationException("Not supported yet.");
             }
         }

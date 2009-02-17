@@ -76,7 +76,7 @@ public abstract class AbstractService implements Service {
     protected final String appName;
 
     /** The logger for the subclass. */
-    private final LoggerWrapper logger;
+    protected final LoggerWrapper logger;
 
     /** The data service. */
     protected final DataService dataService;

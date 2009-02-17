@@ -113,11 +113,11 @@ public class SimpleSgsProtocolAcceptor
     public static final String TRANSPORT_PROPERTY =
         PKG_NAME + ".transport";
     
-    /** The default transport */
+    /** The default transport. */
     public static final String DEFAULT_TRANSPORT =
         "com.sun.sgs.impl.transport.tcp.TcpTransport";
             
-    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
+    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE}. */
     public static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
     
     /** The minimum read buffer size value. */
@@ -135,16 +135,13 @@ public class SimpleSgsProtocolAcceptor
     /** The minimum disconnect delay value. */
     public static final long MIN_DISCONNECT_DELAY = 1000;
 
-    /** The logger for this instance. */
-    private  final LoggerWrapper logger;
-
     /** The identity manager. */
     private final IdentityCoordinator identityManager;
 
     /** The read buffer size for new connections. */
     protected final int readBufferSize;
     
-    /** The transport */
+    /** The transport. */
     protected final Transport transport;
     
     /** The disconnect delay (in milliseconds) for disconnecting sessions. */
@@ -161,7 +158,7 @@ public class SimpleSgsProtocolAcceptor
 	    new ConcurrentSkipListMap<Long, SessionProtocol>();
 
     /** The handle for the task that monitors disconnecting client sessions. */
-    final private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
+    private final RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
 
     /**
      * Constructs an instance with the specified {@code properties},
@@ -200,7 +197,6 @@ public class SimpleSgsProtocolAcceptor
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
-	this.logger = logger;
 	logger.log(Level.CONFIG,
 		   "Creating SimpleSgsProtocolAcceptor properties:{0}",
 		   properties);

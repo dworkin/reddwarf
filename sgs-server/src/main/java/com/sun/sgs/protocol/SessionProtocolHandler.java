@@ -27,19 +27,20 @@ import java.util.concurrent.Future;
  * A handler for session and channel protocol messages for an associated
  * client session.
  *
- * Each operation returns a {@code Future} that indicates when the
- * request has been processed.  A caller may need to know when an
- * operation has completed so that it can throttle incoming messages (for
- * example only resuming reading when the handler completes processing a
- * request), and/or can control the number of clients connected at any given
- * time.
+ * Each operation takes a {@link RequestCompletionHandler} argument to be
+ * notified when the associated request has been processed.  A caller may need
+ * to know when an operation has completed so that it can throttle incoming
+ * messages (for example only resuming reading when the handler completes
+ * processing a request), and/or can control the number of clients connected
+ * at any given time.
  */
 public interface SessionProtocolHandler {
 
     /**
-     * Processes a message sent by the associated client and returns a
-     * future for determining when this handler has completed processing
-     * the session message.  The message starts at the buffer's current
+     * Processes a message sent by the associated client, and invokes the
+     * {@link RequestCompletionHandler#completed completed} method on the
+     * given {@code completionHandler} when this handler has completed
+     * processing the message.  The message starts at the buffer's current
      * position and ends at the buffer's limit.  The buffer's position is
      * not modified by this operation.
      * 
@@ -48,17 +49,19 @@ public interface SessionProtocolHandler {
      * have no effect on the message supplied to this method.
      *
      * @param	message a message
-     * @return	future a future for the result
+     * @param	completionHandler a completion handler
      */
-    Future<Void> sessionMessage(ByteBuffer message);
+    void sessionMessage(
+	ByteBuffer message, RequestCompletionHandler<Void> completionHandler);
 
     /**
      * Processes a channel message sent by the associated client on the
-     * channel with the specified {@code channelId}, and returns a future
-     * for determining when this handler has completed processing the
-     * channel message.  The message starts at the buffer's current
-     * position and ends at the buffer's limit.  The buffer's position is
-     * not modified by this operation.
+     * channel with the specified {@code channelId}, and invokes the
+     * {@link RequestCompletionHandler#completed completed} method on the
+     * given {@code completionHandler} when this handler has completed
+     * processing the channel message.  The message starts at the buffer's
+     * current position and ends at the buffer's limit.  The buffer's position
+     * is not modified by this operation.
      * 
      * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
@@ -66,25 +69,28 @@ public interface SessionProtocolHandler {
      *
      * @param	channelId a channel ID
      * @param	message a message
-     * @return	future a future for the result
+     * @param	completionHandler a completion handler
      */
-    Future<Void> channelMessage(BigInteger channelId, ByteBuffer message);
+    void channelMessage(BigInteger channelId, ByteBuffer message,
+			RequestCompletionHandler<Void> completionHandler);
     
     /**
-     * Processes a logout request from the associated client and returns a
-     * future for determining when this handler has completed processing
-     * the logout request.
+     * Processes a logout request from the associated client, and invokes the
+     * {@link RequestCompletionHandler#completed completed} method on the
+     * given {@code completionHandler} when this handler has completed
+     * processing the logout request.
      *
-     * @return	future a future for the result
+     * @param	completionHandler a completion handler
      */
-    Future<Void> logoutRequest();
+    void logoutRequest(RequestCompletionHandler<Void> completionHandler);
 
     /**
      * Notifies this handler that a non-graceful client disconnection has
-     * occurred, and returns a future for determining when the handler has
-     * completed processing the disconnection.
+     * occurred, and invokes the {@link RequestCompletionHandler#completed
+     * completed} method on the given {@code completionHandler} when this
+     * handler has completed processing the disconnection.
      *
-     * @return	future a future for the result
+     * @param	completionHandler a completion handler
      */
-    Future<Void> disconnect();
+    void disconnect(RequestCompletionHandler<Void> completionHandler);
 }

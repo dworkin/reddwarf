@@ -97,7 +97,7 @@ public class TcpTransport implements Transport {
     public static final String LISTEN_PORT_PROPERTY =
 	PKG_NAME + ".listen.port";
 
-    /** The default port: {@value #DEFAULT_PORT} */
+    /** The default port: {@value #DEFAULT_PORT}. */
     public static final int DEFAULT_PORT = 62964;
     
     /** The listen address. */
@@ -110,6 +110,7 @@ public class TcpTransport implements Transport {
     /** The default acceptor backlog (&lt;= 0 means default). */
     private static final int DEFAULT_ACCEPTOR_BACKLOG = 0;
 
+    /** The acceptor backlog. */
     private final int acceptorBacklog;
     
     /** The async channel group for this service. */
@@ -120,9 +121,12 @@ public class TcpTransport implements Transport {
 
     /** The currently-active accept operation, or {@code null} if none. */
     volatile IoFuture<?, ?> acceptFuture = null;
+
+    /** A lock for accessing the {@code acceptorListener} field. */
+    private Object lock = new Object();
     
-    /** The connection handler. */
-    ConnectionHandler handler = null;
+    /** The acceptor listener.. */
+    private AcceptorListener acceptorListener = null;
     
     /** The transport descriptor */
     private final TcpDescriptor descriptor;
@@ -214,24 +218,27 @@ public class TcpTransport implements Transport {
     }
     
     /** {@inheritDoc} */
-    public synchronized void accept(ConnectionHandler handler) {
-        if (handler == null) {
-            throw new NullPointerException("null handler");
-        }
-        if (!acceptor.isOpen()) {
-            throw new IllegalStateException("transport has been shutdown");
-        }
-        if (this.handler != null) {
-            throw new IllegalStateException("accept already called");
-        }
-        this.handler = handler;
+    public void accept(ConnectionHandler handler) {
+	if (handler == null) {
+	    throw new NullPointerException("null handler");
+	} else if (!acceptor.isOpen()) {
+	    throw new IllegalStateException("transport has been shutdown");
+	}
+	
+	synchronized (lock) {
+	    if (acceptorListener != null) {
+		throw new IllegalStateException("accept already called");
+	    }
+	    acceptorListener = new AcceptorListener(handler);
+	}
+	
         assert acceptFuture == null;
-        acceptFuture = acceptor.accept(new AcceptorListener());
+        acceptFuture = acceptor.accept(acceptorListener);
         logger.log(Level.CONFIG, "transport accepting connections");
     }
 
     /** {@inheritDoc} */
-    public synchronized void shutdown() {
+    public void shutdown() {
 	final IoFuture<?, ?> future = acceptFuture;
 	acceptFuture = null;
         
@@ -239,7 +246,7 @@ public class TcpTransport implements Transport {
 	    future.cancel(true);
 	}
 
-	if (acceptor.isOpen()) {
+	if (acceptor != null && acceptor.isOpen()) {
 	    try {
 		acceptor.close();
             } catch (IOException e) {
@@ -248,7 +255,7 @@ public class TcpTransport implements Transport {
             }
 	}
 
-	if (!asyncChannelGroup.isShutdown()) {
+	if (asyncChannelGroup != null && !asyncChannelGroup.isShutdown()) {
 	    asyncChannelGroup.shutdown();
 	    boolean groupShutdownCompleted = false;
 	    try {
@@ -257,7 +264,7 @@ public class TcpTransport implements Transport {
 	    } catch (InterruptedException e) {
 		logger.logThrow(Level.FINEST, e,
 				"shutdown async group interrupted");
-		Thread.currentThread().interrupt();
+		//Thread.currentThread().interrupt();
 	    }
 	    if (!groupShutdownCompleted) {
 		logger.log(Level.WARNING, "forcing async group shutdown");
@@ -295,7 +302,18 @@ public class TcpTransport implements Transport {
     private class AcceptorListener
         implements CompletionHandler<AsynchronousSocketChannel, Void>
     {
+	/** The connection handler. */
+	private final ConnectionHandler connectionHandler;
 
+	/**
+	 * Constructs an instance with the specified {@code connectionHandler}.
+	 *
+	 * @param connectionHandler a connection handler
+	 */
+	AcceptorListener(ConnectionHandler connectionHandler) {
+	    this.connectionHandler = connectionHandler;
+	}
+	
 	/** Handle new connection or report failure. */
         public void completed(IoFuture<AsynchronousSocketChannel, Void> result)
         {
@@ -304,7 +322,7 @@ public class TcpTransport implements Transport {
                     AsynchronousSocketChannel newChannel = result.getNow();
                     logger.log(Level.FINER, "Accepted {0}", newChannel);
 
-                    handler.newConnection(newChannel);
+                    connectionHandler.newConnection(newChannel);
 
                     // Resume accepting connections
                     acceptFuture = acceptor.accept(this);
@@ -327,7 +345,7 @@ public class TcpTransport implements Transport {
                     logger.logThrow(Level.FINEST, ioe,
                                     "exception during restart");
                     shutdown();
-                    handler.shutdown();
+                    connectionHandler.shutdown();
                 }
             }
 	}

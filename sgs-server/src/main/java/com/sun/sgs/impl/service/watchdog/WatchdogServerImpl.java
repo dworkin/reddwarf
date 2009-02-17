@@ -289,7 +289,8 @@ public final class WatchdogServerImpl
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	serverPort = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
-	    logger.log(Level.INFO, "Server is using port {0,number,#}", serverPort);
+	    logger.log(
+		Level.INFO, "Server is using port {0,number,#}", serverPort);
 	}
 	
 	checkExpirationThread.start();

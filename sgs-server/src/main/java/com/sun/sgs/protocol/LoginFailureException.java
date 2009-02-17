@@ -24,10 +24,8 @@ package com.sun.sgs.protocol;
  * Throwable#getMessage getMessage} method returns a detail message
  * containing an explanation for the failure, the {@link #getReason
  * getReason} method returns the failure reason, and if the failure reason
- * is {@link FailureReason#OTHER} the {@link Throwable#getCause getCause}
+ * is {@link FailureReason#OTHER}, the {@link Throwable#getCause getCause}
  * method returns the possibly-{@code null} cause of the failure.
- *
- * @see LoginCompletionFuture
  */
 public class LoginFailureException extends Exception {
 

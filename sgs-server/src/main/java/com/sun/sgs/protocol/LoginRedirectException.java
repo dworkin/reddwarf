@@ -24,9 +24,7 @@ import java.util.Set;
 
 /**
  * An exception that indicates a login should be redirected to the node
- * returned by the exception's {@link #getNode getNode} method.
- *
- * @see LoginCompletionFuture
+ * returned by this exception's {@link #getNode getNode} method.
  */
 public class LoginRedirectException extends Exception {
 
