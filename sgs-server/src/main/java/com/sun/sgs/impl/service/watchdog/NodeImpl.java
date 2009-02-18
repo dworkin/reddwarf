@@ -22,7 +22,9 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.Serializable;
@@ -61,6 +63,9 @@ class NodeImpl
     /** The host name, or {@code null}. */
     private final String host;
     
+    /** The port JMX can listen on, or {@code -1}. */
+    private final int jmxPort;
+    
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
     
@@ -88,10 +93,12 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name
+     * @param   jmxPort  the port JMX is listening on for the node, 
+     *                   or {@code -1}
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, WatchdogClient client) {
-        this (nodeId, hostName, client, true, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int jmxPort, WatchdogClient client) {
+        this (nodeId, hostName, jmxPort, client, true, INVALID_ID);
     }
 
     /**
@@ -105,7 +112,7 @@ class NodeImpl
      * @param	isAlive if {@code true}, this node is considered alive
      */
     NodeImpl(long nodeId, String hostName, boolean isAlive) {
-	this(nodeId, hostName, null, isAlive, INVALID_ID);
+	this(nodeId, hostName, -1, null, isAlive, INVALID_ID);
     }
 	
     /**
@@ -121,22 +128,23 @@ class NodeImpl
      *		is assigned)
      */
     NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
-        this(nodeId, hostName, null, isAlive, backupId);
+        this(nodeId, hostName, -1, null, isAlive, backupId);
     }
     
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code port}, {@code client}, 
+     * nodeId}, {@code hostName}, {@code jmxPort}, {@code client}, 
      * {@code isAlive} status, and {@code backupId}.
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
+     * @param   jmxPort  the port JMX is listening on, or {@code -1}
      * @param	client   a watchdog client
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    private NodeImpl(long nodeId, String hostName, 
+    private NodeImpl(long nodeId, String hostName, int jmxPort,
                      WatchdogClient client, boolean isAlive, long backupId) 
     {
         this.id = nodeId;
@@ -144,6 +152,7 @@ class NodeImpl
         this.client = client;
         this.isAlive = isAlive;
         this.backupId = backupId;
+        this.jmxPort = jmxPort;
     }
 
     /* -- Implement Node -- */
@@ -345,6 +354,29 @@ class NodeImpl
 	return nodeImpl;
     }
 
+     /**
+      * Returns the port used for remote JMX monitoring, or {@code -1}
+      * if only local monitoring is allowed.
+      * 
+      * @return the port used for remote JMX monitoring of this node
+      */
+    private int getJmxPort() {
+        return jmxPort;
+    }
+    
+    /**
+     * Returns the management information for this node.
+     * 
+     * @return the management information for this node
+     */
+    NodeInfo getNodeInfo() {
+        return new NodeInfo(getHostName(),
+                            getId(),
+                            isAlive(),
+                            getBackupId(),
+                            getJmxPort());
+    }
+     
     /**
      * Removes the node with the specified {@code nodeId} and its
      * binding from the specified {@code dataService}.  If the binding
@@ -481,7 +513,7 @@ class NodeImpl
      * Node} instance with the specified {@code nodeId}.
      *
      * @param	a node ID
-     * @return	a key for acessing the {@code Node} instance
+     * @return	a key for accessing the {@code Node} instance
      */
     private static String getNodeKey(long nodeId) {
 	return NODE_PREFIX + "." + nodeId;

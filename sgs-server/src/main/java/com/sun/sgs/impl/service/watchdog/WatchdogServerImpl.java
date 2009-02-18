@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -27,6 +28,10 @@ import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.management.NodeInfo;
+import com.sun.sgs.management.NodesMXBean;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,8 +47,13 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
+import javax.management.MBeanNotificationInfo;
+import javax.management.Notification;
+import javax.management.NotificationBroadcasterSupport;
 
 /**
  * The {@link WatchdogServer} implementation. <p>
@@ -189,6 +199,7 @@ public final class WatchdogServerImpl
     private final ConcurrentMap<Long, NodeImpl> aliveNodes =
 	new ConcurrentHashMap<Long, NodeImpl>();
 
+    // TBD: use a ConcurrentSkipListSet?
     /** The set of alive nodes, sorted by renew expiration time. */
     final SortedSet<NodeImpl> expirationSet =
 	Collections.synchronizedSortedSet(new TreeSet<NodeImpl>());
@@ -203,6 +214,9 @@ public final class WatchdogServerImpl
     /** The thread for checking node expiration times and checking if
      * recovering nodes need backups assigned.. */
     private final Thread checkExpirationThread = new CheckExpirationThread();
+    
+    /** The JMX MXBean to expose nodes in the system. */
+    private final NodeManager nodeMgr;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -282,10 +296,24 @@ public final class WatchdogServerImpl
 	    recoveringNodes.put(failedNode.getId(), failedNode);
 	}
  
-        // register our local id
-        long[] values = registerNode(host, client);
-        localNodeId = values[0];
+                
+        // Create the node manager MBean and register it.  This must be
+        // done before regiseterNode is called.
+        ProfileCollector collector = 
+            systemRegistry.getComponent(ProfileCollector.class);
+        nodeMgr = new NodeManager(this);
+        try {
+            collector.registerMBean(nodeMgr, NodeManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
         
+        // register our local id
+        int jmxPort = wrappedProps.getIntProperty(
+                    StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
+        long[] values = registerNode(host, client, jmxPort);
+        localNodeId = values[0];
+
 	exporter = new Exporter<WatchdogServer>(WatchdogServer.class);
 	serverPort = exporter.export(this, WATCHDOG_SERVER_NAME, requestedPort);
 	if (requestedPort == 0) {
@@ -369,6 +397,10 @@ public final class WatchdogServerImpl
 	    new HashSet<NodeImpl>(failedNodes);
 	failedNodesExceptMe.remove(aliveNodes.get(localNodeId));
 	notifyClients(failedNodesExceptMe, failedNodes);
+        
+        for (long nodeId : aliveNodes.keySet()) {
+            nodeMgr.notifyNodeFailed(nodeId);
+        }
 	aliveNodes.clear();
     }
 
@@ -378,7 +410,8 @@ public final class WatchdogServerImpl
      * {@inheritDoc}
      */
     public long[] registerNode(final String host, 
-                               WatchdogClient client)
+                               WatchdogClient client,
+                               int jmxPort)
 	throws NodeRegistrationFailedException
     {
 	callStarted();
@@ -406,7 +439,7 @@ public final class WatchdogServerImpl
 		throw new NodeRegistrationFailedException(
 		    "Exception occurred while obtaining node ID", e);
 	    }
-	    final NodeImpl node = new NodeImpl(nodeId, host, client);
+	    final NodeImpl node = new NodeImpl(nodeId, host, jmxPort, client);
             
             if (aliveNodes.putIfAbsent(nodeId, node) != null) {
                 logger.log(Level.SEVERE,
@@ -431,8 +464,7 @@ public final class WatchdogServerImpl
 	    
 	    // Put node in set, sorted by expiration.
 	    node.setExpiration(calculateExpiration());
-	    
-	    // TBD: use a ConcurrentSkipListSet?
+            nodeMgr.notifyNodeStarted(nodeId);
 	    expirationSet.add(node);
 
 	    // Notify clients of new node.
@@ -567,6 +599,7 @@ public final class WatchdogServerImpl
 		     */
 		    for (NodeImpl node : expiredNodes) {
 			aliveNodes.remove(node.getId());
+                        nodeMgr.notifyNodeFailed(node.getId());
 		    }
                     
 		    /*
@@ -842,5 +875,91 @@ public final class WatchdogServerImpl
 		    notifyNode.getId());
 	    }
 	}
+    }
+    
+    // Management support
+    private NodeInfo[] getAllNodeInfo() {
+        final Set<NodeInfo> nodes = new HashSet<NodeInfo>();
+        try {
+            transactionScheduler.runTask(
+                new AbstractKernelRunnable("GetNodeInfo") {
+                    public void run() {
+                        Iterator<Node> iter = NodeImpl.getNodes(dataService);
+                        while (iter.hasNext()) {
+                            NodeImpl node = (NodeImpl) iter.next();
+                            nodes.add(node.getNodeInfo());
+                        }
+		}
+            },  taskOwner);
+        } catch (Exception e) {
+            logger.logThrow(Level.INFO, e,
+                    "Could not retrieve node information");
+            return new NodeInfo[0];
+        }
+        return nodes.toArray(new NodeInfo[nodes.size()]);
+    }
+    
+    /**
+     * Private class for JMX information.
+     */
+    private static class NodeManager extends NotificationBroadcasterSupport
+            implements NodesMXBean 
+    {
+        /** The watchdog server we'll use to get the node info. */
+        private WatchdogServerImpl watchdog;
+        
+        private AtomicLong seqNumber = new AtomicLong();
+        
+        /** Description of the notifications. */
+        private static MBeanNotificationInfo[] notificationInfo =
+            new MBeanNotificationInfo[] {
+                new MBeanNotificationInfo(
+                        new String[] {NODE_STARTED_NOTIFICATION, 
+                                      NODE_FAILED_NOTIFICATION }, 
+                        Notification.class.getName(), 
+                        "A node has started or failed") };
+        /**
+         * Creates an instance of the manager.
+         * @param watchdog  the watchdog server
+         */
+        NodeManager(WatchdogServerImpl watchdog) {
+            super(notificationInfo);
+            this.watchdog = watchdog;
+        }
+
+        /** {@inheritDoc} */
+        public NodeInfo[] getNodes() {
+            return watchdog.getAllNodeInfo();
+        }
+ 
+        /*
+         * Package private methods.
+         */
+               
+        /**
+         * Sends JMX notification that a node started.
+         * @param nodeId the identifier of the newly started node
+         */
+        void notifyNodeStarted(long nodeId) {
+            sendNotification(
+                    new Notification(NODE_STARTED_NOTIFICATION,
+                                     this.MXBEAN_NAME,
+                                     seqNumber.incrementAndGet(),
+                                     System.currentTimeMillis(),
+                                     "Node started: " + nodeId));
+        }
+        
+        /**
+         * Sends JMX notification that a node failed.
+         * @param nodeId the identifier of the failed node
+         */
+        void notifyNodeFailed(long nodeId) {
+            sendNotification(
+                    new Notification(NODE_FAILED_NOTIFICATION,
+                                     this.MXBEAN_NAME,
+                                     seqNumber.incrementAndGet(),
+                                     System.currentTimeMillis(),
+                                     "Node failed:  " + nodeId));
+        }
     }
 }

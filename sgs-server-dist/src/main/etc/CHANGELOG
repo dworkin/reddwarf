@@ -1,5 +1,8 @@
-Version 0.9.9
+Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)
+- Switch to BDB JE 3.3.75 (issue #122)
+- Expose monitoring data through JMX (issue #35)
+- Also fix issues #125, #129, #132, #133
 
 Version 0.9.8:
 - Add ScalableDeque and ScalableList implementations

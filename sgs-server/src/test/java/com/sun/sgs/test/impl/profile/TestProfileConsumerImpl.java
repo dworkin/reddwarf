@@ -40,6 +40,7 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Exchanger;
@@ -50,6 +51,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -740,16 +742,6 @@ public class TestProfileConsumerImpl {
                                ProfileLevel.MIN);
     }
     @Test(expected=IllegalArgumentException.class)
-    public void testSampleTaskAggregateZeroCapacity() throws Exception {
-        ProfileCollector collector = getCollector(serverNode);
-        ProfileConsumer cons1 = collector.getConsumer("c1");
-        AggregateProfileSample s1 = (AggregateProfileSample)
-            cons1.createSample("foo", 
-                               ProfileDataType.TASK_AND_AGGREGATE,
-                               ProfileLevel.MIN);
-        s1.setCapacity(0);
-    }
-    @Test(expected=IllegalArgumentException.class)
     public void testSampleTaskAggregateNegCapacity() throws Exception {
         ProfileCollector collector = getCollector(serverNode);
         ProfileConsumer cons1 = collector.getConsumer("c1");
@@ -914,5 +906,82 @@ public class TestProfileConsumerImpl {
                                ProfileLevel.MAX);
         assertTrue(s3 instanceof TaskProfileSample);
         assertTrue(s3 instanceof AggregateProfileSample);
+    }
+    
+    @Test
+    public void testTaskAggregateSampleZeroCapacity() throws Exception {
+        final List<Long> expected = new LinkedList<Long>();
+        expected.add(Long.valueOf(5));
+        expected.add(Long.valueOf(-1));
+        expected.add(Long.valueOf(2));
+        ProfileCollector collector = getCollector(serverNode);
+        ProfileConsumer cons1 = collector.getConsumer("c1");
+        final AggregateProfileSample samp = (AggregateProfileSample)
+                cons1.createSample("sample1", 
+                                   ProfileDataType.TASK_AND_AGGREGATE, 
+                                   ProfileLevel.MIN);
+        final String sampleName = samp.getName();
+        // Ensure that a zero capacity aggregate sample sends the sample
+        // values to the task listener, but does not accumulate any
+        // samples in the global aggregation.
+        samp.setCapacity(0);
+        
+        final Exchanger<AssertionError> errorExchanger = 
+                new Exchanger<AssertionError>();
+
+        final Identity myOwner = new DummyIdentity("me");
+        SimpleTestListener test = new SimpleTestListener(
+            new Runnable() {
+                public void run() {
+                    AssertionError error = null;
+                    ProfileReport report = SimpleTestListener.report;
+                    if (report.getTaskOwner().equals(myOwner)) {
+                        try {
+                            List<Long> samples =
+                                report.getUpdatedTaskSamples().get(sampleName);
+                            assertEquals(expected, samples);    
+                        } catch (AssertionError e) {
+                            error = e;
+                        }
+                    }
+
+                    // Signal that we're done, and return the exception
+                    try { 
+                        errorExchanger.exchange(error);
+                    } catch (InterruptedException ignored) {
+                        // do nothing
+                    }
+                }
+        });
+        profileCollector.addListener(test, true);
+        
+        assertEquals(0, samp.getNumSamples());
+        assertNotNull(samp.getSamples());
+        for (Long sample : samp.getSamples()) {
+            fail("didn't expect to find a sample " + sample);
+        }
+        txnScheduler.runTask(
+            new TestAbstractKernelRunnable() {
+		public void run() { 
+                    for (long value : expected) {
+                        samp.addSample(value);
+                    }
+                }
+            }, myOwner);
+            
+        AssertionError error = 
+                errorExchanger.exchange(null, 100, TimeUnit.MILLISECONDS);
+        if (error != null) {
+            throw new AssertionError(error);
+        }
+ 
+        // No global samples, yet statistics are maintained
+        assertEquals(0, samp.getNumSamples());
+        assertNotNull(samp.getSamples());
+        for (Long sample : samp.getSamples()) {
+            fail("didn't expect to find a sample " + sample);
+        }
+        assertEquals(5, samp.getMaxSample());
+        assertEquals(-1, samp.getMinSample());
     }
 }

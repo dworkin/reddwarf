@@ -42,7 +42,9 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
@@ -70,6 +72,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * ChannelService implementation. <p>
@@ -200,6 +203,9 @@ public final class ChannelServiceImpl
     /** The maximum number of channel events to service per transaction. */
     final int eventsPerTxn;
 
+    /** Our JMX exposed statistics. */
+    final ChannelServiceStats serviceStats;
+    
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -300,6 +306,17 @@ public final class ChannelServiceImpl
             sessionService.registerSessionDisconnectListener(
                 new ChannelSessionDisconnectListener());
 
+            /* create our service profiling info and register our MBean */
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new ChannelServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats, 
+                                        ChannelServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -346,6 +363,7 @@ public final class ChannelServiceImpl
 				 ChannelListener listener,
 				 Delivery delivery)
     {
+        serviceStats.createChannelOp.report();
 	try {
 	    Channel channel = ChannelImpl.newInstance(
 		name, listener, delivery, writeBufferSize);
@@ -359,6 +377,7 @@ public final class ChannelServiceImpl
 
     /** {@inheritDoc} */
     public Channel getChannel(String name) {
+        serviceStats.getChannelOp.report();
 	try {
 	    return ChannelImpl.getInstance(name);
 	    

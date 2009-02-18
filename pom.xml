@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.projectdarkstar</groupId>
     <artifactId>sgs</artifactId>
-    <version>11</version>
+    <version>12</version>
   </parent>
 
   <groupId>com.projectdarkstar.server</groupId>
@@ -71,6 +71,38 @@
 	    </execution>
 	  </executions>
 	</plugin>
+
+	<!-- The berkeleydb binary package must be retrieved and unpacked
+	     Before the test phase so that they are available during
+	     runtime of the unit tests.
+	     To enable this dependency unpack, activate the unpack-bdb-binaries
+	     execution id in the child POM -->
+	<plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>unpack-bdb-binaries</id>
+              <goals>
+		<goal>unpack</goal>
+              </goals>
+              <configuration>
+		<artifactItems>
+                  <artifactItem>
+                    <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+                    <artifactId>db-binaries</artifactId>
+		    <type>zip</type>
+                    <overWrite>false</overWrite>
+                    <outputDirectory>
+		      ${project.build.directory}/
+		    </outputDirectory>
+                  </artifactItem>
+		</artifactItems>
+              </configuration>
+            </execution>
+          </executions>
+	</plugin>
+
 	
       </plugins>
     </pluginManagement>
@@ -165,8 +197,195 @@
 	<type>zip</type>
 	<version>${sgs.version}</version>
       </dependency>
+
+      <dependency>
+	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	<artifactId>db</artifactId>
+	<version>${bdb.version}</version>
+      </dependency>
+      <dependency>
+	<groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	<artifactId>db-binaries</artifactId>
+	<version>${bdb.version}</version>
+	<type>zip</type>
+      </dependency>
+      <dependency>
+	<groupId>com.sleepycat</groupId>
+	<artifactId>je</artifactId>
+	<version>${bdb.je.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
+
+  <!-- Profiles activated based on platform to set BDB properties
+       The profile that is activated sets the bdb.lib.dir property 
+       to the directory name of the bdb libraries in the bdb
+       binary package for the platform in use. -->
+  <profiles>
+    <profile>
+      <id>macosx-ppc</id>
+      <properties>
+	<bdb.lib.dir>macosx-ppc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>ppc</arch>
+	</os>
+      </activation>
+    </profile>
+
+    <profile>
+      <id>macosx-x86</id>
+      <properties>
+	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+
+    <profile>
+      <id>macosx-x86_64</id>
+      <properties>
+	<bdb.lib.dir>macosx-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>mac</family>
+	  <arch>x86_64</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-x86</id>
+      <properties>
+	<bdb.lib.dir>solaris-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>x86</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>solaris-sparc</id>
+      <properties>
+	<bdb.lib.dir>solaris-sparc</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>SunOS</name>
+	  <arch>sparc</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86</id>
+      <properties>
+	<bdb.lib.dir>linux-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>i386</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>linux-x86_64</id>
+      <properties>
+	<bdb.lib.dir>linux-x86_64</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <name>Linux</name>
+	  <arch>x86_64</arch>
+	</os>
+      </activation>
+    </profile>
+    
+    <profile>
+      <id>win32-x86</id>
+      <properties>
+	<bdb.lib.dir>win32-x86</bdb.lib.dir>
+      </properties>
+      <activation>
+	<os>
+	  <family>windows</family>
+	</os>
+      </activation>
+    </profile>
+
+    <!-- profile enabled to test with BDB Java edition.
+	 This will set the run.bdb.env property to the BDB Java edition
+	 class rather than the native class.  It will also
+	 blank out the run.javapath and ensure that the BDB Java
+	 edition dependency is declared BEFORE the BDB native edition
+	 dependency.  The reason for this is so that we can ensure
+	 that BDB Java edition appears first on the classpath to avoid
+	 incompatible classes available in both editions. -->
+    <profile>
+      <id>bdb-java</id>
+      <properties>
+	<run.bdb.env>
+	  com.sun.sgs.impl.service.data.store.db.je.JeEnvironment
+	</run.bdb.env>
+	<run.javapath></run.javapath>	  
+      </properties>
+      <dependencies>
+	<dependency>
+	  <groupId>com.sleepycat</groupId>
+	  <artifactId>je</artifactId>
+	</dependency>
+	<dependency>
+	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <artifactId>db</artifactId>
+	</dependency>
+      </dependencies>
+    </profile>
+
+ 
+    <!-- profile enabled to test with BDB native edition.
+	 This will set the run.bdb.env property to the BDB native
+	 class rather than the Java edition class.  It will also
+	 set the run.javapath to the appropriate native library
+	 location and ensure that the BDB native edition dependency
+	 is declared BEFORE the BDB Java edition dependency.
+	 The reason for this is so that we can ensure
+	 that BDB native edition appears first on the classpath to avoid
+	 incompatible classes available in both editions. -->
+    <profile>
+      <id>bdb</id>
+      <properties>
+	<run.bdb.env>
+	  com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+	</run.bdb.env>
+	<run.javapath>
+	  target/bdb-${bdb.version}/${bdb.lib.dir}/
+	</run.javapath>	  
+      </properties>
+      <dependencies>
+	<dependency>
+	  <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+	  <artifactId>db</artifactId>
+	</dependency>
+	<dependency>
+	  <groupId>com.sleepycat</groupId>
+	  <artifactId>je</artifactId>
+	</dependency>
+      </dependencies>
+    </profile>
+    
+  </profiles>
 
   <repositories>
     <repository>
@@ -182,7 +401,12 @@
     <sgs-shared.version>1.4</sgs-shared.version>
     <sgs-client.version>0.9.8</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
-    <bdb.je.version>3.2.76</bdb.je.version>
+    <bdb.je.version>3.3.75</bdb.je.version>
+
+    <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
+    <run.bdb.env>
+      com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment
+    </run.bdb.env>
   </properties>
 
 </project>

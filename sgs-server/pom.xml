@@ -111,8 +111,7 @@
 
       <!-- The berkeleydb binary package must be retrieved and unpacked
 	   Before the test phase so that they are available during
-	   runtime of the unit tests
-	   Execution activated from SGS super POM -->
+	   runtime of the unit tests. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -123,7 +122,7 @@
           </execution>
         </executions>
       </plugin>
-
+      
       <!-- Create a clean test-output directory -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
@@ -210,25 +209,6 @@
 
   <reporting>
     <plugins>
-
-      <!-- Configure checkstyle to run during site lifecycle -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<configuration>
-	  <linkXRef>false</linkXRef>
-	  <consoleOutput>true</consoleOutput>
-	  <enableRulesSummary>false</enableRulesSummary>
-	  <configLocation>${checkstyle.config}</configLocation>
-	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
-	  <packageNamesLocation>
-	    ${checkstyle.packageNames}
-	  </packageNamesLocation>
-	  <propertyExpansion>
-	    checkstyle.unusedImports=${checkstyle.unusedImports}
-	  </propertyExpansion>
-        </configuration>
-      </plugin>
 
       <!-- Configure findbugs to run during site lifecycle -->
       <plugin>

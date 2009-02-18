@@ -46,7 +46,7 @@ public final class StandardProperties {
         
     }
 
-    // the root of all the properties
+    // the root of all the Darkstar properties
     private static final String NS = "com.sun.sgs.";
     
     /**
@@ -219,17 +219,6 @@ public final class StandardProperties {
     public static final String NODE_TYPE = NS + "node.type";
     
     /**
-     *  The valid choices for {@link #NODE_TYPE}.
-     */
-    public enum NodeType {
-        /** A single node configuration. */
-        singleNode,
-        /** The core server for multi-node configurations. */
-        coreServerNode,
-        /** An application node for multi-node configurations. */
-        appNode,
-    }
-    /**
      * An optional property that specifies the default for whether to start the
      * servers associated with services.
      */
@@ -240,4 +229,12 @@ public final class StandardProperties {
      * running the servers associated with services.
      */
     public static final String SERVER_HOST = NS + "server.host";
+    
+    /**
+     * An optional system property (this is not a Darkstar property) which
+     * enables remote JMX monitoring, and specifies the port JMX is listening
+     * on.
+     */
+    public static final String SYSTEM_JMX_REMOTE_PORT = 
+            "com.sun.management.jmxremote.port";
 }
