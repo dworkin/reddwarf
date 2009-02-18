@@ -483,7 +483,7 @@ public final class NodeMappingServerImpl
                         RemoveTask rtask = new RemoveTask(id);
                         try {
                             runTransactionally(rtask);
-                            if (rtask.isDead()) {
+                            if (rtask.idRemoved()) {
                                 notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
@@ -541,8 +541,14 @@ public final class NodeMappingServerImpl
             dead = (name == null || !name.startsWith(statuskey));
 
             if (dead) {
-                IdentityMO idmo = 
-		    (IdentityMO) dataService.getServiceBinding(idkey);
+                IdentityMO idmo;
+                try {
+                    idmo = (IdentityMO) dataService.getServiceBinding(idkey);
+                } catch (NameNotBoundException nnbe) {
+                    dead = false;
+                    logger.log(Level.FINE, "{0} has already been removed", id);
+                    return;
+                }
                 long nodeId = idmo.getNodeId();
                 node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
@@ -556,7 +562,7 @@ public final class NodeMappingServerImpl
         }
         
         /** Returns {@code true} if the identity was removed. */
-        boolean isDead() {
+        boolean idRemoved() {
             return dead;
         }
         /** Returns the node the identity was removed from, which can be
