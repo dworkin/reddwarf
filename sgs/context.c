@@ -42,11 +42,13 @@
 #include "sgs/id.h"
 #include "sgs/private/context_impl.h"
 #include "sgs/session.h"
+#include "private/context_impl.h"
 
 /*
  * sgs_ctx_destroy()
  */
 void sgs_ctx_destroy(sgs_context_impl *ctx) {
+    free(ctx->hostname);
     free(ctx);
 }
 
@@ -66,7 +68,8 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     ctx = malloc(sizeof(struct sgs_context_impl));
     if (ctx == NULL) return NULL;
 
-    name_len = strlen(hostname);
+    //Get the length of the string, then add one for the null terminator
+    name_len = strlen(hostname) + 1;
     ctx->hostname = malloc(name_len);
     if (ctx->hostname == NULL) {
         free(ctx);
