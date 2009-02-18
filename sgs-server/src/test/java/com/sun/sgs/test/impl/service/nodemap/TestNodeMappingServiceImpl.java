@@ -846,6 +846,7 @@ public class TestNodeMappingServiceImpl {
         
         Logger logger = 
             Logger.getLogger("com.sun.sgs.impl.service.nodemap.server");
+        Level oldLevel = logger.getLevel();
         logger.setLevel(Level.INFO);
         logger.setFilter(new Filter() {
             public boolean isLoggable(LogRecord record) {
@@ -861,8 +862,8 @@ public class TestNodeMappingServiceImpl {
             }
         });
         
-        // Much like testSetStatusMultRemove, but need to check output
-        // file for inappropriate warning message.
+        // Much like testSetStatusMultRemove, but need to check logging
+        // output for inappropriate warning message.
         // We're simulating an identity that is logged in, logged out...
         nodeMappingService.setStatus(NodeMappingService.class, id, true);
         nodeMappingService.setStatus(NodeMappingService.class, id, false);
@@ -885,8 +886,9 @@ public class TestNodeMappingServiceImpl {
             System.out.println("OK: Time out without a WARNING log message");
         }
         
-        // Remove our test filter.
+        // Remove our test filter and reset the logging level.
         logger.setFilter(null);
+        logger.setLevel(oldLevel);
         
         // Sanity check, be sure our listener still gets a single notification
         // in this log in, out, in, out scenario.
