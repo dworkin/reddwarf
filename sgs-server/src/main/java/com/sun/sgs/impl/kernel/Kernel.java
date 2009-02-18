@@ -44,6 +44,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Version;
@@ -130,6 +131,10 @@ class Kernel {
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
     
+    // The property for specifying the access coordinator
+    private static final String ACCESS_COORDINATOR_PROPERTY =
+	"com.sun.sgs.impl.kernel.access.coordinator";
+
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
@@ -235,9 +240,20 @@ class Kernel {
 	    }
 
             // create the access coordinator
-            AccessCoordinatorImpl accessCoordinator =
-                new AccessCoordinatorImpl(appProperties, proxy,
-                                          profileCollectorHandle);
+            AccessCoordinatorHandle accessCoordinator =
+		new PropertiesWrapper(appProperties).getClassInstanceProperty(
+		    ACCESS_COORDINATOR_PROPERTY,
+		    AccessCoordinatorHandle.class,
+		    new Class[] {
+			Properties.class,
+			TransactionProxy.class,
+			ProfileCollectorHandle.class
+		    },
+		    appProperties, proxy, profileCollectorHandle);
+	    if (accessCoordinator == null) {
+		accessCoordinator = new AccessCoordinatorImpl(
+		    appProperties, proxy, profileCollectorHandle);
+	    }
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work

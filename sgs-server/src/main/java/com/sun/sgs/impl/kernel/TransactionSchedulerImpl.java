@@ -111,7 +111,7 @@ final class TransactionSchedulerImpl
     private final ProfileCollectorHandle profileCollectorHandle;
 
     // the coordinator for all transactional object access
-    private final AccessCoordinatorImpl accessCoordinator;
+    private final AccessCoordinatorHandle accessCoordinator;
 
     // the executor service used to manage our threads
     private final ExecutorService executor;
@@ -146,7 +146,7 @@ final class TransactionSchedulerImpl
     TransactionSchedulerImpl(Properties properties,
                              TransactionCoordinator transactionCoordinator,
                              ProfileCollectorHandle profileCollectorHandle,
-                             AccessCoordinatorImpl accessCoordinator)
+                             AccessCoordinatorHandle accessCoordinator)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating a Transaction Scheduler");
@@ -572,7 +572,8 @@ final class TransactionSchedulerImpl
                         profileCollectorHandle.noteTransactional(
                                                     transaction.getId());
                         accessCoordinator.
-                            notifyNewTransaction(task.getStartTime(),
+                            notifyNewTransaction(transaction,
+						 task.getStartTime(),
                                                  task.getTryCount());
 
                         // run the task in the new transactional context

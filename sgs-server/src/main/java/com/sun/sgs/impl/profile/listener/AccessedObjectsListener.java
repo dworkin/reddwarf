@@ -199,7 +199,9 @@ public class AccessedObjectsListener implements ProfileListener {
      * 
      * @return a formatted representation of the accessed objects
      */
-    private String formatAccesses(List<AccessedObject> accessedObjects) {
+    private String formatAccesses(
+	List<? extends AccessedObject> accessedObjects)
+    {
         StringBuilder formatted = new StringBuilder();
         int count = 0;
 
