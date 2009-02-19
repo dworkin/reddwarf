@@ -47,7 +47,7 @@ public final class StandardProperties {
         
     }
 
-    // the root of all the properties
+    // the root of all the Darkstar properties
     private static final String NS = "com.sun.sgs.";
     
     /**
@@ -226,17 +226,6 @@ public final class StandardProperties {
     public static final String NODE_TYPE = NS + "node.type";
     
     /**
-     *  The valid choices for {@link #NODE_TYPE}.
-     */
-    public enum NodeType {
-        /** A single node configuration. */
-        singleNode,
-        /** The core server for multi-node configurations. */
-        coreServerNode,
-        /** An application node for multi-node configurations. */
-        appNode,
-    }
-    /**
      * An optional property that specifies the default for whether to start the
      * servers associated with services.
      */
@@ -249,14 +238,10 @@ public final class StandardProperties {
     public static final String SERVER_HOST = NS + "server.host";
     
     /**
-     * An optional property that specifies the maximum number of retries for 
-     * IO tasks in services.
+     * An optional system property (this is not a Darkstar property) which
+     * enables remote JMX monitoring, and specifies the port JMX is listening
+     * on.
      */
-    public static final String IO_RETRIES = NS + "io.retries";
-    
-    /**
-     * An optional property that specifies the wait time between successive 
-     * IO task retries.
-     */
-    public static final String IO_WAIT_TIME = NS + "io.wait.time";
+    public static final String SYSTEM_JMX_REMOTE_PORT = 
+            "com.sun.management.jmxremote.port";
 }

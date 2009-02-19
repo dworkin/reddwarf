@@ -19,9 +19,9 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
@@ -147,6 +147,11 @@ public final class TransactionCoordinatorImpl
                 TransactionCoordinator.
                     TXN_DISABLE_PREPAREANDCOMMIT_OPT_PROPERTY,
                 false);
+        
+        // Set our portion of the ConfigManager MXBean
+        ConfigManager config = (ConfigManager) collectorHandle.getCollector().
+                getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+        config.setStandardTxnTimeout(boundedTimeout);
     }
 
     /** {@inheritDoc} */

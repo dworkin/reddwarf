@@ -24,6 +24,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
@@ -244,6 +245,17 @@ public class SgsTestNode {
             props = properties;
         }
 
+        String createMBeanServer =
+           props.getProperty(ProfileCollectorImpl.CREATE_MBEAN_SERVER_PROPERTY);
+        if (createMBeanServer == null) {
+            // User did not specify whether we should create an MBean server,
+            // rather than use the default platform one.  Because this class
+            // helps us create multiple nodes in a single VM, by default we'll
+            // always create a new MBean server, avoiding problems with
+            // MBeans already being registered in a test.
+            props.setProperty(ProfileCollectorImpl.CREATE_MBEAN_SERVER_PROPERTY,
+                             "true");
+        }
 	dbDirectory = 
 	    props.getProperty("com.sun.sgs.impl.service.data.store.DataStoreImpl.directory");
         assert(dbDirectory != null);

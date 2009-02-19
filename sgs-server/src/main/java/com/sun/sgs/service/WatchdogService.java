@@ -137,7 +137,7 @@ public interface WatchdogService extends Service {
      * @param	listener a recovery listener
      */
     void addRecoveryListener(RecoveryListener listener);
-    
+
     /**
      * Informs the watchdog that a problem has occured in a service or 
      * component. The watchdog will notify the server of the failure and then

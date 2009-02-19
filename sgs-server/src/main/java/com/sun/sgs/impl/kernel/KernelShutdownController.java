@@ -12,7 +12,7 @@ public interface KernelShutdownController {
      * failure detected in a service or a component. If this method is called 
      * during startup, it may be delayed until the Kernel is completely booted.
      * 
-     * @param caller the class that called the shutdown. this is to
+     * @param caller the class that called the shutdown. This is to
      * differentiate between being called from a service and being called from
      * a component.
      */

@@ -53,6 +53,7 @@ package com.sun.sgs.service;
  * it may do so by calling {@code TransactionScheduler.runTask}.
  */
 public interface Service {
+
     /**
      * Returns the name used to identify this service.
      *

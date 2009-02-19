@@ -62,18 +62,19 @@ import java.util.logging.Level;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.io.retries
+ *	com.sun.sgs.impl.util.io.task.max.retries
  *	</b></code><br>
  *	<i>Default:</i> 5 retries <br>
  *	Specifies how many times an {@link IoRunnable IoRunnable} task should 
- *      be retried before performing failure procedures.<p>
+ *      be retried before performing failure procedures. The value
+ *	must be greater than or equal to {@code 0}.<p>
  *
  * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.io.wait.time
+ *	com.sun.sgs.impl.util.io.task.wait.time
  *	</b></code><br>
  *	<i>Default:</i> 100 milliseconds <br>
  *      Specifies the wait time between {@link IoRunnable IoRunnable} task
- *      retries.
+ *      retries. The value must be greater than or equal to {@code 0}.
  *
  * </dl> <p>
  * 
@@ -125,6 +126,24 @@ public abstract class AbstractService implements Service {
     /** Thread for shutting down the server. */
     private volatile Thread shutdownThread;
 
+    /** Prefix for io task related properties. */
+    public static final String IO_TASK_PROPERTY_PREFIX =
+            "com.sun.sgs.impl.util.io.task";
+
+    /**
+     * An optional property that specifies the maximum number of retries for
+     * IO tasks in services.
+     */
+    public static final String IO_TASK_RETRIES_PROPERTY = 
+            IO_TASK_PROPERTY_PREFIX + ".max.retries";
+
+    /**
+     * An optional property that specifies the wait time between successive
+     * IO task retries.
+     */
+    public static final String IO_TASK_WAIT_TIME_PROPERTY = 
+            IO_TASK_PROPERTY_PREFIX + ".wait.time";
+
     /** The default number of IO task retries **/
     private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
     
@@ -136,7 +155,7 @@ public abstract class AbstractService implements Service {
     protected final int retryWaitTime;
     
     /** The maximum number of retry attempts for IO operations. */
-    protected final int maxIOAttempts;
+    protected final int maxIoAttempts;
 
     /**
      * Constructs an instance with the specified {@code properties}, {@code
@@ -180,18 +199,15 @@ public abstract class AbstractService implements Service {
 	    throw new IllegalArgumentException(
 		"The " + StandardProperties.APP_NAME +
 		" property must be specified");
-	}
+	}	
 
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
         retryWaitTime = wrappedProps.getIntProperty(
-                StandardProperties.IO_WAIT_TIME, DEFAULT_RETRY_WAIT_TIME);
-        maxIOAttempts = wrappedProps.getIntProperty(
-                StandardProperties.IO_RETRIES, DEFAULT_MAX_IO_ATTEMPTS);
-        if (maxIOAttempts < 1) {
-            throw new IllegalArgumentException("The " +
-                    StandardProperties.IO_RETRIES +
-                    " property must be larger than 0");
-        }
+                IO_TASK_WAIT_TIME_PROPERTY, DEFAULT_RETRY_WAIT_TIME, 0,
+                Integer.MAX_VALUE);
+        maxIoAttempts = wrappedProps.getIntProperty(
+                IO_TASK_RETRIES_PROPERTY, DEFAULT_MAX_IO_ATTEMPTS, 0,
+                Integer.MAX_VALUE);
 	
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -450,7 +466,7 @@ public abstract class AbstractService implements Service {
             return state == State.INITIALIZED;
         }
     }
-
+    
     /**
      * Runs a transactional task to query the status of the node with the
      * specified {@code nodeId} and returns {@code true} if the node is alive
@@ -496,14 +512,14 @@ public abstract class AbstractService implements Service {
 	return transactionScheduler.createTaskQueue();
     }
 
-
     /**
      * Executes the specified {@code ioTask} by invoking its {@link
      * IoRunnable#run run} method. If the specified task throws an
      * {@code IOException}, this method will retry the task for a fixed 
-     * number of times, which is configurable, while the node
-     * with the given {@code nodeId} is alive until the task completes
-     * successfully.
+     * number of times. The method will stop retrying if the node with
+     * the given {@code nodeId} is no longer alive. The number of retries
+     * and the wait time between retries are configurable properties.
+     *
      * <p>
      * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
@@ -514,7 +530,7 @@ public abstract class AbstractService implements Service {
      * transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
-        int maxAttempts = maxIOAttempts;
+        int maxAttempts = maxIoAttempts;
         checkNonTransactionalContext();
         do {
             try {
@@ -525,13 +541,16 @@ public abstract class AbstractService implements Service {
                     logger.logThrow(Level.FINEST, e,
                             "IoRunnable {0} throws", ioTask);
                 }
-                // If the maximum number of attempts have been tried,
-                // then we are forced to shutdown
-                if (--maxAttempts == 0) {
-                    // Report failure of remote node since are having trouble
-                    // contacting it.
+                if (maxAttempts-- == 0) {
+                    logger.logThrow(Level.WARNING, e,
+                            "A communication error occured while running an" +
+                            "IO task. Reporting node {0} as failed.", nodeId);
+
+                    // Report failure of remote node since are
+                    // having trouble contacting it
                     txnProxy.getService(WatchdogService.class).
                             reportFailure(nodeId, this.getClass().toString());
+                    
                     break;
                 }
                 try {

@@ -28,7 +28,6 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.service.RecoveryListener;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.Properties;
 

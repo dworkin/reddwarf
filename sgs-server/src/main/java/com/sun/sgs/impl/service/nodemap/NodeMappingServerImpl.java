@@ -483,7 +483,7 @@ public final class NodeMappingServerImpl
                         RemoveTask rtask = new RemoveTask(id);
                         try {
                             runTransactionally(rtask);
-                            if (rtask.isDead()) {
+                            if (rtask.idRemoved()) {
                                 notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
@@ -541,8 +541,14 @@ public final class NodeMappingServerImpl
             dead = (name == null || !name.startsWith(statuskey));
 
             if (dead) {
-                IdentityMO idmo = 
-		    (IdentityMO) dataService.getServiceBinding(idkey);
+                IdentityMO idmo;
+                try {
+                    idmo = (IdentityMO) dataService.getServiceBinding(idkey);
+                } catch (NameNotBoundException nnbe) {
+                    dead = false;
+                    logger.log(Level.FINE, "{0} has already been removed", id);
+                    return;
+                }
                 long nodeId = idmo.getNodeId();
                 node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
@@ -556,7 +562,7 @@ public final class NodeMappingServerImpl
         }
         
         /** Returns {@code true} if the identity was removed. */
-        boolean isDead() {
+        boolean idRemoved() {
             return dead;
         }
         /** Returns the node the identity was removed from, which can be
@@ -610,7 +616,7 @@ public final class NodeMappingServerImpl
         if (oldNode != null) {
             NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {
-                int retries = maxIOAttempts; // retry a few times
+                int retries = maxIoAttempts; // retry a few times
                 while (retries-- > 0) {
                     try {
                         oldClient.removed(id, newNode);
@@ -634,19 +640,22 @@ public final class NodeMappingServerImpl
         if (newNode != null) {
             NotifyClient newClient = notifyMap.get(newNode.getId());
             if (newClient != null) {
-                int retries = maxIOAttempts; // retry a few times
+                int retries = maxIoAttempts; // retry a few times
                 while (retries-- > 0) {
                     try {
                         newClient.added(id, oldNode);
                         break;
                     } catch (IOException ex) {
-                        logger.logThrow(Level.WARNING, ex, "A communication " +
-                                "error occured while notifying node {0} " +
-                                "that {1} has been added", newClient, id);
-
-                        // shutdown the node corresponding to newClient
-                        watchdogService.reportFailure(newNode.getId(),
-                                this.getClass().toString());
+                        // report failure if we run out of retries
+                        if (retries == 0) {
+                            logger.logThrow(Level.WARNING, ex,
+                                    "A communication error occured while " +
+                                    "notifying node {0} that {1} has " +
+                                    "been removed", newClient, id);
+                            // shutdown the node corresponding to newClient
+                            watchdogService.reportFailure(newNode.getId(),
+                                    this.getClass().toString());
+                        }
                     }
                 }
             }

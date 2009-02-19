@@ -28,6 +28,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -351,6 +352,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	public Throwable getAbortCause() {
 	    return abortCause;
+	}
+
+	/**
+	 * Don't bother to support transaction listeners for just the data
+	 * store, which doesn't use them.
+	 */
+	public void registerListener(TransactionListener listener) {
+	    throw new UnsupportedOperationException(
+		"DataStoreServerImpl doesn't support transaction listeners");
 	}
 
 	/* -- Other methods -- */

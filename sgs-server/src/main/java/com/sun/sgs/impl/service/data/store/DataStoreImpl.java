@@ -1275,8 +1275,8 @@ public class DataStoreImpl
 			txnCountLock.wait();
 		    } catch (InterruptedException e) {
                         // loop until shutdown is complete
-			logger.log(Level.FINEST, "Interrupt ignored during " +
-                                "shutdown");
+			logger.log(Level.FINEST, "DataStore shutdown " +
+                                "interrupt ignored");
 		    }
                 }
                 if (txnCount < 0) {

@@ -39,6 +39,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
@@ -625,6 +626,14 @@ public class TestDataServiceImpl{
     public void testGetServiceBindingAborted() throws Exception {
 	testAborted(getServiceBinding);
     }
+    @Test
+    public void testGetBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(getBinding);
+    }
+    @Test
+    public void testGetServiceBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(getServiceBinding);
+    }
     @Test 
     public void testGetBindingPreparing() throws Exception {
 	testPreparing(getBinding);
@@ -885,6 +894,14 @@ public class TestDataServiceImpl{
     @Test 
     public void testSetServiceBindingAborted() throws Exception {
 	testAborted(setServiceBinding);
+    }
+    @Test
+    public void testSetBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(setBinding);
+    }
+    @Test
+    public void testSetServiceBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(setServiceBinding);
     }
     @Test 
     public void testSetBindingPreparing() throws Exception {
@@ -1185,6 +1202,14 @@ public class TestDataServiceImpl{
     public void testRemoveServiceBindingAborted() throws Exception {
 	testAborted(removeServiceBinding);
     }
+    @Test
+    public void testRemoveBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(removeBinding);
+    }
+    @Test
+    public void testRemoveServiceBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(removeServiceBinding);
+    }
     @Test 
     public void testRemoveBindingPreparing() throws Exception {
 	testPreparing(removeBinding);
@@ -1441,6 +1466,14 @@ public class TestDataServiceImpl{
     public void testNextServiceBoundNameAborted() throws Exception {
 	testAborted(nextServiceBoundName);
     }
+    @Test
+    public void testNextBoundNameBeforeCompletion() throws Exception {
+	testBeforeCompletion(nextBoundName);
+    }
+    @Test
+    public void testNextServiceBoundNameBeforeCompletion() throws Exception {
+	testBeforeCompletion(nextServiceBoundName);
+    }
     @Test 
     public void testNextBoundNamePreparing() throws Exception {
 	testPreparing(nextBoundName);
@@ -1682,6 +1715,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testRemoveObjectAborted() throws Exception {
 	testAborted(removeObject);
+    }
+    @Test
+    public void testRemoveObjectBeforeCompletion() throws Exception {
+	testBeforeCompletion(removeObject);
     }
     @Test 
     public void testRemoveObjectPreparing() throws Exception {
@@ -1948,6 +1985,10 @@ public class TestDataServiceImpl{
     public void testMarkForUpdateAborted() throws Exception {
 	testAborted(markForUpdate);
     }
+    @Test
+    public void testMarkForUpdateBeforeCompletion() throws Exception {
+	testBeforeCompletion(markForUpdate);
+    }
     @Test 
     public void testMarkForUpdatePreparing() throws Exception {
 	testPreparing(markForUpdate);
@@ -2105,6 +2146,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testCreateReferenceAborted() throws Exception {
 	testAborted(createReference);
+    }
+    @Test
+    public void testCreateReferenceBeforeCompletion() throws Exception {
+	testBeforeCompletion(createReference);
     }
     @Test 
     public void testCreateReferencePreparing() throws Exception {
@@ -2268,6 +2313,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testCreateReferenceForIdAborted() throws Exception {
 	testAborted(createReferenceForId);
+    }
+    @Test
+    public void testCreateReferenceForIdBeforeCompletion() throws Exception {
+	testBeforeCompletion(createReferenceForId);
     }
     @Test 
     public void testCreateReferenceForIdPreparing() throws Exception {
@@ -2537,6 +2586,10 @@ public class TestDataServiceImpl{
     public void testNextObjectIdAborted() throws Exception {
 	testAborted(nextObjectId);
     }
+    @Test
+    public void testNextObjectIdBeforeCompletion() throws Exception {
+	testBeforeCompletion(nextObjectId);
+    }
     @Test 
     public void testNextObjectIdPreparing() throws Exception {
 	testPreparing(nextObjectId);
@@ -2605,6 +2658,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testGetReferenceAborted() throws Exception {
 	testAborted(getReference);
+    }
+    @Test
+    public void testGetReferenceBeforeCompletion() throws Exception {
+	testBeforeCompletion(getReference);
     }
     @Test 
     public void testGetReferencePreparing() throws Exception {
@@ -3052,6 +3109,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testGetReferenceUpdateAborted() throws Exception {
 	testAborted(getReferenceUpdate);
+    }
+    @Test 
+    public void testGetReferenceUpdateBeforeCompletion() throws Exception {
+	testBeforeCompletion(getReferenceUpdate);
     }
     @Test 
     public void testGetReferenceUpdatePreparing() throws Exception {
@@ -4080,6 +4141,45 @@ public class TestDataServiceImpl{
         } catch (TestAbortedTransactionException e) {
             System.err.println(e);
         }
+    }
+
+    /**
+     * Tests running the action in a TransactionListener.beforeCompletion
+     * method that is called after running the data service's beforeCompletion
+     * method.  This test depends on the fact that the transaction
+     * implementation calls transaction listeners in the order in which they
+     * are registered.
+     */
+    private void testBeforeCompletion(final Action action) throws Exception {
+	class MyTransactionListener implements TransactionListener {
+	    private RuntimeException exception;
+	    public synchronized void beforeCompletion() {
+		try {
+		    action.run();
+		} catch (RuntimeException e) {
+		    exception = e;
+		}
+	    }
+	    public void afterCompletion(boolean commit) { }
+	    synchronized RuntimeException getException() {
+		return exception;
+	    }
+	}
+	final MyTransactionListener listener = new MyTransactionListener();
+	txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		action.setUp();
+		txnProxy.getCurrentTransaction().registerListener(
+		    listener);
+	    }}, taskOwner);
+	if (listener.getException() instanceof TransactionNotActiveException) {
+	    System.err.println(listener.getException());
+	} else if (listener.getException() != null) {
+	    throw listener.getException();
+	} else {
+	    fail("Expected TransactionNotActiveException");
+	}
     }
 
     /** Tests running the action while preparing. */
