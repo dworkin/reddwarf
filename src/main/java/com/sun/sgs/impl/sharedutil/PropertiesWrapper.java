@@ -330,7 +330,7 @@ public class PropertiesWrapper {
         Class<?>[] paramTypes, Object... args)
     {
         Object instance =
-                getClassInstanceProperty(name, type, paramTypes, args);
+	    getClassInstanceProperty(name, type, paramTypes, args);
         
         if (instance != null) {
             return (T)instance;
