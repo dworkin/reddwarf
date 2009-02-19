@@ -43,14 +43,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * An implementation of {@link AccessCoordinator} that uses a pessimistic
- * algorithm for detecting conflicts. <p>
+ * An implementation of {@link AccessCoordinator} that uses locking to handle
+ * conflicts. <p>
  *
  * The methods that this class provides to implement {@code AccessCoordinator}
  * are not thread safe, and should either be called from a single thread or
  * else protected with external synchronization.
  */
-public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
+public class LockingAccessCoordinator extends AbstractAccessCoordinator
     implements AccessCoordinatorHandle, TransactionParticipant
 {
     /**
@@ -68,7 +68,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
      * keys and maps.  The number of maps controls the amount of concurrency.
      */
     public static final String NUM_KEY_MAPS_PROPERTY =
-	"com.sun.sgs.impl.kernel.PessimisticAccessCoordinator.num.key.maps";
+	"com.sun.sgs.impl.kernel.LockingAccessCoordinator.num.key.maps";
 
     /** The default number of key maps. */
     public static final int NUM_KEY_MAPS_DEFAULT = 8;
@@ -108,7 +108,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
      * @throws	IllegalArgumentException if the values of the configuration
      *		properties are illegal
      */
-    public PessimisticAccessCoordinator(
+    public LockingAccessCoordinator(
 	Properties properties,
 	TransactionProxy txnProxy,
 	ProfileCollectorHandle profileCollectorHandle)
@@ -120,6 +120,9 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	numKeyMaps = wrappedProps.getIntProperty(
 	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	keyMaps = createKeyMaps(numKeyMaps);
+	for (int i = 0; i < numKeyMaps; i++) {
+	    keyMaps[i] = new HashMap<Key, Lock>();
+	}
     }
 
     /* -- Implement AccessCoordinator -- */
@@ -128,6 +131,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
     public <T> AccessReporter<T> registerAccessSource(
 	String sourceName, Class<T> objectIdType)
     {
+	checkNonNull(objectIdType, "objectIdType");
 	return new AccessReporterImpl<T>(sourceName);
     }
 
@@ -282,17 +286,14 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
     /**
      * Releases all of the locks associated with the specified transaction and
      * returns information about the locks requested during that transaction.
-     * The list of requests will be in the order of the requests, with no
-     * duplicate requests, although note that a lock that is upgraded from read
-     * to write access will appear twice.
      *
      * @param	txn the transaction
-     * @return	the list of lock requests made by the transaction
+     * @return	information about object accesses by this transaction
      * @throws	IllegalStateException if {@link #notifyNewTransaction
      *		notifyNewTransaction} has not be called, or {@link #releaseAll
      *		releaseAll} has already been called, for {@code txn}
      */
-    public List<? extends AccessedObject> releaseAll(Transaction txn) {
+    public AccessedObjectsDetail releaseAll(Transaction txn) {
 	Locker locker = getLocker(txn);
 	for (LockRequest request : locker.requests) {
 	    Key key = request.key;
@@ -312,7 +313,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	    }
 	}
 	txnMap.remove(txn);
-	return locker.requests;
+	return locker;
     }
 
     /* -- Public classes -- */
@@ -357,6 +358,12 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	    assert conflictingTxn != null;
 	    this.type = type;
 	    this.conflictingTxn = conflictingTxn;
+	}
+
+	@Override
+	public String toString() {
+	    return "LockConflict[type:" + type +
+		", conflictingTxn:" + conflictingTxn + "]";
 	}
     }
 
@@ -431,8 +438,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
      * @param	txn the finished transaction
      */
     private void reportDetail(Transaction txn) {
-	releaseAll(txn);
-        profileCollectorHandle.setAccessedObjectsDetail(getLocker(txn));
+        profileCollectorHandle.setAccessedObjectsDetail(releaseAll(txn));
     }
 
     /** Attempts to acquire a lock, returning immediately. */
@@ -449,123 +455,19 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	    LockAttemptResult result = lock.lock(locker, forWrite);
 	    if (result == null) {
 		return null;
-	    } else if (result.granted) {
+	    } else if (result.conflict == null) {
 		locker.requests.add(result.request);
 		return null;
 	    } else {
-		conflictingTxn = lock.getFirstOwner().locker.txn;
+		conflictingTxn = result.conflict.txn;
 	    }
 	}
-	Locker conflict = checkDeadlock(locker, key);
-	if (conflict == locker) {
-	    return new LockConflict(LockConflictType.DEADLOCK, conflict.txn);
+	LockConflict conflict = new DeadlockChecker().check(locker, key);
+	if (conflict != null) {
+	    return conflict;
 	} else {
 	    return new LockConflict(LockConflictType.BLOCKED, conflictingTxn);
 	}
-    }
-
-    /**
-     * Checks for deadlocks given that the specified locker was blocked when
-     * attempting to lock the specified key.
-     */
-    private Locker checkDeadlock(Locker locker, Key key) {
-	/*
-	 * XXX: Need to check for multiple deadlocks.  -tjb@sun.com
-	 * (02/19/2009)
-	 */
-	Set<Locker> allOwners = new HashSet<Locker>();
-	allOwners.add(locker);
-	CheckDeadlockResult result = checkDeadlockInternal(allOwners, key);
-	if (result != null) {
-	    return result.setVictimConflict();
-	} else {
-	    return null;
-	}
-    }
-
-    /** The results of a call to {@link #checkDeadlockInternal}. */
-    private static class CheckDeadlockResult {
-
-	/** The locker that was found in a circular reference. */
-	private Locker cycleBoundary;
-
-	/** The current choice of locker to abort. */
-	private Locker victim;
-
-	/** Another locker in the deadlock. */
-	private Locker conflict = null;
-
-	/**
-	 * Creates an instance of this class.  Sets the initial victim to the
-	 * one specified as the cycle boundary.
-	 *
-	 * @param	cycleBoundary the locker that was found in a circular
-	 *		reference
-	 */
-	CheckDeadlockResult(Locker cycleBoundary) {
-	    this.cycleBoundary = cycleBoundary;
-	    victim = cycleBoundary;
-	}
-
-	/** Checks if the victim should be updated to be the argument. */
-	void maybeUpdateVictim(Locker locker) {
-	    if (locker == cycleBoundary) {
-		/* We've gone all the way around the circle, so we're done */
-		cycleBoundary = null;
-	    } else if (cycleBoundary != null &&
-		       locker.requestedStartTime > victim.requestedStartTime)
-	    {
-		/*
-		 * We're not done and this locker started later than the
-		 * current victim, so use it instead.
-		 */
-		if (conflict == null) {
-		    conflict = victim;
-		}
-		victim = locker;
-	    } else if (conflict == null) {
-		conflict = locker;
-	    }
-	}
-
-	Locker setVictimConflict() {
-	    victim.setConflict(
-		new LockConflict(LockConflictType.DEADLOCK, conflict.txn));
-	    return victim;
-	}
-    }
-
-    /**
-     * Checks for deadlocks given the existing set of lockers and continuing
-     * with checking for attempts to lock the specified key.  Returns
-     * information about the deadlock, or null if no deadlock is found.
-     */
-    private CheckDeadlockResult checkDeadlockInternal(
-	Set<Locker> allOwners, Key key)
-    {
-	Set<LockRequest> owners;
-	Map<Key, Lock> keyMap = getKeyMap(key);
-	synchronized (keyMap) {
-	    owners = getLock(key, keyMap).copyOwners();
-	}
-	for (LockRequest ownerRequest : owners) {
-	    Locker owner = ownerRequest.locker;
-	    if (allOwners.contains(owner)) {
-		/* Found a deadlock! */
-		return new CheckDeadlockResult(owner);
-	    }
-	    Lock ownerWaitingFor = owner.getWaitingFor();
-	    if (ownerWaitingFor != null) {
-		allOwners.add(owner);
-		CheckDeadlockResult result =
-		    checkDeadlockInternal(allOwners, ownerWaitingFor.key);
-		if (result != null) {
-		    result.maybeUpdateVictim(owner);
-		    return result;
-		}
-	    }
-	}
-	return null;
     }
 
     /** Attempts to acquire a lock, waiting if needed. */
@@ -761,6 +663,11 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	synchronized void setWaitingFor(Lock waitingFor) {
 	    this.waitingFor = waitingFor;
 	}
+
+	@Override
+	public String toString() {
+	    return "Locker[txn:" + txn + "]";
+	}
     }
 
     /** Represents an object as identified by a source and an object ID. */
@@ -779,8 +686,8 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	 * @param	objectId the object ID of the object
 	 */
 	Key(String source, Object objectId) {
-	    assert source != null;
-	    assert objectId != null;
+	    checkNonNull(source, "source");
+	    checkNonNull(objectId, "objectId");
 	    this.source = source;
 	    this.objectId = objectId;
 	}
@@ -853,30 +760,40 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 		LockRequest request =
 		    new LockRequest(locker, key, forWrite, false);
 		owners.add(request);
-		return new LockAttemptResult(request, false);
+		return new LockAttemptResult(request, null);
 	    }
 	    boolean upgrade = false;
-	    boolean wait = false;
+	    Locker conflict = null;
 	    for (LockRequest ownerRequest : owners) {
 		if (locker == ownerRequest.locker) {
 		    if (!forWrite || ownerRequest.getForWrite()) {
 			return null;
 		    } else {
 			upgrade = true;
-			break;
 		    }
 		} else if (forWrite || ownerRequest.getForWrite()) {
-		    wait = true;
+		    conflict = ownerRequest.locker;
 		}
 	    }
 	    LockRequest request =
 		new LockRequest(locker, key, forWrite, upgrade);
-	    if (!upgrade && !wait) {
+	    if (conflict == null) {
+		if (upgrade) {
+		    for (Iterator<LockRequest> i = owners.iterator();
+			 i.hasNext(); )
+		    {
+			LockRequest ownerRequest = i.next();
+			if (locker == ownerRequest.locker) {
+			    i.remove();
+			    break;
+			}
+		    }
+		}
 		owners.add(request);
-		return new LockAttemptResult(request, false);
+		return new LockAttemptResult(request, null);
 	    }
 	    addWaiter(request);
-	    return new LockAttemptResult(request, true);
+	    return new LockAttemptResult(request, conflict);
 	}
 
 	/**
@@ -886,6 +803,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	 * request at the end of the list.
 	 */
 	private void addWaiter(LockRequest request) {
+	    System.err.println(this + ".addWaiter request:" + request);
 	    if (waiters.isEmpty() || !request.getUpgrade()) {
 		waiters.add(request);
 	    } else {
@@ -926,7 +844,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 		    LockRequest waiter = waiters.get(i);
 		    LockAttemptResult result =
 			lock(waiter.locker, waiter.getForWrite());
-		    if (result != null && !result.granted) {
+		    if (result != null && result.conflict != null) {
 			break;
 		    }
 		    waiters.remove(i--);
@@ -987,6 +905,11 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	    }
 	    return false;
 	}
+
+	@Override
+	public String toString() {
+	    return "Lock[key:" + key + "]";
+	}
     }
 
     /** The result of attempting to request a lock. */
@@ -995,19 +918,19 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	/** The lock request. */
 	final LockRequest request;
 
-	/** Whether the request for the lock was granted. */
-	final boolean granted;
+	/** A conflicting locker, if the request was not granted, or null. */
+	final Locker conflict;
 
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	request the lock request
-	 * @param	granted whether the request was granted
+	 * @param	conflict a conflicting locker or null
 	 */
-	LockAttemptResult(LockRequest request, boolean granted) {
+	LockAttemptResult(LockRequest request, Locker conflict) {
 	    assert request != null;
 	    this.request = request;
-	    this.granted = granted;
+	    this.conflict = conflict;
 	}
     }
 
@@ -1105,6 +1028,12 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 
 	/* -- Other methods -- */
 
+	@Override
+	public String toString() {
+	    return "LockRequest[locker:" + locker + ", key:" + key +
+		", type:" + type + "]";
+	}
+
 	/** Returns whether the request was for write. */
 	boolean getForWrite() {
 	    return type != Type.READ;
@@ -1113,6 +1042,105 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	/** Returns whether the request was for an upgrade. */
 	boolean getUpgrade() {
 	    return type == Type.UPGRADE;
+	}
+    }
+
+    /** Utility class for detecting deadlocks. */
+    private class DeadlockChecker {
+
+	/** All blocked owners found so far. */
+	private final Set<Locker> allOwners = new HashSet<Locker>();
+
+	/** The locker that was found in a circular reference. */
+	private Locker cycleBoundary;
+
+	/** The current choice of a locker to abort. */
+	private Locker victim;
+
+	/** Another locker in the deadlock. */
+	private Locker conflict;
+
+	/** Creates an instance of this class. */
+	DeadlockChecker() { }
+
+	/**
+	 * Checks for a deadlock starting with a locker blocked requesting the
+	 * lock for a key.
+	 *
+	 * @param	locker the locker
+	 * @param	key the key
+	 * @return	a lock conflict if a deadlock was found, else {@code
+	 *		null} 
+	 */
+	LockConflict check(Locker locker, Key key) {
+	    allOwners.add(locker);
+	    if (!checkInternal(locker, key)) {
+		return null;
+	    }
+	    LockConflict lockConflict =
+		new LockConflict(LockConflictType.DEADLOCK, conflict.txn);
+	    victim.setConflict(lockConflict);
+	    if (conflict == locker) {
+		return lockConflict;
+	    } else {
+		return new LockConflict(
+		    LockConflictType.BLOCKED, conflict.txn);
+	    }
+	}
+		    
+	/**
+	 * Checks for deadlock starting with a locker blocked requesting the
+	 * lock for a key, given the previously found lockers that are
+	 * blocked.  Returns whether the deadlock was found.
+	 */
+	private boolean checkInternal(Locker locker, Key key) {
+	    Set<LockRequest> owners;
+	    Map<Key, Lock> keyMap = getKeyMap(key);
+	    synchronized (keyMap) {
+		owners = getLock(key, keyMap).copyOwners();
+	    }
+	    for (LockRequest ownerRequest : owners) {
+		Locker owner = ownerRequest.locker;
+		if (owner != locker && allOwners.contains(owner)) {
+		    /* Found a deadlock! */
+		    cycleBoundary = owner;
+		    victim = owner;
+		    return true;
+		}
+		Lock ownerWaitingFor = owner.getWaitingFor();
+		if (ownerWaitingFor != null) {
+		    allOwners.add(owner);
+		    boolean deadlock =
+			checkInternal(owner, ownerWaitingFor.key);
+		    if (deadlock) {
+			maybeUpdateVictim(owner);
+		    }
+		    return deadlock;
+		}
+	    }
+	    return false;
+	}
+
+	/**
+	 * Updates the victim and conflict fields given an additional locker in
+	 * the chain of lockers checked.
+	 */
+	private void maybeUpdateVictim(Locker locker) {
+	    if (conflict == null) {
+		conflict = locker;
+	    }
+	    if (locker == cycleBoundary) {
+		/* We've gone all the way around the circle, so we're done */
+		cycleBoundary = null;
+	    } else if (cycleBoundary != null &&
+		       locker.requestedStartTime > victim.requestedStartTime)
+	    {
+		/*
+		 * We're not done and this locker started later than the
+		 * current victim, so use it instead.
+		 */
+		victim = locker;
+	    }
 	}
     }
 }
