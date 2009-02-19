@@ -281,22 +281,21 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 
     /**
      * Releases all of the locks associated with the specified transaction and
-     * returns information about the locks obtained during that transaction.
-     * The list of accesses will be in the order of the access requests, with
-     * no duplicate requests, although an lock that is upgraded from read to
-     * write access will appear twice.
+     * returns information about the locks requested during that transaction.
+     * The list of requests will be in the order of the requests, with no
+     * duplicate requests, although note that a lock that is upgraded from read
+     * to write access will appear twice.
      *
      * @param	txn the transaction
-     * @return	the list of lock accesses performed by the transaction
+     * @return	the list of lock requests made by the transaction
      * @throws	IllegalStateException if {@link #notifyNewTransaction
      *		notifyNewTransaction} has not be called, or {@link #releaseAll
      *		releaseAll} has already been called, for {@code txn}
      */
-    public List<LockAccess> releaseAll(Transaction txn) {
+    public List<? extends AccessedObject> releaseAll(Transaction txn) {
 	Locker locker = getLocker(txn);
-	List<LockAccess> accesses = locker.getLockAccesses();
-	for (LockAccess lockAccess : accesses) {
-	    Key key = lockAccess.key;
+	for (LockRequest request : locker.requests) {
+	    Key key = request.key;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
 	    Set<Locker> newOwners;
 	    synchronized (keyMap) {
@@ -313,7 +312,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	    }
 	}
 	txnMap.remove(txn);
-	return accesses;
+	return locker.requests;
     }
 
     /* -- Public classes -- */
@@ -440,19 +439,22 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
     private LockConflict lockNoWaitInternal(
 	Locker locker, Key key, boolean forWrite, Object description)
     {
+	if (description != null) {
+	    locker.setDescription(key, description);
+	}
 	Map<Key, Lock> keyMap = getKeyMap(key);
 	Transaction conflictingTxn;
 	synchronized (keyMap) {
 	    Lock lock = getLock(key, keyMap);
-	    LockAttemptResult result =
-		lock.lock(locker, forWrite);
-	    if (result != LockAttemptResult.WAIT) {
-		if (result == LockAttemptResult.NEW) {
-		    locker.addAccess(key, forWrite, description);
-		}
+	    LockAttemptResult result = lock.lock(locker, forWrite);
+	    if (result == null) {
 		return null;
+	    } else if (result.granted) {
+		locker.requests.add(result.request);
+		return null;
+	    } else {
+		conflictingTxn = lock.getFirstOwner().locker.txn;
 	    }
-	    conflictingTxn = lock.getFirstOwner().locker.txn;
 	}
 	Locker conflict = checkDeadlock(locker, key);
 	if (conflict == locker) {
@@ -467,6 +469,10 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
      * attempting to lock the specified key.
      */
     private Locker checkDeadlock(Locker locker, Key key) {
+	/*
+	 * XXX: Need to check for multiple deadlocks.  -tjb@sun.com
+	 * (02/19/2009)
+	 */
 	Set<Locker> allOwners = new HashSet<Locker>();
 	allOwners.add(locker);
 	CheckDeadlockResult result = checkDeadlockInternal(allOwners, key);
@@ -537,12 +543,12 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
     private CheckDeadlockResult checkDeadlockInternal(
 	Set<Locker> allOwners, Key key)
     {
-	Set<LockerRequest> owners;
+	Set<LockRequest> owners;
 	Map<Key, Lock> keyMap = getKeyMap(key);
 	synchronized (keyMap) {
 	    owners = getLock(key, keyMap).copyOwners();
 	}
-	for (LockerRequest ownerRequest : owners) {
+	for (LockRequest ownerRequest : owners) {
 	    Locker owner = ownerRequest.locker;
 	    if (allOwners.contains(owner)) {
 		/* Found a deadlock! */
@@ -570,11 +576,11 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	}
 	Key key = lock.key;
 	Map<Key, Lock> keyMap = getKeyMap(key);
-	LockerRequest lockerRequest;
+	LockRequest request;
 	synchronized (keyMap) {
-	    lockerRequest = lock.getFirstOwner();
+	    request = lock.getFirstOwner();
 	}
-	Transaction conflictingTxn = lockerRequest.locker.txn;
+	Transaction conflictingTxn = request.locker.txn;
 	long now = System.currentTimeMillis();
 	long stop = Math.min(now + lockTimeout, locker.stopTime);
 	while (true) {
@@ -595,8 +601,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 		throw new RuntimeException("Unexpected interrupt");
 	    }
 	    synchronized (keyMap) {
-		if (lock.isOwner(locker, lockerRequest.forWrite)) {
-		    locker.addAccess(key, lockerRequest.forWrite, null);
+		if (lock.isOwner(locker, request.getForWrite())) {
 		    return null;
 		}
 	    }
@@ -629,8 +634,8 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	/** The time in milliseconds when this transaction times out. */
 	final long stopTime;
 
-	/** The lock accesses performed by this transaction. */
-	private final List<LockAccess> accesses = new ArrayList<LockAccess>();
+	/** The lock requests made by this transaction. */
+	final List<LockRequest> requests = new ArrayList<LockRequest>();
 
 	/** A map from keys to descriptions, or {@code null}. */
 	private Map<Key, Object> keyToDescriptionMap = null;
@@ -667,7 +672,7 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 
 	/** {@inheritDoc} */
 	public List<? extends AccessedObject> getAccessedObjects() {
-	    return Collections.unmodifiableList(accesses);
+	    return Collections.unmodifiableList(requests);
 	}
 
 	/** {@inheritDoc} */
@@ -687,25 +692,6 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/* -- Other methods -- */
-
-	/**
-	 * Records a newly granted access to a lock
-	 *
-	 * @param	key the key identifying the lock
-	 * @param	forWrite if write access was granted
-	 * @param	description the object description or {@code null}
-	 */
-	void addAccess(Key key, boolean forWrite, Object description) {
-	    accesses.add(new LockAccess(this, key, forWrite));
-	    if (description != null) {
-		setDescription(key, description);
-	    }
-	}
-
-	/** Returns the lock accesses made by this locker. */
-	List<LockAccess> getLockAccesses() {
-	    return accesses;
-	}
 
 	/**
 	 * Sets the description associated with a key for this locker.  The
@@ -835,12 +821,10 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	final Key key;
 
 	/** The requests that currently own this lock. */
-	private final Set<LockerRequest> owners =
-	    new HashSet<LockerRequest>();
+	private final Set<LockRequest> owners = new HashSet<LockRequest>();
 
 	/** The requests that are waiting for this lock. */
-	private final List<LockerRequest> waiters =
-	    new ArrayList<LockerRequest>();
+	private final List<LockRequest> waiters = new ArrayList<LockRequest>();
 
 	/**
 	 * Creates a lock.
@@ -854,44 +838,45 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 
 	/**
 	 * Attempts to obtain this lock.  Adds the locker as an owner of the
-	 * lock if the lock was obtained.  Returns {@link LockAttemptResult#NEW
-	 * NEW} if the lock has been newly acquired, {@link
-	 * LockAttemptResult#EXISTING EXISTING} if the locker already owned
-	 * this lock, and {@link LockAttemptResult#WAIT WAIT} if the lock could
-	 * not be obtained.
+	 * lock if the lock was obtained.  Returns {@code null} if the locker
+	 * already owned this lock.  Otherwise, returns a {@code
+	 * LockAttemptResult} containing the {@link LockRequest} and with the
+	 * {@code granted} field set to {@code true} if the lock was acquired,
+	 * else {@code false} if the lock could not be obtained.
 	 *
 	 * @param	locker the locker requesting the lock
 	 * @param	forWrite whether a write lock is requested
-	 * @result	whether the lock was acquired, was already owned, or
-	 *		could not be obtained
+	 * @return	a {@code LockAttemptResult} or {@code null}
 	 */
 	LockAttemptResult lock(Locker locker, boolean forWrite) {
 	    if (owners.isEmpty()) {
-		owners.add(new LockerRequest(locker, forWrite, false));
-		return LockAttemptResult.NEW;
+		LockRequest request =
+		    new LockRequest(locker, key, forWrite, false);
+		owners.add(request);
+		return new LockAttemptResult(request, false);
 	    }
 	    boolean upgrade = false;
 	    boolean wait = false;
-	    for (LockerRequest ownerRequest : owners) {
+	    for (LockRequest ownerRequest : owners) {
 		if (locker == ownerRequest.locker) {
-		    if (!forWrite || ownerRequest.forWrite) {
-			return LockAttemptResult.EXISTING;
+		    if (!forWrite || ownerRequest.getForWrite()) {
+			return null;
 		    } else {
 			upgrade = true;
 			break;
 		    }
-		} else if (forWrite || ownerRequest.forWrite) {
+		} else if (forWrite || ownerRequest.getForWrite()) {
 		    wait = true;
 		}
 	    }
-	    LockerRequest lockerRequest =
-		new LockerRequest(locker, forWrite, upgrade);
+	    LockRequest request =
+		new LockRequest(locker, key, forWrite, upgrade);
 	    if (!upgrade && !wait) {
-		owners.add(lockerRequest);
-		return LockAttemptResult.NEW;
+		owners.add(request);
+		return new LockAttemptResult(request, false);
 	    }
-	    addWaiter(lockerRequest);
-	    return LockAttemptResult.WAIT;
+	    addWaiter(request);
+	    return new LockAttemptResult(request, true);
 	}
 
 	/**
@@ -900,17 +885,17 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	 * upgrade requests, but before other requests.  Otherwise, puts the
 	 * request at the end of the list.
 	 */
-	private void addWaiter(LockerRequest lockerRequest) {
-	    if (waiters.isEmpty() || !lockerRequest.upgrade) {
-		waiters.add(lockerRequest);
+	private void addWaiter(LockRequest request) {
+	    if (waiters.isEmpty() || !request.getUpgrade()) {
+		waiters.add(request);
 	    } else {
 		/*
 		 * Add upgrade requests after any existing ones, but before
 		 * other requests.
 		 */
 		for (int i = 0; i < waiters.size(); i++) {
-		    if (!waiters.get(i).upgrade) {
-			waiters.add(i, lockerRequest);
+		    if (!waiters.get(i).getUpgrade()) {
+			waiters.add(i, request);
 			break;
 		    }
 		}
@@ -926,10 +911,8 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	 */
 	Set<Locker> release(Locker locker) {
 	    boolean owned = false;
-	    for (Iterator<LockerRequest> i = owners.iterator();
-		 i.hasNext(); )
-	    {
-		LockerRequest ownerRequest = i.next();
+	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
+		LockRequest ownerRequest = i.next();
 		if (locker == ownerRequest.locker) {
 		    i.remove();
 		    owned = true;
@@ -940,10 +923,10 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	    if (owned && !waiters.isEmpty()) {
 		boolean found = false;
 		for (int i = 0; i < waiters.size(); i++) {
-		    LockerRequest waiter = waiters.get(i);
+		    LockRequest waiter = waiters.get(i);
 		    LockAttemptResult result =
-			lock(waiter.locker, waiter.forWrite);
-		    if (result == LockAttemptResult.WAIT) {
+			lock(waiter.locker, waiter.getForWrite());
+		    if (result != null && !result.granted) {
 			break;
 		    }
 		    waiters.remove(i--);
@@ -963,27 +946,27 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/**
-	 * Returns the locker request associated with the first owner, assuming
+	 * Returns the lock request associated with the first owner, assuming
 	 * that the lock has at least one owner.
 	 */
-	LockerRequest getFirstOwner() {
+	LockRequest getFirstOwner() {
 	    assert !owners.isEmpty();
 	    return owners.iterator().next();
 	}
 
 	/** Returns a copy of the locker requests for the owners. */
-	Set<LockerRequest> copyOwners() {
+	Set<LockRequest> copyOwners() {
 	    if (owners.isEmpty()) {
 		return Collections.emptySet();
 	    } else {
-		return new HashSet<LockerRequest>(owners);
+		return new HashSet<LockRequest>(owners);
 	    }
 	}
 
 	/** Removes a locker from the list of waiters for this lock. */
 	void flushWaiter(Locker locker) {
 	    for (int i = 0; i < waiters.size(); i++) {
-		LockerRequest request = waiters.get(i);
+		LockRequest request = waiters.get(i);
 		if (request.locker == locker) {
 		    waiters.remove(i);
 		    break;
@@ -996,12 +979,10 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	 * ownership if {@code forWrite} is true.
 	 */
 	boolean isOwner(Locker locker, boolean forWrite) {
-	    for (Iterator<LockerRequest> i = owners.iterator();
-		 i.hasNext(); )
-	    {
-		LockerRequest request = i.next();
+	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
+		LockRequest request = i.next();
 		if (request.locker == locker) {
-		    return !forWrite || request.forWrite;
+		    return !forWrite || request.getForWrite();
 		}
 	    }
 	    return false;
@@ -1009,42 +990,24 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
     }
 
     /** The result of attempting to request a lock. */
-    enum LockAttemptResult {
+    private static class LockAttemptResult {
 
-	/** The lock had already been granted. */
-	EXISTING,
+	/** The lock request. */
+	final LockRequest request;
 
-	/** The request has been newly granted. */
-	NEW,
-
-	/** The request could not be granted immediately. */
-	WAIT;
-    }
-
-    /** A class representing an request for a lock. */
-    private static class LockerRequest {
-
-	/** The locker that requested the lock. */
-	final Locker locker;
-
-	/** Whether a write lock was requested. */
-	final boolean forWrite;
-
-	/** Whether an upgrade from a read to a write lock was requested. */
-	final boolean upgrade;
+	/** Whether the request for the lock was granted. */
+	final boolean granted;
 
 	/**
 	 * Creates an instance of this class.
 	 *
-	 * @param	locker the locker that requested the lock
-	 * @param	forWrite whether a write lock was requested
-	 * @param	upgrade whether an upgrade was requested
+	 * @param	request the lock request
+	 * @param	granted whether the request was granted
 	 */
-	LockerRequest(Locker locker, boolean forWrite, boolean upgrade) {
-	    assert locker != null;
-	    this.locker = locker;
-	    this.forWrite = forWrite;
-	    this.upgrade = upgrade;
+	LockAttemptResult(LockRequest request, boolean granted) {
+	    assert request != null;
+	    this.request = request;
+	    this.granted = granted;
 	}
     }
 
@@ -1082,33 +1045,40 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 	}
     }
 
-    /** A class representing access to a lock. */
-    private static final class LockAccess implements AccessedObject {
+    /** A class representing a request for a lock. */
+    private static final class LockRequest implements AccessedObject {
 
-	/**
-	 * The locker that requested the lock, used to find the description.
-	 */
+	/** Types of requests. */
+	private enum Type { READ, WRITE, UPGRADE; }
+
+	/** The locker that requested the lock. */
 	final Locker locker;
 
 	/** The key identifying the lock. */
 	final Key key;
 
-	/** Whether a write lock was requested. */
-	final boolean forWrite;
+	/** The request type. */
+	private final Type type;
 
 	/**
-	 * Creates an instance of this class.
+	 * Creates a lock request.
 	 *
 	 * @param	locker the locker that requested the lock
 	 * @param	key the key identifying the lock
 	 * @param	forWrite whether a write lock was requested
+	 * @param	upgrade whether an upgrade was requested
 	 */
-	LockAccess(Locker locker, Key key, boolean forWrite) {
+	LockRequest(
+	    Locker locker, Key key, boolean forWrite, boolean upgrade)
+	{
 	    assert locker != null;
 	    assert key != null;
+	    assert !upgrade || forWrite : "Upgrade implies forWrite";
 	    this.locker = locker;
 	    this.key = key;
-	    this.forWrite = forWrite;
+	    type = !forWrite ? Type.READ
+		: !upgrade ? Type.WRITE
+		: Type.UPGRADE;
 	}
 
 	/* -- Implement AccessedObject -- */
@@ -1125,12 +1095,24 @@ public class PessimisticAccessCoordinator extends AbstractAccessCoordinator
 
 	/** {@inheritDoc} */
 	public AccessType getAccessType() {
-	    return forWrite ? AccessType.WRITE : AccessType.READ;
+	    return (type == Type.READ) ? AccessType.READ : AccessType.WRITE;
 	}
 
 	/** {@inheritDoc} */
 	public Object getDescription() {
 	    return locker.getDescription(key);
+	}
+
+	/* -- Other methods -- */
+
+	/** Returns whether the request was for write. */
+	boolean getForWrite() {
+	    return type != Type.READ;
+	}
+
+	/** Returns whether the request was for an upgrade. */
+	boolean getUpgrade() {
+	    return type == Type.UPGRADE;
 	}
     }
 }
