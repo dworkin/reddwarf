@@ -303,16 +303,10 @@ public class PropertiesWrapper {
 	if (className == null) {
 	    return null;
 	}
-        try {
-            return getClassInstance(className, type, paramTypes, args);
-        } catch (Exception e) {
-            throw new IllegalArgumentException(
-		"Exception creating class specified by the " + name +
-                " property", e);
-        }
+	return getClassInstance(className, type, paramTypes, args);
     }
     
-        /**
+    /**
      * Returns an instance of the class whose fully qualified class name is
      * specified by a property, and that has a constructor with the specified
      * parameters.  The class should extend or implement the specified type,
