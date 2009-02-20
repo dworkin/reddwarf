@@ -294,7 +294,8 @@ public class PropertiesWrapper {
      * @return	the new instance or <code>null</code> if the property is not
      *		found
      * @throws	IllegalArgumentException if the property is found and a problem
-     *		occurs creating the instance
+     *		occurs creating the instance, or if the constructor throws
+     *		a checked exception
      */
     public <T> T getClassInstanceProperty(
 	String name, Class<T> type, Class<?>[] paramTypes, Object... args)
@@ -303,7 +304,7 @@ public class PropertiesWrapper {
 	if (className == null) {
 	    return null;
 	}
-	return getClassInstance(className, type, paramTypes, args);
+	return getClassInstance(name, className, type, paramTypes, args);
     }
     
     /**
@@ -321,8 +322,8 @@ public class PropertiesWrapper {
      * @param	args the arguments to pass to the constructor
      * @return	the new instance or <code>null</code> if the property is not
      *		found and {@code defaultClassName} is {@code null}
-     * @throws	IllegalArgumentException if a problem
-     *		occurs creating the instance
+     * @throws	IllegalArgumentException if a problem occurs creating the
+     *		instance, or if the constructor throws a checked exception
      */
     @SuppressWarnings("unchecked")
     public <T> T getClassInstanceProperty(
@@ -333,33 +334,34 @@ public class PropertiesWrapper {
 	    getClassInstanceProperty(name, type, paramTypes, args);
         
         if (instance != null) {
-            return (T)instance;
+            return (T) instance;
         }
 	if (defaultClass == null) {
             return null;
         }
-        return getClassInstance(defaultClass, type, paramTypes, args);
+        return getClassInstance(name, defaultClass, type, paramTypes, args);
     }
     
     /**
      * Returns an instance of the class whose fully qualified class name is
      * specified by {@code className}, and that has a constructor with the
-     * specified
-     * parameters.  The class should extend or implement the specified type,
-     * and not be abstract.
+     * specified parameters.  The class should extend or implement the
+     * specified type, and not be abstract.
      *
      * @param	<T> the type of the return value
+     * @param	name the property name (used for exception message text),
+     *		or {@code null}
      * @param	className the class name
      * @param	type the class which the return value should be an instance of
      * @param	paramTypes the constructor parameter types
      * @param	args the arguments to pass to the constructor
      * @return	the new instance
-     * @throws	IllegalArgumentException if a problem
-     *		occurs creating the instance, or if the constructor throws a
-     *		checked exception
+     * @throws	IllegalArgumentException if a problem occurs creating the
+     *		instance, or if the constructor throws a checked exception
      */
     private <T> T getClassInstance(
-	String className, Class<T> type, Class<?>[] paramTypes, Object... args)
+ 	String name, String className, Class<T> type, Class<?>[] paramTypes,
+	Object... args)
     {
         if (className == null) {
             throw new NullPointerException("null className");
@@ -371,12 +373,13 @@ public class PropertiesWrapper {
 		.newInstance(args);
 	} catch (ClassNotFoundException e) {
 	    throw new IllegalArgumentException(
-		"The class " + className + " was not found",
+		"The class " + className + getPropertyText(name) +
+		" was not found",
 		e);
 	} catch (ClassCastException e) {
 	    throw new IllegalArgumentException(
-		"The class " + className + " does not implement " +
-                type.getName(),
+		"The class " + className + getPropertyText(name) +
+		" does not implement " + type.getName(),
 		e);
 	} catch (NoSuchMethodException e) {
 	    StringBuilder sb = new StringBuilder();
@@ -390,7 +393,7 @@ public class PropertiesWrapper {
 		sb.append(paramType.getName());
 	    }
 	    throw new IllegalArgumentException(
-		"The class " + className +
+		"The class " + className + getPropertyText(name) +
 		" does not have a constructor with required parameters: " + sb,
 		e);
 	} catch (InvocationTargetException e) {
@@ -401,16 +404,31 @@ public class PropertiesWrapper {
 		throw (Error) cause;
 	    } else {
 		throw new IllegalArgumentException(
-		    "Problem calling the constructor for the class " +
-		    className + ": " + cause,
+		    "Calling the constructor for the class " +
+		    className + getPropertyText(name) + " throws: " + cause,
 		    cause);
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(
-		"Problem creating an instance of the class " +
-		className + ": " + e,
+		" Creating an instance of the class " +
+		className + getPropertyText(name) + " throws: " + e,
 		e);
 	}
+    }
+
+    /**
+     * Returns a formatted string containing the property {@code name} (if
+     * it is non-null}, otherwise returns an empty string.
+     *
+     * @param	name a property name or {@code null}
+     * @return	if {@code name} is non-null, a formatted string containing
+     *		the property name; otherwise, an empty string
+     */
+    private String getPropertyText(String name) {
+	return
+	    name != null ?
+	    ", specified by the property: " + name + "," :
+	    "";
     }
     
     /**
