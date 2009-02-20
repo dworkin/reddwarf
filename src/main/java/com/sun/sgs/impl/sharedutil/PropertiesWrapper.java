@@ -410,7 +410,7 @@ public class PropertiesWrapper {
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(
-		" Creating an instance of the class " +
+		"Creating an instance of the class " +
 		className + getPropertyText(name) + " throws: " + e,
 		e);
 	}
