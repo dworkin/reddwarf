@@ -110,9 +110,8 @@ public class TestKernelStartupContext {
         }
 
         /** {@inheritDoc} */
-        public boolean shutdown() {
+        public void shutdown() {
             //do nothing
-            return true;
         }
     }
 }

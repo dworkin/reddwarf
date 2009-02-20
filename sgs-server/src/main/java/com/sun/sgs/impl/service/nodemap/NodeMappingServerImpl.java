@@ -616,13 +616,23 @@ public final class NodeMappingServerImpl
         if (oldNode != null) {
             NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {
-                try {
-                    oldClient.removed(id, newNode);
-                } catch (IOException ex) {
-                    logger.logThrow(Level.WARNING, ex, 
-                            "A communication error occured while notifying" +
-                            " node {0} that {1} has been removed", 
-                            oldClient, id);
+                int retries = maxIoAttempts; // retry a few times
+                while (retries-- > 0) {
+                    try {
+                        oldClient.removed(id, newNode);
+                        break;
+                    } catch (IOException ex) {
+                        // report failure if we run out of retries
+                        if (retries == 0) {
+                            logger.logThrow(Level.WARNING, ex,
+                                    "A communication error occured while " +
+                                    "notifying node {0} that {1} has " +
+                                    "been removed", oldClient, id);
+                            // shutdown the node corresponding to oldClient
+                            watchdogService.reportFailure(oldNode.getId(),
+                                    this.getClass().toString());
+                        }
+                    }
                 }
             }
         }
@@ -630,12 +640,23 @@ public final class NodeMappingServerImpl
         if (newNode != null) {
             NotifyClient newClient = notifyMap.get(newNode.getId());
             if (newClient != null) {
-                try {
-                    newClient.added(id, oldNode);
-                } catch (IOException ex) {
-                    logger.logThrow(Level.WARNING, ex, 
-                            "A communication error occured while notifying" +
-                            " node {0} that {1} has been added", newClient, id);
+                int retries = maxIoAttempts; // retry a few times
+                while (retries-- > 0) {
+                    try {
+                        newClient.added(id, oldNode);
+                        break;
+                    } catch (IOException ex) {
+                        // report failure if we run out of retries
+                        if (retries == 0) {
+                            logger.logThrow(Level.WARNING, ex,
+                                    "A communication error occured while " +
+                                    "notifying node {0} that {1} has " +
+                                    "been removed", newClient, id);
+                            // shutdown the node corresponding to newClient
+                            watchdogService.reportFailure(newNode.getId(),
+                                    this.getClass().toString());
+                        }
+                    }
                 }
             }
         }

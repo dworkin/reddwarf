@@ -27,6 +27,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -50,12 +51,35 @@ import java.util.logging.Level;
  * <p>The {@link #getName getName} method invokes the instance's {@code
  * toString} method, so a concrete subclass of {@code AbstractService}
  * should provide an implementation of the {@code toString} method.
+ * 
+ * An {@link #AbstractService} supports the following properties: <p>
+ *
+ * Property: com.sun.sgs.io.retries
+ * Default: 5 retries
+ * Specifies how many times an IO task should be retried before performing
+ * failure procedures.
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.util.io.task.max.retries
+ *	</b></code><br>
+ *	<i>Default:</i> 5 retries <br>
+ *	Specifies how many times an {@link IoRunnable IoRunnable} task should 
+ *      be retried before performing failure procedures. The value
+ *	must be greater than or equal to {@code 0}.<p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.util.io.task.wait.time
+ *	</b></code><br>
+ *	<i>Default:</i> 100 milliseconds <br>
+ *      Specifies the wait time between {@link IoRunnable IoRunnable} task
+ *      retries. The value must be greater than or equal to {@code 0}.
+ *
+ * </dl> <p>
+ * 
  */
 public abstract class AbstractService implements Service {
-
-    /** The time (in milliseconds) to wait before retrying an (@code
-     * IoRunnable} in the {@code runIoTask} method. */ 
-    private static final int WAIT_TIME_BEFORE_RETRY = 100;
 
     /** Service state. */
     protected static enum State {
@@ -102,6 +126,37 @@ public abstract class AbstractService implements Service {
     /** Thread for shutting down the server. */
     private volatile Thread shutdownThread;
 
+    /** Prefix for io task related properties. */
+    public static final String IO_TASK_PROPERTY_PREFIX =
+            "com.sun.sgs.impl.util.io.task";
+
+    /**
+     * An optional property that specifies the maximum number of retries for
+     * IO tasks in services.
+     */
+    public static final String IO_TASK_RETRIES_PROPERTY = 
+            IO_TASK_PROPERTY_PREFIX + ".max.retries";
+
+    /**
+     * An optional property that specifies the wait time between successive
+     * IO task retries.
+     */
+    public static final String IO_TASK_WAIT_TIME_PROPERTY = 
+            IO_TASK_PROPERTY_PREFIX + ".wait.time";
+
+    /** The default number of IO task retries **/
+    private static final int DEFAULT_MAX_IO_ATTEMPTS = 5;
+    
+    /** The default time interval to wait between IO task retries **/
+    private static final int DEFAULT_RETRY_WAIT_TIME = 100;
+    
+    /** The time (in milliseconds) to wait between retries for IO 
+     * operations. */ 
+    protected final int retryWaitTime;
+    
+    /** The maximum number of retry attempts for IO operations. */
+    protected final int maxIoAttempts;
+
     /**
      * Constructs an instance with the specified {@code properties}, {@code
      * systemRegistry}, {@code txnProxy}, and {@code logger}.  It initializes
@@ -145,6 +200,14 @@ public abstract class AbstractService implements Service {
 		"The " + StandardProperties.APP_NAME +
 		" property must be specified");
 	}	
+
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        retryWaitTime = wrappedProps.getIntProperty(
+                IO_TASK_WAIT_TIME_PROPERTY, DEFAULT_RETRY_WAIT_TIME, 0,
+                Integer.MAX_VALUE);
+        maxIoAttempts = wrappedProps.getIntProperty(
+                IO_TASK_RETRIES_PROPERTY, DEFAULT_MAX_IO_ATTEMPTS, 0,
+                Integer.MAX_VALUE);
 	
 	this.logger = logger;
 	this.taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -206,26 +269,20 @@ public abstract class AbstractService implements Service {
     /**
      * {@inheritDoc}
      *
-     * <p>If this service is in the {@code INITIALIZED} state, this
-     * method throws {@code IllegalStateException}.  If this service
-     * is in the {@code READY} state, this method sets the state to
+     * <p>If this service is in the {@code INITIALIZED} state or
+     * {@code READY} state, this method sets the state to
      * {@code SHUTTING_DOWN}, waits for all calls in progress to
-     * complete, then starts a thread to invoke the {@link #doShutdown
+     * complete, starts a thread to invoke the {@link #doShutdown
      * doShutdown} method, waits for that thread to complete, and
-     * returns {@code true}.  If the service is in the {@code
-     * SHUTTING_DOWN} state, this method waits for the shutdown thread
-     * to complete, and returns {@code true}.  If this service is in
-     * the {@code SHUTDOWN} state, then this method returns {@code
-     * true}.
+     * returns. If this service is in the {@code SHUTTING_DOWN}
+     * state, this method will block until the shutdown is complete. If
+     * this service is in the {@code SHUTDOWN} state, then it will
+     * return immediately. Any retries or interruption handling should be
+     * done in the service's implementation of the
+     * {@link #doShutdown() doShutdown} method.
      *
-     * <p>If the current thread is interrupted while waiting for calls
-     * to complete or while waiting for the shutdown thread to finish,
-     * this method returns {@code false}.
-     *
-     * TODO: If shutdown is interrupted, it should be possible to
-     * re-initiate shutdown.
      */
-    public boolean shutdown() {
+    public void shutdown() {
 	logger.log(Level.FINEST, "shutdown");
 	
 	synchronized (lock) {
@@ -239,7 +296,7 @@ public abstract class AbstractService implements Service {
 		    try {
 			lock.wait();
 		    } catch (InterruptedException e) {
-			return false;
+                        return;
 		    }
 		}
 		shutdownThread = new ShutdownThread();
@@ -250,20 +307,18 @@ public abstract class AbstractService implements Service {
 		break;
 		
 	    case SHUTDOWN:
-		return true;
+                return;
 
 	    default:
-		throw new AssertionError();
+	        throw new AssertionError();
 	    }
 	}
 
 	try {
 	    shutdownThread.join();
 	} catch (InterruptedException e) {
-	    return false;
+            return;
 	}
-
-	return true;
     }
 
     /**
@@ -459,38 +514,52 @@ public abstract class AbstractService implements Service {
 
     /**
      * Executes the specified {@code ioTask} by invoking its {@link
-     * IoRunnable#run run} method.  If the specified task throws an
-     * {@code IOException}, this method will retry the task while the
-     * node with the given {@code nodeId} is alive until the task
-     * completes successfully.
+     * IoRunnable#run run} method. If the specified task throws an
+     * {@code IOException}, this method will retry the task for a fixed 
+     * number of times. The method will stop retrying if the node with
+     * the given {@code nodeId} is no longer alive. The number of retries
+     * and the wait time between retries are configurable properties.
      *
-     * <p>This method must be called from outside a transaction or {@code
+     * <p>
+     * This method must be called from outside a transaction or {@code
      * IllegalStateException} will be thrown.
      *
-     * @param	ioTask a task with IO-related operations
-     * @param	nodeId the node that is the target of the IO operations
-     * @throws	IllegalStateException if this method is invoked within a
-     * 		transactional context
+     * @param ioTask a task with IO-related operations
+     * @param nodeId the node that is the target of the IO operations
+     * @throws IllegalStateException if this method is invoked within a
+     * transactional context
      */
     public void runIoTask(IoRunnable ioTask, long nodeId) {
-	checkNonTransactionalContext();
-	do {
-	    try {
-		ioTask.run();
-		return;
-	    } catch (IOException e) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.logThrow(
-			Level.FINEST, e,
-			"IoRunnable {0} throws", ioTask);
-		}
-		try {
-		    // TBD: what back-off policy do we want here?
-		    Thread.sleep(WAIT_TIME_BEFORE_RETRY);
-		} catch (InterruptedException ie) {
-		}
-	    }
-	} while (isAlive(nodeId));
+        int maxAttempts = maxIoAttempts;
+        checkNonTransactionalContext();
+        do {
+            try {
+                ioTask.run();
+                return;
+            } catch (IOException e) {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.logThrow(Level.FINEST, e,
+                            "IoRunnable {0} throws", ioTask);
+                }
+                if (maxAttempts-- == 0) {
+                    logger.logThrow(Level.WARNING, e,
+                            "A communication error occured while running an" +
+                            "IO task. Reporting node {0} as failed.", nodeId);
+
+                    // Report failure of remote node since are
+                    // having trouble contacting it
+                    txnProxy.getService(WatchdogService.class).
+                            reportFailure(nodeId, this.getClass().toString());
+                    
+                    break;
+                }
+                try {
+                    // TBD: what back-off policy do we want here?
+                    Thread.sleep(retryWaitTime);
+                } catch (InterruptedException ie) {
+                }
+            }
+        } while (isAlive(nodeId));
     }
     
     /**

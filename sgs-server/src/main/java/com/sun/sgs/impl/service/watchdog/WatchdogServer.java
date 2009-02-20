@@ -97,4 +97,24 @@ public interface WatchdogServer extends Remote {
      * 		invoking this method
      */
     void recoveredNode(long nodeId, long backupId) throws IOException;
+
+    /**
+     * Notifies the node with the given ID that it has failed and should
+     * shutdown. If the given node is a remote node, this notification is a 
+     * result of a server running into difficulty communicating with a remote 
+     * node, so the server's watchdog service is responsible for notifying the 
+     * watchdog service in order to issue the shutdown.
+     * 
+     * @param nodeId the failed node's ID
+     * @param isLocal specifies if the node is reporting a failure on itself or
+     * a remote node
+     * @param className the class issuing the failure
+     * @param maxNumberOfAttempts the maximum number of attempts to try and
+     * resolve an {@code IOException}
+     * @throws IOException if a communication error occurs while trying to set
+     * the node as failed
+     */
+    void setNodeAsFailed(long nodeId, boolean isLocal, String className,
+            int maxNumberOfAttempts)
+	    throws IOException;
 }

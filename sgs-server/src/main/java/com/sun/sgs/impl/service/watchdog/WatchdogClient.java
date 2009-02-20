@@ -51,4 +51,16 @@ public interface WatchdogClient extends Remote {
     void nodeStatusChanges(long[] ids, String[] hosts, int[] ports,
 			   boolean[] status, long[] backups)
 	throws IOException;
+
+    /**
+     * Mechanism to report a failure to the Watchdog service. This is called
+     * by the Watchdog server when a remote node is instructed to shutdown.
+     * This method calls the node's local shutdown process to start the
+     * shutdown procedure.
+     * 
+     * @param className the class which reported the failure
+     * @throws IOException if a communication problem occurs while invoking
+     * this method
+     */
+    void reportFailure(String className) throws IOException;
 }

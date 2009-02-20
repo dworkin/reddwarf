@@ -60,6 +60,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -3312,14 +3313,8 @@ public class TestDataServiceImpl{
         // again in the shutdown action.
 	ShutdownAction action = new ShutdownAction();
         try {
-	    action.waitForDone();
-            fail("Expected InvocationTargetException");
-        } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof IllegalStateException) {
-                System.err.println(e);
-            } else {
-                fail("Expected IllegalStateException");
-            }
+            // the expected behavior of a second shutdown is to return silently.
+            action.assertDone();
         } finally {
             // ensure that the next test will run
             serverNode = null;
@@ -3328,27 +3323,25 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testShutdownInterrupt() throws Exception {
+        class TestTask extends InitialTestRunnable {
+            ShutdownServiceAction action1;
+            public void run() throws Exception {
+                super.run();
+                action1 = new ShutdownServiceAction(service);
+                action1.assertBlocked();
+                action1.interrupt(); // shutdown should not unblock
+                action1.assertBlocked();
+                service.setBinding("dummy", new DummyManagedObject());
+            }
+        }
+        
         try {
-            txnScheduler.runTask(new InitialTestRunnable() {
-                public void run() throws Exception {
-                    super.run();
-                    ShutdownServiceAction action =
-                            new ShutdownServiceAction(service);
-                    action.assertBlocked();
-                    action.interrupt();
-                    action.assertResult(false);
-                    service.setBinding("dummy", new DummyManagedObject());
-            }}, taskOwner);
+            TestTask task = new TestTask();
+            txnScheduler.runTask(task, taskOwner);
+            assertTrue(task.action1.waitForDone());
         } finally {
             try {
                 serverNode.shutdown(false);
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    // we expect this:  the data service is known to be shut down
-                    System.err.println(e);
-                } else {
-                    fail("Expected IllegalStateException");
-                }
             } finally {
                 // we really want the serverNode set to null
                 serverNode = null;
@@ -3359,16 +3352,15 @@ public class TestDataServiceImpl{
     @Test 
     public void testConcurrentShutdownInterrupt() throws Exception {
         class TestTask extends InitialTestRunnable {
-            ShutdownServiceAction action2;
+            ShutdownServiceAction action1, action2;
             public void run() throws Exception {
                 super.run();
-                ShutdownServiceAction action1 =
-                        new ShutdownServiceAction(service);
+                action1 = new ShutdownServiceAction(service);
                 action1.assertBlocked();
                 action2 = new ShutdownServiceAction(service);
                 action2.assertBlocked();
-                action1.interrupt();
-                action1.assertResult(false);
+                action1.interrupt(); // shutdown should not unblock
+                action1.assertBlocked(); 
                 action2.assertBlocked();
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new TestAbortedTransactionException("abort"));
@@ -3378,19 +3370,13 @@ public class TestDataServiceImpl{
         try {
             TestTask task = new TestTask();
             txnScheduler.runTask(task, taskOwner);
-            task.action2.assertResult(true);
+            task.action1.assertDone();
+            task.action2.assertDone();
         } catch (TestAbortedTransactionException e) {
             // this is expected:  we threw it above
         } finally {
             try {
                 serverNode.shutdown(false);
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    // we expect this:  the data service is known to be shut down
-                    System.err.println(e);
-                } else {
-                    fail("Expected IllegalStateException");
-                }
             } finally {
                 // we really want the serverNode set to null
                 serverNode = null;
@@ -3436,13 +3422,6 @@ public class TestDataServiceImpl{
         } finally {
             try {
                 serverNode.shutdown(false);
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    // we expect this:  the data service is known to be shut down
-                    System.err.println(e);
-                } else {
-                    fail("Expected IllegalStateException");
-                }
             } finally {
                 // we really want the serverNode set to null
                 serverNode = null;
@@ -4298,7 +4277,7 @@ public class TestDataServiceImpl{
         ShutdownTask task = new ShutdownTask();
         txnScheduler.runTask(task, taskOwner);
 
-        task.shutdownAction.assertResult(true);
+        task.shutdownAction.assertDone();
     }
 
     /** Tests running the action with a new transaction while shutting down. */
@@ -4314,8 +4293,8 @@ public class TestDataServiceImpl{
                 shutdownAction = new ShutdownAction();
                 shutdownAction.assertBlocked();
 
-                threadAction = new ThreadAction<Void>() {
-                    protected Void action() {
+                threadAction = new ThreadAction() {
+                    protected void action() {
                         try {
                             txnScheduler.runTask(new TestAbstractKernelRunnable() {
                                 public void run() {
@@ -4323,14 +4302,16 @@ public class TestDataServiceImpl{
                                         action.run();
                                         fail("Expected IllegalStateException");
                                     } catch (IllegalStateException e) {
-                                        assertEquals("Service is shutting down",
-                                                     e.getMessage());
+                                        if (!e.getMessage().equals("Service " +
+                                                "is shutting down") && !e.
+                                                getMessage().equals("Sevice " +
+                                                "is shut down"))
+                                            fail("Invalid exception message");
                                     }
                             }}, taskOwner);
                         } catch (Exception e) {
                             fail("Unexpected exception " + e);
                         }
-                        return null;
                     }
                 };
             }
@@ -4338,7 +4319,7 @@ public class TestDataServiceImpl{
         ShutdownTask task = new ShutdownTask();
         txnScheduler.runTask(task, taskOwner);
         task.threadAction.assertDone();
-        task.shutdownAction.assertResult(true);
+        task.shutdownAction.assertDone();
     }
 
     /** Tests running the action after shutdown. */
@@ -4391,10 +4372,8 @@ public class TestDataServiceImpl{
     /**
      * A utility class for running an operation in a separate thread and
      * insuring that it either completes or blocks.
-     *
-     * @param	<T> the return type of the operation
      */
-    abstract static class ThreadAction<T> extends Thread {
+    abstract static class ThreadAction extends Thread {
 
 	/**
 	 * The number of milliseconds to wait to see if an operation is
@@ -4418,11 +4397,6 @@ public class TestDataServiceImpl{
 	private Throwable exception;
 
 	/**
-	 * Set to the result of the operation when the operation is complete.
-	 */
-	private T result;
-
-	/**
 	 * Creates an instance of this class and starts the operation in a
 	 * separate thread.
 	 */
@@ -4433,7 +4407,7 @@ public class TestDataServiceImpl{
 	/** Performs the operation and collects the results. */
 	public void run() {
 	    try {
-		result = action();
+		action();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -4446,10 +4420,9 @@ public class TestDataServiceImpl{
 	/**
 	 * The operation to be performed.
 	 *
-	 * @return	the result of the operation
 	 * @throws	Exception if the operation fails
 	 */
-	abstract T action() throws Exception;
+	abstract void action() throws Exception;
 
 	/**
 	 * Asserts that the operation is blocked.
@@ -4479,19 +4452,6 @@ public class TestDataServiceImpl{
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the operation completed with the specified result.
-	 *
-	 * @param	expectedResult the expected result
-	 * @throws	Exception if the operation failed
-	 */
-	synchronized void assertResult(Object expectedResult)
-	    throws Exception
-	{
-	    assertDone();
-	    assertEquals("Unexpected result", expectedResult, result);
 	}
 
 	/**
@@ -4527,23 +4487,23 @@ public class TestDataServiceImpl{
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends ThreadAction<Boolean> {
+    class ShutdownAction extends ThreadAction {
 	ShutdownAction() { }
-	protected Boolean action() throws Exception {
+	protected void action() throws Exception {
             serverNode.shutdown(false);
             serverNode = null;
-            return true;
 	}
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownServiceAction extends ThreadAction<Boolean> {
+    class ShutdownServiceAction extends ThreadAction {
         final DataService service;
 	ShutdownServiceAction(DataService service) {
             this.service = service;
         }
-	protected Boolean action() throws Exception {
-	    return service.shutdown();
+        
+	protected void action() throws Exception {
+            service.shutdown();
 	}
     }
 
@@ -4580,7 +4540,7 @@ public class TestDataServiceImpl{
 	public String nextBoundName(Transaction txn, String name) {
 	    return null;
 	}
-	public boolean shutdown() { return false; }
+	public void shutdown() { }
 	public int getClassId(Transaction txn, byte[] classInfo) { return 0; }
 	public byte[] getClassInfo(Transaction txn, int classId) {
 	    return null;
