@@ -117,15 +117,12 @@ public class TcpTransport implements Transport {
     private final AsynchronousChannelGroup asyncChannelGroup;
 
     /** The acceptor for listening for new connections. */
-    AsynchronousServerSocketChannel acceptor;
+    volatile AsynchronousServerSocketChannel acceptor;
 
     /** The currently-active accept operation, or {@code null} if none. */
     volatile IoFuture<?, ?> acceptFuture = null;
 
-    /** A lock for accessing the {@code acceptorListener} field. */
-    private Object lock = new Object();
-    
-    /** The acceptor listener.. */
+    /** The acceptor listener. */
     private AcceptorListener acceptorListener = null;
     
     /** The transport descriptor */
@@ -218,19 +215,17 @@ public class TcpTransport implements Transport {
     }
     
     /** {@inheritDoc} */
-    public void accept(ConnectionHandler handler) {
+    public synchronized void accept(ConnectionHandler handler) {
 	if (handler == null) {
 	    throw new NullPointerException("null handler");
 	} else if (!acceptor.isOpen()) {
 	    throw new IllegalStateException("transport has been shutdown");
 	}
 	
-	synchronized (lock) {
-	    if (acceptorListener != null) {
-		throw new IllegalStateException("accept already called");
-	    }
-	    acceptorListener = new AcceptorListener(handler);
+	if (acceptorListener != null) {
+	    throw new IllegalStateException("accept already called");
 	}
+	acceptorListener = new AcceptorListener(handler);
 	
         assert acceptFuture == null;
         acceptFuture = acceptor.accept(acceptorListener);
@@ -238,14 +233,14 @@ public class TcpTransport implements Transport {
     }
 
     /** {@inheritDoc} */
-    public void shutdown() {
+    public synchronized void shutdown() {
 	final IoFuture<?, ?> future = acceptFuture;
 	acceptFuture = null;
         
 	if (future != null) {
 	    future.cancel(true);
 	}
-
+	
 	if (acceptor != null && acceptor.isOpen()) {
 	    try {
 		acceptor.close();
@@ -264,7 +259,7 @@ public class TcpTransport implements Transport {
 	    } catch (InterruptedException e) {
 		logger.logThrow(Level.FINEST, e,
 				"shutdown async group interrupted");
-		//Thread.currentThread().interrupt();
+		Thread.currentThread().interrupt();
 	    }
 	    if (!groupShutdownCompleted) {
 		logger.log(Level.WARNING, "forcing async group shutdown");
@@ -279,23 +274,34 @@ public class TcpTransport implements Transport {
             logger.log(Level.FINEST, "transport shutdown");
 	}
     }
-  
+
+    /**
+     * Closes the current acceptor and opens a new one, binding it to the
+     * listen address specified during construction.  This method is
+     * invoked if a problem occurs handling a new connection or initiating
+     * another accept request on the current acceptor.
+     *
+     * @throws	IOException if the async channel group is shutdown, or
+     * 		a problem occurs creating the new acceptor or binding it to
+     * 		the listen address
+     */
     private synchronized void restart()
             throws IOException
     {
-        if (asyncChannelGroup.isShutdown()) {
-            throw new IOException("channel group is shutdown");
-        }
-        try {
-            acceptor.close();
-        } catch (IOException ex) {
-            logger.logThrow(Level.FINEST, ex,
-                            "exception closing acceptor during restart");
-        }
-        acceptor = AsynchronousChannelProvider.provider().
-                openAsynchronousServerSocketChannel(asyncChannelGroup);
-
-        acceptor.bind(listenAddress, acceptorBacklog);
+	if (asyncChannelGroup.isShutdown()) {
+	    throw new IOException("channel group is shutdown");
+	}
+	
+	try {
+	    acceptor.close();
+	} catch (IOException ex) {
+	    logger.logThrow(Level.FINEST, ex,
+			    "exception closing acceptor during restart");
+	}
+	acceptor = AsynchronousChannelProvider.provider().
+	    openAsynchronousServerSocketChannel(asyncChannelGroup);
+	
+	acceptor.bind(listenAddress, acceptorBacklog);
     }
             
     /** A completion handler for accepting connections. */

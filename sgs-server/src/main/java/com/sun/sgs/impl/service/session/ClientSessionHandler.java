@@ -134,6 +134,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	checkNull("dataService", dataService);
 	checkNull("sessionProtocol", sessionProtocol);
 	checkNull("identity", identity);
+	checkNull("completionHandler", completionHandler);
 	this.sessionService = sessionService;
         this.dataService = dataService;
 	this.protocol = sessionProtocol;
@@ -967,7 +968,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	private volatile Throwable exceptionCause = null;
 
 	/**
-	 * Constructs an instance with the specified {@code protocolHandler} and
+	 * Constructs an instance with the specified {@code protocolHandler}
+	 * and {@code completionHandler).
 	 *
 	 * @param	protocolHandler a session protocol handler
 	 * @param	completionHandler a completionHandler

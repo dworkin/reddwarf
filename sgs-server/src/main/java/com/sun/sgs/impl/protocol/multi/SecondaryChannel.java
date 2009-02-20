@@ -539,6 +539,14 @@ class SecondaryChannel implements Channel {
 	 * <p>This implementation schedules a task to resume reading.
 	 */
 	public void completed(Future<Void> future) {
+	    try {
+		future.get();
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e, "Obtaining request result throws ");
+		}
+	    }
 	    scheduleReadOnReadHandler();
 	}
     }

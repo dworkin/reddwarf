@@ -170,7 +170,7 @@ public class TestSimpleSgsProtocol {
         }
     }
     
-    static private class DummyListener implements ProtocolListener {
+    private static class DummyListener implements ProtocolListener {
 
         Identity identity = null;
         SessionProtocol protocol = null;
@@ -196,6 +196,7 @@ public class TestSimpleSgsProtocol {
 	    {
                 System.err.println("***** sessionMessage called..." +
 				   message.remaining());
+		completionHandler.completed(new CompletedFuture());
             }
 
             public void channelMessage(
@@ -218,8 +219,34 @@ public class TestSimpleSgsProtocol {
             }
         }
     }
+
+    private static class CompletedFuture implements Future<Void> {
+
+	CompletedFuture() {
+	}
+                
+	public boolean cancel(boolean mayInterrupteIfRunning) {
+	    return false;
+	}
+
+	public boolean isCancelled() {
+	    return false;
+	}
+
+	public boolean isDone() {
+	    return true;
+	}
+
+	public Void get() {
+	    return null;
+	}
+	
+	public Void get(long timeout, TimeUnit unit) {
+	    return null;
+	}
+    }
             
-    static public class DummyTransport implements Transport {
+    public static class DummyTransport implements Transport {
 
         private final TransportDescriptor descriptor;
         private final Delivery delivery;

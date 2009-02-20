@@ -27,7 +27,7 @@ import java.util.concurrent.Future;
  * A handler for session and channel protocol messages for an associated
  * client session.
  *
- * Each operation takes a {@link RequestCompletionHandler} argument to be
+ * <p>Each operation takes a {@link RequestCompletionHandler} argument to be
  * notified when the associated request has been processed.  A caller may need
  * to know when an operation has completed so that it can throttle incoming
  * messages (for example only resuming reading when the handler completes
