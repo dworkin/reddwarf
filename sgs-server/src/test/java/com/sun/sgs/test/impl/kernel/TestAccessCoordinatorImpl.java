@@ -37,9 +37,9 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.util.Properties;
 
@@ -57,7 +57,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 /**
  * Tests the {@link AccessCoordinatorImpl} class
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestAccessCoordinatorImpl extends Assert {
 
     private SgsTestNode serverNode;
@@ -102,7 +102,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     /*
      * AccessCooridnatorImpl tests
      */
-   
+    
     @Test(expected=NullPointerException.class)
     public void testGetConflictWithNull() throws Exception {
 	txnScheduler.runTask(

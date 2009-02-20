@@ -31,9 +31,9 @@ import com.sun.sgs.profile.ProfileOperation;
 import com.sun.sgs.profile.ProfileReport;
 import com.sun.sgs.profile.ProfileSample;
 import com.sun.sgs.test.util.DummyIdentity;
-import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -53,7 +53,7 @@ import static org.junit.Assert.assertTrue;
  * Tests for profile data that will be run with data of type
  * {@code TASK} and {@code TASK_AND_AGGREGATE}.
  */
-@RunWith(ParameterizedNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestProfileDataTaskImpl {
 
     private final static String APP_NAME = "TestProfileDataTask";

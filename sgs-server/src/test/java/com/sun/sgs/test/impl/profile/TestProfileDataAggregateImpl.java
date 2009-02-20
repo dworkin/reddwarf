@@ -29,8 +29,8 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
-import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -48,7 +48,7 @@ import static org.junit.Assert.assertTrue;
  * Tests for profile data that will be run with data of type
  * {@code AGGREGATE} and {@code TASK_AND_AGGREGATE}.
  */
-@RunWith(ParameterizedNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestProfileDataAggregateImpl {
 
     private final static String APP_NAME = "TestProfileDataAggregateTask";

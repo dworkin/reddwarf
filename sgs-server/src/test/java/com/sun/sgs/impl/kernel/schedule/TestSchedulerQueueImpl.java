@@ -30,8 +30,8 @@ import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyKernelRunnable;
-import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.UtilThreadGroup;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -57,7 +57,7 @@ import org.junit.runners.Parameterized;
  * Note that this is a general collection of tests that apply to any
  * queue.
  */
-@RunWith(ParameterizedNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestSchedulerQueueImpl {
     @Parameterized.Parameters 
         public static LinkedList<String[]> data() {

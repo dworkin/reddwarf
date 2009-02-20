@@ -47,14 +47,14 @@ import com.sun.sgs.app.util.ScalableDeque;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 /**
  * Test the {@link ScalableDeque} class.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestScalableDeque extends Assert {
 
     private static SgsTestNode serverNode;

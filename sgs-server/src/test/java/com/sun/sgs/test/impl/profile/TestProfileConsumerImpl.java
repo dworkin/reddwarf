@@ -37,9 +37,9 @@ import com.sun.sgs.profile.TaskProfileCounter;
 import com.sun.sgs.profile.TaskProfileOperation;
 import com.sun.sgs.profile.TaskProfileSample;
 import com.sun.sgs.test.util.DummyIdentity;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -67,7 +67,7 @@ import static org.junit.Assert.fail;
  * and TASK_AND_AGGREGATE are found in TestProfileDataAggregateImpl.java.  Any
  * other specialized profile data tests are collected here.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestProfileConsumerImpl {
     private final static String APP_NAME = "TestProfileConsumer";
     

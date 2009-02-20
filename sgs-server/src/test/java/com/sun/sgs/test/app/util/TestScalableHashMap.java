@@ -27,11 +27,11 @@ import com.sun.sgs.auth.Identity;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import static com.sun.sgs.test.util.UtilReflection.getConstructor;
 import static com.sun.sgs.test.util.UtilReflection.getMethod;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
@@ -61,7 +61,7 @@ import org.junit.runner.RunWith;
 /**
  * Test the {@link ScalableHashMap} class.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestScalableHashMap extends Assert {
 
     private static SgsTestNode serverNode;

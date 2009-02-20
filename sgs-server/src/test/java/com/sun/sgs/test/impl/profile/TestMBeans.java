@@ -44,9 +44,9 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.test.util.DummyManagedObject;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
@@ -84,7 +84,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Tests for management beans.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestMBeans {
     private final static String APP_NAME = "TestMBeans";
     

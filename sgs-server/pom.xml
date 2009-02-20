@@ -56,6 +56,11 @@
       <groupId>com.sleepycat</groupId>
       <artifactId>je</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.tools.test</groupId>
+      <artifactId>sgs-test-ext</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

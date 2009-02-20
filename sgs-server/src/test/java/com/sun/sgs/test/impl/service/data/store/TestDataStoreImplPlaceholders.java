@@ -25,7 +25,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
-import com.sun.sgs.test.util.NameRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.test.util.UtilReflection;
 import java.io.File;
@@ -38,10 +38,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /** Tests the use of placeholders in the DataStoreImpl class */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestDataStoreImplPlaceholders extends Assert {
 
     /** The name of the DataStoreImpl class. */

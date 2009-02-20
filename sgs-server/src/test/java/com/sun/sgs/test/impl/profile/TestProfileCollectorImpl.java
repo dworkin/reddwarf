@@ -26,9 +26,9 @@ import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.profile.ProfileListener;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +47,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestProfileCollectorImpl {
     private final static String APP_NAME = "TestProfileCollectorImpl";
     

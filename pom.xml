@@ -214,6 +214,13 @@
 	<artifactId>je</artifactId>
 	<version>${bdb.je.version}</version>
       </dependency>
+
+      <dependency>
+	<groupId>com.projectdarkstar.tools.test</groupId>
+	<artifactId>sgs-test-ext</artifactId>
+	<scope>test</scope>
+	<version>${sgs-test-ext.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -402,6 +409,7 @@
     <sgs-client.version>0.9.8</sgs-client.version>
     <bdb.version>4.5.20</bdb.version>
     <bdb.je.version>3.3.75</bdb.je.version>
+    <sgs-test-ext.version>1.0</sgs-test-ext.version>
 
     <run.javapath>target/bdb-${bdb.version}/${bdb.lib.dir}/</run.javapath>
     <run.bdb.env>

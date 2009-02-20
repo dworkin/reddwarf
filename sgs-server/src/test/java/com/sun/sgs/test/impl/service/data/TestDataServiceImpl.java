@@ -48,12 +48,12 @@ import com.sun.sgs.test.util.PrivateReadResolve;
 import com.sun.sgs.test.util.ProtectedReadResolve;
 import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PackageWriteReplace;
-import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.PrivateWriteReplace;
 import com.sun.sgs.test.util.ProtectedWriteReplace;
 import com.sun.sgs.test.util.PublicWriteReplace;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import java.io.File;
 import java.io.IOException;
@@ -77,7 +77,7 @@ import static org.junit.Assert.*;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
-@RunWith(ParameterizedNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestDataServiceImpl{
 
     @Parameterized.Parameters
