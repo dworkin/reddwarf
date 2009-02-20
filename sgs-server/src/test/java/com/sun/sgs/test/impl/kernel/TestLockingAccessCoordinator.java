@@ -31,14 +31,14 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
-import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.NameRunner;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -48,22 +48,44 @@ import org.junit.runner.RunWith;
 /** Tests the {@link LockingAccessCoordinator} class. */
 @RunWith(NameRunner.class)
 public class TestLockingAccessCoordinator extends Assert {
+
+    /** The transaction proxy, for creating transactions. */
     private static final DummyTransactionProxy txnProxy =
 	new DummyTransactionProxy();
+
+    /** A profile collector, for reporting accesses. */
     private static final DummyProfileCollectorHandle profileCollector =
 	new DummyProfileCollectorHandle();
+
+    /** An exception to use for aborting transactions. */
+    private static final Exception ABORT_EXCEPTION = new Exception();
+
+    /** Override for the lock timeout. */
     private static long lockTimeout;
+
+    /** Override for the number of key maps. */
     private static int numKeyMaps;
+
+    /** The configuration properties. */
     private Properties properties;
-    private LockingAccessCoordinator accessCoordinator;
+
+    /** The access coordinator to test. */
+    private LockingAccessCoordinator coordinator;
+
+    /** An active transaction. */
     private DummyTransaction txn;
 
+    /** An access reporter obtained from the coordinator. */
+    private AccessReporter<String> reporter;
+
+    /** Update the lock timeout and number of key maps. */
     @BeforeClass
     public static void beforeClass() {
 	lockTimeout = Long.getLong("test.lockTimeout", -1);
 	numKeyMaps = Integer.getInteger("test.numKeyMaps", -1);
     }
 
+    /** Initialize fields for test methods. */
     @Before
     public void before() throws Exception {
         properties = new Properties();
@@ -77,13 +99,15 @@ public class TestLockingAccessCoordinator extends Assert {
 		LockingAccessCoordinator.NUM_KEY_MAPS_PROPERTY,
 		String.valueOf(numKeyMaps));
 	}
-	accessCoordinator = new LockingAccessCoordinator(
+	coordinator = new LockingAccessCoordinator(
 	    properties, txnProxy, profileCollector);
 	txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
-	accessCoordinator.notifyNewTransaction(txn, 0, 1);
+	coordinator.notifyNewTransaction(txn, 0, 1);
+	reporter = coordinator.registerAccessSource("s", String.class);
     }
 
+    /** Clear transaction state. */
     @After
     public void after() throws Exception {
 	if (txn != null) {
@@ -145,44 +169,42 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test(expected=NullPointerException.class)
     public void testRegisterAccessSourceNullSourceName() {
-	accessCoordinator.registerAccessSource(null, Object.class);
+	coordinator.registerAccessSource(null, Object.class);
     }
 
     @Test(expected=NullPointerException.class)
     public void testRegisterAccessSourceNullObjectIdType() {
-	accessCoordinator.registerAccessSource("a", null);
+	coordinator.registerAccessSource("a", null);
     }
 
     /* -- Test getConflictingTransaction -- */
 
     @Test(expected=NullPointerException.class)
     public void testGetConflictingTransactionNullTxn() {
-	accessCoordinator.getConflictingTransaction(null);
+	coordinator.getConflictingTransaction(null);
     }
 
     /* -- Test notifyNewTransaction -- */
 
     @Test(expected=NullPointerException.class)
     public void testNotifyNewTransactionNullTxn() {
-	accessCoordinator.notifyNewTransaction(null, 0, 1);
+	coordinator.notifyNewTransaction(null, 0, 1);
     }
 
     @Test(expected=IllegalArgumentException.class)
     public void testNotifyNewTransactionIllegalRequestedStartTime() {
-	accessCoordinator.notifyNewTransaction(txn, -1, 1);
+	coordinator.notifyNewTransaction(txn, -1, 1);
     }
 
     @Test(expected=IllegalArgumentException.class)
     public void testNotifyNewTransactionIllegalTryCount() {
-	accessCoordinator.notifyNewTransaction(txn, 0, 0);
+	coordinator.notifyNewTransaction(txn, 0, 0);
     }
 
     /* -- Test AccessReporter.reportObjectAccess -- */
 
     @Test
     public void testReportObjectAccessNullTxn() {
-	AccessReporter<String> reporter =
-	    accessCoordinator.registerAccessSource("a", String.class);
 	try {
 	    reporter.reportObjectAccess(null, "id", AccessType.READ);
 	    fail("Expected NullPointerException");
@@ -197,8 +219,6 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test
     public void testReportObjectAccessNullObjId() {
-	AccessReporter<String> reporter =
-	    accessCoordinator.registerAccessSource("a", String.class);
 	try {
 	    reporter.reportObjectAccess(null, AccessType.READ);
 	    fail("Expected NullPointerException");
@@ -223,8 +243,6 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test
     public void testReportObjectAccessNullAccessType() {
-	AccessReporter<String> reporter =
-	    accessCoordinator.registerAccessSource("a", String.class);
 	try {
 	    reporter.reportObjectAccess("id", null);
 	    fail("Expected NullPointerException");
@@ -247,12 +265,20 @@ public class TestLockingAccessCoordinator extends Assert {
 	}
     }
 
-    //@Test
-    public void testReportObjectAccessMisc() {
-	AccessReporter<String> reporter =
-	    accessCoordinator.registerAccessSource("a", String.class);
+    @Test
+    public void testReportObjectAccessMisc() throws Exception {
+	AccessReporter<String> reporter2 =
+	    coordinator.registerAccessSource("s2", String.class);
+	Object[] expected = {
+	    "s", "read1", AccessType.READ,
+	    "s2", "read1", AccessType.READ,
+	    "s", "upgrade", AccessType.READ,
+	    "s", "write1", AccessType.WRITE,
+	    "s", "upgrade", AccessType.WRITE
+	};
+	int numExpected = expected.length / 3;
 	reporter.reportObjectAccess("read1", AccessType.READ);
-	reporter.reportObjectAccess("read2", AccessType.READ);
+	reporter2.reportObjectAccess("read1", AccessType.READ);
 	reporter.reportObjectAccess("upgrade", AccessType.READ);
 	reporter.reportObjectAccess("upgrade", AccessType.READ);
 	reporter.reportObjectAccess("write1", AccessType.WRITE);
@@ -260,28 +286,33 @@ public class TestLockingAccessCoordinator extends Assert {
 	reporter.reportObjectAccess("write1", AccessType.WRITE);
 	reporter.reportObjectAccess("upgrade", AccessType.WRITE);
 	reporter.reportObjectAccess("upgrade", AccessType.WRITE);
-	AccessedObjectsDetail detail = accessCoordinator.releaseAll(txn);
-	List<? extends AccessedObject> accesses = detail.getAccessedObjects();
-	System.err.println(accesses);
+	txn.commit();
+	txn = null;
+	AccessedObjectsDetail detail = 
+	    profileCollector.getAccessedObjectsDetail();
+	List<? extends AccessedObject> accesses =
+	    detail.getAccessedObjects();
+	assertSame("Expected " + numExpected + " accesses, found " +
+		   accesses.size(),
+		   numExpected,
+		   accesses.size());
+	for (int i = 0; i < expected.length; i += 3) {
+	    AccessedObject result = accesses.get(i / 3);
+	    assertEquals(expected[i], result.getSource());
+	    assertEquals(expected[i + 1], result.getObjectId());
+	    assertEquals(expected[i + 2], result.getAccessType());
+	}
     }
 
     /* -- Test AccessReporter.setObjectDescription -- */
 
-    @Test
+    @Test(expected=NullPointerException.class)
     public void testSetObjectDescriptionNullTxn() {
-	AccessReporter<String> reporter =
-	    accessCoordinator.registerAccessSource("a", String.class);
-	try {
-	    reporter.setObjectDescription(null, "id", "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
+	reporter.setObjectDescription(null, "id", "desc");
     }
 
     @Test
     public void testSetObjectDescriptionNullObjId() {
-	AccessReporter<String> reporter =
-	    accessCoordinator.registerAccessSource("a", String.class);
 	try {
 	    reporter.setObjectDescription(null, "desc");
 	    fail("Expected NullPointerException");
@@ -298,43 +329,106 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test
     public void testLockNoWaitGranted() {
-	LockConflict result =
-	    accessCoordinator.lockNoWait(txn, "s1", "o1", false, null);
-	assertNull(result);
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+    }
+
+    /* -- Test lock conflicts -- */
+
+    @Test
+    public void testReadWriteConflict() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(coordinator.lockNoWait(txn2, "s1", "o1", false, null));
+	assertBlocked(
+	    coordinator.lockNoWait(txn, "s1", "o1", true, null), txn2);
+	txn2.commit();
+	assertGranted(coordinator.waitForLock(txn));
     }
 
     @Test
-    public void testLockNoWaitReadWriteConflict() throws Exception {
+    public void testUpgradeConflict() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
-	accessCoordinator.notifyNewTransaction(txn2, 0, 1);
-	LockConflict result =	
-	    accessCoordinator.lockNoWait(txn2, "s1", "o1", false, null);
-	assertNull(result);
-	result = accessCoordinator.lockNoWait(txn, "s1", "o1", true, null);
-	assertNotNull(result);
-	assertEquals(LockConflictType.BLOCKED, result.type);
-	assertSame(txn2, result.conflictingTxn);
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(coordinator.lockNoWait(txn2, "s1", "o1", false, null));
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertBlocked(
+	    coordinator.lockNoWait(txn, "s1", "o1", true, null), txn2);
 	txn2.commit();
-	result = accessCoordinator.waitForLock(txn);
-	assertNull(result);
+	assertGranted(coordinator.waitForLock(txn));
+    }
+
+    /* -- Test deadlocks -- */
+
+    @Test
+    public void testReadWriteDeadlock() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertGranted(coordinator.lockNoWait(txn2, "s1", "o2", false, null));
+	assertBlocked(
+	    coordinator.lockNoWait(txn, "s1", "o2", true, null), txn2);
+	assertDeadlock(
+	    coordinator.lockNoWait(txn2, "s1", "o1", true, null), txn);
+	txn2.abort(ABORT_EXCEPTION);
+	assertGranted(coordinator.waitForLock(txn));
     }
 
     @Test
-    public void testLockNoWaitUpgradeConflict() throws Exception {
+    public void testUpgradeDeadlock() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
-	accessCoordinator.notifyNewTransaction(txn2, 0, 1);
-	LockConflict result =
-	    accessCoordinator.lockNoWait(txn2, "s1", "o1", false, null);
-	assertNull(result);
-	result = accessCoordinator.lockNoWait(txn, "s1", "o1", false, null);
-	assertNull(result);
-	result = accessCoordinator.lockNoWait(txn, "s1", "o1", true, null);
-	assertNotNull(result);
-	assertEquals(LockConflictType.BLOCKED, result.type);
-	assertSame(txn2, result.conflictingTxn);
-	txn2.commit();
-	result = accessCoordinator.waitForLock(txn);
-	assertNull(result);
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertGranted(coordinator.lockNoWait(txn2, "s1", "o1", false, null));
+	assertBlocked(
+	    coordinator.lockNoWait(txn, "s1", "o1", true, null), txn2);
+	assertDeadlock(
+	    coordinator.lockNoWait(txn2, "s1", "o1", true, null), txn);
+	txn2.abort(ABORT_EXCEPTION);
+	assertGranted(coordinator.waitForLock(txn));
+    }
+
+    @Test
+    public void testReadWriteLoopDeadlock1() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	DummyTransaction txn3 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn3, 2000, 1);
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertGranted(coordinator.lockNoWait(txn2, "s1", "o2", false, null));
+	assertGranted(coordinator.lockNoWait(txn3, "s1", "o3", false, null));
+	assertBlocked(
+	    coordinator.lockNoWait(txn, "s1", "o2", true, null), txn2);
+	assertBlocked(
+	    coordinator.lockNoWait(txn2, "s1", "o3", true, null), txn3);
+	assertDeadlock(
+	    coordinator.lockNoWait(txn3, "s1", "o1", true, null),
+	    txn, txn2);
+	assertBlocked(coordinator.checkLock(txn), txn2);
+	assertGranted(coordinator.checkLock(txn2));
+	txn2.abort(ABORT_EXCEPTION);
+	assertGranted(coordinator.checkLock(txn));
+    }
+
+    @Test
+    public void testReadWriteLoopDeadlock2() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	DummyTransaction txn3 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn3, 2000, 1);
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertGranted(coordinator.lockNoWait(txn2, "s1", "o2", false, null));
+	assertGranted(coordinator.lockNoWait(txn3, "s1", "o3", false, null));
+	assertBlocked(
+	    coordinator.lockNoWait(txn2, "s1", "o3", true, null), txn3);
+	assertBlocked(
+	    coordinator.lockNoWait(txn3, "s1", "o1", true, null), txn);
+	assertBlocked(
+	    coordinator.lockNoWait(txn, "s1", "o2", true, null), txn2, txn3);
+	assertDeadlock(coordinator.checkLock(txn3), txn, txn2);
+	assertBlocked(coordinator.checkLock(txn), txn2);
+	assertGranted(coordinator.checkLock(txn2));
+	txn2.abort(ABORT_EXCEPTION);
+	assertGranted(coordinator.checkLock(txn));
     }
 
     /* -- Other methods and classes -- */
@@ -379,5 +473,50 @@ public class TestLockingAccessCoordinator extends Assert {
 	public ProfileCollector getCollector() {
 	    throw new AssertionError("Not supported");
 	}
+    }
+
+    static void assertGranted(LockConflict conflict) {
+	if (conflict != null) {
+	    fail("Expected no conflict: " + conflict);
+	}
+    }
+
+    static void assertBlocked(
+	LockConflict conflict, Transaction... conflictingTxns)
+    {
+	assertDenied(LockConflictType.BLOCKED, conflict, conflictingTxns);
+    }
+
+    static void assertDeadlock(
+	LockConflict conflict, Transaction... conflictingTxns)
+    {
+	assertDenied(LockConflictType.DEADLOCK, conflict, conflictingTxns);
+    }
+
+    static void assertTimeout(
+	LockConflict conflict, Transaction... conflictingTxns)
+    {
+	assertDenied(LockConflictType.TIMEOUT, conflict, conflictingTxns);
+    }
+
+    static void assertDenied(LockConflictType type,
+			     LockConflict conflict,
+			     Transaction... conflictingTxns)
+    {
+	if (conflict == null || conflict.getType() != type) {
+	    fail("Expected " + type + ": " + conflict);
+	}
+	assertMember(conflictingTxns, conflict.getConflictingTxn());
+    }
+
+    static <T> void assertMember(T[] array, T item) {
+	assertTrue("Must have some members", array.length > 0);
+	for (T e : array) {
+	    if (item == null ? e == null : item.equals(e)) {
+		return;
+	    }
+	}
+	fail("Expected member of " + Arrays.toString(array) +
+	     "\n  found " + item);
     }
 }

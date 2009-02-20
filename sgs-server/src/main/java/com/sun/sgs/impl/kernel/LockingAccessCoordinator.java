@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
@@ -31,6 +32,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,6 +43,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * An implementation of {@link AccessCoordinator} that uses locking to handle
@@ -72,6 +76,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /** The default number of key maps. */
     public static final int NUM_KEY_MAPS_DEFAULT = 8;
+
+    /** An empty array of lock requests. */
+    static final LockRequest[] NO_LOCK_REQUESTS = { };
+
+    /** The logger for this class. */
+    static final LoggerWrapper logger = new LoggerWrapper(
+	Logger.getLogger(LockingAccessCoordinator.class.getName()));
 
     /** Maps transactions to lockers. */
     private final ConcurrentMap<Transaction, Locker> txnMap =
@@ -151,10 +162,15 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	if (requestedStartTime < 0 || tryCount < 1) {
 	    throw new IllegalArgumentException();
 	}
-	Locker existing = txnMap.putIfAbsent(
-	    txn, new Locker(txn, requestedStartTime));
+	Locker locker = new Locker(txn, requestedStartTime);
+	Locker existing = txnMap.putIfAbsent(txn, locker);
 	if (existing != null) {
 	    throw new IllegalStateException("Transaction already started");
+	}
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER,
+		       "Start {0}, requestedStartTime:{1,number,#}",
+		       locker, requestedStartTime);
 	}
 	txn.join(this);
     }
@@ -283,6 +299,39 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	return waitForLockInternal(locker);
     }
 
+    public LockConflict checkLock(Transaction txn) {
+	Locker locker = getLocker(txn);
+	LockConflict lockConflict = locker.getConflict();
+	if (lockConflict != null) {
+	    return lockConflict;
+	}
+	Lock lock = locker.getWaitingFor();
+	if (lock == null) {
+	    return null;
+	}
+	Key key = lock.key;
+	Map<Key, Lock> keyMap = getKeyMap(key);
+	LockRequest request;
+	synchronized (keyMap) {
+	    //XXX
+	    request = lock.getFirstOwner();
+	}
+	Transaction conflictingTxn = request.locker.txn;
+	long now = System.currentTimeMillis();
+	long stop = Math.min(now + lockTimeout, locker.stopTime);
+	if (now > stop) {
+	    synchronized (keyMap) {
+		lock.flushWaiter(locker);
+	    }
+	    locker.setWaitingFor(null);
+	    return new LockConflict(
+		LockConflictType.TIMEOUT, conflictingTxn);
+	} else {
+	    return new LockConflict(
+		LockConflictType.BLOCKED, conflictingTxn);
+	}
+    }
+
     /**
      * Releases all of the locks associated with the specified transaction and
      * returns information about the locks requested during that transaction.
@@ -340,10 +389,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     public static final class LockConflict {
 
 	/** The type of conflict. */
-	public final LockConflictType type;
+	private final LockConflictType type;
 
 	/** A transaction that caused the conflict. */
-	public final Transaction conflictingTxn;
+	private final Transaction conflictingTxn;
 
 	/**
 	 * Creates an instance of this class.
@@ -360,6 +409,25 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    this.conflictingTxn = conflictingTxn;
 	}
 
+	/**
+	 * Returns the type of conflict.
+	 *
+	 * @return	the type of conflict
+	 */
+	public LockConflictType getType() {
+	    return type;
+	}
+
+	/**
+	 * Returns a transaction that caused the conflict.
+	 *
+	 * @return	a transaction that caused the conflict
+	 */
+	public Transaction getConflictingTxn() {
+	    return conflictingTxn;
+	}
+
+	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
 	    return "LockConflict[type:" + type +
@@ -450,51 +518,86 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 	Map<Key, Lock> keyMap = getKeyMap(key);
 	Transaction conflictingTxn;
+	Lock lock;
 	synchronized (keyMap) {
-	    Lock lock = getLock(key, keyMap);
+	    lock = getLock(key, keyMap);
 	    LockAttemptResult result = lock.lock(locker, forWrite);
 	    if (result == null) {
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(Level.FINER,
+			       "Lock {0}, {1}, forWrite:{2}" +
+			       "\n  returns null (already granted)",
+			locker, key, forWrite);
+		}
 		return null;
 	    } else if (result.conflict == null) {
 		locker.requests.add(result.request);
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(Level.FINER,
+			       "Lock {0}, {1}, forWrite:{2}" +
+			       "\n  returns null (new)",
+			locker, key, forWrite);
+		}
 		return null;
 	    } else {
 		conflictingTxn = result.conflict.txn;
 	    }
 	}
-	LockConflict conflict = new DeadlockChecker().check(locker, key);
-	if (conflict != null) {
-	    return conflict;
-	} else {
-	    return new LockConflict(LockConflictType.BLOCKED, conflictingTxn);
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "Lock {0}, {1}, forWrite:{2}\n  blocked",
+		       locker, key, forWrite);
 	}
+	LockConflict conflict = new DeadlockChecker().check(locker, key);
+	if (conflict == null) {
+	    conflict =
+		new LockConflict(LockConflictType.BLOCKED, conflictingTxn);
+	}
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER,
+		       "Lock {0}, {1}, forWrite:{2}\n  returns {3}",
+			locker, key, forWrite, conflict);
+	}
+	locker.setWaitingFor(lock);
+	return conflict;
     }
 
     /** Attempts to acquire a lock, waiting if needed. */
     private LockConflict waitForLockInternal(Locker locker) {
 	Lock lock = locker.getWaitingFor();
 	if (lock == null) {
+	    logger.log(Level.FINER,
+		       "Wait for lock {0}\n  returns null (already granted)",
+			locker);
 	    return null;
 	}
 	Key key = lock.key;
 	Map<Key, Lock> keyMap = getKeyMap(key);
 	LockRequest request;
 	synchronized (keyMap) {
+	    //XXX
 	    request = lock.getFirstOwner();
 	}
 	Transaction conflictingTxn = request.locker.txn;
 	long now = System.currentTimeMillis();
 	long stop = Math.min(now + lockTimeout, locker.stopTime);
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "Wait for lock {0}, stop:{1,number,#}",
+		       locker, stop);
+	}
 	while (true) {
 	    if (now > stop) {
 		synchronized (keyMap) {
 		    lock.flushWaiter(locker);
 		}
 		locker.setWaitingFor(null);
-		return new LockConflict(
+		LockConflict conflict = new LockConflict(
 		    LockConflictType.TIMEOUT, conflictingTxn);
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(Level.FINER, "Wait for lock {0}\n  returns {1}",
+			       locker, conflict);
+		}
+		return conflict;
 	    }
-	    locker.setWaitingFor(lock);
 	    try {
 		synchronized (locker) {
 		    locker.wait(stop - now);
@@ -513,6 +616,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    lock.flushWaiter(locker);
 		}
 		locker.setWaitingFor(null);
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(Level.FINER, "Wait for lock {0}\n  returns {1}",
+			       locker, conflict);
+		}
 		return conflict;
 	    }
 	    now = System.currentTimeMillis();
@@ -664,6 +771,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    this.waitingFor = waitingFor;
 	}
 
+	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
 	    return "Locker[txn:" + txn + "]";
@@ -692,6 +800,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    this.objectId = objectId;
 	}
 
+	/* -- Compare source and object ID -- */
+
 	@Override
 	public boolean equals(Object object) {
 	    if (object == this) {
@@ -710,6 +820,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    return source.hashCode() ^ objectId.hashCode();
 	}
 
+	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
 	    return "Key[source:" + source + ", objectId:" + objectId + "]";
@@ -728,7 +839,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	final Key key;
 
 	/** The requests that currently own this lock. */
-	private final Set<LockRequest> owners = new HashSet<LockRequest>();
+	private final List<LockRequest> owners = new ArrayList<LockRequest>();
 
 	/** The requests that are waiting for this lock. */
 	private final List<LockRequest> waiters = new ArrayList<LockRequest>();
@@ -803,7 +914,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * request at the end of the list.
 	 */
 	private void addWaiter(LockRequest request) {
-	    System.err.println(this + ".addWaiter request:" + request);
 	    if (waiters.isEmpty() || !request.getUpgrade()) {
 		waiters.add(request);
 	    } else {
@@ -869,15 +979,15 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 */
 	LockRequest getFirstOwner() {
 	    assert !owners.isEmpty();
-	    return owners.iterator().next();
+	    return owners.get(0);
 	}
 
 	/** Returns a copy of the locker requests for the owners. */
-	Set<LockRequest> copyOwners() {
+	LockRequest[] copyOwners() {
 	    if (owners.isEmpty()) {
-		return Collections.emptySet();
+		return NO_LOCK_REQUESTS;
 	    } else {
-		return new HashSet<LockRequest>(owners);
+		return owners.toArray(new LockRequest[owners.size()]);
 	    }
 	}
 
@@ -906,6 +1016,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    return false;
 	}
 
+	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
 	    return "Lock[key:" + key + "]";
@@ -1028,9 +1139,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
 	/* -- Other methods -- */
 
+	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
-	    return "LockRequest[locker:" + locker + ", key:" + key +
+	    return "LockRequest[" + locker + ", " + key +
 		", type:" + type + "]";
 	}
 
@@ -1075,12 +1187,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	LockConflict check(Locker locker, Key key) {
 	    allOwners.add(locker);
 	    if (!checkInternal(locker, key)) {
+		logger.log(Level.FINEST, "No deadlock found");
 		return null;
 	    }
 	    LockConflict lockConflict =
 		new LockConflict(LockConflictType.DEADLOCK, conflict.txn);
 	    victim.setConflict(lockConflict);
-	    if (conflict == locker) {
+	    if (victim == locker) {
 		return lockConflict;
 	    } else {
 		return new LockConflict(
@@ -1094,20 +1207,38 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * blocked.  Returns whether the deadlock was found.
 	 */
 	private boolean checkInternal(Locker locker, Key key) {
-	    Set<LockRequest> owners;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
+	    LockRequest[] owners;
 	    synchronized (keyMap) {
 		owners = getLock(key, keyMap).copyOwners();
 	    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "Check deadlock {0}, {1}" +
+			   "\n  owners:{2}" +
+			   "\n  allOwners:{3}",
+			   locker, key, Arrays.toString(owners), allOwners);
+	    }
 	    for (LockRequest ownerRequest : owners) {
 		Locker owner = ownerRequest.locker;
-		if (owner != locker && allOwners.contains(owner)) {
+		if (owner == locker) {
+		    continue;
+		}
+		if (allOwners.contains(owner)) {
 		    /* Found a deadlock! */
 		    cycleBoundary = owner;
 		    victim = owner;
+		    logger.log(Level.FINEST,
+			       "Check deadlock found victim:{0}",
+			       victim);
 		    return true;
 		}
 		Lock ownerWaitingFor = owner.getWaitingFor();
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST,
+			       "Check owner:{0}, waitingFor:{1}",
+			       owner, ownerWaitingFor);
+		}
 		if (ownerWaitingFor != null) {
 		    allOwners.add(owner);
 		    boolean deadlock =
@@ -1140,6 +1271,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		 * current victim, so use it instead.
 		 */
 		victim = locker;
+		logger.log(Level.FINEST,
+			   "Check deadlock new victim:{0}", victim);
 	    }
 	}
     }
