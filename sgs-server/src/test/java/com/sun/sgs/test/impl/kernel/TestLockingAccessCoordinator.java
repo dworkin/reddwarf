@@ -329,124 +329,210 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test
     public void testLockNoWaitGranted() {
-	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertGranted(acquireLock(txn, "s1", "o1", false));
     }
 
     /* -- Test lock conflicts -- */
 
+    /**
+     * Test read/write conflict
+     *
+     * txn2: read o1	=> granted
+     * txn:  write o2	=> blocked
+     * txn2: abort
+     * txn:		=> granted
+     */
     @Test
     public void testReadWriteConflict() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 0, 1);
-	assertGranted(coordinator.lockNoWait(txn2, "s1", "o1", false, null));
-	assertBlocked(
-	    coordinator.lockNoWait(txn, "s1", "o1", true, null), txn2);
+	assertGranted(acquireLock(txn2, "s1", "o1", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o1", true);
+	locker.assertBlocked();
 	txn2.commit();
-	assertGranted(coordinator.waitForLock(txn));
+	assertGranted(locker.getResult());
     }
 
+    /**
+     * Test read/upgrade conflict
+     *
+     * txn2: read o1	=> granted
+     * txn:  read o1	=> granted
+     * txn:  write o1	=> blocked
+     * txn2: commit
+     * txn:		=> granted
+     */
     @Test
     public void testUpgradeConflict() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 0, 1);
-	assertGranted(coordinator.lockNoWait(txn2, "s1", "o1", false, null));
-	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
-	assertBlocked(
-	    coordinator.lockNoWait(txn, "s1", "o1", true, null), txn2);
+	assertGranted(acquireLock(txn2, "s1", "o1", false));
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o1", true);
+	locker.assertBlocked();
 	txn2.commit();
-	assertGranted(coordinator.waitForLock(txn));
+	assertGranted(locker.getResult());
     }
 
     /* -- Test deadlocks -- */
 
+    /**
+     * Test read/write deadlock
+     *
+     * txn is older than txn2
+     *
+     * txn:  read o1	=> granted
+     * txn2: read o2	=> granted
+     * txn:  write o2	=> blocked
+     * txn2: write o1	=> deadlock
+     * txn2: abort
+     * txn:		=> granted
+     */
     @Test
     public void testReadWriteDeadlock() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 1000, 1);
-	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
-	assertGranted(coordinator.lockNoWait(txn2, "s1", "o2", false, null));
-	assertBlocked(
-	    coordinator.lockNoWait(txn, "s1", "o2", true, null), txn2);
-	assertDeadlock(
-	    coordinator.lockNoWait(txn2, "s1", "o1", true, null), txn);
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	assertDeadlock(acquireLock(txn2, "s1", "o1", true), txn);
 	txn2.abort(ABORT_EXCEPTION);
-	assertGranted(coordinator.waitForLock(txn));
+	assertGranted(locker.getResult());
     }
 
+    /**
+     * Test upgrade/upgrade deadlock
+     *
+     * txn is older than txn2
+     *
+     * txn:  read o1	=> granted
+     * txn2: read o1	=> granted
+     * txn:  write o1	=> blocked
+     * txn2: write o1	=> deadlock
+     * txn2: abort
+     * txn:		=> granted
+     */
     @Test
     public void testUpgradeDeadlock() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 1000, 1);
-	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
-	assertGranted(coordinator.lockNoWait(txn2, "s1", "o1", false, null));
-	assertBlocked(
-	    coordinator.lockNoWait(txn, "s1", "o1", true, null), txn2);
-	assertDeadlock(
-	    coordinator.lockNoWait(txn2, "s1", "o1", true, null), txn);
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o1", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o1", true);
+	locker.assertBlocked();
+	assertDeadlock(acquireLock(txn2, "s1", "o1", true), txn);
 	txn2.abort(ABORT_EXCEPTION);
-	assertGranted(coordinator.waitForLock(txn));
+	assertGranted(locker.getResult());
     }
 
+    /**
+     * Test deadlock with three parties in a ring, with last locker the victim.
+     *
+     * txn is oldest, txn2 in the middle, txn3 is youngest
+     *
+     * txn:  read o1	=> granted
+     * txn2: read o2	=> granted
+     * txn3: read o3	=> granted
+     * txn:  write o2	=> blocked
+     * txn2: write o3	=> blocked
+     * txn3: write o1	=> deadlock
+     * txn3: abort
+     * txn2:		=> granted
+     * txn2: abort
+     * txn:		=> granted
+     */
     @Test
     public void testReadWriteLoopDeadlock1() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 1000, 1);
 	DummyTransaction txn3 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn3, 2000, 1);
-	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
-	assertGranted(coordinator.lockNoWait(txn2, "s1", "o2", false, null));
-	assertGranted(coordinator.lockNoWait(txn3, "s1", "o3", false, null));
-	assertBlocked(
-	    coordinator.lockNoWait(txn, "s1", "o2", true, null), txn2);
-	assertBlocked(
-	    coordinator.lockNoWait(txn2, "s1", "o3", true, null), txn3);
-	assertDeadlock(
-	    coordinator.lockNoWait(txn3, "s1", "o1", true, null),
-	    txn, txn2);
-	assertBlocked(coordinator.checkLock(txn), txn2);
-	assertGranted(coordinator.checkLock(txn2));
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	assertGranted(acquireLock(txn3, "s1", "o3", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o3", true);
+	locker2.assertBlocked();
+	assertDeadlock(acquireLock(txn3, "s1", "o1", true), txn, txn2);
+	txn3.abort(ABORT_EXCEPTION);
+	locker.assertBlocked();
+	assertGranted(locker2.getResult());
 	txn2.abort(ABORT_EXCEPTION);
-	assertGranted(coordinator.checkLock(txn));
+	assertGranted(locker.getResult());
     }
 
+    /**
+     * Test deadlock with three parties in a ring, with middle locker the
+     * victim.
+     *
+     * txn is oldest, txn2 in the middle, txn3 is youngest
+     *
+     * txn:  read o1	=> granted
+     * txn2: read o2	=> granted
+     * txn3: read o3	=> granted
+     * txn2: write o3	=> blocked
+     * txn3: write o1	=> blocked
+     * txn1: write o2	=> blocked
+     * txn3:		=> deadlock
+     * txn3: abort
+     * txn2:		=> granted
+     * txn2: abort
+     * txn:		=> granted
+     */
     @Test
     public void testReadWriteLoopDeadlock2() throws Exception {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 1000, 1);
 	DummyTransaction txn3 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn3, 2000, 1);
-	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
-	assertGranted(coordinator.lockNoWait(txn2, "s1", "o2", false, null));
-	assertGranted(coordinator.lockNoWait(txn3, "s1", "o3", false, null));
-	assertBlocked(
-	    coordinator.lockNoWait(txn2, "s1", "o3", true, null), txn3);
-	assertBlocked(
-	    coordinator.lockNoWait(txn3, "s1", "o1", true, null), txn);
-	assertBlocked(
-	    coordinator.lockNoWait(txn, "s1", "o2", true, null), txn2, txn3);
-	assertDeadlock(coordinator.checkLock(txn3), txn, txn2);
-	assertBlocked(coordinator.checkLock(txn), txn2);
-	assertGranted(coordinator.checkLock(txn2));
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	assertGranted(acquireLock(txn3, "s1", "o3", false));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o3", true);
+	locker2.assertBlocked();
+	AcquireLock locker3 = new AcquireLock(txn3, "s1", "o1", true);
+	locker3.assertBlocked();
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	assertDeadlock(locker3.getResult(), txn, txn2);
+	txn3.abort(ABORT_EXCEPTION);
+	locker.assertBlocked();
+	assertGranted(locker2.getResult());
 	txn2.abort(ABORT_EXCEPTION);
-	assertGranted(coordinator.checkLock(txn));
+	assertGranted(locker.getResult());
     }
 
     /* -- Other methods and classes -- */
 
+    /**
+     * A dummy implementation of {@code ProfileCollectorHandle}, just to
+     * accept and provide access to the AccessedObjectsDetail.
+     */
     static class DummyProfileCollectorHandle
 	implements ProfileCollectorHandle
     {
 	private AccessedObjectsDetail detail;
+
 	DummyProfileCollectorHandle() { }
-	public synchronized void setAccessedObjectsDetail(
-	    AccessedObjectsDetail detail)
-	{
-	    this.detail = detail;
-	}
+
+	/**
+	 * Returns the AccessedObjectsDetail last supplied to a call to
+	 * setAccessedObjectsDetail.
+	 */
 	synchronized AccessedObjectsDetail getAccessedObjectsDetail() {
 	    AccessedObjectsDetail result = detail;
 	    detail = null;
 	    return result;
+	}
+
+	/* -- Implement ProfileCollectorHandle -- */
+
+	public synchronized void setAccessedObjectsDetail(
+	    AccessedObjectsDetail detail)
+	{
+	    this.detail = detail;
 	}
 
 	/* -- Unsupported methods -- */
@@ -475,30 +561,42 @@ public class TestLockingAccessCoordinator extends Assert {
 	}
     }
 
+    /* -- Methods for asserting the lock conflict status -- */
+
+    /** Asserts that the lock was granted. */
     static void assertGranted(LockConflict conflict) {
 	if (conflict != null) {
 	    fail("Expected no conflict: " + conflict);
 	}
     }
 
-    static void assertBlocked(
-	LockConflict conflict, Transaction... conflictingTxns)
-    {
-	assertDenied(LockConflictType.BLOCKED, conflict, conflictingTxns);
-    }
-
+    /**
+     * Asserts that the request resulted in a deadlock. The conflictingTxns
+     * argument specifies all of the other transactions that were involved in
+     * the conflict.
+     */
     static void assertDeadlock(
 	LockConflict conflict, Transaction... conflictingTxns)
     {
 	assertDenied(LockConflictType.DEADLOCK, conflict, conflictingTxns);
     }
 
+    /**
+     * Asserts that the request resulted in a timeout. The conflictingTxns
+     * argument specifies all of the other transactions that were involved in
+     * the conflict.
+     */
     static void assertTimeout(
 	LockConflict conflict, Transaction... conflictingTxns)
     {
 	assertDenied(LockConflictType.TIMEOUT, conflict, conflictingTxns);
     }
 
+    /**
+     * Asserts that the request was denied, with the specified type of
+     * conflict. The conflictingTxns argument specifies all of the other
+     * transactions that were involved in the conflict.
+     */
     static void assertDenied(LockConflictType type,
 			     LockConflict conflict,
 			     Transaction... conflictingTxns)
@@ -509,6 +607,10 @@ public class TestLockingAccessCoordinator extends Assert {
 	assertMember(conflictingTxns, conflict.getConflictingTxn());
     }
 
+    /**
+     * Asserts that the element is one of the elements of the array, which
+     * should not be empty.
+     */
     static <T> void assertMember(T[] array, T item) {
 	assertTrue("Must have some members", array.length > 0);
 	for (T e : array) {
@@ -518,5 +620,141 @@ public class TestLockingAccessCoordinator extends Assert {
 	}
 	fail("Expected member of " + Arrays.toString(array) +
 	     "\n  found " + item);
+    }
+
+    /** Attempts to acquire a lock on behalf of a transaction. */
+    LockConflict acquireLock(
+	DummyTransaction txn, String source, Object objectId, boolean forWrite)
+    {
+	return new AcquireLock(txn, source, objectId, forWrite).getResult();
+    }
+
+    /**
+     * A utility class for managing an attempt to acquire a lock.  Use an
+     * instance of this class for attempts that block.
+     */
+    class AcquireLock extends Thread {
+	private final DummyTransaction txn;
+	private final String source;
+	private final Object objectId;
+	private final boolean forWrite;
+
+	/**
+	 * Set to true when the initial attempt to acquire the lock is
+	 * complete, so we know whether the attempt blocked.
+	 */
+	private boolean started = false;
+
+	/** Set to true if the initial attempt to acquire the lock blocked. */
+	private boolean blocked = false;
+
+	/** Set to true when the attempt to acquire the lock is done. */
+	private boolean done = false;
+
+	/** Set to the result of the lock attempt. */
+	private LockConflict result = null;
+
+	/** Set to any exception thrown during the lock attempt. */
+	private Throwable exception = null;
+
+	/**
+	 * Creates an instance that starts a thread to acquire a lock on behalf
+	 * of a transaction.
+	 */
+	AcquireLock(DummyTransaction txn,
+		    String source, Object objectId, boolean forWrite)
+	{
+	    setDaemon(true);
+	    this.txn = txn;
+	    this.source = source;
+	    this.objectId = objectId;
+	    this.forWrite = forWrite;
+	    start();
+	}
+
+	public void run() {
+	    try {
+		LockConflict conflict;
+		boolean wait = false;
+		synchronized (this) {
+		    started = true;
+		    notifyAll();
+		    conflict = coordinator.lockNoWait(
+			txn, source, objectId, forWrite, null);
+		    if (conflict != null
+			&& conflict.getType() == LockConflictType.BLOCKED)
+		    {
+			blocked = true;
+			wait = true;
+		    }
+		}
+		/*
+		 * Don't synchronize on this object while waiting for the lock,
+		 * to avoid deadlock.
+		 */
+		if (wait) {
+		    conflict = coordinator.waitForLock(txn);
+		}
+		synchronized (this) {
+		    result = conflict;
+		    done = true;
+		    notifyAll();
+		}
+	    } catch (Throwable e) {
+		synchronized (this) {
+		    exception = e;
+		    done = true;
+		    notifyAll();
+		}
+	    }
+	}
+
+	/** Checks if the initial attempt to obtain the lock blocked. */
+	boolean blocked() {
+	    synchronized (this) {
+		while (!started) {
+		    try {
+			wait();
+		    } catch (InterruptedException e) {
+			break;
+		    }
+		}
+		return blocked;
+	    }
+	}
+
+	/**
+	 * Asserts that the initial attempt to obtain the lock should have
+	 * blocked.
+	 */
+	void assertBlocked() {
+	    assertTrue("The lock attempt did not block", blocked());
+	}
+
+	/** Returns the result of attempting to obtain the lock. */
+	synchronized LockConflict getResult() {
+	    long now = System.currentTimeMillis();
+	    /* Only wait a second */
+	    long stop = now + 1000;
+	    while (!done && now < stop) {
+		try {
+		    wait(stop - now);
+		    now = System.currentTimeMillis();
+		} catch (InterruptedException e) {
+		    break;
+		}
+	    }
+	    assertTrue("The lock attempt is not done", done);
+	    if (exception == null) {
+		return result;
+	    } else if (exception instanceof RuntimeException) {
+		throw (RuntimeException) exception;
+	    } else if (exception instanceof Error) {
+		throw (Error) exception;
+	    } else {
+		throw new RuntimeException(
+		    "Unexpected exception: " + exception, exception);
+	    }
+	}
     }
 }

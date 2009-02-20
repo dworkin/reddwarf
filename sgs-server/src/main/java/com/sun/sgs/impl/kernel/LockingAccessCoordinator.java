@@ -184,17 +184,17 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /** {@inheritDoc} */
     public void commit(Transaction txn) {
-	reportDetail(txn);
+	endTransaction(txn);
     }
 
     /** {@inheritDoc} */
     public void prepareAndCommit(Transaction txn) {
-	reportDetail(txn);
+	endTransaction(txn);
     }
 
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
-	reportDetail(txn);
+	endTransaction(txn);
     }
 
     /** {@inheritDoc} */
@@ -209,9 +209,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * about conflicts that occurred while attempting to acquire the lock that
      * prevented the lock from being acquired, or else {@code null} if the lock
      * was acquired.  If the {@code type} field of the return value is {@link
-     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should call {@link
-     * #releaseAll releaseAll} to end the transaction, and any other lock or
-     * wait requests will throw {@link IllegalStateException}.
+     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
+     * transaction, and any other lock or wait requests will throw {@link
+     * IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
      * @param	source the source of the object
@@ -246,9 +246,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * acquire the lock was blocked, returns a value with a {@code type} field
      * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
      * {@code type} field of the return value is {@link
-     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should call {@link
-     * #releaseAll releaseAll} to end the transaction, and any other lock or
-     * wait requests will throw {@link IllegalStateException}.
+     * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
+     * transaction, and any other lock or wait requests will throw {@link
+     * IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
      * @param	source the source of the object
@@ -281,9 +281,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * the lock, or else {@code null} if the lock was acquired or the
      * transaction was not waiting.  If the {@code type} field of the return
      * value is {@link LockConflictType#DEADLOCK DEADLOCK}, then the caller
-     * should call {@link #releaseAll releaseAll} to end the transaction, and
-     * any other lock or wait requests will throw {@link
-     * IllegalStateException}.
+     * should abort the transaction, and any other lock or wait requests will
+     * throw {@link IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
      * @return	lock conflict information, or {@code null} if there was no
@@ -297,72 +296,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	Locker locker = getLocker(txn);
 	checkLockerNotAborted(locker);
 	return waitForLockInternal(locker);
-    }
-
-    public LockConflict checkLock(Transaction txn) {
-	Locker locker = getLocker(txn);
-	LockConflict lockConflict = locker.getConflict();
-	if (lockConflict != null) {
-	    return lockConflict;
-	}
-	Lock lock = locker.getWaitingFor();
-	if (lock == null) {
-	    return null;
-	}
-	Key key = lock.key;
-	Map<Key, Lock> keyMap = getKeyMap(key);
-	LockRequest request;
-	synchronized (keyMap) {
-	    //XXX
-	    request = lock.getFirstOwner();
-	}
-	Transaction conflictingTxn = request.locker.txn;
-	long now = System.currentTimeMillis();
-	long stop = Math.min(now + lockTimeout, locker.stopTime);
-	if (now > stop) {
-	    synchronized (keyMap) {
-		lock.flushWaiter(locker);
-	    }
-	    locker.setWaitingFor(null);
-	    return new LockConflict(
-		LockConflictType.TIMEOUT, conflictingTxn);
-	} else {
-	    return new LockConflict(
-		LockConflictType.BLOCKED, conflictingTxn);
-	}
-    }
-
-    /**
-     * Releases all of the locks associated with the specified transaction and
-     * returns information about the locks requested during that transaction.
-     *
-     * @param	txn the transaction
-     * @return	information about object accesses by this transaction
-     * @throws	IllegalStateException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called, or {@link #releaseAll
-     *		releaseAll} has already been called, for {@code txn}
-     */
-    public AccessedObjectsDetail releaseAll(Transaction txn) {
-	Locker locker = getLocker(txn);
-	for (LockRequest request : locker.requests) {
-	    Key key = request.key;
-	    Map<Key, Lock> keyMap = getKeyMap(key);
-	    Set<Locker> newOwners;
-	    synchronized (keyMap) {
-		Lock lock = getLock(key, keyMap);
-		newOwners = lock.release(locker);
-		if (!lock.inUse()) {
-		    keyMap.remove(key);
-		}
-	    }
-	    for (Locker newOwner : newOwners) {
-		synchronized (newOwner) {
-		    newOwner.notify();
-		}
-	    }
-	}
-	txnMap.remove(txn);
-	return locker;
     }
 
     /* -- Public classes -- */
@@ -505,8 +438,28 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      *
      * @param	txn the finished transaction
      */
-    private void reportDetail(Transaction txn) {
-        profileCollectorHandle.setAccessedObjectsDetail(releaseAll(txn));
+    private void endTransaction(Transaction txn) {
+	Locker locker = getLocker(txn);
+	for (LockRequest request : locker.requests) {
+	    Key key = request.key;
+	    Map<Key, Lock> keyMap = getKeyMap(key);
+	    Set<Locker> newOwners;
+	    synchronized (keyMap) {
+		Lock lock = getLock(key, keyMap);
+		newOwners = lock.release(locker);
+		if (!lock.inUse()) {
+		    keyMap.remove(key);
+		}
+	    }
+	    for (Locker newOwner : newOwners) {
+		synchronized (newOwner) {
+		    logger.log(Level.FINEST, "Notify new owner {0}", newOwner);
+		    newOwner.notify();
+		}
+	    }
+	}
+	txnMap.remove(txn);
+        profileCollectorHandle.setAccessedObjectsDetail(locker);
     }
 
     /** Attempts to acquire a lock, returning immediately. */
@@ -574,7 +527,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	Map<Key, Lock> keyMap = getKeyMap(key);
 	LockRequest request;
 	synchronized (keyMap) {
-	    //XXX
+	    /* FIXME: This might not be the conflict if there is an upgrade. */
 	    request = lock.getFirstOwner();
 	}
 	Transaction conflictingTxn = request.locker.txn;
@@ -938,6 +891,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @return	the newly added owners
 	 */
 	Set<Locker> release(Locker locker) {
+	    logger.log(Level.FINEST, "Release {0}", locker);
 	    boolean owned = false;
 	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
 		LockRequest ownerRequest = i.next();
@@ -954,6 +908,12 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    LockRequest waiter = waiters.get(i);
 		    LockAttemptResult result =
 			lock(waiter.locker, waiter.getForWrite());
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "Attempt to lock waiter {0} returns {1}",
+			    waiter, result);
+		    }
 		    if (result != null && result.conflict != null) {
 			break;
 		    }
@@ -1042,6 +1002,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    assert request != null;
 	    this.request = request;
 	    this.conflict = conflict;
+	}
+
+	/** Print fields, for debugging. */
+	@Override
+	public String toString() {
+	    return "LockAttemptResult[" + request +
+		", conflict:" + conflict + "]";
 	}
     }
 
@@ -1187,7 +1154,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	LockConflict check(Locker locker, Key key) {
 	    allOwners.add(locker);
 	    if (!checkInternal(locker, key)) {
-		logger.log(Level.FINEST, "No deadlock found");
+		logger.log(Level.FINEST, "Check deadlock found no deadlock");
 		return null;
 	    }
 	    LockConflict lockConflict =
@@ -1270,9 +1237,12 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		 * We're not done and this locker started later than the
 		 * current victim, so use it instead.
 		 */
+		if (conflict == locker) {
+		    conflict = victim;
+		}
 		victim = locker;
-		logger.log(Level.FINEST,
-			   "Check deadlock new victim:{0}", victim);
+		logger.log(
+		    Level.FINEST, "Check deadlock new victim:{0}", victim);
 	    }
 	}
     }
