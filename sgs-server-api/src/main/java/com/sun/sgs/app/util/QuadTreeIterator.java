@@ -20,6 +20,7 @@
 package com.sun.sgs.app.util;
 
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 /**
  * An interface which defines some common functionality for all
@@ -28,75 +29,64 @@ import java.util.Iterator;
  *
  * <p>
  * When the iterator is first initialized, the first element can be obtained
- * by calling {@link next()} or, {@link nextNoReturn()} and then
- * {@link current()} immediately afterwards. Either {@link next()} or
- * {@link nextNoReturn()} should be called first before {@link currentX()},
- * {@link currentY()} or {@link current()} can be called, otherwise an
- * exception will be thrown.
+ * by calling {@code next()} or, {@link #nextNoReturn nextNoReturn()} and then
+ * {@link #current current()} immediately afterwards. Either {@code next()} or
+ * {@code nextNoReturn()} should be called first before {@link #currentX currentX()},
+ * {@link #currentY currentY()} or {@code current()} can be called, otherwise an
+ * {@link IllegalStateException} will be thrown. An
+ * {@code IllegalStateException} is also thrown in the case when a call
+ * to {@code current()}, {@code currentX()} or {@code currentY()} is made
+ * after the element has been removed due to a call to {@code remove()}.
  *
- * @param <T> the type of element stored in the quadtree's leaves and returned
+ * @param <E> the element stored in the quadtree's leaves and returned
  * by this iterator
  * @see Iterator
  * @see QuadTree
  */
-public interface QuadTreeIterator<T> extends Iterator<T> {
+public interface QuadTreeIterator<E> extends Iterator<E> {
 
     /**
      * Returns the x-coordinate of the element currently pointed
-     * to by the iterator
+     * to by the iterator.
      * @return the x-coordinate of the element currently pointed
-     * to by the iterator, or {@code NaN} if there is no element
-     * currently pointed to by the iterator
+     * to by the iterator
      * @throws IllegalStateException if neither the <tt>next()</tt> nor
-     * <tt>nextNoReturn()</tt> method has yet been called
-     * @throws ObjectNotFoundException if the current element has been
-     * already removed through a call to the<tt>remove()</tt> method
+     * <tt>nextNoReturn()</tt> method has yet been called or if the
+     * current element has been removed
      */
     double currentX();
 
     /**
      * Returns the y-coordinate of the element currently pointed
-     * to by the iterator
+     * to by the iterator.
      * @return the y-coordinate of the element currently pointed
-     * to by the iterator, or {@code NaN} if there is no element
-     * currently pointed to by the iterator
+     * to by the iterator
      * @throws IllegalStateException if neither the <tt>next()</tt> nor
-     * <tt>nextNoReturn()</tt> method has yet been called
-     * @throws ObjectNotFoundException if the current element has been
-     * already removed through a call to the<tt>remove()</tt> method
+     * <tt>nextNoReturn()</tt> method has yet been called or if the
+     * current element has been removed
      */
     double currentY();
 
     /**
      * Advances the iterator without returning the next element in the
-     * sequence. Instead, {@code true} is returned if an
-     * {@code ObjectNotFoundException} was not issued, and {@code false}
-     * in the event that the referenced element no longer exists. If the
-     * element is missing, the iterator does not remove it from the tree.
-     * If {@code false} is returned, the element can still be removed by
-     * calling the {@code remove()} method.
-     *
-     * @return {@code true} if the reference to the element exists, and
-     * {@code false} if the reference to the element does not exist (which
-     * would cause an {@code ObjectNotFoundException} to be thrown if
-     * {@code next()} had been called instead
+     * sequence. If the element is missing, the iterator does not remove it 
+     * from the tree and it can still be removed through a call to the
+     * <tt>remove()</tt> method
      * @throws NoSuchElementException iteration has no more elements.
      */
-    boolean nextNoReturn();
+    void nextNoReturn();
 
     /**
      * Returns the element the cursor is pointing to. This should be used
      * in conjunction with {@code nextNoReturn()} in order
-     * to retrieve the element if it exists. If this method is called
+     * to retrieve the element. If this method is called
      * after {@code next()}, the same element will be returned. Multiple
      * calls to this method will return the same element.
      *
-     * @return the element that the cursor is pointing to, or {@code null}
-     * if there is no reference to the element
+     * @return the element that the cursor is pointing to
      * @throws IllegalStateException if neither the <tt>next()</tt> nor
-     * <tt>nextNoReturn()</tt> method has yet been called
-     * @throws ObjectNotFoundException if the current element has been
-     * already removed through a call to the<tt>remove()</tt> method
+     * <tt>nextNoReturn()</tt> method has yet been called or if the
+     * current element has been removed
      */
-    T current();
+    E current();
 }
