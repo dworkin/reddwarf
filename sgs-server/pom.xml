@@ -191,6 +191,19 @@
 	  </argLine>
 	  <reportsDirectory>${test.reports}</reportsDirectory>
         </configuration>
+	<executions>
+	  <execution>
+	    <phase>integration-test</phase>
+	    <goals>
+	      <goal>test</goal>
+	    </goals>
+	    <configuration>
+	      <argLine>
+		${test.jvm.args} -Dtest.phase=long -Djava.library.path=${run.javapath}
+	      </argLine>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
       <!-- Activate the resource bundle plugin to include the license
