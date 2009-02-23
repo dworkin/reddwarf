@@ -50,6 +50,16 @@ public class TestFilter extends Filter {
     /** If this property is set, then only run the single named test method. */
     private static final String testMethod = System.getProperty("test.method");
     
+    private final Class<?> testClass;
+    private final boolean defaultShouldRun;
+    
+    public TestFilter(Class<?> testClass) {
+        this.testClass = testClass;
+        IntegrationTest annotation = 
+                testClass.getAnnotation(IntegrationTest.class);
+        this.defaultShouldRun = TestPhase.shouldRun(annotation);
+    }
+    
     /**
      * Describes this filter.
      * 
@@ -63,57 +73,44 @@ public class TestFilter extends Filter {
      * Returns whether or not the test given by the {@code description}
      * argument passes the filter.  Tests pass the filter according to the
      * following conditions:
-     * <ul>
-     * <li>If the current test phase is {@link TestPhase#LONG},
-     * a test passes the filter if it has the {@code IntegrationTest}
-     * annotation <em>and</em> the annotation specifies either the
-     * {@link TestPhase#LONG} or {@link TestPhase#BOTH} phase.</li>
-     * <li>If the current test phase is {@link TestPhase#SHORT},
-     * a test passes the filter if it does not have the
-     * {@code IntegrationTest} annotation <em>or</em> it has the
-     * {@code IntegrationTest} annotation and specifies either the
-     * {@link TestPhase#SHORT} or {@link TestPhase#BOTH} phase.</li>
+     * <ol>
      * <li>If the system property test.method is set, only a test with
-     * the name given by this property will pass the filter.</li>
-     * </ul>
+     * the name given by this property will pass the filter.  Otherwise, all
+     * tests make it to the next step.</li>
+     * <li>If there is an {@link IntegrationTest} annotation on the test,
+     * it will pass the filter if the
+     * {@link TestPhase#shouldRun(com.sun.sgs.tools.test.IntegrationTest)}
+     * method returns {@code true}.</li>
+     * <li>If there is no {@code IntegrationTest} annotation on the test,
+     * it defers to the enclosing class.  It will behave according to the
+     * return value of the 
+     * {@link TestPhase#shouldRun(com.sun.sgs.tools.test.IntegrationTest)}
+     * method on the {@code IntegrationTest} annotation of the enclosing
+     * class.</li>
+     * </ol>
      * 
      * @param description the test to run through the filter
      * @return {@code true} if the test passed the filter
+     * @see TestPhase#shouldRun(com.sun.sgs.tools.test.IntegrationTest) 
      */
     public boolean shouldRun(Description description) {
-        
         if (description.isTest()) {
-            
-            if (testMethod == null || 
-                description.getDisplayName().startsWith(testMethod)) {
-                
-                IntegrationTest annotation = 
-                        description.getAnnotation(IntegrationTest.class);
 
-                if (TestPhase.isLongPhase()) {
-                    if (annotation == null) {
-                        return false;
-                    } else if (annotation.value() == TestPhase.LONG ||
-                            annotation.value() == TestPhase.BOTH) {
-                        return true;
-                    } else {
-                        return false;
-                    }
+            if (testMethod == null ||
+                    description.getDisplayName().startsWith(testMethod)) {
+
+                IntegrationTest annotation =
+                        description.getAnnotation(IntegrationTest.class);
+                if(annotation == null) {
+                    return defaultShouldRun;
                 } else {
-                    if (annotation == null) {
-                        return true;
-                    } else if (annotation.value() == TestPhase.SHORT ||
-                            annotation.value() == TestPhase.BOTH) {
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    return TestPhase.shouldRun(annotation);
                 }
             } else {
                 return false;
             }
         }
-        
+
         return true;
     }
 

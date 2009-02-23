@@ -33,7 +33,6 @@
 package com.sun.sgs.tools.test;
 
 import org.junit.runner.Description;
-import org.junit.runner.Result;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.manipulation.NoTestsRemainException;
@@ -53,8 +52,9 @@ public class ParameterizedFilteredNameRunner extends Parameterized {
             throws Throwable {
         super(c);
         
+        //enable the filter
         try {
-            filter(new TestFilter());
+            filter(new TestFilter(c));
         } catch (NoTestsRemainException e) {
             empty = true;
         }

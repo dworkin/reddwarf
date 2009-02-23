@@ -38,11 +38,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Annotation type used to indicate that a test method is an
+ * Annotation type used to indicate that a test method or test class is an
  * integration level test.  
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.TYPE, ElementType.METHOD})
 public @interface IntegrationTest {
 
     /**

@@ -33,7 +33,6 @@
 package com.sun.sgs.tools.test;
 
 import org.junit.runner.Description;
-import org.junit.runner.Result;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.manipulation.NoTestsRemainException;
@@ -54,8 +53,9 @@ public class FilteredNameRunner extends BlockJUnit4ClassRunner {
                                                  Exception {
         super(c);
         
+        //enable the filter
         try {
-            filter(new TestFilter());
+            filter(new TestFilter(c));
         } catch (NoTestsRemainException e) {
             empty = true;
         }
@@ -65,7 +65,7 @@ public class FilteredNameRunner extends BlockJUnit4ClassRunner {
         if(empty) {
             return;
         }
-        
+
         runNotifier.addListener(new RunListenerImpl());
         super.run(runNotifier);
     }
