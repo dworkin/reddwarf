@@ -22,6 +22,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
@@ -68,6 +69,8 @@ public class SgsTestNode {
     private static Field kernelProxy;
     /** system registry */
     private static Field kernelReg;
+    /** shutdown controller */
+    private static Field kernelShutdownCtrl;
 
     static {
         try {
@@ -86,6 +89,9 @@ public class SgsTestNode {
 
             kernelReg = kernelClass.getDeclaredField("systemRegistry");
             kernelReg.setAccessible(true);
+            
+            kernelShutdownCtrl = kernelClass.getDeclaredField("shutdownCtrl");
+            kernelShutdownCtrl.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -131,6 +137,9 @@ public class SgsTestNode {
     private final TaskService taskService;
     private final ClientSessionService sessionService;
     private final ChannelManager channelService;
+    
+    /** Shutdown controller. */
+    private final KernelShutdownController shutdownCtrl;
 
     /** The listen port for the client session service. */
     private int appPort;
@@ -174,7 +183,8 @@ public class SgsTestNode {
     }
 
     /**
-     * Creates additional SgsTestNode instances in this VM.
+     * Creates additional SgsTestNode instances in this VM. This node will be
+     * part of the same cluster as the node specified in the firstNode parameter.
      *
      * @param firstNode  the first {@code SgsTestNode} created in this VM
      * @param listenerClass the class of the listener object, or null if a
@@ -263,6 +273,9 @@ public class SgsTestNode {
         taskService = getService(TaskService.class);
         sessionService = getService(ClientSessionService.class);
         channelService = getService(ChannelServiceImpl.class);
+
+        shutdownCtrl = (KernelShutdownController)
+                kernelShutdownCtrl.get(kernel);
 
         // If an app node, we assume SimpleSgsProtocol and TcpTransport transport
         // for the client IO stack.
@@ -380,6 +393,13 @@ public class SgsTestNode {
      */
     public Properties getServiceProperties() {
         return props;
+    }
+
+    /**
+     * Returns the shutdown controller for this node.
+     */
+    public KernelShutdownController getShutdownCtrl() {
+        return shutdownCtrl;
     }
 
     /**

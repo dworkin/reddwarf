@@ -505,7 +505,6 @@ public class TestDataStoreServerImpl extends TestCase {
     protected class ShutdownAction extends Thread {
 	private boolean done;
 	private Throwable exception;
-	private boolean result;
 
 	/** Creates an instance of this class and starts the thread. */
 	protected ShutdownAction() {
@@ -515,7 +514,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = shutdown();
+		shutdown();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -525,8 +524,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	    }
 	}
 
-	protected boolean shutdown() {
-	    return server.shutdown();
+	protected void shutdown() {
+	    server.shutdown();
 	}
 
 	/** Asserts that the shutdown call is blocked. */
@@ -542,25 +541,12 @@ public class TestDataStoreServerImpl extends TestCase {
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
-	 */
-	public synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
-	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
-	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
 	/** Wait until done, but give up after a while. */

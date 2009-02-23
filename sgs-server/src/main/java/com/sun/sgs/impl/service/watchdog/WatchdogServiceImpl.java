@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.service.watchdog;
 
 import com.sun.sgs.impl.kernel.ConfigManager;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -220,6 +221,9 @@ public final class WatchdogServiceImpl
     /** The name of the local host. */
     final String localHost;
     
+    /** The controller which enables node shutdown */
+    private final KernelShutdownController shutdownController;
+
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
@@ -257,16 +261,18 @@ public final class WatchdogServiceImpl
     /**
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServiceImpl class documentation} for a list
-     * of supported properties.
+     * of supported properties. The Watchdog service is given the ability to
+     * shutdown a node with the {@link KernelShutdownController}.
      *
      * @param	properties service (and server) properties
      * @param	systemRegistry system registry
      * @param	txnProxy transaction proxy
+     * @param   ctrl shutdown controller
      * @throws	Exception if a problem occurs constructing the service/server
      */
     public WatchdogServiceImpl(Properties properties,
-			       ComponentRegistry systemRegistry,
-			       TransactionProxy txnProxy)
+	    ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+	    KernelShutdownController ctrl) 
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
@@ -274,6 +280,12 @@ public final class WatchdogServiceImpl
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
+	// Setup the KernelShutdownController object
+        if (ctrl == null) {
+            throw new NullPointerException("null shutdown controller");
+        }
+	shutdownController = ctrl;
+	
 	try {
 	    boolean startServer = wrappedProps.getBooleanProperty(
  		START_SERVER_PROPERTY,
@@ -455,7 +467,8 @@ public final class WatchdogServiceImpl
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
-		setFailedThenNotify(true);
+		// this will call setFailedThenNotify(true)
+                reportFailure(localNodeId, CLASSNAME);
 		return false;
 	    } else {
 		return true;
@@ -519,6 +532,49 @@ public final class WatchdogServiceImpl
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public synchronized void reportFailure(long nodeId, String className)
+    {
+        if (shuttingDown() || !getIsAlive()) {
+            return;
+        }
+
+        boolean isLocal = (nodeId == localNodeId);
+        if (isLocal) {
+            logger.log(Level.WARNING, "{1} reported failure in local " +
+                    "node with id: {0}", nodeId, className);
+        } else {
+            logger.log(Level.WARNING, "{1} reported failure in remote" +
+                    " node with id {0}", nodeId, className);
+        }
+
+        /*
+         * Try to report the failure to the watchdog server. If we cannot 
+         * contact the Watchdog server while reporting a remote failure, then
+         * set the failure as local.
+         */
+        int retries = maxIoAttempts;
+        while (retries-- > 0) {
+            try {
+                serverProxy.setNodeAsFailed(nodeId, isLocal, className,
+                        maxIoAttempts);
+                break;
+            } catch (IOException ioe) {
+                if (retries == 0) {
+                    logger.log(Level.SEVERE, "Cannot report failure to " +
+                            "Watchdog server");
+                    isLocal = true;
+                }
+            }
+        }
+        
+        if (isLocal) {
+            setFailedThenNotify(true);
+        }
+    }
+
+    /**
      * This thread continuously renews this node with the watchdog server
      * before the renew interval (returned when registering the node) expires.
      */
@@ -560,9 +616,11 @@ public final class WatchdogServiceImpl
 
 		boolean renewed = false;
 		try {
-		    if (!serverProxy.renewNode(localNodeId)) {
-			setFailedThenNotify(true);
-			break;
+    		    if (!serverProxy.renewNode(localNodeId)) {
+                        // server has already marked node as failed, so we can
+                        // go directly to removing this node
+                        setFailedThenNotify(true);
+			return;
 		    }
 		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
@@ -580,8 +638,10 @@ public final class WatchdogServiceImpl
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
-		    setFailedThenNotify(true);
-		    break;
+                    // server has already marked node as failed, so we can
+                    // go directly to removing this node
+                    setFailedThenNotify(true);
+                    return;
 		}
 		if (renewed) {
 		    lastRenewTime = now;
@@ -644,6 +704,12 @@ public final class WatchdogServiceImpl
 	    Node node = new NodeImpl(localNodeId, localHost, false);
 	    notifyNodeListeners(node);
 	}
+
+        logger.log(
+	    Level.SEVERE,
+	    "Node:{0} forced to shutdown due to service failure", localNodeId);
+
+        shutdownController.shutdownNode(this);
     }
 
     /**
@@ -779,6 +845,14 @@ public final class WatchdogServiceImpl
 		}
 	    }
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void reportFailure(String className) {
+	    setFailedThenNotify(true);
+	}
+
     }
 
     /**

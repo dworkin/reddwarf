@@ -54,6 +54,8 @@ import javax.management.JMException;
 import javax.management.MBeanNotificationInfo;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
+import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * The {@link WatchdogServer} implementation. <p>
@@ -534,7 +536,77 @@ public final class WatchdogServerImpl
 	}
     }
     
+    /**
+     * {@inheritDoc}
+     */
+    public void setNodeAsFailed(long nodeId, boolean isLocal, String className,
+            int maxNumberOfAttempts)
+    {
+        NodeImpl remoteNode = aliveNodes.get(nodeId);
+        if (remoteNode == null) {
+            logger.log(Level.FINEST, "Node with ID '" + nodeId +
+                    "' is already reported as failed");
+            return;
+        }
+
+        if (!isLocal) {
+            // Try to report the failure to the watchdog so that the node can 
+            // be shutdown. Try a few times if we run into an IOException.
+            int retries = maxNumberOfAttempts;
+            while (retries-- > 0) {
+                try {
+                    remoteNode.getWatchdogClient().reportFailure(className);
+                    break;
+                } catch (IOException ioe) {
+                    if (retries == 0) {
+                        logger.log(Level.WARNING, "Could not retrieve " +
+                                "watchdog client given " +
+                                maxNumberOfAttempts + " attempt(s)");
+                    }
+                }
+            }
+        }
+        processNodeFailures(Arrays.asList(remoteNode));
+    }
+
     /* -- other methods -- */
+
+    /**
+     * Processes the nodes which have failed by calling the failure methods
+     * for each node in the collection. The processes are separated into two
+     * for-loops so that a failed node is not mistakenly chosen as a backup
+     * while this operation is occurring.
+     *
+     * @param c the collection of failed nodes
+     * @return a subset of {@code nodesToFail} that were marked as failed from
+     * this method
+     */
+    Collection<NodeImpl> processNodeFailures(Collection<NodeImpl> nodesToFail) {
+        Collection<NodeImpl> aliveNodesToFail = new ArrayList<NodeImpl>();
+
+	// Declare the nodes as failed only if it has not be reported to be
+        // be failed already to prevent a failed node from being assigned as a
+        // backup. It should be noted that nodes that are removed from the set
+        // of {@code aliveNodes} are never added back.
+	for (NodeImpl node : nodesToFail) {
+            if (aliveNodes.remove(node.getId()) != null) {
+                aliveNodesToFail.add(node);
+            }
+	}
+
+	// Iterate through the nodes known to still be alive
+	for (NodeImpl node : aliveNodesToFail) {
+            /**
+             * Mark the node as failed, assign it a backup, and update the
+             * data store. Add the node to the list of recovering nodes. The
+             * node will be removed from the list and from the data store in
+             * the 'recoveredNode' callback.
+             */
+            setFailed(node);
+            recoveringNodes.put(node.getId(), node);
+	}
+	return aliveNodesToFail;
+    }
 
     /**
      * Returns the port being used for this server.
@@ -583,15 +655,28 @@ public final class WatchdogServerImpl
 		synchronized (expirationSet) {
 		    while (!expirationSet.isEmpty()) {
 			NodeImpl node = expirationSet.first();
+
+			// We are done aggregating from the sorted
+			// set once the expiration exceeds "now"
 			if (node.getExpiration() > now) {
 			    break;
 			}
-			expiredNodes.add(node);
+
+			// Only report the node as expired if it
+			// is still alive. Otherwise we assume it
+			// is already being reported as failed.
+			if (aliveNodes.containsKey(node.getId())) {
+			    expiredNodes.add(node);
+			}
 			expirationSet.remove(node);
 		    }
 		}
 		
+		/**
+		 * Perform the node failure procedure
+		 */
 		if (!expiredNodes.isEmpty()) {
+                    processNodeFailures(expiredNodes);
 		    /*
 		     * Remove failed nodes from map of "alive" nodes so
 		     * that a failed node won't be assigned as a backup.
@@ -615,7 +700,6 @@ public final class WatchdogServerImpl
 		    }
 		    statusChangedNodes.addAll(expiredNodes);
 		    expiredNodes.clear();
-		    
 		}
 
 		/*
@@ -670,6 +754,7 @@ public final class WatchdogServerImpl
 		}
 	    }
 	}
+    }
 
 	/**
 	 * Chooses a backup for the failed {@code node}, updates the
@@ -774,7 +859,7 @@ public final class WatchdogServerImpl
 		    node);
 	    }
 	}
-    }
+
 
     /**
      * This thread informs all currently known clients of node status

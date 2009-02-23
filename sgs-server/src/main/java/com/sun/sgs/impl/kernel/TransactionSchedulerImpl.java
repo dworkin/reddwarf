@@ -355,12 +355,13 @@ final class TransactionSchedulerImpl
     public void shutdown() {
         synchronized (this) {
             if (isShutdown) {
-                throw new IllegalStateException("Already shutdown");
+                return; // return silently
             }
             isShutdown = true;
+
+            executor.shutdownNow();
+            backingQueue.shutdown();
         }
-        executor.shutdownNow();
-        backingQueue.shutdown();
     }
 
     /*
