@@ -201,6 +201,7 @@
 	      <argLine>
 		${test.jvm.args} -Dtest.phase=long -Djava.library.path=${run.javapath}
 	      </argLine>
+	      <reportsDirectory>${itest.reports}</reportsDirectory>
 	    </configuration>
 	  </execution>
 	</executions>
@@ -254,6 +255,8 @@
     <test.output>target/test-output</test.output>
     <!-- The directory for storing tests results -->
     <test.reports>target/test-reports</test.reports>
+    <!-- The directory for storing integration tests results -->
+    <itest.reports>targets/itest-reports</itest.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>
