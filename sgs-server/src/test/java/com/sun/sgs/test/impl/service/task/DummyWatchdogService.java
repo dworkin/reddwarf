@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.task;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.TransactionProxy;
@@ -57,7 +58,7 @@ public class DummyWatchdogService implements WatchdogService {
 
     /** Creates an instance of the service. */
     public DummyWatchdogService(Properties p, ComponentRegistry cr,
-                                TransactionProxy tp) {
+            TransactionProxy tp, KernelShutdownController ctrl) {
         if (p.getProperty("DummyServer", "false").equals("true")) {
             nodeMap = new ConcurrentHashMap<Long,Node>();
             listeners = new ConcurrentLinkedQueue<NodeListener>();
@@ -79,13 +80,12 @@ public class DummyWatchdogService implements WatchdogService {
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    public void shutdown() {
         isAlive = false;
         nodeMap.remove(localId);
         Node localNode = new NodeImpl(localId);
         for (NodeListener listener : listeners)
             listener.nodeFailed(localNode);
-        return true;
     }
 
     /** {@inheritDoc} */
@@ -157,4 +157,7 @@ public class DummyWatchdogService implements WatchdogService {
         }
     }
 
+    public void reportFailure(long nodeId, String className) {
+        // Don't do anything for now
+    }
 }

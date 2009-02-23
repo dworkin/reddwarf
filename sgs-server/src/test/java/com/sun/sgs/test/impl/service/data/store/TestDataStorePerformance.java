@@ -134,8 +134,9 @@ public class TestDataStorePerformance extends TestCase {
     }
 
     /** Shuts down the store. */
-    protected boolean shutdown() {
-	return store == null || store.shutdown();
+    protected void shutdown() {
+        if (store != null)
+            store.shutdown();
     }
 
     /* -- Tests -- */

@@ -28,10 +28,12 @@ import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.Properties;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
@@ -243,6 +245,66 @@ public class TestAbstractService extends TestCase {
 	assertEquals(ioTask.runCount, 1);
     }
 
+    public void testReportingLocalFailure() throws Exception {
+        final DummyServiceFailureReporter service =
+                new DummyServiceFailureReporter(serviceProps,
+                serverNode.getSystemRegistry(), serverNode.getProxy(), logger);
+        
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() {
+                // Report a failure on ourselves and check if we are alive
+                try {
+                    service.reportLocalFailure();
+                } catch (IOException ioe) {
+                    fail("Unexpected IOException");
+                }
+                try {
+                    Thread.sleep(400); // Let it shutdown
+                    service.isAlive();
+                    fail("Expected IllegalStateException");
+                } catch (IllegalStateException e) {
+                    // Expected, and we do not want to shutdown the node 
+                    // a second time in tearDown()
+                    serverNode = null;
+                } catch (Exception e) {
+                    fail("Expected IllegalStateException");
+                }
+            }
+        }, taskOwner);
+    }
+    
+    private static class DummyServiceFailureReporter extends AbstractService {
+        
+        /*-- empty declarations; not needed for the test --*/
+        protected void doReady() {}
+        protected void doShutdown() {}
+        protected void handleServiceVersionMismatch(Version oldVersion,
+                Version currentVersion) {}
+        
+        /*-- begin custom implementation --*/
+        public DummyServiceFailureReporter(Properties properties,
+                ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+                LoggerWrapper logger) {
+            super(properties, systemRegistry, txnProxy, logger);
+        }
+
+        public boolean isAlive() {
+            // get the watchdog service to check if the node is alive
+            WatchdogService svc = txnProxy.getService(WatchdogService.class);
+            return svc.isLocalNodeAlive();
+        }
+
+        public void reportLocalFailure() throws IOException {
+            WatchdogService svc = txnProxy.getService(WatchdogService.class);
+            svc.reportFailure(svc.getLocalNodeId(), this.getClass().getName());
+        }
+
+        public void reportRemoteFailure(long nodeId) throws IOException {
+            WatchdogService svc = txnProxy.getService(WatchdogService.class);
+            svc.reportFailure(nodeId, this.getClass().getName());
+        }
+    }
+    
     private static class MyRuntimeException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
     }

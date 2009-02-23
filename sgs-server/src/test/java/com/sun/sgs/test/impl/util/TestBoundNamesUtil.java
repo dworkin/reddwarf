@@ -336,7 +336,7 @@ public class TestBoundNamesUtil extends TestCase {
 	/* -- Stubs for Service -- */
 	public String getName() { return null; }
 	public void ready() { }
-	public boolean shutdown() { return false; }
+	public void shutdown() { }
 	/** Get the next name from the set. */
 	public String nextServiceBoundName(String name) {
 	    if (name == null) {

@@ -58,6 +58,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
 
+import com.sun.sgs.service.WatchdogService;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
@@ -70,6 +71,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Properties;
 
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.LogManager;
@@ -129,6 +132,9 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
+
+    // default timeout the kernel's shutdown method (15 minutes)
+    private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
     
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
@@ -148,6 +154,15 @@ class Kernel {
     
     // collector of profile information
     private final ProfileCollectorImpl profileCollector;
+    
+    // shutdown controller that can be passed to components who need to be able 
+    // to issue a kernel shutdown. the watchdog also constains a reference for
+    // services to call shutdown.
+    private final KernelShutdownControllerImpl shutdownCtrl = 
+            new KernelShutdownControllerImpl();
+    
+    // specifies whether this node has already been shutdown
+    private boolean isShutdown = false;
     
     /**
      * Creates an instance of <code>Kernel</code>. Once this is created
@@ -388,6 +403,10 @@ class Kernel {
             }
             throw e;
         }
+        
+        // enable the shutdown controller once the components and services
+        // are setup to allow a node shutdown call from either of them.
+        shutdownCtrl.setReady();
     }
 
     /**
@@ -459,6 +478,10 @@ class Kernel {
             appProperties.getProperty(StandardProperties.WATCHDOG_SERVICE,
                                       DEFAULT_WATCHDOG_SERVICE);
         setupServiceNoManager(watchdogServiceClass, startupContext);
+        
+        // provide a handle to the watchdog service for the shutdown controller
+        shutdownCtrl.setWatchdogHandle(
+                startupContext.getService(WatchdogService.class));
 
         // load the node mapping service, which has no associated manager
 
@@ -596,18 +619,27 @@ class Kernel {
      * Private helper that creates an instance of a <code>service</code> with
      * no manager, based on fully qualified class names.
      */
-    private Service createService(Class<?> serviceClass)
-        throws Exception
-    {
-        // find the appropriate constructor
-        Constructor<?> serviceConstructor =
-            serviceClass.getConstructor(Properties.class,
-                                        ComponentRegistry.class,
-                                        TransactionProxy.class);
-
-        // return a new instance
-        return (Service) (serviceConstructor.
-                          newInstance(appProperties, systemRegistry, proxy));
+    private Service createService(Class<?> serviceClass) throws Exception {
+        Constructor<?> serviceConstructor;
+        try {
+            // find the appropriate constructor
+            serviceConstructor =
+                    serviceClass.getConstructor(Properties.class,
+                    ComponentRegistry.class, TransactionProxy.class);
+            // return a new instance
+            return (Service) (serviceConstructor.newInstance(appProperties,
+                    systemRegistry, proxy));
+        } catch (NoSuchMethodException e) {
+            // instead, look for a constructor with 4 parameters which is for 
+            // services with shutdown privileges.
+            serviceConstructor =
+                    serviceClass.getConstructor(Properties.class,
+                    ComponentRegistry.class, TransactionProxy.class,
+                    KernelShutdownController.class);
+            // return a new instance
+            return (Service) (serviceConstructor.newInstance(appProperties,
+                    systemRegistry, proxy, shutdownCtrl));
+        }
     }
 
     /** Start the application, throwing an exception if there is a problem. */
@@ -645,11 +677,31 @@ class Kernel {
                        application);
         }
     }
-        
+
+    /**
+     * Timer that will call {@link System#exit System.exit} after a timeout
+     * period to force the process to quit if the node shutdown process takes
+     * too long. The timer is started as a daemon so the task won't be run if
+     * a shutdown completes successfully.
+     */
+    private void startShutdownTimeout(final int timeout) {
+        new Timer(true).schedule(new TimerTask() {
+            public void run() {
+                System.exit(1);
+            }
+        }, timeout);
+    }
+    
     /**
      * Shut down all services (in reverse order) and the schedulers.
      */
-    void shutdown() {
+    synchronized void shutdown() {
+        if (isShutdown) { 
+            return;
+        }
+        startShutdownTimeout(DEFAULT_SHUTDOWN_TIMEOUT);
+
+        logger.log(Level.FINE, "Kernel.shutdown() called.");
         if (application != null) {
             application.shutdownServices();
         }
@@ -663,6 +715,9 @@ class Kernel {
         if (taskScheduler != null) {
             taskScheduler.shutdown();
         }
+        
+        logger.log(Level.FINE, "Node is shut down.");
+        isShutdown = true;
     }
     
     /**
@@ -868,6 +923,96 @@ class Kernel {
                 // start the app, so we also need to start it up
                 listener.initialize(properties);
             }
+        }
+    }
+    
+    /**
+     * This is an object created by the {@code Kernel} and passed to the 
+     * services and components which are given shutdown privileges. This object 
+     * allows the {@code Kernel} to be referenced when a shutdown of the node is
+     * necessary, such as when a service on the node has failed or has become
+     * inconsistent. This class can only be instantiated by the {@code Kernel}.
+     */
+    private final class KernelShutdownControllerImpl implements
+            KernelShutdownController 
+    {
+        private WatchdogService watchdogSvc = null;
+        private boolean shutdownQueued = false;
+        private boolean isReady = false;
+        private final Object shutdownQueueLock = new Object();
+
+        /**
+         * This method gives the shutdown controller a handle to the
+         * {@code WatchdogService}. Components will use this handle to report a
+         * failure to the watchdog service instead of shutting down directly.
+         * This which ensures that the server is properly notified when a node
+         * needs to be shut down. This handle can only be set once, any call
+         * after that will be ignored.
+         */
+        public void setWatchdogHandle(WatchdogService watchdogSvc) {
+            if (this.watchdogSvc != null) {
+                return; // do not allow overwriting the watchdog once it's set
+            }
+            this.watchdogSvc = watchdogSvc;
+        }
+        
+        /**
+         * This method flags the controller as being ready to issue shutdowns.
+         * If a shutdown was previously queued, then shutdown the node now.
+         */
+        public void setReady() {
+            synchronized (shutdownQueueLock) {
+                isReady = true;
+                if (shutdownQueued) {
+                    shutdownNode(this);
+                }
+            }
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        public void shutdownNode(Object caller) {
+            synchronized (shutdownQueueLock) {
+                if (isReady) {
+                    // service shutdown; we have already gone through notifying
+                    // the server, so shutdown the node right now
+                    if (caller instanceof WatchdogService) {
+                        runShutdown();
+                    } else {
+                        // component shutdown; we go through the watchdog to
+                        // cleanup and notify the server first
+                        if (watchdogSvc != null) {
+                            watchdogSvc.reportFailure(watchdogSvc.
+                                    getLocalNodeId(),
+                                    caller.getClass().toString());
+                        } else {
+                            // shutdown directly if watchdog has not been setup
+                            runShutdown();
+                        }
+                    }
+                } else {
+                    // queue the request if the Kernel is not ready
+                    shutdownQueued = true;
+                }
+            }
+        }
+        
+        /**
+         * Shutdown the node. This is run in a different thread to prevent a 
+         * possible deadlock due to a service or component's doShutdown()
+         * method waiting for the thread it was issued from to shutdown.
+         * For example, the watchdog service's shutdown method would block if
+         * a Kernel shutdown was called from RenewThread.
+         */
+        private void runShutdown() {
+            logger.log(Level.WARNING, "Controller issued node shutdown.");
+
+            new Thread(new Runnable() {
+                public void run() {
+                    shutdown();
+                }
+            }).start();
         }
     }
     
