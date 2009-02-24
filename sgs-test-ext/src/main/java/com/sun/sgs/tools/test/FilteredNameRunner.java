@@ -40,7 +40,7 @@ import org.junit.runners.BlockJUnit4ClassRunner;
 import org.junit.runners.model.InitializationError;
 
 /**
- * This is a custom implementation of JUunit4's {@code BlockJUnit4ClassRunner}
+ * This is a custom implementation of JUnit4's {@code BlockJUnit4ClassRunner}
  * that adds support for reporting the name of each test when it starts.
  * Additionally, it automatically filters which tests to run based on
  * a {@link TestFilter}.

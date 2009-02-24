@@ -42,7 +42,8 @@ import org.junit.runner.notification.RunNotifier;
  * for backwards compatibility with old JUnit3 tests.  Filtering at the
  * test method level with the {@code IntegrationTest} annotation is not
  * supported, and it is strongly encouraged that any JUnit3 tests be ported
- * to use JUnit4 instead.
+ * to use JUnit4 and either the {@link FilteredNameRunner} or 
+ * {@link ParameterizedFilteredNameRunner} instead.
  */
 public class FilteredJUnit3TestRunner extends JUnit38ClassRunner {
     
