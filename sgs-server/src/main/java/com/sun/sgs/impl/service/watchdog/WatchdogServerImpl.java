@@ -577,7 +577,7 @@ public final class WatchdogServerImpl
      * for-loops so that a failed node is not mistakenly chosen as a backup
      * while this operation is occurring.
      *
-     * @param c the collection of failed nodes
+     * @param nodesToFail the collection of failed nodes
      * @return a subset of {@code nodesToFail} that were marked as failed from
      * this method
      */

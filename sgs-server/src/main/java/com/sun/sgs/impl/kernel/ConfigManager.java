@@ -99,11 +99,6 @@ public class ConfigManager implements ConfigMXBean {
     }
     
     /** {@inheritDoc} */
-    public int getAppPort() {
-        return appPort;
-    }
-
-    /** {@inheritDoc} */
     public String getServerHostName() {
         return serverHost;
     }

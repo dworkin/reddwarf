@@ -87,7 +87,7 @@ class MultiSgsProtocolImpl extends SimpleSgsProtocolImpl {
      * Attach the secondary connection.
      *
      * @param	channel a secondary channel
-     * @param	supportedDelivery an array of supported delivery requirements
+     * @param	delivery an array of supported delivery requirements
      * @return	the session protocol handler for this instance
      */
     SessionProtocolHandler attach(SecondaryChannel channel,

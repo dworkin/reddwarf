@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.kernel.NodeType;
 
 /**
  * This class contains the standard property keys that the kernel looks for
