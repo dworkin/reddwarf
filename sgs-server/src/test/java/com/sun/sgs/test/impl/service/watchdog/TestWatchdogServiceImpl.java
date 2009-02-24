@@ -36,6 +36,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -55,7 +56,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestWatchdogServiceImpl extends TestCase {
     /** The name of the WatchdogServerImpl class. */
     private static final String WatchdogServerPropertyPrefix =

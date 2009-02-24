@@ -27,10 +27,13 @@ import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /**
  * Performance tests for the DataStoreImpl class.
@@ -56,6 +59,8 @@ import junit.framework.TestCase;
  * Testcase: testWriteNames
  * Time: 2.0 ms per transaction
  */
+@IntegrationTest
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataStorePerformance extends TestCase {
 
     /** The name of the DataStoreImpl class. */

@@ -37,6 +37,8 @@ import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -46,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.runner.RunWith;
 
 /*
  * XXX: Test recovery of prepared transactions after a crash
@@ -53,6 +56,7 @@ import junit.framework.TestSuite;
  */
 
 /** Test the DataStoreImpl class */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataStoreImpl extends TestCase {
 
     /** If this property is set, then only run the single named test method. */
