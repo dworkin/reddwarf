@@ -32,49 +32,39 @@
 
 package com.sun.sgs.tools.test;
 
-import org.junit.runner.Description;
-import org.junit.runner.notification.RunListener;
+import org.junit.internal.runners.JUnit38ClassRunner;
 import org.junit.runner.notification.RunNotifier;
-import org.junit.runner.manipulation.NoTestsRemainException;
-import org.junit.runners.Parameterized;
 
 /**
- * This is a custom implementation of JUnit4's {@code Parameterized}
- * that adds support for reporting the name of each test when it starts.
- * Additionally, it automatically filters which tests to run based on
- * a {@link TestFilter}.
+ * This is a custom implementation of JUnit's {@code JUnit38ClassRunner}
+ * that adds support for filtering entire classes of tests based on
+ * the {@link IntegrationTest} annotation.  This class is introduced only
+ * for backwards compatibility with old JUnit3 tests.  Filtering at the
+ * test method level with the {@code IntegrationTest} annotation is not
+ * supported, and it is strongly encouraged that any JUnit3 tests be ported
+ * to use JUnit4 instead.
  */
-public class ParameterizedFilteredNameRunner extends Parameterized {
+public class FilteredJUnit3TestRunner extends JUnit38ClassRunner {
     
     private boolean empty = false;
-
-    public ParameterizedFilteredNameRunner(Class<?> c) 
-            throws Throwable {
+    
+    public FilteredJUnit3TestRunner(Class<?> c) {
         super(c);
         
-        //enable the filter
-        try {
-            filter(new TestFilter(c));
-        } catch (NoTestsRemainException e) {
+        IntegrationTest annotation = 
+                c.getAnnotation(IntegrationTest.class);
+        if (!TestPhase.shouldRun(annotation)) { 
             empty = true;
         }
     }
-
+    
     public void run(RunNotifier runNotifier) {
         if (empty) {
             return;
         }
         
-        runNotifier.addListener(new RunListenerImpl());
         super.run(runNotifier);
     }
-
-    private class RunListenerImpl extends RunListener {
-        public void testStarted(Description description) throws Exception {
-            if (description.isTest())
-                System.err.println("Testcase: " +
-                                   description.getDisplayName());
-        }
-    }
     
+
 }

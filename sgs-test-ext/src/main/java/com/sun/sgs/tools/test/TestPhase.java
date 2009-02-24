@@ -56,12 +56,6 @@ public enum TestPhase {
     
     
     /**
-     * Indicates whether the current phase of tests is the integration test 
-     * phase
-     */
-    private static final boolean longPhase;
-    
-    /**
      * This method will return true if and only if the current testing
      * phase is the unit test phase.  This is established with the system
      * property {@code test.phase}.  A value of {@code long} for this
@@ -72,7 +66,7 @@ public enum TestPhase {
      * @return {@code true} if it is the unit test phase
      */
     public static boolean isShortPhase() {
-        return !longPhase;
+        return !isLongPhase();
     }
     
     /**
@@ -87,7 +81,7 @@ public enum TestPhase {
      * @see TestProfile#
      */
     public static boolean isLongPhase() {
-        return longPhase;
+        return "long".equals(System.getProperty("test.phase"));
     }
     
     /**
@@ -129,19 +123,6 @@ public enum TestPhase {
             } else {
                 return false;
             }
-        }
-    }
-    
-    /**
-     * Initializes the value of {@code longPhase} based on the value of the
-     * system property {@code test.phase}.
-     */
-    static {
-        String phase = System.getProperty("test.phase");
-        if(phase != null && phase.equals("long")) {
-            longPhase = true;
-        } else {
-            longPhase = false;
         }
     }
 }
