@@ -471,11 +471,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    locker.setDescription(key, description);
 	}
 	Map<Key, Lock> keyMap = getKeyMap(key);
-	Transaction conflictingTxn;
-	Lock lock;
+	LockAttemptResult result;
 	synchronized (keyMap) {
-	    lock = getLock(key, keyMap);
-	    LockAttemptResult result = lock.lock(locker, forWrite);
+	    Lock lock = getLock(key, keyMap);
+	    result = lock.lock(locker, forWrite);
 	    if (result == null) {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
@@ -493,19 +492,17 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			locker, key, forWrite);
 		}
 		return null;
-	    } else {
-		conflictingTxn = result.conflict.txn;
 	    }
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "Lock {0}, {1}, forWrite:{2}\n  blocked",
 		       locker, key, forWrite);
 	}
-	locker.setWaitingFor(lock);
+	locker.setWaitingFor(result);
 	LockConflict conflict = new DeadlockChecker(locker).check();
 	if (conflict == null) {
-	    conflict =
-		new LockConflict(LockConflictType.BLOCKED, conflictingTxn);
+	    conflict = new LockConflict(
+		LockConflictType.BLOCKED, result.conflict.txn);
 	}
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER,
@@ -517,66 +514,73 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /** Attempts to acquire a lock, waiting if needed. */
     private LockConflict waitForLockInternal(Locker locker) {
-	Lock lock = locker.getWaitingFor();
-	if (lock == null) {
-	    logger.log(Level.FINER,
-		       "Wait for lock {0}\n  returns null (already granted)",
-			locker);
-	    return null;
-	}
-	Key key = lock.key;
-	Map<Key, Lock> keyMap = getKeyMap(key);
-	LockRequest request;
-	synchronized (keyMap) {
-	    /* FIXME: This might not be the conflict if there is an upgrade. */
-	    request = lock.getFirstOwner();
-	}
-	Transaction conflictingTxn = request.locker.txn;
-	long now = System.currentTimeMillis();
-	long stop = Math.min(now + lockTimeout, locker.stopTime);
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER, "Wait for lock {0}, stop:{1,number,#}",
-		       locker, stop);
-	}
-	while (true) {
-	    if (now > stop) {
-		synchronized (keyMap) {
-		    lock.flushWaiter(locker);
-		}
-		locker.setWaitingFor(null);
-		LockConflict conflict = new LockConflict(
-		    LockConflictType.TIMEOUT, conflictingTxn);
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER, "Wait for lock {0}\n  returns {1}",
-			       locker, conflict);
-		}
-		return conflict;
+	synchronized (locker) {
+	    LockAttemptResult result = locker.getWaitingFor();
+	    if (result == null) {
+		logger.log(Level.FINER,
+			   "Wait for lock {0}\n  returns null (not waiting)",
+			   locker);
+		return null;
 	    }
-	    try {
-		synchronized (locker) {
-		    locker.wait(stop - now);
-		}
-	    } catch (InterruptedException e) {
-		throw new RuntimeException("Unexpected interrupt");
-	    }
+	    Key key = result.request.key;
+	    Map<Key, Lock> keyMap = getKeyMap(key);
+	    Lock lock;
 	    synchronized (keyMap) {
-		if (lock.isOwner(locker, request.getForWrite())) {
+		lock = getLock(key, keyMap);
+	    }
+	    long now = System.currentTimeMillis();
+	    long stop = Math.min(now + lockTimeout, locker.stopTime);
+	    while (true) {
+		if (now > stop) {
+		    synchronized (keyMap) {
+			lock.flushWaiter(locker);
+		    }
+		    locker.setWaitingFor(null);
+		    LockConflict conflict = new LockConflict(
+			LockConflictType.TIMEOUT, result.conflict.txn);
+		    if (logger.isLoggable(Level.FINER)) {
+			logger.log(Level.FINER,
+				   "Wait for lock {0}\n  returns {1}",
+				   locker, conflict);
+		    }
+		    return conflict;
+		}
+		boolean isOwner;
+		synchronized (keyMap) {
+		    isOwner = lock.isOwner(result.request);
+		}
+		if (isOwner) {
+		    logger.log(Level.FINER,
+			       "Wait for lock {0}\n" +
+			       "  returns null (already granted)",
+			       locker);
 		    return null;
 		}
-	    }
-	    LockConflict conflict = locker.getConflict();
-	    if (conflict != null) {
-		synchronized (keyMap) {
-		    lock.flushWaiter(locker);
+		LockConflict conflict = locker.getConflict();
+		if (conflict != null) {
+		    synchronized (keyMap) {
+			lock.flushWaiter(locker);
+		    }
+		    locker.setWaitingFor(null);
+		    if (logger.isLoggable(Level.FINER)) {
+			logger.log(Level.FINER,
+				   "Wait for lock {0}\n  returns {1}",
+				   locker, conflict);
+		    }
+		    return conflict;
 		}
-		locker.setWaitingFor(null);
 		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER, "Wait for lock {0}\n  returns {1}",
-			       locker, conflict);
+		    logger.log(Level.FINER,
+			       "Wait for lock {0}, stop:{1,number,#}",
+			       locker, stop);
 		}
-		return conflict;
+		try {
+		    locker.wait(stop - now);
+		} catch (InterruptedException e) {
+		    throw new RuntimeException("Unexpected interrupt");
+		}
+		now = System.currentTimeMillis();
 	    }
-	    now = System.currentTimeMillis();
 	}
     }
 
@@ -604,11 +608,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	private Map<Key, Object> keyToDescriptionMap = null;
 
 	/**
-	 * The lock that this transaction is waiting for, or {@code null} if it
-	 * is not waiting.  Synchronize on this locker when accessing this
-	 * field.
+	 * The result of the lock request that this transaction is waiting for,
+	 * or {@code null} if it is not waiting.  Synchronize on this locker
+	 * when accessing this field.
 	 */
-	private Lock waitingFor;
+	private LockAttemptResult waitingFor;
 
 	/**
 	 * A conflict that should cause the locker's current request to be
@@ -708,20 +712,23 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	/**
 	 * Checks if this locker is waiting for a lock.
 	 *
-	 * @return	the lock this locker is waiting for or {@code null} if
-	 *		it is not waiting
+	 * @return	the result of the lock request this locker is waiting
+	 *		for or {@code null} if it is not waiting
 	 */
-	synchronized Lock getWaitingFor() {
+	synchronized LockAttemptResult getWaitingFor() {
 	    return waitingFor;
 	}
 
 	/**
 	 * Sets the lock that this locker is waiting for, or marks that it is
-	 * not waiting if the argument is {@code null}.
+	 * not waiting if the argument is {@code null}.  If {@code waitingFor}
+	 * is not {@code null}, then it should represent a conflict, and it's
+	 * {@code conflict} field must not be {@code null}.
 	 *
 	 * @param	waitingFor the lock or {@code null}
 	 */
-	synchronized void setWaitingFor(Lock waitingFor) {
+	synchronized void setWaitingFor(LockAttemptResult waitingFor) {
+	    assert waitingFor == null || waitingFor.conflict != null;
 	    this.waitingFor = waitingFor;
 	}
 
@@ -813,8 +820,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * lock if the lock was obtained.  Returns {@code null} if the locker
 	 * already owned this lock.  Otherwise, returns a {@code
 	 * LockAttemptResult} containing the {@link LockRequest} and with the
-	 * {@code granted} field set to {@code true} if the lock was acquired,
-	 * else {@code false} if the lock could not be obtained.
+	 * {@code conflict} field set to {@code null} if the lock was acquired,
+	 * else set to a conflicting transaction if the lock could not be
+	 * obtained.
 	 *
 	 * @param	locker the locker requesting the lock
 	 * @param	forWrite whether a write lock is requested
@@ -968,14 +976,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/**
-	 * Checks if the specified locker owns this lock, requiring write
-	 * ownership if {@code forWrite} is true.
+	 * Checks if the lock is already owned in a way the satisfies the
+	 * specified request.
 	 */
-	boolean isOwner(Locker locker, boolean forWrite) {
-	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
-		LockRequest request = i.next();
-		if (request.locker == locker) {
-		    return !forWrite || request.getForWrite();
+	boolean isOwner(LockRequest request) {
+	    for (LockRequest owner : owners) {
+		if (request.locker == owner.locker) {
+		    return !request.getForWrite() || owner.getForWrite();
 		}
 	    }
 	    return false;
@@ -994,14 +1001,17 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	/** The lock request. */
 	final LockRequest request;
 
-	/** A conflicting locker, if the request was not granted, or null. */
+	/**
+	 * A conflicting locker, if the request was not granted, or {@code
+	 * null}.
+	 */
 	final Locker conflict;
 
 	/**
 	 * Creates an instance of this class.
 	 *
 	 * @param	request the lock request
-	 * @param	conflict a conflicting locker or null
+	 * @param	conflict a conflicting locker or {@code null}
 	 */
 	LockAttemptResult(LockRequest request, Locker conflict) {
 	    assert request != null;
@@ -1274,13 +1284,14 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    WaiterInfo waiterInfo = waiterMap.get(locker);
 	    if (waiterInfo == null) {
 		LockRequest[] waitingFor;
-		Lock lock = locker.getWaitingFor();
-		if (lock == null || locker.getConflict() != null) {
+		LockAttemptResult result = locker.getWaitingFor();
+		if (result == null || locker.getConflict() != null) {
 		    waitingFor = null;
 		} else {
-		    Map<Key, Lock> keyMap = getKeyMap(lock.key);
+		    Key key = result.request.key;
+		    Map<Key, Lock> keyMap = getKeyMap(key);
 		    synchronized (keyMap) {
-			waitingFor = lock.copyOwners();
+			waitingFor = getLock(key, keyMap).copyOwners();
 		    }
 		}
 		waiterInfo = new WaiterInfo(waitingFor);
