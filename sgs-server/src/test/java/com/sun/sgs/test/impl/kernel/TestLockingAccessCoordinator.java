@@ -504,6 +504,96 @@ public class TestLockingAccessCoordinator extends Assert {
 	assertGranted(locker.getResult());
     }
 
+    /**
+     * Test case with two deadlocks.
+     *
+     * txn is oldest, txn2 in the middle, txn3 is youngest
+     *
+     * txn:  read o1	=> granted
+     * txn2: read o2	=> granted 
+     * txn2: write o1	=> blocked
+     * txn3: read o2	=> granted
+     * txn3: write o1	=> blocked
+     * txn:  write o2	=> blocked
+     * txn2:		=> deadlock
+     * txn2: abort
+     * txn3:		=> deadlock
+     * txn3: abort
+     * txn:		=> granted
+     */
+    @Test
+    public void testDoubleDeadlock() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	DummyTransaction txn3 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn3, 2000, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	assertGranted(acquireLock(txn3, "s1", "o2", false));
+	AcquireLock locker3 = new AcquireLock(txn3, "s1", "o1", true);
+	locker3.assertBlocked();
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	assertDeadlock(locker3.getResult(), txn, txn2);
+	txn3.abort(ABORT_EXCEPTION);
+	locker.assertBlocked();
+	assertDeadlock(locker2.getResult(), txn);
+	txn2.abort(ABORT_EXCEPTION);
+	assertGranted(locker.getResult());
+    }
+
+    /**
+     * Test case with three deadlocks
+     *
+     * txn is oldest, txn2 & txn3 are in the middle, txn4 is youngest
+     *
+     * txn:  write o1	=> granted
+     * txn2: read o2	=> granted
+     * txn3: read o2	=> granted
+     * txn4: read o2	=> granted
+     * txn2: write o1	=> blocked
+     * txn3: write o1	=> blocked
+     * txn4: write o1	=> blocked
+     * txn:  write o2	=> blocked
+     * txn2:		=> deadlock
+     * txn2: abort
+     * txn3:		=> deadlock
+     * txn3: abort
+     * txn4:		=> deadlock
+     * txn4: abort
+     * txn:		=> granted
+     */
+    @Test
+    public void testTripleReadWriteDeadlock() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	DummyTransaction txn3 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn3, 2000, 1);
+	DummyTransaction txn4 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn4, 3000, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	assertGranted(acquireLock(txn3, "s1", "o2", false));
+	assertGranted(acquireLock(txn4, "s1", "o2", false));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	AcquireLock locker3 = new AcquireLock(txn3, "s1", "o1", true);
+	locker3.assertBlocked();
+	AcquireLock locker4 = new AcquireLock(txn4, "s1", "o1", true);
+	locker4.assertBlocked();
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	assertDeadlock(locker2.getResult(), txn, txn3, txn4);
+	txn2.abort(ABORT_EXCEPTION);
+	assertDeadlock(locker3.getResult(), txn, txn2, txn4);
+	txn3.abort(ABORT_EXCEPTION);
+	assertDeadlock(locker4.getResult(), txn, txn2, txn3);
+	txn4.abort(ABORT_EXCEPTION);
+	assertGranted(locker.getResult());
+    }
+
     /* -- Other methods and classes -- */
 
     /**
@@ -604,7 +694,7 @@ public class TestLockingAccessCoordinator extends Assert {
 	if (conflict == null || conflict.getType() != type) {
 	    fail("Expected " + type + ": " + conflict);
 	}
-	assertMember(conflictingTxns, conflict.getConflictingTxn());
+	assertMember(conflictingTxns, conflict.getConflictingTransaction());
     }
 
     /**
