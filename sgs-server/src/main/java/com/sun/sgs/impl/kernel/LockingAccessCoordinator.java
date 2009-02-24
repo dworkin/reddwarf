@@ -357,7 +357,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    return conflictingTxn;
 	}
 
-	/** Print fields, for debugging. */
+	/**
+	 * Returns a string representation of this instance, for debugging.
+	 *
+	 * @return	a string representation of this instance
+	 */
 	@Override
 	public String toString() {
 	    return "LockConflict[type:" + type +
