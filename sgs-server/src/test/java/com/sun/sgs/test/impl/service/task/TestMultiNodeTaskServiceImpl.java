@@ -433,7 +433,7 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         }
         public String getName() { return getClass().getName(); }
         public void ready() throws Exception {}
-        public boolean shutdown() { return true; }
+        public void shutdown() { }
         public long getNodeId() { return nodeId; }
     }
 
