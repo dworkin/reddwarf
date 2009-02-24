@@ -38,7 +38,6 @@ import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
-import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;

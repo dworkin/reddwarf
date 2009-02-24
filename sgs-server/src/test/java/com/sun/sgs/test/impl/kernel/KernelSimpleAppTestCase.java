@@ -21,7 +21,6 @@ package com.sun.sgs.test.impl.kernel;
 
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
-import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;

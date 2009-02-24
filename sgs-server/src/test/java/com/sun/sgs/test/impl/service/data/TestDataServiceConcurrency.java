@@ -29,7 +29,6 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
-import com.sun.sgs.tools.test.IntegrationTest;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
