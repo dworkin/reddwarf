@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import org.junit.After;
@@ -916,6 +917,51 @@ public class TestLockingAccessCoordinator extends Assert {
 	assertDeadlock(locker4.getResult(), txn, txn2, txn3);
 	txn4.abort(ABORT_EXCEPTION);
 	assertGranted(locker.getResult());
+    }
+
+    /* -- Other tests -- */
+
+    /**
+     * Tests requesting shared locks simultaneously from multiple threads, to
+     * measure performance for what should be the fastest case.
+     */
+    @Test
+    public void testPerformance() throws Exception {
+	int repeat = Integer.getInteger("test.repeat", 4);
+	int threads = Integer.getInteger("test.threads", 4);
+	/* Use 5000 for a good stress test */
+	final int count = Integer.getInteger("test.count", 100);
+	final int locks = Integer.getInteger("test.locks", 100);
+	System.err.println("repeat: " + repeat +
+			   "\nthreads: " + threads +
+			   "\ncount: " + count +
+			   "\nlocks: " + locks);
+	for (int r = 0; r < repeat; r++) {
+	    final CountDownLatch counter = new CountDownLatch(threads);
+	    long start = System.currentTimeMillis();
+	    for (int i = 0; i < threads; i++) {
+		new Thread() {
+		    public void run() {
+			for (int c = 0; c < count; c++) {
+			    DummyTransaction txn = new DummyTransaction();
+			    coordinator.notifyNewTransaction(txn, 0, 1);
+			    for (int i = 0; i < locks; i++) {
+				reporter.reportObjectAccess(
+				    txn, "o" + i, AccessType.READ);
+			    }
+			    txn.abort(ABORT_EXCEPTION);
+			}
+			counter.countDown();
+		    }
+		}.start();
+	    }
+	    counter.await();
+	    long time = System.currentTimeMillis() - start;
+	    
+	    System.err.println(
+		time + " ms" +
+		", " + ((double) time / (count * locks)) + " ms/lock");
+	}
     }
 
     /* -- Other methods and classes -- */

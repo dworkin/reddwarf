@@ -816,10 +816,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	final Key key;
 
 	/** The requests that currently own this lock. */
-	private final List<LockRequest> owners = new ArrayList<LockRequest>();
+	private final List<LockRequest> owners = new ArrayList<LockRequest>(2);
 
 	/** The requests that are waiting for this lock. */
-	private final List<LockRequest> waiters = new ArrayList<LockRequest>();
+	private final List<LockRequest> waiters =
+	    new ArrayList<LockRequest>(2);
 
 	/**
 	 * Creates a lock.
