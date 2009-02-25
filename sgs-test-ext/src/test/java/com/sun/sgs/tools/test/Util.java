@@ -32,8 +32,6 @@
 
 package com.sun.sgs.tools.test;
 
-import java.lang.reflect.Method;
-import java.lang.annotation.Annotation;
 import org.junit.Test;
 import org.junit.runner.Description;
 import org.easymock.EasyMock;
@@ -78,33 +76,5 @@ public class Util {
         
         return null;
     }
-    
-    private static class BaseClass {
-        @Test
-        public void noAnnotationMethod() {}
-        
-        @IntegrationTest(TestPhase.SHORT)
-        @Test
-        public void shortAnnotationMethod() {}
-        
-        @IntegrationTest(TestPhase.LONG)
-        @Test
-        public void longAnnotationMethod() {}
-        
-        @IntegrationTest(TestPhase.BOTH)
-        @Test
-        public void bothAnnotationMethod() {}
-    }
-    
-    private class NoAnnotationClass extends BaseClass {}
-    
-    @IntegrationTest(TestPhase.SHORT)
-    private class ShortAnnotationClass extends BaseClass {}
-    
-    @IntegrationTest(TestPhase.LONG)
-    private class LongAnnotationClass extends BaseClass {}
-    
-    @IntegrationTest(TestPhase.BOTH)
-    private class BothAnnotationClass extends BaseClass {}
     
 }

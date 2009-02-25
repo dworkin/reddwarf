@@ -50,11 +50,14 @@ public class TestFilter extends Filter {
     /** If this property is set, then only run the single named test method. */
     private static final String testMethod = System.getProperty("test.method");
     
-    private final Class<?> testClass;
     private final boolean defaultShouldRun;
     
+    /**
+     * Constructs a test filter to filter tests in the given class.
+     * 
+     * @param testClass the class to filter
+     */
     public TestFilter(Class<?> testClass) {
-        this.testClass = testClass;
         IntegrationTest annotation = 
                 testClass.getAnnotation(IntegrationTest.class);
         this.defaultShouldRun = TestPhase.shouldRun(annotation);
@@ -101,7 +104,7 @@ public class TestFilter extends Filter {
 
                 IntegrationTest annotation =
                         description.getAnnotation(IntegrationTest.class);
-                if(annotation == null) {
+                if (annotation == null) {
                     return defaultShouldRun;
                 } else {
                     return TestPhase.shouldRun(annotation);

@@ -105,24 +105,12 @@ public enum TestPhase {
      *         should be run, {@code false} otherwise.
      */
     static boolean shouldRun(IntegrationTest annotation) {
-        if (TestPhase.isLongPhase()) {
-            if (annotation == null) {
-                return false;
-            } else if (annotation.value() == TestPhase.LONG ||
-                    annotation.value() == TestPhase.BOTH) {
-                return true;
-            } else {
-                return false;
-            }
+        if (annotation == null || annotation.value() == TestPhase.SHORT) {
+            return !TestPhase.isLongPhase();
+        } else if (annotation.value() == TestPhase.LONG) {
+            return TestPhase.isLongPhase();
         } else {
-            if (annotation == null) {
-                return true;
-            } else if (annotation.value() == TestPhase.SHORT ||
-                    annotation.value() == TestPhase.BOTH) {
-                return true;
-            } else {
-                return false;
-            }
+            return true;
         }
     }
 }

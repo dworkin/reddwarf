@@ -48,6 +48,13 @@ public class ParameterizedFilteredNameRunner extends Parameterized {
     
     private boolean empty = false;
 
+    /**
+     * Constructs a {@code FilteredNameRunner} for running tests in the
+     * given class.
+     * 
+     * @param c the class to run tests with this runner
+     * @throws Throwable if an error occurs initializing the runner
+     */
     public ParameterizedFilteredNameRunner(Class<?> c) 
             throws Throwable {
         super(c);
@@ -60,6 +67,12 @@ public class ParameterizedFilteredNameRunner extends Parameterized {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * Skips running the tests if they have all been filtered out by a 
+     * {@link IntegrationTest} annotations.
+     */
     public void run(RunNotifier runNotifier) {
         if (empty) {
             return;
@@ -69,11 +82,16 @@ public class ParameterizedFilteredNameRunner extends Parameterized {
         super.run(runNotifier);
     }
 
-    private class RunListenerImpl extends RunListener {
+    /**
+     * A custom {@code RunListener} that prints out the name of each
+     * test to standard error when it is started.
+     */
+    private static class RunListenerImpl extends RunListener {
         public void testStarted(Description description) throws Exception {
-            if (description.isTest())
+            if (description.isTest()) {
                 System.err.println("Testcase: " +
                                    description.getDisplayName());
+            }
         }
     }
     

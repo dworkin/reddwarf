@@ -30,27 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.sun.sgs.tools.test;
-
-import java.lang.annotation.Target;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Inherited;
-
 /**
- * Annotation type used to indicate that a test method or test class is an
- * integration level test.  Note that if an annotation is specified
- * on both a method and that method's class, the one at the method level
- * takes priority.
+ * Includes utility classes that extend JUnit's capabilities providing
+ * support for filtering based on custom annotations.
  */
-@Inherited
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD })
-public @interface IntegrationTest {
-
-    /**
-     * Indicates which phase of testing a test should be run in.
-     */
-    TestPhase value() default TestPhase.LONG;
-}
+package com.sun.sgs.tools.test;

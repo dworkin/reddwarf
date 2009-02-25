@@ -37,7 +37,6 @@ import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runner.manipulation.NoTestsRemainException;
 import org.junit.runners.BlockJUnit4ClassRunner;
-import org.junit.runners.model.InitializationError;
 
 /**
  * This is a custom implementation of JUnit4's {@code BlockJUnit4ClassRunner}
@@ -49,8 +48,14 @@ public class FilteredNameRunner extends BlockJUnit4ClassRunner {
     
     private boolean empty = false;
 
-    public FilteredNameRunner(Class<?> c) throws InitializationError, 
-                                                 Exception {
+    /**
+     * Constructs a {@code FilteredNameRunner} for running tests in the
+     * given class.
+     * 
+     * @param c the class to run tests with this runner
+     * @throws java.lang.Exception if an error occurs initializing the runner
+     */
+    public FilteredNameRunner(Class<?> c) throws Exception {
         super(c);
         
         //enable the filter
@@ -61,8 +66,14 @@ public class FilteredNameRunner extends BlockJUnit4ClassRunner {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     * 
+     * Skips running the tests if they have all been filtered out by a 
+     * {@link IntegrationTest} annotations.
+     */
     public void run(RunNotifier runNotifier) {
-        if(empty) {
+        if (empty) {
             return;
         }
 
@@ -70,11 +81,16 @@ public class FilteredNameRunner extends BlockJUnit4ClassRunner {
         super.run(runNotifier);
     }
 
-    private class RunListenerImpl extends RunListener {
+    /**
+     * A custom {@code RunListener} that prints out the name of each
+     * test to standard error when it is started.
+     */
+    private static class RunListenerImpl extends RunListener {
         public void testStarted(Description description) throws Exception {
-            if (description.isTest())
+            if (description.isTest()) {
                 System.err.println("Testcase: " +
                                    description.getDisplayName());
+            }
         }
     }
 
