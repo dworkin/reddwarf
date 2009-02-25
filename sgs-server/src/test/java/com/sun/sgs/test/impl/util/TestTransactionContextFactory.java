@@ -24,9 +24,12 @@ import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test the TransactionContextFactory class. */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestTransactionContextFactory extends TestCase {
 
     /** Creates an instance of this class. */

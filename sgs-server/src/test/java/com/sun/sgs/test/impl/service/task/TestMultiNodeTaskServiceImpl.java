@@ -48,6 +48,8 @@ import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.UtilProperties;
 
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+
 import java.io.File;
 import java.io.Serializable;
 
@@ -56,6 +58,8 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
+
+import org.junit.runner.RunWith;
 
 import static org.junit.Assert.*;
 
@@ -68,6 +72,7 @@ import static org.junit.Assert.*;
  * that cannot be done with the production service. This assumes that basic
  * interaction tests are already passing from {code TestTaskServiceImpl}.
  */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestMultiNodeTaskServiceImpl extends TestCase {
 
     /** The node that creates the servers */

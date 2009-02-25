@@ -26,15 +26,18 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.ManagerNotFoundException;
 import com.sun.sgs.internal.InternalContext;
 import com.sun.sgs.internal.ManagerLocator;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import org.junit.Test;
 import org.junit.Assert;
+import org.junit.runner.RunWith;
 
 import org.easymock.EasyMock;
 
 /**
  * Test the {@link AppContext} class
  */
+@RunWith(FilteredNameRunner.class)
 public class TestAppContext {
     
     //dummy AppContext

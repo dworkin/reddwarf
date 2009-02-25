@@ -26,9 +26,11 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
-
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestIdGenerator extends TestCase {
 
     private SgsTestNode serverNode;

@@ -1,8 +1,10 @@
 Version 0.9.9:
 - Switch to BDB JE 3.3.75 (issue #122)
 - Expose monitoring data through JMX (issue #35)
-- Also fix issues #125, #129, #132, #133
 - Improve node shutdown mechanism (issues #37 and #112)
+- Split unit-level and integration-level tests into separate execution
+  phases using a custom annotation and JUnit filters (issue #146)
+- Also fix issues #125, #129, #132, #133
 
 Version 0.9.8:
 - Add ScalableDeque and ScalableList implementations
