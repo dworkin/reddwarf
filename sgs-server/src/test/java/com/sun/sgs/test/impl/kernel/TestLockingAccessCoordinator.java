@@ -19,6 +19,9 @@
 
 package com.sun.sgs.test.impl.kernel;
 
+import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator.LockConflict;
@@ -29,6 +32,7 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
+import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.service.Transaction;
@@ -38,6 +42,9 @@ import com.sun.sgs.test.util.NameRunner;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -266,17 +273,77 @@ public class TestLockingAccessCoordinator extends Assert {
     }
 
     @Test
+    public void testReportObjectAccessTransactionNotActive() {
+	txn.abort(ABORT_EXCEPTION);
+	txn = null;
+	try {
+	    reporter.reportObjectAccess("o1", AccessType.READ);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testReportObjectAccessTransactionNotKnown() {
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    reporter.reportObjectAccess(txn2, "o1", AccessType.READ);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	} finally {
+	    txn2.abort(ABORT_EXCEPTION);
+	}
+    }
+
+    @Test
+    public void testReportObjectAccessDescription() throws Exception {
+	reporter.reportObjectAccess("o1", AccessType.READ, "object 1 (a)");
+	reporter.reportObjectAccess("o1", AccessType.WRITE, "object 1 (b)");
+	reporter.reportObjectAccess("o2", AccessType.WRITE, null);
+	reporter.reportObjectAccess("o2", AccessType.WRITE, "object 2");
+	reporter.reportObjectAccess("o3", AccessType.READ);
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "object 1 (a)",
+			    "s", "o1", AccessType.WRITE, "object 1 (a)",
+			    "s", "o2", AccessType.WRITE, "object 2",
+			    "s", "o3", AccessType.READ, null);
+    }			    
+
+    @Test
+    public void testReportObjectAccessMultipleReporters() {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	AccessReporter<String> reporterPrime =
+	    coordinator.registerAccessSource("s1", String.class);
+	AccessReporter<String> reporter2 =
+	    coordinator.registerAccessSource("s2", String.class);
+	AccessReporter<String> reporter2Prime =
+	    coordinator.registerAccessSource("s2", String.class);
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	reporterPrime.reportObjectAccess("o1", AccessType.READ);
+	reporter.reportObjectAccess("o1", AccessType.WRITE);
+	reporterPrime.reportObjectAccess("o1", AccessType.WRITE);
+	reporter2.reportObjectAccess(txn2, "o1", AccessType.READ);
+	reporter2Prime.reportObjectAccess(txn2, "o1", AccessType.READ);
+	reporter2.reportObjectAccess(txn2, "o1", AccessType.WRITE);
+	reporter2Prime.reportObjectAccess(txn2, "o1", AccessType.WRITE);
+    }
+
+    @Test
     public void testReportObjectAccessMisc() throws Exception {
 	AccessReporter<String> reporter2 =
 	    coordinator.registerAccessSource("s2", String.class);
 	Object[] expected = {
-	    "s", "read1", AccessType.READ,
-	    "s2", "read1", AccessType.READ,
-	    "s", "upgrade", AccessType.READ,
-	    "s", "write1", AccessType.WRITE,
-	    "s", "upgrade", AccessType.WRITE
+	    "s", "read1", AccessType.READ, null,
+	    "s2", "read1", AccessType.READ, null,
+	    "s", "upgrade", AccessType.READ, null,
+	    "s", "write1", AccessType.WRITE, null,
+	    "s", "upgrade", AccessType.WRITE, null
 	};
-	int numExpected = expected.length / 3;
 	reporter.reportObjectAccess("read1", AccessType.READ);
 	reporter2.reportObjectAccess("read1", AccessType.READ);
 	reporter.reportObjectAccess("upgrade", AccessType.READ);
@@ -288,20 +355,8 @@ public class TestLockingAccessCoordinator extends Assert {
 	reporter.reportObjectAccess("upgrade", AccessType.WRITE);
 	txn.commit();
 	txn = null;
-	AccessedObjectsDetail detail = 
-	    profileCollector.getAccessedObjectsDetail();
-	List<? extends AccessedObject> accesses =
-	    detail.getAccessedObjects();
-	assertSame("Expected " + numExpected + " accesses, found " +
-		   accesses.size(),
-		   numExpected,
-		   accesses.size());
-	for (int i = 0; i < expected.length; i += 3) {
-	    AccessedObject result = accesses.get(i / 3);
-	    assertEquals(expected[i], result.getSource());
-	    assertEquals(expected[i + 1], result.getObjectId());
-	    assertEquals(expected[i + 2], result.getAccessType());
-	}
+	assertObjectDetails(
+	    profileCollector.getAccessedObjectsDetail(), expected);
     }
 
     /* -- Test AccessReporter.setObjectDescription -- */
@@ -323,6 +378,143 @@ public class TestLockingAccessCoordinator extends Assert {
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	}
+    }
+
+    @Test
+    public void testSetObjectDescriptionTransactionNotActive() {
+	txn.abort(ABORT_EXCEPTION);
+	txn = null;
+	try {
+	    reporter.setObjectDescription("o1", null);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	try {
+	    reporter.setObjectDescription("o1", "description");
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testSetObjectDescriptionTransactionNotKnown() {
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    reporter.setObjectDescription(txn2, "o1", null);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	try {
+	    reporter.setObjectDescription(txn2, "o1", "description");
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	txn2.abort(ABORT_EXCEPTION);
+    }
+
+    @Test
+    public void testSetObjectDescriptionMisc() throws Exception {
+	reporter.setObjectDescription("o1", "object 1 (a)");
+	reporter.setObjectDescription("o1", "object 1 (b)");
+	reporter.reportObjectAccess("o1", AccessType.READ, "object 1 (c)");
+	reporter.setObjectDescription("o2", "object 2 (a)");
+	reporter.reportObjectAccess("o2", AccessType.READ, "object 2 (b)");
+	reporter.setObjectDescription("o2", "object 2 (c)");
+	reporter.reportObjectAccess("o3", AccessType.READ);
+	reporter.setObjectDescription("o3", "object 3 (a)");
+	reporter.setObjectDescription("o3", "object 3 (b)");
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "object 1 (a)",
+			    "s", "o2", AccessType.READ, "object 2 (a)",
+			    "s", "o3", AccessType.READ, "object 3 (a)");
+    }
+
+    /* -- Test AccessedObjectsDetail -- */
+
+    @Test
+    public void testAccessedObjectsDetailNone() throws Exception {
+	txn.commit();
+	txn = null;
+	AccessedObjectsDetail detail =
+	    profileCollector.getAccessedObjectsDetail();
+	assertObjectDetails(detail);
+	assertEquals(ConflictType.NONE, detail.getConflictType());
+	assertEquals(null, detail.getConflictingId());
+    }
+
+    @Test
+    public void testAccessedObjectsDetailNoConflict() throws Exception {
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	reporter.reportObjectAccess("o2", AccessType.WRITE);
+	txn.commit();
+	txn = null;
+	AccessedObjectsDetail detail =
+	    profileCollector.getAccessedObjectsDetail();
+	assertObjectDetails(detail,
+			    "s", "o1", AccessType.READ, null,
+			    "s", "o2", AccessType.WRITE, null);
+	assertEquals(ConflictType.NONE, detail.getConflictType());
+	assertEquals(null, detail.getConflictingId());
+    }
+
+    @Test
+    public void testAccessedObjectsDetailTimeout() throws Exception {
+	reporter.reportObjectAccess(txn, "o1", AccessType.WRITE);
+	DummyTransaction txn2 = new DummyTransaction(1);
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	Thread.sleep(2);
+	try {
+	    reporter.reportObjectAccess(
+		txn2, "o1", AccessType.WRITE, "Object 1");
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testAccessedObjectsDetailTimeoutDescriptionFails()
+	throws Exception
+    {
+	reporter.reportObjectAccess(txn, "o1", AccessType.WRITE);
+	DummyTransaction txn2 = new DummyTransaction(1);
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	Thread.sleep(2);
+	try {
+	    reporter.reportObjectAccess(
+		txn2, "o1", AccessType.WRITE,
+		new Object() {
+		    public String toString() {
+			throw new RuntimeException();
+		    }
+		});
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testAccessedObjectsDetailDeadlock() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	reporter.reportObjectAccess(txn, "o1", AccessType.READ);
+	reporter.reportObjectAccess(txn2, "o2", AccessType.READ);
+	AcquireLock locker = new AcquireLock(txn, "s", "o2", true);
+	locker.assertBlocked();
+	try {
+	    reporter.reportObjectAccess(txn2, "o1", AccessType.WRITE);
+	    fail("Expected TransactionConflictException");
+	} catch (TransactionConflictException e) {
+	    System.err.println(e);
+	}
+	assertGranted(locker.getResult());
     }
 
     /* -- Test lockNoWait -- */
@@ -597,6 +789,30 @@ public class TestLockingAccessCoordinator extends Assert {
     /* -- Other methods and classes -- */
 
     /**
+     * Checks that the proper object accesses were reported.  The expected
+     * argument should provide groups of 4 items: the source, the object ID,
+     * the access type, and the description.
+     */
+    static void assertObjectDetails(
+	AccessedObjectsDetail detail, Object... expected)
+    {
+	assertTrue("The expected argument must provide groups of four",
+		   expected.length % 4 == 0);
+	int numExpected = expected.length / 4;
+	List<? extends AccessedObject> accesses = detail.getAccessedObjects();
+	assertTrue("Expected " + numExpected + " accesses, found " +
+		   accesses.size(),
+		   numExpected == accesses.size());
+	for (int i = 0; i < expected.length; i += 4) {
+	    AccessedObject result = accesses.get(i / 4);
+	    assertEquals(expected[i], result.getSource());
+	    assertEquals(expected[i + 1], result.getObjectId());
+	    assertEquals(expected[i + 2], result.getAccessType());
+	    assertEquals(expected[i + 3], result.getDescription());
+	}
+    }
+
+    /**
      * A dummy implementation of {@code ProfileCollectorHandle}, just to
      * accept and provide access to the AccessedObjectsDetail.
      */
@@ -723,11 +939,12 @@ public class TestLockingAccessCoordinator extends Assert {
      * A utility class for managing an attempt to acquire a lock.  Use an
      * instance of this class for attempts that block.
      */
-    class AcquireLock extends Thread {
+    class AcquireLock implements Callable<LockConflict> {
 	private final DummyTransaction txn;
 	private final String source;
 	private final Object objectId;
 	private final boolean forWrite;
+	private final FutureTask<LockConflict> task;
 
 	/**
 	 * Set to true when the initial attempt to acquire the lock is
@@ -738,15 +955,6 @@ public class TestLockingAccessCoordinator extends Assert {
 	/** Set to true if the initial attempt to acquire the lock blocked. */
 	private boolean blocked = false;
 
-	/** Set to true when the attempt to acquire the lock is done. */
-	private boolean done = false;
-
-	/** Set to the result of the lock attempt. */
-	private LockConflict result = null;
-
-	/** Set to any exception thrown during the lock attempt. */
-	private Throwable exception = null;
-
 	/**
 	 * Creates an instance that starts a thread to acquire a lock on behalf
 	 * of a transaction.
@@ -754,49 +962,37 @@ public class TestLockingAccessCoordinator extends Assert {
 	AcquireLock(DummyTransaction txn,
 		    String source, Object objectId, boolean forWrite)
 	{
-	    setDaemon(true);
 	    this.txn = txn;
 	    this.source = source;
 	    this.objectId = objectId;
 	    this.forWrite = forWrite;
-	    start();
+	    task = new FutureTask<LockConflict>(this);
+	    new Thread(task).start();
 	}
 
-	public void run() {
-	    try {
-		LockConflict conflict;
-		boolean wait = false;
-		synchronized (this) {
-		    started = true;
-		    notifyAll();
-		    conflict = coordinator.lockNoWait(
-			txn, source, objectId, forWrite, null);
-		    if (conflict != null
-			&& conflict.getType() == LockConflictType.BLOCKED)
-		    {
-			blocked = true;
-			wait = true;
-		    }
-		}
-		/*
-		 * Don't synchronize on this object while waiting for the lock,
-		 * to avoid deadlock.
-		 */
-		if (wait) {
-		    conflict = coordinator.waitForLock(txn);
-		}
-		synchronized (this) {
-		    result = conflict;
-		    done = true;
-		    notifyAll();
-		}
-	    } catch (Throwable e) {
-		synchronized (this) {
-		    exception = e;
-		    done = true;
-		    notifyAll();
+	public LockConflict call() {
+	    LockConflict conflict;
+	    boolean wait = false;
+	    synchronized (this) {
+		started = true;
+		notifyAll();
+		conflict = coordinator.lockNoWait(
+		    txn, source, objectId, forWrite, null);
+		if (conflict != null
+		    && conflict.getType() == LockConflictType.BLOCKED)
+		{
+		    blocked = true;
+		    wait = true;
 		}
 	    }
+	    /*
+	     * Don't synchronize on this object while waiting for the lock,
+	     * to avoid deadlock.
+	     */
+	    if (wait) {
+		conflict = coordinator.waitForLock(txn);
+	    }
+	    return conflict;
 	}
 
 	/** Checks if the initial attempt to obtain the lock blocked. */
@@ -822,28 +1018,13 @@ public class TestLockingAccessCoordinator extends Assert {
 	}
 
 	/** Returns the result of attempting to obtain the lock. */
-	synchronized LockConflict getResult() {
-	    long now = System.currentTimeMillis();
-	    /* Only wait a second */
-	    long stop = now + 1000;
-	    while (!done && now < stop) {
-		try {
-		    wait(stop - now);
-		    now = System.currentTimeMillis();
-		} catch (InterruptedException e) {
-		    break;
-		}
-	    }
-	    assertTrue("The lock attempt is not done", done);
-	    if (exception == null) {
-		return result;
-	    } else if (exception instanceof RuntimeException) {
-		throw (RuntimeException) exception;
-	    } else if (exception instanceof Error) {
-		throw (Error) exception;
-	    } else {
-		throw new RuntimeException(
-		    "Unexpected exception: " + exception, exception);
+	LockConflict getResult() {
+	    try {
+		return task.get(1, TimeUnit.SECONDS);
+	    } catch (RuntimeException e) {
+		throw e;
+	    } catch (Exception e) {
+		throw new RuntimeException("Unexpected exception: " + e, e);
 	    }
 	}
     }

@@ -19,6 +19,9 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -218,10 +221,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      *		{@code null}
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
-     * @throws	IllegalStateException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called for {@code txn}, or if
-     *		an earlier lock attempt for this transaction produced a
-     *		deadlock
+     * @throws	IllegalArgumentException if {@link #notifyNewTransaction
+     *		notifyNewTransaction} has not be called for {@code txn}
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock
      */
     public LockConflict lock(Transaction txn,
 			     String source,
@@ -255,10 +258,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      *		{@code null}
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
-     * @throws	IllegalStateException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called for {@code txn}, or if
-     *		an earlier lock attempt for this transaction produced a
-     *		deadlock
+     * @throws	IllegalArgumentException if {@link #notifyNewTransaction
+     *		notifyNewTransaction} has not be called for {@code txn}
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock
      */
     public LockConflict lockNoWait(Transaction txn,
 				   String source,
@@ -284,10 +287,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @param	txn the transaction requesting the lock
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
-     * @throws	IllegalStateException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called for {@code txn}, or if
-     *		an earlier lock attempt for this transaction produced a
-     *		deadlock
+     * @throws	IllegalArgumentException if {@link #notifyNewTransaction
+     *		notifyNewTransaction} has not be called for {@code txn}
+     * @throws	IllegalStateException if an earlier lock attempt for this
+     *		transaction produced a deadlock
      */
     public LockConflict waitForLock(Transaction txn) {
 	Locker locker = getLocker(txn);
@@ -376,13 +379,14 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      *
      * @param	txn the transaction
      * @return	the locker
-     * @throws	IllegalStateException if the transaction is not active
+     * @throws	IllegalArgumentException if the transaction is not active
      */
     Locker getLocker(Transaction txn) {
 	checkNonNull(txn, "txn");
 	Locker locker = txnMap.get(txn);
 	if (locker == null) {
-	    throw new IllegalStateException("Transaction not active: " + txn);
+	    throw new IllegalArgumentException(
+		"Transaction not active: " + txn);
 	}
 	return locker;
     }
@@ -655,7 +659,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
 	/** {@inheritDoc} */
 	public byte[] getConflictingId() {
-	    return txn.getId();
+	    return (conflict != null)
+		? conflict.getConflictingTransaction().getId() : null;
 	}
 
 	/* -- Other methods -- */
@@ -1047,15 +1052,54 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    Transaction txn, T objectId, AccessType type, Object description)
 	{
 	    checkNonNull(type, "type");
-	    lock(txn, source, objectId, type == AccessType.WRITE, description);
+	    LockConflict conflict = lock(
+		txn, source, objectId, type == AccessType.WRITE, description);
+	    if (conflict != null) {
+		String descriptionMsg = "";
+		if (description != null) {
+		    try {
+			descriptionMsg = ", description:" + description;
+		    } catch (RuntimeException e) {
+		    }
+		}
+		String accessMsg = "Access txn:" + txn +
+		    ", type:" + type +
+		    ", source:" + source +
+		    ", id:" + objectId +
+		    descriptionMsg +
+		    " failed: ";
+		String conflictMsg = ", with conflicting transaction " +
+		    conflict.getConflictingTransaction();
+		TransactionAbortedException exception;
+		switch (conflict.getType()) {
+		case TIMEOUT:
+		    exception = new TransactionTimeoutException(
+			accessMsg + "Transaction timed out" + conflictMsg);
+		    break;
+		case DENIED:
+		    exception = new TransactionConflictException(
+			accessMsg + "Access denied" + conflictMsg);
+		    break;
+		case DEADLOCK:
+		    exception = new TransactionConflictException(
+			accessMsg + "Transaction deadlock" + conflictMsg);
+		    break;
+		default:
+		    throw new AssertionError(
+			"Should not be " + conflict.getType());
+		}
+		txn.abort(exception);
+		throw exception;
+	    }
 	}
 
 	/** {@inheritDoc} */
 	public void setObjectDescription(
 	    Transaction txn, T objectId, Object description)
 	{
+	    Locker locker = getLocker(txn);
 	    if (description != null) {
-		getLocker(txn).setDescription(
+		locker.setDescription(
 		    new Key(source, objectId), description);
 	    }
 	}
