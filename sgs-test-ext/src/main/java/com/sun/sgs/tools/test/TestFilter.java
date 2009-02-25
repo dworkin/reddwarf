@@ -42,8 +42,7 @@ import org.junit.runner.manipulation.Filter;
  * (integration or unit respectively).
  * <p>
  * Additionally, if the system property test.method is specified, this
- * filter will only execute the single test specified by that method (if
- * it passes the IntegrationTest filter).
+ * filter will only execute the single test specified by that method.
  */
 public class TestFilter extends Filter {
     
