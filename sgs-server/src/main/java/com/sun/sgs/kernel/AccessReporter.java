@@ -19,6 +19,7 @@
 
 package com.sun.sgs.kernel;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 
 import com.sun.sgs.service.Transaction;
@@ -49,11 +50,6 @@ import com.sun.sgs.service.Transaction;
  * of the {@code DataService}, before a name binding is resolved in
  * the {@code getBinding} method, the requested access to that bound
  * object should be reported.
- * <p>
- * NOTE: in the next phase of this work the coordinator will actually be
- * able to manage conflict. Given this, the {@code reportObjectAccess}
- * methods will change to throw an exception if the access causes the
- * calling transaction to fail.
  *
  * @param <T> the type of the identifier used to identify accessed objects
  */
@@ -77,6 +73,7 @@ public interface AccessReporter<T> {
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
+     * @throws TransactionAbortedException if access failed due to a conflict 
      */
     void reportObjectAccess(T objId, AccessType type);
 
@@ -93,6 +90,7 @@ public interface AccessReporter<T> {
      * @throws IllegalArgumentException if the provided transaction is invalid,
      *                                  has already committed, or is otherwise
      *                                  unknown to the {@code AccessCoordinator}
+     * @throws TransactionAbortedException if access failed due to a conflict 
      */
     void reportObjectAccess(Transaction txn, T objId, AccessType type);
 
@@ -110,6 +108,7 @@ public interface AccessReporter<T> {
      *
      * @throws TransactionNotActiveException if not called in the context
      *                                       of an active transaction
+     * @throws TransactionAbortedException if access failed due to a conflict 
      */
     void reportObjectAccess(T objId, AccessType type, Object description);
 
@@ -130,6 +129,7 @@ public interface AccessReporter<T> {
      * @throws IllegalArgumentException if the provided transaction is invalid,
      *                                  has already committed, or is otherwise
      *                                  unknown to the {@code AccessCoordinator}
+     * @throws TransactionAbortedException if access failed due to a conflict 
      */
     void reportObjectAccess(Transaction txn, T objId, AccessType type, 
 			    Object description);

@@ -106,6 +106,11 @@ public class TestLockingAccessCoordinator extends Assert {
 		LockingAccessCoordinator.NUM_KEY_MAPS_PROPERTY,
 		String.valueOf(numKeyMaps));
 	}
+	init();
+    }
+
+    /** Initialize fields using the current value of properties. */
+    private void init() {
 	coordinator = new LockingAccessCoordinator(
 	    properties, txnProxy, profileCollector);
 	txn = new DummyTransaction();
@@ -476,6 +481,18 @@ public class TestLockingAccessCoordinator extends Assert {
 	} catch (TransactionTimeoutException e) {
 	    System.err.println(e);
 	}
+	AccessedObjectsDetail detail =
+	    profileCollector.getAccessedObjectsDetail();
+	assertObjectDetails(detail, "s", "o1", AccessType.WRITE, "Object 1");
+	assertEquals(ConflictType.ACCESS_NOT_GRANTED,
+		     detail.getConflictType());
+	assertArrayEquals(txn.getId(), detail.getConflictingId());
+	txn.abort(ABORT_EXCEPTION);
+	txn = null;
+	detail = profileCollector.getAccessedObjectsDetail();
+	assertObjectDetails(detail, "s", "o1", AccessType.WRITE, null);
+	assertEquals(ConflictType.NONE, detail.getConflictType());
+	assertEquals(null, detail.getConflictingId());	
     }
 
     @Test
@@ -515,13 +532,128 @@ public class TestLockingAccessCoordinator extends Assert {
 	    System.err.println(e);
 	}
 	assertGranted(locker.getResult());
+	AccessedObjectsDetail detail =
+	    profileCollector.getAccessedObjectsDetail();
+	assertObjectDetails(detail,
+			    "s", "o2", AccessType.READ, null,
+			    "s", "o1", AccessType.WRITE, null);
+	assertEquals(ConflictType.DEADLOCK, detail.getConflictType());
+	assertArrayEquals(txn.getId(), detail.getConflictingId());
+	txn.commit();
+	txn = null;
+	detail = profileCollector.getAccessedObjectsDetail();
+	assertObjectDetails(detail,
+			    "s", "o1", AccessType.READ, null,
+			    "s", "o2", AccessType.WRITE, null);
+	assertEquals(ConflictType.NONE, detail.getConflictType());
+	assertEquals(null, detail.getConflictingId());	
+    }
+
+    /* -- Test lock -- */
+
+    @Test
+    public void testLockGranted() {
+	assertGranted(coordinator.lock(txn, "s1", "o1", false, null));
+	assertGranted(coordinator.lock(txn, "s1", "o1", false, null));
+    }
+
+    @Test
+    public void testLockWhileWaiting() {
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	try {
+	    coordinator.lock(txn2, "s1", "o2", false, null);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testLockAfterDeadlock() {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	assertDeadlock(acquireLock(txn2, "s1", "o1", true), txn);
+	try {
+	    coordinator.lock(txn2, "s1", "o3", false, null);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
     }
 
     /* -- Test lockNoWait -- */
 
     @Test
     public void testLockNoWaitGranted() {
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+	assertGranted(coordinator.lockNoWait(txn, "s1", "o1", false, null));
+    }
+
+    @Test
+    public void testLockNoWaitWhileWaiting() {
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	try {
+	    coordinator.lockNoWait(txn2, "s1", "o2", false, null);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testLockNoWaitAfterDeadlock() {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 1000, 1);
 	assertGranted(acquireLock(txn, "s1", "o1", false));
+	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
+	locker.assertBlocked();
+	assertDeadlock(acquireLock(txn2, "s1", "o1", true), txn);
+	try {
+	    coordinator.lockNoWait(txn2, "s1", "o3", false, null);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test timeouts -- */
+
+    @Test
+    public void testLockTimeout() throws Exception {
+	properties.setProperty(
+	    LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY, String.valueOf(1));
+	init();
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	Thread.sleep(5);
+	assertTimeout(locker2.getResult(), txn);
+    }
+
+    @Test
+    public void testTxnTimeout() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction(1);
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	Thread.sleep(2);
+	assertTimeout(locker2.getResult(), txn);
     }
 
     /* -- Test lock conflicts -- */

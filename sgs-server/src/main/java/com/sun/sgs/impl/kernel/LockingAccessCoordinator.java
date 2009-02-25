@@ -31,8 +31,8 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
+import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
-import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,7 +55,7 @@ import java.util.logging.Logger;
  * else protected with external synchronization.
  */
 public class LockingAccessCoordinator extends AbstractAccessCoordinator
-    implements AccessCoordinatorHandle, TransactionParticipant
+    implements AccessCoordinatorHandle, NonDurableTransactionParticipant
 {
     /**
      * The property for specifying the maximum number of milliseconds to wait
@@ -175,7 +175,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	txn.join(this);
     }
 
-    /* -- Implement TransactionParticipant -- */
+    /* -- Implement NonDurableTransactionParticipant -- */
 
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
@@ -224,7 +224,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @throws	IllegalArgumentException if {@link #notifyNewTransaction
      *		notifyNewTransaction} has not be called for {@code txn}
      * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock
+     *		transaction produced a deadlock, or if waiting for an earlier
+     *		attempt to complete
      */
     public LockConflict lock(Transaction txn,
 			     String source,
@@ -261,7 +262,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @throws	IllegalArgumentException if {@link #notifyNewTransaction
      *		notifyNewTransaction} has not be called for {@code txn}
      * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock
+     *		transaction produced a deadlock, or if waiting for an earlier
+     *		attempt to complete
      */
     public LockConflict lockNoWait(Transaction txn,
 				   String source,
@@ -471,6 +473,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     private LockConflict lockNoWaitInternal(
 	Locker locker, Key key, boolean forWrite, Object description)
     {
+	if (locker.getWaitingFor() != null) {
+	    throw new IllegalStateException(
+		"Attempt to obtain a new lock while waiting");
+	} else if (locker.getConflict() != null) {
+	    throw new IllegalStateException(
+		"Attempt to obtain a new lock after a deadlock");
+	}
 	if (description != null) {
 	    locker.setDescription(key, description);
 	}
@@ -487,8 +496,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			locker, key, forWrite);
 		}
 		return null;
-	    } else if (result.conflict == null) {
-		locker.requests.add(result.request);
+	    }
+	    locker.requests.add(result.request);
+	    if (result.conflict == null) {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
 			       "Lock {0}, {1}, forWrite:{2}" +
@@ -535,13 +545,14 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    long now = System.currentTimeMillis();
 	    long stop = Math.min(now + lockTimeout, locker.stopTime);
 	    while (true) {
-		if (now > stop) {
+		if (now >= stop) {
 		    synchronized (keyMap) {
 			lock.flushWaiter(locker);
 		    }
 		    locker.setWaitingFor(null);
 		    LockConflict conflict = new LockConflict(
 			LockConflictType.TIMEOUT, result.conflict.txn);
+		    locker.setConflict(conflict);
 		    if (logger.isLoggable(Level.FINER)) {
 			logger.log(Level.FINER,
 				   "Wait for lock {0}\n  returns {1}",
@@ -575,8 +586,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		}
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
-			       "Wait for lock {0}, stop:{1,number,#}",
-			       locker, stop);
+			       "Wait for lock {0}, wait:{1,number,#}",
+			       locker, stop - now);
 		}
 		try {
 		    locker.wait(stop - now);
