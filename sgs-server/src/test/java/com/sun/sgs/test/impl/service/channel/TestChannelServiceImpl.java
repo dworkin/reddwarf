@@ -479,12 +479,12 @@ public class TestChannelServiceImpl extends TestCase {
 	}, taskOwner);
     }
 
-    // -- Test Channel.getDeliveryRequirement --
+    // -- Test Channel.getDelivery --
 
     public void testChannelGetDeliveryNoTxn() throws Exception {
 	Channel channel = createChannel();
 	try {
-	    channel.getDeliveryRequirement();
+	    channel.getDelivery();
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -497,7 +497,7 @@ public class TestChannelServiceImpl extends TestCase {
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() {
 		try {
-		    channel.getDeliveryRequirement();
+		    channel.getDelivery();
 		    fail("Expected TransactionNotActiveException");
 		} catch (TransactionNotActiveException e) {
 		    System.err.println(e);
@@ -512,9 +512,9 @@ public class TestChannelServiceImpl extends TestCase {
 		for (Delivery delivery : Delivery.values()) {
 		    Channel channel = channelService.createChannel(
 			delivery.toString(), null, delivery);
-		    if (!delivery.equals(channel.getDeliveryRequirement())) {
+		    if (!delivery.equals(channel.getDelivery())) {
 			fail("Expected: " + delivery + ", got: " +
-			     channel.getDeliveryRequirement());
+			     channel.getDelivery());
 		    }
 		}
 		System.err.println("Delivery requirements are equal");
@@ -530,7 +530,7 @@ public class TestChannelServiceImpl extends TestCase {
 			delivery.toString(), null, delivery);
 		    dataService.removeObject(channel);
 		    try {
-			channel.getDeliveryRequirement();
+			channel.getDelivery();
 			fail("Expected IllegalStateException");
 		    } catch (IllegalStateException e) {
 			System.err.println(e);

@@ -93,6 +93,11 @@ public class ClientSessionWrapper
 	return this;
     }
 
+    /** {@inheritDoc} */
+    public ClientSession send(ByteBuffer message, Delivery delivery) {
+	getClientSession().send(message, delivery);
+	return this;
+    }
     /* -- Implement ManagedObjectRemoval -- */
 
     /** {@inheritDoc} */

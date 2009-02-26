@@ -498,6 +498,20 @@ class SecondaryChannel implements Channel {
                 read();
                 break;
 
+	    case SimpleSgsProtocol.SESSION_MESSAGE:
+		if (protocolHandler != null) {
+		    ByteBuffer clientMessage =
+		        ByteBuffer.wrap(
+			    msg.getBytes(msg.limit() - msg.position()));
+		    
+		    // TBD: schedule a task to process this message?
+		    protocolHandler.sessionMessage(
+			clientMessage, new RequestHandler());
+		} else {
+		    read();
+		}
+		break;
+		
 	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
                 if (protocolHandler != null) {
                     BigInteger channelRefId =

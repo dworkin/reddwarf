@@ -31,6 +31,8 @@ import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
+import com.sun.sgs.impl.service.session.ClientSessionImpl.
+    SendEvent;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
@@ -492,19 +494,22 @@ public final class ClientSessionServiceImpl
     /* -- Package access methods for adding commit actions -- */
     
     /**
-     * Enqueues the specified session {@code message} in the current
-     * context for delivery to the specified client {@code session} when
-     * the context commits.  This method must be called within a
-     * transaction.
+     * Enqueues the specified send event (containing a session {@code
+     * message}) in the current context for delivery to the specified
+     * client {@code session} when the context commits.  This method must
+     * be called within a transaction.
      *
      * @param	session	a client session
-     * @param	message a message
+     * @param	sendEvent a send event containing a message and delivery
+     *		guarantee 
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void addSessionMessage(ClientSessionImpl session, byte[] message) {
-	checkContext().addMessage(session, message);
+    void addSessionMessage(
+	ClientSessionImpl session, SendEvent sendEvent)
+    {
+	checkContext().addMessage(session, sendEvent);
     }
 
     /**
@@ -628,17 +633,19 @@ public final class ClientSessionServiceImpl
 	 * Enqueues a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
-	private void addMessage(ClientSessionImpl session, byte[] message) {
+	private void addMessage(
+	    ClientSessionImpl session, SendEvent sendEvent)
+    	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
 			"Context.addMessage session:{0}, message:{1}",
-			session, message);
+			session, sendEvent.message);
 		}
 		checkPrepared();
 
-		getCommitActions(session).addMessage(message);
+		getCommitActions(session).addMessage(sendEvent);
 	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -787,7 +794,7 @@ public final class ClientSessionServiceImpl
 	private LoginFailureException loginException;
 	
 	/** List of messages to send on commit. */
-	private List<byte[]> messages = new ArrayList<byte[]>();
+	private List<SendEvent> messages = new ArrayList<SendEvent>();
 
 	/** If true, disconnect after sending messages. */
 	private boolean disconnect = false;
@@ -799,8 +806,8 @@ public final class ClientSessionServiceImpl
 	    this.sessionRefId = sessionImpl.getId();
 	}
 
-	void addMessage(byte[] message) {
-	    messages.add(message);
+	void addMessage(SendEvent sendEvent) {
+	    messages.add(sendEvent);
 	}
 
 	void addLoginResult(boolean success, LoginFailureException ex) {
@@ -851,11 +858,13 @@ public final class ClientSessionServiceImpl
 		}
 		SessionProtocol protocol = handler.getSessionProtocol();
 		if (protocol != null) {
-		    for (byte[] message : messages) {
+		    for (SendEvent sendEvent : messages) {
                         try {
-                            protocol.sessionMessage(ByteBuffer.wrap(message));
-                        } catch (IOException ioe) {
-                            logger.logThrow(Level.WARNING, ioe,
+                            protocol.sessionMessage(
+				ByteBuffer.wrap(sendEvent.message),
+				sendEvent.delivery);
+                        } catch (Exception e) {
+                            logger.logThrow(Level.WARNING, e,
                                             "sessionMessage throws");
                         }
 		    }

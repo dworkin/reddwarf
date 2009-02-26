@@ -295,14 +295,10 @@ public final class WatchdogServiceImpl
            
              String finalService =
                 properties.getProperty(StandardProperties.FINAL_SERVICE);
-             StandardService finalStandardService = null;
              boolean isFullStack = true;
              if (finalService == null) {
-                 finalStandardService = StandardService.LAST_SERVICE;
                  isFullStack = true;
              } else {
-                 finalStandardService =
-                    Enum.valueOf(StandardService.class, finalService);
                  isFullStack = 
                     !(properties.getProperty(StandardProperties.APP_LISTENER)
                      .equals(StandardProperties.APP_LISTENER_NONE));

@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.DeliveryNotSupportedException;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -194,6 +195,14 @@ public class ClientSessionImpl
      * Enqueues a send event to this client session's event queue for servicing.
      */
     public ClientSession send(ByteBuffer message) {
+	return send(message, Delivery.RELIABLE);
+    }
+
+    /** {@inheritDoc}
+     *
+     * Enqueues a send event to this client session's event queue for servicing.
+     */
+    public ClientSession send(ByteBuffer message, Delivery delivery) {
 	try {
             if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
@@ -203,7 +212,10 @@ public class ClientSessionImpl
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
                     maxMessageLength);
-            }
+            } else {
+		checkDelivery(delivery);
+		
+	    }
             
             /*
              * TBD: Possible optimization: if we have passed our own special
@@ -214,7 +226,7 @@ public class ClientSessionImpl
              */
 	    byte[] msgBytes = new byte[message.remaining()];
 	    message.asReadOnlyBuffer().get(msgBytes);
-	    addEvent(new SendEvent(msgBytes));
+	    addEvent(new SendEvent(msgBytes, delivery));
 
 	    return getWrappedClientSession();
 
@@ -226,6 +238,33 @@ public class ClientSessionImpl
 	    }
 	    throw e;
 	}
+	
+    }
+
+    /**
+     * Throws {@link DeliveryNotSupportedException} if the specified
+     * {@code delivery} guarantee is not supported by any of this session's
+     * delivery guarantees.
+     *
+     * @param	delivery a delivery guarantee
+     * @throws	DeliveryNotSupportedException if the specified {@code
+     *		delivery} guarantee is not supported by any of this
+     *		session's delivery guarantees
+     */
+    private void checkDelivery(Delivery delivery) {
+	if (deliveries.contains(delivery)) {
+	    return;
+	}
+	
+	for (Delivery d : deliveries) {
+	    if (d.supportsDelivery(delivery)) {
+		return;
+	    }
+	}
+	throw new DeliveryNotSupportedException(
+	    "client session:" + this +
+	    " does not support the delivery guarantee",
+	    delivery);
     }
 
     /**
@@ -734,24 +773,26 @@ public class ClientSessionImpl
 	}
     }
 
-    private static class SendEvent extends SessionEvent {
+    static class SendEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	private final byte[] message;
+	final byte[] message;
+	final Delivery delivery;
 
 	/**
 	 * Constructs a send event with the given {@code message}.
 	 */
-	SendEvent(byte[] message) {
+	SendEvent(byte[] message, Delivery delivery) {
 	    this.message = message;
+	    this.delivery = delivery;
 	}
 
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
 	    sessionImpl.sessionService.
-		addSessionMessage(sessionImpl, message);
+		addSessionMessage(sessionImpl, this);
 	}
 
 	/** Use the message length as the cost for sending messages. */

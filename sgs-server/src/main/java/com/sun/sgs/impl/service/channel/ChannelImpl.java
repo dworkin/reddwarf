@@ -23,6 +23,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.DeliveryNotSupportedException;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -147,12 +148,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Constructs an instance of this class with the specified
-     * {@code name}, {@code listener}, {@code delivery} requirement,
+     * {@code name}, {@code listener}, {@code delivery} guarantee.
      * and write buffer capacity.
      *
      * @param name a channel name
      * @param listener a channel listener
-     * @param delivery a delivery requirement
+     * @param delivery a delivery guarantee
      * @param writeBufferCapacity the capacity of the write buffer, in bytes
      */
     protected ChannelImpl(String name, ChannelListener listener,
@@ -193,7 +194,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Constructs a new {@code Channel} with the given {@code name}, {@code
-     * listener}, {@code delivery} requirement and write-buffer capacity.
+     * listener}, {@code delivery} guarantee and write-buffer capacity.
      */
     static Channel newInstance(String name,
 			       ChannelListener listener,
@@ -229,12 +230,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return name;
     }
 
-    /** Implements {@link Channel#getDeliveryRequirement}. */
-    Delivery getDeliveryRequirement() {
+    /** Implements {@link Channel#getDelivery}. */
+    Delivery getDelivery() {
 	checkContext();
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
-		       "getDeliveryRequirement returns {0}", delivery);
+		       "getDelivery returns {0}", delivery);
 	}
 	return delivery;
     }
@@ -290,7 +291,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	    /*
 	     * Check for null elements, and check that sessions support
-	     * this channel's delivery requirement
+	     * this channel's delivery guarantee.
 	     */
 	    for (ClientSession session : sessions) {
 		if (session == null) {
@@ -319,22 +320,23 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Throws {@code IllegalArgumentException} if the specified {@code
-     * session} does not support this channel's delivery requirement or
-     * {@code Delivery.RELIABLE}.
+     * Throws {@code DeliveryNotSupportedException} if the specified {@code
+     * session} does not support this channel's delivery guarantee.
      *
      * @param	session a client session
-     * @throws	IllegalArgumentException if the specified {@code session}
-     *		does not support this channel's delivery requirement
+     * @throws	DeliveryNotSupportedException if the specified {@code session}
+     *		does not support this channel's delivery guarantee
      */
     void checkDelivery(ClientSession session) {
-	Set<Delivery> deliveries = session.supportedDeliveries();
-	if (!deliveries.contains(delivery) &&
-	    !deliveries.contains(Delivery.RELIABLE))
-	{
-	    throw new IllegalArgumentException(
-		"session unable to support delivery: " + delivery);
+	for (Delivery d : session.supportedDeliveries()) {
+	    if (d.supportsDelivery(delivery)) {
+		return;
+	    }
 	}
+	throw new DeliveryNotSupportedException(
+	    "client session:" + session +
+	    " does not support delivery guarantee",
+	    delivery);
     }
     
     /**

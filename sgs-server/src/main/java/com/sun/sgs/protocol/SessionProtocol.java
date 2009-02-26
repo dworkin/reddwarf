@@ -20,6 +20,7 @@
 package com.sun.sgs.protocol;
 
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.DeliveryNotSupportedException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -27,8 +28,7 @@ import java.nio.channels.Channel;
 import java.util.Set;
 
 /**
- * A protocol for sending session messages and channel messages to
- * a client.
+ * A protocol for sending session messages and channel messages to a client.
  * 
  * <p>The implementation of the protocol is only responsible for the formating
  * and sending of messages to the client. Unless otherwise noted, the
@@ -58,10 +58,10 @@ public interface SessionProtocol extends Channel {
     };
 
     /**
-     * Returns a set containing the delivery requirements supported by
+     * Returns a set containing the delivery types supported by
      * this protocol.  The returned set is serializable.
      *
-     * @return	a set containing the supported delivery requirements
+     * @return	a set containing the supported delivery types
      */
     Set<Delivery> supportedDeliveries();
     
@@ -76,39 +76,55 @@ public interface SessionProtocol extends Channel {
     int getMaxMessageLength();
     
     /**
-     * Sends the associated client the specified {@code message}.
+     * Sends the associated client the specified {@code message} in a
+     * manner that satisfies the specified {@code delivery} guarantee. 
      *
-     * <p>The {@code ByteBuffer} is not modified and may be reused immediately
-     * after this method
-     * returns.  Changes made to the buffer after this method returns will
-     * have no effect on the message sent to the client by this invocation.
+     * <p>When possible, the message should be delivered using the most
+     * efficient means (e.g., protocol and transport) to satisfy the
+     * delivery guarantee.  However, a stronger delivery guarantee may be
+     * used to deliver the message if this protocol only supports
+     * stronger delivery guarantees.  If this protocol is not able to
+     * satisfy the specified delivery guarantee (e.g., only supports weaker
+     * delivery guarantees than the one specified), then a {@link
+     * DeliveryNotSupportedException} will be thrown.
+     *
+     * <p>The {@code ByteBuffer} is not modified and may be reused
+     * immediately after this method returns.  Changes made to the buffer
+     * after this method returns will have no effect on the message sent to
+     * the client by this invocation.
      * 
      * @param	message a message
+     * @param	delivery the delivery guarantee
      * 
-     * @throws IllegalArgumentException if the {@code message} size is
+     * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
-     * @throws IOException if an I/O error occurs
+     * @throws	DeliveryNotSupportedException if the specified {@code
+     *		delivery} guarantee cannot be satisfied by this protocol
+     * @throws	IOException if an I/O error occurs
      */
-    void sessionMessage(ByteBuffer message) throws IOException;
+    void sessionMessage(ByteBuffer message, Delivery delivery)
+	throws IOException;
     
     /**
      * Notifies the associated client that it is joined to the channel
-     * with the specified {@code name} and {@code channelId}.
+     * with the specified {@code name} and {@code channelId}.  This
+     * notification to the client must be delivered reliably.
      *
      * @param	name a channel name
      * @param	channelId the channel's ID
-     * @param	delivery the channel's delivery requirement
+     * @param	delivery the channel's delivery guarantee
      *
      * @throws	DeliveryNotSupportedException if the specified {@code
-     *		delivery} requirement is not supported by this protocol
-     * @throws IOException if an I/O error occurs
+     *		delivery} guarantee cannot be satisfied by this protocol
+     * @throws	IOException if an I/O error occurs
      */
     void channelJoin(String name, BigInteger channelId, Delivery delivery)
             throws IOException;
 
     /**
      * Notifies the associated client that it is no longer a member of
-     * the channel with the specified {@code channelId}.
+     * the channel with the specified {@code channelId}.  This
+     * notification to the client must be delivered reliably.
      *
      * @param	channelId a channel ID
      * 
@@ -117,24 +133,33 @@ public interface SessionProtocol extends Channel {
     void channelLeave(BigInteger channelId) throws IOException;
 
     /**
-     * Sends the associated client the specified channel {@code
-     * message} sent on the channel with the specified {@code channelId}
-     * and {@code delivery} requirement.
+     * Sends the associated client the specified channel {@code message}
+     * for the channel with the specified {@code channelId} in a manner
+     * that satisfies the specified {@code delivery} guarantee.
+     *
+     * <p>When possible, the message should be delivered using the most
+     * efficient means (e.g., protocol and transport) to satisfy the
+     * delivery guarantee.  However, a stronger delivery guarantee may be
+     * used to deliver the message if this protocol only supports
+     * stronger delivery guarantees.  If this protocol is not able to
+     * satisfy the specified delivery guarantee (e.g., only supports weaker
+     * delivery guarantees than the one specified), then a {@link
+     * DeliveryNotSupportedException} will be thrown.
      * 
-     * <p>The {@code ByteBuffer} is not modified and may be reused immediately
-     * after this method
-     * returns.  Changes made to the buffer after this method returns will
-     * have no effect on the message sent to the client by this invocation.
+     * <p>The {@code ByteBuffer} is not modified and may be reused
+     * immediately after this method returns.  Changes made to the buffer
+     * after this method returns will have no effect on the message sent to
+     * the client by this invocation.
      *
      * @param	channelId a channel ID
      * @param	message a channel message
-     * @param	delivery the channel's delivery requirement
+     * @param	delivery the channel's delivery guarantee
      *
      * @throws	DeliveryNotSupportedException if the specified {@code
-     *		delivery} requirement is not supported by this protocol
-     * @throws IllegalArgumentException if the {@code message} size is
+     *		delivery} guarantee cannot be satisfied by this protocol
+     * @throws	IllegalArgumentException if the {@code message} size is
      *          greater than {@link #getMaxMessageLength}
-     * @throws IOException if an I/O error occurs
+     * @throws	IOException if an I/O error occurs
      */
     void channelMessage(
 	BigInteger channelId, ByteBuffer message, Delivery delivery)

@@ -192,16 +192,16 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
     
     /** {@inheritDoc} */
-    public void sessionMessage(ByteBuffer message) {
+    public void sessionMessage(ByteBuffer message, Delivery delivery) {
         final int messageLength = 1 + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf = ByteBuffer.wrap(new byte[messageLength]);
 	buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
 	    put(message).
 	    flip();
-	writeOrEnqueueIfLoginNotHandled(buf);
+	writeBuffer(buf, delivery);
     }
-
+    
     /** {@inheritDoc} */
     public void channelJoin(
 	String name, BigInteger channelId, Delivery delivery)
