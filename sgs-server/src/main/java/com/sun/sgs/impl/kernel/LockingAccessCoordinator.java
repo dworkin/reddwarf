@@ -23,6 +23,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
@@ -71,11 +72,13 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
- *	<i>Default:</i> {@code -1}
+ *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
+ *	value of the {@code com.sun.sgs.txn.timeout} property, if specified,
+ *	otherwise {@value #DEFAULT_LOCK_TIMEOUT}
  *
  * <dd style="padding-top: .5em">The maximum number of milliseconds to wait for
- * obtaining a lock.  A negative value, which is the default, means no lock
- * timeout. <p>
+ *	obtaining a lock.  The value must be greater than {@code 0}, and should
+ *	be less than the transaction timeout. <p>
  *
  * <dt> <i>Property:</i> <b>{@value #NUM_KEY_MAPS_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #NUM_KEY_MAPS_DEFAULT}
@@ -83,24 +86,52 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The number of maps to use for associating keys
  * and maps.  The number of maps controls the amount of concurrency. <p>
  *
- * </dl>
+ * </dl> <p>
+ *
+ * This class uses the {@link Logger} named {@code
+ * com.sun.sgs.impl.kernel.LockingAccessCoordinator} to log information at the
+ * following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#FINER FINER} - Beginning and ending transactions;
+ *	requesting, waiting for, and returning from requesting locks; deadlocks
+ * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
+ *	requesting locks before waiting, releasing locks, results of attempting
+ *	to assign locks to waiters, details of checking deadlocks
+ * </ul>
  */
 public class LockingAccessCoordinator extends AbstractAccessCoordinator
     implements AccessCoordinatorHandle, NonDurableTransactionParticipant
 {
+    /** The class name. */
+    private static final String CLASS =
+	"com.sun.sgs.impl.kernel.LockingAccessCoordinator";
+
     /**
      * The property for specifying the maximum number of milliseconds to wait
      * for obtaining a lock.  A negative value means no lock timeout.
      */
     public static final String LOCK_TIMEOUT_PROPERTY =
-	"com.sun.sgs.lock.timeout";
+	CLASS + ".lock.timeout";
+
+    /**
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
+     */
+    public static final long DEFAULT_LOCK_TIMEOUT = 10;
+
+    /**
+     * The proportion of the transaction timeout to use for the lock timeout if
+     * no lock timeout is specified.
+     */
+    public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
 
     /**
      * The property for specifying the number of maps to use for associating
      * keys and maps.  The number of maps controls the amount of concurrency.
      */
     public static final String NUM_KEY_MAPS_PROPERTY =
-	"com.sun.sgs.impl.kernel.LockingAccessCoordinator.num.key.maps";
+	CLASS + ".num.key.maps";
 
     /** The default number of key maps. */
     public static final int NUM_KEY_MAPS_DEFAULT = 8;
@@ -118,7 +149,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /**
      * The maximum number of milliseconds to spend attempting to acquiring a
-     * lock, or a negative value if there is no lock timeout.
+     * lock.
      */
     private final long lockTimeout;
 
@@ -154,7 +185,17 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     {
 	super(txnProxy, profileCollectorHandle);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	lockTimeout = wrappedProps.getLongProperty(LOCK_TIMEOUT_PROPERTY, -1);
+	long txnTimeout = wrappedProps.getLongProperty(
+	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
+	long defaultLockTimeout = (txnTimeout < 1)
+	    ? DEFAULT_LOCK_TIMEOUT
+	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	/* Avoid underflow */
+	if (defaultLockTimeout < 1) {
+	    defaultLockTimeout = 1;
+	}
+	lockTimeout = wrappedProps.getLongProperty(
+	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
 	numKeyMaps = wrappedProps.getIntProperty(
 	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	keyMaps = createKeyMaps(numKeyMaps);
@@ -196,7 +237,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER,
-		       "Start {0}, requestedStartTime:{1,number,#}",
+		       "begin {0}, requestedStartTime:{1,number,#}",
 		       locker, requestedStartTime);
 	}
 	txn.join(this);
@@ -237,7 +278,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * prevented the lock from being acquired, or else {@code null} if the lock
      * was acquired.  If the {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any other lock or wait requests will throw {@link
+     * transaction, and any other lock or wait requests will throw {@code
      * IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
@@ -275,7 +316,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
      * {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any other lock or wait requests will throw {@link
+     * transaction, and any other lock or wait requests will throw {@code
      * IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
@@ -311,7 +352,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * transaction was not waiting.  If the {@code type} field of the return
      * value is {@link LockConflictType#DEADLOCK DEADLOCK}, then the caller
      * should abort the transaction, and any other lock or wait requests will
-     * throw {@link IllegalStateException}.
+     * throw {@code IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
      * @return	lock conflict information, or {@code null} if there was no
@@ -474,7 +515,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      */
     private void endTransaction(Transaction txn) {
 	Locker locker = getLocker(txn);
-	logger.log(Level.FINER, "End {0}", locker);
+	logger.log(Level.FINER, "end {0}", locker);
 	for (LockRequest request : locker.requests) {
 	    Key key = request.key;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
@@ -491,7 +532,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    }
 	    for (Locker newOwner : newOwners) {
 		synchronized (newOwner) {
-		    logger.log(Level.FINEST, "Notify new owner {0}", newOwner);
+		    logger.log(Level.FINEST, "notify new owner {0}", newOwner);
 		    newOwner.notify();
 		}
 	    }
@@ -522,9 +563,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    if (result == null) {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
-			       "Lock {0}, {1}, forWrite:{2}" +
+			       "lock {0}, {1}, forWrite:{2}" +
 			       "\n  returns null (already granted)",
-			locker, key, forWrite);
+			       locker, key, forWrite);
 		}
 		return null;
 	    }
@@ -532,15 +573,17 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    if (result.conflict == null) {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
-			       "Lock {0}, {1}, forWrite:{2}" +
-			       "\n  returns null (new)",
-			locker, key, forWrite);
+			       "lock {0}, {1}, forWrite:{2}" +
+			       "\n  returns null (granted)",
+			       locker, key, forWrite);
 		}
 		return null;
 	    }
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "Lock {0}, {1}, forWrite:{2}\n  blocked",
+	    logger.log(Level.FINEST,
+		       "lock attempt {0}, {1}, forWrite:{2}" +
+		       "\n  returns blocked",
 		       locker, key, forWrite);
 	}
 	locker.setWaitingFor(result);
@@ -551,7 +594,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER,
-		       "Lock {0}, {1}, forWrite:{2}\n  returns {3}",
+		       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
 			locker, key, forWrite, conflict);
 	}
 	return conflict;
@@ -563,8 +606,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    LockAttemptResult result = locker.getWaitingFor();
 	    if (result == null) {
 		logger.log(Level.FINER,
-			   "Wait for lock {0}\n  returns null (not waiting)",
-			   locker);
+			   "lock {0}\n  returns null (not waiting)", locker);
 		return null;
 	    }
 	    Key key = result.request.key;
@@ -574,8 +616,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		lock = getLock(key, keyMap);
 	    }
 	    long now = System.currentTimeMillis();
-	    long stop = (lockTimeout < 0) ? locker.stopTime
-		: Math.min(now + lockTimeout, locker.stopTime);
+	    long stop = Math.min(now + lockTimeout, locker.stopTime);
 	    while (true) {
 		if (now >= stop) {
 		    synchronized (keyMap) {
@@ -587,8 +628,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    locker.setConflict(conflict);
 		    if (logger.isLoggable(Level.FINER)) {
 			logger.log(Level.FINER,
-				   "Wait for lock {0}\n  returns {1}",
-				   locker, conflict);
+				   "lock {0}, {1}, forWrite:{2}" +
+				   "\n  returns {3}",
+				   locker, key, result.request.getForWrite(),
+				   conflict);
 		    }
 		    return conflict;
 		}
@@ -598,10 +641,12 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		}
 		if (isOwner) {
 		    locker.setWaitingFor(null);
-		    logger.log(Level.FINER,
-			       "Wait for lock {0}\n" +
-			       "  returns null (already granted)",
-			       locker);
+		    if (logger.isLoggable(Level.FINER)) {
+			logger.log(Level.FINER,
+				   "lock {0}, {1}, forWrite:{2}" +
+				   "\n  returns null (granted)",
+				   locker, key, result.request.getForWrite());
+		    }
 		    return null;
 		}
 		LockConflict conflict = locker.getConflict();
@@ -612,15 +657,19 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    locker.setWaitingFor(null);
 		    if (logger.isLoggable(Level.FINER)) {
 			logger.log(Level.FINER,
-				   "Wait for lock {0}\n  returns {1}",
-				   locker, conflict);
+				   "lock {0}, {1}, forWrite:{2}" +
+				   "\n  returns {3}",
+				   locker, key, result.request.getForWrite(),
+				   conflict);
 		    }
 		    return conflict;
 		}
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
-			       "Wait for lock {0}, wait:{1,number,#}",
-			       locker, stop - now);
+			       "wait for lock {0}, {1}, forWrite:{2}" +
+			       ", wait:{3,number,#}",
+			       locker, key, result.request.getForWrite(),
+			       stop - now);
 		}
 		try {
 		    locker.wait(stop - now);
@@ -781,10 +830,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    this.waitingFor = waitingFor;
 	}
 
-	/** Print fields, for debugging. */
+	/** Print the associated transaction, for debugging. */
 	@Override
 	public String toString() {
-	    return "Locker[txn:" + txn + "]";
+	    return txn.toString();
 	}
     }
 
@@ -833,7 +882,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
-	    return "Key[src:" + source + ", id:" + objectId + "]";
+	    return "src:" + source + ", objectId:" + objectId;
 	}
     }
 
@@ -884,7 +933,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	LockAttemptResult lock(
 	    Locker locker, boolean forWrite, boolean waiting)
 	{
-	    assert validate(true);
 	    if (owners.isEmpty()) {
 		LockRequest request =
 		    new LockRequest(locker, key, forWrite, false);
@@ -892,7 +940,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		if (waiting) {
 		    flushWaiter(locker);
 		}
-		assert validate(false);
+		assert validateInUse();
 		return new LockAttemptResult(request, null);
 	    }
 	    boolean upgrade = false;
@@ -903,7 +951,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			if (waiting) {
 			    flushWaiter(locker);
 			}
-			assert validate(false);
+			assert validateInUse();
 			return null;
 		    } else {
 			upgrade = true;
@@ -935,13 +983,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		if (waiting) {
 		    flushWaiter(locker);
 		}
-		assert validate(false);
+		assert validateInUse();
 		return new LockAttemptResult(request, null);
 	    }
 	    if (!waiting) {
 		addWaiter(request);
 	    }
-	    assert validate(false);
+	    assert validateInUse();
 	    return new LockAttemptResult(request, conflict);
 	}
 
@@ -983,8 +1031,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @return	the newly added owners
 	 */
 	List<Locker> release(Locker locker) {
-	    assert validate(false);
-	    logger.log(Level.FINEST, "Release {0}", locker);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "release {0}, {1}", locker, this);
+	    } 
 	    boolean owned = false;
 	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
 		LockRequest ownerRequest = i.next();
@@ -1004,7 +1053,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(
 			    Level.FINEST,
-			    "Attempt to lock waiter {0} returns {1}",
+			    "attempt to lock waiter {0} returns {1}",
 			    waiter, result);
 		    }
 		    if (result != null && result.conflict != null) {
@@ -1019,31 +1068,28 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    lockersToNotify.add(waiter.locker);
 		}
 	    }
-	    assert validate(true);
+	    assert !inUse() || validateInUse();
 	    return lockersToNotify;
 	}
 
 	/**
-	 * Validates the state of this lock.  If {@code notInUseOk} is {@code
-	 * true}, then the lock is permitted to not be in use, either because
-	 * it is newly allocated or has been released. <p>
+	 * Validates the state of this lock, which should be in use.
 	 *
 	 * Consistency constraints: <ul>
-	 * <li>at least one owner, unless {@code notInUseOk} is {@code true}
+	 * <li>at least one owner
 	 * <li>locker appears once in owners and waiters <em>except</em> that
 	 *     an upgrade request can be a waiter if a read request is an owner
 	 * <li>no upgrade waiters if the locker is not a read owner
 	 * <li>all upgrade waiters precede other waiters
 	 * </ul>
 	 *
-	 * @param	notInUseOk if it is valid for the lock to not be in use
 	 * @return	{@code true} if the state is valid, otherwise throws
 	 *		{@link AssertionError}
 	 */
-	private boolean validate(boolean notInUseOk) {
+	private boolean validateInUse() {
 	    int numWaiters = waiters.size();
 	    int numOwners = owners.size();
-	    if (!notInUseOk && numOwners == 0) {
+	    if (numOwners == 0) {
 		throw new AssertionError("No owners: " + this);
 	    }
 	    boolean seenNonUpgrade = false;
@@ -1196,7 +1242,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		String accessMsg = "Access txn:" + txn +
 		    ", type:" + type +
 		    ", source:" + source +
-		    ", id:" + objectId +
+		    ", objectId:" + objectId +
 		    descriptionMsg +
 		    " failed: ";
 		String conflictMsg = ", with conflicting transaction " +
@@ -1369,8 +1415,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    for (pass = 1; true; pass++) {
 		if (!checkInternal(rootLocker, getWaiterInfo(rootLocker))) {
 		    if (result == null) {
-			logger.log(Level.FINER,
-				   "Check deadlock {0}: no deadlock",
+			logger.log(Level.FINEST,
+				   "check deadlock {0}: no deadlock",
 				   rootLocker);
 			return null;
 		    } else {
@@ -1378,7 +1424,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    }
 		}
 		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER, "Check deadlock {0}: victim {1}",
+		    logger.log(Level.FINER, "check deadlock {0}: victim {1}",
 			       rootLocker, victim);
 		}
 		LockConflict deadlock =
@@ -1406,7 +1452,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		if (owner == locker) {
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
-				   "Checking deadlock {0}, pass {1}:" +
+				   "checking deadlock {0}, pass {1}:" +
 				   " locker {2}, waiting for {3}:" +
 				   " ignore self-reference",
 				   rootLocker, pass, locker, request);
@@ -1416,7 +1462,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    if (ownerInfo.waitingFor == null) {
 			if (logger.isLoggable(Level.FINEST)) {
 			    logger.log(Level.FINEST,
-				       "Checking deadlock {0}, pass {1}:" +
+				       "checking deadlock {0}, pass {1}:" +
 				       " locker {2}, waiting for {3}:" +
 				       " ignore not waiting",
 				       rootLocker, pass, locker, request);
@@ -1427,7 +1473,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			victim = owner;
 			if (logger.isLoggable(Level.FINEST)) {
 			    logger.log(Level.FINEST,
-				       "Checking deadlock {0}, pass {1}:" +
+				       "checking deadlock {0}, pass {1}:" +
 				       " locker {2}, waiting for {3}:" +
 				       " deadlock",
 				       rootLocker, pass, locker, request);
@@ -1436,7 +1482,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    } else {
 			if (logger.isLoggable(Level.FINEST)) {
 			    logger.log(Level.FINEST,
-				       "Checking deadlock {0}, pass {1}:" +
+				       "checking deadlock {0}, pass {1}:" +
 				       " locker {2}, waiting for {3}:" +
 				       " recurse",
 				       rootLocker, pass, locker, request);
@@ -1499,7 +1545,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		}
 		victim = locker;
 		logger.log(Level.FINEST,
-			   "Checking deadlock {0}, pass {1}: new victim: {2}",
+			   "checking deadlock {0}, pass {1}: new victim: {2}",
 			   rootLocker, pass, victim);
 	    }
 	}
