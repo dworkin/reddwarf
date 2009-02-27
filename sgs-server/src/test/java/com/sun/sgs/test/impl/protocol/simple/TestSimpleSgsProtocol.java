@@ -262,7 +262,7 @@ public class TestSimpleSgsProtocol {
             return descriptor;
         }
 
-        public Delivery getDeliveryGuarantee() {
+        public Delivery getDelivery() {
             return delivery;
         }
                 

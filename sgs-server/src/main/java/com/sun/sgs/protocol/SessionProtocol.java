@@ -58,12 +58,12 @@ public interface SessionProtocol extends Channel {
     };
 
     /**
-     * Returns a set containing the delivery types supported by
+     * Returns a set containing the delivery guarantees supported by
      * this protocol.  The returned set is serializable.
      *
-     * @return	a set containing the supported delivery types
+     * @return	a set containing the supported delivery guarantees
      */
-    Set<Delivery> supportedDeliveries();
+    Set<Delivery> getDeliveries();
     
     /**
      * Returns the maximum length, in bytes, of the buffers passed as the

@@ -49,7 +49,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
@@ -177,7 +176,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /* -- Implement SessionProtocol -- */
 
     /** {@inheritDoc} */
-    public Set<Delivery> supportedDeliveries() {
+    public Set<Delivery> getDeliveries() {
 	return Collections.unmodifiableSet(deliverySet);
     }
     

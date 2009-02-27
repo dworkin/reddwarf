@@ -45,7 +45,7 @@ public interface Transport {
      * Returns the delivery guarantee for the transport.
      * @return the delivery guarantee for the transport
      */
-    Delivery getDeliveryGuarantee();
+    Delivery getDelivery();
     
     /**
      * Start accepting connections. The transport will invoke the specified

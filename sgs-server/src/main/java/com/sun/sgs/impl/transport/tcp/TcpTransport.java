@@ -210,7 +210,7 @@ public class TcpTransport implements Transport {
     }
     
     /** {@inheritDoc} */
-    public Delivery getDeliveryGuarantee() {
+    public Delivery getDelivery() {
         return Delivery.RELIABLE;
     }
     

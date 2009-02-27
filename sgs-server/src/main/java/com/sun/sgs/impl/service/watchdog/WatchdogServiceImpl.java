@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;

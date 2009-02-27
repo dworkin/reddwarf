@@ -29,7 +29,19 @@ import org.junit.Test;
 public class TestDelivery extends Assert {
 
     @Test
-    public void testSupportsDelivery() {
+    public void testSupportsDeliveryNullDelivery() {
+	for (Delivery delivery : Delivery.values()) {
+	    try {
+		delivery.supportsDelivery(null);
+		fail("expected NullPointerException: " + delivery);
+	    } catch (NullPointerException e) {
+		System.err.println(e);
+	    }
+	}
+    }
+    
+    @Test
+    public void testSupportsDeliveryAllCombinations() {
 	for (Delivery delivery : Delivery.values()) {
 	    assertTrue(Delivery.RELIABLE.supportsDelivery(delivery));
 	    assertTrue(delivery.supportsDelivery(delivery));

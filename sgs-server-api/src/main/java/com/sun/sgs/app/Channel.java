@@ -50,12 +50,11 @@ import java.util.Set;
  * <p>Messages sent on a channel are delivered in a manner that satisfies
  * the channel's delivery guarantee, specified at creation time.  When
  * possible, channel messages are delivered using the most efficient means
- * (e.g., protocol and transport) to satisfy the delivery guarantee.
- * However, a stronger delivery guarantee may be used to deliver the
- * message if the underlying protocol only supports stronger delivery
- * guarantees.  A client session can not be joined to a channel if that
- * client session does not support a protocol satisfying the minimum
- * requirements of the channel's delivery guarantee.
+ * to satisfy the delivery guarantee.  However, a stronger delivery
+ * guarantee may be used to deliver the message if the underlying protocol
+ * only supports stronger delivery guarantees.  A client session can not be
+ * joined to a channel if that client session does not support a protocol
+ * satisfying the minimum requirements of the channel's delivery guarantee.
  *
  * <p>A client session joined to one or more channels may become
  * disconnected due to the client logging out or due to other factors
@@ -159,7 +158,11 @@ public interface Channel extends ManagedObject {
     Channel join(ClientSession session);
 
     /**
-     * Adds the specified client sessions to this channel.
+     * Adds the specified client sessions to this channel.  If any client
+     * session in the specified set does not support a protocol that
+     * satisfies the minimum requirements of the channel's delivery
+     * guarantee, then {@code DeliveryNotSupportedException} will be
+     * thrown.
      *
      * @param sessions a set of client sessions
      *

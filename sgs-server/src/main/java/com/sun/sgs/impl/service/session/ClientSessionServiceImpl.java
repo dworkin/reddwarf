@@ -26,8 +26,6 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;

@@ -214,7 +214,6 @@ public class ClientSessionImpl
                     maxMessageLength);
             } else {
 		checkDelivery(delivery);
-		
 	    }
             
             /*
@@ -252,6 +251,9 @@ public class ClientSessionImpl
      *		session's delivery guarantees
      */
     private void checkDelivery(Delivery delivery) {
+	if (delivery == null) {
+	    throw new NullPointerException("null delivery");
+	}
 	if (deliveries.contains(delivery)) {
 	    return;
 	}

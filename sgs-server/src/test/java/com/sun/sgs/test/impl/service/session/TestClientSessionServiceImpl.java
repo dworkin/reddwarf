@@ -24,6 +24,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
@@ -967,6 +968,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testClientSessionSendNullMessage() throws Exception {
+	try {
+	    sendBufferToClient(null, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testClientSessionSendNullDelivery() throws Exception {
+	try {
+	    sendBufferToClient(ByteBuffer.wrap(new byte[0]), "", null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
     public void testClientSessionSendSameBuffer() throws Exception {
 	String msgString = "buffer";
 	MessageBuffer msg =
@@ -992,6 +1011,14 @@ public class TestClientSessionServiceImpl extends TestCase {
     private void sendBufferToClient(final ByteBuffer buf,
 				    final String expectedMsgString)
 	throws Exception
+    {
+	sendBufferToClient(buf, expectedMsgString, Delivery.RELIABLE);
+    }
+	
+    private void sendBufferToClient(final ByteBuffer buf,
+				    final String expectedMsgString,
+				    final Delivery delivery)
+	throws Exception
     {	
 	final String name = "dummy";
 	DummyClient client = new DummyClient(name);
@@ -1005,7 +1032,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			AppContext.getDataManager().getBinding(name);
 		    System.err.println("Sending messages");
 		    for (int i = 0; i < numMessages; i++) {
-			session.send(buf);
+			session.send(buf, delivery);
 		    }
 		}}, taskOwner);
 	

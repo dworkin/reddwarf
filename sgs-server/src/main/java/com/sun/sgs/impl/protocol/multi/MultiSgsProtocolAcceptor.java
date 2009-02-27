@@ -207,7 +207,7 @@ public class MultiSgsProtocolAcceptor
         public void newConnection(AsynchronousByteChannel byteChannel)
             throws Exception
         {
-            new SecondaryChannel(secondaryTransport.getDeliveryGuarantee(),
+            new SecondaryChannel(secondaryTransport.getDelivery(),
 				 MultiSgsProtocolAcceptor.this,
                                  byteChannel,
                                  readBufferSize);

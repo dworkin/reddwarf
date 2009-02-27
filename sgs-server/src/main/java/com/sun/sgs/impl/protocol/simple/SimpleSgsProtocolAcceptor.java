@@ -213,17 +213,14 @@ public class SimpleSgsProtocolAcceptor
 		systemRegistry.getComponent(IdentityCoordinator.class);
                
             transport =
-                wrappedProps.getClassInstanceProperty(TRANSPORT_PROPERTY,
-                                                      DEFAULT_TRANSPORT,
-                                                      Transport.class,
-                                                      new Class[] {
-                                                            Properties.class},
-                                                      properties);
+                wrappedProps.getClassInstanceProperty(
+		    TRANSPORT_PROPERTY, DEFAULT_TRANSPORT, Transport.class,
+		    new Class[] {Properties.class}, properties);
             
-            if (!transport.getDeliveryGuarantee().equals(Delivery.RELIABLE)) {
+            if (!transport.getDelivery().equals(Delivery.RELIABLE)) {
                 transport.shutdown();
                 throw new IllegalArgumentException(
-                        "transport must support RELIABLE delivery");
+		    "transport must support RELIABLE delivery");
             }
 	    /*
 	     * Set up recurring task to monitor disconnecting client sessions.

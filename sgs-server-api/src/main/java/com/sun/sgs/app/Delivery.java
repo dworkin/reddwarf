@@ -67,6 +67,9 @@ public enum Delivery {
      *		requirements of the specified {@code delivery} guarantee
      */
     public boolean supportsDelivery(Delivery delivery) {
+	if (delivery == null) {
+	    throw new NullPointerException("null delivery");
+	}
 	return
 	    this == delivery ||
 	    this == RELIABLE ||

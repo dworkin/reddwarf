@@ -190,7 +190,7 @@ public class UdpTransport implements Transport {
     }
 
     /** {@inheritDoc} */
-    public Delivery getDeliveryGuarantee() {
+    public Delivery getDelivery() {
         return Delivery.UNRELIABLE;
     }
     

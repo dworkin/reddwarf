@@ -327,7 +327,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * @throws	DeliveryNotSupportedException if the specified {@code session}
      *		does not support this channel's delivery guarantee
      */
-    void checkDelivery(ClientSession session) {
+    private void checkDelivery(ClientSession session) {
 	for (Delivery d : session.supportedDeliveries()) {
 	    if (d.supportsDelivery(delivery)) {
 		return;

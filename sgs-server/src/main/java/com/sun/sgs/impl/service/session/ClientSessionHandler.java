@@ -741,7 +741,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    ClientSessionImpl sessionImpl =
                     new ClientSessionImpl(sessionService,
                                           identity,
-                                          protocol.supportedDeliveries(),
+                                          protocol.getDeliveries(),
                                           protocol.getMaxMessageLength());
 	    sessionRefId = sessionImpl.getId();
 	}

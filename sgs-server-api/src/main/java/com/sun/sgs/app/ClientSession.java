@@ -129,13 +129,13 @@ public interface ClientSession extends ManagedObject {
      * position is not modified by this operation. 
      *
      * <p>When possible, the message should be delivered using the most
-     * efficient means (e.g., protocol and transport) to satisfy the
-     * delivery guarantee.  However, a stronger delivery guarantee may be
-     * used to deliver the message if the underlying protocol only supports
-     * stronger delivery guarantees.  If the protocol is not able to
-     * satisfy the specified delivery guarantee (e.g., only supports weaker
-     * delivery guarantees than the one specified), then a {@link
-     * DeliveryNotSupportedException} will be thrown.
+     * efficient means to satisfy the delivery guarantee.  However, a
+     * stronger delivery guarantee may be used to deliver the message if
+     * the underlying protocol only supports stronger delivery guarantees.
+     * If the protocol is not able to satisfy the specified delivery
+     * guarantee (e.g., only supports weaker delivery guarantees than the
+     * one specified), then a {@link DeliveryNotSupportedException} will be
+     * thrown.
      * 
      * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
