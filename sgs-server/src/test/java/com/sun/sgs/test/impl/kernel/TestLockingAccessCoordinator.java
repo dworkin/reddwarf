@@ -150,19 +150,6 @@ public class TestLockingAccessCoordinator extends Assert {
     }
 
     @Test
-    public void testConstructorIllegalLockTimeout() {
-	properties.setProperty(
-	    LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY, "-37");
-	try {
-	    new LockingAccessCoordinator(
-		properties, txnProxy, profileCollector);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    @Test
     public void testConstructorIllegalNumKeyMaps() {
 	String[] values = { "0", "-50" };
 	for (String value : values) {

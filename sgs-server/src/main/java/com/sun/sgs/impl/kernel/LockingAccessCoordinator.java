@@ -50,22 +50,50 @@ import java.util.logging.Logger;
  * An implementation of {@link AccessCoordinator} that uses locking to handle
  * conflicts. <p>
  *
+ * This implementation checks for deadlock whenever an access request is
+ * blocked due to a conflict.  It selects the youngest transaction as the
+ * deadlock victim, determining the age using the originally requested start
+ * time for the task associated with the transaction.  It does not deny
+ * requests that would not result in deadlock.  When requests block, it queues
+ * the requests in the order that they arrive, except for upgrade requests,
+ * which it puts ahead of non-upgrade requests.  The special treatment of
+ * upgrade requests takes into account that an upgrade request is useless if a
+ * conflicting request goes first and causes the waiter to lose its read
+ * lock. <p>
+ *
  * The methods that this class provides to implement {@code AccessCoordinator}
  * are not thread safe, and should either be called from a single thread or
- * else protected with external synchronization.
+ * else protected with external synchronization. <p>
+ *
+ * The {@link #LockingAccessCoordinator constructor} supports the following
+ * configuration properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@code -1}
+ *
+ * <dd style="padding-top: .5em">The maximum number of milliseconds to wait for
+ * obtaining a lock.  A negative value, which is the default, means no lock
+ * timeout. <p>
+ *
+ * <dt> <i>Property:</i> <b>{@value #NUM_KEY_MAPS_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@value #NUM_KEY_MAPS_DEFAULT}
+ *
+ * <dd style="padding-top: .5em">The number of maps to use for associating keys
+ * and maps.  The number of maps controls the amount of concurrency. <p>
+ *
+ * </dl>
  */
 public class LockingAccessCoordinator extends AbstractAccessCoordinator
     implements AccessCoordinatorHandle, NonDurableTransactionParticipant
 {
     /**
      * The property for specifying the maximum number of milliseconds to wait
-     * for obtaining a lock.
+     * for obtaining a lock.  A negative value means no lock timeout.
      */
     public static final String LOCK_TIMEOUT_PROPERTY =
 	"com.sun.sgs.lock.timeout";
-
-    /** The default number of milliseconds to wait for obtaining a lock. */
-    public static final long LOCK_TIMEOUT_DEFAULT = 10;
 
     /**
      * The property for specifying the number of maps to use for associating
@@ -90,7 +118,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /**
      * The maximum number of milliseconds to spend attempting to acquiring a
-     * lock.
+     * lock, or a negative value if there is no lock timeout.
      */
     private final long lockTimeout;
 
@@ -126,8 +154,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     {
 	super(txnProxy, profileCollectorHandle);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	lockTimeout = wrappedProps.getLongProperty(
-	    LOCK_TIMEOUT_PROPERTY, LOCK_TIMEOUT_DEFAULT, 0, Long.MAX_VALUE);
+	lockTimeout = wrappedProps.getLongProperty(LOCK_TIMEOUT_PROPERTY, -1);
 	numKeyMaps = wrappedProps.getIntProperty(
 	    NUM_KEY_MAPS_PROPERTY, NUM_KEY_MAPS_DEFAULT, 1, Integer.MAX_VALUE);
 	keyMaps = createKeyMaps(numKeyMaps);
@@ -447,15 +474,19 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      */
     private void endTransaction(Transaction txn) {
 	Locker locker = getLocker(txn);
+	logger.log(Level.FINER, "End {0}", locker);
 	for (LockRequest request : locker.requests) {
 	    Key key = request.key;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
-	    List<Locker> newOwners;
+	    List<Locker> newOwners = Collections.emptyList();
 	    synchronized (keyMap) {
-		Lock lock = getLock(key, keyMap);
-		newOwners = lock.release(locker);
-		if (!lock.inUse()) {
-		    keyMap.remove(key);
+		/* Don't create the lock if it isn't present */
+		Lock lock = keyMap.get(key);
+		if (lock != null) {
+		    newOwners = lock.release(locker);
+		    if (!lock.inUse()) {
+			keyMap.remove(key);
+		    }
 		}
 	    }
 	    for (Locker newOwner : newOwners) {
@@ -487,7 +518,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	LockAttemptResult result;
 	synchronized (keyMap) {
 	    Lock lock = getLock(key, keyMap);
-	    result = lock.lock(locker, forWrite);
+	    result = lock.lock(locker, forWrite, false);
 	    if (result == null) {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
@@ -543,7 +574,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		lock = getLock(key, keyMap);
 	    }
 	    long now = System.currentTimeMillis();
-	    long stop = Math.min(now + lockTimeout, locker.stopTime);
+	    long stop = (lockTimeout < 0) ? locker.stopTime
+		: Math.min(now + lockTimeout, locker.stopTime);
 	    while (true) {
 		if (now >= stop) {
 		    synchronized (keyMap) {
@@ -565,6 +597,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    isOwner = lock.isOwner(result.request);
 		}
 		if (isOwner) {
+		    locker.setWaitingFor(null);
 		    logger.log(Level.FINER,
 			       "Wait for lock {0}\n" +
 			       "  returns null (already granted)",
@@ -833,9 +866,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/**
-	 * Attempts to obtain this lock.  Adds the locker as an owner of the
-	 * lock if the lock was obtained.  Returns {@code null} if the locker
-	 * already owned this lock.  Otherwise, returns a {@code
+	 * Attempts to obtain this lock.  If {@code waiting} is {@code true},
+	 * the locker is already waiting for the lock.  Adds the locker as an
+	 * owner of the lock if the lock was obtained, and removes the locker
+	 * from the waiters list if it was waiting.  Returns {@code null} if
+	 * the locker already owned this lock.  Otherwise, returns a {@code
 	 * LockAttemptResult} containing the {@link LockRequest} and with the
 	 * {@code conflict} field set to {@code null} if the lock was acquired,
 	 * else set to a conflicting transaction if the lock could not be
@@ -843,13 +878,21 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 *
 	 * @param	locker the locker requesting the lock
 	 * @param	forWrite whether a write lock is requested
+	 * @param	waiting whether the locker is already a waiter
 	 * @return	a {@code LockAttemptResult} or {@code null}
 	 */
-	LockAttemptResult lock(Locker locker, boolean forWrite) {
+	LockAttemptResult lock(
+	    Locker locker, boolean forWrite, boolean waiting)
+	{
+	    assert validate(true);
 	    if (owners.isEmpty()) {
 		LockRequest request =
 		    new LockRequest(locker, key, forWrite, false);
 		owners.add(request);
+		if (waiting) {
+		    flushWaiter(locker);
+		}
+		assert validate(false);
 		return new LockAttemptResult(request, null);
 	    }
 	    boolean upgrade = false;
@@ -857,6 +900,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    for (LockRequest ownerRequest : owners) {
 		if (locker == ownerRequest.locker) {
 		    if (!forWrite || ownerRequest.getForWrite()) {
+			if (waiting) {
+			    flushWaiter(locker);
+			}
+			assert validate(false);
 			return null;
 		    } else {
 			upgrade = true;
@@ -869,20 +916,32 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		new LockRequest(locker, key, forWrite, upgrade);
 	    if (conflict == null) {
 		if (upgrade) {
+		    boolean found = false;
 		    for (Iterator<LockRequest> i = owners.iterator();
 			 i.hasNext(); )
 		    {
 			LockRequest ownerRequest = i.next();
 			if (locker == ownerRequest.locker) {
 			    i.remove();
+			    found = true;
+			    assert !ownerRequest.getForWrite()
+				: "Should own for read when upgrading";
 			    break;
 			}
 		    }
+		    assert found : "Should own when upgrading";
 		}
 		owners.add(request);
+		if (waiting) {
+		    flushWaiter(locker);
+		}
+		assert validate(false);
 		return new LockAttemptResult(request, null);
 	    }
-	    addWaiter(request);
+	    if (!waiting) {
+		addWaiter(request);
+	    }
+	    assert validate(false);
 	    return new LockAttemptResult(request, conflict);
 	}
 
@@ -900,23 +959,31 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		 * Add upgrade requests after any existing ones, but before
 		 * other requests.
 		 */
+		boolean added = false;
 		for (int i = 0; i < waiters.size(); i++) {
 		    if (!waiters.get(i).getUpgrade()) {
 			waiters.add(i, request);
+			added = true;
 			break;
 		    }
+		}
+		if (!added) {
+		    waiters.add(request);
 		}
 	    }
 	}
 
 	/**
-	 * Releases the ownership of this lock by the locker.  Returns a list
-	 * of the lockers who have been newly made owners of this lock, if any.
+	 * Releases the ownership of this lock by the locker.  Attempts to
+	 * acquire locks for current waiters, removing the ones that acquire
+	 * the lock from the waiters list, adding them to the owners, and
+	 * returning them.
 	 *
 	 * @param	locker the locker whose ownership will be released
 	 * @return	the newly added owners
 	 */
 	List<Locker> release(Locker locker) {
+	    assert validate(false);
 	    logger.log(Level.FINEST, "Release {0}", locker);
 	    boolean owned = false;
 	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
@@ -930,12 +997,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    List<Locker> lockersToNotify = Collections.emptyList();
 	    if (owned && !waiters.isEmpty()) {
 		boolean found = false;
-		for (Iterator<LockRequest> iter = waiters.iterator();
-		     iter.hasNext(); )
-		{
-		    LockRequest waiter = iter.next();
+		for (int i = 0; i < waiters.size(); i++) {
+		    LockRequest waiter = waiters.get(i);
 		    LockAttemptResult result =
-			lock(waiter.locker, waiter.getForWrite());
+			lock(waiter.locker, waiter.getForWrite(), true);
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(
 			    Level.FINEST,
@@ -945,7 +1010,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    if (result != null && result.conflict != null) {
 			break;
 		    }
-		    iter.remove();
+		    /* Back up because this waiter was removed */
+		    i--;
 		    if (!found) {
 			found = true;
 			lockersToNotify = new ArrayList<Locker>();
@@ -953,21 +1019,74 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    lockersToNotify.add(waiter.locker);
 		}
 	    }
+	    assert validate(true);
 	    return lockersToNotify;
 	}
+
+	/**
+	 * Validates the state of this lock.  If {@code notInUseOk} is {@code
+	 * true}, then the lock is permitted to not be in use, either because
+	 * it is newly allocated or has been released. <p>
+	 *
+	 * Consistency constraints: <ul>
+	 * <li>at least one owner, unless {@code notInUseOk} is {@code true}
+	 * <li>locker appears once in owners and waiters <em>except</em> that
+	 *     an upgrade request can be a waiter if a read request is an owner
+	 * <li>no upgrade waiters if the locker is not a read owner
+	 * <li>all upgrade waiters precede other waiters
+	 * </ul>
+	 *
+	 * @param	notInUseOk if it is valid for the lock to not be in use
+	 * @return	{@code true} if the state is valid, otherwise throws
+	 *		{@link AssertionError}
+	 */
+	private boolean validate(boolean notInUseOk) {
+	    int numWaiters = waiters.size();
+	    int numOwners = owners.size();
+	    if (!notInUseOk && numOwners == 0) {
+		throw new AssertionError("No owners: " + this);
+	    }
+	    boolean seenNonUpgrade = false;
+	    for (int i = 0; i < numWaiters - 1; i++) {
+		LockRequest waiter = waiters.get(i);
+		if (!waiter.getUpgrade()) {
+		    seenNonUpgrade = true;
+		} else if (seenNonUpgrade) {
+		    throw new AssertionError(
+			"Upgrade waiter follows non-upgrade: " + this +
+			", waiters: " + waiters);
+		}
+		for (int j = i + 1; j < numWaiters; j++) {
+		    LockRequest waiter2 = waiters.get(j);
+		    if (waiter.locker == waiter2.locker) {
+			throw new AssertionError(
+			    "Locker waits twice: " + this + ", " +
+			    waiter + ", " + waiter2);
+		    }
+		}
+		for (int j = 0; j < numOwners; j++) {
+		    LockRequest owner = owners.get(j);
+		    if (waiter.locker == owner.locker) {
+			if (!waiter.getUpgrade()) {
+			    throw new AssertionError(
+				"Locker owns and waits, but not for" +
+				" upgrade: " + this + ", owner:" + owner +
+				", waiter:" + waiter);
+			} else if (owner.getForWrite()) {
+			    throw new AssertionError(
+				"Locker owns for write but waits for" +
+				" upgrade: " + this + ", owner:" + owner +
+				", waiter:" + waiter);
+			}
+		    }
+		}
+	    }
+	    return true;
+	}    
 
 	/** Checks if this lock has any owners or waiters. */
 	boolean inUse() {
 	    return !owners.isEmpty() || !waiters.isEmpty();
-	}
-
-	/**
-	 * Returns the lock request associated with the first owner, assuming
-	 * that the lock has at least one owner.
-	 */
-	LockRequest getFirstOwner() {
-	    assert !owners.isEmpty();
-	    return owners.get(0);
 	}
 
 	/** Returns a copy of the locker requests for the owners. */
