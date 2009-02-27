@@ -44,5 +44,12 @@ final class BootProperties {
      */
     static final String DEFAULT_APP_PROPERTIES = 
             "META-INF/app.properties";
+    
+    /**
+     * The standard resource location to look for application logging 
+     * properties configuration
+     */
+    static final String DEFAULT_LOG_PROPERTIES =
+            "META-INF/logging.properties";
 
 }
