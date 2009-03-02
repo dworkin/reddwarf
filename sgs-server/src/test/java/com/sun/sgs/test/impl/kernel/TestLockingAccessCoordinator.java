@@ -38,7 +38,7 @@ import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.NameRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -54,7 +54,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /** Tests the {@link LockingAccessCoordinator} class. */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestLockingAccessCoordinator extends Assert {
 
     /** The transaction proxy, for creating transactions. */
@@ -96,7 +96,7 @@ public class TestLockingAccessCoordinator extends Assert {
     /** Initialize fields for test methods. */
     @Before
     public void before() throws Exception {
-        properties = new Properties();
+	properties = new Properties();
 	if (lockTimeout > 0) {
 	    properties.setProperty(
 		LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
@@ -151,14 +151,17 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test
     public void testConstructorIllegalLockTimeout() {
-	properties.setProperty(
-	    LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY, "-37");
-	try {
-	    new LockingAccessCoordinator(
-		properties, txnProxy, profileCollector);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
+	String[] values = { "0", "-37" };
+	for (String value : values) {
+	    properties.setProperty(
+		LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY, value);
+	    try {
+		new LockingAccessCoordinator(
+		    properties, txnProxy, profileCollector);
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(e);
+	    }
 	}
     }
 
@@ -212,6 +215,23 @@ public class TestLockingAccessCoordinator extends Assert {
     @Test(expected=IllegalArgumentException.class)
     public void testNotifyNewTransactionIllegalTryCount() {
 	coordinator.notifyNewTransaction(txn, 0, 0);
+    }
+
+    @Test(expected=IllegalStateException.class)
+    public void testNotifyNewTransactionAgain() {
+	coordinator.notifyNewTransaction(txn, 0, 1);
+    }
+
+    @Test
+    public void testNotifyNewTransactionAborted() {
+	txn.abort(ABORT_EXCEPTION);
+	try {
+	    coordinator.notifyNewTransaction(txn, 0, 1);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+	txn = null;
     }
 
     /* -- Test AccessReporter.reportObjectAccess -- */
@@ -288,6 +308,12 @@ public class TestLockingAccessCoordinator extends Assert {
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
+	try {
+	    reporter.reportObjectAccess("o1", AccessType.READ, null);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
     }
 
     @Test
@@ -298,33 +324,42 @@ public class TestLockingAccessCoordinator extends Assert {
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
-	} finally {
-	    txn2.abort(ABORT_EXCEPTION);
 	}
+	try {
+	    reporter.reportObjectAccess(txn2, "o1", AccessType.READ, null);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	txn2.abort(ABORT_EXCEPTION);
     }
 
     @Test
     public void testReportObjectAccessDescription() throws Exception {
 	reporter.reportObjectAccess("o1", AccessType.READ, "object 1 (a)");
 	reporter.reportObjectAccess("o1", AccessType.WRITE, "object 1 (b)");
+	reporter.reportObjectAccess("o1", AccessType.WRITE, null);
+	reporter.reportObjectAccess("o1", AccessType.WRITE);
 	reporter.reportObjectAccess("o2", AccessType.WRITE, null);
 	reporter.reportObjectAccess("o2", AccessType.WRITE, "object 2");
 	reporter.reportObjectAccess("o3", AccessType.READ);
+	reporter.reportObjectAccess("o4", AccessType.READ, null);
 	txn.commit();
 	txn = null;
 	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
 			    "s", "o1", AccessType.READ, "object 1 (a)",
 			    "s", "o1", AccessType.WRITE, "object 1 (a)",
 			    "s", "o2", AccessType.WRITE, "object 2",
-			    "s", "o3", AccessType.READ, null);
-    }			    
+			    "s", "o3", AccessType.READ, null,
+			    "s", "o4", AccessType.READ, null);
+    }
 
     @Test
     public void testReportObjectAccessMultipleReporters() {
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 0, 1);
 	AccessReporter<String> reporterPrime =
-	    coordinator.registerAccessSource("s1", String.class);
+	    coordinator.registerAccessSource("s", String.class);
 	AccessReporter<String> reporter2 =
 	    coordinator.registerAccessSource("s2", String.class);
 	AccessReporter<String> reporter2Prime =
@@ -343,13 +378,6 @@ public class TestLockingAccessCoordinator extends Assert {
     public void testReportObjectAccessMisc() throws Exception {
 	AccessReporter<String> reporter2 =
 	    coordinator.registerAccessSource("s2", String.class);
-	Object[] expected = {
-	    "s", "read1", AccessType.READ, null,
-	    "s2", "read1", AccessType.READ, null,
-	    "s", "upgrade", AccessType.READ, null,
-	    "s", "write1", AccessType.WRITE, null,
-	    "s", "upgrade", AccessType.WRITE, null
-	};
 	reporter.reportObjectAccess("read1", AccessType.READ);
 	reporter2.reportObjectAccess("read1", AccessType.READ);
 	reporter.reportObjectAccess("upgrade", AccessType.READ);
@@ -362,20 +390,44 @@ public class TestLockingAccessCoordinator extends Assert {
 	txn.commit();
 	txn = null;
 	assertObjectDetails(
-	    profileCollector.getAccessedObjectsDetail(), expected);
+	    profileCollector.getAccessedObjectsDetail(),
+	    "s", "read1", AccessType.READ, null,
+	    "s2", "read1", AccessType.READ, null,
+	    "s", "upgrade", AccessType.READ, null,
+	    "s", "write1", AccessType.WRITE, null,
+	    "s", "upgrade", AccessType.WRITE, null);
     }
 
     /* -- Test AccessReporter.setObjectDescription -- */
 
-    @Test(expected=NullPointerException.class)
+    @Test
     public void testSetObjectDescriptionNullTxn() {
-	reporter.setObjectDescription(null, "id", "desc");
+	try {
+	    reporter.setObjectDescription(null, "id", null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
+	try {
+	    reporter.setObjectDescription(null, "id", "desc");
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
     }
 
     @Test
     public void testSetObjectDescriptionNullObjId() {
 	try {
+	    reporter.setObjectDescription(null, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
+	try {
 	    reporter.setObjectDescription(null, "desc");
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
+	try {
+	    reporter.setObjectDescription(txn, null, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	}
@@ -493,7 +545,7 @@ public class TestLockingAccessCoordinator extends Assert {
 	detail = profileCollector.getAccessedObjectsDetail();
 	assertObjectDetails(detail, "s", "o1", AccessType.WRITE, null);
 	assertEquals(ConflictType.NONE, detail.getConflictType());
-	assertEquals(null, detail.getConflictingId());	
+	assertEquals(null, detail.getConflictingId());
     }
 
     @Test
@@ -547,7 +599,7 @@ public class TestLockingAccessCoordinator extends Assert {
 			    "s", "o1", AccessType.READ, null,
 			    "s", "o2", AccessType.WRITE, null);
 	assertEquals(ConflictType.NONE, detail.getConflictType());
-	assertEquals(null, detail.getConflictingId());	
+	assertEquals(null, detail.getConflictingId());
     }
 
     /* -- Test lock -- */
@@ -588,6 +640,29 @@ public class TestLockingAccessCoordinator extends Assert {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
+    }
+
+    /**
+     * Test what happens if we abandon the attempt to acquire a lock that ends
+     * in a timeout, and then try again after the conflicting transaction
+     * completes.  We don't currently provide an API for doing this in
+     * Darkstar, but it should be possible using the lower level API.
+     */
+    @Test
+    public void testLockAfterTimeout() throws Exception {
+	properties.setProperty(
+	    LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY, String.valueOf(1));
+	init();
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	Thread.sleep(2);
+	assertTimeout(locker2.getResult(), txn);
+	txn.abort(ABORT_EXCEPTION);
+	txn = null;
+	assertGranted(acquireLock(txn2, "s1", "o1", true));
     }
 
     /* -- Test lockNoWait -- */
@@ -663,8 +738,8 @@ public class TestLockingAccessCoordinator extends Assert {
      * Test read/write conflict
      *
      * txn2: read o1	=> granted
-     * txn:  write o2	=> blocked
-     * txn2: abort
+     * txn:  write o1	=> blocked
+     * txn2: commit
      * txn:		=> granted
      */
     @Test
@@ -835,15 +910,15 @@ public class TestLockingAccessCoordinator extends Assert {
      * txn is oldest, txn2 in the middle, txn3 is youngest
      *
      * txn:  read o1	=> granted
-     * txn2: read o2	=> granted 
-     * txn2: write o1	=> blocked
+     * txn2: read o2	=> granted
      * txn3: read o2	=> granted
+     * txn2: write o1	=> blocked
      * txn3: write o1	=> blocked
      * txn:  write o2	=> blocked
-     * txn2:		=> deadlock
-     * txn2: abort
      * txn3:		=> deadlock
      * txn3: abort
+     * txn2:		=> deadlock
+     * txn2: abort
      * txn:		=> granted
      */
     @Test
@@ -854,9 +929,9 @@ public class TestLockingAccessCoordinator extends Assert {
 	coordinator.notifyNewTransaction(txn3, 2000, 1);
 	assertGranted(acquireLock(txn, "s1", "o1", false));
 	assertGranted(acquireLock(txn2, "s1", "o2", false));
+	assertGranted(acquireLock(txn3, "s1", "o2", false));
 	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
 	locker2.assertBlocked();
-	assertGranted(acquireLock(txn3, "s1", "o2", false));
 	AcquireLock locker3 = new AcquireLock(txn3, "s1", "o1", true);
 	locker3.assertBlocked();
 	AcquireLock locker = new AcquireLock(txn, "s1", "o2", true);
@@ -864,7 +939,7 @@ public class TestLockingAccessCoordinator extends Assert {
 	assertDeadlock(locker3.getResult(), txn, txn2);
 	txn3.abort(ABORT_EXCEPTION);
 	locker.assertBlocked();
-	assertDeadlock(locker2.getResult(), txn);
+	assertDeadlock(locker2.getResult(), txn, txn3);
 	txn2.abort(ABORT_EXCEPTION);
 	assertGranted(locker.getResult());
     }
@@ -957,7 +1032,6 @@ public class TestLockingAccessCoordinator extends Assert {
 	    }
 	    counter.await();
 	    long time = System.currentTimeMillis() - start;
-	    
 	    System.err.println(
 		time + " ms" +
 		", " + ((double) time / (count * locks)) + " ms/lock");
@@ -1056,8 +1130,8 @@ public class TestLockingAccessCoordinator extends Assert {
 
     /**
      * Asserts that the request resulted in a deadlock. The conflictingTxns
-     * argument specifies all of the other transactions that were involved in
-     * the conflict.
+     * argument specifies all of the other transactions that may have been
+     * involved in the conflict.
      */
     static void assertDeadlock(
 	LockConflict conflict, Transaction... conflictingTxns)
@@ -1067,8 +1141,8 @@ public class TestLockingAccessCoordinator extends Assert {
 
     /**
      * Asserts that the request resulted in a timeout. The conflictingTxns
-     * argument specifies all of the other transactions that were involved in
-     * the conflict.
+     * argument specifies all of the other transactions that may have been
+     * involved in the conflict.
      */
     static void assertTimeout(
 	LockConflict conflict, Transaction... conflictingTxns)
@@ -1079,7 +1153,7 @@ public class TestLockingAccessCoordinator extends Assert {
     /**
      * Asserts that the request was denied, with the specified type of
      * conflict. The conflictingTxns argument specifies all of the other
-     * transactions that were involved in the conflict.
+     * transactions that may have been involved in the conflict.
      */
     static void assertDenied(LockConflictType type,
 			     LockConflict conflict,
@@ -1092,8 +1166,8 @@ public class TestLockingAccessCoordinator extends Assert {
     }
 
     /**
-     * Asserts that the element is one of the elements of the array, which
-     * should not be empty.
+     * Asserts that the item is one of the elements of the array, which should
+     * not be empty.
      */
     static <T> void assertMember(T[] array, T item) {
 	assertTrue("Must have some members", array.length > 0);

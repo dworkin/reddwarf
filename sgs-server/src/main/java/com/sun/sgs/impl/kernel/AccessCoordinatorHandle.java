@@ -22,8 +22,8 @@ import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
 
 /**
- * The sub-interface of {@code AccessCoordinator} that the kernel uses to
- * notify the access coordinator of new transactions.
+ * A subinterface of {@code AccessCoordinator} that the kernel uses to notify
+ * the access coordinator of new transactions.
  */
 public interface AccessCoordinatorHandle extends AccessCoordinator {
     
@@ -31,7 +31,7 @@ public interface AccessCoordinatorHandle extends AccessCoordinator {
      * Notifies the coordinator that a new transaction is starting. 
      *
      * @param	txn the transaction
-     * @param	requestedStartTime the time milliseconds that the task
+     * @param	requestedStartTime the time in milliseconds that the task
      *		associated with the transaction was originally requested to
      *		start
      * @param	tryCount the number of times that transactions have been

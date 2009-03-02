@@ -19,15 +19,15 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
-import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
-/** Provides a skeletal implementation of {@code AccessCoordinator}. */
-public abstract class AbstractAccessCoordinator implements AccessCoordinator {
-
+/** Provides a skeletal implementation of {@code AccessCoordinatorHandle}. */
+public abstract class AbstractAccessCoordinator
+    implements AccessCoordinatorHandle
+{
     /** The transaction proxy. */
     protected final TransactionProxy txnProxy;
 
@@ -51,11 +51,10 @@ public abstract class AbstractAccessCoordinator implements AccessCoordinator {
     }
 
     /**
-     * Checks that the argument is non-null.
+     * Throws {@link NullPointerException} if the argument is {@code null}.
      *
      * @param	arg the argument
      * @param	parameterName the parameter name for the argument
-     * @throws	NullPointerException if {@code arg} is null
      */
     protected static void checkNonNull(Object arg, String parameterName) {
 	if (arg == null) {
@@ -64,7 +63,7 @@ public abstract class AbstractAccessCoordinator implements AccessCoordinator {
 	}
     }
 
-    /** Provide a skeletal implementation of {@code AccessReporter}. */
+    /** Provides a skeletal implementation of {@code AccessReporter}. */
     public abstract class AbstractAccessReporter<T>
 	implements AccessReporter<T>
     {

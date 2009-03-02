@@ -85,7 +85,7 @@ import java.util.logging.Logger;
  *
  * <dd style="padding-top: .5em">The number of maps to use for associating keys
  *	and maps.  The number of maps controls the amount of concurrency.  The
- *	value must be greater than {code 1}. <p>
+ *	value must be greater than {code 0}. <p>
  *
  * </dl> <p>
  *
@@ -266,7 +266,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /** {@inheritDoc} */
     public String getTypeName() {
-        return CLASS;
+	return CLASS;
     }
 
     /* -- Other public methods -- */
@@ -339,7 +339,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 				   Object description)
     {
 	Locker locker = getLocker(txn);
-	checkLockerNotAborted(locker);	
+	checkLockerNotAborted(locker);
 	return lockNoWaitInternal(
 	    locker, new Key(source, objectId), forWrite, description);
     }
@@ -506,7 +506,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
     }
 
-    /** 
+    /**
      * Releases the locks for the transaction and reports object accesses to
      * the profiling system.
      *
@@ -537,7 +537,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    }
 	}
 	txnMap.remove(txn);
-        profileCollectorHandle.setAccessedObjectsDetail(locker);
+	profileCollectorHandle.setAccessedObjectsDetail(locker);
     }
 
     /** Attempts to acquire a lock, returning immediately. */
@@ -1050,7 +1050,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	List<Locker> release(Locker locker) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "release {0}, {1}", locker, this);
-	    } 
+	    }
 	    boolean owned = false;
 	    for (Iterator<LockRequest> i = owners.iterator(); i.hasNext(); ) {
 		LockRequest ownerRequest = i.next();
@@ -1152,7 +1152,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		}
 	    }
 	    return true;
-	}    
+	}
 
 	/** Checks if this lock has any owners or waiters. */
 	boolean inUse() {
@@ -1299,7 +1299,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    Transaction txn, T objectId, Object description)
 	{
 	    Locker locker = getLocker(txn);
-	    if (description != null) {
+	    if (description == null) {
+		checkNonNull(objectId, "objectId");
+	    } else {
 		locker.setDescription(
 		    new Key(source, objectId), description);
 	    }
@@ -1449,7 +1451,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * Checks for a deadlock starting with the root locker.
 	 *
 	 * @return	a lock conflict if a deadlock was found, else {@code
-	 *		null} 
+	 *		null}
 	 */
 	LockConflict check() {
 	    LockConflict result = null;
@@ -1480,7 +1482,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		}
 	    }
 	}
-		    
+
 	/**
 	 * Checks for deadlock starting with the specified locker and
 	 * information about its waiters.  Returns whether a deadlock was

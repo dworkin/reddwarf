@@ -64,7 +64,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * detail about failure but will also be more compute-intensive.
  */
 class AccessCoordinatorImpl extends AbstractAccessCoordinator
-    implements AccessCoordinatorHandle, NonDurableTransactionParticipant
+    implements NonDurableTransactionParticipant
 {
     /**
      * The map from active transactions to associated detail
