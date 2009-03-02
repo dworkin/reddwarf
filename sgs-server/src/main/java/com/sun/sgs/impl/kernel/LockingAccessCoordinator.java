@@ -54,17 +54,17 @@ import java.util.logging.Logger;
  * This implementation checks for deadlock whenever an access request is
  * blocked due to a conflict.  It selects the youngest transaction as the
  * deadlock victim, determining the age using the originally requested start
- * time for the task associated with the transaction.  It does not deny
- * requests that would not result in deadlock.  When requests block, it queues
- * the requests in the order that they arrive, except for upgrade requests,
- * which it puts ahead of non-upgrade requests.  The special treatment of
- * upgrade requests takes into account that an upgrade request is useless if a
- * conflicting request goes first and causes the waiter to lose its read
- * lock. <p>
+ * time for the task associated with the transaction.  The implementation does
+ * not deny requests that would not result in deadlock.  When requests block,
+ * it services the requests in the order that they arrive, except for upgrade
+ * requests, which it puts ahead of non-upgrade requests.  The justification
+ * for special treatment of upgrade requests is that an upgrade request is
+ * useless if a conflicting request goes first and causes the waiter to lose
+ * its read lock. <p>
  *
- * The methods that this class provides to implement {@code AccessCoordinator}
- * are not thread safe, and should either be called from a single thread or
- * else protected with external synchronization. <p>
+ * The methods that this class provides to implement {@code AccessReporter} are
+ * not thread safe, and should either be called from a single thread or else
+ * protected with external synchronization. <p>
  *
  * The {@link #LockingAccessCoordinator constructor} supports the following
  * configuration properties: <p>
@@ -84,7 +84,8 @@ import java.util.logging.Logger;
  *	<i>Default:</i> {@value #NUM_KEY_MAPS_DEFAULT}
  *
  * <dd style="padding-top: .5em">The number of maps to use for associating keys
- * and maps.  The number of maps controls the amount of concurrency. <p>
+ *	and maps.  The number of maps controls the amount of concurrency.  The
+ *	value must be greater than {code 1}. <p>
  *
  * </dl> <p>
  *
@@ -94,7 +95,7 @@ import java.util.logging.Logger;
  *
  * <ul>
  * <li> {@link Level#FINER FINER} - Beginning and ending transactions;
- *	requesting, waiting for, and returning from requesting locks; deadlocks
+ *	requesting, waiting for, and returning from lock requests; deadlocks
  * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
  *	requesting locks before waiting, releasing locks, results of attempting
  *	to assign locks to waiters, details of checking deadlocks
@@ -109,7 +110,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /**
      * The property for specifying the maximum number of milliseconds to wait
-     * for obtaining a lock.  A negative value means no lock timeout.
+     * for obtaining a lock.
      */
     public static final String LOCK_TIMEOUT_PROPERTY =
 	CLASS + ".lock.timeout";
@@ -136,9 +137,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     /** The default number of key maps. */
     public static final int NUM_KEY_MAPS_DEFAULT = 8;
 
-    /** An empty array of lock requests. */
-    static final LockRequest[] NO_LOCK_REQUESTS = { };
-
     /** The logger for this class. */
     static final LoggerWrapper logger = new LoggerWrapper(
 	Logger.getLogger(LockingAccessCoordinator.class.getName()));
@@ -148,7 +146,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	new ConcurrentHashMap<Transaction, Locker>();
 
     /**
-     * The maximum number of milliseconds to spend attempting to acquiring a
+     * The maximum number of milliseconds to spend attempting to acquire a
      * lock.
      */
     private final long lockTimeout;
@@ -162,8 +160,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     /**
      * An array of maps from key to lock.  The map to use is chosen by using
      * the key's hash code mod the number of key maps.  Synchronization for
-     * locks is based on locking the associated key map.  Locks should not be
-     * used without synchronizing on the associated key map lock.
+     * locks is based on locking the associated key map.  Non-{@code Object}
+     * methods on locks should not be used without synchronizing on the
+     * associated key map lock.
      */
     private final Map<Key, Lock>[] keyMaps;
 
@@ -190,7 +189,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	long defaultLockTimeout = (txnTimeout < 1)
 	    ? DEFAULT_LOCK_TIMEOUT
 	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
-	/* Avoid underflow */
+	/* Lock timeout should be at least 1 */
 	if (defaultLockTimeout < 1) {
 	    defaultLockTimeout = 1;
 	}
@@ -226,9 +225,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     public void notifyNewTransaction(
 	Transaction txn, long requestedStartTime, int tryCount)
     {
-	checkNonNull(txn, "txn");
-	if (requestedStartTime < 0 || tryCount < 1) {
-	    throw new IllegalArgumentException();
+	if (tryCount < 1) {
+	    throw new IllegalArgumentException(
+		"The tryCount must not be less than 1");
 	}
 	Locker locker = new Locker(txn, requestedStartTime);
 	Locker existing = txnMap.putIfAbsent(txn, locker);
@@ -267,7 +266,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /** {@inheritDoc} */
     public String getTypeName() {
-        return getClass().getName();
+        return CLASS;
     }
 
     /* -- Other public methods -- */
@@ -278,7 +277,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * prevented the lock from being acquired, or else {@code null} if the lock
      * was acquired.  If the {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any other lock or wait requests will throw {@code
+     * transaction, and any subsequent lock or wait requests will throw {@code
      * IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
@@ -290,10 +289,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
      * @throws	IllegalArgumentException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called for {@code txn}
+     *		notifyNewTransaction} has not been called for {@code txn}
      * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if waiting for an earlier
-     *		attempt to complete
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
      */
     public LockConflict lock(Transaction txn,
 			     String source,
@@ -316,7 +315,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * of {@link LockConflictType#BLOCKED BLOCKED} rather than waiting.  If the
      * {@code type} field of the return value is {@link
      * LockConflictType#DEADLOCK DEADLOCK}, then the caller should abort the
-     * transaction, and any other lock or wait requests will throw {@code
+     * transaction, and any subsequent lock or wait requests will throw {@code
      * IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
@@ -328,10 +327,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
      * @throws	IllegalArgumentException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called for {@code txn}
+     *		notifyNewTransaction} has not been called for {@code txn}
      * @throws	IllegalStateException if an earlier lock attempt for this
-     *		transaction produced a deadlock, or if waiting for an earlier
-     *		attempt to complete
+     *		transaction produced a deadlock, or if still waiting for an
+     *		earlier attempt to complete
      */
     public LockConflict lockNoWait(Transaction txn,
 				   String source,
@@ -351,14 +350,14 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * the lock, or else {@code null} if the lock was acquired or the
      * transaction was not waiting.  If the {@code type} field of the return
      * value is {@link LockConflictType#DEADLOCK DEADLOCK}, then the caller
-     * should abort the transaction, and any other lock or wait requests will
-     * throw {@code IllegalStateException}.
+     * should abort the transaction, and any subsequent lock or wait requests
+     * will throw {@code IllegalStateException}.
      *
      * @param	txn the transaction requesting the lock
      * @return	lock conflict information, or {@code null} if there was no
      *		conflict
      * @throws	IllegalArgumentException if {@link #notifyNewTransaction
-     *		notifyNewTransaction} has not be called for {@code txn}
+     *		notifyNewTransaction} has not been called for {@code txn}
      * @throws	IllegalStateException if an earlier lock attempt for this
      *		transaction produced a deadlock
      */
@@ -370,25 +369,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /* -- Public classes -- */
 
-    /** The type of lock conflict. */
-    public enum LockConflictType {
-
-	/** The request is currently blocked. */
-	BLOCKED,
-
-	/** The request timed out. */
-	TIMEOUT,
-
-	/** The request was denied. */
-	DENIED,
-
-	/** The request resulted in deadlock and was chosen to be aborted. */
-	DEADLOCK;
-    }
-
-    /**
-     * A class for representing a conflict resulting from requesting a lock.
-     */
+    /** A class for representing a conflict resulting from a lock request. */
     public static final class LockConflict {
 
 	/** The type of conflict. */
@@ -438,8 +419,24 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	@Override
 	public String toString() {
 	    return "LockConflict[type:" + type +
-		", conflictingTxn:" + conflictingTxn + "]";
+		", conflict:" + conflictingTxn + "]";
 	}
+    }
+
+    /** The type of a lock conflict. */
+    public enum LockConflictType {
+
+	/** The request is currently blocked. */
+	BLOCKED,
+
+	/** The request timed out. */
+	TIMEOUT,
+
+	/** The request was denied. */
+	DENIED,
+
+	/** The request resulted in deadlock and was chosen to be aborted. */
+	DEADLOCK;
     }
 
     /* -- Other methods -- */
@@ -462,13 +459,15 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     }
 
     /**
-     * Returns the key map that should be used for the specified key.
+     * Returns the key map to use for the specified key.
      *
      * @param	key the key
      * @return	the associated key map
      */
-    private Map<Key, Lock> getKeyMap(Key key) {
-	return keyMaps[(key.hashCode() & Integer.MAX_VALUE) % numKeyMaps];
+    Map<Key, Lock> getKeyMap(Key key) {
+	/* Mask off the sign bit to get a positive value */
+	int index = (key.hashCode() & Integer.MAX_VALUE) % numKeyMaps;
+	return keyMaps[index];
     }
 
     /**
@@ -480,7 +479,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @param	keyMap the keyMap
      * @return	the associated lock
      */
-    private static Lock getLock(Key key, Map<Key, Lock> keyMap) {
+    static Lock getLock(Key key, Map<Key, Lock> keyMap) {
 	assert Thread.holdsLock(keyMap);
 	Lock lock = keyMap.get(key);
 	if (lock == null) {
@@ -517,9 +516,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	Locker locker = getLocker(txn);
 	logger.log(Level.FINER, "end {0}", locker);
 	for (LockRequest request : locker.requests) {
+	    List<Locker> newOwners = Collections.emptyList();
 	    Key key = request.key;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
-	    List<Locker> newOwners = Collections.emptyList();
 	    synchronized (keyMap) {
 		/* Don't create the lock if it isn't present */
 		Lock lock = keyMap.get(key);
@@ -548,15 +547,22 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	if (locker.getWaitingFor() != null) {
 	    throw new IllegalStateException(
 		"Attempt to obtain a new lock while waiting");
-	} else if (locker.getConflict() != null) {
-	    throw new IllegalStateException(
-		"Attempt to obtain a new lock after a deadlock");
+	}
+	LockConflict conflict = locker.getConflict();
+	if (conflict != null) {
+	    if (conflict.type == LockConflictType.DEADLOCK) {
+		throw new IllegalStateException(
+		    "Attempt to obtain a new lock after a deadlock");
+	    } else {
+		/* Ignoring the previous conflict */
+		locker.setConflict(null);
+	    }
 	}
 	if (description != null) {
 	    locker.setDescription(key, description);
 	}
-	Map<Key, Lock> keyMap = getKeyMap(key);
 	LockAttemptResult result;
+	Map<Key, Lock> keyMap = getKeyMap(key);
 	synchronized (keyMap) {
 	    Lock lock = getLock(key, keyMap);
 	    result = lock.lock(locker, forWrite, false);
@@ -587,7 +593,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		       locker, key, forWrite);
 	}
 	locker.setWaitingFor(result);
-	LockConflict conflict = new DeadlockChecker(locker).check();
+	conflict = new DeadlockChecker(locker).check();
 	if (conflict == null) {
 	    conflict = new LockConflict(
 		LockConflictType.BLOCKED, result.conflict.txn);
@@ -609,21 +615,35 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			   "lock {0}\n  returns null (not waiting)", locker);
 		return null;
 	    }
+	    Lock lock;
 	    Key key = result.request.key;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
-	    Lock lock;
 	    synchronized (keyMap) {
 		lock = getLock(key, keyMap);
 	    }
 	    long now = System.currentTimeMillis();
 	    long stop = Math.min(now + lockTimeout, locker.stopTime);
 	    while (true) {
-		if (now >= stop) {
+		LockConflict conflict = locker.getConflict();
+		if (conflict != null) {
 		    synchronized (keyMap) {
 			lock.flushWaiter(locker);
 		    }
 		    locker.setWaitingFor(null);
-		    LockConflict conflict = new LockConflict(
+		    if (logger.isLoggable(Level.FINER)) {
+			logger.log(Level.FINER,
+				   "lock {0}, {1}, forWrite:{2}" +
+				   "\n  returns {3}",
+				   locker, key, result.request.getForWrite(),
+				   conflict);
+		    }
+		    return conflict;
+		} else if (now >= stop) {
+		    synchronized (keyMap) {
+			lock.flushWaiter(locker);
+		    }
+		    locker.setWaitingFor(null);
+		    conflict = new LockConflict(
 			LockConflictType.TIMEOUT, result.conflict.txn);
 		    locker.setConflict(conflict);
 		    if (logger.isLoggable(Level.FINER)) {
@@ -648,21 +668,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 				   locker, key, result.request.getForWrite());
 		    }
 		    return null;
-		}
-		LockConflict conflict = locker.getConflict();
-		if (conflict != null) {
-		    synchronized (keyMap) {
-			lock.flushWaiter(locker);
-		    }
-		    locker.setWaitingFor(null);
-		    if (logger.isLoggable(Level.FINER)) {
-			logger.log(Level.FINER,
-				   "lock {0}, {1}, forWrite:{2}" +
-				   "\n  returns {3}",
-				   locker, key, result.request.getForWrite(),
-				   conflict);
-		    }
-		    return conflict;
 		}
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
@@ -712,9 +717,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	private LockAttemptResult waitingFor;
 
 	/**
-	 * A conflict that should cause the locker's current request to be
-	 * denied, or {@code null}.  Synchronize on this locker when accessing
-	 * this field.
+	 * A conflict that should cause this transaction's request to be
+	 * denied, or {@code null}.  This value is cleared after the conflict
+	 * has been reported unless the conflict is a deadlock.  Synchronize on
+	 * this locker when accessing this field.
 	 */
 	private LockConflict conflict;
 
@@ -725,11 +731,18 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @param	requestedStartTime the time milliseconds that the task
 	 *		associated with the transaction was originally
 	 *		requested to start
+	 * @throws	IllegalArgumentException if {@code requestedStartTime}
+	 *		is less than {@code 0}
 	 */
 	Locker(Transaction txn, long requestedStartTime) {
+	    checkNonNull(txn, "txn");
+	    if (requestedStartTime < 0) {
+		throw new IllegalArgumentException(
+		    "The requestedStartTime must not be less than 0");
+	    }
 	    this.txn = txn;
-	    this.stopTime = System.currentTimeMillis() + txn.getTimeout();
 	    this.requestedStartTime = requestedStartTime;
+	    this.stopTime = System.currentTimeMillis() + txn.getTimeout();
 	}
 
 	/* -- Implement AccessedObjectsDetail -- */
@@ -790,7 +803,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
 	/**
 	 * Checks if there is a conflict that should cause this locker's
-	 * request to be denied
+	 * request to be denied.  This value can be cleared to permit a new
+	 * request unless the conflict is a deadlock.
 	 *
 	 * @return	the conflicting request or {@code null}
 	 */
@@ -882,7 +896,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	/** Print fields, for debugging. */
 	@Override
 	public String toString() {
-	    return "src:" + source + ", objectId:" + objectId;
+	    return source + ":" + objectId;
 	}
     }
 
@@ -893,6 +907,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * if they hold the lock on the key map associated with the instance.
      */
     private static class Lock {
+
+	/** An empty array of lock requests. */
+	private static final LockRequest[] NO_LOCK_REQUESTS = { };
 
 	/** The key that identifies this lock. */
 	final Key key;
@@ -920,7 +937,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * owner of the lock if the lock was obtained, and removes the locker
 	 * from the waiters list if it was waiting.  Returns {@code null} if
 	 * the locker already owned this lock.  Otherwise, returns a {@code
-	 * LockAttemptResult} containing the {@link LockRequest} and with the
+	 * LockAttemptResult} containing the {@link LockRequest}, and with the
 	 * {@code conflict} field set to {@code null} if the lock was acquired,
 	 * else set to a conflicting transaction if the lock could not be
 	 * obtained.
@@ -970,10 +987,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    {
 			LockRequest ownerRequest = i.next();
 			if (locker == ownerRequest.locker) {
-			    i.remove();
-			    found = true;
 			    assert !ownerRequest.getForWrite()
 				: "Should own for read when upgrading";
+			    i.remove();
+			    found = true;
 			    break;
 			}
 		    }
@@ -994,7 +1011,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/**
-	 * Add a lock request to the list of requests waiting for this lock.
+	 * Adds a lock request to the list of requests waiting for this lock.
 	 * If this is an upgrade request, puts the request after any other
 	 * upgrade requests, but before other requests.  Otherwise, puts the
 	 * request at the end of the list.
@@ -1073,14 +1090,14 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/**
-	 * Validates the state of this lock, which should be in use.
+	 * Validates the state of this lock, which should be in use. <p>
 	 *
 	 * Consistency constraints: <ul>
 	 * <li>at least one owner
+	 * <li>all upgrade waiters precede other waiters
 	 * <li>locker appears once in owners and waiters <em>except</em> that
 	 *     an upgrade request can be a waiter if a read request is an owner
 	 * <li>no upgrade waiters if the locker is not a read owner
-	 * <li>all upgrade waiters precede other waiters
 	 * </ul>
 	 *
 	 * @return	{@code true} if the state is valid, otherwise throws
@@ -1110,9 +1127,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			    waiter + ", " + waiter2);
 		    }
 		}
+		boolean foundOwner = false;
 		for (int j = 0; j < numOwners; j++) {
 		    LockRequest owner = owners.get(j);
 		    if (waiter.locker == owner.locker) {
+			foundOwner = true;
 			if (!waiter.getUpgrade()) {
 			    throw new AssertionError(
 				"Locker owns and waits, but not for" +
@@ -1125,6 +1144,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 				", waiter:" + waiter);
 			}
 		    }
+		}
+		if (waiter.getUpgrade() && !foundOwner) {
+		    throw new AssertionError(
+			"Waiting for upgrade but not owner: " + this +
+			", waiter: " + waiter);
 		}
 	    }
 	    return true;
@@ -1340,6 +1364,26 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    return locker.getDescription(key);
 	}
 
+	/**
+	 * Two instances are equal if they are instances of this class, and
+	 * have the same source, object ID, and access type.
+	 *
+	 * @param	object the object to compare with
+	 * @return	whether this instance equals the argument
+	 */
+	@Override
+	public boolean equals(Object object) {
+	    if (object == this) {
+		return true;
+	    } else if (object instanceof LockRequest) {
+		LockRequest request = (LockRequest) object;
+		return key.equals(request.key) &&
+		    getForWrite() == request.getForWrite();
+	    } else {
+		return false;
+	    }
+	}
+
 	/* -- Other methods -- */
 
 	/** Print fields, for debugging. */
@@ -1372,10 +1416,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	private final Map<Locker, WaiterInfo> waiterMap =
 	    new HashMap<Locker, WaiterInfo>();
 
-	/**
-	 * The top level locker we are checking for deadlocks.   Used for
-	 * logging.
-	 */
+	/** The top level locker we are checking for deadlocks. */
 	private final Locker rootLocker;
 
 	/**
@@ -1400,12 +1441,12 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @param	locker the locker to check
 	 */
 	DeadlockChecker(Locker locker) {
+	    assert locker != null;
 	    rootLocker = locker;
 	}
 
 	/**
-	 * Checks for a deadlock starting with a locker blocked requesting the
-	 * lock for a key.
+	 * Checks for a deadlock starting with the root locker.
 	 *
 	 * @return	a lock conflict if a deadlock was found, else {@code
 	 *		null} 
@@ -1442,7 +1483,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    
 	/**
 	 * Checks for deadlock starting with the specified locker and
-	 * information about its waiters.  Returns whether the deadlock was
+	 * information about its waiters.  Returns whether a deadlock was
 	 * found.
 	 */
 	private boolean checkInternal(Locker locker, WaiterInfo waiterInfo) {
