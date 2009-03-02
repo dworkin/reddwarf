@@ -31,6 +31,7 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -38,8 +39,10 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import org.junit.runner.RunWith;
 
 /** Test the AbstractService class. */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestAbstractService extends TestCase {
 
     private static final LoggerWrapper logger =

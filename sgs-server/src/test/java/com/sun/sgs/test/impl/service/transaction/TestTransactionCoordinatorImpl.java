@@ -38,7 +38,7 @@ import com.sun.sgs.test.util.DummyTransactionListener;
 import com.sun.sgs.test.util.DummyTransactionListener.CalledAfter;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
-import com.sun.sgs.test.util.NameRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import java.io.IOException;
 import java.util.Arrays;
@@ -56,7 +56,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 /** Test TransactionCoordinatorImpl */
 @SuppressWarnings("hiding")
 public class TestTransactionCoordinatorImpl {

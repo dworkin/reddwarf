@@ -26,7 +26,7 @@ import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.nio.channels.AsynchronousByteChannel;
-import com.sun.sgs.test.util.NameRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import java.io.IOException;
@@ -42,7 +42,7 @@ import org.junit.runner.RunWith;
 /**
  * Test the TcpTransport transport.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestTcpTransport {
     
     private volatile Transport transport;

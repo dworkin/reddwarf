@@ -26,6 +26,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,11 +38,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.runner.RunWith;
 
 /**
  * Performs specific tests for the DataStoreServerImpl class that can't easily
  * be performed from via the DataStore interface from the client.
  */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataStoreServerImpl extends TestCase {
 
     /** If this property is set, then only run the single named test method. */

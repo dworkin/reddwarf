@@ -21,14 +21,14 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
-import com.sun.sgs.test.util.ParameterizedNameRunner;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.util.Properties;
 import org.junit.Ignore;
 import org.junit.runner.RunWith;
 
 /** Test the DataStoreService using a networked data store. */
 @SuppressWarnings("hiding")
-@RunWith(ParameterizedNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestDataServiceClient extends TestDataServiceImpl {
     /**
      * The name of the host running the DataStoreServer, or null to create one

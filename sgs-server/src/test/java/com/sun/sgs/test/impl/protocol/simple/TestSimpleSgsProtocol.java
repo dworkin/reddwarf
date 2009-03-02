@@ -34,9 +34,9 @@ import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SgsTestNode.DummyAppListener;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.transport.ConnectionHandler;
 import com.sun.sgs.transport.Transport;
 import com.sun.sgs.transport.TransportDescriptor;
@@ -58,7 +58,7 @@ import org.junit.runner.RunWith;
 /**
  * Test the simple sgs protocol.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestSimpleSgsProtocol {
 
     private static final String APP_NAME = "TestSimpleSgsProtocol";

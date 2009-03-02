@@ -56,6 +56,11 @@
       <groupId>com.sleepycat</groupId>
       <artifactId>je</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.tools.test</groupId>
+      <artifactId>sgs-test-ext</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -186,6 +191,20 @@
 	  </argLine>
 	  <reportsDirectory>${test.reports}</reportsDirectory>
         </configuration>
+	<executions>
+	  <execution>
+	    <phase>integration-test</phase>
+	    <goals>
+	      <goal>test</goal>
+	    </goals>
+	    <configuration>
+	      <argLine>
+		${test.jvm.args} -Dtest.phase=long -Djava.library.path=${run.javapath}
+	      </argLine>
+	      <reportsDirectory>${itest.reports}</reportsDirectory>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
       <!-- Activate the resource bundle plugin to include the license
@@ -236,6 +255,8 @@
     <test.output>target/test-output</test.output>
     <!-- The directory for storing tests results -->
     <test.reports>target/test-reports</test.reports>
+    <!-- The directory for storing integration tests results -->
+    <itest.reports>targets/itest-reports</itest.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>

@@ -28,15 +28,18 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.DummyManagedObject;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test concurrent operation of the data service. */
 @SuppressWarnings("hiding")
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataServiceConcurrency extends TestCase {
 
     /** Logger for this test. */

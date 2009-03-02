@@ -20,12 +20,15 @@
 package com.sun.sgs.test.app;
 
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 
 /**
  * Test the {@link Delivery} enum.
  */
+@RunWith(FilteredNameRunner.class)
 public class TestDelivery extends Assert {
 
     @Test
