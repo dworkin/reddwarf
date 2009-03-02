@@ -57,8 +57,9 @@ class HelloUserSessionListener
      * @param session the session this listener is associated with
      */
     public HelloUserSessionListener(ClientSession session) {
-        if (session == null)
+        if (session == null) {
             throw new NullPointerException("null session");
+        }
 
         sessionRef = AppContext.getDataManager().createReference(session);
         sessionName = session.getName();

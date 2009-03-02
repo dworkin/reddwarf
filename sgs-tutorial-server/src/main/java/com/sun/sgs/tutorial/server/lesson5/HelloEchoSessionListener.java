@@ -58,8 +58,9 @@ class HelloEchoSessionListener
      * @param session the session this listener is associated with
      */
     public HelloEchoSessionListener(ClientSession session) {
-        if (session == null)
+        if (session == null) {
             throw new NullPointerException("null session");
+        }
 
         sessionRef = AppContext.getDataManager().createReference(session);
         sessionName = session.getName();
@@ -95,8 +96,6 @@ class HelloEchoSessionListener
      * Logs when the client disconnects.
      */
     public void disconnected(boolean graceful) {
-        ClientSession session = getSession();
-
         String grace = graceful ? "graceful" : "forced";
 
         logger.log(Level.INFO,

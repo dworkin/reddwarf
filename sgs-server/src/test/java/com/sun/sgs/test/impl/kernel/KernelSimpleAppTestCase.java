@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.kernel;
 
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -33,6 +34,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /**
  * Provides utilities for writing simple end-to-end tests of the server by
@@ -40,6 +42,7 @@ import junit.framework.TestCase;
  * extend this class, and use its methods to implement tests that run
  * applications as external processes.
  */
+@RunWith(FilteredJUnit3TestRunner.class)
 abstract class KernelSimpleAppTestCase extends TestCase {
 
     /** The number of milliseconds to let the kernel run */

@@ -37,6 +37,7 @@ import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -46,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.runner.RunWith;
 
 /*
  * XXX: Test recovery of prepared transactions after a crash
@@ -53,6 +55,7 @@ import junit.framework.TestSuite;
  */
 
 /** Test the DataStoreImpl class */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataStoreImpl extends TestCase {
 
     /** If this property is set, then only run the single named test method. */
@@ -1456,10 +1459,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.shutdown();
 	ShutdownAction action = new ShutdownAction();
 	try {
-	    action.waitForDone();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
+	    assertTrue(action.waitForDone());
 	} finally {
 	    store = null;
 	}
@@ -1469,7 +1469,7 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action = new ShutdownAction();
 	action.assertBlocked();
 	action.interrupt();
-	action.assertResult(false);
+        assertFalse(action.waitForDone());
 	store.setBinding(txn, "foo", id);
 	txn.commit();
 	txn = null;
@@ -1484,10 +1484,11 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	action1.interrupt();
-	action1.assertResult(false);
+        action1.assertBlocked(); // should not be interrupted
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	action2.assertResult(true);
+        assertTrue(action1.waitForDone());
+	assertTrue(action2.waitForDone());
 	txn = null;
 	store = null;
     }
@@ -1498,20 +1499,8 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	boolean result1;
-	try {
-	    result1 = action1.waitForDone();
-	} catch (IllegalStateException e) {
-	    result1 = false;
-	}
-	boolean result2;
-	try {
-	    result2 = action2.waitForDone();
-	} catch (IllegalStateException e) {
-	    result2 = false;
-	}
-	assertTrue(result1 || result2);
-	assertFalse(result1 && result2);
+	assertTrue(action1.waitForDone());
+	assertTrue(action2.waitForDone());
 	txn = null;
 	store = null;
     }
@@ -2030,7 +2019,7 @@ public class TestDataStoreImpl extends TestCase {
 	    txn.commit();
 	    txn = null;
 	}
-	shutdownAction.assertResult(true);
+	assertTrue(shutdownAction.waitForDone());
 	store = null;
     }
 
@@ -2060,7 +2049,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue("Expected IllegalStateException: " + exception,
 		   exception instanceof IllegalStateException);
 	originalTxn.abort(new RuntimeException("abort"));
-	shutdownAction.assertResult(true);
+	assertTrue(shutdownAction.waitForDone());
 	store = null;
     }
 
@@ -2085,7 +2074,6 @@ public class TestDataStoreImpl extends TestCase {
     protected class ShutdownAction extends Thread {
 	private boolean done;
 	private Throwable exception;
-	private boolean result;
 
 	/** Creates an instance of this class and starts the thread. */
 	protected ShutdownAction() {
@@ -2095,7 +2083,7 @@ public class TestDataStoreImpl extends TestCase {
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = shutdown();
+		shutdown();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -2105,8 +2093,8 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 
-	protected boolean shutdown() {
-	    return store.shutdown();
+	protected void shutdown() {
+            store.shutdown();
 	}
 
 	/** Asserts that the shutdown call is blocked. */
@@ -2122,25 +2110,12 @@ public class TestDataStoreImpl extends TestCase {
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
-	 */
-	public synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
-	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
-	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
 	/** Wait until done, but give up after a while. */

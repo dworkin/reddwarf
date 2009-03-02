@@ -51,6 +51,8 @@ import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+
 import java.io.Serializable;
 
 import java.lang.reflect.Constructor;
@@ -63,8 +65,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
+import org.junit.runner.RunWith;
+
 
 /** Test the TaskServiceImpl class */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestTaskServiceImpl extends TestCase {
 
     // the pending namespace in the TaskService

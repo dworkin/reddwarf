@@ -80,8 +80,9 @@ public class SwordWorld
      * @return the room for this {@code SwordWorld}
      */
     public SwordWorldRoom getRoom() {
-        if (roomRef == null)
+        if (roomRef == null) {
             return null;
+        }
 
         return roomRef.get();
     }

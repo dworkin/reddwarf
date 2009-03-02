@@ -44,9 +44,9 @@ import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileConsumer;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.test.util.DummyManagedObject;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
@@ -84,7 +84,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Tests for management beans.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestMBeans {
     private final static String APP_NAME = "TestMBeans";
     
@@ -268,10 +268,11 @@ public class TestMBeans {
         // Ensure that registered MBeans are cleared after profile
         // collector shutdown
         TestMXBean bean1 = new TestMXImpl();
+        TestMXBean bean2 = new TestMXImpl();
         String beanName = "com.sun.sgs:type=Test";
         String otherName = "com.sun.sgs:type=AnotherName";
         profileCollector.registerMBean(bean1, beanName);
-        profileCollector.registerMBean(bean1, otherName);
+        profileCollector.registerMBean(bean2, otherName);
         
         TestMXBean proxy1 = JMX.newMXBeanProxy(mbsc, 
                                                new ObjectName(beanName), 
@@ -280,8 +281,9 @@ public class TestMBeans {
                                                new ObjectName(otherName), 
                                                TestMXBean.class);
         proxy1.setSomething(55);
+        proxy2.setSomething(56);
         assertEquals(55, bean1.getSomething());
-        assertEquals(55, proxy2.getSomething());
+        assertEquals(56, proxy2.getSomething());
         
         profileCollector.shutdown();
         Object o = profileCollector.getRegisteredMBean(beanName);

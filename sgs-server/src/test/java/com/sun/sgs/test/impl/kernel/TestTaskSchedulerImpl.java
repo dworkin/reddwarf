@@ -29,9 +29,9 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.test.impl.kernel.TestTransactionSchedulerImpl.DependentTask;
 
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.util.Properties;
 
@@ -47,7 +47,7 @@ import org.junit.runner.RunWith;
 
 
 /** Basic tests for the TaskScheduler interface. */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestTaskSchedulerImpl {
 
     private SgsTestNode serverNode = null;

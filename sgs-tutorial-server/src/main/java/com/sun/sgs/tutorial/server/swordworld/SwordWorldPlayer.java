@@ -98,8 +98,9 @@ public class SwordWorldPlayer
      * @return the session for this listener
      */
     protected ClientSession getSession() {
-        if (currentSessionRef == null)
+        if (currentSessionRef == null) {
             return null;
+        }
 
         return currentSessionRef.get();
     }
@@ -170,8 +171,9 @@ public class SwordWorldPlayer
      * @return the room this player is currently in, or {@code null}
      */
     protected SwordWorldRoom getRoom() {
-        if (currentRoomRef == null)
+        if (currentRoomRef == null) {
             return null;
+        }
 
         return currentRoomRef.get();
     }

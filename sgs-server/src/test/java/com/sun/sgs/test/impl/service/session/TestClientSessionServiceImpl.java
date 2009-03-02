@@ -50,6 +50,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.SimpleTestIdentityAuthenticator;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -76,9 +77,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.runner.RunWith;
 
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestClientSessionServiceImpl extends TestCase {
 
     /** If this property is set, then only run the single named test method. */
