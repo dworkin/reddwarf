@@ -85,7 +85,7 @@ import java.util.logging.Logger;
  *
  * <dd style="padding-top: .5em">The number of maps to use for associating keys
  *	and maps.  The number of maps controls the amount of concurrency.  The
- *	value must be greater than {code 0}. <p>
+ *	value must be greater than {@code 0}. <p>
  *
  * </dl> <p>
  *
@@ -102,7 +102,7 @@ import java.util.logging.Logger;
  * </ul>
  */
 public class LockingAccessCoordinator extends AbstractAccessCoordinator
-    implements AccessCoordinatorHandle, NonDurableTransactionParticipant
+    implements NonDurableTransactionParticipant
 {
     /** The class name. */
     private static final String CLASS =
@@ -1384,6 +1384,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    } else {
 		return false;
 	    }
+	}
+
+	@Override
+	public int hashCode() {
+	    return key.hashCode() ^ (getForWrite() ? 1 : 0);
 	}
 
 	/* -- Other methods -- */
