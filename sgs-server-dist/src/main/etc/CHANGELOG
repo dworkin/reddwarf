@@ -7,6 +7,10 @@ Version 0.9.9:
   - Add method ClientSession(ByteBuffer, Delivery).
   - Add method Delivery.supportsDelivery(Delivery).
   - Add new exception class com.sun.sgs.app.DeliveryNotSupportedException.
+  - Removed APP_PORT property, replaced in part, by transport specific
+    property. Use com.sun.sgs.impl.transport.tcp.listen.port to set the
+    port of the (default) TCP transport. Otherwise the port will default
+    to 62964.
 - Switch to BDB JE 3.3.75 (issue #122)
 - Expose monitoring data through JMX (issue #35)
 - Improve node shutdown mechanism (issues #37 and #112)
