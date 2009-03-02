@@ -1,5 +1,12 @@
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)
+  - Add com.sun.sgs.protocol and com.sun.sgs.transport packages.
+  - Clarify the meaning of "delivery guarantee" (no longer
+    "delivery requirement") in the classes ClientSession,
+    ChannelManager, and Channel. 
+  - Add method ClientSession(ByteBuffer, Delivery).
+  - Add method Delivery.supportsDelivery(Delivery).
+  - Add new exception class com.sun.sgs.app.DeliveryNotSupportedException.
 - Switch to BDB JE 3.3.75 (issue #122)
 - Expose monitoring data through JMX (issue #35)
 - Also fix issues #125, #129, #132, #133
