@@ -62,7 +62,7 @@
 
 /** Default connection info for server. */
 #define DEFAULT_HOST  "localhost"
-#define DEFAULT_PORT  2502
+#define DEFAULT_PORT  1139
 
 /** The name of the global channel */
 static const wchar_t GLOBAL_CHANNEL_NAME[] = L"-GLOBAL-";
@@ -100,6 +100,14 @@ static int concatstr(const char *prefix, const char *suffix, char *buf,
 static void process_user_cmd(char *cmd);
 static int bytestohex(const uint8_t *ba, const int len, char *hexstr);
 static int hextobytes(const char *hexstr, uint8_t *ba);
+static int checkLogin();
+static void printHelp();
+static void doLogin();
+static void doLogout(int force);
+static void doChannelSend();
+static void doServerSend();
+static void doChannelJoin();
+static void doChannelLeave();
 /*
  * STATIC GLOBAL VARIABLES
  *
@@ -511,7 +519,6 @@ static wchar_t* to_wcs(const char* s) {
     mbstowcs(result, s, wlen);
     return result;
 }
-
 /*
  * function: process_user_cmd()
  *
@@ -533,237 +540,28 @@ static void process_user_cmd(char *cmd) {
 
     if (token == NULL) {
         /** nothing entered? */
-    }
-    else if (strcmp(token, "help") == 0) {
-        printf("Available commands:\n");
-        printf("  quit: terminates the program\n");
-        printf("  login <username> <password>: log into the server\n");
-        printf("  logout: log out from the server (cleanly)\n");
-        printf("  logoutf: log out from the server (forcibly)\n");
-        printf("  srvsend <msg>: send a message directly to the server (not \
-normally necessary)\n");
-        printf("  psend <user-id> <msg>: send a private message to a user (alias\
-: pm)\n");
-        printf("  chsend <channel-name> <msg>: broadcast a message on a channel\n");
-        printf("  chjoin <channel-name>: join a channel (alias: join)\n");
-        printf("  chleave <channel-name>: leave a channel (alias: leave)\n");
-        printf("\n");
-    }
-    else if ((strcmp(token, "quit") == 0) || (strcmp(token, "exit") == 0)) {
+    } else if (strcmp(token, "help") == 0) {
+        printHelp();
+    } else if ((strcmp(token, "quit") == 0) || (strcmp(token, "exit") == 0)) {
         bye(0);
-    }
-    else if (strcmp(token, "login") == 0) {
-        token = strtok(NULL, " ");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: login <username> <password>\n");
-            return;
-        }
-
-        token2 = strtok(NULL, " ");
-
-        if (token2 == NULL) {
-            printf("Invalid command.  Syntax: login <username> <password>\n");
-            return;
-        }
-
-        tmp = strtok(NULL, "");
-
-        if (tmp == token2) {
-            printf("Invalid command.  Syntax: login <username> <password>\n");
-            return;
-        }
-
-        if (sgs_connection_login(g_conn, token, token2) == -1) {
-            perror("Error in sgs_connection_login()");
-            return;
-        }
-    }
-    else if (strcmp(token, "logout") == 0) {
-        if (sgs_connection_logout(g_conn, 0) == -1) {
-            perror("Error in sgs_connection_logout()");
-            return;
-        }
-    }
-    else if (strcmp(token, "logoutf") == 0) {
-        if (sgs_connection_logout(g_conn, 1) == -1) {
-            perror("Error in sgs_connection_logout()");
-            return;
-        }
-    }
-    else if (strcmp(token, "srvsend") == 0) {
-        if (g_session == NULL) {
-            printf("Error: not logged in!\n");
-            return;
-        }
-
-        token = strtok(NULL, "");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: srvsend <msg>\n");
-            return;
-        }
-
-        if (sgs_session_direct_send(g_session, (uint8_t*)token,
-                strlen(token)) == -1) {
-            perror("Error in sgs_session_direct_send()");
-            return;
-        }
-    }
-    else if (strcmp(token, "psend") == 0 || strcmp(token, "pm") == 0) {
-        if (g_session == NULL) {
-            printf("Error: not logged in!\n");
-            return;
-        }
-
-        /** For private messages, use the "Global" channel */
-        channel = sgs_map_get(g_channel_map, GLOBAL_CHANNEL_NAME);
-        if (channel == NULL) {
-            printf("Error: could not find global channel in channel map.\n");
-            return;
-        }
-
-        token = strtok(NULL, " ");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: psend <user> <msg>\n");
-            return;
-        }
-
-        nbytes = strlen(token) / 2;
-
-        if (nbytes > sizeof(bytebuf)) {
-            printf("Error: ran out of buffer space (recipient ID too big).\n");
-            return;
-        }
-
-        result = hextobytes(token, bytebuf);
-
-        if (result == -1) {
-            printf("Error: invalid recipient ID (%s).\n", token);
-            return;
-        }
-
-        recipient = sgs_id_create(bytebuf, nbytes);
-        if (recipient == NULL) {
-            printf("Error: invalid recipient ID (%s).\n", token);
-            return;
-        }
-
-        token = strtok(NULL, "");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: psend <user> <msg>\n");
-            sgs_id_destroy(recipient);
-            return;
-        }
-
-        if (concatstr("/pm ", token, strbuf, sizeof(strbuf)) == -1) {
-            printf("Error: ran out of buffer space (user input too big?).\n");
-            sgs_id_destroy(recipient);
-            return;
-        }
-
-        if (sgs_channel_send(channel, (uint8_t*)strbuf, strlen(strbuf)) == -1) {
-            perror("Error in sgs_session_channel_send()");
-            sgs_id_destroy(recipient);
-            return;
-        }
-
-        sgs_id_destroy(recipient);
-    }
-    else if (strcmp(token, "chsend") == 0) {
-        if (g_session == NULL) {
-            printf("Error: not logged in!\n");
-            fflush(stdout);
-            return;
-        }
-
-        token = strtok(NULL, " ");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
-            fflush(stdout);
-            return;
-        }
-
-        wchar_t* chname = to_wcs(token);
-        channel = sgs_map_get(g_channel_map, chname);
-
-        if (channel == NULL) {
-            printf("Error: Channel \"%ls\" not found.\n", chname);
-            fflush(stdout);
-            free(chname);
-            return;
-        }
-
-        free(chname);
-
-        token = strtok(NULL, "");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
-            fflush(stdout);
-            return;
-        }
-
-        /** note: no prefix necessary for this command */
-
-        if (sgs_channel_send(channel, (uint8_t*)token, strlen(token)) == -1) {
-            perror("Error in sgs_session_channel_send()");
-            return;
-        }
-    }
-    else if (strcmp(token, "chjoin") == 0 || strcmp(token, "join") == 0) {
-        if (g_session == NULL) {
-            printf("Error: not logged in!\n");
-            fflush(stdout);
-            return;
-        }
-
-        token = strtok(NULL, "");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: chjoin <channel-name>\n");
-            return;
-        }
-
-        if (concatstr("/join ", token, strbuf, sizeof(strbuf)) == -1) {
-            printf("Error: ran out of buffer space (user input too big?).\n");
-            return;
-        }
-
-        if (sgs_session_direct_send(g_session, (uint8_t*)strbuf,
-                strlen(strbuf)) == -1) {
-            perror("Error in sgs_session_direct_send()");
-            return;
-        }
-    }
-    else if (strcmp(token, "chleave") == 0 || strcmp(token, "leave") == 0) {
-        if (g_session == NULL) {
-            printf("Error: not logged in!\n");
-            return;
-        }
-
-        token = strtok(NULL, "");
-
-        if (token == NULL) {
-            printf("Invalid command.  Syntax: chleave <channel-name>\n");
-            return;
-        }
-
-        if (concatstr("/leave ", token, strbuf, sizeof(strbuf)) == -1) {
-            printf("Error: ran out of buffer space (user input too big?).\n");
-            return;
-        }
-
-        if (sgs_session_direct_send(g_session, (uint8_t*)strbuf,
-                strlen(strbuf)) == -1) {
-            perror("Error in sgs_session_direct_send()");
-            return;
-        }
-    }
-    else {
+    } else if (strcmp(token, "login") == 0) {
+        doLogin();
+        return;
+    } else if (strcmp(token, "logout") == 0) {
+        doLogout(0);
+        return;
+    } else if (strcmp(token, "logoutf") == 0) {
+        doLogout(1);
+        return;
+    } else if (strcmp(token, "srvsend") == 0) {
+        doServerSend();
+    } else if (strcmp(token, "chsend") == 0) {
+        doChannelSend();
+    } else if (strcmp(token, "chjoin") == 0 || strcmp(token, "join") == 0) {
+        doChannelJoin();
+    } else if (strcmp(token, "chleave") == 0 || strcmp(token, "leave") == 0) {
+        doChannelLeave();
+    } else {
         printf("Unrecognized command.  Try \"help\"\n");
     }
 }
@@ -828,4 +626,213 @@ static int hextobytes(const char *hexstr, uint8_t *ba) {
 
     return 0;
 }
+/*
+ *Check to see if there is a login session. Returns 0 (false)
+ *if there is no current session, returns 1 if there is
+ */
+static int checkLogin() {
+    if (g_session == NULL) {
+        printf("Error: not logged in!\n");
+        return 0;
+    }
+    return 1;
+}
 
+/*
+ *Print the help prompts
+ */
+static void printHelp() {
+    printf("Available commands:\n");
+    printf("  quit: terminates the program\n");
+    printf("  login <username> <password>: log into the server\n");
+    printf("  logout: log out from the server (cleanly)\n");
+    printf("  logoutf: log out from the server (forcibly)\n");
+    printf("  srvsend <msg>: send a message directly to the server (not normally necessary)\n");
+    printf("  chsend <channel-name> <msg>: broadcast a message on a channel\n");
+    printf("  chjoin <channel-name>: join a channel (alias: join)\n");
+    printf("  chleave <channel-name>: leave a channel (alias: leave)\n");
+    printf("\n");
+}
+
+/*
+ *process a login command. All errors are indicated
+ *by error messages printed to the console, so there 
+ *is no return value passed to the calling function
+ */
+static void doLogin() {
+    char *token, *token2, *tmp;
+
+    if (g_session != NULL){
+        printf("already logged in\n");
+        return;
+    }
+    token = strtok(NULL, " ");
+
+    if (token == NULL) {
+        printf("Invalid command.  Syntax: login <username> <password>\n");
+        return;
+    }
+
+    token2 = strtok(NULL, " ");
+
+    if (token2 == NULL) {
+        printf("Invalid command.  Syntax: login <username> <password>\n");
+        return;
+    }
+
+    tmp = strtok(NULL, "");
+
+    if (tmp == token2) {
+        printf("Invalid command.  Syntax: login <username> <password>\n");
+        return;
+    }
+
+    if (sgs_connection_login(g_conn, token, token2) == -1) {
+        perror("Error in sgs_connection_login()");
+    }
+}
+
+/*
+ *Performs a logout. If called with a non-zero value,
+ *this will call connection_logout with the "force" parameter
+ *set to true; otherwise the call is made with the "force"
+ *parameter set to false
+ */
+static void doLogout(int force){
+    if (!checkLogin())
+        return;
+    sgs_connection_logout(g_conn, force);
+}
+
+/*
+ * Perform a channel send. The name of the channel on which
+ * the message will be sent is parsed from the command line,
+ * as is the message itself (which will be the rest of the command
+ * line).
+ */
+static void doChannelSend() {
+    char *token;
+    sgs_channel *channel;
+
+    if (!checkLogin()) {
+        fflush(stdout);
+        return;
+    }
+
+    token = strtok(NULL, " ");
+
+    if (token == NULL) {
+        printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
+        fflush(stdout);
+        return;
+    }
+
+    wchar_t* chname = to_wcs(token);
+    channel = sgs_map_get(g_channel_map, chname);
+
+    if (channel == NULL) {
+        printf("Error: Channel \"%ls\" not found.\n", chname);
+        fflush(stdout);
+        free(chname);
+        return;
+    }
+
+    free(chname);
+
+    token = strtok(NULL, "");
+
+    if (token == NULL) {
+        printf("Invalid command.  Syntax: chsend <channel> <msg>\n");
+        fflush(stdout);
+        return;
+    }
+
+    /** note: no prefix necessary for this command */
+
+    if (sgs_channel_send(channel, (uint8_t*) token, strlen(token)) == -1) {
+        perror("Error in sgs_session_channel_send()");
+        return;
+    }
+}
+
+static void doServerSend() {
+    char *token;
+
+    if (!checkLogin()) {
+        return;
+    }
+
+    token = strtok(NULL, "");
+
+    if (token == NULL) {
+        printf("Invalid command.  Syntax: srvsend <msg>\n");
+        return;
+    }
+
+    if (sgs_session_direct_send(g_session, (uint8_t*) token,
+            strlen(token)) == -1) {
+        perror("Error in sgs_session_direct_send()");
+        return;
+    }
+}
+
+/*
+ * Join a channel. Sends a message to the server to join a channel; the 
+ * the channel exists the client will join it; if the channel does not exist
+ * one will be created with this channel and the server as the only members.
+ * NOTE: this is currently unimplemented in the server.
+ */
+static void doChannelJoin() {
+    char *token;
+    char strbuf[1024];
+    
+    if (!checkLogin()) {
+        fflush(stdout);
+        return;
+    }
+
+    token = strtok(NULL, "");
+
+    if (token == NULL) {
+        printf("Invalid command.  Syntax: chjoin <channel-name>\n");
+        return;
+    }
+
+    if (concatstr("/join ", token, strbuf, sizeof (strbuf)) == -1) {
+        printf("Error: ran out of buffer space (user input too big?).\n");
+        return;
+    }
+
+    if (sgs_session_direct_send(g_session, (uint8_t*) strbuf,
+            strlen(strbuf)) == -1) {
+        perror("Error in sgs_session_direct_send()");
+        return;
+    }
+}
+
+static void doChannelLeave() {
+    char *token;
+    char strbuf[1024];
+
+    if (!checkLogin()) {
+        return;
+    }
+
+    token = strtok(NULL, "");
+
+    if (token == NULL) {
+        printf("Invalid command.  Syntax: chleave <channel-name>\n");
+        return;
+    }
+
+    if (concatstr("/leave ", token, strbuf, sizeof (strbuf)) == -1) {
+        printf("Error: ran out of buffer space (user input too big?).\n");
+        return;
+    }
+
+    if (sgs_session_direct_send(g_session, (uint8_t*) strbuf,
+            strlen(strbuf)) == -1) {
+        perror("Error in sgs_session_direct_send()");
+        return;
+    }
+}
