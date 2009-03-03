@@ -373,10 +373,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     public static final class LockConflict {
 
 	/** The type of conflict. */
-	private final LockConflictType type;
+	final LockConflictType type;
 
 	/** A transaction that caused the conflict. */
-	private final Transaction conflictingTxn;
+	final Transaction conflictingTxn;
 
 	/**
 	 * Creates an instance of this class.
