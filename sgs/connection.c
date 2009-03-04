@@ -252,19 +252,18 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
 int sgs_connection_logout(sgs_connection_impl *connection, int force) {
     if (force) {
         conn_closed(connection);
-    }
-    else {
+    } else {
         if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
             errno = ENOTCONN;
             return -1;
         }
 
         connection->expecting_disconnect = 1;
-		if (connection->in_redirect)
-			return 0;
+        if (connection->in_redirect)
+            return 0;
         sgs_session_impl_logout(connection->session);
     }
-  
+
     return 0;
 }
 
