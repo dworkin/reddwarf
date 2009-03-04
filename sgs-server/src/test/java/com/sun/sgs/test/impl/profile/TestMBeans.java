@@ -417,7 +417,6 @@ public class TestMBeans {
         String appListener = (String) mbsc.getAttribute(name, "AppListener");
         String appName = (String) mbsc.getAttribute(name, "AppName");
         String hostName = (String) mbsc.getAttribute(name, "HostName");
-        int appPort = (Integer) mbsc.getAttribute(name, "AppPort");
         String appRoot = (String) mbsc.getAttribute(name, "AppRoot");
         int jmxPort = (Integer) mbsc.getAttribute(name, "JmxPort");
         NodeType type = NodeType.valueOf(
@@ -433,7 +432,6 @@ public class TestMBeans {
         System.out.println("  txn timeout:" + timeout);
         
         System.out.println("  host name: " + hostName);
-        System.out.println("  port: " + appPort);
         System.out.println("  jmx port: " + jmxPort);
         System.out.println("  server host:" + serverHost);
         
@@ -443,7 +441,6 @@ public class TestMBeans {
         assertEquals(appListener, proxy.getAppListener());
         assertEquals(appName, proxy.getAppName());
         assertEquals(hostName, proxy.getHostName());
-        assertEquals(appPort, proxy.getAppPort());
         assertEquals(appRoot, proxy.getAppRoot());
         assertEquals(jmxPort, proxy.getJmxPort());
         assertEquals(type, proxy.getNodeType());
@@ -453,7 +450,6 @@ public class TestMBeans {
         assertEquals(appListener, bean.getAppListener());
         assertEquals(appName, bean.getAppName());
         assertEquals(hostName, bean.getHostName());
-        assertEquals(appPort, bean.getAppPort());
         assertEquals(appRoot, bean.getAppRoot());
         assertEquals(jmxPort, bean.getJmxPort());
         assertEquals(type, bean.getNodeType());
@@ -844,21 +840,20 @@ public class TestMBeans {
         // Get individual fields
         long reg = (Long) mbsc.getAttribute(name, 
                                 "RegisterSessionDisconnectListenerCalls");
-        long send = (Long) mbsc.getAttribute(name, 
-                                "SendProtocolMessageNonTransactionalCalls");
+        long get = (Long) mbsc.getAttribute(name, 
+                                "GetSessionProtocolCalls");
         
         // Create the proxy for the object
         ClientSessionServiceMXBean proxy = 
             JMX.newMXBeanProxy(mbsc, name, ClientSessionServiceMXBean.class);
         
         assertTrue(reg <= proxy.getRegisterSessionDisconnectListenerCalls());
-        assertTrue(send <= proxy.getSendProtocolMessageNonTransactionalCalls());
+        assertTrue(get <= proxy.getGetSessionProtocolCalls());
         
         serverNode.getClientSessionService().
-            sendProtocolMessageNonTransactional(new BigInteger("555"),
-                ByteBuffer.wrap("Message".getBytes()), Delivery.RELIABLE);
-        assertTrue(send < proxy.getSendProtocolMessageNonTransactionalCalls());
-        assertTrue(send < bean.getSendProtocolMessageNonTransactionalCalls());
+            getSessionProtocol(new BigInteger("555"));
+        assertTrue(get < proxy.getGetSessionProtocolCalls());
+        assertTrue(get < bean.getGetSessionProtocolCalls());
     }
      
     @Test

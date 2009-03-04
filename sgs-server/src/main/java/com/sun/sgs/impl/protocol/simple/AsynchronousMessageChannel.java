@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.session;
+package com.sun.sgs.impl.protocol.simple;
 
 import com.sun.sgs.impl.nio.DelegatingCompletionHandler;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -74,8 +74,8 @@ public class AsynchronousMessageChannel implements Channel {
      * @throws	IllegalArgumentException if {@code readBufferSize} is smaller
      *		than {@value #PREFIX_LENGTH}
      */
-    public AsynchronousMessageChannel(
-	AsynchronousByteChannel channel, int readBufferSize)
+    public AsynchronousMessageChannel(AsynchronousByteChannel channel,
+                                      int readBufferSize)
     {
 	if (readBufferSize < PREFIX_LENGTH) {
 	    throw new IllegalArgumentException(
@@ -103,8 +103,8 @@ public class AsynchronousMessageChannel implements Channel {
      *		space to read the next message
      * @throws	ReadPendingException if a read is in progress
      */
-    public IoFuture<ByteBuffer, Void> read(
-	CompletionHandler<ByteBuffer, Void> handler)
+    public IoFuture<ByteBuffer, Void> read(CompletionHandler<ByteBuffer,
+                                                             Void> handler)
     {
         if (!readPending.compareAndSet(false, true)) {
             throw new ReadPendingException();
@@ -123,8 +123,8 @@ public class AsynchronousMessageChannel implements Channel {
      * @return	a future representing the result of the operation
      * @throws	WritePendingException if a write is in progress
      */
-    public IoFuture<Void, Void> write(
-	ByteBuffer src, CompletionHandler<Void, Void> handler)
+    public IoFuture<Void, Void> write(ByteBuffer src,
+                                      CompletionHandler<Void, Void> handler)
     {
         if (!writePending.compareAndSet(false, true)) {
             throw new WritePendingException();
@@ -135,11 +135,13 @@ public class AsynchronousMessageChannel implements Channel {
     /* -- Implement Channel -- */
 
     /** {@inheritDoc} */
+    @Override
     public void close() throws IOException {
         channel.close();
     }
 
     /** {@inheritDoc} */
+    @Override
     public boolean isOpen() {
         return channel.isOpen();
     }

@@ -24,6 +24,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
@@ -35,6 +36,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -101,7 +103,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private static final String APP_NAME = "TestClientSessionServiceImpl";
-
+    
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
     private static final int WAIT_TIME = 5000;
@@ -128,17 +130,16 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final String NODE_PREFIX =
 	"com.sun.sgs.impl.service.watchdog.node";
 
-
     /** The ClientSession service properties. */
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-	    StandardProperties.APP_PORT, "20000");
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY, "20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
 
-    /** Any additional nodes, keyed by node hostname (for tests
+    /** Any additional nodes, keyed by node host name (for tests
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
@@ -289,18 +290,11 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testConstructorNoPort() throws Exception {
-	try {
-	    Properties props =
-		createProperties(
-		    StandardProperties.APP_NAME, APP_NAME);
-	    new ClientSessionServiceImpl(
-		props, serverNode.getSystemRegistry(),
-		serverNode.getProxy());
-
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
+        Properties props =
+            createProperties(StandardProperties.APP_NAME, APP_NAME);
+        new ClientSessionServiceImpl(
+            props, serverNode.getSystemRegistry(),
+            serverNode.getProxy());
     }
 
     public void testConstructorDisconnectDelayTooSmall() throws Exception {
@@ -308,8 +302,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Properties props =
 		createProperties(
 		    StandardProperties.APP_NAME, APP_NAME,
-		    StandardProperties.APP_PORT, "20000",
-		    "com.sun.sgs.impl.service.session.disconnect.delay", "199");
+                    SimpleSgsProtocolAcceptor.DISCONNECT_DELAY_PROPERTY, "199");
 	    new ClientSessionServiceImpl(
 		props, serverNode.getSystemRegistry(),
 		serverNode.getProxy());
@@ -619,6 +612,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int port = serverNode.getAppPort();
 	try {
 	    client1.connect(port).login();
+	    Thread.sleep(100);
 	    client2.connect(port).login();
 	    client1.checkDisconnectedCallback(false);
 	    assertTrue(client2.isConnected());
@@ -977,6 +971,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    public void testClientSessionSendNullMessage() throws Exception {
+	try {
+	    sendBufferToClient(null, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testClientSessionSendNullDelivery() throws Exception {
+	try {
+	    sendBufferToClient(ByteBuffer.wrap(new byte[0]), "", null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
     public void testClientSessionSendSameBuffer() throws Exception {
 	String msgString = "buffer";
 	MessageBuffer msg =
@@ -1002,6 +1014,14 @@ public class TestClientSessionServiceImpl extends TestCase {
     private void sendBufferToClient(final ByteBuffer buf,
 				    final String expectedMsgString)
 	throws Exception
+    {
+	sendBufferToClient(buf, expectedMsgString, Delivery.RELIABLE);
+    }
+	
+    private void sendBufferToClient(final ByteBuffer buf,
+				    final String expectedMsgString,
+				    final Delivery delivery)
+	throws Exception
     {	
 	final String name = "dummy";
 	DummyClient client = new DummyClient(name);
@@ -1015,7 +1035,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			AppContext.getDataManager().getBinding(name);
 		    System.err.println("Sending messages");
 		    for (int i = 0; i < numMessages; i++) {
-			session.send(buf);
+			session.send(buf, delivery);
 		    }
 		}}, taskOwner);
 	
@@ -1132,6 +1152,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	final String user = "foo";
 	DummyClient client = new DummyClient(user);
 	client.connect(serverNode.getAppPort()).login();
+	client.sendMessage(new byte[0]);
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
@@ -1246,7 +1267,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String reason;
 	private String redirectHost;
         private int redirectPort;
-	private byte[] reconnectKey;
+	private byte[] reconnectKey = new byte[0];
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -1416,9 +1437,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 */
 	void sendMessage(byte[] message) {
 	    MessageBuffer buf =
-		new MessageBuffer(1+ message.length);
+		new MessageBuffer(5 + reconnectKey.length + message.length);
 	    buf.putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putBytes(message);
+		putByteArray(reconnectKey).
+		putByteArray(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
@@ -1618,6 +1640,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			System.err.println("login succeeded: " + name);
 			lock.notifyAll();
 		    }
+		    sendMessage(new byte[0]);
 		    break;
 		    
 		case SimpleSgsProtocol.LOGIN_FAILURE:
@@ -1714,6 +1737,12 @@ public class TestClientSessionServiceImpl extends TestCase {
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
 
+	    if (!(session instanceof ClientSessionWrapper)) {
+		throw new IllegalArgumentException(
+		    "session not instance of ClientSessionWrapper:" +
+		    session);
+	    }
+
 	    String name = session.getName();
 	    DummyClientSessionListener listener;
 	    
@@ -1774,7 +1803,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 	private final String name;
-	private final BigInteger sessionRefId;
+	private final ManagedReference<ClientSession> sessionRef;
+	private BigInteger reconnectKey = null;
 	private final boolean disconnectedThrowsException;
 
 
@@ -1783,9 +1813,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    boolean disconnectedThrowsException)
 	{
 	    this.name = name;
-	    session = ((ClientSessionWrapper) session).getClientSession();
-	    this.sessionRefId =
-		AppContext.getDataManager().createReference(session).getId();
+	    this.sessionRef =
+		AppContext.getDataManager().createReference(session);
 	    this.disconnectedThrowsException = disconnectedThrowsException;
 	}
 
@@ -1793,16 +1822,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
-	    DataManager dataManager = AppContext.getDataManager();
-	    dataManager.markForUpdate(this);
-	    DummyClient client = dummyClients.get(sessionRefId);
-	    ClientSession session = (ClientSession)
-		dataManager.getBinding(name);
-	    dataManager.removeObject(session);
-	    client.receivedDisconnectedCallback = true;
-	    client.graceful = graceful;
-	    synchronized (client.disconnectedCallbackLock) {
-		client.disconnectedCallbackLock.notifyAll();
+	    AppContext.getDataManager().removeObject(sessionRef.get());
+	    DummyClient client =
+                    reconnectKey == null ? null :
+                                           dummyClients.get(reconnectKey);
+	    if (client != null) {
+		client.receivedDisconnectedCallback = true;
+		client.graceful = graceful;
+		synchronized (client.disconnectedCallbackLock) {
+		    client.disconnectedCallbackLock.notifyAll();
+		}
 	    }
 	    if (disconnectedThrowsException) {
 		throw new RuntimeException(
@@ -1812,9 +1841,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void receivedMessage(ByteBuffer message) {
-            byte[] bytes = new byte[message.remaining()];
-            message.asReadOnlyBuffer().get(bytes);
-	    DummyClient client = dummyClients.get(sessionRefId);
+            byte[] messageBytes = new byte[message.remaining()];
+	    message.get(messageBytes);
+	    MessageBuffer buf = new MessageBuffer(messageBytes);
+	    AppContext.getDataManager().markForUpdate(this);
+	    reconnectKey = new BigInteger(1, buf.getByteArray());
+	    byte[] bytes = buf.getByteArray();
+	    if (bytes.length == 0) {
+		return;
+	    }
+	    DummyClient client = dummyClients.get(reconnectKey);
 	    System.err.println(
 		"receivedMessage: " + HexDumper.toHexString(bytes) + 
 		"\nthrowException: " + client.throwException);

@@ -139,10 +139,10 @@ public interface WatchdogService extends Service {
     void addRecoveryListener(RecoveryListener listener);
 
     /**
-     * Informs the watchdog that a problem has occured in a service or 
-     * component. The watchdog will notify the server of the failure and then
-     * proceeed to shutting down the node. The node specified as the nodeId can
-     * be a local node or a remote node.
+     * Informs the watchdog that a problem has occured in a service or
+     * component. The watchdog will notify the server of the failure and
+     * then proceeed to shutting down the node. The node specified as the
+     * {@code nodeId} can be a local node or a remote node.
      * 
      * @param nodeId the id of the node to shutdown
      * @param className the class name of the service that failed

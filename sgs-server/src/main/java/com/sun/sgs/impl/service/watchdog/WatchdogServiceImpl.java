@@ -22,7 +22,6 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -221,9 +220,6 @@ public final class WatchdogServiceImpl
     /** The name of the local host. */
     final String localHost;
     
-    /** The application port. */
-    final int appPort;
-
     /** The controller which enables node shutdown */
     private final KernelShutdownController shutdownController;
 
@@ -298,14 +294,10 @@ public final class WatchdogServiceImpl
            
              String finalService =
                 properties.getProperty(StandardProperties.FINAL_SERVICE);
-             StandardService finalStandardService = null;
              boolean isFullStack = true;
              if (finalService == null) {
-                 finalStandardService = StandardService.LAST_SERVICE;
                  isFullStack = true;
              } else {
-                 finalStandardService =
-                    Enum.valueOf(StandardService.class, finalService);
                  isFullStack = 
                     !(properties.getProperty(StandardProperties.APP_LISTENER)
                      .equals(StandardProperties.APP_LISTENER_NONE));
@@ -316,22 +308,6 @@ public final class WatchdogServiceImpl
             
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
-
-            // If we're running on a full stack (the usual case), or a
-            // partial stack that includes the client session service,
-            // insist that a valid port number be specfied.
-            // The client session service will attempt to open that port.
-            //
-            // Otherwise, no port is needed or required, and we simply use
-            // -1 as a placeholder for the port number.
-            if (isFullStack || 
-                (StandardService.ClientSessionService.ordinal() <=
-                    finalStandardService.ordinal())) {
-                appPort = wrappedProps.getRequiredIntProperty(
-                    StandardProperties.APP_PORT, 1, 65535);
-            } else {
-                appPort = -1;
-            }
 
 	    /*
 	     * Check service version.
@@ -353,7 +329,7 @@ public final class WatchdogServiceImpl
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
-		    clientHost, appPort, clientProxy, isFullStack);
+		    clientHost, clientProxy, isFullStack);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -379,8 +355,8 @@ public final class WatchdogServiceImpl
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values = serverProxy.registerNode(clientHost, appPort, 
-                                                         clientProxy, jmxPort);
+                long[] values =
+		    serverProxy.registerNode(clientHost, clientProxy, jmxPort);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
                     throw new IllegalArgumentException(
@@ -413,9 +389,8 @@ public final class WatchdogServiceImpl
             
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, port:{1} " +
-			   "localNodeId:{2}",
-			   clientHost, appPort, localNodeId);
+			   "node registered, host:{0}, localNodeId:{1}",
+			   clientHost, localNodeId);
 	    }
 	    
 	} catch (Exception e) {
@@ -439,7 +414,7 @@ public final class WatchdogServiceImpl
     }
     
     /** {@inheritDoc} */
-    protected void doReady() {
+    protected void doReady() throws Exception {
 	// TBD: the client shouldn't accept incoming calls until this
 	// service is ready which would give all RecoveryListeners a
 	// chance to register.
@@ -721,12 +696,13 @@ public final class WatchdogServiceImpl
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, appPort, false);
+	    Node node = new NodeImpl(localNodeId, localHost, false);
 	    notifyNodeListeners(node);
 	}
 
-        logger.log(Level.SEVERE,
-                "Node forced to shutdown due to service failure.");
+        logger.log(
+	    Level.SEVERE,
+	    "Node:{0} forced to shutdown due to service failure", localNodeId);
 
         shutdownController.shutdownNode(this);
     }
@@ -840,9 +816,11 @@ public final class WatchdogServiceImpl
     private final class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
-	public void nodeStatusChanges(
- 	    long[] ids, String[] hosts, int[] ports, 
-            boolean[] status, long[] backups)
+        @Override
+	public void nodeStatusChanges(long[] ids,
+                                      String[] hosts,
+                                      boolean[] status,
+                                      long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
 		status.length != backups.length)
@@ -855,8 +833,7 @@ public final class WatchdogServiceImpl
 		    continue;
 		}
 		Node node =
-		    new NodeImpl(ids[i], hosts[i], ports[i], 
-                                 status[i], backups[i]);
+                        new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (!status[i] && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);

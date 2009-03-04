@@ -68,8 +68,8 @@ class ChannelWrapper
     }
     
     /** {@inheritDoc} */
-    public Delivery getDeliveryRequirement() {
-	return getChannel().getDeliveryRequirement();
+    public Delivery getDelivery() {
+	return getChannel().getDelivery();
     }
 
     /** {@inheritDoc} */

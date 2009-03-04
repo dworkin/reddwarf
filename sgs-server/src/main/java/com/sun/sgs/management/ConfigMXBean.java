@@ -71,14 +71,6 @@ public interface ConfigMXBean {
      */
     String getHostName();
     
-    /**
-     * Returns the TCP port for client connections.
-     * FIXME:  update for new protocol
-     * 
-     * @return the TCP port for application client connections
-     */
-    int getAppPort();
-   
     /** 
      * Returns the server host property.
      * 

@@ -140,6 +140,7 @@ public class DummyWatchdogService implements WatchdogService {
     /** A basic, private implementation of Node. */
     private class NodeImpl implements Node {
         private final long nodeId;
+
         NodeImpl(long nodeId) {
             this.nodeId = nodeId;
         }
@@ -156,7 +157,6 @@ public class DummyWatchdogService implements WatchdogService {
             return isLocalNodeAlive();
         }
     }
-
     public void reportFailure(long nodeId, String className) {
         // Don't do anything for now
     }
