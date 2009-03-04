@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.kernel;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.BufferedReader;
@@ -72,10 +73,11 @@ abstract class KernelSimpleAppTestCase extends TestCase {
 	new File(dir, "dsdb").mkdir();
 	/* Create application configuration properties */
 	config = createProperties(
-	    "com.sun.sgs.app.listener",
-	    "com.sun.sgs.test.impl.kernel.SimpleApp",
-	    "com.sun.sgs.app.name", "SimpleApp",
-	    "com.sun.sgs.app.port", String.valueOf(getPort()),
+	    StandardProperties.APP_LISTENER,
+                "com.sun.sgs.test.impl.kernel.SimpleApp",
+	    StandardProperties.APP_NAME, "SimpleApp",
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
+                String.valueOf(getPort()),
 	    "com.sun.sgs.app.root", dir.toURI().toURL().getPath(),
 	    "com.sun.sgs.impl.service.nodemap.server.start", "true",
 	    "com.sun.sgs.impl.service.watchdog.server.start", "true");

@@ -23,6 +23,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.DeliveryNotSupportedException;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -42,7 +43,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
@@ -135,6 +135,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private boolean isClosed = false;
 
     /**
+     * The maximum channel message length supported by sessions joined to this
+     * channel.
+     */
+    private int maxMessageLength = Integer.MAX_VALUE;
+    
+    /**
      * The maximum number of message bytes that can be queued for delivery on
      * this channel.
      */
@@ -142,12 +148,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Constructs an instance of this class with the specified
-     * {@code name}, {@code listener}, {@code delivery} requirement,
+     * {@code name}, {@code listener}, {@code delivery} guarantee.
      * and write buffer capacity.
      *
      * @param name a channel name
      * @param listener a channel listener
-     * @param delivery a delivery requirement
+     * @param delivery a delivery guarantee
      * @param writeBufferCapacity the capacity of the write buffer, in bytes
      */
     protected ChannelImpl(String name, ChannelListener listener,
@@ -188,16 +194,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /**
      * Constructs a new {@code Channel} with the given {@code name}, {@code
-     * listener}, {@code delivery} requirement and write-buffer capacity.
+     * listener}, {@code delivery} guarantee and write-buffer capacity.
      */
     static Channel newInstance(String name,
 			       ChannelListener listener,
 			       Delivery delivery,
-			       int writeBufferCapacity)
+                               int writeBufferCapacity)
     {
 	// TBD: create other channel types depending on delivery.
 	return new OrderedUnreliableChannelImpl(
-	    name, listener, delivery, writeBufferCapacity).getWrappedChannel();
+            name, listener, delivery, writeBufferCapacity).getWrappedChannel();
     }
 
     /**
@@ -224,12 +230,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return name;
     }
 
-    /** Implements {@link Channel#getDeliveryRequirement}. */
-    Delivery getDeliveryRequirement() {
+    /** Implements {@link Channel#getDelivery}. */
+    Delivery getDelivery() {
 	checkContext();
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
-		       "getDeliveryRequirement returns {0}", delivery);
+		       "getDelivery returns {0}", delivery);
 	}
 	return delivery;
     }
@@ -255,6 +261,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    if (session == null) {
 		throw new NullPointerException("null session");
 	    }
+	    checkDelivery(session);
+	    
 	    /*
 	     * Enqueue join request with underlying (unwrapped) client
 	     * session object.
@@ -282,6 +290,18 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 
 	    /*
+	     * Check for null elements, and check that sessions support
+	     * this channel's delivery guarantee.
+	     */
+	    for (ClientSession session : sessions) {
+		if (session == null) {
+		    throw new NullPointerException(
+			"sessions contains a null element");
+		}
+		checkDelivery(session);
+	    }
+	    
+	    /*
 	     * Enqueue join requests, each with underlying (unwrapped)
 	     * client session object.
 	     *
@@ -300,12 +320,32 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
+     * Throws {@code DeliveryNotSupportedException} if the specified {@code
+     * session} does not support this channel's delivery guarantee.
+     *
+     * @param	session a client session
+     * @throws	DeliveryNotSupportedException if the specified {@code session}
+     *		does not support this channel's delivery guarantee
+     */
+    private void checkDelivery(ClientSession session) {
+	for (Delivery d : session.supportedDeliveries()) {
+	    if (d.supportsDelivery(delivery)) {
+		return;
+	    }
+	}
+	throw new DeliveryNotSupportedException(
+	    "client session:" + session +
+	    " does not support delivery guarantee",
+	    delivery);
+    }
+    
+    /**
      * Returns the underlying {@code ClientSession} for the specified
      * {@code session}.  Note: The client session service wraps each client
      * session object that it hands out to the application.  The channel
      * service implementation relies on the assumption that a client
      * session's {@code ManagedObject} ID is the client session's ID (used
-     * for identifiying the client session, e.g. for sending messages to
+     * for identifying the client session, e.g. for sending messages to
      * the client session).  This method is invoked by the {@code join} and
      * {@code leave} methods in order to access the underlying {@code
      * ClientSession} so that the correct client session ID can be obtained.
@@ -465,10 +505,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		throw new NullPointerException("null message");
 	    }
 	    message = message.asReadOnlyBuffer();
-            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
+            
+            if (message.remaining() > maxMessageLength) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
+                    maxMessageLength);
             }
 	    /*
 	     * Enqueue send request.
@@ -786,6 +827,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	dataService.setServiceBinding(
 	    sessionKey, new ClientSessionInfo(dataService, session));
 
+        if (session.getMaxMessageLength() < maxMessageLength) {
+            maxMessageLength = session.getMaxMessageLength();
+        }
 	return true;
     }
 
@@ -1397,6 +1441,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		BigInteger channelRefId = getChannelRefId();
 		final byte[] channelIdBytes = channel.channelId;
 		final String channelName = channel.name;
+		final Delivery channelDelivery = channel.delivery;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelIdBytes));
@@ -1408,7 +1453,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			    public void run() throws IOException {
 				ChannelServer server = getChannelServer(nodeId);
 				if (server != null) {
-				    server.refresh(channelName, channelIdBytes);
+				    server.refresh(channelName, channelIdBytes,
+						   channelDelivery);
 				}
 			    } },
 			nodeId);
@@ -1533,11 +1579,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    }
 	    final String channelName = channel.name;
 	    final byte[] channelIdBytes = channel.channelId;
+	    final Delivery channelDelivery = channel.delivery;
 	    ChannelServiceImpl.getChannelService().addChannelTask(
 		eventQueue.getChannelRefId(),
 		new IoRunnable() {
 		    public void run() throws IOException {
-			server.join(channelName, channelIdBytes, sessionId);
+			server.join(channelName, channelIdBytes,
+				    channelDelivery, sessionId);
 		    } },
 		nodeId);
 	}

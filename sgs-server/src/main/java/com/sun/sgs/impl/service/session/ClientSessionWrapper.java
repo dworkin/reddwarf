@@ -20,11 +20,13 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Set;
 
 /**
  * A wrapper for a {@code ClientSessionImpl} object that is passed to the
@@ -67,6 +69,16 @@ public class ClientSessionWrapper
     }
 
     /** {@inheritDoc} */
+    public Set<Delivery> supportedDeliveries() {
+	return getClientSession().supportedDeliveries();
+    }
+    
+    /** {@inheritDoc} */
+    public int getMaxMessageLength() {
+        return getClientSession().getMaxMessageLength();
+    }
+    
+    /** {@inheritDoc} */
     public boolean isConnected() {
 	try {
 	    return sessionRef.get().isConnected();
@@ -81,6 +93,11 @@ public class ClientSessionWrapper
 	return this;
     }
 
+    /** {@inheritDoc} */
+    public ClientSession send(ByteBuffer message, Delivery delivery) {
+	getClientSession().send(message, delivery);
+	return this;
+    }
     /* -- Implement ManagedObjectRemoval -- */
 
     /** {@inheritDoc} */

@@ -33,18 +33,11 @@ public interface Node {
     long getId();
 
     /** 
-     * Returns this node's hostname.
+     * Returns this node's host name.
      *
-     * @return	this node's hostname
+     * @return	this node's host name
      */
     String getHostName();
-
-    /**
-     * Returns this node's port.
-     * 
-     * @return this node's port
-     */
-    int getPort();
     
     /**
      * Returns {@code true} if the node is known to be alive, and
