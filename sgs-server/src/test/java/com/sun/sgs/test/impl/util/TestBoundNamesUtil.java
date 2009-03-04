@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,8 +32,10 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.TreeSet;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test the BoundNamesUtil class. */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestBoundNamesUtil extends TestCase {
 
     /** A data service to supply service name bindings. */

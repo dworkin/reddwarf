@@ -52,11 +52,11 @@ public interface ClientSessionServiceMXBean {
     
     /**
      * Returns the number of times {@link 
-     * ClientSessionService#sendProtocolMessageNonTransactional 
-     * sendProtocolMessageNonTransactional} has been called.
+     * ClientSessionService#getSessionProtocol getSessionProtocol}
+     * has been called.
      * 
-     * @return the number of times {@code sendProtocolMessageNonTransactional} 
+     * @return the number of times {@code getSessionProtocol} 
      *         has been called
      */
-    long getSendProtocolMessageNonTransactionalCalls();
+    long getGetSessionProtocolCalls();
 }

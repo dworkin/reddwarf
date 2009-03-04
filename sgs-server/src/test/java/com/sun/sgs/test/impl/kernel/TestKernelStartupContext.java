@@ -27,8 +27,8 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.Properties;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,7 +39,7 @@ import org.junit.runner.RunWith;
  * to allow Services to be able to use our app utilities in
  * their constructors.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestKernelStartupContext {
     @Before
     public void clearManagerLocator() {

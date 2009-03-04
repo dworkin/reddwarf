@@ -58,9 +58,10 @@ import com.sun.sgs.nio.channels.IoFuture;
 import com.sun.sgs.nio.channels.ReadPendingException;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 import com.sun.sgs.nio.channels.WritePendingException;
+import java.nio.channels.ClosedSelectorException;
 
 /**
- * Reactive implementation of the Proactor pattern; an asynchronous IO
+ * Reactive implementation of the Reactor pattern; an asynchronous IO
  * dispatcher.  When an asynchronous IO operation is initiated, the reactor
  * enables interest in that operation with a {@link Selector}, returning
  * a future that will be completed when the operation becomes ready and the
@@ -69,7 +70,7 @@ import com.sun.sgs.nio.channels.WritePendingException;
  * The actual behavior of completing the IO operation is provided by the
  * asynchronous channel implementations; the reactor merely signals readiness
  * and invokes the completion handler for the operation as the operations
- * complete or are cancelled.
+ * complete or are canceled.
  */
 class Reactor {
 
@@ -174,32 +175,35 @@ class Reactor {
         synchronized (selectorLock) {
             if (lifecycleState < SHUTDOWN_NOW) {
                 lifecycleState = SHUTDOWN_NOW;
+            } else {
+                return;
+            }
+        }
 
-                // FIXME this is unsafe -- the selector keys() set may
-                // change while we are iterating.  Need a better strategy,
-                // maybe one that will interrupt the dispatching of
-                // existing keys. -JM
+        // To avoid deadlock, must not hold  selectorLock when calling close().
+        // Selector keys() set may change while we are iterating.
+        while (true) {
+            try {
+                for (SelectionKey key : selector.keys()) {
+                    try {
+                        Closeable asyncKey = (Closeable)key.attachment();
+                        if (asyncKey != null) {
+                            synchronized (asyncKey) {
+                                asyncKey.close();
+                            }
+                        }
+                    } catch (IOException ignore) { }
+                }
+            } catch (ConcurrentModificationException e) {
+                continue;
+            } catch (ClosedSelectorException e) {
+                break;
+            }
+            break;
+        }
 
-		// This fix is a bit of a hack, but it is safe and
-		// it works.  (ann 4/10/08)
-
-		while (true) {
-		    try {
-			for (SelectionKey key : selector.keys()) {
-			    try {
-				Closeable asyncKey =
-				    (Closeable) key.attachment();
-				if (asyncKey != null) {
-				    asyncKey.close();
-                                }
-			    } catch (IOException ignore) { }
-			}
-		    } catch (ConcurrentModificationException e) {
-			continue;
-		    }
-		    break;
-		}
-
+        synchronized (selectorLock) {
+            if (lifecycleState == SHUTDOWN_NOW) {
                 selector.wakeup();
             }
         }
@@ -409,10 +413,9 @@ class Reactor {
     {
         synchronized (selectorLock) {
             selector.wakeup();
-            SelectionKey key = asyncKey.key;
-            SelectableChannel channel = asyncKey.channel();
             int interestOps;
             synchronized (asyncKey) {
+                SelectionKey key = asyncKey.key;
                 if (key == null || (!key.isValid())) {
                     throw new ClosedAsynchronousChannelException();
                 }
@@ -423,6 +426,8 @@ class Reactor {
 		    throw new ClosedAsynchronousChannelException();
 		}
 
+                SelectableChannel channel = asyncKey.channel();
+                
                 // These precondition checks don't belong here; they
                 // should be refactored to AsyncSocketChannelImpl.
                 // However, they need to occur inside the asyncKey
@@ -470,7 +475,7 @@ class Reactor {
     }
 
     /**
-     * A FutureTask that can be cancelled by a timeout exception.
+     * A FutureTask that can be canceled by a timeout exception.
      * 
      * @param <R> the result type
      */
@@ -716,7 +721,7 @@ class Reactor {
         /**
          * {@inheritDoc}
          * <p>
-         * This implemenation does the following:
+         * This implementation does the following:
          * <ul>
          * <li>
          * Unregisters the underlying channel with the reactor
@@ -748,6 +753,11 @@ class Reactor {
                 selector.wakeup();
 
                 // Awaken any and all pending operations
+		// FIXME: This can cause deadlock because a pending
+		// operation may already be locking the 'lock' field of the
+		// DelegatingCompletionHandler and when the pending
+		// operation resumes, it needs to lock the 'selectorLock'
+		// which is already held by this thread.  -- ann (2/10/09)
                 selected(OP_ACCEPT | OP_CONNECT | OP_READ | OP_WRITE);
             }
         }
@@ -889,7 +899,7 @@ class Reactor {
          * 
          * @param task the task to notify
          * @param timeout the timeout
-         * @param unit the unit of the timout
+         * @param unit the unit of the timeout
          */
         TimeoutHandler(AsyncOp<?> task, long timeout, TimeUnit unit) {
             this.task = task;

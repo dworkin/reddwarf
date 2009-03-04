@@ -1,5 +1,22 @@
 Project Darkstar Server API Changes
 
+Version 0.9.9
+
+- Add support for specifying a delivery guarantee on session messages
+
+  The method ClientSession.send(ByteBuffer, Delivery) has been
+  added.
+
+- Clarify session and channel delivery semantics
+
+  The delivery parameter is a "delivery guarantee" and no longer
+  "delivery requirement" in the classes ClientSession,
+  ChannelManager, and Channel. The Javadoc for these classes
+  have been modified to reflect this.
+
+  To aid in the handling of delivery guarantees, the method
+  Delivery.supportsDelivery(Delivery) has been added.
+
 Version 0.9.8
 
 - Add support for pluggable AppContext behavior
