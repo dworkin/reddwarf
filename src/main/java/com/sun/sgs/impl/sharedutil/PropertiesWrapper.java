@@ -294,8 +294,8 @@ public class PropertiesWrapper {
      * @return	the new instance or <code>null</code> if the property is not
      *		found
      * @throws	IllegalArgumentException if the property is found and a problem
-     *		occurs creating the instance, or if the constructor throws a
-     *		checked exception
+     *		occurs creating the instance, or if the constructor throws
+     *		a checked exception
      */
     public <T> T getClassInstanceProperty(
 	String name, Class<T> type, Class<?>[] paramTypes, Object... args)
@@ -304,6 +304,68 @@ public class PropertiesWrapper {
 	if (className == null) {
 	    return null;
 	}
+	return getClassInstance(name, className, type, paramTypes, args);
+    }
+    
+    /**
+     * Returns an instance of the class whose fully qualified class name is
+     * specified by a property, and that has a constructor with the specified
+     * parameters.  The class should extend or implement the specified type,
+     * and not be abstract.
+     *
+     * @param	<T> the type of the return value
+     * @param	name the property name
+     * @param   defaultClass  the fully qualified class name to use if the
+     *          {@code name} property is not found
+     * @param	type the class which the return value should be an instance of
+     * @param	paramTypes the constructor parameter types
+     * @param	args the arguments to pass to the constructor
+     * @return	the new instance or <code>null</code> if the property is not
+     *		found and {@code defaultClassName} is {@code null}
+     * @throws	IllegalArgumentException if a problem occurs creating the
+     *		instance, or if the constructor throws a checked exception
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T getClassInstanceProperty(
+	String name, String defaultClass, Class<T> type,
+        Class<?>[] paramTypes, Object... args)
+    {
+        Object instance =
+	    getClassInstanceProperty(name, type, paramTypes, args);
+        
+        if (instance != null) {
+            return (T) instance;
+        }
+	if (defaultClass == null) {
+            return null;
+        }
+        return getClassInstance(name, defaultClass, type, paramTypes, args);
+    }
+    
+    /**
+     * Returns an instance of the class whose fully qualified class name is
+     * specified by {@code className}, and that has a constructor with the
+     * specified parameters.  The class should extend or implement the
+     * specified type, and not be abstract.
+     *
+     * @param	<T> the type of the return value
+     * @param	name the property name (used for exception message text),
+     *		or {@code null}
+     * @param	className the class name
+     * @param	type the class which the return value should be an instance of
+     * @param	paramTypes the constructor parameter types
+     * @param	args the arguments to pass to the constructor
+     * @return	the new instance
+     * @throws	IllegalArgumentException if a problem occurs creating the
+     *		instance, or if the constructor throws a checked exception
+     */
+    private <T> T getClassInstance(
+ 	String name, String className, Class<T> type, Class<?>[] paramTypes,
+	Object... args)
+    {
+        if (className == null) {
+            throw new NullPointerException("null className");
+        }
 	try {
 	    return Class.forName(className)
 		.asSubclass(type)
@@ -311,13 +373,13 @@ public class PropertiesWrapper {
 		.newInstance(args);
 	} catch (ClassNotFoundException e) {
 	    throw new IllegalArgumentException(
-		"The class specified by the " + name + " property was not " +
-		"found: " + className,
+		"The class " + className + getPropertyText(name) +
+		" was not found",
 		e);
 	} catch (ClassCastException e) {
 	    throw new IllegalArgumentException(
-		"The class specified by the " + name + " property does not " +
-		"implement " + type.getName() + ": " + className,
+		"The class " + className + getPropertyText(name) +
+		" does not implement " + type.getName(),
 		e);
 	} catch (NoSuchMethodException e) {
 	    StringBuilder sb = new StringBuilder();
@@ -331,9 +393,8 @@ public class PropertiesWrapper {
 		sb.append(paramType.getName());
 	    }
 	    throw new IllegalArgumentException(
-		"The class specified by the " + name + " property, " +
-		className + ", does not have a constructor with required " +
-		"parameters: " + sb,
+		"The class " + className + getPropertyText(name) +
+		" does not have a constructor with required parameters: " + sb,
 		e);
 	} catch (InvocationTargetException e) {
 	    Throwable cause = e.getCause();
@@ -343,16 +404,63 @@ public class PropertiesWrapper {
 		throw (Error) cause;
 	    } else {
 		throw new IllegalArgumentException(
-		    "Problem calling the constructor for the class " +
-		    "specified by the " + name + " property: " +
-		    className + ": " + cause,
+		    "Calling the constructor for the class " +
+		    className + getPropertyText(name) + " throws: " + cause,
 		    cause);
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(
-		"Problem creating an instance of the class specified by the " +
-		name + " property: " + className + ": " + e,
+		"Creating an instance of the class " +
+		className + getPropertyText(name) + " throws: " + e,
 		e);
 	}
+    }
+
+    /**
+     * Returns a formatted string containing the property {@code name} (if
+     * it is non-null}, otherwise returns an empty string.
+     *
+     * @param	name a property name or {@code null}
+     * @return	if {@code name} is non-null, a formatted string containing
+     *		the property name; otherwise, an empty string
+     */
+    private String getPropertyText(String name) {
+	return
+	    name != null ?
+	    ", specified by the property: " + name + "," :
+	    "";
+    }
+    
+    /**
+     * Parse a property containing property value pairs. The specified property
+     * is parsed as a ":" separated list, with each pair of elements treated as
+     * a property key and value. Each pair is added to a properties object by
+     * calling {@link Properties#setProperty Properties.setProperty}. The
+     * resulting properties object is returned.
+     * @param name the property name
+     * @return a {@code Properties} object
+     * @throws IllegalArgumentException if {@code name} is {@code null},
+     * or the property is not found,
+     * or the embedded property list is malformed.
+     */
+    public Properties getEmbeddedProperties(String name)
+            throws IllegalArgumentException
+    {
+        if (name == null)
+            throw new IllegalArgumentException("name can not be null");
+        final String arg = getProperty(name);
+        if (arg == null)
+            throw new IllegalArgumentException(
+                    "The " + name + " property must be specified");
+        final String[] propAndValue = arg.split(":");
+        if ((propAndValue.length % 2) != 0)
+            throw new IllegalArgumentException(
+                    "Missmatch propery value pair: " + arg);
+        final Properties prop = new Properties();
+        for (int i = 0; i < propAndValue.length;) {
+            prop.setProperty(propAndValue[i], propAndValue[i+1]);
+            i += 2;
+        }
+        return prop;
     }
 }	
