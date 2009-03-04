@@ -104,8 +104,6 @@ public class SimpleSgsProtocol {
     /** The version number, currently {@code 0x04}. */
     public static final byte VERSION = 0x04;
 
-    final String TYPE = "SimpleSGSv" + VERSION;
-    
     /**
      * Login request from a client to a server. This message should only be sent
      * to a server; if received by a client it should be ignored. <br>
