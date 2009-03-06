@@ -25,7 +25,6 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
-import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
@@ -85,9 +84,6 @@ final class Context extends TransactionContext implements TransactionListener {
      */
     final ReferenceTable refs = new ReferenceTable();
 
-    /** The proxy for notifying of object accesses. */
-    final AccessReporter<BigInteger> oidAccesses;
-
     /**
      * A map that records all managed objects that are currently having
      * ManagedObjectRemoval.removingObject called on them, to detect recursion,
@@ -102,18 +98,16 @@ final class Context extends TransactionContext implements TransactionListener {
 	    Transaction txn,
 	    int debugCheckInterval,
 	    boolean detectModifications,
-	    ClassesTable classesTable,
-	    AccessReporter<BigInteger> oidAccesses)
+	    ClassesTable classesTable)
     {
 	super(txn);
 	assert service != null && store != null && txn != null &&
-	    classesTable != null && oidAccesses != null;
+	    classesTable != null;
 	this.service = service;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
-	this.oidAccesses = oidAccesses;
 	classSerial = classesTable.createClassSerialization(this.txn);
 	txn.registerListener(this);
 	if (logger.isLoggable(Level.FINER)) {
@@ -250,11 +244,14 @@ final class Context extends TransactionContext implements TransactionListener {
     ManagedObject getBinding(String internalName) {
 	long id = store.getBinding(txn, internalName);
 	assert id >= 0 : "Object ID must not be negative";
-	return (ManagedObject) getReference(id).get(false);
+	ManagedObject result = (ManagedObject) getReference(id).get(false);
+	store.setBindingDescription(txn, internalName, result);
+	return result;
     }
 
     /** Sets the object associated with the specified internal name. */
     void setBinding(String internalName, Object object) {
+	store.setBindingDescription(txn, internalName, object);
 	store.setBinding(txn, internalName, getReference(object).oid);
     }
 

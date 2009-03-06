@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.Transaction;
@@ -87,7 +88,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
     @BeforeClass
     public static void initialize() throws Exception {
 	cleanDirectory(dbDirectory);
-	store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props, /* XXX */ new NullAccessCoordinator());
     }
 
     /** Create a transaction and an object in the data store. */
@@ -231,7 +232,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	txn.commit();
 	txn = null;
 	store.shutdown();
-	store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props, new NullAccessCoordinator());
 	long nextId = -1;
 	for (int i = 0; true; i++) {
 	    if (i % 40 == 0) {

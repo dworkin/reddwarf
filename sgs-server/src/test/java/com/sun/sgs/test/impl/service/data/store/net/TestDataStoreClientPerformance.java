@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
@@ -65,7 +66,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props),
+	    new DataStoreClient(props, /* XXX */ new NullAccessCoordinator()),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;

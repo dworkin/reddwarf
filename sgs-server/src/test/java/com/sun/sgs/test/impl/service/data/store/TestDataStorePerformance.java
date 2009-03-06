@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data.store;
 
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
@@ -339,7 +340,7 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props), DummyProfileCoordinator.getCollector());
+	    new DataStoreImpl(props, /* XXX */ new NullAccessCoordinator()), DummyProfileCoordinator.getCollector());
         DummyProfileCoordinator.startProfiling();
 	return store;
     }

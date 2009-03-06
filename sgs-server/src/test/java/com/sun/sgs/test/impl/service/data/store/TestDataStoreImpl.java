@@ -25,6 +25,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -1898,7 +1899,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props), DummyProfileCoordinator.getCollector());
+	    new DataStoreImpl(props, /* FIXME */ new NullAccessCoordinator()), DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
@@ -92,7 +93,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     @Override
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props), DummyProfileCoordinator.getCollector());
+	    new DataStoreClient(props, /* XXX */ new NullAccessCoordinator()), DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

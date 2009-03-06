@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.net;
 
+import com.sun.sgs.impl.service.data.store.BindingValue;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -282,28 +283,28 @@ class DataStoreProtocol implements DataStoreServer {
 	}
     }
 
-    public long getBinding(long tid, String name) throws IOException {
+    public BindingValue getBinding(long tid, String name) throws IOException {
 	out.writeShort(GET_BINDING);
 	out.writeLong(tid);
 	writeString(name);
 	checkResult();
-	return in.readLong();
+	return readBindingValue();
     }
 
     private void handleGetBinding(DataStoreServer server) throws IOException {
 	try {
 	    long tid = in.readLong();
 	    String name = readString();
-	    long result = server.getBinding(tid, name);
+	    BindingValue result = server.getBinding(tid, name);
 	    out.writeBoolean(true);
-	    out.writeLong(result);
+	    writeBindingValue(result);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
 	}
     }
 
-    public void setBinding(long tid, String name, long oid)
+    public BindingValue setBinding(long tid, String name, long oid)
 	throws IOException
     {
 	out.writeShort(SET_BINDING);
@@ -311,6 +312,7 @@ class DataStoreProtocol implements DataStoreServer {
 	writeString(name);
 	out.writeLong(oid);
 	checkResult();
+	return readBindingValue();
     }
 
     private void handleSetBinding(DataStoreServer server) throws IOException {
@@ -318,19 +320,23 @@ class DataStoreProtocol implements DataStoreServer {
 	    long tid = in.readLong();
 	    String name = readString();
 	    long oid = in.readLong();
-	    server.setBinding(tid, name, oid);
+	    BindingValue result = server.setBinding(tid, name, oid);
 	    out.writeBoolean(true);
+	    writeBindingValue(result);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
 	}
     }
 
-    public void removeBinding(long tid, String name) throws IOException {
+    public BindingValue removeBinding(long tid, String name)
+	throws IOException
+    {
 	out.writeShort(REMOVE_BINDING);
 	out.writeLong(tid);
 	writeString(name);
 	checkResult();
+	return readBindingValue();
     }
 
     private void handleRemoveBinding(DataStoreServer server)
@@ -339,8 +345,9 @@ class DataStoreProtocol implements DataStoreServer {
 	try {
 	    long tid = in.readLong();
 	    String name = readString();
-	    server.removeBinding(tid, name);
+	    BindingValue result = server.removeBinding(tid, name);
 	    out.writeBoolean(true);
+	    writeBindingValue(result);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
@@ -631,5 +638,16 @@ class DataStoreProtocol implements DataStoreServer {
 	for (int i = 0; i < len; i++) {
 	    out.writeLong(array[i]);
 	}
+    }
+
+    /** Read a BindingValue from input. */
+    private BindingValue readBindingValue() throws IOException {
+	return new BindingValue(in.readLong(), readString());
+    }
+
+    /** Write a BindingValue to output. */
+    private void writeBindingValue(BindingValue result) throws IOException {
+	out.writeLong(result.getObjectId());
+	writeString(result.getNextName());
     }
 }

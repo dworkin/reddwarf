@@ -4546,6 +4546,12 @@ public class TestDataServiceImpl{
 	    return null;
 	}
 	public long nextObjectId(Transaction txn, long oid) { return -1; }
+	public void setObjectDescription(
+	    Transaction txn, long oid, Object description)
+	{ }
+	public void setBindingDescription(
+	    Transaction txn, String name, Object description)
+	{ }
     }
 
     /**
