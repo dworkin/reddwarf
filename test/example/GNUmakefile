@@ -20,7 +20,7 @@ $(EXE): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS) $(LDLIBS)
 
 clean:
-	-/bin/rm -rf $(OBJDIR)
+	-/bin/rm -rf $(OBJDIR)/*
 
 realclean: clean
 	-/bin/rm -f $(EXE)
