@@ -80,11 +80,10 @@ static fd_set* fd_copy(fd_set* from, fd_set* to) {
 static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel);
 static void channel_left_cb(sgs_connection *conn, sgs_channel *channel);
 static void channel_recv_msg_cb(sgs_connection *conn, sgs_channel *channel,
-    const uint8_t *msg, size_t msglen);
+        const uint8_t *msg, size_t msglen);
 static void disconnected_cb(sgs_connection *conn);
 static void logged_in_cb(sgs_connection *conn, sgs_session *session);
-static void login_failed_cb(sgs_connection *conn, const uint8_t *msg,
-    size_t msglen);
+static void login_failed_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen);
 static void reconnected_cb(sgs_connection *conn);
 static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg, size_t msglen);
 static void register_fd_cb(sgs_connection *conn, int fd, short events);
