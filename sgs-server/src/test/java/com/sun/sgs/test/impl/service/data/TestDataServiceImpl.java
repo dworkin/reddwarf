@@ -35,6 +35,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
+import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
@@ -406,7 +407,9 @@ public class TestDataServiceImpl{
     }
 
     public static class DataStoreConstructorFails extends DummyDataStore {
-	public DataStoreConstructorFails(Properties props) {
+	public DataStoreConstructorFails(
+	    Properties props, AccessCoordinator accessCoordinator)
+	{
 	    throw new DataStoreConstructorException();
 	}
     }

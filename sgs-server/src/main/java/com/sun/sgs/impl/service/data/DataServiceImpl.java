@@ -46,6 +46,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -298,10 +299,6 @@ public final class DataServiceImpl implements DataService {
 	    return new Context(
 		DataServiceImpl.this, store, txn, debugCheckInterval,
 		detectModifications, classesTable);
-	}
-	@Override protected TransactionParticipant createParticipant() {
-	    /* Create a durable participant */
-	    return new Participant();
 	}
     }
 

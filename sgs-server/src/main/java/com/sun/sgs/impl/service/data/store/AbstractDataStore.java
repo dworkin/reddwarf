@@ -122,7 +122,7 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(null, FINEST, e, "createObject txn:" + txn);
+	    throw handleException(txn, FINEST, e, "createObject txn:" + txn);
 	}
     }
 
@@ -896,7 +896,7 @@ public abstract class AbstractDataStore
 					       String operation)
     {
 	boolean abort = (e instanceof TransactionAbortedException);
-	if (abort && !txn.isAborted()) {
+	if (abort && txn != null && !txn.isAborted()) {
 	    txn.abort(e);
 	}
 	LoggerWrapper thisLogger = abort ? abortLogger : logger;
