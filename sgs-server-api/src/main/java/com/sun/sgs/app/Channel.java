@@ -31,7 +31,7 @@ import java.util.Set;
  *
  * <p>A channel is created by invoking the {@link
  * ChannelManager#createChannel ChannelManager.createChannel} method with a
- * name, a {@code ChannelListener}, and a {@link Delivery} requirement.  A
+ * name, a {@code ChannelListener}, and a {@link Delivery} guarantee. A
  * {@link ClientSession} can be added or removed from a channel using that
  * {@code Channel}'s {@link #join(ClientSession) join} and {@link
  * #leave(ClientSession) leave} methods respectively.  All client sessions
@@ -41,13 +41,20 @@ import java.util.Set;
  * DataManager#removeObject DataManager.removeObject} method.
  *
  * <p>The server can send a message to all client sessions joined to a
- * channel by using the {@link #send send} method.  Note that the
- * methods of this interface are invoked within the context of an
- * executing {@link Task}; as a result, a message sent to client
- * sessions using the {@code send} method will not be sent until after
- * its corresponding task completes.  Messages sent on a channel will
- * be delivered according to that channel's {@link Delivery}
- * requirement, specified at channel creation time.
+ * channel by using the {@link #send send} method.  Note that the methods
+ * of this interface are invoked within the context of an executing {@link
+ * Task}; as a result, a message sent to client sessions using the {@code
+ * send} method will not be sent until after its corresponding task
+ * completes.
+ *
+ * <p>Messages sent on a channel are delivered in a manner that satisfies
+ * the channel's delivery guarantee, specified at creation time.  When
+ * possible, channel messages are delivered using the most efficient means
+ * to satisfy the delivery guarantee.  However, a stronger delivery
+ * guarantee may be used to deliver the message if the underlying protocol
+ * only supports stronger delivery guarantees.  A client session can not be
+ * joined to a channel if that client session does not support a protocol
+ * satisfying the minimum requirements of the channel's delivery guarantee.
  *
  * <p>A client session joined to one or more channels may become
  * disconnected due to the client logging out or due to other factors
@@ -76,15 +83,15 @@ public interface Channel extends ManagedObject {
     String getName();
     
     /**
-     * Returns the delivery requirement of this channel.
+     * Returns the delivery guarantee of this channel.
      *
-     * @return the delivery requirement
+     * @return the delivery guarantee
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      *	       a problem with the current transaction
      */
-    Delivery getDeliveryRequirement();
+    Delivery getDelivery();
 
     /**
      * Returns {@code true} if this channel has client sessions
@@ -131,13 +138,18 @@ public interface Channel extends ManagedObject {
     /**
      * Adds a client session to this channel.  If the specified
      * session is already joined to this channel, then no action is
-     * taken.
+     * taken.  If the client session does not support a protocol that
+     * satisfies the minimum requirements of the channel's delivery
+     * guarantee, then {@code DeliveryNotSupportedException} will be
+     * thrown. 
      *
      * @param session a client session
      *
      * @return this channel
      *
      * @throws IllegalStateException if this channel is closed
+     * @throws DeliveryNotSupportedException if the session does not support
+     *	       the minimum requirements of this channel's delivery guarantee
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
      * @throws TransactionException if the operation failed because of
@@ -146,13 +158,19 @@ public interface Channel extends ManagedObject {
     Channel join(ClientSession session);
 
     /**
-     * Adds the specified client sessions to this channel.
+     * Adds the specified client sessions to this channel.  If any client
+     * session in the specified set does not support a protocol that
+     * satisfies the minimum requirements of the channel's delivery
+     * guarantee, then {@code DeliveryNotSupportedException} will be
+     * thrown.
      *
      * @param sessions a set of client sessions
      *
      * @return this channel
      *
      * @throws IllegalStateException if this channel is closed
+     * @throws DeliveryNotSupportedException if any session does not support
+     * 	       the minimum requirements of this channel's delivery guarantee
      * @throws ResourceUnavailableException if there are not enough resources
      *	       to join the channel
      * @throws TransactionException if the operation failed because of
@@ -215,6 +233,10 @@ public interface Channel extends ManagedObject {
      * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the channel by this invocation.
+     * 
+     * <p>The maximum length of a message that can be sent over the channel is
+     * dependent on the maximum message length supported by all joined client
+     * sessions. (See: {@link ClientSession#getMaxMessageLength})
      *
      * @param	sender the sending client session, or {@code null}
      * @param	message a message
@@ -222,6 +244,8 @@ public interface Channel extends ManagedObject {
      * @return	this channel
      *
      * @throws	IllegalStateException if this channel is closed
+     * @throws  IllegalArgumentException if the channel would be unable
+     *          to send the specified message because it exceeds a size limit 
      * @throws	MessageRejectedException if there are not enough resources
      *		to send the specified message
      * @throws	TransactionException if the operation failed because of

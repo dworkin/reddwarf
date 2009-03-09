@@ -20,12 +20,13 @@
 package com.sun.sgs.app;
 
 /**
- * Representation for message delivery requirements.  A channel is
- * created with a delivery requirement.  See the {@link
+ * Representation for message delivery guarantees.  A channel is
+ * created with a delivery guarantee.  See the {@link
  * ChannelManager#createChannel ChannelManager.createChannel} method
  * for details.
  *
- * <p>Messages are guaranteed to be delivered <i>at most once</i>.
+ * <p>With all delivery guarantees, messages are guaranteed to be delivered
+ * <i>at most once</i>. 
  */
 public enum Delivery {
 
@@ -55,4 +56,23 @@ public enum Delivery {
      * delivered preserve the sender's order.
      */
     RELIABLE;
+
+    /**
+     * Returns {@code true} if this delivery guarantee meets the minimum
+     * requirements of the specified {@code delivery} guarantee, otherwise
+     * returns {@code false}.
+     *
+     * @param	delivery a delivery guarantee
+     * @return	{@code true} if this delivery guarantee meets the minimum
+     *		requirements of the specified {@code delivery} guarantee
+     */
+    public boolean supportsDelivery(Delivery delivery) {
+	if (delivery == null) {
+	    throw new NullPointerException("null delivery");
+	}
+	return
+	    this == delivery ||
+	    this == RELIABLE ||
+	    delivery == UNRELIABLE;
+    }
 }

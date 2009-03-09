@@ -337,9 +337,9 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
         String portStr = String.valueOf(port);
 
         return UtilProperties.createProperties(
-            "com.sun.sgs.app.name", appName,
-            "com.sun.sgs.app.port", 
-                Integer.toString(SgsTestNode.getNextAppPort()),
+            StandardProperties.APP_NAME, appName,
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
+                Integer.toString(SgsTestNode.getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
             StandardProperties.APP_LISTENER,

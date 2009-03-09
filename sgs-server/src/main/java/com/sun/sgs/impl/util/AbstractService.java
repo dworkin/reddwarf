@@ -100,7 +100,7 @@ public abstract class AbstractService implements Service {
     protected final String appName;
 
     /** The logger for the subclass. */
-    private final LoggerWrapper logger;
+    protected final LoggerWrapper logger;
 
     /** The data service. */
     protected final DataService dataService;
@@ -234,10 +234,11 @@ public abstract class AbstractService implements Service {
      * service is shutting down, or is already shut down, this method
      * throws {@code IllegalStateException}.
      *
+     * @throws	Exception if a problem occurs
      * @throws	IllegalStateException if this service is shutting down
      *		or is already shut down
      */
-    public void ready() {
+    public void ready() throws Exception {
 	logger.log(Level.FINEST, "ready");
 	synchronized (lock) {
 	    switch (state) {
@@ -263,8 +264,10 @@ public abstract class AbstractService implements Service {
      * Performs ready operations.  This method is invoked by the
      * {@link #ready ready} method only once so that the subclass can
      * perform any operations necessary during the "ready" phase.
+     *
+     * @throws	Exception if a problem occurs
      */
-    protected abstract void doReady();
+    protected abstract void doReady() throws Exception;
 
     /**
      * {@inheritDoc}
@@ -324,7 +327,7 @@ public abstract class AbstractService implements Service {
     /**
      * Performs shutdown operations.  This method is invoked by the
      * {@link #shutdown shutdown} method only once so that the
-     * subclass can perfom any operations necessary to shutdown the
+     * subclass can perform any operations necessary to shutdown the
      * service.
      */
     protected abstract void doShutdown();
@@ -583,15 +586,15 @@ public abstract class AbstractService implements Service {
      * true}.
      *
      * @param	e an exception
-     * @return	{@code true} if the specified exception is retryable, annd
+     * @return	{@code true} if the specified exception is retryable, and
      *		{@code false} otherwise
      */
     public static boolean isRetryableException(Exception e) {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }
-    
-    /**
+     
+   /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
      */   
@@ -681,7 +684,7 @@ public abstract class AbstractService implements Service {
      * and throws {@code IllegalStateException} if the thread is in a
      * transactional context.
      */
-    private void checkNonTransactionalContext() {
+    protected void checkNonTransactionalContext() {
 	try {
 	    txnProxy.getCurrentTransaction();
 	    throw new IllegalStateException(

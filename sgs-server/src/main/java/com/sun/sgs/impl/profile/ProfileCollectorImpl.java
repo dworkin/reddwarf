@@ -75,7 +75,7 @@ import javax.management.ObjectName;
  * kernel to collect and report profiling data. It uses a single thread to
  * consume and report profiling data to {@code ProfileListeners}.
  * <p>
- * The {@link #ProfileCollector constructor} supports the following
+ * The {@link #ProfileCollectorImpl constructor} supports the following
  * properties: <p>
  *
  * <dl style="margin-left: 1em">
