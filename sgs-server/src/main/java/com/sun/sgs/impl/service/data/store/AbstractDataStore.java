@@ -118,7 +118,8 @@ public abstract class AbstractDataStore
 	    long result = createObjectInternal(txn);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(
-		    FINEST, "createObject returns oid:{0,number,#}", result);
+		    FINEST, "createObject txn:{0} returns oid:{1,number,#}",
+		    txn, result);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
@@ -152,7 +153,6 @@ public abstract class AbstractDataStore
 		FINEST, "markForUpdate txn:{0}, oid:{1,number,#}", txn, oid);
 	}
 	try {
-	    checkOid(oid);
 	    reportObjectAccess(txn, oid, WRITE);
 	    markForUpdateInternal(txn, oid);
 	    if (logger.isLoggable(FINEST)) {
@@ -193,7 +193,6 @@ public abstract class AbstractDataStore
 		       txn, oid, forUpdate);
 	}
 	try {
-	    checkOid(oid);
 	    reportObjectAccess(txn, oid, forUpdate ? WRITE : READ);
 	    byte[] result = getObjectInternal(txn, oid, forUpdate);
 	    if (logger.isLoggable(FINEST)) {
@@ -242,8 +241,8 @@ public abstract class AbstractDataStore
 		FINEST, "setObject txn:{0}, oid:{1,number,#}", txn, oid);
 	}
 	try {
-	    checkOid(oid);
 	    checkNonNull(data, "data");
+	    reportObjectAccess(txn, oid, WRITE);
 	    setObjectInternal(txn, oid, data);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
@@ -274,8 +273,10 @@ public abstract class AbstractDataStore
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation does logging, checks that {@code oid} is valid and
-     * {@code data} is not {@code null}, reports object accesses, and calls
+     * This implementation does logging, checks that {@code oids} is not {@code
+     * null} and its elements are valid, that {@code dataArray} and its
+     * elements are not {@code null}, and that {@code oids} and {@code
+     * dataArray} have the same length, reports object accesses, and calls
      * {@link #setObjectsInternal setObjectsInternal} to perform the actual
      * operation.
      */
@@ -286,7 +287,7 @@ public abstract class AbstractDataStore
 	}
 	try {
 	    for (long oid : oids) {
-		checkOid(oid);
+		reportObjectAccess(txn, oid, WRITE);
 	    }
 	    for (byte[] data : dataArray) {
 		if (data == null) {
@@ -339,7 +340,7 @@ public abstract class AbstractDataStore
 		FINEST, "removeObject txn:{0}, oid:{1,number,#}", txn, oid);
 	}
 	try {
-	    checkOid(oid);
+	    reportObjectAccess(txn, oid, WRITE);
 	    removeObjectInternal(txn, oid);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
@@ -382,6 +383,9 @@ public abstract class AbstractDataStore
 	    reportNameAccess(txn, name, READ);
 	    BindingValue result = getBindingInternal(txn, name);
 	    if (!result.getNameBound()) {
+		/*
+		 * Read lock the next name if the requested name is not found.
+		 */
 		reportNameAccess(txn, result.getNextName(), READ);
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
@@ -408,7 +412,6 @@ public abstract class AbstractDataStore
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
      * @return	information about the object ID and the next name
-     * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -422,8 +425,9 @@ public abstract class AbstractDataStore
      * {@inheritDoc} <p>
      *
      * This implementation does logging, checks that {@code name} is not {@code
-     * null}, reports object accesses, and calls {@link #setBindingInternal
-     * setBindingInternal} to perform the actual operation.
+     * null} and that {@code oid} is valid, reports object accesses, and calls
+     * {@link #setBindingInternal setBindingInternal} to perform the actual
+     * operation.
      */
     public void setBinding(Transaction txn, String name, long oid) {
 	if (logger.isLoggable(FINEST)) {
@@ -436,7 +440,7 @@ public abstract class AbstractDataStore
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = setBindingInternal(txn, name, oid);
 	    if (!result.getNameBound()) {
-		/* Lock the next name if this name was unbound */
+		/* Lock the next name if the requested name was unbound */
 		reportNameAccess(txn, result.getNextName(), WRITE);
 	    }
 	    if (logger.isLoggable(FINEST)) {
@@ -462,7 +466,7 @@ public abstract class AbstractDataStore
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
      * @param	oid the object ID
-     * @return	information about the previous object ID and the next name
+     * @return	information about the old object ID and the next name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -488,16 +492,17 @@ public abstract class AbstractDataStore
 	    BindingValue result = removeBindingInternal(txn, name);
 	    if (!result.getNameBound()) {
 		/*
-		 * Only need READ access to the name and the next name if the
-		 * name can't be removed because it is not present.
+		 * Only need read access to the name and the next name if the
+		 * name can't be removed because it is not present.  No
+		 * modifications are made in this case.
 		 */
 		reportNameAccess(txn, name, READ);
 		reportNameAccess(txn, result.getNextName(), READ);
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
 	    /*
-	     * Otherwise, need WRITE access to the name and the next name if
-	     * removing it.
+	     * Otherwise, need write access to the name and the next name if
+	     * really doing the remove.
 	     */
 	    reportNameAccess(txn, name, WRITE);
 	    reportNameAccess(txn, result.getNextName(), WRITE);
@@ -508,7 +513,7 @@ public abstract class AbstractDataStore
 	    }
 	} catch (RuntimeException e) {
 	    throw handleException(
-		txn, FINEST, e, "removBinding txn:" + txn + ", name:" + name);
+		txn, FINEST, e, "removeBinding txn:" + txn + ", name:" + name);
 	}
     }
 
@@ -521,7 +526,6 @@ public abstract class AbstractDataStore
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
      * @return	information about the object ID and the next name
-     * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -534,9 +538,9 @@ public abstract class AbstractDataStore
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation does logging, checks that {@code name} is not {@code
-     * null}, reports object accesses, and calls {@link #nextBoundNameInternal
-     * nextBoundNameInternal} to perform the actual operation.
+     * This implementation does logging, reports object accesses, and calls
+     * {@link #nextBoundNameInternal nextBoundNameInternal} to perform the
+     * actual operation.
      */
     public String nextBoundName(Transaction txn, String name) {
 	if (logger.isLoggable(FINEST)) {
@@ -587,7 +591,7 @@ public abstract class AbstractDataStore
 	    shutdownInternal();
 	    logger.log(FINER, "shutdown complete");
 	} catch (RuntimeException e) {
-	    throw handleException(null, FINER, e, "shutdown throws");
+	    throw handleException(null, FINER, e, "shutdown");
 	}
     }
 
@@ -612,7 +616,7 @@ public abstract class AbstractDataStore
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    throw handleException(null, FINER, e, "getClassInfo txn:" + txn);
+	    throw handleException(txn, FINER, e, "getClassId txn:" + txn);
 	}
     }	    
 
@@ -660,7 +664,7 @@ public abstract class AbstractDataStore
 	    return result;
 	} catch (RuntimeException e) {
 	    throw handleException(
-		null, FINER, e,
+		txn, FINER, e,
 		"getClassInfo txn:" + txn + ",classId:" + classId);
 	}
     }
@@ -671,8 +675,6 @@ public abstract class AbstractDataStore
      * @param	txn the transaction under which the operation should take place
      * @param	classId the class ID
      * @return	the associated class information
-     * @throws	IllegalArgumentException if {@code classId} is not greater than
-     *		{@code 0}
      * @throws	ClassInfoNotFoundException if the ID is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
@@ -702,7 +704,7 @@ public abstract class AbstractDataStore
 	    }
 	    long result = nextObjectIdInternal(txn, oid);
 	    if (result != -1) {
-		/* Only report access if the object if it was found */
+		/* Only report access to the object if it was found */
 		reportObjectAccess(txn, result, READ);
 	    }
 	    if (logger.isLoggable(FINEST)) {
@@ -735,6 +737,15 @@ public abstract class AbstractDataStore
     protected abstract long nextObjectIdInternal(Transaction txn, long oid);
 
     /** {@inheritDoc} */
+    public void setObjectDescription(
+	Transaction txn, long oid, Object description)
+    {
+	checkOid(oid);
+	checkNonNull(description, "description");
+	objectAccesses.setObjectDescription(txn, oid, description);
+    }
+
+    /** {@inheritDoc} */
     public void setBindingDescription(
 	Transaction txn, String name, Object description)
     {
@@ -742,15 +753,6 @@ public abstract class AbstractDataStore
 	checkNonNull(description, "description");
 	nameAccesses.setObjectDescription(
 	    txn, getNameForAccess(name), description);
-    }
-
-    /** {@inheritDoc} */
-    public void setObjectDescription(
-	Transaction txn, long oid, Object description)
-    {
-	checkOid(oid);
-	checkNonNull(description, "description");
-	objectAccesses.setObjectDescription(txn, oid, description);
     }
 
     /* -- Implement TransactionParticipant -- */

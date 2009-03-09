@@ -750,8 +750,8 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  See the {@linkplain DataStoreImpl class documentation} for
-     * a list of supported properties.
+     * properties and access coordinator.  See the {@linkplain DataStoreImpl
+     * class documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
      * @param	accessCoordinator the access coordinator
@@ -767,7 +767,7 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties and using the specified scheduler.  See the {@linkplain
+     * properties, access coordinator, and scheduler.  See the {@linkplain
      * DataStoreImpl class documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
@@ -1031,7 +1031,6 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /** {@inheritDoc} */
     protected void removeObjectInternal(Transaction txn, long oid) {
-	checkOid(oid);
 	TxnInfo txnInfo = checkTxn(txn);
 	byte[] key = DataEncoding.encodeLong(oid);
 	boolean found = oidsDb.delete(txnInfo.dbTxn, key);
@@ -1059,11 +1058,14 @@ public class DataStoreImpl extends AbstractDataStore {
     {
 	TxnInfo txnInfo = checkTxn(txn);
 	byte[] key = DataEncoding.encodeString(name);
-	boolean found = (namesDb.get(txnInfo.dbTxn, key, true) != null);
+	byte[] oldValue = namesDb.get(txnInfo.dbTxn, key, true);
 	namesDb.put(txnInfo.dbTxn, key, DataEncoding.encodeLong(oid));
 	txnInfo.modified = true;
-	return found ? new BindingValue(1, null)
-	    : new BindingValue(-1, txnInfo.nextName(name, namesDb));
+	if (oldValue != null) {
+	    return new BindingValue(1, null);
+	} else {
+	    return new BindingValue(-1, txnInfo.nextName(name, namesDb));
+	}
     }
 
     /** {@inheritDoc} */
@@ -1075,9 +1077,10 @@ public class DataStoreImpl extends AbstractDataStore {
 	    txnInfo.dbTxn, DataEncoding.encodeString(name));
 	if (found) {
 	    txnInfo.modified = true;
+	    return new BindingValue(1, txnInfo.nextName(name, namesDb));
+	} else {
+	    return new BindingValue(-1, txnInfo.nextName(name, namesDb));
 	}
-	return new BindingValue(
-	    found ? 1 : -1, txnInfo.nextName(name, namesDb));
     }
     
     /**
@@ -1125,6 +1128,16 @@ public class DataStoreImpl extends AbstractDataStore {
 	checkTxn(txn);
 	byte[] hashKey = getKeyFromClassInfo(classInfo);
 	boolean done = false;
+	/*
+	 * Use a separate transaction when obtaining the class ID so that
+	 * the ID will be available for other transactions to use right
+	 * away.  This approach means that the class info will be
+	 * registered even if the main transaction fails.  If any
+	 * transaction wants to register a new class, though, it's very
+	 * likely that the class will be needed, even if that transaction
+	 * aborts, so it makes sense to commit this operation separately to
+	 * improve concurrency.  -tjb@sun.com (05/23/2007)
+	 */
 	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
 	try {
 	    int result;

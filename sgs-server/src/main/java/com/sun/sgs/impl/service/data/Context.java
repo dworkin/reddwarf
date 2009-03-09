@@ -26,7 +26,6 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
-import com.sun.sgs.service.TransactionParticipant;
 import java.math.BigInteger;
 import java.util.IdentityHashMap;
 import java.util.logging.Level;
@@ -65,12 +64,6 @@ final class Context extends TransactionContext implements TransactionListener {
      * checks on the reference table.
      */
     private int count = 0;
-
-    /**
-     * The participant object for the data store, or null if the data store has
-     * not yet joined the transaction.
-     */
-    TransactionParticipant storeParticipant;
 
     /**
      * Stores information about managed references.  This field is logically
@@ -183,13 +176,7 @@ final class Context extends TransactionContext implements TransactionListener {
     public boolean prepare() throws Exception {
 	try {
 	    isPrepared = true;
-	    boolean result;
-	    if (storeParticipant == null) {
-		isCommitted = true;
-		result = true;
-	    } else {
-		result = storeParticipant.prepare(txn);
-	    }
+	    boolean result = true;
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "prepare tid:{0,number,#} returns {1}",
 			   getTxnId(), result);
@@ -208,9 +195,6 @@ final class Context extends TransactionContext implements TransactionListener {
     public void commit() {
 	try {
 	    isCommitted = true;
-	    if (storeParticipant != null) {
-		storeParticipant.commit(txn);
-	    }
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "commit tid:{0,number,#} returns",
 			   getTxnId());
@@ -228,9 +212,6 @@ final class Context extends TransactionContext implements TransactionListener {
     public void prepareAndCommit() throws Exception {
 	try {
 	    isCommitted = true;
-	    if (storeParticipant != null) {
-		storeParticipant.prepareAndCommit(txn);
-	    }
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
 			   "prepareAndCommit tid:{0,number,#} returns",
@@ -249,9 +230,6 @@ final class Context extends TransactionContext implements TransactionListener {
     @Override
     public void abort(boolean retryable) {
 	try {
-	    if (storeParticipant != null) {
-		storeParticipant.abort(txn);
-	    }
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "abort tid:{0,number,#} returns",
 			   getTxnId());

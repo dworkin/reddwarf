@@ -210,8 +210,8 @@ public final class DataStoreClient extends AbstractDataStore {
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  See the {@link DataStoreClient class documentation} for a
-     * list of supported properties.
+     * properties and access coordinator.  See the {@link DataStoreClient class
+     * documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
      * @param	accessCoordinator the access coordinator
@@ -567,7 +567,8 @@ public final class DataStoreClient extends AbstractDataStore {
 	}
 	/*
 	 * If we're throwing an exception saying that the transaction was
-	 * aborted, then make sure to abort the transaction now.
+	 * aborted, then note that the server must already know about the
+	 * abort.
 	 */
 	if (e instanceof TransactionAbortedException) {
 	    TxnInfo txnInfo = threadTxnInfo.get();
