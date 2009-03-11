@@ -102,17 +102,11 @@ public class LoggerPropertiesInit {
                 System.getProperty("java.util.logging.config.file"));
         
             Vector<InputStream> streamList = new Vector<InputStream>(3);
-            if (resourceStream == null && configFileStream == null) {
-                streamList.add(defaultStream);
-            } else if (resourceStream == null) {
-                streamList.add(defaultStream);
-                streamList.add(configFileStream);
-            } else if (configFileStream == null) {
-                streamList.add(defaultStream);
+            streamList.add(defaultStream);
+            if (resourceStream != null) {
                 streamList.add(resourceStream);
-            } else {
-                streamList.add(defaultStream);
-                streamList.add(resourceStream);
+            } 
+            if (configFileStream != null) {
                 streamList.add(configFileStream);
             }
 
