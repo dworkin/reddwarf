@@ -25,10 +25,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.io.SequenceInputStream;
+import java.io.Closeable;
 import java.util.logging.LogManager;
 
 /**
- * This class is used to initialize Java logging levels at system startup.
+ * This class is used to initialize logging levels at system startup.
  * If the system property {@code java.util.logging.config.class} is set to this
  * class's name, the constructor for this class will be used to initialize
  * logging levels from several sources.
@@ -38,7 +39,7 @@ public class LoggerPropertiesInit {
     /**
      * This class is instantiated if the system property 
      * {@code java.util.logging.config.class} is set to this class's
-     * name.  Initialize Java logging levels according to the following rules.
+     * name.  Initialize logging levels according to the following rules.
      * In each of the rules below, the "source {@code InputStream}" is used
      * to set the logging levels with the 
      * {@link LogManager#readConfiguration(java.io.InputStream)} method:
@@ -47,7 +48,7 @@ public class LoggerPropertiesInit {
      * {@link BootProperties#DEFAULT_LOG_PROPERTIES} exists, <em>and</em>
      * the file specified by the system property 
      * {@code java.util.logging.config.file} exists, use the concatenation of
-     * InputStreams of these two items (in that order) as the source
+     * input streams of these two items (in that order) as the source
      * {@code InputStream}.</li>
      * <li>If one and only one of the resources mentioned above exists,
      * use it as the source {@code InputStream}.</li>
@@ -56,8 +57,11 @@ public class LoggerPropertiesInit {
      * {@link LogManager} as if neither {@code java.util.logging.config.class}
      * nor {@code java.util.logging.config.file} are set.</li>
      * </ul>
+     * Note that if both resources exist as in the first scenario above,
+     * any property that is specified in both resources will retain the
+     * value of the property from the {@code java.util.logging.config.file}. 
      * 
-     * @throws java.io.IOException if an error occurs reading the configuration
+     * @throws IOException if an error occurs reading the configuration
      *         from the source {@code InputStream}
      */
     public LoggerPropertiesInit() throws IOException {
@@ -81,14 +85,14 @@ public class LoggerPropertiesInit {
                 defaultLogProperties);
         
         InputStream fileStream = null;
+        String configFileName = System.getProperty(
+                "java.util.logging.config.file");
         try {
-            fileStream = new FileInputStream(
-                    new File(System.getProperty(
-                             "java.util.logging.config.file")));
+            if (configFileName != null) {
+                fileStream = new FileInputStream(new File(configFileName));
+            }
         } catch (FileNotFoundException fnfe) {
             //ignore file doesn't exist
-        } catch (NullPointerException npe) {
-            //ignore null property
         }
         
         if (resourceStream == null && fileStream == null) {
@@ -103,6 +107,26 @@ public class LoggerPropertiesInit {
             SequenceInputStream combinedStream = 
                     new SequenceInputStream(resourceStream, fileStream);
             LogManager.getLogManager().readConfiguration(combinedStream);
+            close(combinedStream);
+        }
+        
+        close(resourceStream);
+        close(fileStream);
+    }
+    
+    /**
+     * Utility method to force close a {@code Closeable} object, ignoring any
+     * exception that is thrown.
+     * 
+     * @param c the {@code Closeable} to close
+     */
+    private static void close(Closeable c) {
+        try {
+            if (c != null) {
+                c.close();
+            }
+        } catch (IOException e) {
+            //ignore
         }
     }
 

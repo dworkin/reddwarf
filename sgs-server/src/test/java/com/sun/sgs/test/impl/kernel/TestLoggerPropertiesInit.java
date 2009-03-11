@@ -84,6 +84,7 @@ public class TestLoggerPropertiesInit
                 new BufferedWriter(new FileWriter(configFile)));
         writer.println(".level = SEVERE");
         writer.println("a.b.c.level = FINER");
+        writer.println("d.e.f.level = FINEST");
         writer.close();
     }
     
@@ -99,6 +100,7 @@ public class TestLoggerPropertiesInit
         Assert.assertEquals("INFO", 
                             LogManager.getLogManager().getProperty(".level"));
         Assert.assertNull(LogManager.getLogManager().getProperty("a.b.c.level"));
+        Assert.assertNull(LogManager.getLogManager().getProperty("d.e.f.level"));
         Assert.assertNull(LogManager.getLogManager().getProperty("x.y.z.level"));
     }
     
@@ -111,6 +113,7 @@ public class TestLoggerPropertiesInit
                             LogManager.getLogManager().getProperty("a.b.c.level"));
         Assert.assertEquals("FINEST",
                             LogManager.getLogManager().getProperty("x.y.z.level"));
+        Assert.assertNull(LogManager.getLogManager().getProperty("d.e.f.level"));
         
         Logger abc = Logger.getLogger("a.b.c");
         Logger xyz = Logger.getLogger("x.y.z");
@@ -127,6 +130,8 @@ public class TestLoggerPropertiesInit
                             LogManager.getLogManager().getProperty(".level"));
         Assert.assertEquals("FINER",
                             LogManager.getLogManager().getProperty("a.b.c.level"));
+        Assert.assertEquals("FINEST",
+                            LogManager.getLogManager().getProperty("d.e.f.level"));
         Assert.assertNull(LogManager.getLogManager().getProperty("x.y.z.level"));
     }
     
@@ -141,11 +146,15 @@ public class TestLoggerPropertiesInit
         Assert.assertEquals("FINER",
                             LogManager.getLogManager().getProperty("a.b.c.level"));
         Assert.assertEquals("FINEST",
+                            LogManager.getLogManager().getProperty("d.e.f.level"));
+        Assert.assertEquals("FINEST",
                             LogManager.getLogManager().getProperty("x.y.z.level"));
         
         Logger abc = Logger.getLogger("a.b.c");
+        Logger def = Logger.getLogger("d.e.f");
         Logger xyz = Logger.getLogger("x.y.z");
         Assert.assertEquals(Level.FINER, abc.getLevel());
+        Assert.assertEquals(Level.FINEST, def.getLevel());
         Assert.assertEquals(Level.FINEST, xyz.getLevel());
     }
     
