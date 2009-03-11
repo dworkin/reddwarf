@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.io.SequenceInputStream;
 import java.io.Closeable;
+import java.util.Vector;
 import java.util.logging.LogManager;
 
 /**
@@ -40,7 +41,9 @@ public class LoggerPropertiesInit {
      * This class is instantiated if the system property 
      * {@code java.util.logging.config.class} is set to this class's
      * name.  Initialize logging levels according to the following rules.
-     * In each of the rules below, the "source {@code InputStream}" is used
+     * In each of the rules below, the input stream from the file
+     * "lib/logging.properties" from the JRE is concatenated with the
+     * "source {@code InputStream}" and used
      * to set the logging levels with the 
      * {@link LogManager#readConfiguration(java.io.InputStream)} method:
      * <ul>
@@ -55,7 +58,9 @@ public class LoggerPropertiesInit {
      * <li>If neither of the resources mentioned above exist, initialize
      * the logging levels according to the standard rules for the
      * {@link LogManager} as if neither {@code java.util.logging.config.class}
-     * nor {@code java.util.logging.config.file} are set.</li>
+     * nor {@code java.util.logging.config.file} are set.  In other words,
+     * there is no "source {@code InputStream}" and the default
+     * "lib/logging.properties" file is simply used.</li>
      * </ul>
      * Note that if both resources exist as in the first scenario above,
      * any property that is specified in both resources will retain the
@@ -76,42 +81,72 @@ public class LoggerPropertiesInit {
      * 
      * @param defaultLogProperties the location of the system resource used
      *        to specify logging configuration
-     * @throws java.io.IOException
+     * @throws IOException if an error occurs reading the configuration
+     *         from the source {@code InputStream}
      * @see LoggerPropertiesInit#LoggerPropertiesInit() 
      */
     private static void init(String defaultLogProperties) 
             throws IOException {
-        InputStream resourceStream = ClassLoader.getSystemResourceAsStream(
-                defaultLogProperties);
+        InputStream defaultStream = null;
+        InputStream resourceStream = null;
+        InputStream configFileStream = null;
+        SequenceInputStream combinedStream = null;
         
-        InputStream fileStream = null;
-        String configFileName = System.getProperty(
-                "java.util.logging.config.file");
         try {
-            if (configFileName != null) {
-                fileStream = new FileInputStream(new File(configFileName));
+            defaultStream = getInputStreamFromFilename(
+                System.getProperty("java.home") + File.separator +
+                "lib" + File.separator + "logging.properties");
+            resourceStream = ClassLoader.getSystemResourceAsStream(
+                defaultLogProperties);
+            configFileStream = getInputStreamFromFilename(
+                System.getProperty("java.util.logging.config.file"));
+        
+            Vector<InputStream> streamList = new Vector<InputStream>(3);
+            if (resourceStream == null && configFileStream == null) {
+                streamList.add(defaultStream);
+            } else if (resourceStream == null) {
+                streamList.add(defaultStream);
+                streamList.add(configFileStream);
+            } else if (configFileStream == null) {
+                streamList.add(defaultStream);
+                streamList.add(resourceStream);
+            } else {
+                streamList.add(defaultStream);
+                streamList.add(resourceStream);
+                streamList.add(configFileStream);
+            }
+
+            combinedStream = new SequenceInputStream(streamList.elements());
+            LogManager.getLogManager().readConfiguration(combinedStream);
+        } finally {
+            close(combinedStream);
+            close(configFileStream);
+            close(resourceStream);
+            close(defaultStream);
+        }
+    }
+    
+    /**
+     * Utility method that opens and returns an {@code InputStream} connected
+     * to the file with the given name.
+     * 
+     * @param filename name of the file to get a stream
+     * @return an {@code InputStream} attached to the given file or {@code null}
+     *         if the file does not exist or the filename is {@code null}
+     */
+    private static InputStream getInputStreamFromFilename(String filename) {
+        InputStream fileStream = null;
+        
+        try {
+            System.err.println(filename);
+            if (filename != null) {
+                fileStream = new FileInputStream(new File(filename));
             }
         } catch (FileNotFoundException fnfe) {
             //ignore file doesn't exist
         }
         
-        if (resourceStream == null && fileStream == null) {
-            System.getProperties().remove("java.util.logging.config.class");
-            System.getProperties().remove("java.util.logging.config.file");
-            LogManager.getLogManager().readConfiguration();
-        } else if (resourceStream == null) {
-            LogManager.getLogManager().readConfiguration(fileStream);
-        } else if (fileStream == null) {
-            LogManager.getLogManager().readConfiguration(resourceStream);
-        } else {
-            SequenceInputStream combinedStream = 
-                    new SequenceInputStream(resourceStream, fileStream);
-            LogManager.getLogManager().readConfiguration(combinedStream);
-            close(combinedStream);
-        }
-        
-        close(resourceStream);
-        close(fileStream);
+        return fileStream;
     }
     
     /**
@@ -128,6 +163,13 @@ public class LoggerPropertiesInit {
         } catch (IOException e) {
             //ignore
         }
+    }
+    
+    /**
+     * This method exists to appease Checkstyle.
+     */
+    void noop() {
+        
     }
 
 }
