@@ -128,7 +128,8 @@ import java.util.Iterator;
  */
 public class BindingKeyedHashSet<E>
     extends AbstractSet<E>
-    implements Serializable, ManagedObjectRemoval {
+    implements Serializable
+{
 
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
@@ -147,14 +148,13 @@ public class BindingKeyedHashSet<E>
      *
      * @serial
      */
-    private final ManagedReference<BindingKeyedHashMap<E, E>> map;
+    private final BindingKeyedHashMap<E> map;
 
     /**
      * Creates an empty set.
      */
-    public BindingKeyedHashSet() {
-	map = AppContext.getDataManager().
-                createReference(new BindingKeyedHashMap<E, E>());
+    public BindingKeyedHashSet(String prefix) {
+	map = new BindingKeyedHashMap<E>(prefix);
     }
 
     /**
@@ -166,8 +166,8 @@ public class BindingKeyedHashSet<E>
      *	       specified collection is {@code null} or does not implement
      *	       {@code Serializable}
      */
-    public BindingKeyedHashSet(Collection<? extends E> c) {
-	this();
+    public BindingKeyedHashSet(String prefix, Collection<? extends E> c) {
+	this(prefix);
 	addAll(c);
     }
 
@@ -183,14 +183,14 @@ public class BindingKeyedHashSet<E>
      *	       does not implement {@code Serializable}
      */
     public boolean add(E e) {
-	return map.get().put(e, e) == null;
+	return map.put(e.toString(), e) == null;
     }
 
     /**
      * Removes all the elements in this set.
      */
     public void clear() {
-	map.get().clear();
+	map.clear();
     }
 
     /**
@@ -201,7 +201,7 @@ public class BindingKeyedHashSet<E>
      * @return {@code true} if this set contains the specified element
      */
     public boolean contains(Object o) {
-	return map.get().containsKey(o);
+	return map.containsKey(o.toString());
     }
 
     /**
@@ -210,7 +210,7 @@ public class BindingKeyedHashSet<E>
      * @return {@code true} if this set contains no elements
      */
     public boolean isEmpty() {
-	return map.get().isEmpty();
+	return map.isEmpty();
     }
 
     /**
@@ -220,7 +220,7 @@ public class BindingKeyedHashSet<E>
      * @return an iterator over the elements in this set
      */
     public Iterator<E> iterator() {
-	return map.get().keySet().iterator();
+	return new BindingKeyedHashMap.ValueIterator<E>(map.getKeyPrefix());
     }
 
     /**
@@ -231,7 +231,7 @@ public class BindingKeyedHashSet<E>
      * @return {@code true} if the element was initially present in this set
      */
     public boolean remove(Object o) {
-	Object removed = map.get().remove(o);
+	Object removed = map.remove(o.toString());
 	return removed != null &&  o.equals(removed);
     }
 
@@ -241,7 +241,7 @@ public class BindingKeyedHashSet<E>
      * @return the number of elements in this set
      */
     public int size() {
-	return map.get().size();
+	return map.size();
     }
 
     /**
@@ -273,15 +273,5 @@ public class BindingKeyedHashSet<E>
 	    throw new NullPointerException("The argument must not be null");
 	}
 	return super.retainAll(c);
-    }
-
-    /**
-     * {@inheritDoc} <p>
-     *
-     * This implementation removes the underlying {@code BindingKeyedHashMap}.
-     */
-    public void removingObject() {
-	AppContext.getDataManager().removeObject(
-	    map.get());
     }
 }

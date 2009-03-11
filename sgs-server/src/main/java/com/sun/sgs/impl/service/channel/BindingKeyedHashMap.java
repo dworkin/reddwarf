@@ -21,7 +21,6 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -31,7 +30,6 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
@@ -47,13 +45,25 @@ import java.util.Set;
  * bindings in the data service to store key/value pairs.  This map does
  * not permit {@code null} keys or values.
  *
- * <p>A key provided to this map's methods must have a unique and reproducible
- * {@code toString} result because the {@code toString} result is used as a
- * suffix of the binding's key in the data service.
+ * <p>Note: Only a {@code String} can be used as a key for a {@code
+ * BindingKeyedHashMap}.
+ *
+ * <p>A value is stored in the data service using its associated key (a
+ * String) as a suffix to the {@code keyPrefix} specified during
+ * construction.  All values must implement {@code Serializable}, but may not
+ * implement {@code ManagedSerializable}.  If a value implements {@code
+ * Serializable}, but does not implement {@link ManagedObject}, the value
+ * will be wrapped in an instance of {@code ManagedSerializable} when
+ * storing it in the data service.
+ *
+ * <p>Instances of {@code BindingKeyedHashMap} as well as its associated
+ * iterators are serializable, but not managed objects.
+ *
+ * @param	V the type for the map's values
  */
-public class BindingKeyedHashMap<K, V>
-    extends AbstractMap<K, V>
-    implements ManagedObjectValueMap<K, V>, Serializable, ManagedObjectRemoval
+public class BindingKeyedHashMap<V>
+    extends AbstractMap<String, V>
+    implements Serializable
 {
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
@@ -68,20 +78,22 @@ public class BindingKeyedHashMap<K, V>
     private final String keyPrefix;
 
     /**
-     * Constructs an instance.
+     * Constructs an instance with the specified {@code keyPrefix}.
+     *
+     * @param	keyPrefix a key prefix
      */
-    public BindingKeyedHashMap() {
-	DataService dataService = ChannelServiceImpl.getDataService();
-	this.keyPrefix = PREFIX + HexDumper.toHexString(
-	    dataService.createReference(this).getId().toByteArray()) + ".";
-	dataService.setServiceBinding(
-	    getBindingName(KEY_STOP), KeyValuePair.createKeyStop());
-	
-	// TBD: have "key start" too?
-	// TBD: should this throw an exception of a map with the same
-	// key prefix already exists?
+    public BindingKeyedHashMap(String keyPrefix) {
+	this.keyPrefix = keyPrefix;
     }
 
+    /**
+     * Returns the key prefix for this map.
+     *
+     * @return	the key prefix for this map
+     */
+    public String getKeyPrefix() {
+	return keyPrefix;
+    }
     /* -- Override AbstractMap methods -- */
 
     /** {@inheritDoc} */
@@ -90,8 +102,8 @@ public class BindingKeyedHashMap<K, V>
     }
     
     /** {@inheritDoc} */
-    public V put(K key, V value) {
-	checkSerializable("key", key);
+    public V put(String key, V value) {
+	checkNull("key", key);
 	checkSerializable("value", value);
 	
 	// Get previous value while removing entry.
@@ -104,10 +116,17 @@ public class BindingKeyedHashMap<K, V>
 	return previousValue;
     }
 
-    private void putInternal(K key, V value) {
-	KeyValuePair<K, V> pair = new KeyValuePair<K, V>(key, value);
+    private void putInternal(String key, V value) {
+	if (value instanceof ManagedSerializable) {
+	    throw new IllegalArgumentException(
+		"value cannot be an instanceof ManagedSerializable");
+	}
+	ManagedObject v =
+	    value instanceof ManagedObject ?
+	    (ManagedObject) value :
+	    new ManagedSerializable<V>(value);
 	ChannelServiceImpl.getDataService().
-	    setServiceBinding(getBindingName(key.toString()), pair);
+	    setServiceBinding(getBindingName(key), v);
     }
 
     /** {@inheritDoc} */
@@ -116,17 +135,7 @@ public class BindingKeyedHashMap<K, V>
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
-	    KeyValuePair<K, V> pair = uncheckedCast(
- 		ChannelServiceImpl.getDataService().
-		    getServiceBinding(bindingName));
-	    try {
-		if (!key.equals(pair.getKey())) {
-		    return null;
-		}
-	    } catch (ObjectNotFoundException e) {
-		return null;
-	    }
-	    value = pair.getValue();
+	    value = getValue(bindingName);
 	} catch (NameNotBoundException e) {
 	}
 	return value;
@@ -139,10 +148,8 @@ public class BindingKeyedHashMap<K, V>
 	String bindingName = getBindingName(key.toString());
 	boolean containsKey = false;
 	try {
-	    KeyValuePair<K, V>  pair = uncheckedCast(
-		dataService.getServiceBinding(bindingName));
-	    Object currentKey = pair.getKey();
-	    containsKey = currentKey.equals(key);
+	    dataService.getServiceBinding(bindingName);
+	    containsKey = true;
 	} catch (NameNotBoundException e) {
 	} catch (ObjectNotFoundException e) {
 	}
@@ -152,7 +159,7 @@ public class BindingKeyedHashMap<K, V>
     /** {@inheritDoc} */
     public boolean containsValue(Object value) {
 	checkNull("value", value);
-	Iterator iter = new ValueIterator(keyPrefix);
+	Iterator iter = new ValueIterator<V>(keyPrefix);
 	while (iter.hasNext()) {
 	    try {
 		if (value.equals(iter.next())) {
@@ -171,22 +178,11 @@ public class BindingKeyedHashMap<K, V>
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
-	    KeyValuePair<K, V> pair = 
-		uncheckedCast(dataService.getServiceBinding(bindingName));
-	    Object currentKey = null;
-	    try {
-		currentKey = pair.getKey();
-	    } catch (ObjectNotFoundException e) {
-	    }
-	    // If key matches current key, get value and remove key/value pair.
-	    if (currentKey != null && key.equals(currentKey)) {
-		// TBD: should this catching ONFE?  If not, how does the
-		// binding get removed if the value has been removed?
-		value = pair.getValue();
-		dataService.removeObject(pair);
-		dataService.removeServiceBinding(bindingName);
-	    }
-
+	    
+	    value = removeValue(bindingName);
+	    // TBD: should this catching ONFE?  If not, how does the
+	    // binding get removed if the value has been removed?
+	    dataService.removeServiceBinding(bindingName);
 	} catch (NameNotBoundException e) {
 	}
 	return value;
@@ -194,7 +190,7 @@ public class BindingKeyedHashMap<K, V>
 
     /** {@inheritDoc} */
     public void clear() {
-	Iterator<K> iter = new KeyIterator<K, V>(keyPrefix);
+	Iterator<String> iter = new KeyIterator<V>(keyPrefix);
 	while (iter.hasNext()) {
 	    iter.next();
 	    iter.remove();
@@ -203,15 +199,15 @@ public class BindingKeyedHashMap<K, V>
 
 
     /** {@inheritDoc} */
-    public Set<Entry<K, V>> entrySet() {
-	return new EntrySet<K, V>(keyPrefix);
+    public Set<Entry<String, V>> entrySet() {
+	return new EntrySet<V>(keyPrefix);
     }
 
     /**
      * A serializable {@code Set} for this map's entries.
      */
-    private static final class EntrySet<K, V>
-	extends AbstractSet<Entry<K, V>>
+    private static final class EntrySet<V>
+	extends AbstractSet<Entry<String, V>>
 	implements Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -230,8 +226,8 @@ public class BindingKeyedHashMap<K, V>
 	}
 
 	/** {@inheritDoc} */
-        public Iterator<Entry<K, V>> iterator() {
-            return new EntryIterator<K, V>(keyPrefix);
+        public Iterator<Entry<String, V>> iterator() {
+            return new EntryIterator<V>(keyPrefix);
 	}
 
 	/** {@inheritDoc} */
@@ -242,7 +238,7 @@ public class BindingKeyedHashMap<K, V>
 	/** {@inheritDoc} */
 	public int size() {
 	    int size = 0;
-	    for (Entry<K, V> entry : this) {
+	    for (Entry<String, V> entry : this) {
 		size++;
 	    }
 	    return size;
@@ -250,7 +246,7 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    Iterator<Entry<K, V>> iter = iterator();
+	    Iterator<Entry<String, V>> iter = iterator();
 	    while (iter.hasNext()) {
 		iter.next();
 		iter.remove();
@@ -259,15 +255,15 @@ public class BindingKeyedHashMap<K, V>
     }
 
     /** {@inheritDoc} */
-    public Set<K> keySet() {
-        return new KeySet<K, V>(keyPrefix);
+    public Set<String> keySet() {
+        return new KeySet<V>(keyPrefix);
     }
     
     /**
      * A serializable {@code Set} for this map's entries.
      */
-    private static final class KeySet<K, V>
-	extends AbstractSet<K>
+    private static final class KeySet<V>
+	extends AbstractSet<String>
 	implements Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -286,8 +282,8 @@ public class BindingKeyedHashMap<K, V>
 	}
 
 	/** {@inheritDoc} */
-        public Iterator<K> iterator() {
-            return new KeyIterator<K, V>(keyPrefix);
+        public Iterator<String> iterator() {
+            return new KeyIterator<V>(keyPrefix);
 	}
 
 	/** {@inheritDoc} */
@@ -298,7 +294,7 @@ public class BindingKeyedHashMap<K, V>
 	/** {@inheritDoc} */
 	public int size() {
 	    int size = 0;
-	    for (K key : this) {
+	    for (String key : this) {
 		size++;
 	    }
 	    return size;
@@ -306,7 +302,7 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    Iterator<K> iter = iterator();
+	    Iterator<String> iter = iterator();
 	    while (iter.hasNext()) {
 		iter.next();
 		iter.remove();
@@ -316,13 +312,13 @@ public class BindingKeyedHashMap<K, V>
 
     /** {@inheritDoc} */
     public Collection<V> values() {
-        return new Values<K, V>(keyPrefix);
+        return new Values<V>(keyPrefix);
     }
     
     /**
      * A serializable {@code Set} for this map's entries.
      */
-    private static final class Values<K, V>
+    private static final class Values<V>
 	extends AbstractCollection<V>
 	implements Serializable
     {
@@ -343,7 +339,7 @@ public class BindingKeyedHashMap<K, V>
 
 	/** {@inheritDoc} */
         public Iterator<V> iterator() {
-            return new ValueIterator<K, V>(keyPrefix);
+            return new ValueIterator<V>(keyPrefix);
 	}
 
 	/** {@inheritDoc} */
@@ -373,7 +369,7 @@ public class BindingKeyedHashMap<K, V>
      * An abstract iterator for obtaining this map's entries.
      * values.
      */
-    private abstract static class AbstractIterator<E, K, V>
+    private abstract static class AbstractIterator<E, V>
 	implements Iterator<E>, Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -425,33 +421,58 @@ public class BindingKeyedHashMap<K, V>
 	    }
 	}
 	
+	/** {@inheritDoc} */
 	public abstract E next();
 	
 	/** {@inheritDoc} */
-	public Entry<K, V> nextEntry() {
+	public void remove() {
+	    if (keyReturnedByNext == null) {
+		throw new IllegalStateException();
+	    }
+
+	    removeValue(keyReturnedByNext);
+	    dataService.removeServiceBinding(keyReturnedByNext);
+	    keyReturnedByNext = null;
+	}
+	
+	public Entry<String, V> nextEntry() {
 	    try {
 		if (!hasNext()) {
 		    throw new NoSuchElementException();
 		}
 		keyReturnedByNext = nextName;
 		key = nextName;
-		return uncheckedCast(
- 		    dataService.getServiceBinding(keyReturnedByNext));
+		return new KeyValuePair<String, V>(
+		    keyReturnedByNext.substring(prefix.length()),
+		    getValue(keyReturnedByNext));
 	    } finally {
 		nextName = null;
 	    }
 	}
 
-	/** {@inheritDoc} */
-	public void remove() {
-	    if (keyReturnedByNext == null) {
-		throw new IllegalStateException();
+	public String nextKey() {
+	    try {
+		if (!hasNext()) {
+		    throw new NoSuchElementException();
+		}
+		keyReturnedByNext = nextName;
+		key = nextName;
+		return keyReturnedByNext.substring(prefix.length());
+	    } finally {
+		nextName = null;
 	    }
-	    ManagedObject keyValuePair =
-		dataService.getServiceBinding(keyReturnedByNext);
-	    dataService.removeObject(keyValuePair);
-	    dataService.removeServiceBinding(keyReturnedByNext);
-	    keyReturnedByNext = null;
+	}
+	public V nextValue() {
+	    try {
+		if (!hasNext()) {
+		    throw new NoSuchElementException();
+		}
+		keyReturnedByNext = nextName;
+		key = nextName;
+		return getValue(keyReturnedByNext);
+	    } finally {
+		nextName = null;
+	    }
 	}
 
 	private void readObject(ObjectInputStream s)
@@ -460,13 +481,29 @@ public class BindingKeyedHashMap<K, V>
 	    s.defaultReadObject();
 	    dataService = ChannelServiceImpl.getDataService();
 	}
+	
+	@SuppressWarnings("unchecked")
+	private V getValue(String bindingName) {
+	    ManagedObject v = dataService. getServiceBinding(bindingName);
+	    return
+		v instanceof ManagedSerializable ?
+		(V) ((ManagedSerializable) v).get() :
+		(V) v;
+	}
+
+	private void removeValue(String bindingName) {
+	    ManagedObject v = dataService.getServiceBinding(bindingName);
+	    if (v instanceof ManagedSerializable) {
+		dataService.removeObject(v);
+	    }
+	}
     }
 
     /**
      * An iterator over the entry set
      */
-    private static final class EntryIterator<K, V>
-            extends AbstractIterator<Entry<K, V>, K, V>
+    private static final class EntryIterator<V>
+            extends AbstractIterator<Entry<String, V>, V>
     {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -483,7 +520,7 @@ public class BindingKeyedHashMap<K, V>
 	/**
 	 * {@inheritDoc}
 	 */
-        public Entry<K, V> next() {
+        public Entry<String, V> next() {
 	    return nextEntry();
 	}
     }
@@ -491,8 +528,8 @@ public class BindingKeyedHashMap<K, V>
     /**
      * An iterator over the keys in the map.
      */
-    private static final class KeyIterator<K, V>
-            extends AbstractIterator<K, K, V>
+    private static final class KeyIterator<V>
+            extends AbstractIterator<String, V>
     {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -509,17 +546,19 @@ public class BindingKeyedHashMap<K, V>
 	/**
 	 * {@inheritDoc}
 	 */
-	public K next() {
-	    return nextEntry().getKey();
+	public String next() {
+
+
+
+	    return nextKey();
 	}
     }
-
 
     /**
      * An iterator over the values in the tree.
      */
-    private static final class ValueIterator<K, V>
-            extends AbstractIterator<V, K, V>
+    static final class ValueIterator<V>
+            extends AbstractIterator<V, V>
     {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
@@ -537,14 +576,14 @@ public class BindingKeyedHashMap<K, V>
 	 * {@inheritDoc}
 	 */
 	public V next() {
-	    return nextEntry().getValue();
+	    return nextValue();
 	}
     }
 
     /* -- Implement ManagedObjectValueMap -- */
 
     /** {@inheritDoc} */
-    public boolean putOverride(K key, V value) {
+    public boolean putOverride(String key, V value) {
 	checkSerializable("key", key);
 	checkSerializable("value", value);
 	boolean previouslyMapped = containsKey(key);
@@ -553,87 +592,57 @@ public class BindingKeyedHashMap<K, V>
     }
 
     /** {@inheritDoc} */
-    public boolean removeOverride(K key) {
+    public boolean removeOverride(String key) {
 	checkNull("key", key);
 	boolean previouslyMapped = containsKey(key);
 	if (previouslyMapped) {
-	    DataService dataService = ChannelServiceImpl.getDataService();
-	    String bindingName = getBindingName(key.toString());
-	    dataService.removeObject(
-		dataService.getServiceBinding(bindingName));
-	    dataService.removeServiceBinding(bindingName);
+	    try {
+		DataService dataService = ChannelServiceImpl.getDataService();
+		String bindingName = getBindingName(key);
+		ManagedObject v = dataService.getServiceBinding(bindingName);
+		if (v instanceof ManagedSerializable) {
+		    dataService.removeObject(v);
+		}
+		dataService.removeServiceBinding(bindingName);
+	    } catch (ObjectNotFoundException ignore) {
+	    }
 	}
 	return previouslyMapped;
     }
     
-    /* -- Implement ManagedObjectRemoval -- */
-
-    /** {@inheritDoc} */
-    public void removingObject() {
-	/*
-	 * Clear map and remove key stop.
-	 */
-	clear();
-	DataService dataService = ChannelServiceImpl.getDataService();
-	String keyName = getBindingName(KEY_STOP);
-	ManagedObject keyStop = dataService.getServiceBinding(keyName);
-	dataService.removeObject(keyStop);
-	dataService.removeServiceBinding(keyName);
-    }
-
     /* -- Private classes and methods. -- */
 
-    /**
-     * A managed object container for a key/value pair.
-     */
-    private static class KeyValuePair<K, V>
-	implements Entry<K, V>, ManagedObject, Serializable
+    private static final class KeyValuePair<K, V>
+	implements Entry<K, V>, Serializable
     {
+	
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	/** The key. */
-	private final Wrapper<K> k;
-	/** The value. */
-	private Wrapper<V> v;
+	private final K k;
+	private V v;
 
-	/**
-	 * Constructs an instance with the specified {@code key} and
-	 * {@code value}.
-	 *
-	 * @param key a key
-	 * @param value a value
-	 */
 	KeyValuePair(K key, V value) {
-	    checkNull("key", key);
-	    k = new Wrapper<K>(key);
-	    v = new Wrapper<V>(value);
+	    this.k = key;
+	    this.v = value;
 	}
-	
-	static KeyValuePair createKeyStop() {
-	    return new KeyValuePair();
-	}
-	
-	private KeyValuePair() {
-	    k = new Wrapper<K>(null);
-	    v = new Wrapper<V>(null);
-	}
+
 	
 	/** {@inheritDoc} */
 	public K getKey() {
-	    return k.get();
+	    return k;
 	}
 
 	/** {@inheritDoc} */
 	public V getValue() {
-	    return v.get();
+	    return v;
 	}
 
 	/** {@inheritDoc} */
 	public V setValue(V value) {
 	    checkSerializable("value", value);
-	    V previousValue = v.get();
-	    v.set(value);
+	    V previousValue = this.v;
+	    this.v = value;
 	    return previousValue;
 	}
 
@@ -659,55 +668,6 @@ public class BindingKeyedHashMap<K, V>
 	/** {@inheritDoc} */
 	public String toString() {
 	    return k.toString() + "=" + v.toString();
-	}
-    }
-
-    /**
-     * A serializable wrapper containing either a serializable
-     * object, or a reference to a managed object.
-     */
-    private static class Wrapper<T> implements Serializable {
-	/** The serialVersionUID for this class. */
-	private static final long serialVersionUID = 1L;
-
-	private ManagedReference<T> ref;
-	private T obj = null;
-
-	Wrapper(T obj) {
-	    set(obj);
-	}
-
-	T get() {
-	    if (ref != null) {
-		return  ref.get();
-	    } else {
-		return obj;
-	    }
-	}
-
-	void set(T obj) {
-	    if (obj != null && !(obj instanceof Serializable)) {
-		throw new IllegalArgumentException("obj not serializable");
-	    }
-	    if (obj instanceof ManagedObject) {
-		ref = uncheckedCast(AppContext.getDataManager().
-				    createReference((ManagedObject) obj));
-	    } else {
-		ref = null;
-	    }
-	    this.obj = obj;
-	}
-
-	private void writeObject(ObjectOutputStream s) throws IOException {
-	    if (ref != null) {
-		obj = null;
-	    }
-	    s.defaultWriteObject();
-	}
-
-	public String toString() {
-	    T o = get();
-	    return o != null ? o.toString() : "null";
 	}
     }
 
@@ -740,8 +700,28 @@ public class BindingKeyedHashMap<K, V>
     }
 
     @SuppressWarnings("unchecked")
-    private static <T> T uncheckedCast(Object object) {
-        return (T) object;
+    private V getValue(String bindingName) {
+	ManagedObject v =
+	    ChannelServiceImpl.getDataService().
+	        getServiceBinding(bindingName);
+	return
+	    v instanceof ManagedSerializable ?
+	    (V) ((ManagedSerializable) v).get() :
+	    (V) v;
+    }
+
+    @SuppressWarnings("unchecked")
+    private V removeValue(String bindingName) {
+	V value = null;
+	DataService dataService = ChannelServiceImpl.getDataService();
+	ManagedObject v = dataService.getServiceBinding(bindingName);
+	if (v instanceof ManagedSerializable) {
+	    value = (V) ((ManagedSerializable) v).get();
+	    dataService.removeObject(v);
+	} else {
+	    value = (V) v;
+	}
+	return value;
     }
 
     private static void checkNull(String name, Object obj) {

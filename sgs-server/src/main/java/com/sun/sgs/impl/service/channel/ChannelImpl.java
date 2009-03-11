@@ -34,6 +34,7 @@ import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.impl.service.channel.BindingKeyedHashMap.ValueIterator;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
@@ -56,7 +57,10 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -81,16 +85,22 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** The package name. */
     private static final String PKG_NAME = "com.sun.sgs.impl.service.channel.";
 
-    /** The channels map key. */
-    private static final String CHANNELS_MAP_KEY =
-	PKG_NAME + "channelsMap";
+    /** The channels map prefix. */
+    private static final String CHANNELS_MAP_PREFIX = PKG_NAME + "channel.";
 
-    /** The channels map key. */
-    private static final String EVENT_QUEUES_MAP_KEY =
-	PKG_NAME + "eventQueuesMap";
+    /** An event queue map prefix. */
+    private static final String EVENT_QUEUE_MAP_PREFIX =
+	PKG_NAME + "eventQueue.";
+
+    private static final String SESSION_SET_PREFIX =
+	PKG_NAME + "session.";
 
     /** The random number generator for choosing a new coordinator. */
     private static final Random random = new Random();
+
+    /** The map of channels, keyed by name. */
+    private static final BindingKeyedHashMap<ChannelImpl> channelsMap =
+	new BindingKeyedHashMap<ChannelImpl>(CHANNELS_MAP_PREFIX);
 
     /** The channel name. */
     protected final String name;
@@ -107,6 +117,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** The delivery requirement for messages sent on this channel. */
     protected final Delivery delivery;
 
+    /** The node IDs of ChannelServers that have locally connected
+     * members of this channel. */
+    private final Set<Long> servers = new HashSet<Long>();
+    
     /**
      * The node ID of the coordinator for this channel.  At first, it
      * is the node that the channel was created on.  If the
@@ -130,10 +144,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
     /** The event queue reference. */
     private final ManagedReference<EventQueue> eventQueueRef;
-
-    /** The sessions map reference. */
-    private final ManagedReference<Map<Long, Set<BigInteger>>>
-	sessionsMapRef;
 
     /**
      * Constructs an instance of this class with the specified
@@ -178,10 +188,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	getChannelsMap().put(name, this);
 	EventQueue eventQueue = new EventQueue(this);
 	eventQueueRef = dataService.createReference(eventQueue);
-	getEventQueuesMap(coordNodeId).put(channelRefId, eventQueue);
-	Map<Long, Set<BigInteger>> sessionsMap =
-	    new BindingKeyedHashMap<Long, Set<BigInteger>>();
-	sessionsMapRef = dataService.createReference(sessionsMap);
+	getEventQueuesMap(coordNodeId).
+	    put(channelRefId.toString(), eventQueue);
     }
 
     /** Returns the data service. */
@@ -190,63 +198,21 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns the channels map, keyed by channel name.  Creates and
-     * stores the map if it doesn't already exist.
+     * Returns the channels map, keyed by channel name.
      */
-    static ManagedObjectValueMap<String, ChannelImpl> getChannelsMap() {
-	DataService dataService = getDataService();
-	ManagedObjectValueMap<String, ChannelImpl> channelsMap;
-	try {
-	    channelsMap = uncheckedCast(
-		dataService.getServiceBinding(CHANNELS_MAP_KEY));
-	} catch (NameNotBoundException e) {
-	    channelsMap =
-		new BindingKeyedHashMap<String, ChannelImpl>();
-	    dataService.setServiceBinding(CHANNELS_MAP_KEY, channelsMap);
-	}
+    private static BindingKeyedHashMap<ChannelImpl> getChannelsMap() {
 	return channelsMap;
     }
 
     /**
-     * Returns the event queues map, keyed by node ID. Creates and stores the
-     * top-level map if it doesn't already exist.
+     * Returns the event queues map for the specified coordinator
+     * {@code nodeId}.
      */
-    static ManagedObjectValueMap
-	<Long, ManagedObjectValueMap<BigInteger, EventQueue>>
-	getNodeToEventQueuesMap()
-    {
-	DataService dataService = getDataService();
-	ManagedObjectValueMap
-	    <Long, ManagedObjectValueMap<BigInteger, EventQueue>>
-	    nodeIdToEventQueuesMap;
-	try {
-	    nodeIdToEventQueuesMap = uncheckedCast(
- 		dataService.getServiceBinding(EVENT_QUEUES_MAP_KEY));
-	} catch (NameNotBoundException e) {
-	    nodeIdToEventQueuesMap =
-		new BindingKeyedHashMap
-		    <Long, ManagedObjectValueMap<BigInteger, EventQueue>>();
-	    dataService.setServiceBinding(
-		EVENT_QUEUES_MAP_KEY, nodeIdToEventQueuesMap);
-	}
-	return nodeIdToEventQueuesMap;
-    }
-
-    /**
-     * Returns the event queues map for the specified {@code nodeId},
-     * creating one if not already present.
-     */
-    private static ManagedObjectValueMap<BigInteger, EventQueue>
+    private static BindingKeyedHashMap<EventQueue>
 	getEventQueuesMap(long nodeId)
     {
-	ManagedObjectValueMap<BigInteger, EventQueue> eventQueuesMap =
-	    getNodeToEventQueuesMap().get(nodeId);
-	if (eventQueuesMap == null) {
-	    eventQueuesMap =
-		new BindingKeyedHashMap<BigInteger, EventQueue>();
-	    getNodeToEventQueuesMap().put(nodeId, eventQueuesMap);
-	}
-	return eventQueuesMap;
+	return new BindingKeyedHashMap<EventQueue>(
+	    EVENT_QUEUE_MAP_PREFIX + Long.toString(nodeId) + ".");
     }
 
     /* -- Factory methods -- */
@@ -301,14 +267,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** Implements {@link Channel#hasSessions}. */
     boolean hasSessions() {
 	checkClosed();
-	return !(sessionsMapRef.get().isEmpty());
+	return !servers.isEmpty();
     }
 
     /** Implements {@link Channel#getSessions}. */
     Iterator<ClientSession> getSessions() {
 	checkClosed();
 	return
-	    new ClientSessionIterator(sessionsMapRef.get().values().iterator());
+	    new ClientSessionIterator(
+		new ValueIterator<BigInteger>(
+		    SESSION_SET_PREFIX + channelRefId.toString() + "."));
     }
 
     /** Implements {@link Channel#join(ClientSession)}. */
@@ -589,6 +557,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     void close() {
 	checkContext();
+	getDataService().markForUpdate(this);
 	if (!isClosed) {
 	    /*
 	     * Enqueue close event.
@@ -698,13 +667,31 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns the sessions set for the specified {@code nodeId}, creating
      * one if not already present.
      */
+    private Set<BigInteger> getOrCreateSessionsSet(long nodeId) {
+	getDataService().markForUpdate(this);
+	servers.add(nodeId);
+	return getSessionsSet(nodeId);
+    }
+    
+    /**
+     * Returns the sessions set for the specified {@code nodeId}, or null
+     * if there is no sessions set for the specified {@code nodeId}.
+     */
     private Set<BigInteger> getSessionsSet(long nodeId) {
-	Set<BigInteger> sessions = sessionsMapRef.get().get(nodeId);
-	if (sessions == null) {
-	    sessions = new BindingKeyedHashSet<BigInteger>();
-	    sessionsMapRef.get().put(nodeId, sessions);
-	}
-	return sessions;
+	return
+	    new BindingKeyedHashSet<BigInteger>(
+		SESSION_SET_PREFIX +
+		channelRefId.toString() + "." +
+		Long.toString(nodeId) + ".");
+    }
+
+    /**
+     * Removes the sessions set for the specified {@code nodeId}.
+     */
+    private void removeSessionsSet(long nodeId) {
+	getSessionsSet(nodeId).clear();
+	getDataService().markForUpdate(this);
+	servers.remove(nodeId);
     }
 
     /**
@@ -720,7 +707,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private boolean addSession(ClientSession session) {
 
 	return
-	    getSessionsSet(getNodeId(session)).
+	    getOrCreateSessionsSet(getNodeId(session)).
 	        add(getSessionRefId(session));
     }
 
@@ -736,14 +723,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private boolean removeSession(
 	final long nodeId, final BigInteger sessionRefId)
     {
-	Map<Long, Set<BigInteger>> sessionsMap = sessionsMapRef.get();
-	Set<BigInteger> sessionsSet = sessionsMap.get(nodeId);
+	Set<BigInteger> sessionsSet = getSessionsSet(nodeId);
 	if (sessionsSet != null) {
 	    if (sessionsSet.remove(sessionRefId)) {
 		sendLeaveNotification(nodeId, sessionRefId);
 		if (sessionsSet.isEmpty()) {
-		    sessionsMap.remove(nodeId);
-		    getDataService().removeObject(sessionsSet);
+		    removeSessionsSet(nodeId);
 		}
 		return true;
 	    }
@@ -778,9 +763,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		coordNodeId, failedCoordNodeId, this);
 	    return;
 	}
-	Set<BigInteger> sessionsSet =
-	    sessionsMapRef.get().remove(failedCoordNodeId);
-	dataService.removeObject(sessionsSet);
+	
+	removeSessionsSet(failedCoordNodeId);
+
 	/*
 	 * Assign a new coordinator, and store event queue in new
 	 * coordinator's event queue map.
@@ -795,7 +780,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		coordNodeId);
 	}
 	EventQueue eventQueue = eventQueueRef.get();
-	getEventQueuesMap(coordNodeId).put(channelRefId, eventQueueRef.get());
+	getEventQueuesMap(coordNodeId).
+	    put(channelRefId.toString(), eventQueueRef.get());
 
 	/*
 	 * Mark the event queue to indicate that a refresh must be sent to
@@ -818,7 +804,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * This method should be called within a transaction.
      */
     private long chooseCoordinatorNode() {
-	Set<Long> serverIdSet = sessionsMapRef.get().keySet();
+	Set<Long> serverIdSet = getMemberNodeIds();
 	if (!serverIdSet.isEmpty()) {
 	    int numServers = serverIdSet.size();
 	    Long[] serverIds = serverIdSet.toArray(new Long[numServers]);
@@ -899,8 +885,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns a list containing the node IDs of the channel servers for
      * this channel. 
      */
-    private Set<Long> getChannelServerNodeIds() {
-	return sessionsMapRef.get().keySet();
+    private Set<Long> getMemberNodeIds() {
+	return new HashSet<Long>(servers);
     }
     
     /**
@@ -910,21 +896,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private void removeAllSessions() {
 
-	DataService dataService = getDataService();
-	Iterator<Entry<Long, Set<BigInteger>>> entryIter =
-	    sessionsMapRef.get().entrySet().iterator();
-	while (entryIter.hasNext()) {
-	    Entry<Long, Set<BigInteger>> entry = entryIter.next();
-	    long nodeId = entry.getKey();
-	    Set<BigInteger> sessionsSet = entry.getValue();
-	    Iterator<BigInteger> sessionsIter = sessionsSet.iterator();
-	    while(sessionsIter.hasNext()) {
-		BigInteger sessionRefId = sessionsIter.next();
+	for (long nodeId : getMemberNodeIds()) {
+	    for (BigInteger sessionRefId : getSessionsSet(nodeId)) {
 		sendLeaveNotification(nodeId, sessionRefId);
-		sessionsIter.remove();
 	    }
-	    entryIter.remove();
-	    dataService.removeObject(sessionsSet);
+	    removeSessionsSet(nodeId);
 	}
     }
 
@@ -969,18 +945,11 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		dataService.removeObject(maybeWrappedListener);
 	    }
 	}
-	ManagedObjectValueMap<BigInteger, EventQueue> eventQueuesMap =
-	    getNodeToEventQueuesMap().get(coordNodeId);
-	if (eventQueuesMap != null) {
-	    eventQueuesMap.removeOverride(channelRefId);
-	    if (eventQueuesMap.isEmpty()) {
-		getNodeToEventQueuesMap().remove(coordNodeId);
-		dataService.removeObject(eventQueuesMap);
-	    }
-	}
+	BindingKeyedHashMap<EventQueue> eventQueuesMap =
+	    getEventQueuesMap(coordNodeId);
+	eventQueuesMap.removeOverride(channelRefId.toString());
 	EventQueue eventQueue = eventQueueRef.get();
 	dataService.removeObject(eventQueue);
-	dataService.removeObject(sessionsMapRef.get());
     }
 
     /**
@@ -988,7 +957,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * a member of this channel.
      */
     private boolean hasSession(long nodeId, BigInteger sessionRefId) {
-	Set<BigInteger> sessionsSet = sessionsMapRef.get().get(nodeId);
+	Set<BigInteger> sessionsSet = getSessionsSet(nodeId);
 	return sessionsSet != null && sessionsSet.contains(sessionRefId);
     }
 
@@ -1000,10 +969,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static class ClientSessionIterator
 	implements Iterator<ClientSession>
     {
-	/** The underlying iterator for sets of sessions. */
-	private final Iterator<Set<BigInteger>> setIter;
-
-	private Iterator<BigInteger> sessionIter;
+	/** The iterator for sessions. */
+	private Iterator<BigInteger> iterator;
 
 	/** The client session to be returned by {@code next}. */
 	private ClientSession nextSession = null;
@@ -1012,35 +979,37 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance of this class with the specified
 	 * {@code iterator}.
 	 */
-	ClientSessionIterator(Iterator<Set<BigInteger>> iterator) {
-	    setIter = iterator;
+	ClientSessionIterator(Iterator<BigInteger> iterator) {
+	    this.iterator = iterator;
 	}
 
 	/** {@inheritDoc} */
 	public boolean hasNext() {
-	    if (sessionIter == null || !sessionIter.hasNext()) {
-		if (!setIter.hasNext()) {
-		    return false;
-		} else {
-		    sessionIter = setIter.next().iterator();
-		    
-		}
+	    if (!iterator.hasNext()) {
+		return false;
 	    }
-	    if (!sessionIter.hasNext()) {
+	    if (nextSession != null) {
+		return true;
+	    }
+	    ClientSessionImpl session = (ClientSessionImpl)
+		getObjectForId(iterator.next());
+	    if (session == null) {
 		return hasNext();
 	    } else {
+		nextSession = session.getWrappedClientSession();
 		return true;
 	    }
 	}
 
 	/** {@inheritDoc} */
 	public ClientSession next() {
-	    if (!hasNext()) {
-		throw new NoSuchElementException();
-	    } else {
-		return
-		    ((ClientSessionImpl) getObjectForId(sessionIter.next())).
-		        getWrappedClientSession();
+	    try {
+		if (nextSession == null && !hasNext()) {
+		    throw new NoSuchElementException();
+		}
+		return nextSession;
+	    } finally {
+		nextSession = null;
 	    }
 	}
 
@@ -1231,7 +1200,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
 			       HexDumper.toHexString(channelRefId.toByteArray()));
 		}
-		for (final long nodeId : channel.getChannelServerNodeIds()) {
+		for (final long nodeId : channel.getMemberNodeIds()) {
 		    channelService.addChannelTask(
 		    	channelRefId,
 			new IoRunnable() {
@@ -1437,7 +1406,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	public void serviceEvent(EventQueue eventQueue) {
 
 	    ChannelImpl channel = eventQueue.getChannel();
-	    Set<Long> serverNodeIds = channel.getChannelServerNodeIds();
+	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
 	    channel.removeAllSessions();
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
@@ -1518,7 +1487,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    final BigInteger channelRefId = eventQueue.getChannelRefId();
-	    for (final long nodeId : channel.getChannelServerNodeIds()) {
+	    for (final long nodeId : channel.getMemberNodeIds()) {
 		channelService.addChannelTask(
 		    eventQueue.getChannelRefId(),
 		    new IoRunnable() {
@@ -1576,7 +1545,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	    ChannelImpl channel = eventQueue.getChannel();
 	    final BigInteger channelRefId = eventQueue.getChannelRefId();
-	    Set<Long> serverNodeIds = channel.getChannelServerNodeIds();
+	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
 	    channel.removeChannel();
 	    final ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
@@ -1614,12 +1583,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private static EventQueue getEventQueue(long nodeId, BigInteger channelRefId) {
 
-	ManagedObjectValueMap<BigInteger, EventQueue> eventQueueMap =
-	    getNodeToEventQueuesMap().get(nodeId);
-	EventQueue eventQueue = null;
-	if (eventQueueMap != null) {
-	    eventQueue = eventQueueMap.get(channelRefId);
-	}
+	EventQueue eventQueue =
+	    getEventQueuesMap(nodeId).get(channelRefId.toString());
 	if (eventQueue == null) {
 	    logger.log(
 		Level.WARNING,
@@ -1673,14 +1638,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns an iterator for channels that are coordinated on the node with
      * the specified {@code nodeId}.
      */
-    private static Iterator<BigInteger> getChannelsIterator(long nodeId) {
-
-	ManagedObjectValueMap<BigInteger, EventQueue>
-	    eventQueuesMap = getNodeToEventQueuesMap().get(nodeId);
-	return
-	    eventQueuesMap != null ?
-	    eventQueuesMap.keySet().iterator() :
-	    null;
+    private static Iterator<String> getChannelsIterator(long nodeId) {
+	return getEventQueuesMap(nodeId).keySet().iterator();
     }
     
     /**
@@ -1700,7 +1659,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private final long nodeId;
 
 	/** The iterator for channels on the failed node. */
-	private final Iterator<BigInteger> channelIter;
+	private final Iterator<String> channelIter;
 
 	/**
 	 * Constructs an instance of this class with the specified
@@ -1720,15 +1679,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * specified {@code nodeId}, then no action is taken.
 	 */
 	public void run() {
-	    if (channelIter == null || !channelIter.hasNext()) {
+	    if (!channelIter.hasNext()) {
 		return;
 	    }
 
 	    WatchdogService watchdogService =
 		ChannelServiceImpl.getWatchdogService();
 	    TaskService taskService = ChannelServiceImpl.getTaskService();
-	    DataService dataService = getDataService();
-	    BigInteger channelRefId = channelIter.next();
+	    DataService dataService = getDataService();	
+	    BigInteger channelRefId = new BigInteger(channelIter.next());
 	    channelIter.remove();
 	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	    if (channel != null) {
@@ -1741,15 +1700,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		 * a chance to schedule a task to remove member sessions for
 		 * another failed node (cascading failure during recovery).
 		 */
-		Iterator<Entry<Long, Set<BigInteger>>> entryIter =
-		    channel.sessionsMapRef.get().entrySet().iterator();
-		while (entryIter.hasNext()) {
-		    Entry<Long, Set<BigInteger>> entry = entryIter.next();
-		    long serverNodeId = entry.getKey();
+		for (long serverNodeId : channel.getMemberNodeIds()) {
 		    Node serverNode = watchdogService.getNode(serverNodeId);
 		    if (serverNode == null || !serverNode.isAlive()) {
-			entryIter.remove();
-			dataService.removeObject(entry.getValue());
+			channel.removeSessionsSet(serverNodeId);
 		    }
 		}
 	    }
@@ -1761,12 +1715,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     */
 	    if (channelIter.hasNext()) {
 		taskService.scheduleTask(this);
-	    } else {
-		ManagedObjectValueMap<BigInteger, EventQueue> eventQueuesMap =
-		    getNodeToEventQueuesMap().remove(nodeId);
-		if (eventQueuesMap != null) {
-		    dataService.removeObject(eventQueuesMap);
-		}
 	    }
 	}
     }
@@ -1787,7 +1735,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private final long failedNodeId;
 	
 	/** The iterator for locally-coordinated channels.*/
-	private final Iterator<BigInteger> iter;
+	private final Iterator<String> iter;
 	
 	/**
 	 * Constructs an instance with the specified {@code localNodeId}
@@ -1812,7 +1760,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return;
 	    }
 	    
-	    BigInteger channelRefId = iter.next();
+	    BigInteger channelRefId = new BigInteger(iter.next());
 	    TaskService taskService = ChannelServiceImpl.getTaskService();
 	    taskService.scheduleTask(
 		new RemoveFailedSessionsFromChannelTask(
@@ -1851,11 +1799,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	public void run() {
 	    ChannelImpl channel =
 		(ChannelImpl) getObjectForId(channelRefId);
-	    Set<BigInteger> sessionSet =
-		channel.sessionsMapRef.get().remove(failedNodeId);
-	    if (sessionSet != null) {
-		getDataService().removeObject(sessionSet);
-	    }
+	    channel.removeSessionsSet(failedNodeId);
 	}
     }
 
@@ -1870,6 +1814,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	BigInteger channelRefId, long nodeId)
     {
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	return channel.sessionsMapRef.get().get(nodeId);
+	return channel.getSessionsSet(nodeId);
     }
 }

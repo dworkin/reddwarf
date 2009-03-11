@@ -105,9 +105,9 @@ public final class ChannelServiceImpl
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
 
-    /** The channel servers map key. */
-    private static final String CHANNEL_SERVERS_MAP_KEY =
-	PKG_NAME + ".channelServersMap";
+    /** The channel server map prefix. */
+    private static final String CHANNEL_SERVER_MAP_PREFIX =
+	PKG_NAME + "server.";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -134,6 +134,11 @@ public final class ChannelServiceImpl
 
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
+
+    private static BindingKeyedHashMap<ChannelServer>
+	channelServerMap =
+	    new BindingKeyedHashMap<ChannelServer>(CHANNEL_SERVER_MAP_PREFIX);
+
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -163,7 +168,7 @@ public final class ChannelServiceImpl
 
     /** The cache of channel server proxies, keyed by the server's node ID. */
     private final ConcurrentHashMap<Long, ChannelServer>
-	channelServerMap = new ConcurrentHashMap<Long, ChannelServer>();
+	channelServerCache = new ConcurrentHashMap<Long, ChannelServer>();
 
     /** The cache of local channel membership lists, keyed by channel ID. */
     private final ConcurrentHashMap<BigInteger, Set<BigInteger>>
@@ -287,8 +292,8 @@ public final class ChannelServiceImpl
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreChannelServerProxy") {
 		    public void run() {
-			ChannelImpl.getChannelsMap();
-			getChannelServersMap().put(localNodeId, serverProxy);
+			channelServerMap.put(
+			    Long.toString(localNodeId), serverProxy);
 		    } },
 		taskOwner);
 
@@ -329,20 +334,7 @@ public final class ChannelServiceImpl
     }
     
      /** {@inheritDoc} */
-    protected void doReady() throws Exception {
-	/*
-	 * Create global channels map, if not already created.  The global
-	 * channels map can't (currently) be created during service
-	 * construction if the channels map is a ScalableHashMap (because
-	 * DataManager is not yet available in the AppContext).
-	 * -- awol (1/8/09)
-	 */
-	transactionScheduler.runTask(
-	    new AbstractKernelRunnable("StoreChannelsMap") {
-		public void run() {
-		    ChannelImpl.getChannelsMap();
-		    ChannelImpl.getNodeToEventQueuesMap();
-		} },  taskOwner);
+    protected void doReady() {
     }
 
     /** {@inheritDoc} */
@@ -1056,7 +1048,7 @@ public final class ChannelServiceImpl
 	if (nodeId == localNodeId) {
 	    return serverImpl;
 	} else {
-	    ChannelServer channelServer = channelServerMap.get(nodeId);
+	    ChannelServer channelServer = channelServerCache.get(nodeId);
 	    if (channelServer != null) {
 		return channelServer;
 	    } else {
@@ -1066,7 +1058,7 @@ public final class ChannelServiceImpl
 		    transactionScheduler.runTask(task, taskOwner);
 		    channelServer = task.channelServer;
 		    if (channelServer != null) {
-			channelServerMap.put(nodeId, channelServer);
+			channelServerCache.put(nodeId, channelServer);
 		    }
 		    return channelServer;
 		} catch (RuntimeException e) {
@@ -1148,7 +1140,7 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc} */
 	public void nodeFailed(Node node) {
 	    final long nodeId = node.getId();
-	    channelServerMap.remove(nodeId);
+	    channelServerCache.remove(nodeId);
 	    final TaskService taskService = getTaskService();
 	    try {
 		if (logger.isLoggable(Level.INFO)) {
@@ -1208,7 +1200,7 @@ public final class ChannelServiceImpl
 	 * specified during construction.
 	 */
 	public void run() {
-	    getChannelServersMap().removeOverride(nodeId);
+	    channelServerMap.removeOverride(Long.toString(nodeId));
 	}
     }
 
@@ -1227,29 +1219,8 @@ public final class ChannelServiceImpl
 
 	/** {@inheritDoc} */
 	public void run() {
-	    channelServer = getChannelServersMap().get(nodeId);
+	    channelServer =
+		channelServerMap.get(Long.toString(nodeId));
 	}
-    }
-
-    /**
-     * Returns the channel servers map, keyed by node ID.  Creates and
-     * stores the map if it doesn't already exist.  This method must be run
-     * within a transaction.
-     */
-    private static ManagedObjectValueMap<Long, ChannelServer>
-	getChannelServersMap()
-    {
-	DataService dataService = getDataService();
-	ManagedObjectValueMap<Long, ChannelServer> channelServersMap;
-	try {
-	    channelServersMap = uncheckedCast(
-		dataService.getServiceBinding(CHANNEL_SERVERS_MAP_KEY));
-	} catch (NameNotBoundException e) {
-	    channelServersMap =
-		new BindingKeyedHashMap<Long, ChannelServer>();
-	    dataService.setServiceBinding(CHANNEL_SERVERS_MAP_KEY,
-					  channelServersMap);
-	}
-	return channelServersMap;
     }
 }
