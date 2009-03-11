@@ -55,10 +55,10 @@ import org.junit.runner.RunWith;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 
 /**
- * Tests the {@link AccessCoordinatorImpl} class
+ * Tests the {@link TrackingAccessCoordinator} class
  */
 @RunWith(FilteredNameRunner.class)
-public class TestAccessCoordinatorImpl extends Assert {
+public class TestTrackingAccessCoordinator extends Assert {
 
     private SgsTestNode serverNode;
     private TransactionScheduler txnScheduler;
@@ -75,13 +75,14 @@ public class TestAccessCoordinatorImpl extends Assert {
 
     @Before public void startup() throws Exception {
         Properties properties = SgsTestNode.
-	    getDefaultProperties("TestAccessCoordinatorImpl",
+	    getDefaultProperties("TestTrackingAccessCoordinator",
 				 null, null);
 
         properties.setProperty("com.sun.sgs.finalService", "DataService");
         properties.setProperty("com.sun.sgs.txn.timeout", "1000000");
 
-        serverNode = new SgsTestNode("TestAccessCoordinatorImpl", null, properties);
+        serverNode = new SgsTestNode(
+	    "TestTrackingAccessCoordinator", null, properties);
 
         taskOwner = serverNode.getProxy().getCurrentOwner();
         txnScheduler = serverNode.getSystemRegistry().

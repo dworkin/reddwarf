@@ -95,8 +95,8 @@ import javax.management.JMException;
  * a colon-separated list of fully-qualified class names, each of which 
  * implements {@link ProfileListener}.
  * <p>
- * By default, creates an instance of {@link AccessCoordinatorImpl} to manage
- * access to shared objects.  The {@value #ACCESS_COORDINATOR_PROPERTY}
+ * By default, creates an instance of {@link TrackingAccessCoordinator} to
+ * track access to shared objects.  The {@value #ACCESS_COORDINATOR_PROPERTY}
  * configuration property can be used to specify another implementation.  The
  * value of the property should be the name of a public, non-abstract class
  * that implements the {@link AccessCoordinatorHandle} interface, and that
@@ -274,7 +274,7 @@ class Kernel {
 		    },
 		    appProperties, proxy, profileCollectorHandle);
 	    if (accessCoordinator == null) {
-		accessCoordinator = new AccessCoordinatorImpl(
+		accessCoordinator = new TrackingAccessCoordinator(
 		    appProperties, proxy, profileCollectorHandle);
 	    }
 

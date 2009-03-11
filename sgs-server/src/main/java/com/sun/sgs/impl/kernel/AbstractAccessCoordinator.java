@@ -19,6 +19,7 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.service.Transaction;
@@ -44,26 +45,20 @@ public abstract class AbstractAccessCoordinator
 	TransactionProxy txnProxy,
 	ProfileCollectorHandle profileCollectorHandle)
     {
-	checkNonNull(txnProxy, "txnProxy");
-	checkNonNull(profileCollectorHandle, "profileCollectorHandle");
+	checkNull("txnProxy", txnProxy);
+	checkNull("profileCollectorHandle", profileCollectorHandle);
 	this.txnProxy = txnProxy;
 	this.profileCollectorHandle = profileCollectorHandle;
     }
 
     /**
-     * Throws {@link NullPointerException} if the argument is {@code null}.
-     *
-     * @param	arg the argument
-     * @param	parameterName the parameter name for the argument
+     * Provides a skeletal implementation of {@code AccessReporter}, supplying
+     * the overloadings of {@code reportObjectAccess} and {@code
+     * setObjectDescription} that supply default arguments.  Subclasses should
+     * at least provide implementations of the {@link
+     * reportObjectAccess(Transaction, T, AccessType, Object)} and {@link
+     * setObjectDescription(Transaction, T, Object)} methods.
      */
-    protected static void checkNonNull(Object arg, String parameterName) {
-	if (arg == null) {
-	    throw new NullPointerException(
-		"The " + parameterName + " argument must not be null");
-	}
-    }
-
-    /** Provides a skeletal implementation of {@code AccessReporter}. */
     public abstract class AbstractAccessReporter<T>
 	implements AccessReporter<T>
     {
@@ -76,7 +71,7 @@ public abstract class AbstractAccessCoordinator
 	 * @param	source the source for objects managed by this reporter
 	 */
         protected AbstractAccessReporter(String source) {
-	    checkNonNull(source, "source");
+	    checkNull("source", source);
             this.source = source;
         }
 

@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.kernel;
 
+import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
@@ -182,6 +183,25 @@ public class TestKernelSetAccessCoordinator extends Assert {
 	node.shutdown(false);
     }
 
+    @Test
+    public void testLockingAccessCoordinator() throws Exception {
+	properties.setProperty(ACCESS_COORDINATOR_PROPERTY,
+			       LockingAccessCoordinator.class.getName());
+	SgsTestNode node = new SgsTestNode(
+	    "TestKernelSetAccessCoordinator", null, properties);
+	node.shutdown(false);
+    }
+
+    @Test
+    public void testMyAccessCoordinator() throws Exception {
+	properties.setProperty(ACCESS_COORDINATOR_PROPERTY,
+			       MyAccessCoordinator.class.getName());
+	SgsTestNode node = new SgsTestNode(
+	    "TestKernelSetAccessCoordinator", null, properties);
+	assertTrue(MyAccessCoordinator.getCreated());
+	node.shutdown(false);
+    }
+
     /* -- Other classes and methods -- */
 
     public abstract static class AbstractCoordinator
@@ -251,6 +271,25 @@ public class TestKernelSetAccessCoordinator extends Assert {
 	}
 	public Transaction getConflictingTransaction(Transaction txn) {
 	    return null;
+	}
+    }
+
+    public static class MyAccessCoordinator extends NullAccessCoordinator {
+	private static boolean created;
+
+	public MyAccessCoordinator(
+	    Properties properties,
+	    TransactionProxy txnProxy,
+	    ProfileCollectorHandle profileCollectorHandle)
+	{
+	    super(properties, txnProxy, profileCollectorHandle);
+	    created = true;
+	}
+
+	static boolean getCreated() {
+	    boolean result = created;
+	    created = false;
+	    return result;
 	}
     }
 }

@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.AccessReporter;
@@ -57,13 +58,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * past transactions to discover what may have caused conflict. This is
  * currently only useful for {@code ProfileListener}s that wish to diplay
  * this detail. By default this backlog tracking is disabled. To enable,
- * set the {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.queue.size}
+ * set the {@code com.sun.sgs.impl.kernel.TrackingAccessCoordinator.queue.size}
  * property to some positive value indicating the length of backlog to use.
  * Note that with each transaction failure this backlog will be scanned
  * to find a conflicting transaction, so a larger backlog may provide more
  * detail about failure but will also be more compute-intensive.
  */
-class AccessCoordinatorImpl extends AbstractAccessCoordinator
+class TrackingAccessCoordinator extends AbstractAccessCoordinator
     implements NonDurableTransactionParticipant
 {
     /**
@@ -95,19 +96,19 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
      * property must be non-negative.
      */
     static final String BACKLOG_QUEUE_PROPERTY =
-        AccessCoordinatorImpl.class.getName() + ".queue.size";
+        TrackingAccessCoordinator.class.getName() + ".queue.size";
 
     /**
-     * Creates an instance of {@code AccessCoordinatorImpl}.
+     * Creates an instance of {@code TrackingAccessCoordinator}.
      *
      * @throws IllegalArgumentException if the requested backlog queue size
      *                                  is not a valid number greater than 0
      */
-    AccessCoordinatorImpl(Properties properties, TransactionProxy txnProxy,
-                          ProfileCollectorHandle profileCollector) 
+    TrackingAccessCoordinator(Properties properties, TransactionProxy txnProxy,
+			      ProfileCollectorHandle profileCollector) 
     {
 	super(txnProxy, profileCollector);
-	checkNonNull(properties, "properties");
+	Objects.checkNull("properties", properties);
         String backlogProp = properties.getProperty(BACKLOG_QUEUE_PROPERTY);
         if (backlogProp != null) {
             try {
@@ -133,8 +134,8 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
     public <T> AccessReporter<T> registerAccessSource(String sourceName, 
                                                       Class<T> objectIdType)
     {
-	checkNonNull(sourceName, "sourceName");
-	checkNonNull(objectIdType, "objectIdType");
+	Objects.checkNull("sourceName", sourceName);
+	Objects.checkNull("objectIdType", objectIdType);
         return new AccessReporterImpl<T>(sourceName);
     }
 
@@ -142,7 +143,7 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
      * {@inheritDoc} 
      */
     public Transaction getConflictingTransaction(Transaction txn) {
-	checkNonNull(txn, "txn");
+	Objects.checkNull("txn", txn);
         // given that we're not actively managing contention yet (which
         // means that there aren't many active conflicts) and the scheduler
         // isn't trying to optimize using this interface, we don't try
@@ -178,15 +179,20 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
     public void notifyNewTransaction(
 	Transaction txn, long requestedStartTime, int tryCount)
     {
-        // NOTE: the parameters are here for the next step, where we want
-        // input to decide how to resolve conflict
+	if (requestedStartTime < 0) {
+	    throw new IllegalArgumentException(
+		"The requestedStartTime must not be less than 0");
+	}
+	if (tryCount < 1) {
+	    throw new IllegalArgumentException(
+		"The tryCount must not be less than 1");
+	}
+	if (txnMap.containsKey(txn)) {
+	    throw new IllegalStateException("Transaction already started");
+	}		
         txn.join(this);
         txnMap.put(txn, new AccessedObjectsDetailImpl(txn));
     }
-
-    // NOTE: there will be another version of the notifyNewTransaction
-    // method that takes a specific resolution policy (once we get that
-    // feature implemented)
 
     /*
      * Implement NonDurableTransactionParticipant interface.
@@ -465,10 +471,10 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
         /** Creates an instance of {@code AccessedObjectImpl}. */
         AccessedObjectImpl(Object objId, AccessType type, String source,
                            AccessedObjectsDetailImpl parent) {
-	    checkNonNull(objId, "objId");
-	    checkNonNull(type, "type");
-	    checkNonNull(source, "source");
-            checkNonNull(parent, "parent");
+	    Objects.checkNull("objId", objId);
+	    Objects.checkNull("type", type);
+	    Objects.checkNull("source", source);
+            Objects.checkNull("parent", parent);
 	    
             this.objId = objId;
             this.type = type;
@@ -537,9 +543,9 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
         /** {@inheritDoc} */
 	public void reportObjectAccess(Transaction txn, T objId,
                                        AccessType type, Object description) {
-	    checkNonNull(txn, "txn");
-	    checkNonNull(objId, "objId");
-	    checkNonNull(type, "type");
+	    Objects.checkNull("txn", txn);
+	    Objects.checkNull("objId", objId);
+	    Objects.checkNull("type", type);
 
 	    AccessedObjectsDetailImpl detail = txnMap.get(txn);
             if (detail == null) {
@@ -556,19 +562,18 @@ class AccessCoordinatorImpl extends AbstractAccessCoordinator
         /** {@inheritDoc} */
 	public void setObjectDescription(Transaction txn, T objId,
                                          Object description) {
-	    checkNonNull(txn, "txn");
-	    checkNonNull(objId, "objId");
-
-            if (description == null) {
-                return;
-            }
+	    Objects.checkNull("txn", txn);
+	    Objects.checkNull("objId", objId);
 
             AccessedObjectsDetailImpl detail = txnMap.get(txn);
             if (detail == null) {
                 throw new IllegalArgumentException("Unknown transaction: " +
                                                    txn);
             }
-            detail.setDescription(source, objId, description);
+
+            if (description != null) {
+		detail.setDescription(source, objId, description);
+	    }
         }
     }
 

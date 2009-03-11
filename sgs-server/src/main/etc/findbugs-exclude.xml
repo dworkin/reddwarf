@@ -30,6 +30,15 @@
     <Bug pattern="DM_CONVERT_CASE"/>
   </Match>
   
+  <!-- Findbugs can't tell why we're doing a notify at this point, but
+       it is because we have identified new lock owners that need to be
+       informed of their new status. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator"/>
+    <Method name="endTransaction"/>
+    <Bug pattern="NN_NAKED_NOTIFY"/>
+  </Match>
+
   <!-- There really is only one waiter, so no need to use notifyAll, and
        notify is faster -->
   <Match>
@@ -67,12 +76,12 @@
 
   <!-- Return value is intentionally being thrown out. -->
   <Match>
-    <Class name="com.sun.sgs.impl.kernel.AccessCoordinatorImpl"/>
+    <Class name="com.sun.sgs.impl.kernel.TrackingAccessCoordinator"/>
     <Method name="reportDetail"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
   </Match>
   <Match>
-    <Class name="com.sun.sgs.impl.kernel.AccessCoordinatorImpl"/>
+    <Class name="com.sun.sgs.impl.kernel.TrackingAccessCoordinator"/>
     <Method name="reportDetail"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
   </Match>

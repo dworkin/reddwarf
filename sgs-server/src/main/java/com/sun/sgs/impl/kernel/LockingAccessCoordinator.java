@@ -21,10 +21,13 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionInterruptedException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
@@ -46,6 +49,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+
+/*
+ * TODO: Consider creating a base class that provides the lock and
+ * lockNoWaitInternal level methods as a common utility.
+ * -tjb@sun.com (03/10/2009)
+ */
 
 /**
  * An implementation of {@link AccessCoordinator} that uses locking to handle
@@ -84,8 +94,10 @@ import java.util.logging.Logger;
  *	<i>Default:</i> {@value #NUM_KEY_MAPS_DEFAULT}
  *
  * <dd style="padding-top: .5em">The number of maps to use for associating keys
- *	and maps.  The number of maps controls the amount of concurrency.  The
- *	value must be greater than {@code 0}. <p>
+ *	and maps.  The number of maps controls the amount of concurrency, and
+ *	should typically be set to a value to support concurrent access by the
+ *	number of active threads.  The value must be greater than {@code
+ *	0}. <p>
  *
  * </dl> <p>
  *
@@ -99,6 +111,54 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Notifying new lock owners, results of
  *	requesting locks before waiting, releasing locks, results of attempting
  *	to assign locks to waiters, details of checking deadlocks
+ * </ul> <p>
+ *
+ * The implementation of this class uses the following thread synchronization
+ * scheme to avoid internal deadlocks:
+ *
+ * <ul>
+ *
+ * <li>Synchronization is only used on {@link Locker} objects and on the {@code
+ *     Map}s that hold {@link Lock} objects
+ *
+ * <li>A thread can synchronize on at most one locker and one lock at a time,
+ *     always synchronizing on the locker first
+ *
+ * </ul>
+ *
+ * To make it easier to adhere to these rules, the implementation takes the
+ * following steps:
+ *
+ * <ul>
+ *
+ * <li>The {@code Lock} class is not synchronized <p>
+ *
+ *     Callers of non-{@code Object} methods on the {@code Lock} class should
+ *     make sure that they are synchronized on the associated key map.
+ *
+ * <li>The {@link Locker} class only uses synchronization for getter and setter
+ *     methods
+ *
+ * <li>Blocks synchronized on a {@code Lock} should not synchronize on anything
+ *     else <p>
+ *
+ *     The code enforces this requirement by having lock methods not make calls
+ *     to other classes, and by performing minimal work while synchronized on
+ *     the associated key map.
+ *
+ * <li>Blocks synchronized on a {@code Locker} should not synchronize on a
+ *     different locker, but can synchronize on a {@code Lock}
+ *
+ *     In fact, only one method synchronizes on a {@code Locker} and on a
+ *     {@code Lock} -- the {@link #waitForInternal waitForInternal} method.
+ *     That method also makes sure that the only synchronized {@code Locker}
+ *     methods that it calls are on the locker it has already synchronized on.
+ *     The {@link DeadlockChecker} class also synchronizes on key maps and
+ *     lockers, but is called outside of synchronized blocks and only
+ *     synchronizes on one thing at a time.
+ *
+ * <li>Use assertions to check adherence to the scheme
+ *
  * </ul>
  */
 public class LockingAccessCoordinator extends AbstractAccessCoordinator
@@ -116,16 +176,17 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	CLASS + ".lock.timeout";
 
     /**
-     * The default value of the lock timeout property, if no transaction
-     * timeout is specified.
-     */
-    public static final long DEFAULT_LOCK_TIMEOUT = 10;
-
-    /**
      * The proportion of the transaction timeout to use for the lock timeout if
      * no lock timeout is specified.
      */
     public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
+
+    /**
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
+     */
+    public static final long DEFAULT_LOCK_TIMEOUT = 
+	computeLockTimeout(TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
 
     /**
      * The property for specifying the number of maps to use for associating
@@ -187,12 +248,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	long txnTimeout = wrappedProps.getLongProperty(
 	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
 	long defaultLockTimeout = (txnTimeout < 1)
-	    ? DEFAULT_LOCK_TIMEOUT
-	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
-	/* Lock timeout should be at least 1 */
-	if (defaultLockTimeout < 1) {
-	    defaultLockTimeout = 1;
-	}
+	    ? DEFAULT_LOCK_TIMEOUT : computeLockTimeout(txnTimeout);
 	lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
 	numKeyMaps = wrappedProps.getIntProperty(
@@ -209,13 +265,18 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
     public <T> AccessReporter<T> registerAccessSource(
 	String sourceName, Class<T> objectIdType)
     {
-	checkNonNull(objectIdType, "objectIdType");
+	checkNull("objectIdType", objectIdType);
 	return new AccessReporterImpl<T>(sourceName);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation does not record information about completed
+     * transactions, so it always returns {@code null}.
+     */
     public Transaction getConflictingTransaction(Transaction txn) {
-	checkNonNull(txn, "txn");
+	checkNull("txn", txn);
 	return null;
     }
 
@@ -435,6 +496,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	/** The request was denied. */
 	DENIED,
 
+	/** The request was interrupted. */
+	INTERRUPTED,
+
 	/** The request resulted in deadlock and was chosen to be aborted. */
 	DEADLOCK;
     }
@@ -449,7 +513,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      * @throws	IllegalArgumentException if the transaction is not active
      */
     Locker getLocker(Transaction txn) {
-	checkNonNull(txn, "txn");
+	checkNull("txn", txn);
 	Locker locker = txnMap.get(txn);
 	if (locker == null) {
 	    throw new IllegalArgumentException(
@@ -519,20 +583,30 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    List<Locker> newOwners = Collections.emptyList();
 	    Key key = request.key;
 	    Map<Key, Lock> keyMap = getKeyMap(key);
-	    synchronized (keyMap) {
-		/* Don't create the lock if it isn't present */
-		Lock lock = keyMap.get(key);
-		if (lock != null) {
-		    newOwners = lock.release(locker);
-		    if (!lock.inUse()) {
-			keyMap.remove(key);
+	    assert Lock.noteSync(key);
+	    try {
+		synchronized (keyMap) {
+		    /* Don't create the lock if it isn't present */
+		    Lock lock = keyMap.get(key);
+		    if (lock != null) {
+			newOwners = lock.release(locker);
+			if (!lock.inUse()) {
+			    keyMap.remove(key);
+			}
 		    }
 		}
+	    } finally {
+		assert Lock.noteUnsync(key);
 	    }
 	    for (Locker newOwner : newOwners) {
-		synchronized (newOwner) {
-		    logger.log(Level.FINEST, "notify new owner {0}", newOwner);
-		    newOwner.notify();
+		logger.log(Level.FINEST, "notify new owner {0}", newOwner);
+		assert newOwner.noteSync();
+		try {
+		    synchronized (newOwner) {
+			newOwner.notify();
+		    }
+		} finally {
+		    assert newOwner.noteUnsync();
 		}
 	    }
 	}
@@ -563,28 +637,33 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 	LockAttemptResult result;
 	Map<Key, Lock> keyMap = getKeyMap(key);
-	synchronized (keyMap) {
-	    Lock lock = getLock(key, keyMap);
-	    result = lock.lock(locker, forWrite, false);
-	    if (result == null) {
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER,
-			       "lock {0}, {1}, forWrite:{2}" +
-			       "\n  returns null (already granted)",
-			       locker, key, forWrite);
-		}
-		return null;
+	assert Lock.noteSync(key);
+	try {
+	    synchronized (keyMap) {
+		Lock lock = getLock(key, keyMap);
+		result = lock.lock(locker, forWrite, false);
 	    }
-	    locker.requests.add(result.request);
-	    if (result.conflict == null) {
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(Level.FINER,
-			       "lock {0}, {1}, forWrite:{2}" +
-			       "\n  returns null (granted)",
-			       locker, key, forWrite);
-		}
-		return null;
+	} finally {
+	    assert Lock.noteUnsync(key);
+	}
+	if (result == null) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER,
+			   "lock {0}, {1}, forWrite:{2}" +
+			   "\n  returns null (already granted)",
+			   locker, key, forWrite);
 	    }
+	    return null;
+	}
+	locker.requests.add(result.request);
+	if (result.conflict == null) {
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER,
+			   "lock {0}, {1}, forWrite:{2}" +
+			   "\n  returns null (granted)",
+			   locker, key, forWrite);
+	    }
+	    return null;
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
@@ -608,88 +687,132 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
     /** Attempts to acquire a lock, waiting if needed. */
     private LockConflict waitForLockInternal(Locker locker) {
-	synchronized (locker) {
-	    LockAttemptResult result = locker.getWaitingFor();
-	    if (result == null) {
-		logger.log(Level.FINER,
-			   "lock {0}\n  returns null (not waiting)", locker);
-		return null;
-	    }
-	    Lock lock;
-	    Key key = result.request.key;
-	    Map<Key, Lock> keyMap = getKeyMap(key);
-	    synchronized (keyMap) {
-		lock = getLock(key, keyMap);
-	    }
-	    long now = System.currentTimeMillis();
-	    long stop = Math.min(now + lockTimeout, locker.stopTime);
-	    while (true) {
-		LockConflict conflict = locker.getConflict();
-		if (conflict != null) {
-		    synchronized (keyMap) {
-			lock.flushWaiter(locker);
-		    }
-		    locker.setWaitingFor(null);
-		    if (logger.isLoggable(Level.FINER)) {
-			logger.log(Level.FINER,
-				   "lock {0}, {1}, forWrite:{2}" +
-				   "\n  returns {3}",
-				   locker, key, result.request.getForWrite(),
-				   conflict);
-		    }
-		    return conflict;
-		} else if (now >= stop) {
-		    synchronized (keyMap) {
-			lock.flushWaiter(locker);
-		    }
-		    locker.setWaitingFor(null);
-		    conflict = new LockConflict(
-			LockConflictType.TIMEOUT, result.conflict.txn);
-		    locker.setConflict(conflict);
-		    if (logger.isLoggable(Level.FINER)) {
-			logger.log(Level.FINER,
-				   "lock {0}, {1}, forWrite:{2}" +
-				   "\n  returns {3}",
-				   locker, key, result.request.getForWrite(),
-				   conflict);
-		    }
-		    return conflict;
-		}
-		boolean isOwner;
-		synchronized (keyMap) {
-		    isOwner = lock.isOwner(result.request);
-		}
-		if (isOwner) {
-		    locker.setWaitingFor(null);
-		    if (logger.isLoggable(Level.FINER)) {
-			logger.log(Level.FINER,
-				   "lock {0}, {1}, forWrite:{2}" +
-				   "\n  returns null (granted)",
-				   locker, key, result.request.getForWrite());
-		    }
+	assert locker.noteSync();
+	try {
+	    synchronized (locker) {
+		LockAttemptResult result = locker.getWaitingFor();
+		if (result == null) {
+		    logger.log(
+			Level.FINER,
+			"lock {0}\n  returns null (not waiting)", locker);
 		    return null;
 		}
+		Lock lock;
+		Key key = result.request.key;
+		Map<Key, Lock> keyMap = getKeyMap(key);
+		assert Lock.noteSync(key);
+		try {
+		    synchronized (keyMap) {
+			lock = getLock(key, keyMap);
+		    }
+		} finally {
+		    assert Lock.noteUnsync(key);
+		}
+		long now = System.currentTimeMillis();
+		long stop = Math.min(addCheckOverflow(now, lockTimeout),
+				     locker.stopTime);
+		LockConflict conflict = null;
+		while (true) {
+		    conflict = locker.getConflict();
+		    if (conflict != null) {
+			break;
+		    } else if (now >= stop) {
+			conflict = new LockConflict(
+			    LockConflictType.TIMEOUT, result.conflict.txn);
+			locker.setConflict(conflict);
+			break;
+		    }
+		    boolean isOwner;
+		    assert Lock.noteSync(key);
+		    try {
+			synchronized (keyMap) {
+			    isOwner = lock.isOwner(result.request);
+			}
+		    } finally {
+			assert Lock.noteUnsync(key);
+		    }
+		    if (isOwner) {
+			locker.setWaitingFor(null);
+			if (logger.isLoggable(Level.FINER)) {
+			    logger.log(
+				Level.FINER,
+				"lock {0}, {1}, forWrite:{2}" +
+				"\n  returns null (granted)",
+				locker, key, result.request.getForWrite());
+			}
+			return null;
+		    }
+		    if (logger.isLoggable(Level.FINER)) {
+			logger.log(Level.FINER,
+				   "wait for lock {0}, {1}, forWrite:{2}" +
+				   ", wait:{3,number,#}",
+				   locker, key, result.request.getForWrite(),
+				   stop - now);
+		    }
+		    try {
+			locker.wait(stop - now);
+		    } catch (InterruptedException e) {
+			conflict = new LockConflict(
+			    LockConflictType.INTERRUPTED, result.conflict.txn);
+			locker.setConflict(conflict);
+			break;
+		    }
+		    now = System.currentTimeMillis();
+		}
+		assert conflict != null;
+		assert Lock.noteSync(key);
+		try {
+		    synchronized (keyMap) {
+			lock.flushWaiter(locker);
+		    }
+		} finally {
+		    assert Lock.noteUnsync(key);
+		}
+		locker.setWaitingFor(null);
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(Level.FINER,
-			       "wait for lock {0}, {1}, forWrite:{2}" +
-			       ", wait:{3,number,#}",
+			       "lock {0}, {1}, forWrite:{2}\n  returns {3}",
 			       locker, key, result.request.getForWrite(),
-			       stop - now);
+			       conflict);
 		}
-		try {
-		    locker.wait(stop - now);
-		} catch (InterruptedException e) {
-		    throw new RuntimeException("Unexpected interrupt");
-		}
-		now = System.currentTimeMillis();
+		return conflict;
 	    }
+	} finally {
+	    assert locker.noteUnsync();
 	}
+    }
+
+    /**
+     * Computes the lock timeout based on the specified transaction timeout and
+     * {@link #DEFAULT_LOCK_TIMEOUT_PROPORTION}.
+     */
+    private static long computeLockTimeout(long txnTimeout) {
+	long result = (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	/* Lock timeout should be at least 1 */
+	if (result < 1) {
+	    result = 1;
+	}
+	return result;
+    }
+
+    /** Add two non-negative longs and don't wrap around on overflow. */
+    static long addCheckOverflow(long x, long y) {
+	assert x >= 0 && y >= 0;
+	long result = x + y;
+	return (result >= 0) ? result : Long.MAX_VALUE;
     }
 
     /* -- Other classes -- */
 
     /** Records information about a transaction requesting locks. */
     static class Locker implements AccessedObjectsDetail {
+
+	/**
+	 * When assertions are enabled, holds the {@code Locker} that the
+	 * current thread is synchronized on, if any.
+	 */
+	private static final ThreadLocal<Locker> currentSync =
+	    new ThreadLocal<Locker>();
 
 	/** The transaction. */
 	final Transaction txn;
@@ -735,14 +858,15 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 *		is less than {@code 0}
 	 */
 	Locker(Transaction txn, long requestedStartTime) {
-	    checkNonNull(txn, "txn");
+	    checkNull("txn", txn);
 	    if (requestedStartTime < 0) {
 		throw new IllegalArgumentException(
 		    "The requestedStartTime must not be less than 0");
 	    }
 	    this.txn = txn;
 	    this.requestedStartTime = requestedStartTime;
-	    this.stopTime = System.currentTimeMillis() + txn.getTimeout();
+	    this.stopTime = addCheckOverflow(
+		System.currentTimeMillis(), txn.getTimeout());
 	}
 
 	/* -- Implement AccessedObjectsDetail -- */
@@ -809,6 +933,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @return	the conflicting request or {@code null}
 	 */
 	synchronized LockConflict getConflict() {
+	    assert checkAllowSync();
 	    return conflict;
 	}
 
@@ -817,6 +942,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * with the specified request.
 	 */
 	synchronized void setConflict(LockConflict conflict) {
+	    assert checkAllowSync();
 	    this.conflict = conflict;
 	    notify();
 	}
@@ -828,6 +954,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 *		for or {@code null} if it is not waiting
 	 */
 	synchronized LockAttemptResult getWaitingFor() {
+	    assert checkAllowSync();
 	    return waitingFor;
 	}
 
@@ -840,10 +967,65 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @param	waitingFor the lock or {@code null}
 	 */
 	synchronized void setWaitingFor(LockAttemptResult waitingFor) {
+	    assert checkAllowSync();
 	    assert waitingFor == null || waitingFor.conflict != null;
 	    this.waitingFor = waitingFor;
 	}
 
+	/**
+	 * Checks that the current thread is permitted to synchronize on this
+	 * locker.  Throws an {@link AssertionError} if already synchronized on
+	 * a locker other than this one or any lock, otherwise returns {@code
+	 * true}.
+	 */
+	boolean checkAllowSync() {
+	    Locker locker = currentSync.get();
+	    if (locker != null && locker != this) {
+		throw new AssertionError(
+		    "Attempt to synchronize on locker " + this +
+		    ", but already synchronized on " + locker);
+	    }
+	    Lock.checkNoSync();
+	    return true;
+	}
+
+	/**
+	 * Notes the start of synchronization on this locker.  Throws {@link
+	 * AssertionError} if already synchronized on any locker or lock,
+	 * otherwise returns {@code true}.
+	 */
+	boolean noteSync() {
+	    Locker locker = currentSync.get();
+	    if (locker != null) {
+		throw new AssertionError(
+		    "Attempt to synchronize on locker " + this +
+		    ", but already synchronized on " + locker);
+	    }
+	    Lock.checkNoSync();
+	    currentSync.set(this);
+	    return true;
+	}
+
+	/**
+	 * Notes the end of synchronization on this locker.  Throws {@link
+	 * AssertionError} if not already synchronized on this locker,
+	 * otherwise returns {@code true}.
+	 */
+	boolean noteUnsync() {
+	    Locker locker = currentSync.get();
+	    if (locker == null) {
+		throw new AssertionError(
+		    "Attempt to unsynchronize on locker " + this +
+		    ", but not currently synchronized on a locker");
+	    } else if (locker != this) {
+		throw new AssertionError(
+		    "Attempt to unsynchronize on locker " + this +
+		    ", but currently synchronized on " + locker);
+	    }
+	    currentSync.remove();
+	    return true;
+	}
+	    
 	/** Print the associated transaction, for debugging. */
 	@Override
 	public String toString() {
@@ -867,8 +1049,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @param	objectId the object ID of the object
 	 */
 	Key(String source, Object objectId) {
-	    checkNonNull(source, "source");
-	    checkNonNull(objectId, "objectId");
+	    checkNull("source", source);
+	    checkNull("objectId", objectId);
 	    this.source = source;
 	    this.objectId = objectId;
 	}
@@ -908,16 +1090,29 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
      */
     private static class Lock {
 
+	/**
+	 * When assertions are enabled, hold the {@code Key} whose associated
+	 * {@code Map} the current thread is synchronized on, if any.
+	 */
+	private static final ThreadLocal<Key> currentSync =
+	    new ThreadLocal<Key>();
+
 	/** An empty array of lock requests. */
 	private static final LockRequest[] NO_LOCK_REQUESTS = { };
 
 	/** The key that identifies this lock. */
 	final Key key;
 
-	/** The requests that currently own this lock. */
+	/**
+	 * The requests that currently own this lock.  Use a small initial
+	 * size, since the number of owners is typically small.
+	 */
 	private final List<LockRequest> owners = new ArrayList<LockRequest>(2);
 
-	/** The requests that are waiting for this lock. */
+	/**
+	 * The requests that are waiting for this lock.  Use a small initial
+	 * size, since the number of owners is typically small.
+	 */
 	private final List<LockRequest> waiters =
 	    new ArrayList<LockRequest>(2);
 
@@ -927,7 +1122,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @param	key the key that identifies this lock
 	 */
 	Lock(Key key) {
-	    checkNonNull(key, "key");
+	    checkNull("key", key);
 	    this.key = key;
 	}
 
@@ -950,6 +1145,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	LockAttemptResult lock(
 	    Locker locker, boolean forWrite, boolean waiting)
 	{
+	    assert checkSync();
 	    if (owners.isEmpty()) {
 		LockRequest request =
 		    new LockRequest(locker, key, forWrite, false);
@@ -1048,6 +1244,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * @return	the newly added owners
 	 */
 	List<Locker> release(Locker locker) {
+	    assert checkSync();
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "release {0}, {1}", locker, this);
 	    }
@@ -1073,6 +1270,12 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 			    "attempt to lock waiter {0} returns {1}",
 			    waiter, result);
 		    }
+		    /*
+		     * Stop when the first conflict is detected.  This
+		     * implementation always services waiters in order, so
+		     * there is no reason to look further after we've found a
+		     * waiter that is still blocked.
+		     */
 		    if (result != null && result.conflict != null) {
 			break;
 		    }
@@ -1090,9 +1293,12 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	}
 
 	/**
-	 * Validates the state of this lock, which should be in use. <p>
+	 * Validates the state of this lock, given that it is known to be in
+	 * use. <p>
 	 *
-	 * Consistency constraints: <ul>
+	 * Locks that are in use must satisfy the following consistency
+	 * constraints:
+	 * <ul>
 	 * <li>at least one owner
 	 * <li>all upgrade waiters precede other waiters
 	 * <li>locker appears once in owners and waiters <em>except</em> that
@@ -1154,13 +1360,19 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	    return true;
 	}
 
-	/** Checks if this lock has any owners or waiters. */
+	/**
+	 * Returns whether this lock is currently in use, or whether it is not
+	 * in use and can be removed from the lock table.  Locks are in use if
+	 * they have any owners or waiters.
+	 */
 	boolean inUse() {
+	    assert checkSync();
 	    return !owners.isEmpty() || !waiters.isEmpty();
 	}
 
 	/** Returns a copy of the locker requests for the owners. */
 	LockRequest[] copyOwners() {
+	    assert checkSync();
 	    if (owners.isEmpty()) {
 		return NO_LOCK_REQUESTS;
 	    } else {
@@ -1170,6 +1382,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
 	/** Removes a locker from the list of waiters for this lock. */
 	void flushWaiter(Locker locker) {
+	    assert checkSync();
 	    for (Iterator<LockRequest> iter = waiters.iterator();
 		 iter.hasNext(); )
 	    {
@@ -1186,12 +1399,81 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 * specified request.
 	 */
 	boolean isOwner(LockRequest request) {
+	    assert checkSync();
 	    for (LockRequest owner : owners) {
 		if (request.locker == owner.locker) {
 		    return !request.getForWrite() || owner.getForWrite();
 		}
 	    }
 	    return false;
+	}
+
+	/**
+	 * Notes the start of synchronization on the map associated with {@code
+	 * key}.  Throws {@link AssertionError} if already synchronized on a
+	 * key, otherwise returns {@code true}.
+	 */
+	static boolean noteSync(Key key) {
+	    Key currentKey = currentSync.get();
+	    if (currentKey != null) {
+		throw new AssertionError(
+		    "Attempt to synchronize on map for key " + key +
+		    ", but already synchronized on " + currentKey);
+	    }
+	    currentSync.set(key);
+	    return true;
+	}
+
+	/**
+	 * Notes the end of synchronization on the map associated with {@code
+	 * key}.  Throws {@link AssertionError} if not already synchronized on
+	 * {@code key}, otherwise returns {@code true}.
+	 */
+	static boolean noteUnsync(Key key) {
+	    Key currentKey = currentSync.get();
+	    if (currentKey == null) {
+		throw new AssertionError(
+		    "Attempt to unsynchronize on map for key " + key +
+		    ", but not currently synchronized on a key");
+	    } else if (!currentKey.equals(key)) {
+		throw new AssertionError(
+		    "Attempt to unsynchronize on map for key " + key +
+		    ", but currently synchronized on " + currentKey);
+	    }
+	    currentSync.remove();
+	    return true;
+	}
+
+	/**
+	 * Checks that the current thread is not synchronized on the map
+	 * associated with a key, throwing {@link AssertionError} if it is, and
+	 * otherwise returning {@code true}.
+	 */
+	static boolean checkNoSync() {
+	    Key currentKey = currentSync.get();
+	    if (currentKey != null) {
+		throw new AssertionError(
+		    "Currently synchronized on key " + currentKey);
+	    }
+	    return true;
+	}
+
+	/**
+	 * Checks that the current thread is synchronized on the map associated
+	 * with this lock, throwing {@link AssertionError} if it is not, and
+	 * otherwise returning {@code true}.
+	 */
+	boolean checkSync() {
+	    Key currentKey = currentSync.get();
+	    if (currentKey == null) {
+		throw new AssertionError(
+		    "Currently not synchronized on a key");
+	    } else if (!currentKey.equals(key)) {
+		throw new AssertionError(
+		    "Should be synchronized on " + key +
+		    ", but currently synchronized on " + currentKey);
+	    }
+	    return true;
 	}
 
 	/** Print fields, for debugging. */
@@ -1252,7 +1534,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	public void reportObjectAccess(
 	    Transaction txn, T objectId, AccessType type, Object description)
 	{
-	    checkNonNull(type, "type");
+	    checkNull("type", type);
 	    LockConflict conflict = lock(
 		txn, source, objectId, type == AccessType.WRITE, description);
 	    if (conflict != null) {
@@ -1281,6 +1563,10 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		    exception = new TransactionConflictException(
 			accessMsg + "Access denied" + conflictMsg);
 		    break;
+		case INTERRUPTED:
+		    exception = new TransactionInterruptedException(
+			accessMsg + "Transaction interrupted" + conflictMsg);
+		    break;
 		case DEADLOCK:
 		    exception = new TransactionConflictException(
 			accessMsg + "Transaction deadlock" + conflictMsg);
@@ -1300,7 +1586,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	{
 	    Locker locker = getLocker(txn);
 	    if (description == null) {
-		checkNonNull(objectId, "objectId");
+		checkNull("objectId", objectId);
 	    } else {
 		locker.setDescription(
 		    new Key(source, objectId), description);
@@ -1559,8 +1845,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		} else {
 		    Key key = result.request.key;
 		    Map<Key, Lock> keyMap = getKeyMap(key);
-		    synchronized (keyMap) {
-			waitingFor = getLock(key, keyMap).copyOwners();
+		    assert Lock.noteSync(key);
+		    try {
+			synchronized (keyMap) {
+			    waitingFor = getLock(key, keyMap).copyOwners();
+			}
+		    } finally {
+			assert Lock.noteUnsync(key);
 		    }
 		}
 		waiterInfo = new WaiterInfo(waitingFor);
@@ -1571,7 +1862,9 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 
 	/**
 	 * Updates the victim and conflict fields to reflect an additional
-	 * locker in the deadlock chain.
+	 * locker in the deadlock chain.  Use the argument as the victim if it
+	 * has a newer requested start time than the previously selected
+	 * victim.
 	 */
 	private void maybeUpdateVictim(Locker locker) {
 	    assert locker != null;

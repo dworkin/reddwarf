@@ -21,6 +21,7 @@ package com.sun.sgs.test.impl.kernel;
 
 import com.sun.sgs.impl.kernel.AbstractAccessCoordinator;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
@@ -55,13 +56,13 @@ public class NullAccessCoordinator extends AbstractAccessCoordinator {
     public <T> AccessReporter<T> registerAccessSource(
 	String sourceName, Class<T> objectIdType)
     {
-	checkNonNull(objectIdType, "objectIdType");
+	checkNull("objectIdType", objectIdType);
 	return new AccessReporterImpl<T>(sourceName);
     }
 
     /** {@inheritDoc} */
     public Transaction getConflictingTransaction(Transaction txn) {
-	checkNonNull(txn, "txn");
+	checkNull("txn", txn);
 	return null;
     }
 
@@ -71,7 +72,7 @@ public class NullAccessCoordinator extends AbstractAccessCoordinator {
     public void notifyNewTransaction(
 	Transaction txn, long requestedStartTime, int tryCount)
     {
-	checkNonNull(txn, "txn");
+	checkNull("txn", txn);
 	if (requestedStartTime < 0) {
 	    throw new IllegalArgumentException(
 		"The requestedStartTime must not be less than 0");
@@ -102,17 +103,17 @@ public class NullAccessCoordinator extends AbstractAccessCoordinator {
 	public void reportObjectAccess(
 	    Transaction txn, T objectId, AccessType type, Object description)
 	{
-	    checkNonNull(txn, "txn");
-	    checkNonNull(objectId, "objectId");
-	    checkNonNull(type, "type");
+	    checkNull("txn", txn);
+	    checkNull("objectId", objectId);
+	    checkNull("type", type);
 	}
 
 	/** {@inheritDoc} */
 	public void setObjectDescription(
 	    Transaction txn, T objectId, Object description)
 	{
-	    checkNonNull(txn, "txn");
-	    checkNonNull(objectId, "objectId");
+	    checkNull("txn", txn);
+	    checkNull("objectId", objectId);
 	}
     }
 }

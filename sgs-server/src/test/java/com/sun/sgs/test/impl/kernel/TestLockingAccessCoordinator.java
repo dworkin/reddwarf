@@ -20,34 +20,24 @@
 package com.sun.sgs.test.impl.kernel;
 
 import com.sun.sgs.app.TransactionConflictException;
-import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionInterruptedException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator.LockConflict;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator.LockConflictType;
-import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
-import com.sun.sgs.kernel.AccessedObject;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileParticipantDetail;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
-import org.junit.After;
-import org.junit.Assert;
+import java.util.concurrent.TimeoutException;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -55,36 +45,14 @@ import org.junit.runner.RunWith;
 
 /** Tests the {@link LockingAccessCoordinator} class. */
 @RunWith(FilteredNameRunner.class)
-public class TestLockingAccessCoordinator extends Assert {
-
-    /** The transaction proxy, for creating transactions. */
-    private static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
-
-    /** A profile collector, for reporting accesses. */
-    private static final DummyProfileCollectorHandle profileCollector =
-	new DummyProfileCollectorHandle();
-
-    /** An exception to use for aborting transactions. */
-    private static final Exception ABORT_EXCEPTION = new Exception();
-
+public class TestLockingAccessCoordinator
+    extends BasicAccessCoordinatorTest<LockingAccessCoordinator>
+{
     /** Override for the lock timeout. */
     private static long lockTimeout;
 
     /** Override for the number of key maps. */
     private static int numKeyMaps;
-
-    /** The configuration properties. */
-    private Properties properties;
-
-    /** The access coordinator to test. */
-    private LockingAccessCoordinator coordinator;
-
-    /** An active transaction. */
-    private DummyTransaction txn;
-
-    /** An access reporter obtained from the coordinator. */
-    private AccessReporter<String> reporter;
 
     /** Update the lock timeout and number of key maps. */
     @BeforeClass
@@ -94,40 +62,30 @@ public class TestLockingAccessCoordinator extends Assert {
     }
 
     /** Initialize fields for test methods. */
-    @Before
-    public void before() throws Exception {
-	properties = new Properties();
-	if (lockTimeout > 0) {
+    protected void init() {
+	if (lockTimeout > 0 &&
+	    properties.getProperty(
+		LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY) == null)
+	{
 	    properties.setProperty(
 		LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
 		String.valueOf(lockTimeout));
 	}
-	if (numKeyMaps > 0) {
+	if (numKeyMaps > 0 &&
+	    properties.getProperty(
+		LockingAccessCoordinator.NUM_KEY_MAPS_PROPERTY) == null)
+	{
 	    properties.setProperty(
 		LockingAccessCoordinator.NUM_KEY_MAPS_PROPERTY,
 		String.valueOf(numKeyMaps));
 	}
-	init();
+	super.init();
     }
 
-    /** Initialize fields using the current value of properties. */
-    private void init() {
-	coordinator = new LockingAccessCoordinator(
+    /** Creates a {@code LockingAccessCoordinator}. */
+    protected LockingAccessCoordinator createAccessCoordinator() {
+	return new LockingAccessCoordinator(
 	    properties, txnProxy, profileCollector);
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	coordinator.notifyNewTransaction(txn, 0, 1);
-	reporter = coordinator.registerAccessSource("s", String.class);
-    }
-
-    /** Clear transaction state. */
-    @After
-    public void after() throws Exception {
-	if (txn != null) {
-	    txn.commit();
-	    txn = null;
-	}
-	txnProxy.setCurrentTransaction(null);
     }
 
     /* -- Tests -- */
@@ -181,345 +139,7 @@ public class TestLockingAccessCoordinator extends Assert {
 	}
     }
 
-    /* -- Test registerAccessSource -- */
-
-    @Test(expected=NullPointerException.class)
-    public void testRegisterAccessSourceNullSourceName() {
-	coordinator.registerAccessSource(null, Object.class);
-    }
-
-    @Test(expected=NullPointerException.class)
-    public void testRegisterAccessSourceNullObjectIdType() {
-	coordinator.registerAccessSource("a", null);
-    }
-
-    /* -- Test getConflictingTransaction -- */
-
-    @Test(expected=NullPointerException.class)
-    public void testGetConflictingTransactionNullTxn() {
-	coordinator.getConflictingTransaction(null);
-    }
-
-    /* -- Test notifyNewTransaction -- */
-
-    @Test(expected=NullPointerException.class)
-    public void testNotifyNewTransactionNullTxn() {
-	coordinator.notifyNewTransaction(null, 0, 1);
-    }
-
-    @Test(expected=IllegalArgumentException.class)
-    public void testNotifyNewTransactionIllegalRequestedStartTime() {
-	coordinator.notifyNewTransaction(txn, -1, 1);
-    }
-
-    @Test(expected=IllegalArgumentException.class)
-    public void testNotifyNewTransactionIllegalTryCount() {
-	coordinator.notifyNewTransaction(txn, 0, 0);
-    }
-
-    @Test(expected=IllegalStateException.class)
-    public void testNotifyNewTransactionAgain() {
-	coordinator.notifyNewTransaction(txn, 0, 1);
-    }
-
-    @Test
-    public void testNotifyNewTransactionAborted() {
-	txn.abort(ABORT_EXCEPTION);
-	try {
-	    coordinator.notifyNewTransaction(txn, 0, 1);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	txn = null;
-    }
-
-    /* -- Test AccessReporter.reportObjectAccess -- */
-
-    @Test
-    public void testReportObjectAccessNullTxn() {
-	try {
-	    reporter.reportObjectAccess(null, "id", AccessType.READ);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess(null, "id", AccessType.READ, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-    }
-
-    @Test
-    public void testReportObjectAccessNullObjId() {
-	try {
-	    reporter.reportObjectAccess(null, AccessType.READ);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess(txn, null, AccessType.READ);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess(null, AccessType.READ, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess(txn, null, AccessType.READ, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-    }
-
-    @Test
-    public void testReportObjectAccessNullAccessType() {
-	try {
-	    reporter.reportObjectAccess("id", null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess(txn, "id", null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess("id", null, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.reportObjectAccess(txn, "id", null, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-    }
-
-    @Test
-    public void testReportObjectAccessTransactionNotActive() {
-	txn.abort(ABORT_EXCEPTION);
-	txn = null;
-	try {
-	    reporter.reportObjectAccess("o1", AccessType.READ);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	try {
-	    reporter.reportObjectAccess("o1", AccessType.READ, null);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-    }
-
-    @Test
-    public void testReportObjectAccessTransactionNotKnown() {
-	DummyTransaction txn2 = new DummyTransaction();
-	try {
-	    reporter.reportObjectAccess(txn2, "o1", AccessType.READ);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-	try {
-	    reporter.reportObjectAccess(txn2, "o1", AccessType.READ, null);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-	txn2.abort(ABORT_EXCEPTION);
-    }
-
-    @Test
-    public void testReportObjectAccessDescription() throws Exception {
-	reporter.reportObjectAccess("o1", AccessType.READ, "object 1 (a)");
-	reporter.reportObjectAccess("o1", AccessType.WRITE, "object 1 (b)");
-	reporter.reportObjectAccess("o1", AccessType.WRITE, null);
-	reporter.reportObjectAccess("o1", AccessType.WRITE);
-	reporter.reportObjectAccess("o2", AccessType.WRITE, null);
-	reporter.reportObjectAccess("o2", AccessType.WRITE, "object 2");
-	reporter.reportObjectAccess("o3", AccessType.READ);
-	reporter.reportObjectAccess("o4", AccessType.READ, null);
-	txn.commit();
-	txn = null;
-	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
-			    "s", "o1", AccessType.READ, "object 1 (a)",
-			    "s", "o1", AccessType.WRITE, "object 1 (a)",
-			    "s", "o2", AccessType.WRITE, "object 2",
-			    "s", "o3", AccessType.READ, null,
-			    "s", "o4", AccessType.READ, null);
-    }
-
-    @Test
-    public void testReportObjectAccessMultipleReporters() {
-	DummyTransaction txn2 = new DummyTransaction();
-	coordinator.notifyNewTransaction(txn2, 0, 1);
-	AccessReporter<String> reporterPrime =
-	    coordinator.registerAccessSource("s", String.class);
-	AccessReporter<String> reporter2 =
-	    coordinator.registerAccessSource("s2", String.class);
-	AccessReporter<String> reporter2Prime =
-	    coordinator.registerAccessSource("s2", String.class);
-	reporter.reportObjectAccess("o1", AccessType.READ);
-	reporterPrime.reportObjectAccess("o1", AccessType.READ);
-	reporter.reportObjectAccess("o1", AccessType.WRITE);
-	reporterPrime.reportObjectAccess("o1", AccessType.WRITE);
-	reporter2.reportObjectAccess(txn2, "o1", AccessType.READ);
-	reporter2Prime.reportObjectAccess(txn2, "o1", AccessType.READ);
-	reporter2.reportObjectAccess(txn2, "o1", AccessType.WRITE);
-	reporter2Prime.reportObjectAccess(txn2, "o1", AccessType.WRITE);
-    }
-
-    @Test
-    public void testReportObjectAccessMisc() throws Exception {
-	AccessReporter<String> reporter2 =
-	    coordinator.registerAccessSource("s2", String.class);
-	reporter.reportObjectAccess("read1", AccessType.READ);
-	reporter2.reportObjectAccess("read1", AccessType.READ);
-	reporter.reportObjectAccess("upgrade", AccessType.READ);
-	reporter.reportObjectAccess("upgrade", AccessType.READ);
-	reporter.reportObjectAccess("write1", AccessType.WRITE);
-	reporter.reportObjectAccess("read1", AccessType.READ);
-	reporter.reportObjectAccess("write1", AccessType.WRITE);
-	reporter.reportObjectAccess("upgrade", AccessType.WRITE);
-	reporter.reportObjectAccess("upgrade", AccessType.WRITE);
-	txn.commit();
-	txn = null;
-	assertObjectDetails(
-	    profileCollector.getAccessedObjectsDetail(),
-	    "s", "read1", AccessType.READ, null,
-	    "s2", "read1", AccessType.READ, null,
-	    "s", "upgrade", AccessType.READ, null,
-	    "s", "write1", AccessType.WRITE, null,
-	    "s", "upgrade", AccessType.WRITE, null);
-    }
-
-    /* -- Test AccessReporter.setObjectDescription -- */
-
-    @Test
-    public void testSetObjectDescriptionNullTxn() {
-	try {
-	    reporter.setObjectDescription(null, "id", null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.setObjectDescription(null, "id", "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-    }
-
-    @Test
-    public void testSetObjectDescriptionNullObjId() {
-	try {
-	    reporter.setObjectDescription(null, null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.setObjectDescription(null, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.setObjectDescription(txn, null, null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-	try {
-	    reporter.setObjectDescription(txn, null, "desc");
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	}
-    }
-
-    @Test
-    public void testSetObjectDescriptionTransactionNotActive() {
-	txn.abort(ABORT_EXCEPTION);
-	txn = null;
-	try {
-	    reporter.setObjectDescription("o1", null);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	try {
-	    reporter.setObjectDescription("o1", "description");
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-    }
-
-    @Test
-    public void testSetObjectDescriptionTransactionNotKnown() {
-	DummyTransaction txn2 = new DummyTransaction();
-	try {
-	    reporter.setObjectDescription(txn2, "o1", null);
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-	try {
-	    reporter.setObjectDescription(txn2, "o1", "description");
-	    fail("Expected IllegalArgumentException");
-	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-	txn2.abort(ABORT_EXCEPTION);
-    }
-
-    @Test
-    public void testSetObjectDescriptionMisc() throws Exception {
-	reporter.setObjectDescription("o1", "object 1 (a)");
-	reporter.setObjectDescription("o1", "object 1 (b)");
-	reporter.reportObjectAccess("o1", AccessType.READ, "object 1 (c)");
-	reporter.setObjectDescription("o2", "object 2 (a)");
-	reporter.reportObjectAccess("o2", AccessType.READ, "object 2 (b)");
-	reporter.setObjectDescription("o2", "object 2 (c)");
-	reporter.reportObjectAccess("o3", AccessType.READ);
-	reporter.setObjectDescription("o3", "object 3 (a)");
-	reporter.setObjectDescription("o3", "object 3 (b)");
-	txn.commit();
-	txn = null;
-	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
-			    "s", "o1", AccessType.READ, "object 1 (a)",
-			    "s", "o2", AccessType.READ, "object 2 (a)",
-			    "s", "o3", AccessType.READ, "object 3 (a)");
-    }
-
-    /* -- Test AccessedObjectsDetail -- */
-
-    @Test
-    public void testAccessedObjectsDetailNone() throws Exception {
-	txn.commit();
-	txn = null;
-	AccessedObjectsDetail detail =
-	    profileCollector.getAccessedObjectsDetail();
-	assertObjectDetails(detail);
-	assertEquals(ConflictType.NONE, detail.getConflictType());
-	assertEquals(null, detail.getConflictingId());
-    }
-
-    @Test
-    public void testAccessedObjectsDetailNoConflict() throws Exception {
-	reporter.reportObjectAccess("o1", AccessType.READ);
-	reporter.reportObjectAccess("o2", AccessType.WRITE);
-	txn.commit();
-	txn = null;
-	AccessedObjectsDetail detail =
-	    profileCollector.getAccessedObjectsDetail();
-	assertObjectDetails(detail,
-			    "s", "o1", AccessType.READ, null,
-			    "s", "o2", AccessType.WRITE, null);
-	assertEquals(ConflictType.NONE, detail.getConflictType());
-	assertEquals(null, detail.getConflictingId());
-    }
+    /* -- Test AccessedObjectsDetail more -- */
 
     @Test
     public void testAccessedObjectsDetailTimeout() throws Exception {
@@ -665,6 +285,18 @@ public class TestLockingAccessCoordinator extends Assert {
 	assertGranted(acquireLock(txn2, "s1", "o1", true));
     }
 
+    @Test
+    public void testLockInterrupt() throws Exception {
+	DummyTransaction txn2 = new DummyTransaction();
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(acquireLock(txn2, "s1", "o1", false));
+	AcquireLock locker = new AcquireLock(txn, "s1", "o1", true);
+	locker.assertBlocked();
+	locker.interruptThread();
+	assertInterrupted(locker.getResult(), txn2);
+	txn2.abort(ABORT_EXCEPTION);
+    }
+
     /* -- Test lockNoWait -- */
 
     @Test
@@ -709,26 +341,58 @@ public class TestLockingAccessCoordinator extends Assert {
 
     @Test
     public void testLockTimeout() throws Exception {
-	properties.setProperty(
-	    LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY, String.valueOf(1));
+	properties.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			       String.valueOf(20));
 	init();
 	DummyTransaction txn2 = new DummyTransaction();
 	coordinator.notifyNewTransaction(txn2, 0, 1);
 	assertGranted(acquireLock(txn, "s1", "o1", true));
 	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
 	locker2.assertBlocked();
-	Thread.sleep(5);
+	Thread.sleep(40);
+	assertTimeout(locker2.getResult(), txn);
+    }
+
+    @Test
+    public void testMaxLockTimeout() throws Exception {
+	properties.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			       String.valueOf(Long.MAX_VALUE));
+	init();
+	DummyTransaction txn2 = new DummyTransaction(40);
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	Thread.sleep(20);
+	locker2.assertBlocked();
+	Thread.sleep(40);
 	assertTimeout(locker2.getResult(), txn);
     }
 
     @Test
     public void testTxnTimeout() throws Exception {
-	DummyTransaction txn2 = new DummyTransaction(1);
+	DummyTransaction txn2 = new DummyTransaction(20);
 	coordinator.notifyNewTransaction(txn2, 0, 1);
 	assertGranted(acquireLock(txn, "s1", "o1", true));
 	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
 	locker2.assertBlocked();
-	Thread.sleep(2);
+	Thread.sleep(40);
+	assertTimeout(locker2.getResult(), txn);
+    }
+
+    @Test
+    public void testMaxTxnTimeout() throws Exception {
+	properties.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			       String.valueOf(40));
+	init();
+	DummyTransaction txn2 = new DummyTransaction(Long.MAX_VALUE);
+	coordinator.notifyNewTransaction(txn2, 0, 1);
+	assertGranted(acquireLock(txn, "s1", "o1", true));
+	AcquireLock locker2 = new AcquireLock(txn2, "s1", "o1", true);
+	locker2.assertBlocked();
+	Thread.sleep(20);
+	locker2.assertBlocked();
+	Thread.sleep(40);
 	assertTimeout(locker2.getResult(), txn);
     }
 
@@ -1038,87 +702,6 @@ public class TestLockingAccessCoordinator extends Assert {
 	}
     }
 
-    /* -- Other methods and classes -- */
-
-    /**
-     * Checks that the proper object accesses were reported.  The expected
-     * argument should provide groups of 4 items: the source, the object ID,
-     * the access type, and the description.
-     */
-    static void assertObjectDetails(
-	AccessedObjectsDetail detail, Object... expected)
-    {
-	assertTrue("The expected argument must provide groups of four",
-		   expected.length % 4 == 0);
-	int numExpected = expected.length / 4;
-	List<? extends AccessedObject> accesses = detail.getAccessedObjects();
-	assertTrue("Expected " + numExpected + " accesses, found " +
-		   accesses.size(),
-		   numExpected == accesses.size());
-	for (int i = 0; i < expected.length; i += 4) {
-	    AccessedObject result = accesses.get(i / 4);
-	    assertEquals(expected[i], result.getSource());
-	    assertEquals(expected[i + 1], result.getObjectId());
-	    assertEquals(expected[i + 2], result.getAccessType());
-	    assertEquals(expected[i + 3], result.getDescription());
-	}
-    }
-
-    /**
-     * A dummy implementation of {@code ProfileCollectorHandle}, just to
-     * accept and provide access to the AccessedObjectsDetail.
-     */
-    static class DummyProfileCollectorHandle
-	implements ProfileCollectorHandle
-    {
-	private AccessedObjectsDetail detail;
-
-	DummyProfileCollectorHandle() { }
-
-	/**
-	 * Returns the AccessedObjectsDetail last supplied to a call to
-	 * setAccessedObjectsDetail.
-	 */
-	synchronized AccessedObjectsDetail getAccessedObjectsDetail() {
-	    AccessedObjectsDetail result = detail;
-	    detail = null;
-	    return result;
-	}
-
-	/* -- Implement ProfileCollectorHandle -- */
-
-	public synchronized void setAccessedObjectsDetail(
-	    AccessedObjectsDetail detail)
-	{
-	    this.detail = detail;
-	}
-
-	/* -- Unsupported methods -- */
-
-	public void notifyThreadAdded() { fail("Not supported"); }
-	public void notifyThreadRemoved() { fail("Not supported"); }
-	public void startTask(KernelRunnable task, Identity owner,
-			      long scheduledStartTime, int readyCount)
-	{
-	    fail("Not supported");
-	}
-	public void noteTransactional(byte[] transactionId) {
-	    fail("Not supported");
-	}
-	public void addParticipant(
-	    ProfileParticipantDetail participantDetail)
-	{
-	    fail("Not supported");
-	}
-	public void finishTask(int tryCount) { fail("Not supported"); }
-	public void finishTask(int tryCount, Throwable t) {
-	    fail("Not supported");
-	}
-	public ProfileCollector getCollector() {
-	    throw new AssertionError("Not supported");
-	}
-    }
-
     /* -- Methods for asserting the lock conflict status -- */
 
     /** Asserts that the lock was granted. */
@@ -1127,6 +710,18 @@ public class TestLockingAccessCoordinator extends Assert {
 	    fail("Expected no conflict: " + conflict);
 	}
     }
+
+    /**
+     * Asserts that the request resulted in an interrupt. The conflictingTxns
+     * argument specifies all of the other transactions that may have been
+     * involved in the conflict.
+     */
+    static void assertInterrupted(
+	LockConflict conflict, Transaction... conflictingTxns)
+    {
+	assertDenied(LockConflictType.INTERRUPTED, conflict, conflictingTxns);
+    }
+
 
     /**
      * Asserts that the request resulted in a deadlock. The conflictingTxns
@@ -1197,6 +792,7 @@ public class TestLockingAccessCoordinator extends Assert {
 	private final Object objectId;
 	private final boolean forWrite;
 	private final FutureTask<LockConflict> task;
+	private final Thread thread;
 
 	/**
 	 * Set to true when the initial attempt to acquire the lock is
@@ -1219,7 +815,8 @@ public class TestLockingAccessCoordinator extends Assert {
 	    this.objectId = objectId;
 	    this.forWrite = forWrite;
 	    task = new FutureTask<LockConflict>(this);
-	    new Thread(task).start();
+	    thread = new Thread(task);
+	    thread.start();
 	}
 
 	public LockConflict call() {
@@ -1247,7 +844,10 @@ public class TestLockingAccessCoordinator extends Assert {
 	    return conflict;
 	}
 
-	/** Checks if the initial attempt to obtain the lock blocked. */
+	/**
+	 * Checks if the initial attempt to obtain the lock blocked and the
+	 * result is not yet available.
+	 */
 	boolean blocked() {
 	    synchronized (this) {
 		while (!started) {
@@ -1257,8 +857,26 @@ public class TestLockingAccessCoordinator extends Assert {
 			break;
 		    }
 		}
-		return blocked;
+		if (!blocked) {
+		    return false;
+		}
+		try {
+		    task.get(0, TimeUnit.SECONDS);
+		    return false;
+		} catch (TimeoutException e) {
+		    return true;
+		} catch (RuntimeException e) {
+		    throw e;
+		} catch (Exception e) {
+		    throw new RuntimeException(
+			"Unexpected exception: " + e, e);
+		}
 	    }
+	}
+
+	/** Interrupts the waiting thread. */
+	void interruptThread() {
+	    thread.interrupt();
 	}
 
 	/**
