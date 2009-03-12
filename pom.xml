@@ -8,7 +8,7 @@
   <artifactId>sgs</artifactId>
   <name>Project Darkstar Master POM</name>
   <packaging>pom</packaging>
-  <version>12</version>
+  <version>13</version>
   <url>http://www.projectdarkstar.com</url>
   <description>
     This is the super POM inherited by all sgs modules
@@ -264,7 +264,7 @@
     <repository>
       <id>java.net-maven2-repository</id>
       <name>java.net Maven2 Repository</name>
-      <url>java-net:/maven2-repository/trunk/www/repository/</url>
+      <url>java-net:/maven2-repository/trunk/repository/</url>
     </repository>
     <snapshotRepository>
       <id>games-darkstar-snapshot-repository</id>
