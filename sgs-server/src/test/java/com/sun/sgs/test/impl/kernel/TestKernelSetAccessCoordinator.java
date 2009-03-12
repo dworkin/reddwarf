@@ -19,13 +19,19 @@
 
 package com.sun.sgs.test.impl.kernel;
 
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.AbstractAccessCoordinator;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
+import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
@@ -198,7 +204,17 @@ public class TestKernelSetAccessCoordinator extends Assert {
 			       MyAccessCoordinator.class.getName());
 	SgsTestNode node = new SgsTestNode(
 	    "TestKernelSetAccessCoordinator", null, properties);
-	assertTrue(MyAccessCoordinator.getCreated());
+        Identity taskOwner = node.getProxy().getCurrentOwner();
+        TransactionScheduler txnScheduler =
+	    node.getSystemRegistry().getComponent(TransactionScheduler.class);
+	final DataService dataService = node.getDataService();
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() throws Exception {
+		    dataService.setBinding("a", new DummyManagedObject());
+		}
+	    }, taskOwner);
+	assertTrue(MyAccessCoordinator.getUsed());
 	node.shutdown(false);
     }
 
@@ -274,22 +290,56 @@ public class TestKernelSetAccessCoordinator extends Assert {
 	}
     }
 
-    public static class MyAccessCoordinator extends NullAccessCoordinator {
-	private static boolean created;
+    /** Records whether its methods were called. */
+    public static class MyAccessCoordinator extends AbstractAccessCoordinator {
+	private static boolean used;
 
 	public MyAccessCoordinator(
 	    Properties properties,
 	    TransactionProxy txnProxy,
 	    ProfileCollectorHandle profileCollectorHandle)
 	{
-	    super(properties, txnProxy, profileCollectorHandle);
-	    created = true;
+	    super(txnProxy, profileCollectorHandle);
 	}
 
-	static boolean getCreated() {
-	    boolean result = created;
-	    created = false;
+	static boolean getUsed() {
+	    boolean result = used;
+	    used = false;
 	    return result;
+	}
+
+	public <T> AccessReporter<T> registerAccessSource(
+	    String sourceName, Class<T> objectIdType)
+	{
+	    return new AccessReporterImpl<T>(sourceName);
+	}
+
+	public Transaction getConflictingTransaction(Transaction txn) {
+	    return null;
+	}
+
+	public void notifyNewTransaction(
+	    Transaction txn, long requestedStartTime, int tryCount)
+	{
+	}
+
+	private class AccessReporterImpl<T> extends AbstractAccessReporter<T> {
+	    AccessReporterImpl(String source) {
+		super(source);
+	    }
+
+	    public void reportObjectAccess(
+		Transaction txn, T objectId, AccessType type,
+		Object description)
+	    {
+		used = true;
+	    }
+
+	    public void setObjectDescription(
+		Transaction txn, T objectId, Object description)
+	    {
+		used = true;
+	    }
 	}
     }
 }
