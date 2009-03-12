@@ -256,7 +256,7 @@
     <!-- The directory for storing tests results -->
     <test.reports>target/test-reports</test.reports>
     <!-- The directory for storing integration tests results -->
-    <itest.reports>targets/itest-reports</itest.reports>
+    <itest.reports>target/itest-reports</itest.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>
