@@ -96,11 +96,12 @@
     </fileSet>
 
     <!-- Include all of the Berkeley DB binaries except for the Windows
-	 DLL -->
+	 DLL, db.jar, LICENSE, and mac PPC binaries -->
     <fileSet>
       <directory>${project.build.directory}/bdb-${bdb.version}</directory>
       <outputDirectory>lib/natives</outputDirectory>
       <excludes>
+	<exclude>macosx-ppc/</exclude>
 	<exclude>db.jar</exclude>
 	<exclude>LICENSE</exclude>
 	<exclude>win32-x86/libdb_java45.dll</exclude>

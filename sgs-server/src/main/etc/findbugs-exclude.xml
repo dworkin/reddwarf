@@ -136,6 +136,7 @@
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$7"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
@@ -294,6 +295,14 @@
     <Class name="com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl$RecoveryCompleteFutureImpl"/>
     <Field name="listener"/>
     <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+
+  <!-- Dead but overwritten parameter. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl"/>
+    <Method name="loginFailure"/>
+    <Parameter name="reason"/>
+    <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
   </Match>
 
 </FindBugsFilter>

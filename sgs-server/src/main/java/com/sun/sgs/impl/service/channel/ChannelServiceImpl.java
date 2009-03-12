@@ -31,7 +31,6 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -43,6 +42,8 @@ import com.sun.sgs.impl.util.TransactionContextMap;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.profile.ProfileCollector;
+import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -55,6 +56,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.WatchdogService;
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -70,6 +72,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * ChannelService implementation. <p>
@@ -127,7 +130,7 @@ public final class ChannelServiceImpl
     
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.write.max";
+        PKG_NAME + ".write.buffer.size";
 
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
@@ -206,9 +209,12 @@ public final class ChannelServiceImpl
     /** The write buffer size for new channels. */
     private final int writeBufferSize;
     
-    /** The maximum number of channel events to sevice per transaction. */
+    /** The maximum number of channel events to service per transaction. */
     final int eventsPerTxn;
 
+    /** Our JMX exposed statistics. */
+    final ChannelServiceStats serviceStats;
+    
     /**
      * Constructs an instance of this class with the specified {@code
      * properties}, {@code systemRegistry}, and {@code txnProxy}.
@@ -309,8 +315,16 @@ public final class ChannelServiceImpl
             sessionService.registerSessionDisconnectListener(
                 new ChannelSessionDisconnectListener());
 
-	    
-	    
+            /* Create our service profiling info and register our MBean. */
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new ChannelServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats, 
+                                        ChannelServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
 
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -358,6 +372,7 @@ public final class ChannelServiceImpl
 				 ChannelListener listener,
 				 Delivery delivery)
     {
+        serviceStats.createChannelOp.report();
 	try {
 	    Channel channel = ChannelImpl.newInstance(
 		name, listener, delivery, writeBufferSize);
@@ -371,6 +386,7 @@ public final class ChannelServiceImpl
 
     /** {@inheritDoc} */
     public Channel getChannel(String name) {
+        serviceStats.getChannelOp.report();
 	try {
 	    return ChannelImpl.getInstance(name);
 	    
@@ -386,7 +402,7 @@ public final class ChannelServiceImpl
      * Handles a channel {@code message} that the specified {@code session}
      * is sending on the channel with the specified {@code channelRefId}.
      * This method is invoked from the {@code ClientSessionHandler} of the
-     * given session, when it receives a {@code CHANNEL_MESSAGE} protocol
+     * given session, when it receives a channel
      * message.  This method must be called from within a transaction. <p>
      *
      * @param	channelRefId the channel ID, as a {@code BigInteger}
@@ -447,10 +463,12 @@ public final class ChannelServiceImpl
 	 * Reads the local membership list for the specified
 	 * {@code channelRefId}, and updates the local membership cache
 	 * for that channel.  If any join or leave notifications were
-	 * missed, then send the appropriate CHANNEL_JOIN or CHANNEL_LEAVE
-	 * protocol message to the effected session(s).
+	 * missed, then send the appropriate channel join or channel leave
+	 * message to the effected session(s).
 	 */
-	public void refresh(String name, final BigInteger channelRefId) {
+	public void refresh(String name, final BigInteger channelRefId,
+			    Delivery delivery)
+        {
 	    callStarted();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINE, "refreshing channelId:{0}",
@@ -517,29 +535,31 @@ public final class ChannelServiceImpl
 		byte[] channelId = channelRefId.toByteArray();
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
-			MessageBuffer msg =
-			    new MessageBuffer(1 +
-				MessageBuffer.getSize(name) +
-					      channelId.length);
-			msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-			    putString(name).
-			    putBytes(channelId);
-			sessionService.sendProtocolMessageNonTransactional(
- 		    	    sessionRefId,
-			    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
-			    Delivery.RELIABLE);
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
+			if (protocol != null) {
+                            try {
+                                protocol.channelJoin(name, channelRefId,
+                                                     delivery);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ioe,
+                                                "channelJoin throws");
+                            }
+			}
 		    }
 		}
 		if (leavers != null) {
 		    for (BigInteger sessionRefId : leavers) {
-			ByteBuffer msg =
-			    ByteBuffer.allocate(1 + channelId.length);
-			msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
-			    put(channelId).
-			    flip();
-			sessionService.sendProtocolMessageNonTransactional(
-			    sessionRefId, msg.asReadOnlyBuffer(),
-			    Delivery.RELIABLE);
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
+			if (protocol != null) {
+                            try {
+                                protocol.channelLeave(channelRefId);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ioe,
+                                                "channelLeave throws");
+                            }
+			}
 		    }
 		}
 
@@ -552,10 +572,13 @@ public final class ChannelServiceImpl
 	 *
 	 * Adds the specified {@code sessionRefId} to the per-channel cache
 	 * for the given channel's local member sessions, and sends a
-	 * CHANNEL_JOIN protocol message to the session with the corresponding
+	 * channel join message to the session with the corresponding
 	 * {@code sessionId}.
 	 */
-	public void join(String name, BigInteger channelRefId, BigInteger sessionRefId) {
+	public void join(String name, BigInteger channelRefId,
+			 Delivery delivery, BigInteger sessionRefId)
+
+	{
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
@@ -592,19 +615,17 @@ public final class ChannelServiceImpl
 		}
 		channelSet.add(channelRefId);
 
-		// Send CHANNEL_JOIN protocol message.
-		byte[] channelId = channelRefId.toByteArray();
-		MessageBuffer msg =
-		    new MessageBuffer(1 +
-			MessageBuffer.getSize(name) +
-			channelId.length);
-		msg.putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-		    putString(name).
-		    putBytes(channelId);
-		sessionService.sendProtocolMessageNonTransactional(
- 		    sessionRefId,
-		    ByteBuffer.wrap(msg.getBuffer()).asReadOnlyBuffer(),
-		    Delivery.RELIABLE);
+		// Send channel join protocol message.
+		SessionProtocol protocol =
+		    sessionService.getSessionProtocol(sessionRefId);
+		if (protocol != null) {
+                    try {
+                        protocol.channelJoin(name, channelRefId, delivery);
+                    } catch (IOException ioe) {
+                        logger.logThrow(Level.WARNING, ioe,
+                                        "channelJoin throws");
+                    }
+		}
 
 	    } finally {
 		callFinished();
@@ -615,7 +636,7 @@ public final class ChannelServiceImpl
 	 *
 	 * Removes the specified {@code sessionRefId} from the per-channel
 	 * cache for the given channel's local member sessions, and sends a
-	 * CHANNEL_LEAVE protocol message to the session with the corresponding
+	 * channel leave message to the session with the corresponding
 	 * {@code sessionRefId}.
 	 */
 	public void leave(BigInteger channelRefId, BigInteger sessionRefId) {
@@ -643,15 +664,18 @@ public final class ChannelServiceImpl
 		    channelSet.remove(channelRefId);
 		}
 
-		// Send CHANNEL_LEAVE protocol message.
-		byte[] channelId = channelRefId.toByteArray();
-		ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
-		msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
-		    put(channelId).
-		    flip();
-		    sessionService.sendProtocolMessageNonTransactional(
-		        sessionRefId, msg.asReadOnlyBuffer(),
-			Delivery.RELIABLE);
+		// Send channel leave protocol message.
+		SessionProtocol protocol =
+		    sessionService.getSessionProtocol(sessionRefId);
+		if (protocol != null) {
+                    try {
+                        protocol.channelLeave(channelRefId);
+                    } catch (IOException ioe) {
+                        logger.logThrow(Level.WARNING, ioe,
+                                        "channelLeave throws");
+                    }
+		}
+		
 	    } finally {
 		callFinished();
 	    }
@@ -660,7 +684,7 @@ public final class ChannelServiceImpl
 	/** {@inheritDoc}
 	 *
 	 * Removes the channel from the per-channel cache of local member
-	 * sessions, and sends a CHANNEL_LEAVE protocol message to the
+	 * sessions, and sends a channel leave message to the
 	 * channel's local member sessions.
 	 */
 	public void leaveAll(BigInteger channelRefId) {
@@ -674,14 +698,17 @@ public final class ChannelServiceImpl
 		localMembers = localChannelMembersMap.remove(channelRefId);
 		byte[] channelId = channelRefId.toByteArray();
 		if (localMembers != null) {
-		    ByteBuffer msg = ByteBuffer.allocate(1 + channelId.length);
-		    msg.put(SimpleSgsProtocol.CHANNEL_LEAVE).
-			put(channelId).
-			flip();
 		    for (BigInteger sessionRefId : localMembers) {
-			sessionService.sendProtocolMessageNonTransactional(
-			    sessionRefId, msg.asReadOnlyBuffer(),
-			    Delivery.RELIABLE);
+			SessionProtocol protocol =
+			    sessionService.getSessionProtocol(sessionRefId);
+			if (protocol != null) {
+                            try {
+                                protocol.channelLeave(channelRefId);
+                            } catch (IOException ioe) {
+                                logger.logThrow(Level.WARNING, ioe,
+                                                "channelLeave throws");
+                            }
+			}
 		    }
 		}
 		
@@ -721,19 +748,19 @@ public final class ChannelServiceImpl
 		    return;
 		}
 
-		byte[] channelId = channelRefId.toByteArray();
-		ByteBuffer msg =
-		    ByteBuffer.allocate(3 + channelId.length + message.length);
-		msg.put(SimpleSgsProtocol.CHANNEL_MESSAGE)
-		   .putShort((short) channelId.length)
-		   .put(channelId)
-		   .put(message)
-		   .flip();
-		
 		for (BigInteger sessionRefId : localMembers) {
-		    sessionService.sendProtocolMessageNonTransactional(
- 			sessionRefId, msg.asReadOnlyBuffer(),
-			Delivery.RELIABLE);
+		    SessionProtocol protocol =
+			sessionService.getSessionProtocol(sessionRefId);
+		    if (protocol != null) {
+                        try {
+                            protocol.channelMessage(channelRefId,
+                                                    ByteBuffer.wrap(message),
+                                                    Delivery.RELIABLE);
+                        } catch (IOException ioe) {
+                            logger.logThrow(Level.WARNING, ioe,
+                                            "channelMessage throws");
+                        }
+		    }
 		}
 
 	    } finally {

@@ -26,12 +26,19 @@ import java.io.Serializable;
  * communication group consisting of multiple client sessions and the
  * server.
  *
- * <p>A Channel is created with a {@link Delivery} requirement.
- * Messages sent on a channel are delivered according to the
- * delivery requirement specified at creation time.  A delivery
- * requirement on a channel cannot be changed.  If different delivery
- * requirements are needed, then different channels should be used for
- * communication.
+ * <p>A Channel is created with a {@link Delivery} guarantee.  Messages
+ * sent on a channel are delivered in a manner that satisfies the channel's
+ * delivery guarantee.  When possible, channel messages are delivered using
+ * the most efficient means to satisfy the delivery guarantee.  However, a
+ * stronger delivery guarantee may be used to deliver the message if the
+ * underlying protocol only supports stronger delivery guarantees.  A
+ * client session can not be joined to a channel if that client session
+ * does not support a protocol satisfying the minimum requirements of the
+ * channel's delivery guarantee.
+ *
+ * <p>The delivery guarantee of a channel cannot be changed.  If different
+ * delivery guarantees are needed, then different channels should be used
+ * for communication.
  * 
  * @see AppContext#getChannelManager
  */
@@ -39,7 +46,7 @@ public interface ChannelManager {
 
     /**
      * Creates a new channel with the specified listener and delivery
-     * requirement, binds it to the specified name, and returns it.
+     * guarantee, binds it to the specified name, and returns it.
      *
      * <p>If the specified {@code listener} is
      * non-{@code null}, then when any client session sends a
@@ -64,12 +71,13 @@ public interface ChannelManager {
      * channel created, in order to reduce the possible contention on
      * channel listeners.
      *
-     * <p>Messages sent on the returned channel are delivered according to
-     * the specified delivery requirement.
+     * <p>Messages sent on the returned channel are delivered in a manner
+     * that satisfies the minimum requirements of the specified delivery
+     * guarantee. 
      *
      * @param	name a name
      * @param	listener a channel listener, or {@code null}
-     * @param	delivery a delivery requirement
+     * @param	delivery a delivery guarantee
      *
      * @return	a new channel bound to the specified name
      *

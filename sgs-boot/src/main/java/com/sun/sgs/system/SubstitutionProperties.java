@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.Enumeration;
 import java.io.InputStream;
 import java.io.IOException;
-import java.io.Reader;
 
 /**
  * Extension of {@link Properties} that provides automatic support for
@@ -93,28 +92,9 @@ public class SubstitutionProperties extends Properties {
      * @throws IOException if an error occurred while reading from the stream
      * @see java.util.Properties#load(java.io.InputStream) 
      */
-    @Override
     public void load(InputStream inStream) 
             throws IOException {
         super.load(inStream);
-        replaceAll();
-    }
-    
-    /**
-     * Load properties from a {@code Reader}.  The properties are loaded
-     * by calling {@code super.load(reader);}  Additionally, the loaded
-     * properties are filtered and any properties that contain substitutable 
-     * variables (i.e. ${PROPNAME}) are replaced and set with their
-     * interpolated value.
-     * 
-     * @param reader the reader to load the properties from
-     * @throws IOException if an error occurred while reading from the reader
-     * @see java.util.Properties#load(java.io.Reader) 
-     */
-    @Override
-    public void load(Reader reader) 
-            throws IOException {
-        super.load(reader);
         replaceAll();
     }
     
@@ -130,7 +110,6 @@ public class SubstitutionProperties extends Properties {
      * @throws IOException if an error occurred while reading from the stream
      * @see java.util.Properties#loadFromXML(java.io.InputStream) 
      */
-    @Override
     public void loadFromXML(InputStream inStream) 
             throws IOException {
         super.load(inStream);
@@ -150,7 +129,6 @@ public class SubstitutionProperties extends Properties {
      *         not set
      * @see java.util.Properties#setProperty(java.lang.String, java.lang.String)
      */
-    @Override
     public Object setProperty(String name, String value) {
         String prev = super.getProperty(name);
         super.setProperty(name, value);

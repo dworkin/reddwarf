@@ -31,100 +31,9 @@ import java.util.Collection;
 import java.util.Iterator;
 
 /**
- * A scalable implementation of {@code Set} backed by a {@link
- * BindingKeyedHashMap}. 
+ * An implementation of {@code Set} backed by a {@link BindingKeyedHashMap}.
  *
- * <p>
- *
- * Developers may use this class as a drop-in replacement for the {@link
- * java.util.HashSet} class for use in a {@link ManagedObject}. Note that,
- * unlike {@code HashSet}, this class can be used to store {@code
- * ManagedObject} instances directly.
- *
- * <p>
- *
- * This implementation requires that all elements implement {@link
- * Serializable}.  Attempting to add non-{@code null} elements to the set
- * that do not implement {@code Serializable} will result in an {@link
- * IllegalArgumentException} being thrown.  If an element is an instance of
- * {@code Serializable} but does not implement {@code ManagedObject}, this
- * class will persist the element as necessary; when such an element is
- * removed from the set, it is also removed from the {@code DataManager}.
- * If an element is an instance of {@code ManagedObject}, the developer
- * will be responsible for removing these objects from the {@code
- * DataManager} when done with them.  Developers should not remove these
- * object from the {@code DataManager} prior to removing them from the set.
- *
- * <p>
- *
- * Applications must make sure that objects used as elements in sets of this
- * class have {@code equals} and {@code hashCode} methods that return the same
- * values after the elements have been serialized and deserialized.  In
- * particular, elements that use {@link Object#equals Object.equals} and {@link
- * Object#hashCode Object.hashCode} will typically not be equal, and will have
- * different hash codes, each time they are deserialized, and so are probably
- * not suitable for use with this class.
- *
- * <p>
- *
- * This class marks itself for update as necessary; no additional calls to the
- * {@link DataManager} are necessary when modifying the map.  Developers do not
- * need to call {@code markForUpdate} or {@code getForUpdate} on this set, as
- * this will eliminate all the concurrency benefits of this class.  However,
- * calling {@code getForUpdate} or {@code markForUpdate} can be used if a
- * operation needs to prevent all access to the set.
- *
- * <p>
- *
- * This class offers constant-time implementations of the {@code add},
- * {@code remove} and {@code contains} methods.  Note that, unlike most
- * collections, the {@code size} method for this class is <u>not</u> a
- * constant-time operations, because it requires accessing all of the
- * entries in the set.
- *
- * <p>
- *
- * <a name="iterator"></a> The {@code Iterator} for this class implements
- * {@code Serializable}.  A single iterator may be saved by different {@code
- * ManagedObject} instances, which will create distinct copies of the original
- * iterator.  A copy starts its iteration from where the state of the original
- * was at the time of the copy.  However, each copy maintains a separate,
- * independent state from the original and will therefore not reflect any
- * changes to the original iterator.  To share a single {@code Iterator}
- * between multiple {@code ManagedObject} <i>and</i> have the iterator use a
- * consistent view for each, the iterator should be contained within a shared
- * {@code ManagedObject}.
- *
- * <p>
- *
- * The iterator does not throw {@link java.util.ConcurrentModificationException}.
- * The iterator for this class is stable with respect to the concurrent changes
- * to the associated collection, but may ignore additions and removals made to
- * the set during iteration.
- *
- * <p>
- *
- * If a call to the {@link Iterator#next next} method on the iterator causes a
- * {@link ObjectNotFoundException} to be thrown because the return value has
- * been removed from the {@code DataManager}, the iterator will still have
- * successfully moved to the next entry in its iteration.  In this case, the
- * {@link Iterator#remove remove} method may be called on the iterator to
- * remove the current object even though that object could not be returned.
- *
- * <p>
- *
- * This class and its iterator implement all optional operations.  This set
- * does not support {@code null} elements.  This set provides no guarantees
- * on the order of elements when iterating.
- *
- * @param <E> the type of elements maintained by this set
- *
- * @see Object#hashCode Object.hashCode
- * @see java.util.Set
- * @see java.util.HashSet
- * @see BindingKeyedHashMap
- * @see Serializable
- * @see ManagedObject
+ * @param	<E> the element type
  */
 public class BindingKeyedHashSet<E>
     extends AbstractSet<E>
@@ -135,15 +44,6 @@ public class BindingKeyedHashSet<E>
     private static final long serialVersionUID = 1;
 
     /**
-     * The minor version number, which can be modified to note a compatible
-     * change to the data structure.  Incompatible changes should be marked by
-     * a change to the serialVersionUID.
-     *
-     * @serial
-     */
-    private final short minorVersion = 1;
-
-    /**
      * The reference to the backing map for this set.
      *
      * @serial
@@ -151,23 +51,26 @@ public class BindingKeyedHashSet<E>
     private final BindingKeyedHashMap<E> map;
 
     /**
-     * Creates an empty set.
+     * Creates an empty set with the specified {@code keyPrefix}.
+     *
+     * @param keyPrefix the key prefix for a service binding name
      */
-    public BindingKeyedHashSet(String prefix) {
-	map = new BindingKeyedHashMap<E>(prefix);
+    public BindingKeyedHashSet(String keyPrefix) {
+	map = new BindingKeyedHashMap<E>(keyPrefix);
     }
 
     /**
      * Creates a new set containing the elements in the specified collection.
      *
      * @param c the collection of elements to be added to the set
+     * @param keyPrefix the key prefix for a service binding name
      *
      * @throws IllegalArgumentException if any element contained in the
      *	       specified collection is {@code null} or does not implement
      *	       {@code Serializable}
      */
-    public BindingKeyedHashSet(String prefix, Collection<? extends E> c) {
-	this(prefix);
+    public BindingKeyedHashSet(String keyPrefix, Collection<? extends E> c) {
+	this(keyPrefix);
 	addAll(c);
     }
 
@@ -220,7 +123,7 @@ public class BindingKeyedHashSet<E>
      * @return an iterator over the elements in this set
      */
     public Iterator<E> iterator() {
-	return new BindingKeyedHashMap.ValueIterator<E>(map.getKeyPrefix());
+	return map.values().iterator();
     }
 
     /**

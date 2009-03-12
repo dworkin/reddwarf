@@ -56,6 +56,11 @@
       <groupId>com.sleepycat</groupId>
       <artifactId>je</artifactId>
     </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.tools.test</groupId>
+      <artifactId>sgs-test-ext</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -111,8 +116,7 @@
 
       <!-- The berkeleydb binary package must be retrieved and unpacked
 	   Before the test phase so that they are available during
-	   runtime of the unit tests
-	   Execution activated from SGS super POM -->
+	   runtime of the unit tests. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -123,7 +127,7 @@
           </execution>
         </executions>
       </plugin>
-
+      
       <!-- Create a clean test-output directory -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
@@ -187,6 +191,20 @@
 	  </argLine>
 	  <reportsDirectory>${test.reports}</reportsDirectory>
         </configuration>
+	<executions>
+	  <execution>
+	    <phase>integration-test</phase>
+	    <goals>
+	      <goal>test</goal>
+	    </goals>
+	    <configuration>
+	      <argLine>
+		${test.jvm.args} -Dtest.phase=long -Djava.library.path=${run.javapath}
+	      </argLine>
+	      <reportsDirectory>${itest.reports}</reportsDirectory>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
       <!-- Activate the resource bundle plugin to include the license
@@ -210,25 +228,6 @@
 
   <reporting>
     <plugins>
-
-      <!-- Configure checkstyle to run during site lifecycle -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<configuration>
-	  <linkXRef>false</linkXRef>
-	  <consoleOutput>true</consoleOutput>
-	  <enableRulesSummary>false</enableRulesSummary>
-	  <configLocation>${checkstyle.config}</configLocation>
-	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
-	  <packageNamesLocation>
-	    ${checkstyle.packageNames}
-	  </packageNamesLocation>
-	  <propertyExpansion>
-	    checkstyle.unusedImports=${checkstyle.unusedImports}
-	  </propertyExpansion>
-        </configuration>
-      </plugin>
 
       <!-- Configure findbugs to run during site lifecycle -->
       <plugin>
@@ -256,6 +255,8 @@
     <test.output>target/test-output</test.output>
     <!-- The directory for storing tests results -->
     <test.reports>target/test-reports</test.reports>
+    <!-- The directory for storing integration tests results -->
+    <itest.reports>target/itest-reports</itest.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>

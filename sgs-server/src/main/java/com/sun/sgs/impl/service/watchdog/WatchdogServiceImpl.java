@@ -19,14 +19,17 @@
 
 package com.sun.sgs.impl.service.watchdog;
 
+import com.sun.sgs.impl.kernel.ConfigManager;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.kernel.StandardProperties.StandardService;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.management.NodeInfo;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -57,6 +60,7 @@ import java.util.logging.Logger;
  * practice, this flaw is not a problem so long as the server is started first
  * before starting other nodes.
  */
+import javax.management.JMException;
 
 /**
  * The {@link WatchdogService} implementation. <p>
@@ -123,6 +127,17 @@ import java.util.logging.Logger;
  *	node status change notifications from the watchdog server.  The value
  *	must be greater than or equal to {@code 0} and no greater than
  *	{@code 65535}.<p>
+ * 
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.management.jmxremote.port
+ *	</b></code><br>
+ *	<i>Default:</i> None <br>
+ *
+ * <dd style="padding-top: .5em">
+ *	Enables remote JMX monitoring through the specified port.  By default,
+ *      remote monitoring is not enabled. Not that this is a system property,
+ *      and must be set on the command line when starting the node.<p>
+ *      
  * </dl> <p>
  */
 public final class WatchdogServiceImpl
@@ -205,9 +220,9 @@ public final class WatchdogServiceImpl
     /** The name of the local host. */
     final String localHost;
     
-    /** The application port. */
-    final int appPort;
-    
+    /** The controller which enables node shutdown */
+    private final KernelShutdownController shutdownController;
+
     /** The thread that renews the node with the watchdog server. */
     final Thread renewThread = new RenewThread();
 
@@ -239,19 +254,24 @@ public final class WatchdogServiceImpl
      */
     private boolean isAlive = true;
     
+    /** Our profiled data */
+    private final WatchdogServiceStats serviceStats;
+    
     /**
      * Constructs an instance of this class with the specified properties.
      * See the {@link WatchdogServiceImpl class documentation} for a list
-     * of supported properties.
+     * of supported properties. The Watchdog service is given the ability to
+     * shutdown a node with the {@link KernelShutdownController}.
      *
      * @param	properties service (and server) properties
      * @param	systemRegistry system registry
      * @param	txnProxy transaction proxy
+     * @param   ctrl shutdown controller
      * @throws	Exception if a problem occurs constructing the service/server
      */
     public WatchdogServiceImpl(Properties properties,
-			       ComponentRegistry systemRegistry,
-			       TransactionProxy txnProxy)
+	    ComponentRegistry systemRegistry, TransactionProxy txnProxy,
+	    KernelShutdownController ctrl) 
 	throws Exception
     {
 	super(properties, systemRegistry, txnProxy, logger);
@@ -259,6 +279,12 @@ public final class WatchdogServiceImpl
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
+	// Setup the KernelShutdownController object
+        if (ctrl == null) {
+            throw new NullPointerException("null shutdown controller");
+        }
+	shutdownController = ctrl;
+	
 	try {
 	    boolean startServer = wrappedProps.getBooleanProperty(
  		START_SERVER_PROPERTY,
@@ -268,14 +294,10 @@ public final class WatchdogServiceImpl
            
              String finalService =
                 properties.getProperty(StandardProperties.FINAL_SERVICE);
-             StandardService finalStandardService = null;
              boolean isFullStack = true;
              if (finalService == null) {
-                 finalStandardService = StandardService.LAST_SERVICE;
                  isFullStack = true;
              } else {
-                 finalStandardService =
-                    Enum.valueOf(StandardService.class, finalService);
                  isFullStack = 
                     !(properties.getProperty(StandardProperties.APP_LISTENER)
                      .equals(StandardProperties.APP_LISTENER_NONE));
@@ -286,22 +308,6 @@ public final class WatchdogServiceImpl
             
 	    String clientHost = wrappedProps.getProperty(
 		CLIENT_HOST_PROPERTY, localHost);
-
-            // If we're running on a full stack (the usual case), or a
-            // partial stack that includes the client session service,
-            // insist that a valid port number be specfied.
-            // The client session service will attempt to open that port.
-            //
-            // Otherwise, no port is needed or required, and we simply use
-            // -1 as a placeholder for the port number.
-            if (isFullStack || 
-                (StandardService.ClientSessionService.ordinal() <=
-                    finalStandardService.ordinal())) {
-                appPort = wrappedProps.getRequiredIntProperty(
-                    StandardProperties.APP_PORT, 1, 65535);
-            } else {
-                appPort = -1;
-            }
 
 	    /*
 	     * Check service version.
@@ -323,7 +329,7 @@ public final class WatchdogServiceImpl
 	    if (startServer) {
 		serverImpl = new WatchdogServerImpl(
 		    properties, systemRegistry, txnProxy, 
-		    clientHost, appPort, clientProxy, isFullStack);
+		    clientHost, clientProxy, isFullStack);
 		host = localHost;
 		serverPort = serverImpl.getPort();
 	    } else {
@@ -343,12 +349,14 @@ public final class WatchdogServiceImpl
 	    serverProxy = (WatchdogServer)
 		rmiRegistry.lookup(WatchdogServerImpl.WATCHDOG_SERVER_NAME);
 
+            int jmxPort = wrappedProps.getIntProperty(
+                    StandardProperties.SYSTEM_JMX_REMOTE_PORT, -1);
             if (startServer) {
                 localNodeId = serverImpl.localNodeId;
                 renewInterval = serverImpl.renewInterval;
             } else {
-                long[] values = serverProxy.registerNode(clientHost, appPort, 
-                                                         clientProxy);
+                long[] values =
+		    serverProxy.registerNode(clientHost, clientProxy, jmxPort);
                 if (values == null || values.length < 2) {
                     setFailedThenNotify(false);
                     throw new IllegalArgumentException(
@@ -360,11 +368,29 @@ public final class WatchdogServiceImpl
             }
             renewThread.start();
             
+            // create our profiling info and register our MBean
+            ProfileCollector collector = 
+                systemRegistry.getComponent(ProfileCollector.class);
+            serviceStats = new WatchdogServiceStats(collector, this);
+            try {
+                collector.registerMBean(serviceStats, 
+                                        WatchdogServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+            // set our data in the ConfigMXBean
+            ConfigManager config = (ConfigManager)
+                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            if (config == null) {
+                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
+            } else {
+                config.setJmxPort(jmxPort);
+            }
+            
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.log(Level.CONFIG,
-			   "node registered, host:{0}, port:{1} " +
-			   "localNodeId:{2}",
-			   clientHost, appPort, localNodeId);
+			   "node registered, host:{0}, localNodeId:{1}",
+			   clientHost, localNodeId);
 	    }
 	    
 	} catch (Exception e) {
@@ -423,18 +449,21 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public long getLocalNodeId() {
 	checkState();
+        serviceStats.getLocalNodeIdOp.report();
 	return localNodeId;
     }
 
     /** {@inheritDoc} */
     public boolean isLocalNodeAlive() {
 	checkState();
+        serviceStats.isLocalNodeAliveOp.report();
 	if (!getIsAlive()) {
 	    return false;
 	} else {
 	    Node node = NodeImpl.getNode(dataService, localNodeId);
 	    if (node == null || !node.isAlive()) {
-		setFailedThenNotify(true);
+		// this will call setFailedThenNotify(true)
+                reportFailure(localNodeId, CLASSNAME);
 		return false;
 	    } else {
 		return true;
@@ -445,12 +474,14 @@ public final class WatchdogServiceImpl
     /** {@inheritDoc} */
     public boolean isLocalNodeAliveNonTransactional() {
 	checkState();
+        serviceStats.isLocalNodeAliveNonTransOp.report();
 	return getIsAlive();
     }
     
     /** {@inheritDoc} */
     public Iterator<Node> getNodes() {
 	checkState();
+        serviceStats.getNodesOp.report();
 	txnProxy.getCurrentTransaction();
 	return NodeImpl.getNodes(dataService);
     }
@@ -461,6 +492,7 @@ public final class WatchdogServiceImpl
 	if (nodeId < 0) {
 	    throw new IllegalArgumentException("invalid nodeId: " + nodeId);
 	}
+        serviceStats.getNodeOp.report();
 	return NodeImpl.getNode(dataService, nodeId);
     }
 
@@ -470,11 +502,13 @@ public final class WatchdogServiceImpl
 	if (listener == null) {
 	    throw new NullPointerException("null listener");
 	}
+        serviceStats.addNodeListenerOp.report();
 	nodeListeners.putIfAbsent(listener, listener);
     }
 
     /** {@inheritDoc} */
     public Node getBackup(long nodeId) {
+        serviceStats.getBackupOp.report();
 	NodeImpl node = (NodeImpl) getNode(nodeId);
 	return
 	    (node != null && node.hasBackup()) ?
@@ -488,7 +522,51 @@ public final class WatchdogServiceImpl
 	if (listener == null) {
 	    throw new NullPointerException("null listener");
 	}
+        serviceStats.addRecoveryListenerOp.report();
 	recoveryListeners.putIfAbsent(listener, listener);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public synchronized void reportFailure(long nodeId, String className)
+    {
+        if (shuttingDown() || !getIsAlive()) {
+            return;
+        }
+
+        boolean isLocal = (nodeId == localNodeId);
+        if (isLocal) {
+            logger.log(Level.WARNING, "{1} reported failure in local " +
+                    "node with id: {0}", nodeId, className);
+        } else {
+            logger.log(Level.WARNING, "{1} reported failure in remote" +
+                    " node with id {0}", nodeId, className);
+        }
+
+        /*
+         * Try to report the failure to the watchdog server. If we cannot 
+         * contact the Watchdog server while reporting a remote failure, then
+         * set the failure as local.
+         */
+        int retries = maxIoAttempts;
+        while (retries-- > 0) {
+            try {
+                serverProxy.setNodeAsFailed(nodeId, isLocal, className,
+                        maxIoAttempts);
+                break;
+            } catch (IOException ioe) {
+                if (retries == 0) {
+                    logger.log(Level.SEVERE, "Cannot report failure to " +
+                            "Watchdog server");
+                    isLocal = true;
+                }
+            }
+        }
+        
+        if (isLocal) {
+            setFailedThenNotify(true);
+        }
     }
 
     /**
@@ -533,9 +611,11 @@ public final class WatchdogServiceImpl
 
 		boolean renewed = false;
 		try {
-		    if (!serverProxy.renewNode(localNodeId)) {
-			setFailedThenNotify(true);
-			break;
+    		    if (!serverProxy.renewNode(localNodeId)) {
+                        // server has already marked node as failed, so we can
+                        // go directly to removing this node
+                        setFailedThenNotify(true);
+			return;
 		    }
 		    renewed = true;
 		    nextRenewInterval = startRenewInterval;
@@ -553,8 +633,10 @@ public final class WatchdogServiceImpl
 		}
 		long now = System.currentTimeMillis();
 		if (now - lastRenewTime > renewInterval) {
-		    setFailedThenNotify(true);
-		    break;
+                    // server has already marked node as failed, so we can
+                    // go directly to removing this node
+                    setFailedThenNotify(true);
+                    return;
 		}
 		if (renewed) {
 		    lastRenewTime = now;
@@ -614,9 +696,15 @@ public final class WatchdogServiceImpl
 	}
 
 	if (notify) {
-	    Node node = new NodeImpl(localNodeId, localHost, appPort, false);
+	    Node node = new NodeImpl(localNodeId, localHost, false);
 	    notifyNodeListeners(node);
 	}
+
+        logger.log(
+	    Level.SEVERE,
+	    "Node:{0} forced to shutdown due to service failure", localNodeId);
+
+        shutdownController.shutdownNode(this);
     }
 
     /**
@@ -696,6 +784,31 @@ public final class WatchdogServiceImpl
 	}
     }
 
+    // Management methods
+    /**
+     * Retrieves information about the current node.
+     * @return information about the current node
+     */
+    NodeInfo getNodeStatusInfo() {
+        GetNodeStatusTask task = new GetNodeStatusTask();
+        try {
+            transactionScheduler.runTask(task, taskOwner);
+        } catch (Exception e) {
+            logger.logThrow(Level.INFO, e, "Could not retrive node info");
+        }
+        return task.info;
+    }
+    
+    private final class GetNodeStatusTask extends AbstractKernelRunnable {
+        NodeInfo info;
+        GetNodeStatusTask() {
+            super(null);
+        }
+        public void run() {
+            NodeImpl node = NodeImpl.getNode(dataService, localNodeId);
+            info = node.getNodeInfo();
+        }
+    }
     /**
      * Implements the WatchdogClient that receives callbacks from the
      * WatchdogServer.
@@ -703,9 +816,11 @@ public final class WatchdogServiceImpl
     private final class WatchdogClientImpl implements WatchdogClient {
 
 	/** {@inheritDoc} */
-	public void nodeStatusChanges(
- 	    long[] ids, String[] hosts, int[] ports, 
-            boolean[] status, long[] backups)
+        @Override
+	public void nodeStatusChanges(long[] ids,
+                                      String[] hosts,
+                                      boolean[] status,
+                                      long[] backups)
 	{
 	    if (ids.length != hosts.length || hosts.length != status.length ||
 		status.length != backups.length)
@@ -718,14 +833,21 @@ public final class WatchdogServiceImpl
 		    continue;
 		}
 		Node node =
-		    new NodeImpl(ids[i], hosts[i], ports[i], 
-                                 status[i], backups[i]);
+                        new NodeImpl(ids[i], hosts[i], status[i], backups[i]);
 		notifyNodeListeners(node);
 		if (!status[i] && backups[i] == localNodeId) {
 		    notifyRecoveryListeners(node);
 		}
 	    }
 	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	public void reportFailure(String className) {
+	    setFailedThenNotify(true);
+	}
+
     }
 
     /**

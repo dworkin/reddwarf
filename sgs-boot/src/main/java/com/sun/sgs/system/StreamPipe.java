@@ -53,7 +53,6 @@ public class StreamPipe implements Runnable {
      * and outputs the results to the {@code OutputStream} associated with
      * this object.
      */
-    @Override
     public void run() {
         byte[] buf = new byte[1024];
         int count;

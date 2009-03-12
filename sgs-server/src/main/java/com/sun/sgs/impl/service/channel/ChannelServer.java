@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.rmi.Remote;
@@ -53,10 +54,12 @@ public interface ChannelServer extends Remote {
      *
      * @param	name a channel name
      * @param	channelRefId a channel ID
+     * @param	delivery the channel's delivery requirement
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void refresh(String name, BigInteger channelRefId) throws IOException;
+    void refresh(String name, BigInteger channelRefId, Delivery delivery)
+	throws IOException;
 
     /**
      * Notifies this server that the locally-connected session with
@@ -66,10 +69,12 @@ public interface ChannelServer extends Remote {
      * @param	name a channel name
      * @param	channelRefId a channel ID
      * @param	sessionRefId a session ID
+     * @param	delivery the channel's delivery requirement
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    void join(String name, BigInteger channelRefId, BigInteger sessionRefId)
+    void join(String name, BigInteger channelRefId, Delivery delivery,
+	      BigInteger sessionRefId)
 	throws IOException;
 
     /**

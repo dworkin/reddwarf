@@ -21,41 +21,39 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.nio.channels.ClosedAsynchronousChannelException;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.ReadPendingException;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.protocol.LoginFailureException;
+import com.sun.sgs.protocol.LoginFailureException.FailureReason;
+import com.sun.sgs.protocol.LoginRedirectException;
+import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.RequestCompletionHandler;
+import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.security.auth.login.LoginException;
 
 /**
  * Handles sending/receiving messages to/from a client session and
  * disconnecting a client session.
  */
-class ClientSessionHandler {
+class ClientSessionHandler implements SessionProtocolHandler {
 
     /** Connection state. */
     private static enum State {
@@ -77,9 +75,6 @@ class ClientSessionHandler {
     /** Message for indicating login/authentication failure. */
     private static final String LOGIN_REFUSED_REASON = "Login refused";
 
-    /** The LOGIN_FAILURE protocol message. */
-    private static final byte[] loginFailureMessage = getLoginFailureMessage();
-
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
 
@@ -87,31 +82,22 @@ class ClientSessionHandler {
     private final DataService dataService;
 
     /** The I/O channel for sending messages to the client. */
-    private final AsynchronousMessageChannel sessionConnection;
-
-    /** The completion handler for reading from the I/O channel. */
-    private volatile ReadHandler readHandler = new ConnectedReadHandler();
-
-    /** The completion handler for writing to the I/O channel. */
-    private volatile WriteHandler writeHandler = new ConnectedWriteHandler();
-
+    private final SessionProtocol protocol;
+    
     /** The session ID as a BigInteger. */
     private volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
-    private volatile Identity identity;
+    private final Identity identity;
 
     /** The login status. */
     private volatile boolean loggedIn;
 
     /** The lock for accessing the following fields: {@code state},
-     * {@code messageQueue}, {@code disconnectHandled}, and {@code shutdown}.
+     * {@code disconnectHandled}, and {@code shutdown}.
      */
     private final Object lock = new Object();
 
-    /** Messages enqueued to be sent after the login ack is sent. */
-    private final List<ByteBuffer> messageQueue = new ArrayList<ByteBuffer>();
-    
     /** The connection state. */
     private State state = State.CONNECTED;
 
@@ -121,47 +107,158 @@ class ClientSessionHandler {
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
+    /** Login completion future for this handler. */
+    private final LoginCompletionFuture loginCompletionFuture;
+
     /** The queue of tasks for notifying listeners of received messages. */
     private volatile TaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class using the provided I/O connection,
+     * Constructs an instance of this class using the provided byte channel,
      * and starts reading from the connection.
      *
      * @param	sessionService the ClientSessionService instance
      * @param	dataService the DataService instance
-     * @param	sessionConnection the connection associated with this handler
+     * @param	sessionProtocol a session protocol
+     * @param	identity an identity
+     * @param	completionHandler a completion handler for the login request
      */
-    ClientSessionHandler(ClientSessionServiceImpl sessionService,
-			 DataService dataService,
-			 AsynchronousMessageChannel sessionConnection)
+    ClientSessionHandler(
+	ClientSessionServiceImpl sessionService,
+	DataService dataService,
+	SessionProtocol sessionProtocol,
+	Identity identity,
+	RequestCompletionHandler<SessionProtocolHandler> completionHandler)
     {
-	if (sessionService == null) {
-	    throw new NullPointerException("null sessionService");
-	} else if (dataService == null) {
-	    throw new NullPointerException("null dataService");
-	} else if (sessionConnection == null) {
-	    throw new NullPointerException("null sessionConnection");
-	}
+	checkNull("sessionService", sessionService);
+	checkNull("dataService", dataService);
+	checkNull("sessionProtocol", sessionProtocol);
+	checkNull("identity", identity);
+	checkNull("completionHandler", completionHandler);
 	this.sessionService = sessionService;
         this.dataService = dataService;
-	this.sessionConnection = sessionConnection;
+	this.protocol = sessionProtocol;
+	this.identity = identity;
+	loginCompletionFuture =
+	    new LoginCompletionFuture(this, completionHandler);
+	
+	scheduleNonTransactionalTask(
+	    new AbstractKernelRunnable("HandleLoginRequest") {
+		public void run() {
+		    handleLoginRequest();
+		} });
 
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
 		       "creating new ClientSessionHandler on nodeId:{0}",
 		        sessionService.getLocalNodeId());
 	}
-
-	/*
-	 * TBD: It might be a good idea to implement high- and low-water marks
-	 * for the buffers, so they don't go into hysteresis when they get
-	 * full. -JM
-	 */
-
-	scheduleReadOnReadHandler();
     }
 
+    /* -- Implement SessionProtocolHandler -- */
+    
+    /** {@inheritDoc} */
+    public void sessionMessage(
+	final ByteBuffer message,
+	RequestCompletionHandler<Void> completionHandler)
+    {
+	CompletionFutureImpl future = new CompletionFutureImpl();
+	if (!loggedIn) {
+	    logger.log(
+		Level.WARNING,
+		"session message received before login completed:{0}",
+		this);
+	    future.done();
+	    completionHandler.completed(future);
+	    return;
+	}
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("NotifyListenerMessageReceived") {
+		public void run() {
+		    ClientSessionImpl sessionImpl =
+			ClientSessionImpl.getSession(dataService, sessionRefId);
+		    if (sessionImpl != null) {
+			if (isConnected()) {
+			    sessionImpl.getClientSessionListener(dataService).
+				receivedMessage(
+				    message.asReadOnlyBuffer());
+			}
+		    } else {
+			scheduleHandleDisconnect(false, true);
+		    }
+		} }, identity);
+
+	// Wait until processing is complete before notifying future
+	enqueueCompletionNotification(completionHandler, future);
+    }
+
+    /** {@inheritDoc} */
+    public void channelMessage(final BigInteger channelId,
+			       final ByteBuffer message,
+			       RequestCompletionHandler<Void> completionHandler)
+    {
+	CompletionFutureImpl future = new CompletionFutureImpl();
+	if (!loggedIn) {
+	    logger.log(
+		Level.WARNING,
+		"channel message received before login completed:{0}",
+		this);
+	    future.done();
+	    completionHandler.completed(future);
+	    return;
+	}
+
+	taskQueue.addTask(
+	    new AbstractKernelRunnable("HandleChannelMessage") {
+		public void run() {
+		    ClientSessionImpl sessionImpl =
+			ClientSessionImpl.getSession(dataService, sessionRefId);
+		    if (sessionImpl != null) {
+			if (isConnected()) {
+			    sessionService.getChannelService().
+				handleChannelMessage(
+				    channelId,
+				    sessionImpl.getWrappedClientSession(),
+				    message.asReadOnlyBuffer());
+			}
+		    } else {
+			scheduleHandleDisconnect(false, true);
+		    }
+		} }, identity);
+
+	// Wait until processing is complete before notifying future
+	enqueueCompletionNotification(completionHandler, future);
+    }
+
+    /** {@inheritDoc} */
+    public void logoutRequest(
+	RequestCompletionHandler<Void> completionHandler)
+    {
+	scheduleHandleDisconnect(isConnected(), false);
+
+	// Enable protocol message channel to read immediately
+	CompletionFutureImpl future = new CompletionFutureImpl();
+	future.done();
+	completionHandler.completed(future);
+    }
+
+    /** {@inheritDoc} */
+    public void disconnect(RequestCompletionHandler<Void> completionHandler) {
+	scheduleHandleDisconnect(false, true);
+	
+	// TBD: should we wait to notify until client disconnects connection?
+	CompletionFutureImpl future = new CompletionFutureImpl();
+	future.done();
+	completionHandler.completed(future);
+    }
+
+    /* -- Implement Object -- */
+
+    /** {@inheritDoc} */
+    public String toString() {
+	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
+    }
+    
     /* -- Instance methods -- */
 
     /**
@@ -179,40 +276,14 @@ class ClientSessionHandler {
     }
 
     /**
-     * Sends the specified login protocol {@code message}, followed by any
-     * enqueued messages, and sets the state to LOGIN_HANDLED.
+     * Returns the protocol for the associated client session.
      *
-     * @param	message the login protocol message
-     * @param	delivery the delivery requirement
-     * @param	success if {@code true}, login is successful
-     *
+     * @return	a protocol
      */
-    void sendLoginProtocolMessage(
-	byte[] message, Delivery delivery, boolean success)
-    {
-	synchronized (lock) {
-	    if (state != State.CONNECTED) {
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.log(
-		        Level.WARNING,
-			"unexpected state:{0} for login protocol message, " +
-			"session:{1}", state.toString(), this);
-		}
-		throw new IllegalStateException("unexpected state: " +
-						state.toString());
-	    }
-
-	    loggedIn = success;
-	    
-	    writeToWriteHandler(ByteBuffer.wrap(message));
-	    state = State.LOGIN_HANDLED;
-	    for (ByteBuffer nextMessage : messageQueue) {
-		writeToWriteHandler(nextMessage);
-	    }
-	    messageQueue.clear();
-	}
+    SessionProtocol getSessionProtocol() {
+	return protocol;
     }
-
+ 
     /**
      * Returns {@code true} if the login for this session has been handled,
      * otherwise returns {@code false}.
@@ -224,48 +295,32 @@ class ClientSessionHandler {
     }
 
     /**
-     * Immediately sends the specified protocol {@code message} according to
-     * the specified {@code delivery} requirement if the session has logged
-     * in; otherwise, enqueues the message until the login ack has been sent.
+     * Sends a login success message to the client, and sets local state
+     * indicating that the login request has been handled and the client is
+     * logged in.
      */
-    void sendProtocolMessage(byte[] message, Delivery delivery) {
-	// TBI: ignore delivery for now...
+    void loginSuccess() {
 	synchronized (lock) {
-	    switch (state) {
-	    case CONNECTED:
-		messageQueue.add(ByteBuffer.wrap(message));
-		return;
-		
-	    case LOGIN_HANDLED:
-		break;
-		
-	    default:
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(
-			       Level.FINER,
-			       "sendProtocolMessage session:{0} " +
-			       "session is disconnected", this);
-		}
-		return;
-	    }
+	    checkConnectedState();
+	    loggedIn = true;
+	    loginCompletionFuture.done();
+	    state = State.LOGIN_HANDLED;
 	}
-
-	writeToWriteHandler(ByteBuffer.wrap(message));
     }
-
+	
     /**
-     * Writes a message to the write handler.
+     * Sends a login failure message for the specified {@code reason} to
+     * the client, and sets local state indicating that the login request
+     * has been handled.
+     *
+     * @param	exception the login failure exception
      */
-    private void writeToWriteHandler(ByteBuffer message) {
-	try {
-	    writeHandler.write(message);
-		    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "sendProtocolMessage session:{0} throws", this);
-	    }
+    void loginFailure(LoginFailureException exception) {
+	checkNull("exception", exception);
+	synchronized (lock) {
+	    checkConnectedState();
+	    loginCompletionFuture.setException(exception);
+	    state = State.LOGIN_HANDLED;
 	}
     }
 
@@ -273,7 +328,7 @@ class ClientSessionHandler {
      * Handles a disconnect request (if not already handled) by doing
      * the following: <ol>
      *
-     * <li> sending a disconnect acknowledgment (LOGOUT_SUCCESS)
+     * <li> sending a disconnect acknowledgment (logout success)
      *    if 'graceful' is true
      *
      * <li> if {@code closeConnection} is {@code true}, closing this
@@ -283,16 +338,16 @@ class ClientSessionHandler {
      * <li> submitting a transactional task to call the 'disconnected'
      *    callback on the listener for this session.
      *
-     * <li> notifying the identity (if non-null) that the session has
+     * <li> notifying the identity that the session has
      *    logged out.
      *
-     * <li> notifying the node mapping service that the identity (if
-     *    non-null) is no longer active.
+     * <li> notifying the node mapping service that the identity is no
+     *	  longer active. 
      * </ol>
      *
      * <p>Note:if {@code graceful} is {@code true}, then {@code
      * closeConnection} must be {@code false} so that the client will receive
-     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * the logout success message.  The client may not
      * receive the message if the connection is disconnected immediately
      * after sending the message.
      *
@@ -320,40 +375,28 @@ class ClientSessionHandler {
 	    sessionService.removeHandler(sessionRefId);
 	}
 	
-	if (identity != null) {
-	    // TBD: Due to the scheduler's behavior, this notification
-	    // may happen out of order with respect to the
-	    // 'notifyLoggedIn' callback.  Also, this notification may
-	    // also happen even though 'notifyLoggedIn' was not invoked.
-	    // Are these behaviors okay?  -- ann (3/19/07)
-	    final Identity thisIdentity = identity;
-	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
-		    public void run() {
-			thisIdentity.notifyLoggedOut();
-		    } });
-	    if (sessionService.removeUserLogin(identity, this)) {
-		deactivateIdentity(identity);
-	    }
+	// TBD: Due to the scheduler's behavior, this notification
+	// may happen out of order with respect to the
+	// 'notifyLoggedIn' callback.  Also, this notification may
+	// also happen even though 'notifyLoggedIn' was not invoked.
+	// Are these behaviors okay?  -- ann (3/19/07)
+	scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
+		public void run() {
+		    identity.notifyLoggedOut();
+		} });
+	if (sessionService.removeUserLogin(identity, this)) {
+	    deactivateIdentity();
 	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
 		assert !closeConnection;
-	        byte[] msg = { SimpleSgsProtocol.LOGOUT_SUCCESS };
-		// Bypass sendProtocolMessage method which prevents sending
-		// messages to disconnecting sessions.
-		writeToWriteHandler(ByteBuffer.wrap(msg));
 	    }
 
 	    if (closeConnection) {
 		closeConnection();
-	    } else {
-		sessionService.monitorDisconnection(this);
 	    }
 	}
-
-	readHandler = new ClosedReadHandler();
-        writeHandler = new ClosedWriteHandler();
 
 	if (sessionRefId != null) {
 	    scheduleTask(
@@ -373,12 +416,12 @@ class ClientSessionHandler {
      *
      * <p>Note:if {@code graceful} is {@code true}, then {@code
      * closeConnection} must be {@code false} so that the client will receive
-     * the {@code LOGOUT_SUCCESS} protocol message.  The client may not
+     * the logout success message.  The client may not
      * receive the message if the connection is disconnected immediately
      * after sending the message.
      *
      * @param	graceful if {@code true}, disconnection is graceful (i.e.,
-     * 		a LOGOUT_SUCCESS protocol message is sent before
+     * 		a logout success message is sent before
      * 		disconnecting the client session)
      * @param	closeConnection if {@code true}, close this session's
      *		connection immediately, otherwise monitor the connection to
@@ -403,15 +446,15 @@ class ClientSessionHandler {
      * Closes the connection associated with this instance.
      */
     void closeConnection() {
-	if (sessionConnection.isOpen()) {
+	if (protocol.isOpen()) {
 	    try {
-		sessionConnection.close();
+		protocol.close();
 	    } catch (IOException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e,
 			"closing connection for handle:{0} throws",
-			sessionConnection);
+			protocol);
 		}
 	    }
 	}
@@ -432,545 +475,46 @@ class ClientSessionHandler {
 	}
     }
     
-    /* -- Implement Object -- */
-
-    /** {@inheritDoc} */
-    public String toString() {
-	return getClass().getName() + "[" + identity + "]@" + sessionRefId;
-    }
-
-    /* -- I/O completion handlers -- */
-
-    /** A completion handler for writing to a connection. */
-    private abstract class WriteHandler
-        implements CompletionHandler<Void, Void>
-    {
-	/** Writes the specified message. */
-        abstract void write(ByteBuffer message);
-    }
-
-    /** A completion handler for writing that always fails. */
-    private class ClosedWriteHandler extends WriteHandler {
-
-	ClosedWriteHandler() { }
-
-        @Override
-        void write(ByteBuffer message) {
-            throw new ClosedAsynchronousChannelException();
-        }
-        
-        public void completed(IoFuture<Void, Void> result) {
-            throw new AssertionError("should be unreachable");
-        }    
-    }
-
-    /** A completion handler for writing to the session's channel. */
-    private class ConnectedWriteHandler extends WriteHandler {
-
-	/** The lock for accessing the fields {@code pendingWrites} and
-	 * {@code isWriting}. The locks {@code lock} and {@code writeLock}
-	 * should only be acquired in that specified order.
-	 */
-	private final Object writeLock = new Object();
-	
-	/** An unbounded queue of messages waiting to be written. */
-        private final LinkedList<ByteBuffer> pendingWrites =
-            new LinkedList<ByteBuffer>();
-
-	/** Whether a write is underway. */
-        private boolean isWriting = false;
-
-	/** Creates an instance of this class. */
-        ConnectedWriteHandler() { }
-
-	/**
-	 * Adds the message to the queue, and starts processing the queue if
-	 * needed.
-	 */
-        @Override
-        void write(ByteBuffer message) {
-            boolean first;
-            synchronized (writeLock) {
-                first = pendingWrites.isEmpty();
-                pendingWrites.add(message);
-            }
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(Level.FINEST,
-			   "write session:{0} message:{1} first:{2}",
-                           ClientSessionHandler.this,
-			   HexDumper.format(message, 0x50), first);
-            }
-            if (first) {
-                processQueue();
-            }
-        }
-
-	/** Start processing the first element of the queue, if present. */
-        private void processQueue() {
-            ByteBuffer message;
-            synchronized (writeLock) {
-                if (isWriting) {
-                    return;
-		}
-                message = pendingWrites.peek();
-                if (message == null) {
-		    return;
-		}
-		isWriting = true;
-            }
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(
-		    Level.FINEST,
-		    "processQueue session:{0} size:{1,number,#} head={2}",
-		    ClientSessionHandler.this, pendingWrites.size(),
-		    HexDumper.format(message, 0x50));
-            }
-            try {
-                sessionConnection.write(message, this);
-            } catch (RuntimeException e) {
-                logger.logThrow(Level.SEVERE, e,
-				"{0} processing message {1}",
-				ClientSessionHandler.this,
-				HexDumper.format(message, 0x50));
-                throw e;
-            }
-        }
-
-	/** Done writing the first request in the queue. */
-        public void completed(IoFuture<Void, Void> result) {
-	    ByteBuffer message;
-            synchronized (writeLock) {
-                message = pendingWrites.remove();
-                isWriting = false;
-            }
-            if (logger.isLoggable(Level.FINEST)) {
-		ByteBuffer resetMessage = message.duplicate();
-		resetMessage.reset();
-                logger.log(Level.FINEST,
-			   "completed write session:{0} message:{1}",
-			   ClientSessionHandler.this,
-			   HexDumper.format(resetMessage, 0x50));
-            }
-            try {
-                result.getNow();
-                /* Keep writing */
-                processQueue();
-            } catch (ExecutionException e) {
-                /*
-		 * TBD: If we're expecting the session to close, don't
-                 * complain.
-		 */
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.logThrow(Level.FINE, e,
-				    "write session:{0} message:{1} throws",
-				    ClientSessionHandler.this,
-				    HexDumper.format(message, 0x50));
-                }
-                scheduleHandleDisconnect(false, true);
-            }
-        }
-    }
-
-    /** A completion handler for reading from a connection. */
-    private abstract class ReadHandler
-        implements CompletionHandler<ByteBuffer, Void>
-    {
-	/** Initiates the read request. */
-        abstract void read();
-    }
-
-    /** A completion handler for reading that always fails. */
-    private class ClosedReadHandler extends ReadHandler {
-
-	ClosedReadHandler() { }
-
-        @Override
-        void read() {
-            throw new ClosedAsynchronousChannelException();
-        }
-
-        public void completed(IoFuture<ByteBuffer, Void> result) {
-            throw new AssertionError("should be unreachable");
-        }
-    }
-
-    /** A completion handler for reading from the session's channel. */
-    private class ConnectedReadHandler extends ReadHandler {
-
-	/** The lock for accessing the {@code isReading} field. The locks
-	 * {@code lock} and {@code readLock} should only be acquired in
-	 * that specified order.
-	 */
-	private final Object readLock = new Object();
-
-	/** Whether a read is underway. */
-        private boolean isReading = false;
-
-	/** Creates an instance of this class. */
-        ConnectedReadHandler() { }
-
-	/** Reads a message from the connection. */
-        @Override
-        void read() {
-            synchronized (readLock) {
-                if (isReading) {
-                    throw new ReadPendingException();
-		}
-                isReading = true;
-            }
-            sessionConnection.read(this);
-        }
-
-	/** Handles the completed read operation. */
-        public void completed(IoFuture<ByteBuffer, Void> result) {
-            synchronized (readLock) {
-                isReading = false;
-            }
-            try {
-                ByteBuffer message = result.getNow();
-                if (message == null) {
-                    scheduleHandleDisconnect(false, true);
-                    return;
-                }
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "completed read session:{0} message:{1}",
-                        ClientSessionHandler.this,
-			HexDumper.format(message, 0x50));
-                }
-
-                byte[] payload = new byte[message.remaining()];
-                message.get(payload);
-
-                // Dispatch
-                bytesReceived(payload);
-
-            } catch (Exception e) {
-
-                /*
-		 * TBD: If we're expecting the channel to close, don't
-                 * complain.
-		 */
-
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.logThrow(
-                        Level.FINE, e,
-                        "Read completion exception {0}", sessionConnection);
-                }
-                scheduleHandleDisconnect(false, true);
-            }
-        }
-
-	/** Processes the received message. */
-        private void bytesReceived(byte[] buffer) {
-
-	    MessageBuffer msg = new MessageBuffer(buffer);
-	    byte opcode = msg.getByte();
-
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
- 		    Level.FINEST,
-		    "processing opcode 0x{0}",
-		    Integer.toHexString(opcode));
-	    }
-	    
-	    switch (opcode) {
-		
-	    case SimpleSgsProtocol.LOGIN_REQUEST:
-
-	        byte version = msg.getByte();
-	        if (version != SimpleSgsProtocol.VERSION) {
-	            if (logger.isLoggable(Level.SEVERE)) {
-	                logger.log(Level.SEVERE,
-	                    "got protocol version:{0}, " +
-	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
-	            }
-	            scheduleHandleDisconnect(false, true);
-	            break;
-	        }
-
-		final String name = msg.getString();
-		final String password = msg.getString();
-		scheduleNonTransactionalTask(
-		    new AbstractKernelRunnable("HandleLoginRequest") {
-			public void run() {
-			    handleLoginRequest(name, password);
-			} });
-
-                // Resume reading immediately
-		read();
-
-		break;
-		
-	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		if (!loggedIn) {
-		    logger.log(
-		    	Level.WARNING,
-			"session message received before login completed:{0}",
-			this);
-		    break;
-		}
-		final ByteBuffer clientMessage =
-		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		taskQueue.addTask(
-		  new AbstractKernelRunnable("NotifyListenerMessageReceived") {
-		    public void run() {
-			ClientSessionImpl sessionImpl =
-			    ClientSessionImpl.getSession(
-				dataService, sessionRefId);
-			if (sessionImpl != null) {
-			    if (isConnected()) {
-				sessionImpl.
-				    getClientSessionListener(dataService).
-				        receivedMessage(clientMessage.
-						            asReadOnlyBuffer());
-			    }
-			} else {
-			    scheduleHandleDisconnect(false, true);
-			}
-		    } }, identity);
-
-		// Wait until processing is complete before resuming reading
-		enqueueReadResume();
-
-		break;
-
-	    case SimpleSgsProtocol.CHANNEL_MESSAGE:
-		if (!loggedIn) {
-		    logger.log(
-		    	Level.WARNING,
-			"channel message received before login completed:{0}",
-			this);
-		    break;
-		}
-		final BigInteger channelRefId =
-		    new BigInteger(1, msg.getBytes(msg.getShort()));
-		final ByteBuffer channelMessage =
-		    ByteBuffer.wrap(msg.getBytes(msg.limit() - msg.position()));
-		taskQueue.addTask(
-		  new AbstractKernelRunnable("HandleChannelMessage") {
-		    public void run() {
-			ClientSessionImpl sessionImpl =
-			    ClientSessionImpl.getSession(
-				dataService, sessionRefId);
-			if (sessionImpl != null) {
-			    if (isConnected()) {
-				sessionService.getChannelService().
-				    handleChannelMessage(
-					channelRefId,
-					sessionImpl.getWrappedClientSession(),
-					channelMessage.asReadOnlyBuffer());
-			    }
-			} else {
-			    scheduleHandleDisconnect(false, true);
-			}
-		    } }, identity);
-
-		// Wait until processing is complete before resuming reading
-		enqueueReadResume();
-
-		break;
-
-
-	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-		// TBD: identity may be null. Fix to pass a non-null identity
-		// when scheduling the task.
-		scheduleHandleDisconnect(isConnected(), false);
-
-		// Resume reading immediately
-                read();
-
-		break;
-		
-	    default:
-		if (logger.isLoggable(Level.SEVERE)) {
-		    logger.log(
-			Level.SEVERE,
-			"unknown opcode 0x{0}",
-			Integer.toHexString(opcode));
-		}
-		// TBD: identity may be null. Fix to pass a non-null identity
-		// when scheduling the task.
-		scheduleHandleDisconnect(false, true);
-		break;
-	    }
-	}
-	
-	/**
-	 * Handles a login request for the specified {@code name} and
-	 * {@code password}, scheduling the appropriate response to be
-	 * sent to the client (either LOGIN_SUCCESS, LOGIN_FAILURE, or
-	 * LOGIN_REDIRECT).
-	 */
-	private void handleLoginRequest(String name, String password) {
-
-	    logger.log(
-		Level.FINEST, 
-		"handling login request for name:{0}", name);
-
-	    /*
-	     * Authenticate identity.
-	     */
-	    final Identity authenticatedIdentity;
-	    try {
-		authenticatedIdentity = authenticate(name, password);
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.FINEST, e,
-		    "login authentication failed for name:{0}", name);
-		sendLoginFailureAndDisconnect();
-		return;
-	    }
-
-	    Node node;
-	    try {
-		/*
-		 * Get node assignment.
-		 */
-		sessionService.nodeMapService.assignNode(
-		    ClientSessionHandler.class, authenticatedIdentity);
-		GetNodeTask getNodeTask =
-		    new GetNodeTask(authenticatedIdentity);		
-		sessionService.runTransactionalTask(
-		    getNodeTask, authenticatedIdentity);
-		node = getNodeTask.getNode();
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
-			       name, node);
-		}
-
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "getting node assignment for identity:{0} throws", name);
-		sendLoginFailureAndDisconnect();
-		return;
-	    }
-
-	    long assignedNodeId = node.getId();
-	    if (assignedNodeId == sessionService.getLocalNodeId()) {
-		/*
-		 * Handle this login request locally: Set the client
-		 * session's identity, store the client session in the data
-		 * store (which assigns it an ID--the ID of the reference
-		 * to the client session object), inform the session
-		 * service that this handler is available (by invoking
-		 * "addHandler", and schedule a task to perform client
-		 * login (call the AppListener.loggedIn method).
-		 */
-		if (!sessionService.validateUserLogin(
-			authenticatedIdentity, ClientSessionHandler.this))
-		{
-		    // This login request is not allowed to proceed.
-		    sendLoginFailureAndDisconnect();
-		    return;
-		}
-		identity = authenticatedIdentity;
-		taskQueue = sessionService.createTaskQueue();
-		CreateClientSessionTask createTask =
-		    new CreateClientSessionTask();
-		try {
-		    sessionService.runTransactionalTask(createTask, identity);
-		} catch (Exception e) {
-		    logger.logThrow(
-			Level.WARNING, e,
-			"Storing ClientSession for identity:{0} throws", name);
-		    sendLoginFailureAndDisconnect();
-		    return;
-		}
-		sessionService.addHandler(
-		    sessionRefId, ClientSessionHandler.this);
-		scheduleTask(new LoginTask());
-		
-	    } else {
-		/*
-		 * Redirect login to assigned (non-local) node.
-		 */
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(
-			Level.FINE,
-			"redirecting login for identity:{0} " +
-			"from nodeId:{1} to node:{2}",
-			name, sessionService.getLocalNodeId(), node);
-		}
-		final byte[] loginRedirectMessage =
-		    getLoginRedirectMessage(node.getHostName(), node.getPort());
-		// TBD: identity may be null. Fix to pass a non-null identity
-		// when scheduling the task.
-		scheduleNonTransactionalTask(
-		  new AbstractKernelRunnable("SendLoginRedirectMessage") {
-		    public void run() {
-			sendLoginProtocolMessage(
- 			    loginRedirectMessage, Delivery.RELIABLE, false);
-			handleDisconnect(false, false);
-		    } });
-	    }
-	}
-
-	/**
-	 * Sends the LOGIN_FAILURE protocol message to the client and
-	 * disconnects the client session.
-	 */
-	private void sendLoginFailureAndDisconnect() {
-	    // TBD: identity may be null. Fix to pass a non-null identity
-	    // when scheduling the task.
-	    scheduleNonTransactionalTask(
-	      new AbstractKernelRunnable("SendLoginFailureMessage") {
-		public void run() {
-		    sendLoginProtocolMessage(
- 			loginFailureMessage, Delivery.RELIABLE, false);
-		    handleDisconnect(false, false);
-		} });
-	}
-    }
+    /* -- other private methods and classes -- */
 
     /**
-     * Schedules a task to resume reading.  Use this method to delay reading
-     * until a task resulting from an earlier read request has been completed.
+     * Schedules a task to notify the completion handler.  Use this method
+     * to delay notification until a task resulting from an earlier request
+     * has been completed.
+     *
+     * @param	completionHandler a completion handler
+     * @param	future a completion future
      */
-    void enqueueReadResume() {
+    private void enqueueCompletionNotification(
+	final RequestCompletionHandler<Void> completionHandler,
+	final CompletionFutureImpl future)
+{
 	taskQueue.addTask(
-	    new AbstractKernelRunnable("ScheduleReadOnReadHandler") {
+	    new AbstractKernelRunnable("ScheduleCompletionNotification") {
 		public void run() {
-		    scheduleReadOnReadHandler();
+		    future.done();
+		    completionHandler.completed(future);
 		} }, identity);
     }
 
     /**
-     * Schedules an asynchronous task to resume reading.
-     */
-    private void scheduleReadOnReadHandler() {
-	scheduleNonTransactionalTask(
-	    new AbstractKernelRunnable("ResumeReadOnReadHandler") {
-		public void run() {
-		    logger.log(Level.FINER, "resuming reads session:{0}", this);
-		    if (isConnected()) {
-			readHandler.read();
-		    }
-		} });
-    }
-    
-    /* -- other private methods and classes -- */
-
-    /**
      * Invokes the {@code setStatus} method on the node mapping service
-     * with the given {@code inactiveIdentity} and {@code false} to mark
+     * with {@code false} to mark
      * the identity as inactive.  This method is invoked when a login is
      * redirected and also when a this client session is disconnected.
      */
-    private void deactivateIdentity(Identity inactiveIdentity) {
+    private void deactivateIdentity() {
 	try {
 	    /*
 	     * Set identity's status for this class to 'false'.
 	     */
 	    sessionService.nodeMapService.setStatus(
-		ClientSessionHandler.class, inactiveIdentity, false);
+		ClientSessionHandler.class, identity, false);
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.WARNING, e,
 		"setting status for identity:{0} throws",
-		inactiveIdentity.getName());
+		identity.getName());
 	}
     }
     
@@ -986,16 +530,164 @@ class ClientSessionHandler {
     }
 
     /**
-     * Authenticates the specified username and password, throwing
-     * LoginException if authentication fails.
+     * Handles a login request, notifying the specified {@code future} when
+     * the request is completed.
      */
-    private Identity authenticate(String username, String password)
-	throws LoginException
-    {
-	return sessionService.identityManager.authenticateIdentity(
-	    new NamePasswordCredentials(username, password.toCharArray()));
+    private void handleLoginRequest() {
+	logger.log(
+	    Level.FINEST, 
+	    "handling login request for identity:{0}", identity);
+	
+	final Node node;
+	try {
+	    /*
+	     * Get node assignment.
+	     */
+	    sessionService.nodeMapService.assignNode(
+		ClientSessionHandler.class, identity);
+	    GetNodeTask getNodeTask = new GetNodeTask(identity);		
+	    sessionService.runTransactionalTask(getNodeTask, identity);
+	    node = getNodeTask.getNode();
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE, "identity:{0} assigned to node:{1}",
+			   identity, node);
+	    }
+	    
+	} catch (Exception e) {
+	    logger.logThrow(
+	        Level.WARNING, e,
+		"getting node assignment for identity:{0} throws", identity);
+	    sendLoginFailureAndDisconnect(
+		new LoginFailureException(LOGIN_REFUSED_REASON, e));
+	    return;
+	}
+
+	long assignedNodeId = node.getId();
+	if (assignedNodeId == sessionService.getLocalNodeId()) {
+	    /*
+	     * Handle this login request locally: Validate that the
+	     * user is allowed to log in, store the client session in
+	     * the data store (which assigns it an ID--the ID of the
+	     * reference to the client session object), inform the
+	     * session service that this handler is available (by
+	     * invoking "addHandler"), and schedule a task to perform
+	     * client login (call the AppListener.loggedIn method).
+	     */
+	    if (!sessionService.validateUserLogin(
+		    identity, ClientSessionHandler.this))
+	    {
+		// This login request is not allowed to proceed.
+		sendLoginFailureAndDisconnect(
+		    new LoginFailureException(
+			LOGIN_REFUSED_REASON, FailureReason.DUPLICATE_LOGIN));
+		return;
+	    }
+	    taskQueue = sessionService.createTaskQueue();
+	    CreateClientSessionTask createTask =
+		new CreateClientSessionTask();
+	    try {
+		sessionService.runTransactionalTask(createTask, identity);
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "Storing ClientSession for identity:{0} throws", identity);
+		sendLoginFailureAndDisconnect(
+		    new LoginFailureException(LOGIN_REFUSED_REASON, e));
+		return;
+	    }
+	    sessionService.addHandler(
+		sessionRefId, ClientSessionHandler.this);
+	    scheduleTask(new LoginTask());
+	    
+	} else {
+	    /*
+	     * Redirect login to assigned (non-local) node.
+	     */
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(
+		    Level.FINE,
+		    "redirecting login for identity:{0} " +
+		    "from nodeId:{1} to node:{2}",
+		    identity, sessionService.getLocalNodeId(), node);
+	    }
+	    
+	    scheduleNonTransactionalTask(
+	        new AbstractKernelRunnable("SendLoginRedirectMessage") {
+		    public void run() {
+			try {
+                            try {
+                                loginRedirect(node);
+                            } catch (Exception ex) {
+                                loginFailure(
+                                    new LoginFailureException("Redirect failed",
+                                                              ex));
+                            }
+                        } finally {
+                            handleDisconnect(false, false);
+                        }
+		    } });
+	}
     }
 
+    /**
+     * Sends a login redirect message for the specified {@code host} and
+     * {@code port} to the client, and sets local state indicating that
+     * the login request has been handled.
+     *
+     * @param	node a node
+     */
+    private void loginRedirect(Node node) {
+	synchronized (lock) {
+	    checkConnectedState();
+	    Set<ProtocolDescriptor> descriptors =
+		ClientSessionServiceImpl.getInstance().
+		    getProtocolDescriptors(node.getId());
+	    loginCompletionFuture.setException(
+ 		new LoginRedirectException(node, descriptors));
+	    state = State.LOGIN_HANDLED;
+	}
+    }
+
+    /**
+     * Throws an {@code IllegalStateException} if the associated client
+     * session handler is not in the {@code CONNECTED} state.
+     */
+    private void checkConnectedState() {
+	assert Thread.holdsLock(lock);
+	
+	if (state != State.CONNECTED) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.log(
+		    Level.WARNING,
+		    "unexpected state:{0} for login protocol message, " +
+		    "session:{1}", state.toString(), this);
+	    }
+	    throw new IllegalStateException("unexpected state: " +
+					    state.toString());
+	}
+    }
+
+    /**
+     * Sends a login failure message to the client and
+     * disconnects the client session.
+     *
+     * @param	throwable an exception that occurred while processing the
+     * 		login request, or {@code null}
+     */
+    private void sendLoginFailureAndDisconnect(
+ 	final LoginFailureException exception)
+    {
+	scheduleNonTransactionalTask(
+	    new AbstractKernelRunnable("SendLoginFailureMessage") {
+		public void run() {
+		    try {
+                        loginFailure(exception);
+                    } finally {
+                        handleDisconnect(false, false);
+                    }
+		} });
+    }
+    
     /**
      * Schedules a non-durable, transactional task.
      */
@@ -1047,7 +739,10 @@ class ClientSessionHandler {
 	/** {@inheritDoc} */
 	public void run() {
 	    ClientSessionImpl sessionImpl =
-		new ClientSessionImpl(sessionService, identity);
+                    new ClientSessionImpl(sessionService,
+                                          identity,
+                                          protocol.getDeliveries(),
+                                          protocol.getMaxMessageLength());
 	    sessionRefId = sessionImpl.getId();
 	}
     }
@@ -1091,15 +786,6 @@ class ClientSessionHandler {
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
 
-	    // FIXME: currently we choose the reconnect key to be
-	    // the session ID, to facilitate the test of the Channel Service.
-	    // If the reconnect key is generated some other way, the test
-	    // will have to be updated to get the session key some other way.
-	    byte[] reconnectKey = sessionRefId.toByteArray();
-	    MessageBuffer ack = new MessageBuffer(1 + reconnectKey.length);
-	    ack.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		putBytes(reconnectKey);
-
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
 
@@ -1120,66 +806,229 @@ class ClientSessionHandler {
 		sessionImpl.putClientSessionListener(
 		    dataService, returnedListener);
 
-		sessionService.sendLoginAck(
-		    sessionImpl, ack.getBuffer(), Delivery.RELIABLE, true);
+		sessionService.addLoginResult(sessionImpl, true, null);
 		
-		final Identity thisIdentity = identity;
 		sessionService.scheduleTaskOnCommit(
 		    new AbstractKernelRunnable("NotifyLoggedIn") {
 			public void run() {
 			    logger.log(
 			        Level.FINE,
 				"calling notifyLoggedIn on identity:{0}",
-				thisIdentity);
+				identity);
 			    // notify that this identity logged in,
 			    // whether or not this session is connected at
 			    // the time of notification.
-			    thisIdentity.notifyLoggedIn();
+			    identity.notifyLoggedIn();
 			} });
 		
 	    } else {
+		LoginFailureException loginFailureEx;
 		if (ex == null) {
 		    logger.log(
 		        Level.WARNING,
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
+		    loginFailureEx = new LoginFailureException(
+			LOGIN_REFUSED_REASON, FailureReason.REJECTED_LOGIN);
 		} else if (!isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
 			"Invoking loggedIn on AppListener:{0} with " +
 			"session: {1} throws",
 			appListener, ClientSessionHandler.this);
+		    loginFailureEx =
+			new LoginFailureException(LOGIN_REFUSED_REASON, ex);
 		} else {
 		    throw ex;
 		}
-		sessionService.sendLoginAck(
-		    sessionImpl, loginFailureMessage, Delivery.RELIABLE, false);
+		sessionService.addLoginResult(
+		    sessionImpl, false, loginFailureEx);
+
 		sessionImpl.disconnect();
 	    }
 	}
     }
 
     /**
-     * Returns a byte array containing a LOGIN_FAILURE protocol message.
+     * This future is an abstract implementation for the futures
+     * returned by {@code ProtocolListener} and {@code SessionProtocolHandler}.
      */
-    private static byte[] getLoginFailureMessage() {
-        int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
-        MessageBuffer ack = new MessageBuffer(1 + stringSize);
-        ack.putByte(SimpleSgsProtocol.LOGIN_FAILURE).
-            putString(LOGIN_REFUSED_REASON);
-        return ack.getBuffer();
+    private abstract static class AbstractCompletionFuture<T>
+            implements Future<T>
+    {
+	/**
+	 * Indicates whether the operation associated with this future
+	 * is complete.
+	 */
+	private boolean done = false;
+
+	/** Lock for accessing the {@code done} field. */
+	private Object lock = new Object();
+	
+	/** Constructs an instance. */
+	protected AbstractCompletionFuture() {
+	}
+
+	/**
+	 * Returns the value associated with this future, or throws
+	 * {@code ExecutionException} if there is a problem
+	 * processing the operation associated with this future.
+	 *
+	 * @return	the value for this future
+	 * @throws	ExecutionException if there is a problem processing
+	 *		the operation associated with this future
+	 */
+	protected abstract T getValue()
+	    throws ExecutionException;
+
+
+	/** {@inheritDoc} */
+	public boolean cancel(boolean mayInterruptIfRunning) {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public T get() throws InterruptedException, ExecutionException {
+	    synchronized (lock) {
+		while (!done) {
+		    lock.wait();
+		}
+	    }
+	    return getValue();
+	}
+
+	/** {@inheritDoc} */
+	public T get(long timeout, TimeUnit unit)
+	    throws InterruptedException, ExecutionException, TimeoutException
+	{
+	    synchronized (lock) {
+		if (!done) {
+		    unit.timedWait(lock, timeout);
+		}
+		if (!done) {
+		    throw new TimeoutException();
+		}
+		return getValue();
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public boolean isCancelled() {
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+	public boolean isDone() {
+	    synchronized (lock) {
+		return done;
+	    }
+	}
+
+	/**
+	 * Indicates that the operation associated with this future
+	 * is complete. Subsequent invocations to {@link #isDone
+	 * isDone} will return {@code true}.
+	 */
+	void done() {
+	    synchronized (lock) {
+		done = true;
+		lock.notifyAll();
+	    }
+	}
     }
 
     /**
-     * Returns a byte array containing a LOGIN_REDIRECT protocol
-     * message containing the given {@code hostname} and {@code port}.
+     * This future is returned from {@link SessionProtocolHandler}
+     * operations.
      */
-    private static byte[] getLoginRedirectMessage(String hostname, int port) {
-	int hostStringSize = MessageBuffer.getSize(hostname);
-	MessageBuffer ack = new MessageBuffer(1 + hostStringSize + 4);
-        ack.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
-            putString(hostname).
-            putInt(port);
-        return ack.getBuffer();
-    }	
+    private static class CompletionFutureImpl
+            extends AbstractCompletionFuture<Void>
+    {
+	/** {@inheritDoc} */
+	protected Void getValue() {
+	    return null;
+	}
+    }
+
+    /**
+     * This future is returned from the {@code ProtocolListener}'s
+     * {@code newLogin} method.
+     */
+    private static class LoginCompletionFuture
+	extends AbstractCompletionFuture<SessionProtocolHandler>
+    {
+	/** The session protocol handler. */
+	private final SessionProtocolHandler protocolHandler;
+
+	/** The completion handler for the login request. */
+	private final RequestCompletionHandler<SessionProtocolHandler>
+	    completionHandler;
+
+	/** An exception cause, or {@code null}. */
+	private volatile Throwable exceptionCause = null;
+
+	/**
+	 * Constructs an instance with the specified {@code protocolHandler}
+	 * and {@code completionHandler).
+	 *
+	 * @param	protocolHandler a session protocol handler
+	 * @param	completionHandler a completionHandler
+	 */
+	LoginCompletionFuture(
+	    SessionProtocolHandler protocolHandler,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
+        {
+	    super();
+	    this.protocolHandler = protocolHandler;
+	    this.completionHandler = completionHandler;
+	}
+
+	/** {@inheritDoc} */
+	protected SessionProtocolHandler getValue()
+	    throws ExecutionException
+	{
+	    if (exceptionCause != null) {
+		throw new ExecutionException(exceptionCause);
+	    } else {
+		return protocolHandler;
+	    }
+	}
+
+	/**
+	 * Sets the exception cause for this future to the specified
+	 * {@code throwable}.  The given exception will be used as
+	 * the cause of the {@code ExecutionException} thrown by
+	 * this future's {@code get} methods.
+	 *
+	 * @param	throwable an exception cause
+	 */
+	void setException(Throwable throwable) {
+	    checkNull("throwable", throwable);
+	    exceptionCause = throwable;
+	    done();
+	}
+
+	/**
+	 * Notifies the completion handler that the login request
+	 * processing is complete.
+	 */
+	void done() {
+	    super.done();
+	    completionHandler.completed(this);
+	}
+    }
+
+    /**
+     * Throws a {@code NullPointerException} if the specified
+     * {@code var} is null.  The exception's detail message will
+     * include the specified variable's name, {@code varName}.
+     *
+     * @param	varName the variable's name
+     * @param	var the variable to check
+     */
+    private static void checkNull(String varName, Object var) {
+	if (var == null) {
+	    throw new NullPointerException("null " + varName);
+	}
+    }
 }

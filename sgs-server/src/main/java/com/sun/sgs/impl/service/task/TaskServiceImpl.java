@@ -31,7 +31,6 @@ import com.sun.sgs.app.util.ScalableHashSet;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
@@ -45,10 +44,6 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileConsumer.ProfileDataType;
-import com.sun.sgs.profile.ProfileOperation;
 
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeMappingListener;
@@ -78,6 +73,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 
 /**
@@ -236,11 +232,8 @@ public class TaskServiceImpl
         availablePendingMap;
 
     // the profiled operations
-    private final ProfileOperation scheduleNDTaskOp;
-    private final ProfileOperation scheduleNDTaskDelayedOp;
-    private final ProfileOperation scheduleTaskOp;
-    private final ProfileOperation scheduleTaskDelayedOp;
-    private final ProfileOperation scheduleTaskPeriodicOp;
+    private final TaskServiceStats serviceStats;
+    
     /**
      * Creates an instance of {@code TaskServiceImpl}. See the class javadoc
      * for applicable properties.
@@ -318,24 +311,15 @@ public class TaskServiceImpl
                                             "be non-negative");
         }
 
-        // create our profiling info
+        // create our profiling info and register our MBean
         ProfileCollector collector = 
             systemRegistry.getComponent(ProfileCollector.class);
-        ProfileConsumer consumer = collector.getConsumer(
-                ProfileCollectorImpl.CORE_CONSUMER_PREFIX + "TaskService");
-
-        ProfileLevel level = ProfileLevel.MAX;
-        ProfileDataType type = ProfileDataType.TASK_AND_AGGREGATE;
-        scheduleNDTaskOp =
-            consumer.createOperation("scheduleNonDurableTask", type, level);
-        scheduleNDTaskDelayedOp =
-            consumer.createOperation("scheduleNonDurableTaskDelayed", 
-                                     type, level);
-        scheduleTaskOp = consumer.createOperation("scheduleTask", type, level);
-        scheduleTaskDelayedOp =
-            consumer.createOperation("scheduleDelayedTask", type, level);
-        scheduleTaskPeriodicOp =
-            consumer.createOperation("schedulePeriodicTask", type, level);
+        serviceStats = new TaskServiceStats(collector);
+        try {
+            collector.registerMBean(serviceStats, TaskServiceStats.MXBEAN_NAME);
+        } catch (JMException e) {
+            logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+        }
 
         // finally, create a timer for delaying the status votes and get
         // the delay used in submitting status votes
@@ -471,7 +455,7 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleTask(Task task) {
-        scheduleTaskOp.report();
+        serviceStats.scheduleTaskOp.report();
         scheduleSingleTask(task, START_NOW);
     }
 
@@ -479,7 +463,7 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleTask(Task task, long delay) {
-        scheduleTaskDelayedOp.report();
+        serviceStats.scheduleTaskDelayedOp.report();
         long startTime = System.currentTimeMillis() + delay;
 
         if (delay < 0) {
@@ -517,7 +501,7 @@ public class TaskServiceImpl
      */
     public PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
                                                    long period) {
-        scheduleTaskPeriodicOp.report();
+        serviceStats.scheduleTaskPeriodicOp.report();
         // note the start time
         long startTime = System.currentTimeMillis() + delay;
 
@@ -572,7 +556,7 @@ public class TaskServiceImpl
         if (shuttingDown()) {
             throw new IllegalStateException("Service is shutdown");
         }
-        scheduleNDTaskOp.report();
+        serviceStats.scheduleNDTaskOp.report();
 
         Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
@@ -593,7 +577,7 @@ public class TaskServiceImpl
         if (shuttingDown()) {
             throw new IllegalStateException("Service is shutdown");
         }
-        scheduleNDTaskDelayedOp.report();
+        serviceStats.scheduleNDTaskDelayedOp.report();
 
         Identity owner = txnProxy.getCurrentOwner();
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,

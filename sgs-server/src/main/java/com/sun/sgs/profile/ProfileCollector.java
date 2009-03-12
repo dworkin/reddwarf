@@ -21,6 +21,7 @@ package com.sun.sgs.profile;
 
 import java.util.List;
 import java.util.Map;
+import javax.management.JMException;
 
 /**
  * This is the main aggregation point for profiling data. Implementations of
@@ -37,8 +38,7 @@ import java.util.Map;
 public interface ProfileCollector {
 
     /**
-     *  The valid choices for
-     * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.
+     *  The profiling levels.
      */
     enum ProfileLevel {
         /** 
@@ -62,17 +62,15 @@ public interface ProfileCollector {
     }
     
     /** 
-     * The default system profiling level, which is the default level
-     * for any newly created {@code ProfileConsumer} and can be set at
-     * startup with the property 
-     * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_PROPERTY}.  
+     * Gets the default system profiling level, which is the default level
+     * for any newly created {@code ProfileConsumer}.  
      * 
      * @return the default profiling level
      */
     ProfileLevel getDefaultProfileLevel();
 
     /**
-     * Set the default profile level, used as the initial level when creating
+     * Sets the default profile level, used as the initial level when creating
      * new {@code ProfileConsumer}s.
      * 
      * @param level the new default profile level
@@ -162,4 +160,27 @@ public interface ProfileCollector {
      * @return the map of names to consumers
      */
     Map<String, ProfileConsumer> getConsumers();
+    
+    /**
+     * Registers the given MBean with the current VM's platform MBean server,
+     * allowing it to be monitored by tools like JConsole.
+     * 
+     * @param mBean the MBean or MXBean to be registered
+     * @param mBeanName the name under which it should be registered
+     * 
+     * @throws JMException if there were any problems reported
+     *    by the JMX system during registration, including if an object
+     *    has already been registered with the {@code mBeanName}
+     */
+    void registerMBean(Object mBean, String mBeanName) throws JMException;
+    
+    /**
+     * Returns the object registered under the given name, or {@code null}
+     * if no object has been registered with that name.
+     * 
+     * @param mBeanName the name the object was registered under
+     * @return the object passed into {@link #registerMBean(Object, String)
+     *         registerMBean} with the given {@code mBeanName}
+     */
+    Object getRegisteredMBean(String mBeanName);
 }
