@@ -33,16 +33,23 @@ final class BootProperties {
     }
     
     /**
-     * the standard location for the home directory properties config file
-     * which can be used to override any properties for the application
+     * The standard location for the home directory properties config file
+     * which can be used to override any properties for the application.
      */ 
     static final String DEFAULT_HOME_CONFIG_FILE = ".sgs.properties";
     
     /**
      * The standard resource location to look for application
-     * properties configuration
+     * properties configuration.
      */
     static final String DEFAULT_APP_PROPERTIES = 
             "META-INF/app.properties";
+    
+    /**
+     * The standard resource location to look for application logging 
+     * properties configuration.
+     */
+    static final String DEFAULT_LOG_PROPERTIES =
+            "META-INF/logging.properties";
 
 }

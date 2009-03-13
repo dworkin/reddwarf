@@ -95,6 +95,8 @@ public final class Boot {
         executeCmd.add("-classpath");
         executeCmd.add(bootClassPath(properties));
         executeCmd.add("-Djava.library.path=" + bootNativePath(properties));
+        executeCmd.add("-Djava.util.logging.config.class=" +
+                       BootEnvironment.DEFAULT_SGS_LOGGING_CLASS);
         executeCmd.add("-Djava.util.logging.config.file=" + 
                        properties.getProperty(BootEnvironment.SGS_LOGGING));
         for (String i : bootCommandLineProps(properties)) {
