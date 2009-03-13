@@ -84,7 +84,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
  *	value of the {@code com.sun.sgs.txn.timeout} property, if specified,
- *	otherwise {@value #DEFAULT_LOCK_TIMEOUT}
+ *	otherwise times the value of the default transaction timeout.
  *
  * <dd style="padding-top: .5em">The maximum number of milliseconds to wait for
  *	obtaining a lock.  The value must be greater than {@code 0}, and should
@@ -119,7 +119,7 @@ import java.util.logging.Logger;
  * <ul>
  *
  * <li>Synchronization is only used on {@link Locker} objects and on the {@code
- *     Map}s that hold {@link Lock} objects
+ *     Map}s that hold {@code Lock} objects
  *
  * <li>A thread can synchronize on at most one locker and one lock at a time,
  *     always synchronizing on the locker first
@@ -150,12 +150,12 @@ import java.util.logging.Logger;
  *     different locker, but can synchronize on a {@code Lock}
  *
  *     In fact, only one method synchronizes on a {@code Locker} and on a
- *     {@code Lock} -- the {@link #waitForInternal waitForInternal} method.
- *     That method also makes sure that the only synchronized {@code Locker}
- *     methods that it calls are on the locker it has already synchronized on.
- *     The {@link DeadlockChecker} class also synchronizes on key maps and
- *     lockers, but is called outside of synchronized blocks and only
- *     synchronizes on one thing at a time.
+ *     {@code Lock} -- the {@link #waitForLockInternal waitForLockInternal}
+ *     method.  That method also makes sure that the only synchronized {@code
+ *     Locker} methods that it calls are on the locker it has already
+ *     synchronized on.  The {@code DeadlockChecker} class also synchronizes on
+ *     key maps and lockers, but is called outside of synchronized blocks and
+ *     only synchronizes on one thing at a time.
  *
  * <li>Use assertions to check adherence to the scheme
  *

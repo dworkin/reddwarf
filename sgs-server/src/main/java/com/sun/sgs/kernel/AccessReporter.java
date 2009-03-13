@@ -50,6 +50,10 @@ import com.sun.sgs.service.Transaction;
  * of the {@code DataService}, before a name binding is resolved in
  * the {@code getBinding} method, the requested access to that bound
  * object should be reported.
+ * <p>
+ * If the implementation of the {@code reportObjectAccess} methods detect a
+ * conflict and wish to cause the calling transaction to fail, they will abort
+ * the transaction and then throw a {@link TransactionAbortedException}.
  *
  * @param <T> the type of the identifier used to identify accessed objects
  */

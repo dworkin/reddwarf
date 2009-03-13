@@ -100,7 +100,8 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
  *	value of the <code>com.sun.sgs.txn.timeout</code> property, if
- *	specified, otherwise {@value #DEFAULT_LOCK_TIMEOUT}
+ *	specified, otherwise times the value of the default transaction
+ *	timeout.
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that an attempt to obtain a lock will be allowed to continue before

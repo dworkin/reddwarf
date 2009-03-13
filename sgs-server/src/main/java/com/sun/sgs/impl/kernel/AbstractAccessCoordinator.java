@@ -55,9 +55,9 @@ public abstract class AbstractAccessCoordinator
      * Provides a skeletal implementation of {@code AccessReporter}, supplying
      * the overloadings of {@code reportObjectAccess} and {@code
      * setObjectDescription} that supply default arguments.  Subclasses should
-     * at least provide implementations of the {@link
-     * reportObjectAccess(Transaction, T, AccessType, Object)} and {@link
-     * setObjectDescription(Transaction, T, Object)} methods.
+     * at least provide implementations of the four argument overloading of
+     * {@code reportObjectAccess} and the three argument overloading of {@code
+     * setObjectDescription}.
      */
     public abstract class AbstractAccessReporter<T>
 	implements AccessReporter<T>

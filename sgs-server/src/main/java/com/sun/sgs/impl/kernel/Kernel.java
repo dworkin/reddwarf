@@ -115,6 +115,9 @@ class Kernel {
     // the property for setting the profile listeners
     public static final String PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.listeners";
+    // The property for specifying the access coordinator
+    public static final String ACCESS_COORDINATOR_PROPERTY =
+	"com.sun.sgs.impl.kernel.access.coordinator";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -145,10 +148,6 @@ class Kernel {
     // default timeout the kernel's shutdown method (15 minutes)
     private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
     
-    // The property for specifying the access coordinator
-    private static final String ACCESS_COORDINATOR_PROPERTY =
-	"com.sun.sgs.impl.kernel.access.coordinator";
-
     // the proxy used by all transactional components
     private static final TransactionProxy proxy = new TransactionProxyImpl();
     
