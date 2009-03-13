@@ -19,21 +19,21 @@
 
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.auth.IdentityCoordinator;
-import com.sun.sgs.impl.kernel.ConfigManager;
-import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
+import com.sun.sgs.impl.service.session.ClientSessionImpl.
+    SendEvent;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
@@ -42,14 +42,14 @@ import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.nio.channels.AsynchronousChannelGroup;
-import com.sun.sgs.nio.channels.AsynchronousServerSocketChannel;
-import com.sun.sgs.nio.channels.AsynchronousSocketChannel;
-import com.sun.sgs.nio.channels.CompletionHandler;
-import com.sun.sgs.nio.channels.IoFuture;
-import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
+import com.sun.sgs.protocol.LoginFailureException;
+import com.sun.sgs.protocol.ProtocolAcceptor;
+import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RequestCompletionHandler;
+import com.sun.sgs.protocol.SessionProtocol;
+import com.sun.sgs.protocol.SessionProtocolHandler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
@@ -65,8 +65,6 @@ import com.sun.sgs.service.WatchdogService;
 import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -78,13 +76,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.JMException;
@@ -95,9 +88,9 @@ import javax.management.JMException;
  * The {@link #ClientSessionServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
  * <code>com.sun.sgs.app.name</code></a> and <a
- * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.port">
- * <code>com.sun.sgs.app.port</code></a> configuration properties and supports
- * these public configuration <a
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.impl.service.session.transports">
+ * <code>com.sun.sgs.impl.service.session.transports</code></a> configuration
+ * properties and supports these public configuration <a
  * href="../../../app/doc-files/config-properties.html#ClientSessionService">
  * properties</a>. <p>
  */
@@ -106,7 +99,7 @@ public final class ClientSessionServiceImpl
     implements ClientSessionService
 {
     /** The package name. */
-    public static final String PKG_NAME = "com.sun.sgs.impl.service.session";
+    private static final String PKG_NAME = "com.sun.sgs.impl.service.session";
     
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -119,19 +112,15 @@ public final class ClientSessionServiceImpl
     /** The name of the version key. */
     private static final String VERSION_KEY = PKG_NAME + ".service.version";
 
+    /** The name of the key for the protocol descriptors map. */
+    private static final String PROTOCOL_DESCRIPTORS_MAP_KEY =
+	PKG_NAME + ".service.protocol.descriptors.map";
+
     /** The major version. */
-    private static final int MAJOR_VERSION = 1;
+    private static final int MAJOR_VERSION = 2;
     
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
-    
-    /**
-     * The server listen address property.
-     * This is the host interface we are listening on. Default is listen
-     * on all interfaces.
-     */
-    private static final String LISTEN_HOST_PROPERTY =
-        PKG_NAME + ".listen.address";
     
     /** The name of the server port property. */
     private static final String SERVER_PORT_PROPERTY =
@@ -140,26 +129,6 @@ public final class ClientSessionServiceImpl
     /** The default server port. */
     private static final int DEFAULT_SERVER_PORT = 0;
 
-    /** The name of the acceptor backlog property. */
-    private static final String ACCEPTOR_BACKLOG_PROPERTY =
-        PKG_NAME + ".acceptor.backlog";
-
-    /** The default acceptor backlog (&lt;= 0 means default). */
-    private static final int DEFAULT_ACCEPTOR_BACKLOG = 0;
-
-    private static final String EVENTS_PER_TXN_PROPERTY =
-	PKG_NAME + ".events.per.txn";
-
-    /** The default events per transaction. */
-    private static final int DEFAULT_EVENTS_PER_TXN = 1;
-
-    /** The name of the read buffer size property. */
-    private static final String READ_BUFFER_SIZE_PROPERTY =
-        PKG_NAME + ".buffer.read.max";
-
-    /** The default read buffer size: {@value #DEFAULT_READ_BUFFER_SIZE} */
-    private static final int DEFAULT_READ_BUFFER_SIZE = 128 * 1024;
-    
     /** The name of the write buffer size property. */
     private static final String WRITE_BUFFER_SIZE_PROPERTY =
         PKG_NAME + ".buffer.write.max";
@@ -167,42 +136,30 @@ public final class ClientSessionServiceImpl
     /** The default write buffer size: {@value #DEFAULT_WRITE_BUFFER_SIZE} */
     private static final int DEFAULT_WRITE_BUFFER_SIZE = 128 * 1024;
 
+    /** The events per transaction property. */
+    private static final String EVENTS_PER_TXN_PROPERTY =
+	PKG_NAME + ".events.per.txn";
+
+    /** The default events per transaction. */
+    private static final int DEFAULT_EVENTS_PER_TXN = 1;
+
     /** The name of the allow new login property. */
     private static final String ALLOW_NEW_LOGIN_PROPERTY =
 	PKG_NAME + ".allow.new.login";
 
-    /** The name of the disconnect delay property. */
-    private static final String DISCONNECT_DELAY_PROPERTY =
-	PKG_NAME + ".disconnect.delay";
-    
-    /** The time (in milliseconds) that a disconnecting connection is
-     * allowed before this service forcibly disconnects it.
-     */
-    private static final long DEFAULT_DISCONNECT_DELAY = 1000;
+    /** The protocol acceptor property name. */
+    private static final String PROTOCOL_ACCEPTOR_PROPERTY =
+	PKG_NAME + ".protocol.acceptor";
 
-    /** The read buffer size for new connections. */
-    private final int readBufferSize;
+    /** The default protocol acceptor class. */
+    private static final String DEFAULT_PROTOCOL_ACCEPTOR =
+	"com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor";
 
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
 
-    /** The disconnect delay (in milliseconds) for disconnecting sessions. */
-    private final long disconnectDelay;
-
-    /** The port for accepting connections. */
-    private final int appPort;
-
     /** The local node's ID. */
     private final long localNodeId;
-
-    /** The async channel group for this service. */
-    private final AsynchronousChannelGroup asyncChannelGroup;
-
-    /** The acceptor for listening for new connections. */
-    private final AsynchronousServerSocketChannel acceptor;
-
-    /** The currently-active accept operation, or {@code null} if none. */
-    volatile IoFuture<?, ?> acceptFuture;
 
     /** The registered session disconnect listeners. */
     private final Set<ClientSessionDisconnectListener>
@@ -240,9 +197,6 @@ public final class ClientSessionServiceImpl
     /** The channel service. */
     private volatile ChannelServiceImpl channelService;
     
-    /** The identity manager. */
-    final IdentityCoordinator identityManager;
-
     /** The exporter for the ClientSessionServer. */
     private final Exporter<ClientSessionServer> exporter;
 
@@ -251,6 +205,12 @@ public final class ClientSessionServiceImpl
 	
     /** The proxy for the ClientSessionServer. */
     private final ClientSessionServer serverProxy;
+
+    /** The protocol listener. */
+    private final ProtocolListener protocolListener;
+
+    /** The protocol acceptor. */
+    private final ProtocolAcceptor protocolAcceptor;
 
     /** The map of logged in {@code ClientSessionHandler}s, keyed by
      *  identity.
@@ -263,17 +223,7 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
-    /** The map of disconnecting {@code ClientSessionHandler}s, keyed by
-     * the time the connection should expire.
-     */
-    private final ConcurrentSkipListMap<Long, ClientSessionHandler>
-	disconnectingHandlersMap =
-	    new ConcurrentSkipListMap<Long, ClientSessionHandler>();
-
-    /** The handle for the task that monitors disconnecting client sessions. */
-    private RecurringTaskHandle monitorDisconnectingSessionsTaskHandle;
-
-    /** The maximum number of session events to sevice per transaction. */
+    /** The maximum number of session events to service per transaction. */
     final int eventsPerTxn;
 
     /** The flag that indicates how to handle same user logins.  If {@code
@@ -305,24 +255,16 @@ public final class ClientSessionServiceImpl
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);	
 	try {
-            appPort = wrappedProps.getRequiredIntProperty(
-                StandardProperties.APP_PORT, 1, 65535);
 	    /*
 	     * Get the property for controlling session event processing
 	     * and connection disconnection.
 	     */
-	    eventsPerTxn = wrappedProps.getIntProperty(
-		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
-		1, Integer.MAX_VALUE);
-            readBufferSize = wrappedProps.getIntProperty(
-                READ_BUFFER_SIZE_PROPERTY, DEFAULT_READ_BUFFER_SIZE,
-                8192, Integer.MAX_VALUE);
             writeBufferSize = wrappedProps.getIntProperty(
                 WRITE_BUFFER_SIZE_PROPERTY, DEFAULT_WRITE_BUFFER_SIZE,
                 8192, Integer.MAX_VALUE);
-	    disconnectDelay = wrappedProps.getLongProperty(
-		DISCONNECT_DELAY_PROPERTY, DEFAULT_DISCONNECT_DELAY,
-		200, Long.MAX_VALUE);
+	    eventsPerTxn = wrappedProps.getIntProperty(
+		EVENTS_PER_TXN_PROPERTY, DEFAULT_EVENTS_PER_TXN,
+		1, Integer.MAX_VALUE);
 	    allowNewLogin = wrappedProps.getBooleanProperty(
  		ALLOW_NEW_LOGIN_PROPERTY, false);
 
@@ -348,8 +290,6 @@ public final class ClientSessionServiceImpl
 	    }
 
 	    /* Get services and check service version. */
-	    identityManager =
-		systemRegistry.getComponent(IdentityCoordinator.class);
 	    flushContextsThread.start();
 	    contextFactory = new ContextFactory(txnProxy);
 	    watchdogService = txnProxy.getService(WatchdogService.class);
@@ -358,8 +298,7 @@ public final class ClientSessionServiceImpl
 	    localNodeId = watchdogService.getLocalNodeId();
 	    watchdogService.addRecoveryListener(
 		new ClientSessionServiceRecoveryListener());
-	    int acceptorBacklog = wrappedProps.getIntProperty(
-	                ACCEPTOR_BACKLOG_PROPERTY, DEFAULT_ACCEPTOR_BACKLOG);
+	    
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("CheckServiceVersion") {
 		    public void run() {
@@ -379,52 +318,21 @@ public final class ClientSessionServiceImpl
 		taskOwner);
 
 	    /*
-	     * Listen for incoming client connections. If no host address
-             * is supplied, default to listen on all interfaces.
+	     * Create the protocol listener and acceptor.
 	     */
-            String hostAddress = properties.getProperty(LISTEN_HOST_PROPERTY);
-            InetSocketAddress listenAddress =
-                hostAddress == null ?
-		new InetSocketAddress(appPort) :
-		new InetSocketAddress(hostAddress, appPort);
-            AsynchronousChannelProvider provider =
-                // TODO fetch from config
-                AsynchronousChannelProvider.provider();
-            asyncChannelGroup =
-                // TODO fetch from config
-                provider.openAsynchronousChannelGroup(
-                    Executors.newCachedThreadPool());
-            acceptor =
-                provider.openAsynchronousServerSocketChannel(asyncChannelGroup);
-	    try {
-                acceptor.bind(listenAddress, acceptorBacklog);
-		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(
-			Level.CONFIG, "bound to port:{0,number,#}",
-			getListenPort());
-		}
-	    } catch (Exception e) {
-		logger.logThrow(Level.WARNING, e,
-                                "acceptor failed to listen on {0}",
-                                listenAddress);
-		try {
-		    acceptor.close();
-                } catch (IOException ioe) {
-                    logger.logThrow(Level.WARNING, ioe,
-                        "problem closing acceptor");
-                }
-		throw e;
-	    }
+	    protocolListener = new ProtocolListenerImpl();
 
-	    /*
-	     * Set up recurring task to monitor disconnecting client sessions.
-	     */
-	    monitorDisconnectingSessionsTaskHandle =
-		taskScheduler.scheduleRecurringTask(
- 		    new MonitorDisconnectingSessionsTask(),
-		    taskOwner, System.currentTimeMillis(),
-		    Math.max(disconnectDelay, DEFAULT_DISCONNECT_DELAY) / 2);
-	    monitorDisconnectingSessionsTaskHandle.start();
+	    protocolAcceptor =
+		wrappedProps.getClassInstanceProperty(
+		    PROTOCOL_ACCEPTOR_PROPERTY,
+                    DEFAULT_PROTOCOL_ACCEPTOR,
+		    ProtocolAcceptor.class,
+		    new Class[] {
+			Properties.class, ComponentRegistry.class,
+			TransactionProxy.class },
+		    properties, systemRegistry, txnProxy);
+	    
+	    assert protocolAcceptor != null;
             
             /* Create our service profiling info and register our MBean */
             ProfileCollector collector = 
@@ -437,13 +345,6 @@ public final class ClientSessionServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
             
-            ConfigManager config = (ConfigManager)
-                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
-            if (config == null) {
-                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
-            } else {
-                config.setAppPort(appPort);
-            }
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -467,66 +368,43 @@ public final class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    public void doReady() {
+    public void doReady() throws Exception {
 	channelService = txnProxy.getService(ChannelServiceImpl.class);
-        acceptFuture = acceptor.accept(new AcceptorListener());
-        try {
-            if (logger.isLoggable(Level.CONFIG)) {
-                logger.log(
-                    Level.CONFIG, "listening on {0}",
-                    acceptor.getLocalAddress());
-            }
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe.getMessage(), ioe);
-        }
+	try {
+	    protocolAcceptor.accept(protocolListener);
+	} catch (IOException e) {
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to start accepting connections");
+	    }
+	    throw e;
+	}
+	
+	transactionScheduler.runTask(
+            new AbstractKernelRunnable("AddProtocolDescriptorMapping") {
+		public void run() {
+		    getProtocolDescriptorsMap().
+			put(localNodeId,
+			    Collections.singleton(
+				protocolAcceptor.getDescriptor()));
+		} },
+	    taskOwner);
     }
 
     /** {@inheritDoc} */
     public void doShutdown() {
-	final IoFuture<?, ?> future = acceptFuture;
-	acceptFuture = null;
-	if (future != null) {
-	    future.cancel(true);
-	}
-
-	if (acceptor != null) {
+	if (protocolAcceptor != null) {
 	    try {
-		acceptor.close();
-            } catch (IOException e) {
-                logger.logThrow(Level.FINEST, e, "closing acceptor throws");
-                // swallow exception
-            } 
+		protocolAcceptor.close();
+	    } catch (IOException ignore) {
+	    }
 	}
-
 	for (ClientSessionHandler handler : handlers.values()) {
 	    handler.shutdown();
 	}
 	handlers.clear();
 	
-	if (asyncChannelGroup != null) {
-	    asyncChannelGroup.shutdown();
-	    boolean groupShutdownCompleted = false;
-	    try {
-		groupShutdownCompleted =
-		    asyncChannelGroup.awaitTermination(1, TimeUnit.SECONDS);
-	    } catch (InterruptedException e) {
-		logger.logThrow(Level.FINEST, e,
-				"shutdown acceptor interrupted");
-		Thread.currentThread().interrupt();
-	    }
-	    if (!groupShutdownCompleted) {
-		logger.log(Level.WARNING, "forcing async group shutdown");
-		try {
-		    asyncChannelGroup.shutdownNow();
-		} catch (IOException e) {
-		    logger.logThrow(Level.FINEST, e,
-				    "shutdown acceptor throws");
-		    // swallow exception
-		}
-	    }
-	}
-	logger.log(Level.FINEST, "acceptor shutdown");
-
 	if (exporter != null) {
 	    try {
 		exporter.unexport();
@@ -536,31 +414,10 @@ public final class ClientSessionServiceImpl
 		// swallow exception
 	    }
 	}
-
-	if (monitorDisconnectingSessionsTaskHandle != null) {
-	    try {
-		monitorDisconnectingSessionsTaskHandle.cancel();
-	    } finally {
-		monitorDisconnectingSessionsTaskHandle = null;
-	    }
-	}
-	    
-	disconnectingHandlersMap.clear();
-
+	
 	synchronized (flushContextsLock) {
 	    flushContextsLock.notifyAll();
 	}
-    }
-
-    /**
-     * Returns the port this service is listening on for incoming
-     * client session connections.
-     *
-     * @return the port this service is listening on
-     * @throws IOException if an IO problem occurs
-     */
-    public int getListenPort() throws IOException {
-        return ((InetSocketAddress) acceptor.getLocalAddress()).getPort();
     }
 
     /**
@@ -606,97 +463,98 @@ public final class ClientSessionServiceImpl
     }
     
     /** {@inheritDoc} */
-    public void sendProtocolMessageNonTransactional(
-	BigInteger sessionRefId, ByteBuffer message, Delivery delivery)
-    {
-        serviceStats.sendProtocolMessageNonTransactionalOp.report();
-	ClientSessionHandler handler = handlers.get(sessionRefId);
-	/*
-	 * If a local handler exists, forward message to local handler
-	 * to send to client session.
-	 */
-	if (handler != null) {
-	    byte[] bytes = new byte[message.remaining()];
-	    message.get(bytes);
-	    handler.sendProtocolMessage(bytes, delivery);
-	} else {
-	    logger.log(
-		Level.FINE,
-		"Discarding messages for unknown session:{0}",
-		sessionRefId);
-		return;
+    public SessionProtocol getSessionProtocol(BigInteger sessionRefId) {
+	if (sessionRefId == null) {
+	    throw new NullPointerException("null sessionRefId");
 	}
+        serviceStats.getSessionProtocolOp.report();
+	ClientSessionHandler handler = handlers.get(sessionRefId);
+	
+	return handler != null ? handler.getSessionProtocol() : null;
     }
 
+    /* -- Implement ProtocolListener -- */
+
+    private class ProtocolListenerImpl implements ProtocolListener {
+
+	/** {@inheritDoc} */
+	public void newLogin(
+	    Identity identity, SessionProtocol protocol,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
+	{
+	    new ClientSessionHandler(
+		ClientSessionServiceImpl.this, dataService, protocol,
+		identity, completionHandler);
+	}
+	
+    }
+    
     /* -- Package access methods for adding commit actions -- */
     
     /**
-     * Sends the specified protocol {@code message} to the specified
-     * client {@code session} with the specified {@code delivery}
-     * guarantee.  This method must be called within a transaction.
+     * Enqueues the specified send event (containing a session {@code
+     * message}) in the current context for delivery to the specified
+     * client {@code session} when the context commits.  This method must
+     * be called within a transaction.
      *
      * @param	session	a client session
-     * @param	message a complete protocol message
-     * @param	delivery a delivery requirement
+     * @param	sendEvent a send event containing a message and delivery
+     *		guarantee 
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void sendProtocolMessage(
-	ClientSessionImpl session, ByteBuffer message, Delivery delivery)
+    void addSessionMessage(
+	ClientSessionImpl session, SendEvent sendEvent)
     {
-        byte[] bytes = new byte[message.remaining()];
-        message.get(bytes);
-	checkContext().addMessage(session, bytes, delivery);
+	checkContext().addMessage(session, sendEvent);
     }
 
     /**
-     * Sends the specified login acknowledgment {@code message} to the
-     * specified client {@code session} with the specified {@code delivery}
-     * guarantee.  If {@code success} is false, then no further messages
-     * can be sent to this session, even if they have been enqueued during
-     * the current transaction.
      *
-     * <p>When the transaction commits, the login acknowledgment message is
-     * delivered to the client session first, and if {@code success} is
-     * true, all other enqueued messages will be delivered.
+     * Records the login result in the current context, so that the specified
+     * client {@code session} can be notified when the context commits.  If
+     * {@code success} is {@code false}, the specified {@code exception} will be
+     * used as the cause of the {@code ExecutionException} in the {@code Future}
+     * passed to the {@link RequestCompletionHandler} for the login request, and
+     * no subsequent session messages will be forwarded to the session, even if
+     * they have been enqueued during the current transaction.  If success is
+     * {@code true}, then the {@code Future} passed to the {@code
+     * RequestCompletionHandler} for the login request will contain this {@link
+     * SessionProtocolHandler}.
+     *
+     * <p>When the transaction commits, the session's associated {@code
+     * ClientSessionHandler} is notified of the login result, and if {@code
+     * success} is {@code true}, all enqueued messages will be delivered to
+     * the client session.
      *
      * @param	session	a client session
-     * @param	message a complete protocol message
-     * @param	delivery a delivery requirement
      * @param	success if {@code true}, login was successful
+     * @param	exception a login failure exception, or {@code null} (only valid
+     *		if {@code success} is {@code false}
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void sendLoginAck(
- 	ClientSessionImpl session, byte[] message,
-	Delivery delivery, boolean success)
+    void addLoginResult(ClientSessionImpl session,
+			boolean success,
+			LoginFailureException exception)
     {
-	Context context = checkContext();
-	context.addLoginAck(session, message, delivery, success);
+	checkContext().addLoginResult(session, success, exception);
     }
 
     /**
-     * Disconnects the specified client {@code session}.  This method must
-     * be invoked within a transaction.
+     * Adds a request to disconnect the specified client {@code session} when
+     * the current context commits.  This method must be invoked within a
+     * transaction.
      *
      * @param	session a client session
      *
      * @throws 	TransactionException if there is a problem with the
      *		current transaction
      */
-    void disconnect(ClientSessionImpl session) {
+    void addDisconnectRequest(ClientSessionImpl session) {
 	checkContext().requestDisconnect(session);
-    }
-
-    /**
-     * Returns the size of the read buffer to use for new connections.
-     * 
-     * @return the size of the read buffer to use for new connections
-     */
-    int getReadBufferSize() {
-        return readBufferSize;
     }
 
     /**
@@ -706,51 +564,6 @@ public final class ClientSessionServiceImpl
      */
     int getWriteBufferSize() {
         return writeBufferSize;
-    }
-
-    /** A completion handler for accepting connections. */
-    private class AcceptorListener
-        implements CompletionHandler<AsynchronousSocketChannel, Void>
-    {
-
-	/** Handle new connection or report failure. */
-        public void completed(
-	    IoFuture<AsynchronousSocketChannel, Void> result)
-        {
-            try {
-                try {
-                    AsynchronousSocketChannel newChannel = result.getNow();
-                    logger.log(Level.FINER, "Accepted {0}", newChannel);
-
-		    /* The handler will call addHandler if login succeeds */
-		    new ClientSessionHandler(
-			ClientSessionServiceImpl.this, dataService,
-			new AsynchronousMessageChannel(
-			    newChannel, readBufferSize));
-
-                    // Resume accepting connections
-                    acceptFuture = acceptor.accept(this);
-
-                } catch (ExecutionException e) {
-                    throw (e.getCause() == null) ? e : e.getCause();
-                }
-            } catch (CancellationException e) {               
-                logger.logThrow(Level.FINE, e, "acceptor cancelled"); 
-                //ignore
-            } catch (Throwable e) {
-                SocketAddress addr = null;
-                try {
-                    addr = acceptor.getLocalAddress();
-                } catch (IOException ioe) {
-                    // ignore
-                }
-
-                logger.logThrow(
-		    Level.SEVERE, e, "acceptor error on {0}", addr);
-
-                // TBD: take other actions, such as restarting acceptor?
-            }
-	}
     }
 
     /* -- Implement TransactionContextFactory -- */
@@ -783,25 +596,25 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
-	 * Adds a login acknowledgment message be sent to the specified
+	 * Adds the specified login result be sent to the specified
 	 * session after this transaction commits.  If {@code success} is
 	 * {@code false}, no other messages are sent to the session after
 	 * the login acknowledgment.
 	 */
-	void addLoginAck(
- 	    ClientSessionImpl session, byte[] message, Delivery delivery,
-	    boolean success)
+	void addLoginResult(
+	    ClientSessionImpl session, boolean success,
+	    LoginFailureException ex)
 	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addLoginAck success:{0} session:{1}," +
-			"message:{2}", success, session, message);
+			"Context.addLoginResult success:{0} session:{1}",
+			success, session);
 		}
 		checkPrepared();
 
-		getCommitActions(session).addLoginAck(message, success);
+		getCommitActions(session).addLoginResult(success, ex);
 
 	    
 	    } catch (RuntimeException e) {
@@ -815,22 +628,22 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
-	 * Adds a message to be sent to the specified session after
+	 * Enqueues a message to be sent to the specified session after
 	 * this transaction commits.
 	 */
 	private void addMessage(
-	    ClientSessionImpl session, byte[] message, Delivery delivery)
-	{
+	    ClientSessionImpl session, SendEvent sendEvent)
+    	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
 			"Context.addMessage session:{0}, message:{1}",
-			session, message);
+			session, sendEvent.message);
 		}
 		checkPrepared();
 
-		getCommitActions(session).addMessage(message);
+		getCommitActions(session).addMessage(sendEvent);
 	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -941,7 +754,7 @@ public final class ClientSessionServiceImpl
 	}
 	
 	/**
-	 * Sends all protocol messages enqueued during this context's
+	 * Sends all message enqueued during this context's
 	 * transaction (via the {@code addMessage} and {@code
 	 * addMessageFirst} methods), and disconnects any session
 	 * whose disconnection was requested via the {@code
@@ -969,14 +782,17 @@ public final class ClientSessionServiceImpl
 	/** The client session ID as a BigInteger. */
 	private final BigInteger sessionRefId;
 
-	/** The login ack protocol message, or null. */
-	private byte[] loginAck = null;
-
-	/** The login outcome, only valid if {@code loginAck} is non-null. */
-	private boolean loginSuccess = false;
+	/** Indicates whether a login result should be sent. */
+	private boolean sendLoginResult = false;
 	
-	/** List of protocol messages to send on commit. */
-	private List<byte[]> messages = new ArrayList<byte[]>();
+	/** The login result. */
+	private boolean loginSuccess = false;
+
+	/** The login exception. */
+	private LoginFailureException loginException;
+	
+	/** List of messages to send on commit. */
+	private List<SendEvent> messages = new ArrayList<SendEvent>();
 
 	/** If true, disconnect after sending messages. */
 	private boolean disconnect = false;
@@ -988,13 +804,14 @@ public final class ClientSessionServiceImpl
 	    this.sessionRefId = sessionImpl.getId();
 	}
 
-	void addMessage(byte[] message) {
-	    messages.add(message);
+	void addMessage(SendEvent sendEvent) {
+	    messages.add(sendEvent);
 	}
 
-	void addLoginAck(byte[] message, boolean success) {
-	    loginAck = message;
+	void addLoginResult(boolean success, LoginFailureException ex) {
+	    sendLoginResult = true;
 	    loginSuccess = success;
+	    loginException = ex;
 	}
 	
 	void setDisconnect() {
@@ -1002,7 +819,7 @@ public final class ClientSessionServiceImpl
 	}
 
 	void flush() {
-	    sendMessages();
+	    sendSessionMessages();
 	    if (disconnect) {
 		ClientSessionHandler handler = handlers.get(sessionRefId);
 		/*
@@ -1020,7 +837,7 @@ public final class ClientSessionServiceImpl
 	    }
 	}
 
-	void sendMessages() {
+	void sendSessionMessages() {
 
 	    ClientSessionHandler handler = handlers.get(sessionRefId);
 	    /*
@@ -1029,15 +846,26 @@ public final class ClientSessionServiceImpl
 	     * error message.
 	     */
 	    if (handler != null && handler.isConnected()) {
-		if (loginAck != null) {
-		    handler.sendLoginProtocolMessage(
-			loginAck, Delivery.RELIABLE, loginSuccess);
-		    if (!loginSuccess) {
+		if (sendLoginResult) {
+		    if (loginSuccess) {
+			handler.loginSuccess();
+		    } else {
+			handler.loginFailure(loginException);
 			return;
 		    }
 		}
-		for (byte[] message : messages) {
-		    handler.sendProtocolMessage(message, Delivery.RELIABLE);
+		SessionProtocol protocol = handler.getSessionProtocol();
+		if (protocol != null) {
+		    for (SendEvent sendEvent : messages) {
+                        try {
+                            protocol.sessionMessage(
+				ByteBuffer.wrap(sendEvent.message),
+				sendEvent.delivery);
+                        } catch (Exception e) {
+                            logger.logThrow(Level.WARNING, e,
+                                            "sessionMessage throws");
+                        }
+		    }
 		}
 	    } else {
 		logger.log(
@@ -1293,6 +1121,7 @@ public final class ClientSessionServiceImpl
      * client has successfully logged in.
      */
     void addHandler(BigInteger sessionRefId, ClientSessionHandler handler) {
+        assert handler != null;
 	handlers.put(sessionRefId, handler);
     }
     
@@ -1313,21 +1142,6 @@ public final class ClientSessionServiceImpl
 	}
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
-    }
-
-    /**
-     * Adds the specified {@code handler} to the map containing {@code
-     * ClientSessionHandler}s that are disconnecting.  The map is keyed by
-     * connection expiration time.  The connection will expire after a fixed
-     * delay and will be forcibly terminated if the client hasn't already
-     * closed the connection.
-     *
-     * @param	handler a {@code ClientSessionHandler} for a disconnecting
-     *		{@code ClientSession}
-     */
-    void monitorDisconnection(ClientSessionHandler handler) {
-	disconnectingHandlersMap.put(
-	    System.currentTimeMillis() + disconnectDelay,  handler);
     }
 
     /**
@@ -1389,36 +1203,6 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * A task to monitor disconnecting {@code ClientSessionHandler}s to ensure
-     * that their associated connections are closed by the client in a
-     * timely manner.  If a connection is not terminated by the expiration
-     * time, then the connection is forcibly closed.
-     */
-    private class MonitorDisconnectingSessionsTask
-	extends AbstractKernelRunnable
-    {
-	/** Constructs and instance. */
-	MonitorDisconnectingSessionsTask() {
-	    super(null);
-	}
-	
-	/** {@inheritDoc} */
-	public void run() {
-	    long now = System.currentTimeMillis();
-	    if (!disconnectingHandlersMap.isEmpty() &&
-		disconnectingHandlersMap.firstKey() < now) {
-
-		Map<Long, ClientSessionHandler> expiredSessions = 
-		    disconnectingHandlersMap.headMap(now);
-		for (ClientSessionHandler handler : expiredSessions.values()) {
-		    handler.closeConnection();
-		}
-		expiredSessions.clear();
-	    }
-	}
-    }
-
-    /**
      * The {@code RecoveryListener} for handling requests to recover
      * for a failed {@code ClientSessionService}.
      */
@@ -1453,10 +1237,12 @@ public final class ClientSessionServiceImpl
 				
 			    /*
 			     * Remove client session server proxy and
-			     * associated binding for failed node.
+			     * associated binding for failed node, as
+			     * well as protocol descriptors for the
+			     * failed node.
 			     */
 			    taskService.scheduleTask(
-				new RemoveClientSessionServerProxyTask(nodeId));
+				new RemoveNodeSpecificDataTask(nodeId));
 			} },
 		    taskOwner);
 					     
@@ -1473,10 +1259,10 @@ public final class ClientSessionServiceImpl
     }
 
     /**
-     * A persistent task to remove the client session server proxy for a
-     * specified node.
+     * A persistent task to remove the client session server proxy
+     * and protocol descriptors for a failed node.
      */
-    private static class RemoveClientSessionServerProxyTask
+    private static class RemoveNodeSpecificDataTask
 	 implements Task, Serializable
     {
 	/** The serialVersionUID for this class. */
@@ -1489,12 +1275,13 @@ public final class ClientSessionServiceImpl
 	 * Constructs an instance of this class with the specified
 	 * {@code nodeId}.
 	 */
-	RemoveClientSessionServerProxyTask(long nodeId) {
+	RemoveNodeSpecificDataTask(long nodeId) {
 	    this.nodeId = nodeId;
 	}
 
 	/**
-	 * Removes the client session server proxy and binding for the node
+	 * Removes the client session server proxy and binding and
+	 * also removes the protocol descriptors for the node
 	 * specified during construction.
 	 */
 	public void run() {
@@ -1503,6 +1290,7 @@ public final class ClientSessionServiceImpl
 	    try {
 		dataService.removeObject(
 		    dataService.getServiceBinding(sessionServerKey));
+		getProtocolDescriptorsMap().remove(nodeId);
 	    } catch (NameNotBoundException e) {
 		// already removed
 		return;
@@ -1511,4 +1299,68 @@ public final class ClientSessionServiceImpl
 	    dataService.removeServiceBinding(sessionServerKey);
 	}
     }
+
+    /**
+     * Returns a set of protocol descriptors for the specified
+     * {@code nodeId}, or {@code null} if there are no descriptors
+     * for the node.  This method must be run outside a transaction.
+     */
+    Set<ProtocolDescriptor> getProtocolDescriptors(long nodeId) {
+	checkNonTransactionalContext();
+	GetProtocolDescriptorsTask protocolDescriptorsTask =
+	    new GetProtocolDescriptorsTask(nodeId);
+	try {
+	    transactionScheduler.runTask(protocolDescriptorsTask, taskOwner);
+	    return protocolDescriptorsTask.descriptors;
+	} catch (Exception e) {
+            logger.logThrow(Level.WARNING, e,
+                            "GetProtocolDescriptorsTask for node:{0} throws",
+                            nodeId);
+	    return null;
+	}
+    }
+
+    /**
+     * A task to obtain the protocol descriptors for a given node.
+     */
+    private static class GetProtocolDescriptorsTask
+	extends AbstractKernelRunnable
+    {
+	private final long nodeId;
+	volatile Set<ProtocolDescriptor> descriptors = null;
+
+	/** Constructs an instance with the specified {@code nodeId}. */
+	GetProtocolDescriptorsTask(long nodeId) {
+	    super(null);
+	    this.nodeId = nodeId;
+	}
+
+	/** {@inheritDoc} */
+	public void run() {
+	    descriptors = getProtocolDescriptorsMap().get(nodeId);
+	}
+    }
+
+    /**
+     * Returns the protocol descriptors map, keyed by node ID.  Creates and
+     * stores the map if it doesn't already exist.  This method must be run
+     * within a transaction.
+     */
+    private static Map<Long, Set<ProtocolDescriptor>>
+	getProtocolDescriptorsMap()
+    {
+	DataService dataService = getDataService();
+	Map<Long, Set<ProtocolDescriptor>> protocolDescriptorsMap;
+	try {
+	    protocolDescriptorsMap = Objects.uncheckedCast(
+		dataService.getServiceBinding(PROTOCOL_DESCRIPTORS_MAP_KEY));
+	} catch (NameNotBoundException e) {
+	    protocolDescriptorsMap =
+		new ScalableHashMap<Long, Set<ProtocolDescriptor>>();
+	    dataService.setServiceBinding(PROTOCOL_DESCRIPTORS_MAP_KEY,
+					  protocolDescriptorsMap);
+	}
+	return protocolDescriptorsMap;
+    }
 }
+

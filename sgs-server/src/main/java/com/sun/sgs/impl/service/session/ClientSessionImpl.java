@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.DeliveryNotSupportedException;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -38,7 +39,6 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import java.io.IOException;
@@ -46,6 +46,7 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -94,12 +95,18 @@ public class ClientSessionImpl
     /** The identity for this session. */
     private final Identity identity;
 
+    /** The set of delivery requirements for this session. */
+    private final Set<Delivery> deliveries;
+
     /** The node ID for this session (final because sessions can't move yet). */
     private final long nodeId;
 
     /** Indicates whether this session is connected. */
     private volatile boolean connected = true;
 
+    /** Maximum message length for session messages. */
+    private final int maxMessageLength;
+    
     /** The capacity of the write buffer, in bytes. */
     private final int writeBufferCapacity;
 
@@ -110,8 +117,8 @@ public class ClientSessionImpl
 
     /**
      * Constructs an instance of this class with the specified {@code
-     * sessionService}, {@code identity}, and the local node ID, and stores
-     * this instance with the following bindings:<p>
+     * sessionService}, {@code identity}, and supported {@code deliveries},
+     * and stores this instance with the following bindings:<p>
      *
      * <pre>
      * com.sun.sgs.impl.service.session.impl.&lt;idBytes&gt;
@@ -121,21 +128,27 @@ public class ClientSessionImpl
      *
      * @param	sessionService a client session service
      * @param	identity the session's identity
-     * @throws TransactionException if there is a problem with the
+     * @param	deliveries the session's supported delivery requirements
+     * @param	maxMessageLength the maximum session message length
+     * @throws	TransactionException if there is a problem with the
      * 		current transaction
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService,
-		      Identity identity)
+		      Identity identity, Set<Delivery> deliveries,
+                      int maxMessageLength)
     {
 	if (sessionService == null) {
 	    throw new NullPointerException("null sessionService");
-	}
-	if (identity == null) {
-	    throw new IllegalStateException("session's identity is not set");
+	} else if (identity == null) {
+	    throw new NullPointerException("null identity");
+	} else if (deliveries == null) {
+	    throw new NullPointerException("null deliveries");
 	}
 	this.sessionService = sessionService;
 	this.identity = identity;
+	this.deliveries = deliveries;
 	this.nodeId = sessionService.getLocalNodeId();
+        this.maxMessageLength = maxMessageLength;
 	writeBufferCapacity = sessionService.getWriteBufferSize();
 	DataService dataService = sessionService.getDataService();
 	ManagedReference<ClientSessionImpl> sessionRef =
@@ -163,6 +176,16 @@ public class ClientSessionImpl
     }
 
     /** {@inheritDoc} */
+    public Set<Delivery> supportedDeliveries() {
+	return deliveries;
+    }
+    
+    /** {@inheritDoc} */
+    public int getMaxMessageLength() {
+        return maxMessageLength;
+    }
+    
+    /** {@inheritDoc} */
     public boolean isConnected() {
 	return connected;
     }
@@ -172,14 +195,27 @@ public class ClientSessionImpl
      * Enqueues a send event to this client session's event queue for servicing.
      */
     public ClientSession send(ByteBuffer message) {
+	return send(message, Delivery.RELIABLE);
+    }
+
+    /** {@inheritDoc}
+     *
+     * Enqueues a send event to this client session's event queue for servicing.
+     */
+    public ClientSession send(ByteBuffer message, Delivery delivery) {
 	try {
-            if (message.remaining() > SimpleSgsProtocol.MAX_PAYLOAD_LENGTH) {
+            if (!isConnected()) {
+		throw new IllegalStateException("client session not connected");
+            } else if (message == null) {
+		throw new NullPointerException("null message");
+	    } else if (message.remaining() > maxMessageLength) {
                 throw new IllegalArgumentException(
                     "message too long: " + message.remaining() + " > " +
-                        SimpleSgsProtocol.MAX_PAYLOAD_LENGTH);
-            } else if (!isConnected()) {
-		throw new IllegalStateException("client session not connected");
+                    maxMessageLength);
+            } else {
+		checkDelivery(delivery);
 	    }
+            
             /*
              * TBD: Possible optimization: if we have passed our own special
              * buffer to the app, we can detect that here and possibly avoid a
@@ -187,11 +223,9 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-            ByteBuffer buf = ByteBuffer.wrap(new byte[1 + message.remaining()]);
-            buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
-		put(message.asReadOnlyBuffer()).
-		flip();
-	    addEvent(new SendEvent(buf.array()));
+	    byte[] msgBytes = new byte[message.remaining()];
+	    message.asReadOnlyBuffer().get(msgBytes);
+	    addEvent(new SendEvent(msgBytes, delivery));
 
 	    return getWrappedClientSession();
 
@@ -203,6 +237,36 @@ public class ClientSessionImpl
 	    }
 	    throw e;
 	}
+	
+    }
+
+    /**
+     * Throws {@link DeliveryNotSupportedException} if the specified
+     * {@code delivery} guarantee is not supported by any of this session's
+     * delivery guarantees.
+     *
+     * @param	delivery a delivery guarantee
+     * @throws	DeliveryNotSupportedException if the specified {@code
+     *		delivery} guarantee is not supported by any of this
+     *		session's delivery guarantees
+     */
+    private void checkDelivery(Delivery delivery) {
+	if (delivery == null) {
+	    throw new NullPointerException("null delivery");
+	}
+	if (deliveries.contains(delivery)) {
+	    return;
+	}
+	
+	for (Delivery d : deliveries) {
+	    if (d.supportsDelivery(delivery)) {
+		return;
+	    }
+	}
+	throw new DeliveryNotSupportedException(
+	    "client session:" + this +
+	    " does not support the delivery guarantee",
+	    delivery);
     }
 
     /**
@@ -711,24 +775,26 @@ public class ClientSessionImpl
 	}
     }
 
-    private static class SendEvent extends SessionEvent {
+    static class SendEvent extends SessionEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	private final byte[] message;
+	final byte[] message;
+	final Delivery delivery;
 
 	/**
 	 * Constructs a send event with the given {@code message}.
 	 */
-	SendEvent(byte[] message) {
+	SendEvent(byte[] message, Delivery delivery) {
 	    this.message = message;
+	    this.delivery = delivery;
 	}
 
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.sendProtocolMessage(
-		sessionImpl, ByteBuffer.wrap(message), Delivery.RELIABLE);
+	    sessionImpl.sessionService.
+		addSessionMessage(sessionImpl, this);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -754,7 +820,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.disconnect(sessionImpl);
+	    sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

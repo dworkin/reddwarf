@@ -31,7 +31,6 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.ClientSessionService;
@@ -278,10 +277,16 @@ public class SgsTestNode {
         shutdownCtrl = (KernelShutdownController)
                 kernelShutdownCtrl.get(kernel);
 
-	if (sessionService != null) {
-	    appPort =
-		((ClientSessionServiceImpl) sessionService).getListenPort();
-	}
+        // If an app node, we assume SimpleSgsProtocol and TcpTransport transport
+        // for the client IO stack.
+        if (sessionService != null) {
+            String portProp =
+                    props.getProperty(
+                       com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY);
+            appPort = portProp == null ?
+                            com.sun.sgs.impl.transport.tcp.TcpTransport.DEFAULT_PORT :
+                            Integer.parseInt(portProp);
+        }
     }
 
     /**
@@ -431,9 +436,10 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             StandardProperties.APP_NAME, appName,
-            StandardProperties.APP_PORT, Integer.toString(getNextAppPort()),
             StandardProperties.SERVER_START, startServer,
             StandardProperties.SERVER_HOST, "localhost",
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
+                String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.port", 
@@ -471,17 +477,10 @@ public class SgsTestNode {
     }
 
     /**
-     * Returns the bound app port.
+     * Returns a bound app port.
      */
     public int getAppPort() {
 	return appPort;
-    }
-    
-    /**
-     * Returns a unique port number.
-     */
-    public static int getNextAppPort() {
-        return getNextUniquePort();
     }
     
     /**

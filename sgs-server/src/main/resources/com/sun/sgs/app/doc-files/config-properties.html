@@ -153,10 +153,6 @@ space available for Project Darkstar use.
 <dd>The <a href="../AppListener.html"><code>AppListener</code></a> for
   the application, specified as a fully qualified class name.
 
-<dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
-<span class="required"> for application and single nodes</span>
-<dd>The TCP port on which to listen for client connections.
-
 </dl>
 
 <a name="CommonProperties"></a>
@@ -164,6 +160,18 @@ space available for Project Darkstar use.
 
 These properties control various general facilities in the Project Darkstar
 Server, and can be used in any node configuration unless otherwise specified.
+
+<a name="AppServerPorts"></a>
+<h3>Application Server Port Properties</h3>
+By default, the application server uses a TCP transport for client communications. This property can be used by application nodes to specify 
+the port to be used for the client listeners. 
+
+<dl>
+<dt><a name="com.sun.sgs.impl.transport.tcp.listen.port">com.sun.sgs.impl.transport.tcp.listen.port</a>
+<span class="default">62964</span>
+<dd>The TCP port on which to listen for client connections when the TCP
+transport is configured.
+</dl>
 
 <a name="CoreServerPorts"></a>
 <h3>Core Server Port Properties</h3>
