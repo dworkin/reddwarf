@@ -141,6 +141,11 @@ public final class BootEnvironment {
             "${SGS_HOME}" + File.separator + "conf" + File.separator +
             "sgs-logging.properties";
     /**
+     * The default value for the java.util.logging.config.class.
+     */
+    public static final String DEFAULT_SGS_LOGGING_CLASS = 
+            "com.sun.sgs.impl.kernel.LoggerPropertiesInit";
+    /**
      * The default value for the {@code BDB_TYPE} property.
      */
     public static final String DEFAULT_BDB_TYPE = "db";

@@ -39,7 +39,6 @@ public class ConfigManager implements ConfigMXBean {
     private final String appRoot;
     private final String appListener;
     private final String hostName;
-    private int appPort = -1;   // default is no app port
     private final String serverHost;
     private int jmxPort;
     private long standardTxnTimeout;
@@ -99,11 +98,6 @@ public class ConfigManager implements ConfigMXBean {
     }
     
     /** {@inheritDoc} */
-    public int getAppPort() {
-        return appPort;
-    }
-
-    /** {@inheritDoc} */
     public String getServerHostName() {
         return serverHost;
     }
@@ -134,15 +128,5 @@ public class ConfigManager implements ConfigMXBean {
      */
     public void setJmxPort(int jmxPort) {
         this.jmxPort = jmxPort;
-    }
-    
-    /**
-     * Sets the application port number when it is known by
-     * the client session service.
-     * TODO:  will change with the pluggable I/O
-     * @param appPort the application port
-     */
-    public void setAppPort(int appPort) {
-        this.appPort = appPort;
     }
 }

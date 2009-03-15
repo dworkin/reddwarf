@@ -34,7 +34,7 @@ import com.sun.sgs.profile.ProfileOperation;
 class ClientSessionServiceStats implements ClientSessionServiceMXBean {
 
     final ProfileOperation registerSessionDisconnectListenerOp;
-    final ProfileOperation sendProtocolMessageNonTransactionalOp;
+    final ProfileOperation getSessionProtocolOp;
     
     ClientSessionServiceStats(ProfileCollector collector) {
         ProfileConsumer consumer = 
@@ -46,9 +46,8 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
         registerSessionDisconnectListenerOp =
             consumer.createOperation("registerSessionDisconnectListener", 
                                      type, level);
-        sendProtocolMessageNonTransactionalOp =
-            consumer.createOperation("sendProtocolMessageNonTransactional", 
-                                     type, level);
+        getSessionProtocolOp =
+            consumer.createOperation("getSessionProtocol", type, level);
     }
 
     /** {@inheritDoc} */
@@ -58,8 +57,8 @@ class ClientSessionServiceStats implements ClientSessionServiceMXBean {
     }
 
     /** {@inheritDoc} */
-    public long getSendProtocolMessageNonTransactionalCalls() {
+    public long getGetSessionProtocolCalls() {
         return ((AggregateProfileOperation) 
-                    sendProtocolMessageNonTransactionalOp).getCount();
+                    getSessionProtocolOp).getCount();
     }
 }

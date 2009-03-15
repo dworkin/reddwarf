@@ -64,8 +64,9 @@ public class HelloPersistence3
      * @return the subtask this task delegates to, or null if none is set
      */
     public TrivialTimedTask getSubTask() {
-        if (subTaskRef == null)
+        if (subTaskRef == null) {
             return null;
+        }
 
         return subTaskRef.get();
     }

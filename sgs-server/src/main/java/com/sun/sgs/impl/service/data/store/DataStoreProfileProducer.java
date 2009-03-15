@@ -182,9 +182,9 @@ public class DataStoreProfileProducer
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    public void shutdown() {
 	/* No profiling for this operation -- it only happens once */
-	return dataStore.shutdown();
+	dataStore.shutdown();
     }
 
     /** {@inheritDoc} */
