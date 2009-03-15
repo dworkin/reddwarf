@@ -59,7 +59,6 @@ public interface DataStoreServer extends Remote {
      * @param	oid the object ID
      * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
      *		negative
-     * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active

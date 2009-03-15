@@ -23,20 +23,23 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 import com.sun.sgs.test.util.DummyManagedObject;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test concurrent operation of the data service. */
 @SuppressWarnings("hiding")
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataServiceConcurrency extends TestCase {
 
     /** Logger for this test. */
@@ -184,7 +187,7 @@ public class TestDataServiceConcurrency extends TestCase {
             final AtomicInteger i = new AtomicInteger(0);
 	    final int start = t * perThread;
             while (i.get() < perThread) {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             int ival = i.get();
                             while (ival < perThread) {
@@ -302,7 +305,7 @@ public class TestDataServiceConcurrency extends TestCase {
             final AtomicInteger i = new AtomicInteger(0);
             try {
                 while (i.get() < operations) {
-                    txnScheduler.runTask(new AbstractKernelRunnable() {
+                    txnScheduler.runTask(new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
                                 while (i.get() < operations) {
                                     if (i.get() % 1000 == 0 &&

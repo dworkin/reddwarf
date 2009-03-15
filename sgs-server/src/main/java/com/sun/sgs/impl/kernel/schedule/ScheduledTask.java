@@ -34,35 +34,35 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 public interface ScheduledTask {
 
     /** Identifier that represents a non-recurring task. */
-    public static final int NON_RECURRING = -1;
+    int NON_RECURRING = -1;
 
     /**
      * Returns the task.
      *
      * @return the {@code KernelRunnable} to run
      */
-    public KernelRunnable getTask();
+    KernelRunnable getTask();
 
     /**
      * Returns the owner.
      *
      * @return the {@code Identity} that owns the task
      */
-    public Identity getOwner();
+    Identity getOwner();
 
     /**
      * Returns the priority.
      *
      * @return the {@code Priority}
      */
-    public Priority getPriority();
+    Priority getPriority();
 
     /**
      * Returns the time at which this task is scheduled to start.
      *
      * @return the scheduled run time for the task
      */
-    public long getStartTime();
+    long getStartTime();
 
     /**
      * Returns the period for the task if it's recurring, or
@@ -70,7 +70,7 @@ public interface ScheduledTask {
      *
      * @return the period between recurring executions.
      */
-    public long getPeriod();
+    long getPeriod();
 
     /**
      * Returns whether this is a recurring task. If this is not a recurring
@@ -79,7 +79,7 @@ public interface ScheduledTask {
      * @return {@code true} if this task is a recurring task,
      *         {@code false} otherwise.
      */
-    public boolean isRecurring();
+    boolean isRecurring();
 
     /**
      * Returns the {@code RecurringTaskHandle} associated with this task if
@@ -87,7 +87,7 @@ public interface ScheduledTask {
      *
      * @return the associated {@code RecurringTaskHandle} or {@code null}
      */
-    public RecurringTaskHandle getRecurringTaskHandle();
+    RecurringTaskHandle getRecurringTaskHandle();
 
     /**
      * Returns whether this task has been cancelled.
@@ -95,7 +95,7 @@ public interface ScheduledTask {
      * @return {@code true} if this {@code ScheduledTask} has been cancelled,
      *         {@code false} otherwise
      */
-    public boolean isCancelled();
+    boolean isCancelled();
 
     /**
      * Cancel this {@code ScheduledTask}. Note that if the task is already
@@ -115,6 +115,6 @@ public interface ScheduledTask {
      *                              succeeded and {@code allowInterrupt}
      *                              is {@code true}
      */
-    public boolean cancel(boolean allowInterrupt) throws InterruptedException;
+    boolean cancel(boolean allowInterrupt) throws InterruptedException;
 
 }

@@ -44,19 +44,19 @@ public interface Identity {
      *
      * @return the identity's name
      */
-    public String getName();
+    String getName();
 
     /**
      * Notifies the system that this identity has logged in. Typically this
      * is done shortly after authenticating the identity. Note that it is
      * valid to authenticate an identity that does not log into the system.
      */
-    public void notifyLoggedIn();
+    void notifyLoggedIn();
 
     /**
      * Notifies the system that this identity has logged out. Typically this
      * is done after a client disconnects from the system.
      */
-    public void notifyLoggedOut();
+    void notifyLoggedOut();
 
 }

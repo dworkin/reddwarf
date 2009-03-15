@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.projectdarkstar.server</groupId>
     <artifactId>sgs-server-parent</artifactId>
-    <version>0.9.8-SNAPSHOT</version>
+    <version>0.9.9-SNAPSHOT</version>
   </parent>
 
   <artifactId>sgs-server</artifactId>
@@ -25,6 +25,19 @@
       <artifactId>junit</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.easymock</groupId>
+      <artifactId>easymock</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.projectdarkstar.client</groupId>
+      <artifactId>sgs-client</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.server</groupId>
+      <artifactId>sgs-server-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.projectdarkstar.server</groupId>
       <artifactId>sgs-shared</artifactId>
     </dependency>
@@ -39,22 +52,23 @@
       <type>zip</type>
     </dependency>
 
-    <!-- Included as compile time dependency only unless
-	 BDB Java edition profile is activated (config from SGS super POM) -->
     <dependency>
-      <groupId>com.projectdarkstar.ext.berkeleydb</groupId>
+      <groupId>com.sleepycat</groupId>
       <artifactId>je</artifactId>
-      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.projectdarkstar.tools.test</groupId>
+      <artifactId>sgs-test-ext</artifactId>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
 
-      <!-- We need to customize the manifest for this particular jar
-	   The Class-Path entry is tweaked so that the db.jar does not
-	   contain a version number and is in a subdirectory.
-	   Life would be better if we didn't have to do this -->
+      <!-- Customize the manifest for this particular jar
+	   to include the the Kernel as the executable class
+	   and the sgs jar files in the classpath -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -66,14 +80,14 @@
             </manifest>
 	    <manifestEntries>
 	      <Class-Path>
-		bdb/db.jar
-		je-${bdb.je.version}.jar
 		sgs-shared-${sgs-shared.version}.jar
+		sgs-server-api-${sgs.version}.jar
 	      </Class-Path>
 	    </manifestEntries>
           </archive>
         </configuration>
       </plugin>
+
 
       <!-- Always attach a sources jar (with the assembly plugin)
 	   Normally the maven-source-plugin should be used for this.
@@ -102,8 +116,7 @@
 
       <!-- The berkeleydb binary package must be retrieved and unpacked
 	   Before the test phase so that they are available during
-	   runtime of the unit tests
-	   Execution activated from SGS super POM -->
+	   runtime of the unit tests. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -114,7 +127,7 @@
           </execution>
         </executions>
       </plugin>
-
+      
       <!-- Create a clean test-output directory -->
       <plugin>
 	<groupId>org.apache.maven.plugins</groupId>
@@ -178,6 +191,20 @@
 	  </argLine>
 	  <reportsDirectory>${test.reports}</reportsDirectory>
         </configuration>
+	<executions>
+	  <execution>
+	    <phase>integration-test</phase>
+	    <goals>
+	      <goal>test</goal>
+	    </goals>
+	    <configuration>
+	      <argLine>
+		${test.jvm.args} -Dtest.phase=long -Djava.library.path=${run.javapath}
+	      </argLine>
+	      <reportsDirectory>${itest.reports}</reportsDirectory>
+	    </configuration>
+	  </execution>
+	</executions>
       </plugin>
 
       <!-- Activate the resource bundle plugin to include the license
@@ -201,25 +228,6 @@
 
   <reporting>
     <plugins>
-
-      <!-- Configure checkstyle to run during site lifecycle -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-	<configuration>
-	  <linkXRef>false</linkXRef>
-	  <consoleOutput>true</consoleOutput>
-	  <enableRulesSummary>false</enableRulesSummary>
-	  <configLocation>${checkstyle.config}</configLocation>
-	  <headerLocation>${checkstyle.header.gpl}</headerLocation>
-	  <packageNamesLocation>
-	    ${checkstyle.packageNames}
-	  </packageNamesLocation>
-	  <propertyExpansion>
-	    checkstyle.unusedImports=${checkstyle.unusedImports}
-	  </propertyExpansion>
-        </configuration>
-      </plugin>
 
       <!-- Configure findbugs to run during site lifecycle -->
       <plugin>
@@ -247,6 +255,8 @@
     <test.output>target/test-output</test.output>
     <!-- The directory for storing tests results -->
     <test.reports>target/test-reports</test.reports>
+    <!-- The directory for storing integration tests results -->
+    <itest.reports>target/itest-reports</itest.reports>
     <run.logging>
       ${basedir}/src/test/properties/logging.properties
     </run.logging>

@@ -35,6 +35,6 @@ public interface TaskQueue {
      * @param task the {@code KernelRunnable} to add
      * @param owner the {@code Identity} that owns the task
      */
-    public void addTask(KernelRunnable task, Identity owner);
+    void addTask(KernelRunnable task, Identity owner);
 
 }

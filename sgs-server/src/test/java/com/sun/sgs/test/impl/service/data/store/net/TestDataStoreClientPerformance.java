@@ -66,7 +66,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 			  String.valueOf(port));
 	DataStore store = new DataStoreProfileProducer(
 	    new DataStoreClient(props),
-	    DummyProfileCoordinator.getRegistrar());
+	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

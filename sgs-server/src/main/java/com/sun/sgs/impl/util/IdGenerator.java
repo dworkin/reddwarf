@@ -132,6 +132,11 @@ public class IdGenerator {
 	volatile long firstId;
 	volatile long lastId;
 
+	/** Constructs an instance. */
+	ReserveIdBlockTask() {
+	    super(null);
+	}
+
 	/** {@inheritDoc} */
 	public void run() {
 	    DataService dataService = txnProxy.getService(DataService.class);

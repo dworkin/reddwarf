@@ -239,7 +239,8 @@ public final class NodeMappingServerImpl
         /*
          * Check service version.
          */
-        transactionScheduler.runTask(new AbstractKernelRunnable() {
+        transactionScheduler.runTask(
+	    new AbstractKernelRunnable("CheckServiceVersion") {
                 public void run() {
                     checkServiceVersion(
                         NodeMapUtil.VERSION_KEY, 
@@ -384,6 +385,7 @@ public final class NodeMappingServerImpl
         /** return value, node assignment */
         private Node node;
         CheckTask(Identity id, String serviceName) {
+	    super(null);
             idkey = NodeMapUtil.getIdentityKey(id);
             this.serviceName = serviceName;
             this.id = id;
@@ -481,7 +483,7 @@ public final class NodeMappingServerImpl
                         RemoveTask rtask = new RemoveTask(id);
                         try {
                             runTransactionally(rtask);
-                            if (rtask.isDead()) {
+                            if (rtask.idRemoved()) {
                                 notifyListeners(rtask.getNode(), null, id);
                                 logger.log(Level.FINE, "Removed {0}", id);
                             }
@@ -527,6 +529,7 @@ public final class NodeMappingServerImpl
         private Node node;
         
         RemoveTask(Identity id) {
+	    super(null);
             this.id = id;
             idkey = NodeMapUtil.getIdentityKey(id);
             statuskey = NodeMapUtil.getPartialStatusKey(id);
@@ -538,8 +541,14 @@ public final class NodeMappingServerImpl
             dead = (name == null || !name.startsWith(statuskey));
 
             if (dead) {
-                IdentityMO idmo = 
-		    (IdentityMO) dataService.getServiceBinding(idkey);
+                IdentityMO idmo;
+                try {
+                    idmo = (IdentityMO) dataService.getServiceBinding(idkey);
+                } catch (NameNotBoundException nnbe) {
+                    dead = false;
+                    logger.log(Level.FINE, "{0} has already been removed", id);
+                    return;
+                }
                 long nodeId = idmo.getNodeId();
                 node = watchdogService.getNode(nodeId);
                 // Remove the node->id binding.  
@@ -553,7 +562,7 @@ public final class NodeMappingServerImpl
         }
         
         /** Returns {@code true} if the identity was removed. */
-        boolean isDead() {
+        boolean idRemoved() {
             return dead;
         }
         /** Returns the node the identity was removed from, which can be
@@ -607,13 +616,23 @@ public final class NodeMappingServerImpl
         if (oldNode != null) {
             NotifyClient oldClient = notifyMap.get(oldNode.getId());
             if (oldClient != null) {
-                try {
-                    oldClient.removed(id, newNode);
-                } catch (IOException ex) {
-                    logger.logThrow(Level.WARNING, ex, 
-                            "A communication error occured while notifying" +
-                            " node {0} that {1} has been removed", 
-                            oldClient, id);
+                int retries = maxIoAttempts; // retry a few times
+                while (retries-- > 0) {
+                    try {
+                        oldClient.removed(id, newNode);
+                        break;
+                    } catch (IOException ex) {
+                        // report failure if we run out of retries
+                        if (retries == 0) {
+                            logger.logThrow(Level.WARNING, ex,
+                                    "A communication error occured while " +
+                                    "notifying node {0} that {1} has " +
+                                    "been removed", oldClient, id);
+                            // shutdown the node corresponding to oldClient
+                            watchdogService.reportFailure(oldNode.getId(),
+                                    this.getClass().toString());
+                        }
+                    }
                 }
             }
         }
@@ -621,12 +640,23 @@ public final class NodeMappingServerImpl
         if (newNode != null) {
             NotifyClient newClient = notifyMap.get(newNode.getId());
             if (newClient != null) {
-                try {
-                    newClient.added(id, oldNode);
-                } catch (IOException ex) {
-                    logger.logThrow(Level.WARNING, ex, 
-                            "A communication error occured while notifying" +
-                            " node {0} that {1} has been added", newClient, id);
+                int retries = maxIoAttempts; // retry a few times
+                while (retries-- > 0) {
+                    try {
+                        newClient.added(id, oldNode);
+                        break;
+                    } catch (IOException ex) {
+                        // report failure if we run out of retries
+                        if (retries == 0) {
+                            logger.logThrow(Level.WARNING, ex,
+                                    "A communication error occured while " +
+                                    "notifying node {0} that {1} has " +
+                                    "been removed", newClient, id);
+                            // shutdown the node corresponding to newClient
+                            watchdogService.reportFailure(newNode.getId(),
+                                    this.getClass().toString());
+                        }
+                    }
                 }
             }
         }
@@ -726,7 +756,7 @@ public final class NodeMappingServerImpl
         final IdentityMO newidmo = new IdentityMO(id, newNodeId);
         
         try {
-            runTransactionally(new AbstractKernelRunnable() {
+            runTransactionally(new AbstractKernelRunnable("MoveIdentity") {
                 public void run() {                   
                     // First, we clean up any old mappings.
                     if (oldNode != null) {
@@ -810,6 +840,7 @@ public final class NodeMappingServerImpl
         private final long nodeId;
                             
         GetNodeTask(long nodeId) {
+	    super(null);
             this.nodeId = nodeId; 
         }               
                     
@@ -919,6 +950,7 @@ public final class NodeMappingServerImpl
         GetIdOnNodeTask(DataService dataService, 
                         String nodekey, LoggerWrapper logger) 
         {
+	    super(null);
             this.dataService = dataService;
             this.nodekey = nodekey;
             this.logger = logger;
@@ -1017,6 +1049,7 @@ public final class NodeMappingServerImpl
          * @param idkey Identitifier key
          */
         GetIdTask(DataService dataService, String idkey) {
+	    super(null);
             this.dataService = dataService;
             this.idkey = idkey;
         }
@@ -1074,6 +1107,7 @@ public final class NodeMappingServerImpl
         private Set<String> foundKeys = new HashSet<String>();
 
         AssertTask(Identity id, DataService dataService) {
+	    super(null);
             this.id = id;
             this.dataService = dataService;
             idkey = NodeMapUtil.getIdentityKey(id);

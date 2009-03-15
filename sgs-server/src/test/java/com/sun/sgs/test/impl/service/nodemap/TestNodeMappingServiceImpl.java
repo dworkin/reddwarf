@@ -25,7 +25,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.LocalNodePolicy;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -38,6 +37,8 @@ import com.sun.sgs.service.UnknownIdentityException;
 import com.sun.sgs.service.UnknownNodeException;
 import com.sun.sgs.service.WatchdogService;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -48,9 +49,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import junit.framework.TestCase;
+import java.util.concurrent.Exchanger;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Filter;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-public class TestNodeMappingServiceImpl extends TestCase {
+@RunWith(FilteredNameRunner.class)
+public class TestNodeMappingServiceImpl {
 
     /** Number of additional nodes to create for selected tests */
     private static final int NUM_NODES = 3;
@@ -115,14 +130,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	return field;
     }
     
-    /** Constructs a test instance. */
-    public TestNodeMappingServiceImpl(String name) throws Exception {
-        super(name);
-    }
-    
-    /** Test setup. */
-    protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
+    @Before
+    public void setUp() throws Exception {
         setUp(null);
     }
 
@@ -179,7 +188,8 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
         
     /** Shut down the nodes. */
-    protected void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         if (additionalNodes != null) {
             for (SgsTestNode node : additionalNodes) {
                 node.shutdown(false);
@@ -191,6 +201,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
     
         ////////     The tests     /////////
+    @Test
     public void testConstructor() {
         NodeMappingService nodemap = null;
         try {
@@ -204,32 +215,29 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
 
+    @Test(expected = NullPointerException.class)
     public void testConstructorNullProperties() throws Exception {
         NodeMappingService nodemap = null;
         try {
             nodemap = 
                 new NodeMappingServiceImpl(null, systemRegistry, txnProxy);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
     }
     
+    @Test(expected = NullPointerException.class)
     public void testConstructorNullProxy() throws Exception {
         NodeMappingService nodemap = null;
         try {
             nodemap = 
               new NodeMappingServiceImpl(serviceProps, systemRegistry, null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException e) {
-            System.err.println(e);
         } finally {
             if (nodemap != null) { nodemap.shutdown(); }
         }
     }
     
+    @Test(expected = IllegalArgumentException.class)
     public void testConstructorAppButNoServerHost() throws Exception {
         // Server start is false but we didn't specify a server host
         Properties props = 
@@ -239,17 +247,13 @@ public class TestNodeMappingServiceImpl extends TestCase {
                     SgsTestNode.DummyAppListener.class);
         props.remove(StandardProperties.SERVER_HOST);
 	
-        try {
-            NodeMappingService nmap =
-                new NodeMappingServiceImpl(props, systemRegistry, txnProxy);
-            fail("Expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            System.err.println(e);
-        }
+        NodeMappingService nmap =
+            new NodeMappingServiceImpl(props, systemRegistry, txnProxy);
     }
     
+    @Test
     public void testConstructedVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = (Version)
 			serverNode.getDataService()
@@ -264,8 +268,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
 		}}, taskOwner);
     }
     
+    @Test
     public void testConstructorWithCurrentVersion() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version = new Version(MAJOR_VERSION, MINOR_VERSION);
 		    serverNode.getDataService()
@@ -278,8 +283,9 @@ public class TestNodeMappingServiceImpl extends TestCase {
 	    systemRegistry, txnProxy);  
     }
 
+    @Test(expected = IllegalStateException.class)
     public void testConstructorWithMajorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION + 1, MINOR_VERSION);
@@ -287,16 +293,12 @@ public class TestNodeMappingServiceImpl extends TestCase {
                               .setServiceBinding(VERSION_KEY, version);
 		}}, taskOwner);
 
-	try {
-	    new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+        new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
     }
 
+    @Test(expected = IllegalStateException.class)
     public void testConstructorWithMinorVersionMismatch() throws Exception {
-	txnScheduler.runTask(new AbstractKernelRunnable() {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		public void run() {
 		    Version version =
 			new Version(MAJOR_VERSION, MINOR_VERSION + 1);
@@ -304,14 +306,10 @@ public class TestNodeMappingServiceImpl extends TestCase {
                               .setServiceBinding(VERSION_KEY, version);
 		}}, taskOwner);
 
-	try {
-	    new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+        new NodeMappingServiceImpl(serviceProps, systemRegistry, txnProxy);  
     }
     
+    @Test
     public void testReady() throws Exception {
         NodeMappingService nodemap = null;
         try {
@@ -328,7 +326,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
             nodemap.assignNode(NodeMappingService.class, id);
             
             txnScheduler.runTask(
-                new AbstractKernelRunnable() {
+                new TestAbstractKernelRunnable() {
                     public void run() throws Exception {
                         nodeMappingService.getNode(id);
                     }
@@ -364,11 +362,13 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     /* -- Test Service -- */
+    @Test
     public void testGetName() {
         System.out.println(nodeMappingService.getName());
     }
     
     /* -- Test assignNode -- */
+    @Test
     public void testAssignNode() throws Exception {   
         // Assign outside a transaction
         final Identity id = new IdentityImpl("first");
@@ -378,7 +378,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
        
         // Now expect to be able to find the identity
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id);
                     // Make sure we got a notification
@@ -397,24 +397,17 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }, taskOwner);
     }
     
+    @Test(expected = NullPointerException.class)
     public void testAssignNodeNullServer() throws Exception {
-        try {
-            nodeMappingService.assignNode(null, new IdentityImpl("first"));
-            fail("Expected NullPointerException");
-        } catch (NullPointerException ex) {
-            System.err.println(ex);  
-        } 
+        nodeMappingService.assignNode(null, new IdentityImpl("first"));
     }
     
+    @Test(expected = NullPointerException.class)
     public void testAssignNodeNullIdentity() throws Exception {
-        try {
-            nodeMappingService.assignNode(NodeMappingService.class, null);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException ex) {
-            System.err.println(ex);  
-        } 
+        nodeMappingService.assignNode(NodeMappingService.class, null); 
     }
     
+    @Test
     public void testAssignNodeTwice() throws Exception {
         Identity id = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id);
@@ -436,7 +429,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         assertEquals(node1, node2);
     }
     
-
+    @Test
     public void testAssignMultNodes() throws Exception {
         // This test is partly so I can compare the time it takes to
         // assign one node, or the same node twice
@@ -454,7 +447,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         for (int j = 0; j < MAX; j++) {
             final Identity id = ids[j];
             txnScheduler.runTask(
-                new AbstractKernelRunnable() {
+                new TestAbstractKernelRunnable() {
                     public void run() throws Exception {
                         nodeMappingService.getNode(id);
                     }
@@ -462,6 +455,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
+    @Test
     public void testRoundRobinAutoMove() throws Exception {
         // Remove what happened at setup().  I know, I know...
         tearDown();
@@ -488,7 +482,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         // Gather up the nodes
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Iterator<Node> iter = watchdog.getNodes();
                     while (iter.hasNext()) {
@@ -501,7 +495,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         // For each node, gather up the identities
         for (final Node node : nodes) {
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Iterator<Identity> idIter = 
                         nodeMappingService.getIdentities(node.getId());
@@ -541,6 +535,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         assertTrue("expected an id to move", foundDiff);
      }
     
+    @Test
     public void testLocalNodePolicy() throws Exception {
         // Remove what happened at setup().  I know, I know...
         tearDown();
@@ -575,50 +570,45 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
      }
     
+    @Test
     public void testAssignNodeInTransaction() throws Exception {
         // TODO should API specify a transaction exception will be thrown?
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
-                nodeMappingService.assignNode(NodeMappingService.class, new IdentityImpl("first"));
+                nodeMappingService.assignNode(NodeMappingService.class, 
+                                              new IdentityImpl("first"));
             }
         }, taskOwner);
     }
     
     /* -- Test getNode -- */
+    @Test(expected = NullPointerException.class)
     public void testGetNodeNullIdentity() throws Exception {
-        try {
-            txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
-                        public void run() throws Exception {
-                            nodeMappingService.getNode(null);
-                        }
-                }, taskOwner);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException ex) {
-            System.err.println(ex);  
-        }
+        txnScheduler.runTask(
+                new TestAbstractKernelRunnable() {
+                    public void run() throws Exception {
+                        nodeMappingService.getNode(null);
+                    }
+            }, taskOwner);
     } 
     
+    @Test(expected = UnknownIdentityException.class)
     public void testGetNodeBadIdentity() throws Exception {
-        try {
-            txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
-                        public void run() throws Exception {
-                            nodeMappingService.getNode(new IdentityImpl("first"));
-                        }
-                }, taskOwner);
-            fail("Expected UnknownIdentityException");
-        } catch (UnknownIdentityException ex) {
-            System.err.println(ex);
-        }
+        txnScheduler.runTask(
+                new TestAbstractKernelRunnable() {
+                    public void run() throws Exception {
+                        nodeMappingService.getNode(new IdentityImpl("first"));
+                    }
+            }, taskOwner);
     }
    
+    @Test
     public void testGetNode() {
         final Identity id = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id);
         try {
             txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
+                    new TestAbstractKernelRunnable() {
                         public void run() throws Exception {
                             nodeMappingService.getNode(id);
                         }
@@ -632,6 +622,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
     // Check to see if identities are changing in a transaction
     // and that any caching of identities in transaction works.
+    @Test
     public void testGetNodeMultiple() throws Exception {
         // A better test would have another thread racing to change
         // the identity.
@@ -651,27 +642,23 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     /*-- Test getIdentities --*/
-    
+    @Test(expected = UnknownNodeException.class)
     public void testGetIdentitiesBadNode() throws Exception {
-        try {
-            txnScheduler.runTask(
-                    new AbstractKernelRunnable() {
-                        public void run() throws Exception {
-                            nodeMappingService.getIdentities(999L);
-                        }
-                }, taskOwner);
-            fail("Expected UnknownNodeException");
-        } catch (UnknownNodeException ex) {
-            System.err.println(ex);
-        }
+        txnScheduler.runTask(
+                new TestAbstractKernelRunnable() {
+                    public void run() throws Exception {
+                        nodeMappingService.getIdentities(999L);
+                    }
+            }, taskOwner);
     }
    
+    @Test
     public void testGetIdentities() throws Exception {
         final Identity id1 = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id1);
 
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id1);
 		    Set<Identity> foundSet = new HashSet<Identity>();
@@ -685,6 +672,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }, taskOwner);
     }
     
+    @Test
     public void testGetIdentitiesNoIds() throws Exception {
         addNodes(null);
         // This test assumes that we can create a node that has no
@@ -692,7 +680,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         final long nodeId = additionalNodes[NUM_NODES - 1].getNodeId();
 
         txnScheduler.runTask(
-            new AbstractKernelRunnable() {
+            new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Iterator<Identity> ids = 
                         nodeMappingService.getIdentities(nodeId);
@@ -704,6 +692,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }, taskOwner);
     }
     
+    @Test
     public void testGetIdentitiesMultiple() throws Exception {
         addNodes(null);
         
@@ -738,7 +727,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         for (final Node node : nodeset) {
             final Set s = nodemap.get(node);
             
-            txnScheduler.runTask(new AbstractKernelRunnable(){
+            txnScheduler.runTask(new TestAbstractKernelRunnable(){
                 public void run() throws Exception {
 		    Set<Identity> foundSet = new HashSet<Identity>();
                     Iterator<Identity> idIter = 
@@ -754,24 +743,17 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     /* -- Test setStatus -- */
+    @Test(expected = NullPointerException.class)
     public void testSetStatusNullService() throws Exception {
-        try {
-            nodeMappingService.setStatus(null, new IdentityImpl("first"), true);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException ex) {
-            System.err.println(ex);  
-        }
+        nodeMappingService.setStatus(null, new IdentityImpl("first"), true);
     }
     
+    @Test(expected = NullPointerException.class)
     public void testSetStatusNullIdentity() throws Exception {
-        try {
-            nodeMappingService.setStatus(NodeMappingService.class, null, true);
-            fail("Expected NullPointerException");
-        } catch (NullPointerException ex) {
-            System.err.println(ex);  
-        }
+        nodeMappingService.setStatus(NodeMappingService.class, null, true);
     }
     
+    @Test
     public void testSetStatusRemove() throws Exception {
         Identity id = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id);
@@ -803,6 +785,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         }
     }
     
+    @Test
     public void testSetStatusMultRemove() throws Exception {
         Identity id = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id);
@@ -839,7 +822,95 @@ public class TestNodeMappingServiceImpl extends TestCase {
             assertTrue(removedNodes.contains(null));
         }
     }
+    
+    /**
+     * Regression test for sgs-server issue #140, node mapping server
+     * is logging at too high a level in a particular scenario.
+     */
+    @Test
+    public void testSetStatusQuickMultRemove() throws Exception {  
+        Identity id = new IdentityImpl("something");
+        nodeMappingService.assignNode(NodeMappingService.class, id);
+        GetNodeTask task = new GetNodeTask(id);
+        txnScheduler.runTask(task, taskOwner);
+        Node node = task.getNode();
         
+        // clear out the listener
+        TestListener listener = nodeListenerMap.get(node.getId());
+        listener.clear();
+
+        // We arrange for the test to fail if there is a WARNING log message
+        // in the time period we're interested in.  The threads use an
+        // Exchanger to synchronize and get results from the logger.
+        final Exchanger<Boolean> errorExchanger = new Exchanger<Boolean>();
+        
+        Logger logger = 
+            Logger.getLogger("com.sun.sgs.impl.service.nodemap.server");
+        Level oldLevel = logger.getLevel();
+        logger.setLevel(Level.INFO);
+        logger.setFilter(new Filter() {
+            public boolean isLoggable(LogRecord record) {
+                if (record.getLevel() == Level.WARNING) {
+                    // Tell the parent thread we've seen a WARNING message.
+                    try { 
+                        errorExchanger.exchange(Boolean.TRUE);
+                    } catch (InterruptedException ignored) {
+                        // do nothing
+                    }
+                }
+                return true;
+            }
+        });
+        
+        // Much like testSetStatusMultRemove, but need to check logging
+        // output for inappropriate warning message.
+        // We're simulating an identity that is logged in, logged out...
+        nodeMappingService.setStatus(NodeMappingService.class, id, true);
+        nodeMappingService.setStatus(NodeMappingService.class, id, false);
+        // ... and then immediately logged in and out again.
+        nodeMappingService.setStatus(NodeMappingService.class, id, true);
+        nodeMappingService.setStatus(NodeMappingService.class, id, false); 
+        
+        // Wait up to removeTime * 4, and see if we got a WARNING log message
+        try {
+            Boolean error = errorExchanger.exchange(null, 
+                                                    removeTime * 4, 
+                                                    TimeUnit.MILLISECONDS);
+            if (error) {
+                fail(" Got a log record at level WARNING");
+            }
+        } catch (TimeoutException e) {
+            // There might be multiple messages at different levels, or none
+            // at all:  we are only looking for confusing WARNING messages
+            // when there is actually no error to warn about.
+            System.out.println("OK: Time out without a WARNING log message");
+        }
+        
+        // Remove our test filter and reset the logging level.
+        logger.setFilter(null);
+        logger.setLevel(oldLevel);
+        
+        // Sanity check, be sure our listener still gets a single notification
+        // in this log in, out, in, out scenario.
+        try {
+            txnScheduler.runTask(task, taskOwner);
+            fail("Expected UnknownIdentityException");
+        } catch (UnknownIdentityException e) {
+            // Make sure we got a notification
+            assertEquals(0, listener.getAddedIds().size());
+            assertEquals(0, listener.getAddedNodes().size());
+            
+            List<Identity> removedIds = listener.getRemovedIds();
+            List<Node> removedNodes = listener.getRemovedNodes();
+            assertEquals(1, removedIds.size());
+            assertEquals(1, removedNodes.size());
+            assertTrue(removedIds.contains(id));
+            // no new node
+            assertTrue(removedNodes.contains(null));
+        }
+    }
+        
+    @Test
     public void testSetStatusNoRemove() throws Exception {
         Identity id = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id);
@@ -862,6 +933,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     /* -- Test private mapToNewNode -- */
+    @Test
     public void testListenersOnMove() throws Exception {   
         // We need some additional nodes for this test to work correctly.
         addNodes(null);
@@ -939,6 +1011,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     }
     
     /* -- Tests to see what happens if the server isn't available --*/
+    @Test
     public void testEvilServerAssignNode() throws Exception {
         // replace the serverimpl with our evil proxy
         Object oldServer = swapToEvilServer(nodeMappingService);
@@ -951,6 +1024,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         swapToNormalServer(nodeMappingService, oldServer);
     }
     
+    @Test
     public void testEvilServerGetNode() throws Exception {
         // replace the serverimpl with our evil proxy
         Identity id = new IdentityImpl("first");
@@ -964,6 +1038,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         swapToNormalServer(nodeMappingService, oldServer);
     }
     
+    @Test
     public void testEvilServerGetIdentities() throws Exception {
         // put an identity in with a node
         // try to getNode that identity.
@@ -972,7 +1047,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         
         Object oldServer = swapToEvilServer(nodeMappingService);
         
-        txnScheduler.runTask(new AbstractKernelRunnable(){
+        txnScheduler.runTask(new TestAbstractKernelRunnable(){
                 public void run() throws Exception {
                     Node node = nodeMappingService.getNode(id1);
 		    Set<Identity> foundSet = new HashSet<Identity>();
@@ -987,6 +1062,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
         swapToNormalServer(nodeMappingService, oldServer);
     }
     
+    @Test
     public void testEvilServerSetStatus() throws Exception {
         final Identity id = new IdentityImpl("first");
         nodeMappingService.assignNode(NodeMappingService.class, id);
@@ -998,7 +1074,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
 
         // Identity should now be gone... this is a hole in the
         // implementation, currently.  It won't be removed.  
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     Node node = nodeMappingService.getNode(id);
@@ -1042,7 +1118,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     
     /** Use the invariant checking method */
     private void verifyMapCorrect(final Identity id) throws Exception {  
-        txnScheduler.runTask( new AbstractKernelRunnable() {
+        txnScheduler.runTask( new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 boolean valid = 
                     (Boolean) assertValidMethod.invoke(nodeMappingService, id);
@@ -1054,7 +1130,7 @@ public class TestNodeMappingServiceImpl extends TestCase {
     /** 
      * Simple task to call getNode and return an id 
      */
-    private class GetNodeTask extends AbstractKernelRunnable {
+    private class GetNodeTask extends TestAbstractKernelRunnable {
         /** The identity */
         private Identity id;
         /** The node the identity is assigned to */

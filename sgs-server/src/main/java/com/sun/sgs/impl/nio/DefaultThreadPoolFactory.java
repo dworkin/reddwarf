@@ -30,7 +30,10 @@ import com.sun.sgs.nio.channels.ThreadPoolFactory;
 class DefaultThreadPoolFactory implements ThreadPoolFactory {
 
     /** A lazily-initialized singleton holder. */
-    static class LazyInstanceHolder {
+    static final class LazyInstanceHolder {
+        /** This class should not be instantiated. */
+        private LazyInstanceHolder() { }
+        
         /** The lazily-initialized singleton instance. */
         static DefaultThreadPoolFactory instance =
             new DefaultThreadPoolFactory();

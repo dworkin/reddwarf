@@ -19,16 +19,16 @@
 
 package com.sun.sgs.impl.service.transaction;
 
-import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
-import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -95,8 +95,8 @@ final class TransactionImpl implements Transaction {
      */
     private Throwable abortCause = null;
 
-    /** The optional collector used to report participant detail. */
-    private final ProfileCollector collector;
+    /** The collectorHandle used to report participant detail. */
+    private final ProfileCollectorHandle collectorHandle;
 
     /** Collected profiling data on each participant, created only if
      *  global profiling is set to MEDIUM at the start of the transaction.
@@ -104,21 +104,30 @@ final class TransactionImpl implements Transaction {
     private final HashMap<String, ProfileParticipantDetailImpl> detailMap;
 
     /**
+     * The registered {@code TransactionListener}s, or {@code null}.  The
+     * listeners are stored and called in the order registered, to simplify
+     * testing.
+     */
+    private List<TransactionListener> listeners = null;
+
+    /**
      * Creates an instance with the specified transaction ID, timeout, 
-     * prepare and commit optimization flag, and collector.
+     * prepare and commit optimization flag, and collectorHandle.
      */
     TransactionImpl(long tid, long timeout, boolean usePrepareAndCommitOpt,
-                    ProfileCollector collector) 
+                    ProfileCollectorHandle collectorHandle) 
     {
 	this.tid = tid;
 	this.timeout = timeout;
         this.disablePrepareAndCommitOpt = usePrepareAndCommitOpt;
-	this.collector = collector;
+	this.collectorHandle = collectorHandle;
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
 	state = State.ACTIVE;
-	if (collector.getDefaultProfileLevel().ordinal() >= 
-                ProfileLevel.MEDIUM.ordinal()) {
+	if (collectorHandle.getCollector().
+                getDefaultProfileLevel().ordinal() >= 
+                ProfileLevel.MEDIUM.ordinal()) 
+        {
 	    detailMap = new HashMap<String, ProfileParticipantDetailImpl>();
 	} else {
 	    detailMap = null;
@@ -256,10 +265,11 @@ final class TransactionImpl implements Transaction {
 		ProfileParticipantDetailImpl detail =
 		    detailMap.get(participant.getTypeName());
 		detail.setAborted(finishTime - startTime);
-		collector.addParticipant(detail);
+		collectorHandle.addParticipant(detail);
 	    }
 	}
 	state = State.ABORTED;
+	notifyListenersAfter(false);
     }
 
     /** {@inheritDoc} */
@@ -270,6 +280,23 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public Throwable getAbortCause() {
 	return abortCause;
+    }
+
+    /** {@inheritDoc} */
+    public void registerListener(TransactionListener listener) {
+	assert Thread.currentThread() == owner : "Wrong thread";
+	if (listener == null) {
+	    throw new NullPointerException("The listener must not be null");
+	} else if (state != State.ACTIVE) {
+	    throw new TransactionNotActiveException(
+		"Transaction is not active: " + state);
+	}
+	if (listeners == null) {
+	    listeners = new ArrayList<TransactionListener>();
+	    listeners.add(listener);
+	} else if (!listeners.contains(listener)) {
+	    listeners.add(listener);
+	}
     }
 
     /* -- Object methods -- */
@@ -316,13 +343,14 @@ final class TransactionImpl implements Transaction {
      *		aborted
      * @throws	TransactionAbortedException if a call to {@link
      *		TransactionParticipant#prepare prepare} on a transaction
-     *		participant aborts the transaction but does not throw an
-     *		exception
+     *		participant or to {@link TransactionListener#beforeCompletion
+     *		beforeCompletion} on a transaction listener aborts the
+     *		transaction but does not throw an exception
      * @throws	IllegalStateException if {@code prepare} has been called on any
      *		transaction participant and {@link Transaction#abort abort} has
      *		not been called on the transaction
      * @throws	Exception any exception thrown when calling {@code prepare} on
-     *		a participant
+     *		a participant or {@code beforeCompletion} on a listener
      * @see	TransactionHandle#commit TransactionHandle.commit
      */
     void commit() throws Exception {
@@ -335,6 +363,7 @@ final class TransactionImpl implements Transaction {
 	    throw new IllegalStateException(
 		"Transaction is not active: " + state);
 	}
+	notifyListenersBefore();
 	state = State.PREPARING;
 	long startTime = 0;
 	ProfileParticipantDetailImpl detail = null;
@@ -356,7 +385,7 @@ final class TransactionImpl implements Transaction {
 		    if (readOnly) {
 			iter.remove();
 			if (detail != null) {
-			    collector.addParticipant(detail);
+			    collectorHandle.addParticipant(detail);
 			}
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -370,7 +399,7 @@ final class TransactionImpl implements Transaction {
 			detail.
 			    setCommittedDirectly(System.currentTimeMillis() -
 						 startTime);
-			collector.addParticipant(detail);
+			collectorHandle.addParticipant(detail);
 		    }
 		    iter.remove();
 		    if (logger.isLoggable(Level.FINEST)) {
@@ -394,7 +423,7 @@ final class TransactionImpl implements Transaction {
 	    }
 	    if (state == State.ABORTED) {
 		throw new MaybeRetryableTransactionAbortedException(
-		    "Transaction has been aborted", abortCause);
+		    "Transaction has been aborted: " + abortCause, abortCause);
 	    }
 	}
 	state = State.COMMITTING;
@@ -412,7 +441,7 @@ final class TransactionImpl implements Transaction {
 		if (detail != null) {
 		    detail.setCommitted(System.currentTimeMillis() -
 					startTime);
-		    collector.addParticipant(detail);
+		    collectorHandle.addParticipant(detail);
 		}
 	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
@@ -423,6 +452,7 @@ final class TransactionImpl implements Transaction {
 	    }
 	}
 	state = State.COMMITTED;
+	notifyListenersAfter(true);
     }
 
     /** Returns a byte array that represents the specified long. */
@@ -431,5 +461,55 @@ final class TransactionImpl implements Transaction {
 	    (byte) (l >>> 56), (byte) (l >>> 48), (byte) (l >>> 40),
 	    (byte) (l >>> 32), (byte) (l >>> 24), (byte) (l >>> 16),
 	    (byte) (l >>> 8), (byte) l };
+    }
+
+    /** Notify any listeners before preparing the transaction. */
+    private void notifyListenersBefore() {
+	if (listeners != null) {
+	    /*
+	     * Don't use foreach iteration here, so that we can handle the
+	     * possibility that a beforeCompletion call adds another listener.
+	     */
+	    for (int i = 0; i < listeners.size(); i++) {
+		TransactionListener listener = listeners.get(i);
+		try {
+		    listener.beforeCompletion();
+		} catch (RuntimeException e) {
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.logThrow(
+			    Level.FINEST, e,
+			    "beforeCompletion {0} listener:{1} failed",
+			    this, listener);
+		    }
+		    if (state != State.ABORTED) {
+			abort(e);
+		    }
+		    throw e;
+		}
+		if (state == State.ABORTED) {
+		    throw new MaybeRetryableTransactionAbortedException(
+			"Transaction has been aborted: " + abortCause,
+			abortCause);
+		}
+	    }
+	}
+    }
+
+    /** Notify any listeners after completing the transaction. */
+    private void notifyListenersAfter(boolean commited) {
+	if (listeners != null) {
+	    for (TransactionListener listener : listeners) {
+		try {
+		    listener.afterCompletion(commited);
+		} catch (RuntimeException e) {
+		    if (logger.isLoggable(Level.WARNING)) {
+			logger.logThrow(
+			    Level.WARNING, e,
+			    "afterCompletion {0} listener:{1} failed",
+			    this, listener);
+		    }
+		}
+	    }
+	}
     }
 }

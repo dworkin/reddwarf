@@ -35,11 +35,11 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
@@ -48,17 +48,19 @@ import com.sun.sgs.test.util.PrivateReadResolve;
 import com.sun.sgs.test.util.ProtectedReadResolve;
 import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PackageWriteReplace;
-import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.PrivateWriteReplace;
 import com.sun.sgs.test.util.ProtectedWriteReplace;
 import com.sun.sgs.test.util.PublicWriteReplace;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -76,7 +78,7 @@ import static org.junit.Assert.*;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
-@RunWith(ParameterizedNameRunner.class)
+@RunWith(ParameterizedFilteredNameRunner.class)
 public class TestDataServiceImpl{
 
     @Parameterized.Parameters
@@ -136,7 +138,7 @@ public class TestDataServiceImpl{
     private DummyManagedObject dummy;
 
     /** A kernel runnable to bind "dummy" to the ManagedObject dummy. */
-    class InitialTestRunnable extends AbstractKernelRunnable {
+    class InitialTestRunnable extends TestAbstractKernelRunnable {
         public void run() throws Exception {
             dummy = new DummyManagedObject();
             service.setBinding("dummy", dummy);
@@ -460,7 +462,7 @@ public class TestDataServiceImpl{
                 setBinding(app, service, "", dummy);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 DummyManagedObject result =
                     (DummyManagedObject) getBinding(app, service, "");
@@ -500,7 +502,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
 	/* New binding removed in last transaction */
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     getBinding(app, service, "testGetBindingNotFound");
@@ -513,7 +515,7 @@ public class TestDataServiceImpl{
                            new DummyManagedObject());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 removeBinding(app, service, "testGetBindingNotFound");
                 try {
@@ -525,7 +527,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
 	/* Existing binding removed in last transaction. */
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     getBinding(app, service, "testGetBindingNotFound");
@@ -562,7 +564,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
 	/* New object removed in last transaction */
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     getBinding(app, service, "testGetBindingRemoved");
@@ -574,7 +576,7 @@ public class TestDataServiceImpl{
                            new DummyManagedObject());
         }}, taskOwner);
 	/* Existing object removed in this transaction */
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.removeObject(
                     getBinding(app, service, "testGetBindingRemoved"));
@@ -587,7 +589,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
 	/* Existing object removed in last transaction */
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     getBinding(app, service, "testGetBindingRemoved");
@@ -623,6 +625,14 @@ public class TestDataServiceImpl{
     @Test 
     public void testGetServiceBindingAborted() throws Exception {
 	testAborted(getServiceBinding);
+    }
+    @Test
+    public void testGetBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(getBinding);
+    }
+    @Test
+    public void testGetServiceBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(getServiceBinding);
     }
     @Test 
     public void testGetBindingPreparing() throws Exception {
@@ -691,7 +701,7 @@ public class TestDataServiceImpl{
                 super.run();
                 setBinding(app, service, "dummy", new DeserializationFails());
         }}, taskOwner);
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     getBinding(app, service, "dummy");
@@ -720,7 +730,7 @@ public class TestDataServiceImpl{
                 assertEquals(dummy, result);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 DummyManagedObject result =
                     (DummyManagedObject) getBinding(app, service, "dummy");
@@ -738,7 +748,7 @@ public class TestDataServiceImpl{
                 service.setServiceBinding("dummy", serviceDummy);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 DummyManagedObject result =
                     (DummyManagedObject) service.getBinding("dummy");
@@ -769,7 +779,7 @@ public class TestDataServiceImpl{
         serverNodeRestart(properties, false);
 
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         Thread.sleep(200);
@@ -884,6 +894,14 @@ public class TestDataServiceImpl{
     @Test 
     public void testSetServiceBindingAborted() throws Exception {
 	testAborted(setServiceBinding);
+    }
+    @Test
+    public void testSetBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(setBinding);
+    }
+    @Test
+    public void testSetServiceBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(setServiceBinding);
     }
     @Test 
     public void testSetBindingPreparing() throws Exception {
@@ -1007,7 +1025,7 @@ public class TestDataServiceImpl{
 	}
 
 	try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     dummy.setValue(
                         new Object[] {
@@ -1053,7 +1071,7 @@ public class TestDataServiceImpl{
 	}
 
 	try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     dummy.setValue(
                         new Object[] {
@@ -1087,7 +1105,7 @@ public class TestDataServiceImpl{
 
         final DummyManagedObject dummy2 = new DummyManagedObject();
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                 assertEquals(dummy, getBinding(app, service, "dummy"));
                 setBinding(app, service, "dummy", dummy2);
@@ -1098,13 +1116,13 @@ public class TestDataServiceImpl{
             System.err.println(e);
         }
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 assertEquals(dummy, getBinding(app, service, "dummy"));
                 setBinding(app, service, "dummy", dummy2);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 assertEquals(dummy2, getBinding(app, service, "dummy"));
         }}, taskOwner);
@@ -1183,6 +1201,14 @@ public class TestDataServiceImpl{
     @Test 
     public void testRemoveServiceBindingAborted() throws Exception {
 	testAborted(removeServiceBinding);
+    }
+    @Test
+    public void testRemoveBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(removeBinding);
+    }
+    @Test
+    public void testRemoveServiceBindingBeforeCompletion() throws Exception {
+	testBeforeCompletion(removeServiceBinding);
     }
     @Test 
     public void testRemoveBindingPreparing() throws Exception {
@@ -1263,7 +1289,7 @@ public class TestDataServiceImpl{
                 service.removeObject(dummy);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 removeBinding(app, service, "dummy");
                 try {
@@ -1294,7 +1320,7 @@ public class TestDataServiceImpl{
                 setBinding(app, service, "dummy", new DeserializationFails());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 removeBinding(app, service, "dummy");
                 try {
@@ -1321,7 +1347,7 @@ public class TestDataServiceImpl{
                 setBinding(app, service, "dummy", dummy);
         }}, taskOwner);
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     removeBinding(app, service, "dummy");
                     Transaction txn = txnProxy.getCurrentTransaction();
@@ -1331,7 +1357,7 @@ public class TestDataServiceImpl{
             System.err.println(e);
         }
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 removeBinding(app, service, "dummy");
                 try {
@@ -1353,7 +1379,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.removeBinding("dummy");
                     DummyManagedObject serviceResult =
@@ -1366,7 +1392,7 @@ public class TestDataServiceImpl{
             System.err.println(e);
         }
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.removeServiceBinding("dummy");
                 DummyManagedObject result =
@@ -1439,6 +1465,14 @@ public class TestDataServiceImpl{
     @Test 
     public void testNextServiceBoundNameAborted() throws Exception {
 	testAborted(nextServiceBoundName);
+    }
+    @Test
+    public void testNextBoundNameBeforeCompletion() throws Exception {
+	testBeforeCompletion(nextBoundName);
+    }
+    @Test
+    public void testNextServiceBoundNameBeforeCompletion() throws Exception {
+	testBeforeCompletion(nextServiceBoundName);
     }
     @Test 
     public void testNextBoundNamePreparing() throws Exception {
@@ -1519,7 +1553,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                 removeBinding(app, service, "zzz-1");
                 assertEquals("zzz-2", nextBoundName(app, service, "zzz-"));
@@ -1535,7 +1569,7 @@ public class TestDataServiceImpl{
             System.err.println(e);
         }
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 removeBinding(app, service, "zzz-2");
                 assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
@@ -1682,6 +1716,10 @@ public class TestDataServiceImpl{
     public void testRemoveObjectAborted() throws Exception {
 	testAborted(removeObject);
     }
+    @Test
+    public void testRemoveObjectBeforeCompletion() throws Exception {
+	testBeforeCompletion(removeObject);
+    }
     @Test 
     public void testRemoveObjectPreparing() throws Exception {
 	testPreparing(removeObject);
@@ -1721,7 +1759,7 @@ public class TestDataServiceImpl{
                 }
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     service.getBinding("dummy");
@@ -1751,7 +1789,7 @@ public class TestDataServiceImpl{
     public void testRemoveObjectPreviousTxn() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.removeObject(dummy);
         }}, taskOwner);
@@ -1774,7 +1812,7 @@ public class TestDataServiceImpl{
         final TestTask task = new TestTask();
         txnScheduler.runTask(task, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 ObjectWithRemoval removal =
                         (ObjectWithRemoval) service.getBinding("removal");
@@ -1789,7 +1827,7 @@ public class TestDataServiceImpl{
                 }
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     service.getBinding("removal");
@@ -1813,7 +1851,7 @@ public class TestDataServiceImpl{
                 service.setBinding("x", x);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 ObjectWithRemoval x =
                         (ObjectWithRemoval) service.getBinding("x");
@@ -1947,6 +1985,10 @@ public class TestDataServiceImpl{
     public void testMarkForUpdateAborted() throws Exception {
 	testAborted(markForUpdate);
     }
+    @Test
+    public void testMarkForUpdateBeforeCompletion() throws Exception {
+	testBeforeCompletion(markForUpdate);
+    }
     @Test 
     public void testMarkForUpdatePreparing() throws Exception {
 	testPreparing(markForUpdate);
@@ -1984,14 +2026,14 @@ public class TestDataServiceImpl{
 
 	service.setDetectModifications(false);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 service.markForUpdate(dummy);
                 dummy.value = "b";
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 assertEquals("b", dummy.value);
@@ -2012,7 +2054,7 @@ public class TestDataServiceImpl{
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
         serverNodeRestart(properties, true);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = new DummyManagedObject();
                 dummy.setValue("a");
@@ -2021,7 +2063,7 @@ public class TestDataServiceImpl{
 
         final Semaphore mainFlag = new Semaphore(0);
         final Semaphore threadFlag = new Semaphore(0);
-        txnScheduler.scheduleTask(new AbstractKernelRunnable() {
+        txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 assertEquals("a", dummy.value);
@@ -2030,7 +2072,7 @@ public class TestDataServiceImpl{
                 assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
         }}, taskOwner);
 
-        txnScheduler.scheduleTask(new AbstractKernelRunnable() {
+        txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
                     DummyManagedObject dummy2 =
@@ -2054,7 +2096,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceNull() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     service.createReference(null);
@@ -2067,7 +2109,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceNotSerializable() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 ManagedObject mo = new ManagedObject() { };
                 try {
@@ -2081,7 +2123,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceNotManagedObject() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 Object object = Boolean.TRUE;
                 try {
@@ -2104,6 +2146,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testCreateReferenceAborted() throws Exception {
 	testAborted(createReference);
+    }
+    @Test
+    public void testCreateReferenceBeforeCompletion() throws Exception {
+	testBeforeCompletion(createReference);
     }
     @Test 
     public void testCreateReferencePreparing() throws Exception {
@@ -2145,7 +2191,7 @@ public class TestDataServiceImpl{
     public void testCreateReferenceExisting() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 DummyManagedObject dummy =
                     (DummyManagedObject) service.getBinding("dummy");
@@ -2189,7 +2235,7 @@ public class TestDataServiceImpl{
     public void testCreateReferencePreviousTxn() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 assertEquals(dummy, service.createReference(dummy).get());
         }}, taskOwner);
@@ -2197,7 +2243,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceTwoObjects() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 DummyManagedObject x = new DummyManagedObject();
                 DummyManagedObject y = new DummyManagedObject();
@@ -2211,7 +2257,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceForIdNullId() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     service.createReferenceForId(null);
@@ -2224,7 +2270,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceForIdTooSmallId() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 BigInteger id = new BigInteger("-1");
                 try {
@@ -2239,7 +2285,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testCreateReferenceForIdTooBigId() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 BigInteger maxLong =
                         new BigInteger(String.valueOf(Long.MAX_VALUE));
@@ -2267,6 +2313,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testCreateReferenceForIdAborted() throws Exception {
 	testAborted(createReferenceForId);
+    }
+    @Test
+    public void testCreateReferenceForIdBeforeCompletion() throws Exception {
+	testBeforeCompletion(createReferenceForId);
     }
     @Test 
     public void testCreateReferenceForIdPreparing() throws Exception {
@@ -2311,7 +2361,7 @@ public class TestDataServiceImpl{
         final TestTask task = new TestTask();
         txnScheduler.runTask(task, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 ManagedReference<DummyManagedObject> ref =
                     uncheckedCast(service.createReferenceForId(task.id));
@@ -2326,7 +2376,7 @@ public class TestDataServiceImpl{
                 }
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
             ManagedReference<DummyManagedObject> ref =
                 uncheckedCast(service.createReferenceForId(task.id));
@@ -2343,7 +2393,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testNextObjectIdIllegalIds() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 BigInteger id =
                     BigInteger.valueOf(Long.MIN_VALUE).subtract(BigInteger.ONE);
@@ -2372,7 +2422,7 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testNextObjectIdBoundaryIds() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 BigInteger first = service.nextObjectId(null);
                 assertEquals(first, service.nextObjectId(null));
@@ -2426,7 +2476,7 @@ public class TestDataServiceImpl{
         final TestTask task = new TestTask();
         txnScheduler.runTask(task, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 service.removeObject(dummy);
@@ -2449,7 +2499,7 @@ public class TestDataServiceImpl{
                 }
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 BigInteger id = null;
                 while (true) {
@@ -2503,13 +2553,13 @@ public class TestDataServiceImpl{
         final TestTask task = new TestTask();
         txnScheduler.runTask(task, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 service.removeObject(dummy.getNext());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 BigInteger id = task.dummyId;
@@ -2535,6 +2585,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testNextObjectIdAborted() throws Exception {
 	testAborted(nextObjectId);
+    }
+    @Test
+    public void testNextObjectIdBeforeCompletion() throws Exception {
+	testBeforeCompletion(nextObjectId);
     }
     @Test 
     public void testNextObjectIdPreparing() throws Exception {
@@ -2578,7 +2632,7 @@ public class TestDataServiceImpl{
                 }
         }}, taskOwner);
 
-         txnScheduler.runTask(new AbstractKernelRunnable() {
+         txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 try {
@@ -2604,6 +2658,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testGetReferenceAborted() throws Exception {
 	testAborted(getReference);
+    }
+    @Test
+    public void testGetReferenceBeforeCompletion() throws Exception {
+	testBeforeCompletion(getReference);
     }
     @Test 
     public void testGetReferencePreparing() throws Exception {
@@ -2635,7 +2693,7 @@ public class TestDataServiceImpl{
                 dummy.setNext(new DeserializationFails());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 try {
@@ -2655,7 +2713,7 @@ public class TestDataServiceImpl{
                 dummy.setNext(new DummyManagedObject());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     dummy.getNext();
@@ -2679,7 +2737,7 @@ public class TestDataServiceImpl{
         serverNodeRestart(properties, false);
 
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     try {
                         dummy =
@@ -2703,7 +2761,7 @@ public class TestDataServiceImpl{
      */
     @Test 
     public void testGetReferenceTimeoutReadResolve() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 DeserializationDelayed dummy = new DeserializationDelayed();
                 dummy.setNext(new DummyManagedObject());
@@ -2715,7 +2773,7 @@ public class TestDataServiceImpl{
         serverNodeRestart(properties, false);
 
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     try {
                         DeserializationDelayed.delay = 200;
@@ -2982,7 +3040,7 @@ public class TestDataServiceImpl{
                 }
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 try {
@@ -2998,14 +3056,14 @@ public class TestDataServiceImpl{
     public void testGetReferenceForUpdateMaybeModified() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 service.createReference(dummy).getForUpdate();
                 dummy.value = "B";
                 }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 assertEquals("B", dummy.value);
@@ -3022,14 +3080,14 @@ public class TestDataServiceImpl{
                 dummy.setNext(dummy2);
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 DummyManagedObject dummy2 = dummy.getNextForUpdate();
                 dummy2.value = "B";
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 DummyManagedObject dummy2 = dummy.getNext();
@@ -3051,6 +3109,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testGetReferenceUpdateAborted() throws Exception {
 	testAborted(getReferenceUpdate);
+    }
+    @Test 
+    public void testGetReferenceUpdateBeforeCompletion() throws Exception {
+	testBeforeCompletion(getReferenceUpdate);
     }
     @Test 
     public void testGetReferenceUpdatePreparing() throws Exception {
@@ -3084,7 +3146,7 @@ public class TestDataServiceImpl{
                 dummy.setNext(new DeserializationFails());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 try {
@@ -3104,7 +3166,7 @@ public class TestDataServiceImpl{
                 dummy.setNext(new DummyManagedObject());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 try {
                     dummy.getNextForUpdate();
@@ -3129,7 +3191,7 @@ public class TestDataServiceImpl{
         properties.setProperty("com.sun.sgs.txn.timeout", "1000");
         serverNodeRestart(properties, true);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = new DummyManagedObject();
                 dummy.setValue("a");
@@ -3140,7 +3202,7 @@ public class TestDataServiceImpl{
         final Semaphore mainFlag = new Semaphore(0);
         final Semaphore threadFlag = new Semaphore(0);
 
-        txnScheduler.scheduleTask(new AbstractKernelRunnable() {
+        txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 dummy.getNext();
@@ -3149,7 +3211,7 @@ public class TestDataServiceImpl{
                 assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
         }}, taskOwner);
 
-        txnScheduler.scheduleTask(new AbstractKernelRunnable() {
+        txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
 
@@ -3189,7 +3251,7 @@ public class TestDataServiceImpl{
         final TestTask task = new TestTask();
         txnScheduler.runTask(task, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 ManagedReference<DummyManagedObject> ref =
@@ -3231,7 +3293,7 @@ public class TestDataServiceImpl{
 
         final TestTask task = new TestTask();
         txnScheduler.runTask(task, taskOwner);
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 dummy = (DummyManagedObject) service.getBinding("dummy");
                 ManagedReference<DummyManagedObject> ref4 =
@@ -3251,14 +3313,8 @@ public class TestDataServiceImpl{
         // again in the shutdown action.
 	ShutdownAction action = new ShutdownAction();
         try {
-	    action.waitForDone();
-            fail("Expected InvocationTargetException");
-        } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof IllegalStateException) {
-                System.err.println(e);
-            } else {
-                fail("Expected IllegalStateException");
-            }
+            // the expected behavior of a second shutdown is to return silently.
+            action.assertDone();
         } finally {
             // ensure that the next test will run
             serverNode = null;
@@ -3267,27 +3323,25 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testShutdownInterrupt() throws Exception {
+        class TestTask extends InitialTestRunnable {
+            ShutdownServiceAction action1;
+            public void run() throws Exception {
+                super.run();
+                action1 = new ShutdownServiceAction(service);
+                action1.assertBlocked();
+                action1.interrupt(); // shutdown should not unblock
+                action1.assertBlocked();
+                service.setBinding("dummy", new DummyManagedObject());
+            }
+        }
+        
         try {
-            txnScheduler.runTask(new InitialTestRunnable() {
-                public void run() throws Exception {
-                    super.run();
-                    ShutdownServiceAction action =
-                            new ShutdownServiceAction(service);
-                    action.assertBlocked();
-                    action.interrupt();
-                    action.assertResult(false);
-                    service.setBinding("dummy", new DummyManagedObject());
-            }}, taskOwner);
+            TestTask task = new TestTask();
+            txnScheduler.runTask(task, taskOwner);
+            assertTrue(task.action1.waitForDone());
         } finally {
             try {
                 serverNode.shutdown(false);
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    // we expect this:  the data service is known to be shut down
-                    System.err.println(e);
-                } else {
-                    fail("Expected IllegalStateException");
-                }
             } finally {
                 // we really want the serverNode set to null
                 serverNode = null;
@@ -3298,16 +3352,15 @@ public class TestDataServiceImpl{
     @Test 
     public void testConcurrentShutdownInterrupt() throws Exception {
         class TestTask extends InitialTestRunnable {
-            ShutdownServiceAction action2;
+            ShutdownServiceAction action1, action2;
             public void run() throws Exception {
                 super.run();
-                ShutdownServiceAction action1 =
-                        new ShutdownServiceAction(service);
+                action1 = new ShutdownServiceAction(service);
                 action1.assertBlocked();
                 action2 = new ShutdownServiceAction(service);
                 action2.assertBlocked();
-                action1.interrupt();
-                action1.assertResult(false);
+                action1.interrupt(); // shutdown should not unblock
+                action1.assertBlocked(); 
                 action2.assertBlocked();
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new TestAbortedTransactionException("abort"));
@@ -3317,19 +3370,13 @@ public class TestDataServiceImpl{
         try {
             TestTask task = new TestTask();
             txnScheduler.runTask(task, taskOwner);
-            task.action2.assertResult(true);
+            task.action1.assertDone();
+            task.action2.assertDone();
         } catch (TestAbortedTransactionException e) {
             // this is expected:  we threw it above
         } finally {
             try {
                 serverNode.shutdown(false);
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    // we expect this:  the data service is known to be shut down
-                    System.err.println(e);
-                } else {
-                    fail("Expected IllegalStateException");
-                }
             } finally {
                 // we really want the serverNode set to null
                 serverNode = null;
@@ -3375,13 +3422,6 @@ public class TestDataServiceImpl{
         } finally {
             try {
                 serverNode.shutdown(false);
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof IllegalStateException) {
-                    // we expect this:  the data service is known to be shut down
-                    System.err.println(e);
-                } else {
-                    fail("Expected IllegalStateException");
-                }
             } finally {
                 // we really want the serverNode set to null
                 serverNode = null;
@@ -3396,7 +3436,7 @@ public class TestDataServiceImpl{
 
         serverNodeRestart(null, false);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 assertEquals(dummy, service.getBinding("dummy"));
         }}, taskOwner);
@@ -3408,7 +3448,7 @@ public class TestDataServiceImpl{
     public void testCommitNoStoreParticipant() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
         // We use dummy outside of the transaction - it is transient here.
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.removeObject(dummy);
         }}, taskOwner);
@@ -3418,7 +3458,7 @@ public class TestDataServiceImpl{
     public void testAbortNoStoreParticipant() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
         // We use dummy outside of the transaction - it is transient here.
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.removeObject(dummy);
                 Transaction txn = txnProxy.getCurrentTransaction();
@@ -3429,11 +3469,11 @@ public class TestDataServiceImpl{
     @Test 
     public void testCommitReadOnly() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.getBinding("dummy");
         }}, taskOwner);
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.getBinding("dummy");
         }}, taskOwner);
@@ -3443,7 +3483,7 @@ public class TestDataServiceImpl{
     public void testAbortReadOnly() throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.getBinding("dummy");
                     Transaction txn = txnProxy.getCurrentTransaction();
@@ -3452,7 +3492,7 @@ public class TestDataServiceImpl{
         } catch (TestAbortedTransactionException e) {
             System.err.println(e);
         }
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.getBinding("dummy");
         }}, taskOwner);
@@ -3460,13 +3500,13 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testContentEquals() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.setBinding("a", new ContentEquals(3));
                 service.setBinding("b", new ContentEquals(3));
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
             assertNotSame(service.getBinding("a"), service.getBinding("b"));
         }}, taskOwner);
@@ -3502,7 +3542,7 @@ public class TestDataServiceImpl{
     }
 
     private void serializeReferenceToEnclosingInternal() throws Exception {
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.setBinding("a", NonManaged.staticLocal);
                 service.setBinding("b", NonManaged.staticAnonymous);
@@ -3512,7 +3552,7 @@ public class TestDataServiceImpl{
                 service.setBinding("f", new NonManaged().createLocal());
         }}, taskOwner);
 
-        txnScheduler.runTask(new AbstractKernelRunnable() {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.setBinding("a", Managed.staticLocal);
                 service.setBinding("b", Managed.staticAnonymous);
@@ -3520,7 +3560,7 @@ public class TestDataServiceImpl{
         }}, taskOwner);
 
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("a", new Managed().createInner());
             }}, taskOwner);
@@ -3530,7 +3570,7 @@ public class TestDataServiceImpl{
 	}
 
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("b", new Managed().createAnonymous());
             }}, taskOwner);
@@ -3540,7 +3580,7 @@ public class TestDataServiceImpl{
 	}
 
 	try {
-	    txnScheduler.runTask(new AbstractKernelRunnable() {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     service.setBinding("b", new Managed().createLocal());
             }}, taskOwner);
@@ -3705,7 +3745,7 @@ public class TestDataServiceImpl{
                 service.setBinding("dummy2", new DummyManagedObject());
         }}, taskOwner);
 
-        class TestTask1 extends AbstractKernelRunnable {
+        class TestTask1 extends TestAbstractKernelRunnable {
             Exception exception = null;
             private final int runNumber;
             private final Semaphore flag1;
@@ -3727,11 +3767,12 @@ public class TestDataServiceImpl{
                     throw new RuntimeException("just kill it");             
                 }
 
-                firstTry = false;
                 dummy = (DummyManagedObject) service.getBinding("dummy");
 
                 // First step is done, let the other task proceed
                 flag1.release();
+                firstTry = false;
+
                 // We can only hope the second task gets a chance
                 Thread.sleep(runNumber * 500);
                 System.err.println(runNumber + " task 1 ("
@@ -3752,7 +3793,7 @@ public class TestDataServiceImpl{
             }
         }
 
-        class TestTask2 extends AbstractKernelRunnable {
+        class TestTask2 extends TestAbstractKernelRunnable {
             Exception exception = null;
             Transaction txn = null;
             private final int runNumber;
@@ -3773,13 +3814,13 @@ public class TestDataServiceImpl{
                 if (!firstTry) {
                     throw new RuntimeException("just kill it");
                 }
-                firstTry = false;
                 flag1.acquire();
                 service.getBinding("dummy2");
                 // Let the other task proceed
                 flag2.release();
                 System.err.println(runNumber + " task 2 ("
                                  + txn + "): released flag");
+                firstTry = false;
                 try {
                     ((DummyManagedObject)
                          service.getBinding("dummy")).setValue(runNumber);
@@ -3836,7 +3877,7 @@ public class TestDataServiceImpl{
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
         try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() {
                     dummy = (DummyManagedObject) service.getBinding("dummy");
                     dummy.value = Thread.currentThread();
@@ -3855,7 +3896,7 @@ public class TestDataServiceImpl{
                 dummy.value = new SerializationFailsAfterDeserialize();
         }}, taskOwner);
 	try {
-            txnScheduler.runTask(new AbstractKernelRunnable() {
+            txnScheduler.runTask(new TestAbstractKernelRunnable() {
             public void run() {
                 service.getBinding("dummy");
             }}, taskOwner);
@@ -4102,6 +4143,45 @@ public class TestDataServiceImpl{
         }
     }
 
+    /**
+     * Tests running the action in a TransactionListener.beforeCompletion
+     * method that is called after running the data service's beforeCompletion
+     * method.  This test depends on the fact that the transaction
+     * implementation calls transaction listeners in the order in which they
+     * are registered.
+     */
+    private void testBeforeCompletion(final Action action) throws Exception {
+	class MyTransactionListener implements TransactionListener {
+	    private RuntimeException exception;
+	    public synchronized void beforeCompletion() {
+		try {
+		    action.run();
+		} catch (RuntimeException e) {
+		    exception = e;
+		}
+	    }
+	    public void afterCompletion(boolean commit) { }
+	    synchronized RuntimeException getException() {
+		return exception;
+	    }
+	}
+	final MyTransactionListener listener = new MyTransactionListener();
+	txnScheduler.runTask(new InitialTestRunnable() {
+	    public void run() throws Exception {
+		super.run();
+		action.setUp();
+		txnProxy.getCurrentTransaction().registerListener(
+		    listener);
+	    }}, taskOwner);
+	if (listener.getException() instanceof TransactionNotActiveException) {
+	    System.err.println(listener.getException());
+	} else if (listener.getException() != null) {
+	    throw listener.getException();
+	} else {
+	    fail("Expected TransactionNotActiveException");
+	}
+    }
+
     /** Tests running the action while preparing. */
     private void testPreparing(final Action action) throws Exception {
         class Participant extends DummyNonDurableTransactionParticipant {
@@ -4197,14 +4277,14 @@ public class TestDataServiceImpl{
         ShutdownTask task = new ShutdownTask();
         txnScheduler.runTask(task, taskOwner);
 
-        task.shutdownAction.assertResult(true);
+        task.shutdownAction.assertDone();
     }
 
     /** Tests running the action with a new transaction while shutting down. */
     private void testShuttingDownNewTxn(final Action action) throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        class ShutdownTask extends AbstractKernelRunnable {
+        class ShutdownTask extends TestAbstractKernelRunnable {
             ShutdownAction shutdownAction;
             ThreadAction threadAction;
             public void run() throws Exception {
@@ -4213,23 +4293,25 @@ public class TestDataServiceImpl{
                 shutdownAction = new ShutdownAction();
                 shutdownAction.assertBlocked();
 
-                threadAction = new ThreadAction<Void>() {
-                    protected Void action() {
+                threadAction = new ThreadAction() {
+                    protected void action() {
                         try {
-                            txnScheduler.runTask(new AbstractKernelRunnable() {
+                            txnScheduler.runTask(new TestAbstractKernelRunnable() {
                                 public void run() {
                                     try {
                                         action.run();
                                         fail("Expected IllegalStateException");
                                     } catch (IllegalStateException e) {
-                                        assertEquals("Service is shutting down",
-                                                     e.getMessage());
+                                        if (!e.getMessage().equals("Service " +
+                                                "is shutting down") && !e.
+                                                getMessage().equals("Sevice " +
+                                                "is shut down"))
+                                            fail("Invalid exception message");
                                     }
                             }}, taskOwner);
                         } catch (Exception e) {
                             fail("Unexpected exception " + e);
                         }
-                        return null;
                     }
                 };
             }
@@ -4237,7 +4319,7 @@ public class TestDataServiceImpl{
         ShutdownTask task = new ShutdownTask();
         txnScheduler.runTask(task, taskOwner);
         task.threadAction.assertDone();
-        task.shutdownAction.assertResult(true);
+        task.shutdownAction.assertDone();
     }
 
     /** Tests running the action after shutdown. */
@@ -4260,7 +4342,7 @@ public class TestDataServiceImpl{
             service.shutdown();
 
             try {
-                txnScheduler.runTask(new AbstractKernelRunnable() {
+                txnScheduler.runTask(new TestAbstractKernelRunnable() {
                     public void run() {
                         action.run();
                 }}, taskOwner);
@@ -4290,10 +4372,8 @@ public class TestDataServiceImpl{
     /**
      * A utility class for running an operation in a separate thread and
      * insuring that it either completes or blocks.
-     *
-     * @param	<T> the return type of the operation
      */
-    abstract static class ThreadAction<T> extends Thread {
+    abstract static class ThreadAction extends Thread {
 
 	/**
 	 * The number of milliseconds to wait to see if an operation is
@@ -4317,11 +4397,6 @@ public class TestDataServiceImpl{
 	private Throwable exception;
 
 	/**
-	 * Set to the result of the operation when the operation is complete.
-	 */
-	private T result;
-
-	/**
 	 * Creates an instance of this class and starts the operation in a
 	 * separate thread.
 	 */
@@ -4332,7 +4407,7 @@ public class TestDataServiceImpl{
 	/** Performs the operation and collects the results. */
 	public void run() {
 	    try {
-		result = action();
+		action();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -4345,10 +4420,9 @@ public class TestDataServiceImpl{
 	/**
 	 * The operation to be performed.
 	 *
-	 * @return	the result of the operation
 	 * @throws	Exception if the operation fails
 	 */
-	abstract T action() throws Exception;
+	abstract void action() throws Exception;
 
 	/**
 	 * Asserts that the operation is blocked.
@@ -4378,19 +4452,6 @@ public class TestDataServiceImpl{
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the operation completed with the specified result.
-	 *
-	 * @param	expectedResult the expected result
-	 * @throws	Exception if the operation failed
-	 */
-	synchronized void assertResult(Object expectedResult)
-	    throws Exception
-	{
-	    assertDone();
-	    assertEquals("Unexpected result", expectedResult, result);
 	}
 
 	/**
@@ -4426,23 +4487,23 @@ public class TestDataServiceImpl{
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends ThreadAction<Boolean> {
+    class ShutdownAction extends ThreadAction {
 	ShutdownAction() { }
-	protected Boolean action() throws Exception {
+	protected void action() throws Exception {
             serverNode.shutdown(false);
             serverNode = null;
-            return true;
 	}
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownServiceAction extends ThreadAction<Boolean> {
+    class ShutdownServiceAction extends ThreadAction {
         final DataService service;
 	ShutdownServiceAction(DataService service) {
             this.service = service;
         }
-	protected Boolean action() throws Exception {
-	    return service.shutdown();
+        
+	protected void action() throws Exception {
+            service.shutdown();
 	}
     }
 
@@ -4479,7 +4540,7 @@ public class TestDataServiceImpl{
 	public String nextBoundName(Transaction txn, String name) {
 	    return null;
 	}
-	public boolean shutdown() { return false; }
+	public void shutdown() { }
 	public int getClassId(Transaction txn, byte[] classInfo) { return 0; }
 	public byte[] getClassInfo(Transaction txn, int classId) {
 	    return null;

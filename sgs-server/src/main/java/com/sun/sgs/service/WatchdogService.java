@@ -20,6 +20,7 @@
 package com.sun.sgs.service;
 
 import java.util.Iterator;
+import com.sun.sgs.app.TransactionException;
 
 /**
  * The {@code WatchdogService} monitors the health of server nodes and
@@ -137,5 +138,14 @@ public interface WatchdogService extends Service {
      */
     void addRecoveryListener(RecoveryListener listener);
 
-    
+    /**
+     * Informs the watchdog that a problem has occured in a service or
+     * component. The watchdog will notify the server of the failure and
+     * then proceeed to shutting down the node. The node specified as the
+     * {@code nodeId} can be a local node or a remote node.
+     * 
+     * @param nodeId the id of the node to shutdown
+     * @param className the class name of the service that failed
+     */
+    void reportFailure(long nodeId, String className);
 }

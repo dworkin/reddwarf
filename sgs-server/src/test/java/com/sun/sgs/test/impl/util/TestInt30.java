@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.util;
 
 import com.sun.sgs.impl.util.Int30;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -27,8 +28,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test the Int30 class. */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestInt30 extends TestCase {
     ByteArrayOutputStream out;
 

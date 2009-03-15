@@ -50,7 +50,7 @@ final class StartupKernelContext extends KernelContext {
      * @param manager the {@code Manager} to add
      */
     void addManager(Object manager) {
-        ((ComponentRegistryImpl)managerComponents).addComponent(manager);
+        ((ComponentRegistryImpl) managerComponents).addComponent(manager);
     }
 
     /**
@@ -59,7 +59,7 @@ final class StartupKernelContext extends KernelContext {
      * @param service the {@code Service} to add
      */
     void addService(Service service) {
-        ((ComponentRegistryImpl)serviceComponents).addComponent(service);
+        ((ComponentRegistryImpl) serviceComponents).addComponent(service);
     }
 
     /**

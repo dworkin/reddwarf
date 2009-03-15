@@ -28,16 +28,15 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -139,8 +138,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     private static final int TXN_ALLOCATION_BLOCK_SIZE = 100;
 
     /**
-     * The name of the undocumented property that controls whether to replace
-     * Java(TM) RMI with an experimental, socket-based facility.
+     * Whether to replace Java(TM) RMI with an experimental, socket-based
+     * facility.
      */
     private static final boolean noRmi = Boolean.getBoolean(
 	PACKAGE + ".no.rmi");
@@ -355,6 +354,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    return abortCause;
 	}
 
+	/**
+	 * Don't bother to support transaction listeners for just the data
+	 * store, which doesn't use them.
+	 */
+	public void registerListener(TransactionListener listener) {
+	    throw new UnsupportedOperationException(
+		"DataStoreServerImpl doesn't support transaction listeners");
+	}
+
 	/* -- Other methods -- */
 
 	public String toString() {
@@ -389,8 +397,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	final SortedMap<Long, Txn> table =
-	    Collections.synchronizedSortedMap(new TreeMap<Long, Txn>());
+	final NavigableMap<Long, Txn> table =
+	    new ConcurrentSkipListMap<Long, Txn>();
 
 	/** Creates an instance. */
 	TxnTable() { }
@@ -455,15 +463,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    result.add(txn);
 		}
 		/* Search for the next entry */
-		Long startingId = Long.valueOf(nextId + 1);
-		nextId = null;
-		synchronized (table) {
-		    Iterator<Long> iter =
-			table.tailMap(startingId).keySet().iterator();
-		    if (iter.hasNext()) {
-			nextId = iter.next();
-		    }
-		}
+		nextId = table.higherKey(nextId);
 	    }
 	    return result;
 	}
@@ -611,10 +611,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    remote = new DataStoreServerRemote(server, port);
 	    return remote.getLocalPort();
 	}
-	public boolean unexport() {
+	public void unexport() {
 	    if (remote == null) {
-		throw new IllegalStateException(
-		    "The server is already shut down");
+		return;
 	    }
 	    try {
 		remote.shutdown();
@@ -622,9 +621,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    } catch (IOException e) {
 		logger.logThrow(
 		    Level.FINE, e, "Problem shutting down server");
-		return false;
+		return;
 	    }
-	    return true;
 	}
     }
 
@@ -636,10 +634,10 @@ public class DataStoreServerImpl implements DataStoreServer {
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if the value of the {@code
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
-     *		property is less than {@code 0} or greater than {@code 65535},
-     *		or if thrown by the {@link
-     *		DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
+     *	      com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
+     *	      property is less than {@code 0} or greater than {@code 65535},
+     *	      or if thrown by the {@link
+     *	      DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
      * @throws	IOException if a network problem occurs
      */
     public DataStoreServerImpl(Properties properties) throws IOException {
@@ -868,20 +866,14 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Other public methods -- */
 
     /**
-     * Attempts to shut down this server, returning a value that specifies
-     * whether the attempt was successful.
+     * Shuts down this server. Calls to this method will block until the
+     * shutdown is complete.
      *
-     * @return	{@code true} if the shut down was successful, else
-     *		{@code false}
-     * @throws	IllegalStateException if the {@code shutdown} method has
-     *		already been called and returned {@code true}
      */
-    public synchronized boolean shutdown() {
-	if (!store.shutdown()) {
-	    return false;
-	}
+    public synchronized void shutdown() {
+        store.shutdown();
 	executor.shutdownNow();
-	return exporter.unexport();
+	exporter.unexport();
     }
 
     /**

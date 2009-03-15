@@ -104,7 +104,7 @@ final class Util {
      * 
      * @param <V> the result type
      */
-    static abstract class DoneFuture<V> implements Future<V> {
+    abstract static class DoneFuture<V> implements Future<V> {
 
         /** Allows construction by a subclass. */
         protected DoneFuture() { }
@@ -203,8 +203,9 @@ final class Util {
          *        {@code Future}'s {@link Future#get() get} methods.
          */
         FailedFuture(Throwable exception) {
-            if (exception == null)
+            if (exception == null) {
                 throw new NullPointerException("exception is null");
+            }
             this.exception = exception;
         }
 

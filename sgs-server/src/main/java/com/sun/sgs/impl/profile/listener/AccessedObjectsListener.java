@@ -51,14 +51,14 @@ import java.util.Properties;
  * detail.
  * <p>
  * By default, the set of accesses displayed for a given transaction
- * will be limited to the first 20. This can be changed by setting the
- * {@code com.sun.sgs.impl.profile.listener.AccessedObjectsListener.access.count}
+ * will be limited to the first 20. This can be changed by setting the {@code
+ * com.sun.sgs.impl.profile.listener.AccessedObjectsListener.access.count}
  * property with a positive integer value.
  */
 public class AccessedObjectsListener implements ProfileListener {
 
     // a local backlog of the past access detail
-    private final BoundedLinkedHashMap<TransactionId,AccessedObjectsDetail>
+    private final BoundedLinkedHashMap<TransactionId, AccessedObjectsDetail>
         backlogMap;
 
     /** Property that defines the maximum number of accesses to display. */
@@ -82,9 +82,11 @@ public class AccessedObjectsListener implements ProfileListener {
      *                                  properties is provided but invalid
      */
     public AccessedObjectsListener(Properties properties, Identity owner,
-				   ComponentRegistry registry) {
-        if (properties == null)
+				   ComponentRegistry registry) 
+    {
+        if (properties == null) {
             throw new NullPointerException("Properties cannot be null");
+        }
 
         String backlogProp =
             properties.getProperty("com.sun.sgs.impl.kernel." +
@@ -92,7 +94,7 @@ public class AccessedObjectsListener implements ProfileListener {
         if (backlogProp != null) {
             try {
                 backlogMap = new BoundedLinkedHashMap
-                    <TransactionId,AccessedObjectsDetail>(Integer.
+                    <TransactionId, AccessedObjectsDetail>(Integer.
                                                        parseInt(backlogProp));
             } catch (NumberFormatException nfe) {
                 throw new IllegalArgumentException("Backlog size must be a " +
@@ -128,8 +130,9 @@ public class AccessedObjectsListener implements ProfileListener {
     public void report(ProfileReport profileReport) {
         // get the access detail, or return if there is none available
 	AccessedObjectsDetail detail = profileReport.getAccessedObjectsDetail();
-	if (detail == null)
+	if (detail == null) {
             return;
+        }
 
         // if a backlog is in use, then store the new detail
         TransactionId txnId = null;
@@ -140,8 +143,9 @@ public class AccessedObjectsListener implements ProfileListener {
 
         // if there was conflict, then figure out what to display
         if (detail.getConflictType() != ConflictType.NONE) {
-            if (txnId == null)
+            if (txnId == null) {
                 txnId = new TransactionId(profileReport.getTransactionId());
+            }
             // print out the detail for the failed transaction
 	    System.out.printf("Task type %s failed due to conflict.  Details:"
 			      + "%n  accessor id: %s, try count %d; objects "
@@ -200,8 +204,9 @@ public class AccessedObjectsListener implements ProfileListener {
         int count = 0;
 
 	for (AccessedObject object : accessedObjects) {
-            if (++count > accessesToShow)
+            if (++count > accessesToShow) {
                 break;
+            }
 
             try {
                 formatted.append(String.format("[source: %s] %-5s %s, " +
@@ -228,10 +233,11 @@ public class AccessedObjectsListener implements ProfileListener {
 
         // if we went over the max count then it means there was still
         // more to show, so add a message about the truncation
-	if (--count == accessesToShow)
+	if (--count == accessesToShow) {
 	    formatted.
                 append(String.format("[%d further accesses truncated]%n",
                                      accessedObjects.size() - accessesToShow));
+        }
 
 	return formatted.toString();
     }
@@ -247,7 +253,9 @@ public class AccessedObjectsListener implements ProfileListener {
      * A private implementation of {@code LinkedHashMap} that is
      * bounded in size.
      */
-    private static class BoundedLinkedHashMap<K,V> extends LinkedHashMap<K,V> {
+    private static class BoundedLinkedHashMap<K, V> 
+            extends LinkedHashMap<K, V> 
+    {
         private static final long serialVersionUID = 1;
 
         // the bounding size
@@ -258,7 +266,7 @@ public class AccessedObjectsListener implements ProfileListener {
             this.maxSize = maxSize;
         }
         /** Overrides to bound to a fixed size. */
-        protected boolean removeEldestEntry(Entry<K,V> eldest) {
+        protected boolean removeEldestEntry(Entry<K, V> eldest) {
             return size() > maxSize;
         }
     }

@@ -96,8 +96,9 @@ public class AttachedFuture<R, A> implements IoFuture<R, A> {
 
     /** {@inheritDoc} */
     public R getNow() throws ExecutionException {
-        if (! isDone())
+        if (!isDone()) {
             throw new IllegalStateException("not done");
+        }
 
         /*
          * The Future is done, so a result should be available immediately.
@@ -117,8 +118,9 @@ public class AttachedFuture<R, A> implements IoFuture<R, A> {
                 }
             }
         } finally {
-            if (wasInterrupted)
+            if (wasInterrupted) {
                 Thread.currentThread().interrupt();
+            }
         }
     }
 

@@ -212,6 +212,7 @@ class RoundRobinPolicy implements NodeAssignPolicy {
                 WatchdogService watchdogService, long nodeId,
                 LoggerWrapper logger) 
         {
+	    super(null);
             this.dataService = dataService;
             this.watchdogService = watchdogService;
             this.nodeId = nodeId;

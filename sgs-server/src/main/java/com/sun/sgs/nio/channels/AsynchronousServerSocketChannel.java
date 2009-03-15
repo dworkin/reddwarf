@@ -77,10 +77,14 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  * <h4>Usage Example:</h4>
  * <pre>
  *   final AsynchronousServerSocketChannel listener = 
- *       AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(5000));
+ *       AsynchronousServerSocketChannel.open().bind(
+ *           new InetSocketAddress(5000));
  * 
- *   listener.accept(new CompletionHandler&lt;AsynchronousSocketChannel,Void&gt;() {
- *       public void completed(IoFuture&lt;AsynchronousSocketChannel,Void&gt; result) {
+ *   listener.accept(
+ *     new CompletionHandler&lt;AsynchronousSocketChannel,Void&gt;() {
+ *       public void completed(IoFuture&lt;AsynchronousSocketChannel,Void&gt; 
+ *                             result) 
+ *       {
  *           try {
  *               AsynchronousSocketChannel ch = result.getNow();
  *               :
@@ -100,7 +104,8 @@ public abstract class AsynchronousServerSocketChannel
      * 
      * @param provider the asynchronous channel provider for this channel
      */
-    protected AsynchronousServerSocketChannel(AsynchronousChannelProvider provider)
+    protected AsynchronousServerSocketChannel(
+                                AsynchronousChannelProvider provider)
     {
         super(provider);
     }

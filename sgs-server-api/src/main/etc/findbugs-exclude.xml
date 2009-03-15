@@ -1,0 +1,70 @@
+<!-- This file specifies a findbugs filter for excluding reports that
+     should not be considered errors.
+
+     The format of this file is documented at:
+
+       http://findbugs.sourceforge.net/manual/filter.html
+
+     When possible, please specify the full names of the bug codes,
+     using the pattern attribute, to make it clearer what reports are
+     being suppressed.  You can find a listing of codes at:
+
+       http://findbugs.sourceforge.net/bugDescriptions.html
+  -->
+
+<FindBugsFilter>
+
+  <!-- Package com.sun.sgs.app.util -->
+
+  <!-- Testing methods to call via reflection. -->
+  <Match>
+    <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+    <Or>
+      <Method name="getAvgTreeDepth"/>
+      <Method name="getMaxTreeDepth"/>
+      <Method name="getMinTreeDepth"/>
+    </Or>
+    <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+  </Match>
+
+  <!-- OK if version fields are not currently being read, they should
+       still be instance fields. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashSet"/>
+    </Or>
+    <Field name="minorVersion"/>
+    <Bug pattern="SS_SHOULD_BE_STATIC"/>
+  </Match>
+
+  <!-- The root fields of these classes are initialized the the default
+       value (null) and set lazily. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$EntrySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$KeySet"/>
+      <Class name="com.sun.sgs.app.util.ScalableHashMap$Values"/>
+    </Or>
+    <Field name="root"/>
+    <Bug pattern="SE_TRANSIENT_FIELD_NOT_RESTORED"/>
+  </Match>
+
+  <!-- OK to declare ManagedReference as serializable field -->
+  <Match>
+    <Or>
+      <Field type="com.sun.sgs.app.ManagedReference"/>
+      <Field type="com.sun.sgs.app.ManagedReference[]"/>
+    </Or>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+
+  <!-- ScalableDeque knowingly breaks the equals contract internally
+       to support random access removals.  This is completely
+       hidden from the user and so we are allowing it here -->
+  <Match>
+    <Class name="com.sun.sgs.app.util.ScalableDeque$Element"/>
+    <Bug pattern="EC_UNRELATED_TYPES"/>
+  </Match>
+
+</FindBugsFilter>

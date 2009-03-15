@@ -184,8 +184,9 @@ class ReactiveChannelGroup
         AsyncKey asyncKey = null;
         Reactor reactor = null;
         synchronized (stateLock) {
-            if (lifecycleState != RUNNING)
+            if (lifecycleState != RUNNING) {
                 throw new ShutdownChannelGroupException();
+            }
 
             reactor = reactorAssignmentStrategy.getReactorFor(ch);
         }
@@ -197,7 +198,7 @@ class ReactiveChannelGroup
             if (asyncKey == null) {
                 try {
                     ch.close();
-                } catch (IOException ignore) {}
+                } catch (IOException ignore) { }
             }
         }
     }
@@ -263,10 +264,11 @@ class ReactiveChannelGroup
             // handle termination correctly.
 
             try {
-                for (;;) {
+                for (;; ) {
                     boolean keepGoing = reactor.performWork();
-                    if (! keepGoing)
+                    if (!keepGoing) {
                         break;
+                    }
                 }
             } catch (IOException  t) {
                 exception = t;
@@ -318,11 +320,13 @@ class ReactiveChannelGroup
         final long deadline = System.currentTimeMillis() + millis;
 
         synchronized (stateLock) {
-            for (;;) {
-                if (lifecycleState == DONE)
+            for (;; ) {
+                if (lifecycleState == DONE) {
                     return true;
-                if (millis <= 0)
+                }
+                if (millis <= 0) {
                     return false;
+                }
                 stateLock.wait(millis);
                 millis = deadline - System.currentTimeMillis();
             }
@@ -358,8 +362,9 @@ class ReactiveChannelGroup
             if (lifecycleState < SHUTDOWN) {
                 lifecycleState = SHUTDOWN;
 
-                for (Reactor reactor : reactors)
+                for (Reactor reactor : reactors) {
                     reactor.shutdown();
+                }
 
                 tryTerminate();
             }
@@ -415,8 +420,9 @@ class ReactiveChannelGroup
 
         assert Thread.holdsLock(stateLock);
 
-        if (lifecycleState == RUNNING || lifecycleState == DONE)
+        if (lifecycleState == RUNNING || lifecycleState == DONE) {
             return;
+        }
 
         if (reactors.isEmpty()) {
             lifecycleState = DONE;

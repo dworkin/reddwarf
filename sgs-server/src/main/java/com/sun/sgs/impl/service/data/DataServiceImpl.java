@@ -46,10 +46,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
-import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
-import com.sun.sgs.profile.ProfileConsumer;
-import com.sun.sgs.profile.ProfileOperation;
-import com.sun.sgs.profile.ProfileRegistrar;
+import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -59,6 +56,7 @@ import java.math.BigInteger;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.management.JMException;
 
 /**
  * Provides an implementation of <code>DataService</code> based on {@link
@@ -105,6 +103,18 @@ import java.util.logging.Logger;
  *	references table.  Note that the number of operations is measured
  *	separately for each transaction.  This property is intended for use in
  *	debugging. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>{@value #OPTIMISTIC_WRITE_LOCKS}
+ *	</b></code><br>
+ *	<i>Default:</i> <code>false</code>
+ *
+ * <dd style="padding-top: .5em">Whether to wait until commit time to obtain
+ *	write locks.  If <code>false</code>, which is the default, the service
+ *	acquires write locks as soon as it knows that an object is being
+ *	modified.  If <code>true</code>, the service delays obtaining write
+ *	locks until commit time, which may improve performance in some cases,
+ *	typically when there is low contention.  Note that setting this flag to
+ *	<code>true</code> does not delay write locks when removing objects.<p>
  *
  * </dl> <p>
  *
@@ -169,6 +179,10 @@ public final class DataServiceImpl implements DataService {
     public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";
 
+    /** The property that specifies to use optimistic write locking. */
+    public static final String OPTIMISTIC_WRITE_LOCKS =
+	CLASSNAME + ".optimistic.write.locks";
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -206,6 +220,12 @@ public final class DataServiceImpl implements DataService {
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
 
+    /** Whether to delay obtaining write locks. */
+    final boolean optimisticWriteLocks;
+
+    /** The data service profiling information. */
+    private final DataServiceStats serviceStats;
+    
     /**
      * Synchronize on this object before accessing the state,
      * debugCheckInterval, or detectModifications fields.
@@ -235,9 +255,6 @@ public final class DataServiceImpl implements DataService {
 
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
-
-    /** Our profiling operations. */
-    private final ProfileOperation createReferenceOp;
     
     /**
      * Defines the transaction context map for this class.  This class checks
@@ -361,10 +378,10 @@ public final class DataServiceImpl implements DataService {
      * @param	systemRegistry the registry of available system components
      * @param	txnProxy the transaction proxy
      * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
-     *		</code> property is not specified, if the value of the <code>
-     *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
-     *		</code> property is not a valid integer, or if the data store
-     *		constructor detects an illegal property value
+     *        </code> property is not specified, if the value of the <code>
+     *        com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+     *	      </code> property is not a valid integer, or if the data store
+     *	      constructor detects an illegal property value
      * @throws	Exception if a problem occurs creating the service
      */
     public DataServiceImpl(Properties properties,
@@ -399,10 +416,12 @@ public final class DataServiceImpl implements DataService {
 	    // bindings.
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
-	    oidAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME+":objects", BigInteger.class);
-	    boundNameAccesses = accessCoordinator.
-		registerAccessSource(CLASSNAME+":bound-names", String.class);
+	    oidAccesses = 
+                    accessCoordinator.registerAccessSource(
+                    CLASSNAME + ":objects", BigInteger.class);
+	    boundNameAccesses = 
+                    accessCoordinator.registerAccessSource(
+                    CLASSNAME + ":bound-names", String.class);
 
 	    debugCheckInterval = wrappedProps.getIntProperty(
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
@@ -410,6 +429,8 @@ public final class DataServiceImpl implements DataService {
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
+	    optimisticWriteLocks = wrappedProps.getBooleanProperty(
+		OPTIMISTIC_WRITE_LOCKS, Boolean.FALSE);
 	    TaskScheduler taskScheduler =
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
@@ -428,13 +449,19 @@ public final class DataServiceImpl implements DataService {
 		baseStore = new DataStoreClient(properties);
 	    }
             storeToShutdown = baseStore;
-            ProfileRegistrar registrar = 
-		systemRegistry.getComponent(ProfileRegistrar.class);
-	    store = new DataStoreProfileProducer(baseStore, registrar);
-            ProfileConsumer consumer =
-                registrar.registerProfileProducer(getClass().getName());
-            createReferenceOp = consumer.registerOperation(
-		"createReference", ProfileLevel.MAX);
+            ProfileCollector collector = 
+		systemRegistry.getComponent(ProfileCollector.class);
+	    store = new DataStoreProfileProducer(baseStore, collector);
+            
+            // create our service profiling info and register our MBean
+            serviceStats = new DataServiceStats(collector);
+            try {
+                collector.registerMBean(serviceStats,
+                                        DataServiceStats.MXBEAN_NAME);
+            } catch (JMException e) {
+                logger.logThrow(Level.CONFIG, e, "Could not register MBean");
+            }
+
 	    classesTable = new ClassesTable(store);
 	    synchronized (contextMapLock) {
 		if (contextMap == null) {
@@ -446,7 +473,7 @@ public final class DataServiceImpl implements DataService {
 		state = State.RUNNING;
 	    }
 	    systemRegistry.getComponent(TransactionScheduler.class).runTask(
-		    new AbstractKernelRunnable() {
+		    new AbstractKernelRunnable("BindDataServiceHeader") {
 			public void run() {
 			    DataServiceHeader header;
 			    try {
@@ -495,26 +522,31 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public ManagedObject getBinding(String name) {
+        serviceStats.getBindingOp.report();
 	return getBindingInternal(name, false);
     }
 
     /** {@inheritDoc} */
      public void setBinding(String name, Object object) {
+         serviceStats.setBindingOp.report();
 	 setBindingInternal(name, object, false);
     }
 
     /** {@inheritDoc} */
     public void removeBinding(String name) {
+        serviceStats.removeBindingOp.report();
 	removeBindingInternal(name, false);
     }
 
     /** {@inheritDoc} */
     public String nextBoundName(String name) {
+        serviceStats.nextBoundNameOp.report();
 	return nextBoundNameInternal(name, false);
     }
 
     /** {@inheritDoc} */
     public void removeObject(Object object) {
+        serviceStats.removeObjOp.report();
 	Context context = null;
 	ManagedReferenceImpl<?> ref = null;
 	try {
@@ -558,6 +590,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public void markForUpdate(Object object) {
+        serviceStats.markForUpdateOp.report();
 	Context context = null;
 	ManagedReferenceImpl<?> ref = null;
 	try {
@@ -593,7 +626,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public <T> ManagedReference<T> createReference(T object) {
-        createReferenceOp.report();
+        serviceStats.createRefOp.report();
 	Context context = null;
 	try {
 	    checkManagedObject(object);
@@ -627,26 +660,31 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public ManagedObject getServiceBinding(String name) {
+        serviceStats.getServiceBindingOp.report();
 	return getBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
      public void setServiceBinding(String name, Object object) {
+         serviceStats.setServiceBindingOp.report();
 	 setBindingInternal(name, object, true);
     }
 
     /** {@inheritDoc} */
     public void removeServiceBinding(String name) {
+       serviceStats.removeServiceBindingOp.report();
        removeBindingInternal(name, true);
     }
 
     /** {@inheritDoc} */
     public String nextServiceBoundName(String name) {
+        serviceStats.nextServiceBoundNameOp.report();
 	return nextBoundNameInternal(name, true);
     }
 
     /** {@inheritDoc} */
     public ManagedReference<?> createReferenceForId(BigInteger id) {
+        serviceStats.createRefForIdOp.report();
 	Context context = null;
 	try {
 	    context = getContext();
@@ -673,6 +711,7 @@ public final class DataServiceImpl implements DataService {
 
     /** {@inheritDoc} */
     public BigInteger nextObjectId(BigInteger objectId) {
+        serviceStats.nextObjIdOp.report();
 	try {
 	    long oid = (objectId == null) ? -1 : getOid(objectId);
 	    if (objectId != null) {
@@ -803,7 +842,8 @@ public final class DataServiceImpl implements DataService {
 	    /*
 	     * Incomplete implementation left for future reference:
 	     *
-	     * String nextBoundName = nextBoundNameInternal(name, serviceBinding);
+	     * String nextBoundName = nextBoundNameInternal(name,
+             *                                              serviceBinding);
 	     * if (nextBoundName == null) {
  	     *     boundNameAccesses.
 	     *         reportObjectAccess(END_OF_NAMESPACE, AccessType.WRITE);
@@ -995,59 +1035,30 @@ public final class DataServiceImpl implements DataService {
     /* -- Other methods -- */
 
     /** 
-     * Attempts to shut down this service, returning a value indicating whether
-     * the attempt was successful.  The call will throw {@link
-     * IllegalStateException} if a call to this method has already completed
-     * with a return value of <code>true</code>. <p>
-     *
-     * This implementation will refuse to accept calls associated with
-     * transactions that were not joined prior to the <code>shutdown</code>xs
-     * call by throwing an <code>IllegalStateException</code>, and will wait
-     * for already joined transactions to commit or abort before returning.  It
-     * will also return <code>false</code> if {@link Thread#interrupt
-     * Thread.interrupt} is called on a thread that is currently blocked within
-     * a call to this method. <p>
-     *
-     * @return	<code>true</code> if the shut down was successful, else
-     *		<code>false</code>
-     * @throws	IllegalStateException if the <code>shutdown</code> method has
-     *		already been called and returned <code>true</code>
+     * {@inheritDoc}
      */
-    public boolean shutdown() {
-	synchronized (stateLock) {
-	    while (state == State.SHUTTING_DOWN) {
-		try {
-		    stateLock.wait();
-		} catch (InterruptedException e) {
-		    return false;
-		}
-	    }
-	    if (state == State.SHUTDOWN) {
-		throw new IllegalStateException(
-		    "Service is already shut down");
-	    }
-	    state = State.SHUTTING_DOWN;
-	}
-	boolean done = false;
-	try {
-	    if (store.shutdown()) {
-		synchronized (stateLock) {
-		    state = State.SHUTDOWN;
-		    stateLock.notifyAll();
-		}
-		done = true;
-		return true;
-	    } else {
-		return false;
-	    }
-	} finally {
-	    if (!done) {
-		synchronized (stateLock) {
-		    state = State.RUNNING;
-		    stateLock.notifyAll();
-		}
-	    }
-	}
+    public void shutdown() {
+        synchronized (stateLock) {
+            while (state == State.SHUTTING_DOWN) {
+                try {
+                    stateLock.wait();
+                } catch (InterruptedException e) {
+                    // loop until shutdown is complete
+                    logger.log(Level.FINEST, "DataService shutdown " +
+                            "interrupt ignored");
+                }
+            }
+            if (state == State.SHUTDOWN) {
+                return; // return silently
+            }
+            state = State.SHUTTING_DOWN;
+        }
+
+        store.shutdown();
+        synchronized (stateLock) {
+            state = State.SHUTDOWN;
+            stateLock.notifyAll();
+        }
     }
 
     /**

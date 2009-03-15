@@ -52,7 +52,7 @@ public interface IdentityCoordinator
      *
      * @throws LoginException if authentication fails
      */
-    public Identity authenticateIdentity(IdentityCredentials credentials)
+    Identity authenticateIdentity(IdentityCredentials credentials)
         throws LoginException;
 
 }

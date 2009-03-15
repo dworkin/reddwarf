@@ -21,11 +21,13 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.kernel.TransactionScheduler;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.util.Properties;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestSgsTestNode extends TestCase {
     /** The node that creates the servers */
     private SgsTestNode serverNode;
@@ -98,7 +100,7 @@ public class TestSgsTestNode extends TestCase {
         assertSame("expected same object", o1, task.getManager());
     }
     
-    private class GetManagerTask extends AbstractKernelRunnable {
+    private class GetManagerTask extends TestAbstractKernelRunnable {
         private Object manager = null;
         public void run() throws Exception {
             manager = AppContext.getManager(DataManager.class);

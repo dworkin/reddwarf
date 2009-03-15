@@ -22,13 +22,25 @@ package com.sun.sgs.profile;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 
 /**
- * This interface should be implemented by components that accept
- * profiling data associated with tasks that are running through the
- * scheduler.  Typically each consumer is matched with a
- * <code>ProfileProducer</code>.  Note that operations, counters and
- * samples are always handled in separate namespaces, so their
- * registrations will not collide.
+ * A profile consumer object is used to gather profiling data for a 
+ * specific system or application component.  Each profile consumer
+ * has a level associated with it, which determines how much data the
+ * consumer will gather.
+ * <p>
+ * Profile consumers are factories for profile counters, operations,
+ * and samples.  These profiling data objects come in three varieties:
+ * <ul>
+ * <li> aggregate, where the data is collected until it is explicitly cleared
+ * <li> task-local, where data is collected on a task-by-task basis into a 
+ *      {@link ProfileReport}
+ * <li> aggregate and task-local, where the data is both aggregated until
+ *      cleared and reported on a task-by-task basis
+ * </ul>
  *
+ * The factory methods include a parameter indicating the minimum profile
+ * level the consumer must be set at for the created object's profiling
+ * data to be collected.
+ * 
  * @see ProfileCounter
  * @see ProfileOperation
  * @see ProfileSample
@@ -54,70 +66,87 @@ public interface ProfileConsumer {
     ProfileLevel getProfileLevel();
     
     /**
-     * Registers the named operation with this consumer, such that the
-     * operation can be reported as part of a task's profile. Note
-     * that registering the same name multiple times on the same
-     * consumer will produce the same canonical instance of
-     * <code>ProfileOperation</code>.  
+     * The valid types of profile operations, counters and samples that
+     * can be created with the profile data factory methods.
+     */
+    enum ProfileDataType {
+        /**  
+         * Task local data reported through the {@link ProfileReport} to
+         * {@code ProfileListener}s on a per-task basis.
+         */
+        TASK,
+        /**
+         * Data that is aggregated until it is explicitly cleared.
+         */
+        AGGREGATE,
+        /**
+         * Data that is both aggregated and reported on a per-task basis.
+         */
+        TASK_AND_AGGREGATE,
+    }
+    
+    /**
+     * Creates the named operation in this consumer.  If an operation has
+     * already been created by this consumer with the same {@code name},
+     * {@code type} and {@code minLevel}, it is returned.
      *
      * @param name the name of the operation
+     * @param type the type of operation to create
      * @param minLevel the minimum level of profiling that must be set to report
      *              this operation
      *
-     * @return an instance of <code>ProfileOperation</code>
+     * @return a {@code ProfileOperation} to note operations
+     * 
+     * @throws IllegalArgumentException if an operation has already been
+     *         created with this {@code name} but a different {@code type}
+     *         or {@code minLevel}
      */
-    ProfileOperation registerOperation(String name, ProfileLevel minLevel);
+    ProfileOperation createOperation(String name,  
+                                     ProfileDataType type,
+                                     ProfileLevel minLevel);
 
     /**
-     * Registers the named counter with this consumer, such that the
-     * counter can be incremented during the run of a task. If this
-     * counter is local to a task it means that each time a new task
-     * runs, the counter is perceived as starting from zero for that
-     * task. Note that registering the same name multiple times on the
-     * same consumer <i>will</i> produce the same canonical instance of
-     * {@code ProfileCounter}.
+     * Creates the named counter in this consumer.  If a counter has
+     * already been created by this consumer with the same {@code name},
+     * {@code type} and {@code minLevel}, it is returned.
      *
      * @param name the name of the counter
-     * @param taskLocal <code>true</code> if this counter is local to
-     *        tasks, <code>false</code> otherwise
+     * @param type the type of counter to create
      * @param minLevel the minimum level of profiling that must be set to update
      *              this counter
      *
-     * @return an instance of <code>ProfileCounter</code>
+     * @return a {@code ProfileCounter}
+     * 
+     * @throws IllegalArgumentException if a counter has already been
+     *         created with this {@code name} but a different {@code type}
+     *         or {@code minLevel}
      */
-    ProfileCounter registerCounter(String name, boolean taskLocal,
-                                   ProfileLevel minLevel);
+    ProfileCounter createCounter(String name, 
+                                 ProfileDataType type,
+                                 ProfileLevel minLevel);
 
     /**
-     * Registers the named source of data samples, and returns a
-     * {@code ProfileSample} that can record each new datum during
-     * the lifetime of a task or the application.  If the sample
-     * counting should be local to a task, the current list of samples
-     * will be empty upon each start of a task.  Note that registering
-     * the same name multiple times on the same consumer <i>will</i>
-     * produce the same canonical instance of {@code ProfileSample}.
-     * <p>
-     *  A negative value for {@code maxSamples} indicates an infinite
-     *  number of samples.  Note that for non-task-local sample
-     *  sources, this is a potential memory leak as the number of
-     *  samples increases.  Once the limit of samples has been
-     *  reached, older samples will be dropped to make room for the
-     *  newest samples
+     * Creates the named sample collection in this consumer.  If a sample has
+     * already been created by this consumer with the same {@code name},
+     * {@code type}, and {@code minLevel}, it is returned.  
      *
-     * @param name a name or description of the sample type
-     * @param taskLocal <code>true</code> if this counter is local to
-     *        tasks, <code>false</code> otherwise
-     * @param maxSamples the maximum number of samples to keep.
+     * @param name a name or description of the sample collection
+     * @param type the type of sample collection to create
      * @param minLevel the minimum level of profiling that must be set to record
      *              this sample  
      *
-     * @return a {@code ProfileSample} that collects the data
+     * @return a {@code ProfileSample} that collects {@code long} data
+     * 
+     * @throws IllegalArgumentException if a sample collection has already been
+     *         created with this {@code name} but a different {@code type} or
+     *         {@code minLevel}
      */
-    ProfileSample registerSampleSource(String name, boolean taskLocal,
-				       long maxSamples, ProfileLevel minLevel);
+    ProfileSample createSample(String name, 
+                               ProfileDataType type,
+                               ProfileLevel minLevel);
 
     /**
-     * Each profile consumer has a unique name.
+     * The profile consumer's unique name.
      *
      * @return the name of this consumer
      */

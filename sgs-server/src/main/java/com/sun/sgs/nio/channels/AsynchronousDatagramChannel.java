@@ -102,8 +102,10 @@ import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
  *       .bind(new InetSocketAddress(4000));
  * 
  *   // print the source address of all packets that we receive
- *   dc.receive(buffer, buffer, new CompletionHandler&lt;SocketAddress,ByteBuffer&gt;() {
- *       public void completed(IoFuture&lt;SocketAddress,ByteBuffer&gt; result) {
+ *   dc.receive(buffer, buffer, 
+ *     new CompletionHandler&lt;SocketAddress,ByteBuffer&gt;() {
+ *       public void completed(IoFuture&lt;SocketAddress,ByteBuffer&gt; result)
+ *       {
  *           try {
  *                SocketAddress sa = result.getNow();
  *                System.out.println(sa);
@@ -124,7 +126,8 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * 
      * @param provider the asynchronous channel provider for this channel
      */
-    protected AsynchronousDatagramChannel(AsynchronousChannelProvider provider) {
+    protected AsynchronousDatagramChannel(AsynchronousChannelProvider provider)
+    {
         super(provider);
     }
 
@@ -170,7 +173,7 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * @throws IOException if an I/O error occurs
      */
     public static AsynchronousDatagramChannel open() throws IOException {
-        return open((ProtocolFamily)null, (AsynchronousChannelGroup)null);
+        return open((ProtocolFamily) null, (AsynchronousChannelGroup) null);
     }
 
     /**
@@ -364,7 +367,8 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * @return an {@code IoFuture} object representing the pending result
      * @throws ClosedAsynchronousChannelException if this channel is closed
      */
-    public final <A> IoFuture<Void, A> disconnect(CompletionHandler<Void, ? super A> handler)
+    public final <A> IoFuture<Void, A> 
+            disconnect(CompletionHandler<Void, ? super A> handler)
     {
         return disconnect(null, handler);
     }
@@ -378,8 +382,9 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * source address of the datagram upon successful completion.
      * <p>
      * The datagram is transferred into the given byte buffer starting at
-     * its current position, as if by a regular
-     * {@link AsynchronousByteChannel#read(ByteBuffer, Object, CompletionHandler) read}
+     * its current position, as if by a regular {@link 
+     *  AsynchronousByteChannel#read(ByteBuffer, Object, 
+     *  CompletionHandler) read}
      * operation. If there are fewer bytes remaining in the buffer than are
      * required to hold the datagram then the remainder of the datagram is
      * silently discarded.
@@ -486,7 +491,8 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * the datagram in the underlying output buffer.
      * <p>
      * The datagram is transferred from the byte buffer as if by a regular
-     * {@link AsynchronousByteChannel#write(ByteBuffer, Object, CompletionHandler) write}
+     * {@link AsynchronousByteChannel#write(ByteBuffer, 
+     *      Object, CompletionHandler) write}
      * operation.
      * <p>
      * If there is a security manager installed and the the channel is not
@@ -539,8 +545,8 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * remaining in the buffer or zero if there was insufficient room for
      * the datagram in the underlying output buffer.
      * <p>
-     * This method is equivalent to invoking
-     * {@link #send(ByteBuffer, SocketAddress, long, TimeUnit, Object, CompletionHandler)}
+     * This method is equivalent to invoking {@link #send(ByteBuffer, 
+     *  SocketAddress, long, TimeUnit, Object, CompletionHandler)}
      * with a timeout of {@code 0L}.
      * 
      * @param <A> the attachment type
@@ -583,8 +589,8 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * remaining in the buffer or zero if there was insufficient room for
      * the datagram in the underlying output buffer.
      * <p>
-     * This method is equivalent to invoking
-     * {@link #send(ByteBuffer, SocketAddress, long, TimeUnit, Object, CompletionHandler)}
+     * This method is equivalent to invoking {@link #send(ByteBuffer, 
+     *   SocketAddress, long, TimeUnit, Object, CompletionHandler)}
      * with a timeout of {@code 0L}, and an attachment of {@code null}.
      * 
      * @param <A> the attachment type
@@ -720,7 +726,8 @@ public abstract class AsynchronousDatagramChannel extends AsynchronousChannel
      * the datagram in the underlying output buffer.
      * <p>
      * The datagram is transferred from the byte buffer as if by a regular
-     * {@link AsynchronousByteChannel#write(ByteBuffer, Object, CompletionHandler) write}
+     * {@link AsynchronousByteChannel#write(
+     *     ByteBuffer, Object, CompletionHandler) write}
      * operation.
      * <p>
      * This method may only be invoked if this channel is connected, in

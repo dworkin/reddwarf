@@ -118,22 +118,26 @@ final class AsyncServerSocketChannelImpl
                                              int backlog)
         throws IOException
     {
-        if ((local != null) && (!(local instanceof InetSocketAddress)))
+        if ((local != null) && (!(local instanceof InetSocketAddress))) {
             throw new UnsupportedAddressTypeException();
+        }
 
         InetSocketAddress inetLocal = (InetSocketAddress) local;
-        if ((inetLocal != null) && inetLocal.isUnresolved())
+        if ((inetLocal != null) && inetLocal.isUnresolved()) {
             throw new UnresolvedAddressException();
+        }
 
         final ServerSocket socket = channel.socket();
 
         try {
             socket.bind(local, backlog);
         } catch (SocketException e) {
-            if (socket.isBound())
+            if (socket.isBound()) {
                 throw Util.initCause(new AlreadyBoundException(), e);
-            if (socket.isClosed())
+            }
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
         return this;
@@ -150,14 +154,17 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     @Override
-    public AsyncServerSocketChannelImpl setOption(SocketOption name, Object value)
+    public AsyncServerSocketChannelImpl setOption(SocketOption name, 
+                                                  Object value)
         throws IOException
     {
-        if (! (name instanceof StandardSocketOption))
+        if (!(name instanceof StandardSocketOption)) {
             throw new IllegalArgumentException("Unsupported option " + name);
+        }
 
-        if (value == null || !name.type().isAssignableFrom(value.getClass()))
+        if (value == null || !name.type().isAssignableFrom(value.getClass())) {
             throw new IllegalArgumentException("Bad parameter for " + name);
+        }
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final ServerSocket socket = channel.socket();
@@ -165,19 +172,21 @@ final class AsyncServerSocketChannelImpl
         try {
             switch (stdOpt) {
             case SO_RCVBUF:
-                socket.setReceiveBufferSize(((Integer)value).intValue());
+                socket.setReceiveBufferSize(((Integer) value).intValue());
                 break;
 
             case SO_REUSEADDR:
-                socket.setReuseAddress(((Boolean)value).booleanValue());
+                socket.setReuseAddress(((Boolean) value).booleanValue());
                 break;
 
             default:
-                throw new IllegalArgumentException("Unsupported option " + name);
+                throw new IllegalArgumentException("Unsupported option " 
+                                                   + name);
             }
         } catch (SocketException e) {
-            if (socket.isClosed())
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
         return this;
@@ -187,8 +196,9 @@ final class AsyncServerSocketChannelImpl
      * {@inheritDoc}
      */
     public Object getOption(SocketOption name) throws IOException {
-        if (! (name instanceof StandardSocketOption))
+        if (!(name instanceof StandardSocketOption)) {
             throw new IllegalArgumentException("Unsupported option " + name);
+        }
 
         StandardSocketOption stdOpt = (StandardSocketOption) name;
         final ServerSocket socket = channel.socket();
@@ -202,11 +212,13 @@ final class AsyncServerSocketChannelImpl
                 return socket.getReuseAddress();
 
             default:
-                throw new IllegalArgumentException("Unsupported option " + name);
+                throw new IllegalArgumentException("Unsupported option " 
+                                                   + name);
             }
         } catch (SocketException e) {
-            if (socket.isClosed())
+            if (socket.isClosed()) {
                 throw Util.initCause(new ClosedChannelException(), e);
+            }
             throw e;
         }
     }
@@ -249,6 +261,6 @@ final class AsyncServerSocketChannelImpl
                         throw Util.initCause(
                             new AsynchronousCloseException(), e);
                     }
-                }});
+                } });
     }
 }

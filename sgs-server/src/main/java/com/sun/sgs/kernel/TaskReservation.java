@@ -42,7 +42,7 @@ public interface TaskReservation
      * @throws IllegalStateException if the reservation has already been
      *                               used or cancelled
      */
-    public void cancel();
+    void cancel();
 
     /**
      * Uses the reservation, scheduling all associated tasks to run.
@@ -50,6 +50,6 @@ public interface TaskReservation
      * @throws IllegalStateException if the reservation has already been
      *                               used or cancelled
      */
-    public void use();
+    void use();
 
 }

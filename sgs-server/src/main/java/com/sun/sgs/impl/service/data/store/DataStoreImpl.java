@@ -804,6 +804,16 @@ public class DataStoreImpl
 	DbTransaction dbTxn = null;
 	boolean done = false;
 	try {
+	    File directoryFile = new File(specifiedDirectory).getAbsoluteFile();
+            if (!directoryFile.exists()) {
+                logger.log(Level.INFO, "Creating database directory : " +
+                           directoryFile.getAbsolutePath());
+                if (!directoryFile.mkdirs()) {
+                    throw new DataStoreException("Unable to create database " +
+                                                 "directory : " +
+                                                 directoryFile.getName());
+                }
+	    }
 	    env = DbEnvironmentFactory.getEnvironment(
 		directory, properties, scheduler);
 	    dbTxn = env.beginTransaction(Long.MAX_VALUE);
@@ -997,13 +1007,10 @@ public class DataStoreImpl
 	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	/*
-	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
-	 * without reading or writing, so get the object and ask for a write
-	 * lock.  -tjb@sun.com (10/06/2006)
-	 */
 	try {
-	    getObjectInternal(txn, oid, true);
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    oidsDb.markForUpdate(txnInfo.dbTxn, DataEncoding.encodeLong(oid));
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
@@ -1024,8 +1031,14 @@ public class DataStoreImpl
 		       txn, oid, forUpdate);
 	}
 	try {
-	    byte[] result =
-		decodeValue(getObjectInternal(txn, oid, forUpdate));
+	    checkId(oid);
+	    TxnInfo txnInfo = checkTxn(txn);
+	    byte[] result = oidsDb.get(
+		txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
+	    if (result == null || isPlaceholderValue(result)) {
+		throw new ObjectNotFoundException("Object not found: " + oid);
+	    }
+	    byte[] decodedResult = decodeValue(result);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -1033,26 +1046,12 @@ public class DataStoreImpl
 		    "returns",
 		    txn, oid, forUpdate);
 	    }
-	    return result;
+	    return decodedResult;
 	} catch (RuntimeException e) {
 	    throw convertException(txn, Level.FINEST, e,
 				   "getObject txn:" + txn + ", oid:" + oid +
 				   ", forUpdate:" + forUpdate);
 	}
-    }
-
-    /** Implement getObject, without logging. */
-    private byte[] getObjectInternal(
-	Transaction txn, long oid, boolean forUpdate)
-    {
-	checkId(oid);
-	TxnInfo txnInfo = checkTxn(txn);
-	byte[] result = oidsDb.get(
-	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
-	if (result == null || isPlaceholderValue(result)) {
-	    throw new ObjectNotFoundException("Object not found: " + oid);
-	}
-	return result;
     }
 
     /** {@inheritDoc} */
@@ -1131,12 +1130,10 @@ public class DataStoreImpl
 	    checkId(oid);
 	    TxnInfo txnInfo = checkTxn(txn);
 	    byte[] key = DataEncoding.encodeLong(oid);
-	    byte[] value = oidsDb.get(txnInfo.dbTxn, key, true);
-	    if (value == null || isPlaceholderValue(value)) {
+	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
+	    if (!found) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    }
-	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
-	    assert found : "Object not found during delete";
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -1265,7 +1262,7 @@ public class DataStoreImpl
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
+    public void shutdown() {
 	logger.log(Level.FINER, "shutdown");
 	try {
 	    synchronized (txnCountLock) {
@@ -1277,24 +1274,21 @@ public class DataStoreImpl
 				   txnCount);
 			txnCountLock.wait();
 		    } catch (InterruptedException e) {
-			logger.log(Level.FINEST, "shutdown interrupted");
-			break;
+                        // loop until shutdown is complete
+			logger.log(Level.FINEST, "DataStore shutdown " +
+                                "interrupt ignored");
 		    }
-		}
-		if (txnCount < 0) {
-		    throw new IllegalStateException("DataStore is shut down");
-		}
-		boolean ok = (txnCount == 0);
-		if (ok) {
-		    infoDb.close();
-		    classesDb.close();
-		    oidsDb.close();
-		    namesDb.close();
-		    env.close();
-		    txnCount = -1;
-		}
-		logger.log(Level.FINER, "shutdown returns {0}", ok);
-		return ok;
+                }
+                if (txnCount < 0) {
+                    return; // return silently
+                }
+
+                infoDb.close();
+                classesDb.close();
+                oidsDb.close();
+                namesDb.close();
+                env.close();
+                txnCount = -1;
 	    }
 	} catch (RuntimeException e) {
 	    throw convertException(null, Level.FINER, e, "shutdown");

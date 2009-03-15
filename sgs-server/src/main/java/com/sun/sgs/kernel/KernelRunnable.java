@@ -37,7 +37,7 @@ public interface KernelRunnable {
      *
      * @return the fully-qualified name of the base task class type
      */
-    public String getBaseTaskType();
+    String getBaseTaskType();
 
     /**
      * Runs this <code>KernelRunnable</code>. If this is run by a
@@ -49,6 +49,6 @@ public interface KernelRunnable {
      *
      * @throws Exception if any error occurs
      */
-    public void run() throws Exception;
+    void run() throws Exception;
 
 }

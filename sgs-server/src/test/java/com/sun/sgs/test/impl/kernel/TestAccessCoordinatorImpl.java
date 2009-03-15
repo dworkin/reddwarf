@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 
 import com.sun.sgs.app.util.ScalableHashMap;
+import com.sun.sgs.app.util.ManagedSerializable;
 
 import com.sun.sgs.auth.Identity;
 
@@ -31,16 +32,14 @@ import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 
-import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.ManagedSerializable;
-
 import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
+import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.util.Properties;
 
@@ -58,7 +57,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 /**
  * Tests the {@link AccessCoordinatorImpl} class
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestAccessCoordinatorImpl extends Assert {
 
     private SgsTestNode serverNode;
@@ -103,11 +102,11 @@ public class TestAccessCoordinatorImpl extends Assert {
     /*
      * AccessCooridnatorImpl tests
      */
-   
+    
     @Test(expected=NullPointerException.class)
     public void testGetConflictWithNull() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    accessCoordinator.getConflictingTransaction(null);
 		}
@@ -117,7 +116,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test(expected=NullPointerException.class)
     public void testAccessSourceNullName() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    accessCoordinator.registerAccessSource(null, Object.class);
@@ -128,7 +127,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test(expected=NullPointerException.class)
     public void testAccessSourceNullType() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    accessCoordinator.registerAccessSource("source", null);
@@ -142,7 +141,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     
     @Test public void testRegisterAccessSource() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", Integer.class);
@@ -153,7 +152,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test(expected=NullPointerException.class)
     public void testAccessReporterNullTransaction() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", Integer.class);
@@ -165,7 +164,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test(expected=NullPointerException.class)
     public void testAccessReporterNullTransaction2() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", Integer.class);
@@ -177,7 +176,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test(expected=NullPointerException.class)
     public void testAccessReporterNullTransaction3() throws Exception {
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 
 		    AccessReporter<Integer> reporter = 
@@ -193,7 +192,7 @@ public class TestAccessCoordinatorImpl extends Assert {
 	    accessCoordinator.registerAccessSource("test", Integer.class);
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    reporter.setObjectDescription(null, "description");		    
 		}
@@ -203,7 +202,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test public void testAccessReporterNullDescription() throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
  		    final AccessReporter<Integer> reporter = 
  			accessCoordinator.registerAccessSource("test", 
@@ -218,7 +217,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     public void testAccessReporterNullId() throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", 
@@ -232,7 +231,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     public void testAccessReporterNullAccessType() throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test",
@@ -246,7 +245,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test public void testAccessReporterAccessWithDescription() throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", 
@@ -262,7 +261,7 @@ public class TestAccessCoordinatorImpl extends Assert {
 	final SgsTestNode node = serverNode;
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    TransactionProxy proxy = node.getProxy();
 		    AccessReporter<Integer> reporter = 
@@ -278,7 +277,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test public void testAccessReporterMultipleDescriptions() throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", 
@@ -293,7 +292,7 @@ public class TestAccessCoordinatorImpl extends Assert {
     @Test public void testAccessReporterMultipleAccesses() throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", 
@@ -312,7 +311,7 @@ public class TestAccessCoordinatorImpl extends Assert {
 	throws Exception {
 
 	txnScheduler.runTask(
-	    new AbstractKernelRunnable() {
+	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
 		    AccessReporter<Integer> reporter = 
 			accessCoordinator.registerAccessSource("test", 

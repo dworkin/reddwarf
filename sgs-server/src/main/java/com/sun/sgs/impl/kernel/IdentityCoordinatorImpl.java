@@ -58,7 +58,7 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
                                            class.getName()));
 
     // the available authenticators
-    private final HashMap<String,List<IdentityAuthenticator>> authenticatorMap;
+    private final HashMap<String, List<IdentityAuthenticator>> authenticatorMap;
 
     // a unique collection of the authenticators, for management purposes,
     // and currently unused
@@ -73,11 +73,12 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
      * @param authenticators the available <code>IdentityAuthenticator</code>s
      */
     public IdentityCoordinatorImpl(List<IdentityAuthenticator> authenticators) {
-        if (authenticators == null)
+        if (authenticators == null) {
             throw new NullPointerException("Authenticators must not be null");
+        }
 
         // add the authenticators in the right order
-        authenticatorMap = new HashMap<String,List<IdentityAuthenticator>>();
+        authenticatorMap = new HashMap<String, List<IdentityAuthenticator>>();
         for (IdentityAuthenticator authenticator : authenticators) {
             String [] identifiers =
                 authenticator.getSupportedCredentialTypes();
@@ -105,14 +106,16 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
     public Identity authenticateIdentity(IdentityCredentials credentials)
         throws LoginException
     {
-        if (credentials == null)
+        if (credentials == null) {
             throw new NullPointerException("Credentials must not be null");
+        }
 
         List<IdentityAuthenticator> authenticators =
             authenticatorMap.get(credentials.getCredentialsType());
-        if (authenticators == null)
+        if (authenticators == null) {
             throw new CredentialException("Unsupported credentials type: " +
                                           credentials.getCredentialsType());
+        }
 
         for (IdentityAuthenticator authenticator : authenticators) {
             try {
@@ -123,11 +126,12 @@ class IdentityCoordinatorImpl implements IdentityCoordinator
                 // generally meaningful to return errors from different
                 // authenticators since some of them might be expected
                 // behavior. So, for now, these errors are being ignored
-                if (logger.isLoggable(Level.FINEST))
+                if (logger.isLoggable(Level.FINEST)) {
                     logger.logThrow(Level.FINEST, le, "Could not " +
                                     "authenticate credentials with " +
                                     "authenticator {0}",
                                     authenticator.getClass().getName());
+                }
             }
         }
 

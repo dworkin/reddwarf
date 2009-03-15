@@ -91,8 +91,9 @@ public abstract class AsynchronousChannelGroup {
      * @param provider the asynchronous channel provider for this group
      */
     protected AsynchronousChannelGroup(AsynchronousChannelProvider provider) {
-        if (provider == null)
+        if (provider == null) {
             throw new NullPointerException("null provider");
+        }
         this.provider = provider;
     }
 
@@ -109,7 +110,8 @@ public abstract class AsynchronousChannelGroup {
      * Creates an asynchronous channel group.
      * <p>
      * The new group is created by invoking the
-     * {@link AsynchronousChannelProvider#openAsynchronousChannelGroup(ExecutorService)
+     * {@link 
+     * AsynchronousChannelProvider#openAsynchronousChannelGroup(ExecutorService)
      * openAsynchronousChannelGroup} method of the system-wide default
      * {@link AsynchronousChannelProvider} object.
      * <p>

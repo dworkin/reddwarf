@@ -1,15 +1,176 @@
+Project Darkstar Server Distribution
+Version ${sgs.version}
+
+INTRODUCTION
+
+Project Darkstar lets developers write scalable, reliable, persistent
+and fault-tolerant game server applications using simple
+single-threaded, event-driven code.
+
+This distribution of the Project Darkstar Server contains everything you
+need to develop game servers that run as applications in the Project
+Darkstar Server environment.  Information about building client
+applications is available as separate downloads.
+
+In addition to the documents, APIs and examples, this distribution
+contains a complete single-system version of the Project Darkstar
+Server.
+
+See the CHANGELOG file for a summary of recent changes, and the RELEASE
+COMPATIBILITY section below for information about compatibility.
+
+CONTENTS
+
 This distribution contains the following subdirectories:
 
-- sgs-server-${sgs.version}
-  Project Darkstar Server
+- bin
+  The bootstrap JAR files used to bootup and shutdown a 
+  Project Darkstar Server and the application deployed into it
 
-- bdb-${bdb.version}
-  Berkeley DB
+- conf
+  Configuration files used to configure the runtime state of
+  the server
 
-- mina-${org.apache.mina.version}
-  Apache MINA
+- deploy
+  Location used to deploy applications by dropping in application
+  JAR files
 
-- slf4j-${slf4j-api.version}
-  Simple Logging Facade for Java (SLF4J)
+- javadoc
+  Javadoc documentation for the server API
 
-See the README file in the sgs-server-${sgs.version} subdirectory for instructions.
+- lib
+  JAR files needed to develop for the Project Darkstar Server, and to
+  run server applications
+
+- license
+  License files for Project Darkstar Server and included third party
+  libraries
+
+- src
+  The source code for the Project Darkstar server
+
+- tutorial
+  Documentation and sample code for the server tutorial
+	
+SUPPORTED PLATFORMS
+
+This distribution has been tested on the following operating systems and
+processors:
+
+- Solaris(TM) 10 Operating System on SPARC processors and AMD 64-bit
+  processors
+- Windows XP SP2 on 32-bit processors
+- Redhat Linux EL4 on 32-bit processors
+- Mac OS X 10.5 on Intel processors
+
+This distribution requires Java(TM) Platform, Standard Edition 6 (Java
+SE platform 6), or greater.
+
+It has been tested with version 1.6.0_11 of Java SE platform 6 on
+Solaris, Windows, and Linux platforms, and version 1.6.0_07 on Mac OS X
+platforms.
+
+REQUIRED LIBRARIES
+
+The Project Darkstar server depends on several additional libraries.
+
+This distribution requires Berkeley DB version ${bdb.version}, which may be
+bundled with this distribution, or else can be obtained and compiled
+from:
+
+  http://www.oracle.com/database/berkeley-db/db/index.html
+
+This distribution supports Berkeley DB Java edition version
+${bdb.je.version}, which may be bundled with this distribution, or else
+can be obtained from:
+
+  http://www.oracle.com/database/berkeley-db/je/index.html
+
+DEVELOPING AND RUNNING
+
+The Project Darkstar server can be started up using the executable bootstrapper
+JAR file in the bin directory.
+
+  java -jar bin/sgs-boot.jar
+
+The Project Darkstar server can be shutdown using the executable stopper JAR
+file in the bin directory.
+
+  java -jar bin/sgs-stop.jar
+
+Project Darkstar is an application container in which applications (or games)
+can be deployed.  By default, any JAR files that are placed into the
+deploy directory are considered part of the deployed application.
+Additionally, a single application JAR should contain an embedded 
+META-INF/app.properties file.  This file is automatically used by the 
+Project Darkstar server to set the runtime configuration properties of the
+application.
+
+For example, to deploy the Hello World tutorial application into the default
+Project Darkstar container, copy the tutorial.jar file from the tutorial 
+directory into the deploy directory.  Then bootup the server using the 
+executable bootstrapper described above.
+
+Additional customization of the location of deployed applications and runtime
+configuration files is possible.  See the configuration files located in the
+conf directory for additional details.
+
+
+RELEASE COMPATIBILITY
+
+Release 0.9.7:
+
+- Running an application using release 0.9.7 with persistent data
+  created using release 0.9.6 will automatically upgrade the data to the
+  current release format, which is incompatible with earlier releases.
+
+- The following configuration properties were changed incompatibly:
+
+  com.sun.sgs.impl.kernel.profile.level
+  com.sun.sgs.impl.kernel.profile.listeners
+
+Release 0.9.6:
+
+- See the API-CHANGES file for a detailed list of changes to the API in
+  this release.
+
+- Does not support persistent data from earlier releases.
+
+
+KNOWN ISSUES
+
+This version of the Project Darkstar Server has the following
+limitations:
+
+- Multi-node operation is currently not scalable.  Depending on the
+  application, adding additional application nodes to a multi-node
+  cluster may reduce performance, not improve it.  We expect this
+  behavior to improve in future releases.
+
+- This release supports only limited I/O throttling, so it is possible
+  for clients to overwhelm the server with network traffic and cause the
+  server to run out of memory.  As a temporary workaround, developers
+  must ensure that clients do not send network traffic faster than the
+  server application can process it.
+
+- It does not support pluggable I/O transports.
+
+- The API for customizing managers and services is incomplete and still
+  under development.
+
+- The transaction coordinator implementation does not support more than
+  one persistent service at a time.  This restriction prevents using
+  additional services that modify the contents of databases.
+
+
+MORE INFORMATION
+
+For more information, please see the tutorial in the tutorial directory
+and the documentation in the doc directory.  Also check the
+http://www.projectdarkstar.com website, which has links to more
+information and to the Project Darkstar forums.
+
+If you cannot find an answer to your question in any of these places,
+please email the Darkstar team at:
+
+   dev@games-darkstar.dev.java.net

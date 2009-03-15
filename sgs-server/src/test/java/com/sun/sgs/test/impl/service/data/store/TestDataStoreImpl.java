@@ -37,10 +37,9 @@ import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import com.sun.sgs.test.util.UtilReflection;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
@@ -48,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.runner.RunWith;
 
 /*
  * XXX: Test recovery of prepared transactions after a crash
@@ -55,6 +55,7 @@ import junit.framework.TestSuite;
  */
 
 /** Test the DataStoreImpl class */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataStoreImpl extends TestCase {
 
     /** If this property is set, then only run the single named test method. */
@@ -81,24 +82,6 @@ public class TestDataStoreImpl extends TestCase {
     private static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
-
-    /** The DataStoreImpl.setObjectRaw(Transaction,long,byte[]) method. */
-    private static final Method setObjectRaw =
-	UtilReflection.getMethod(DataStoreImpl.class, "setObjectRaw",
-				 Transaction.class, long.class, byte[].class);
-
-    /** The DataStoreImpl.getObjectRaw(Transaction,long) method. */
-    private static final Method getObjectRaw =
-	UtilReflection.getMethod(DataStoreImpl.class, "getObjectRaw",
-				 Transaction.class, long.class);
-
-    /** The DataStoreImpl.nextObjectIdRaw(Transaction,long) method. */
-    private static final Method nextObjectIdRaw =
-	UtilReflection.getMethod(DataStoreImpl.class, "nextObjectIdRaw",
-				 Transaction.class, long.class);
-
-    /** The value of the DataStoreHeader.PLACEHOLDER_OBJ_VALUE field. */
-    private static final byte PLACEHOLDER_OBJ_VALUE = 3;
 
     /** An instance of the data store, to test. */
     protected static DataStore store;
@@ -342,12 +325,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testMarkForUpdateNotFound() throws Exception {
-	try {
-	    store.markForUpdate(txn, id);
-	    fail("Expected ObjectNotFoundException");
-	} catch (ObjectNotFoundException e) {
-	    System.err.println(e);
-	}
+	store.markForUpdate(txn, id);
     }
 
     /* -- Unusual states -- */
@@ -391,28 +369,6 @@ public class TestDataStoreImpl extends TestCase {
 		((DataStoreProfileProducer) store).getDataStore()));
 	/* Marking for update is not an update! */
 	assertTrue(txn.prepare());
-    }
-
-    public void testMarkForUpdatePlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	createPlaceholder(txn, id);
-	for (int i = 0; i < 2; i++) {
-	    if (i == 1) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    try {
-		store.markForUpdate(txn, id);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
-	}
-	store.setObject(txn, id, new byte[0]);
-	txn.commit();
-	txn = null;
     }
 
     /* -- Test getObject -- */
@@ -515,34 +471,6 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testGetObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	createPlaceholder(txn, id);
-	for (int i = 0; i < 2; i++) {
-	    if (i == 1) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    try {
-		store.getObject(txn, id, false);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
-	    try {
-		store.getObject(txn, id, true);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
-	}
-	store.setObject(txn, id, new byte[0]);
-	txn.commit();
-	txn = null;
-    }
-
     /* -- Test setObject -- */
 
     public void testSetObjectNullTxn() {
@@ -630,25 +558,6 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
-    }
-
-    public void testSetObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	for (int i = 0; i < 2; i++) {
-	    id = store.createObject(txn);
-	    createPlaceholder(txn, id);
-	    if (i == 1) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    byte[] value = { 1, 2 };
-	    store.setObject(txn, id, value);
-	    assertSameBytes(value, store.getObject(txn, id, false));
-	}
-	txn.commit();
-	txn = null;
     }
 
     /* -- Test setObjects -- */
@@ -783,27 +692,6 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testSetObjectsPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	for (int i = 0; i < 2; i++) {
-	    long[] ids = { store.createObject(txn), store.createObject(txn) };
-	    byte[][] dataArray = { { 1, 2 }, { 3, 4, 5 } };
-	    createPlaceholder(txn, ids[0]);
-	    createPlaceholder(txn, ids[1]);
-	    if (i == 1) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    store.setObjects(txn, ids, dataArray);
-	    assertSameBytes(dataArray[0], store.getObject(txn, ids[0], false));
-	    assertSameBytes(dataArray[1], store.getObject(txn, ids[1], false));
-	}
-	txn.commit();
-	txn = null;
-    }
-
     /* -- Test removeObject -- */
 
     public void testRemoveObjectNullTxn() {
@@ -884,28 +772,6 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected ObjectNotFoundException");
 	} catch (ObjectNotFoundException e) {
 	}
-    }
-
-    public void testRemoveObjectPlaceholder() throws Exception {
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	createPlaceholder(txn, id);
-	for (int i = 0; i < 2; i++) {
-	    if (i == 1) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    try {
-		store.removeObject(txn, id);
-		fail("Expected ObjectNotFoundException");
-	    } catch (ObjectNotFoundException e) {
-		System.err.println(e);
-	    }
-	}
-	store.setObject(txn, id, new byte[0]);
-	txn.commit();
-	txn = null;
     }
 
     /* -- Test getBinding -- */
@@ -1593,10 +1459,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.shutdown();
 	ShutdownAction action = new ShutdownAction();
 	try {
-	    action.waitForDone();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
+	    assertTrue(action.waitForDone());
 	} finally {
 	    store = null;
 	}
@@ -1606,7 +1469,7 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action = new ShutdownAction();
 	action.assertBlocked();
 	action.interrupt();
-	action.assertResult(false);
+        assertFalse(action.waitForDone());
 	store.setBinding(txn, "foo", id);
 	txn.commit();
 	txn = null;
@@ -1621,10 +1484,11 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	action1.interrupt();
-	action1.assertResult(false);
+        action1.assertBlocked(); // should not be interrupted
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	action2.assertResult(true);
+        assertTrue(action1.waitForDone());
+	assertTrue(action2.waitForDone());
 	txn = null;
 	store = null;
     }
@@ -1635,20 +1499,8 @@ public class TestDataStoreImpl extends TestCase {
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
 	txn.abort(new RuntimeException("abort"));
-	boolean result1;
-	try {
-	    result1 = action1.waitForDone();
-	} catch (IllegalStateException e) {
-	    result1 = false;
-	}
-	boolean result2;
-	try {
-	    result2 = action2.waitForDone();
-	} catch (IllegalStateException e) {
-	    result2 = false;
-	}
-	assertTrue(result1 || result2);
-	assertFalse(result1 && result2);
+	assertTrue(action1.waitForDone());
+	assertTrue(action2.waitForDone());
 	txn = null;
 	store = null;
     }
@@ -2003,74 +1855,6 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    /* -- Other tests -- */
-
-    /** Test that allocation block placeholders get removed at startup. */
-    public void testRemoveAllocationPlaceholders() throws Exception {
-	/*
-	 * Only run this test against a local data store because it requires
-	 * shutting the data store down, and we can only do that with a local
-	 * one.  -tjb@sun.com (07/16/2008)
-	 */
-	if (!(store instanceof DataStoreImpl)) {
-	    return;
-	}
-	/* Create objects but don't create data */
-	for (int i = 0; i < 1025; i++) {
-	    if (i % 25 == 0) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    store.createObject(txn);
-	}
-	/* Create objects but abort the last ones in the block */
-	for (int i = 1025; i < 2050; i++) {
-	    if (i % 25 == 0) {
-		if (i == 2025) {
-		    txn.abort(new RuntimeException("abort"));
-		} else {
-		    txn.commit();
-		}
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    store.setObject(
-		txn, store.createObject(txn), new byte[] { (byte) i });
-	}
-	/* Create objects */
-	for (int i = 2050; i < 3075; i++) {
-	    if (i % 25 == 0) {
-		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    store.setObject(
-		txn, store.createObject(txn), new byte[] { (byte) i });
-	}
-	txn.commit();
-	txn = null;
-	store.shutdown();
-	store = createDataStore();
-	long nextId = -1;
-	for (int i = 0; true; i++) {
-	    if (i % 40 == 0) {
-		if (txn != null) {
-		    txn.commit();
-		}
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    }
-	    nextId = nextObjectIdRaw(txn, nextId);
-	    if (nextId < 0) {
-		break;
-	    }
-	    byte[] value = getObjectRaw(txn, nextId);
-	    if (value != null &&
-		value.length > 0 &&
-		value[0] == PLACEHOLDER_OBJ_VALUE)
-	    {
-		fail("Found placeholder at object ID " + nextId);
-	    }
-	}
-    }
-
     /* -- Other methods and classes -- */
 
     /** Creates a unique directory. */
@@ -2114,7 +1898,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props), DummyProfileCoordinator.getRegistrar());
+	    new DataStoreImpl(props), DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }
@@ -2235,7 +2019,7 @@ public class TestDataStoreImpl extends TestCase {
 	    txn.commit();
 	    txn = null;
 	}
-	shutdownAction.assertResult(true);
+	assertTrue(shutdownAction.waitForDone());
 	store = null;
     }
 
@@ -2265,7 +2049,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue("Expected IllegalStateException: " + exception,
 		   exception instanceof IllegalStateException);
 	originalTxn.abort(new RuntimeException("abort"));
-	shutdownAction.assertResult(true);
+	assertTrue(shutdownAction.waitForDone());
 	store = null;
     }
 
@@ -2290,7 +2074,6 @@ public class TestDataStoreImpl extends TestCase {
     protected class ShutdownAction extends Thread {
 	private boolean done;
 	private Throwable exception;
-	private boolean result;
 
 	/** Creates an instance of this class and starts the thread. */
 	protected ShutdownAction() {
@@ -2300,7 +2083,7 @@ public class TestDataStoreImpl extends TestCase {
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = shutdown();
+		shutdown();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -2310,8 +2093,8 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 
-	protected boolean shutdown() {
-	    return store.shutdown();
+	protected void shutdown() {
+            store.shutdown();
 	}
 
 	/** Asserts that the shutdown call is blocked. */
@@ -2327,25 +2110,12 @@ public class TestDataStoreImpl extends TestCase {
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
-	 */
-	public synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
-	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
-	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
 	/** Wait until done, but give up after a while. */
@@ -2368,42 +2138,6 @@ public class TestDataStoreImpl extends TestCase {
 	if (!Arrays.equals(x, y)) {
 	    fail("Expected " + Arrays.toString(x) + ", got " +
 		 Arrays.toString(y));
-	}
-    }
-
-    /** Creates a placeholder at the specified object ID. */
-    private static void createPlaceholder(Transaction txn, long oid) {
-	setObjectRaw(txn, oid, new byte[] { PLACEHOLDER_OBJ_VALUE });
-    }
-
-    /** Calls DataStoreImpl.setObjectRaw. */
-    private static void setObjectRaw(
-	Transaction txn, long oid, byte[] data)
-    {
-	try {
-	    setObjectRaw.invoke((DataStoreImpl) store, txn, oid, data);
-	} catch (Exception e) {
-	    throw new RuntimeException(e.getMessage(), e);
-	}
-    }
-
-    /** Calls DataStoreImpl.getObjectRaw. */
-    private static byte[] getObjectRaw(Transaction txn, long oid) {
-	try {
-	    return (byte[]) getObjectRaw.invoke(
-		(DataStoreImpl) store, txn, oid);
-	} catch (Exception e) {
-	    throw new RuntimeException(e.getMessage(), e);
-	}
-    }
-	
-    /** Calls DataStoreImpl.nextObjectIdRaw. */
-    private static long nextObjectIdRaw(Transaction txn, long oid) {
-	try {
-	    return (Long) nextObjectIdRaw.invoke(
-		(DataStoreImpl) store, txn, oid);
-	} catch (Exception e) {
-	    throw new RuntimeException(e.getMessage(), e);
 	}
     }
 }

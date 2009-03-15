@@ -52,15 +52,16 @@ public final class TransactionId {
 
     /** {@inheritDoc} */
     public boolean equals(Object o) {
-        if ((o == null) || (! (o instanceof TransactionId)))
+        if ((o == null) || (!(o instanceof TransactionId))) {
             return false;
-        return txnId == ((TransactionId)o).txnId;
+        }
+        return txnId == ((TransactionId) o).txnId;
     }
 
     /** {@inheritDoc} */
     public int hashCode() {
         // the hash code specified in the javadoc for java.lang.Long
-        return (int)(txnId ^ (txnId >>> 32));
+        return (int) (txnId ^ (txnId >>> 32));
     }
 
 }

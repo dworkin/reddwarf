@@ -28,6 +28,6 @@ interface TimedTaskListener {
      *
      * @param task the {@code ScheduledTask} that is ready to run
      */
-    public void timedTaskReady(ScheduledTask task);
+    void timedTaskReady(ScheduledTask task);
 
 }
