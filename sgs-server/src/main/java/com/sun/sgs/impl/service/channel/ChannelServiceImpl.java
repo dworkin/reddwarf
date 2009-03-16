@@ -34,6 +34,8 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.AbstractService;
+import com.sun.sgs.impl.util.BindingKeyedCollections;
+import com.sun.sgs.impl.util.BindingKeyedMap;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.TransactionContext;
@@ -103,7 +105,7 @@ public final class ChannelServiceImpl
     private static final String VERSION_KEY = PKG_NAME + ".service.version";
 
     /** The major version. */
-    private static final int MAJOR_VERSION = 1;
+    private static final int MAJOR_VERSION = 2;
     
     /** The minor version. */
     private static final int MINOR_VERSION = 0;
@@ -138,10 +140,11 @@ public final class ChannelServiceImpl
     /** The transaction context map. */
     private static TransactionContextMap<Context> contextMap = null;
 
-    private static BindingKeyedHashMap<ChannelServer>
-	channelServerMap =
-	    new BindingKeyedHashMap<ChannelServer>(CHANNEL_SERVER_MAP_PREFIX);
+    /** The factory for creating BindingKeyedCollections. */
+    private static BindingKeyedCollections collectionsFactory;
 
+    /** The map of node ID (string) to ChannelServer proxy. */
+    private static BindingKeyedMap<ChannelServer> channelServerMap;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -242,6 +245,12 @@ public final class ChannelServiceImpl
 		if (contextMap == null) {
 		    contextMap = new TransactionContextMap<Context>(txnProxy);
 		}
+		collectionsFactory =
+		    systemRegistry.getComponent(BindingKeyedCollections.class);
+		if (channelServerMap == null) {
+		    channelServerMap =
+			collectionsFactory.newMap(CHANNEL_SERVER_MAP_PREFIX);
+		}
 	    }
 	    contextFactory = new ContextFactory(contextMap);
 	    WatchdogService watchdogService =
@@ -298,7 +307,7 @@ public final class ChannelServiceImpl
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreChannelServerProxy") {
 		    public void run() {
-			channelServerMap.put(
+			getChannelServerMap().put(
 			    Long.toString(localNodeId), serverProxy);
 		    } },
 		taskOwner);
@@ -1057,6 +1066,13 @@ public final class ChannelServiceImpl
     }
 
     /**
+     * Returns the BindingKeyedCollections instance.
+     */
+    static synchronized BindingKeyedCollections getCollectionsFactory() {
+	return collectionsFactory;
+    }
+
+    /**
      * Returns the local node ID.
      */
     static long getLocalNodeId() {
@@ -1202,6 +1218,15 @@ public final class ChannelServiceImpl
     }
 
     /**
+     * Returns the global channel server map, keyed by node ID string.
+     */
+    private static synchronized BindingKeyedMap<ChannelServer>
+	getChannelServerMap()
+    {
+	return channelServerMap;
+    }
+
+    /**
      * A persistent task to remove the channel server proxy for a specified
      * node.
      */
@@ -1227,7 +1252,7 @@ public final class ChannelServiceImpl
 	 * specified during construction.
 	 */
 	public void run() {
-	    channelServerMap.removeOverride(Long.toString(nodeId));
+	    getChannelServerMap().removeOverride(Long.toString(nodeId));
 	}
     }
 
@@ -1246,8 +1271,7 @@ public final class ChannelServiceImpl
 
 	/** {@inheritDoc} */
 	public void run() {
-	    channelServer =
-		channelServerMap.get(Long.toString(nodeId));
+	    channelServer = getChannelServerMap().get(Long.toString(nodeId));
 	}
     }
 }

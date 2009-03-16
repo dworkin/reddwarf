@@ -17,16 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.channel;
+package com.sun.sgs.impl.util;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.app.util.ManagedSerializable;
-import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -46,30 +42,26 @@ import java.util.Set;
  * not permit {@code null} keys or values.
  *
  * <p>Note: Only a {@code String} can be used as a key for a {@code
- * BindingKeyedHashMap}.
+ * BindingKeyedMap}.
  *
  * <p>A value is stored in the data service using its associated key (a
  * String) as a suffix to the {@code keyPrefix} specified during
- * construction.  All values must implement {@code Serializable}, but may not
- * implement {@code ManagedSerializable}.  If a value implements {@code
- * Serializable}, but does not implement {@link ManagedObject}, the value
- * will be wrapped in an instance of {@code ManagedSerializable} when
- * storing it in the data service.
+ * construction.  All values must implement {@code Serializable}.  If a
+ * value implements {@code Serializable}, but does not implement {@link
+ * ManagedObject}, the value will be wrapped in an instance of {@code
+ * ManagedSerializable} when storing it in the data service.
  *
- * <p>Instances of {@code BindingKeyedHashMap} as well as its associated
- * iterators are serializable, but not managed objects.
+ * <p>Instances of {@code BindingKeyedMap} as well as its associated
+ * iterators are serializable, but not managed, objects.
  *
  * @param	V the type for the map's values
  */
-public class BindingKeyedHashMap<V>
+public class BindingKeyedMapImpl<V>
     extends AbstractMap<String, V>
-    implements Serializable
+    implements BindingKeyedMap<V>, Serializable
 {
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
-
-    /** The key prefix's prefix. */
-    private static String PREFIX = BindingKeyedHashMap.class.getName() + "_";
 
     /** The key stop (works for alphanumeric keys). */
     private static final String KEY_STOP = "~";
@@ -82,18 +74,33 @@ public class BindingKeyedHashMap<V>
      *
      * @param	keyPrefix a key prefix
      */
-    public BindingKeyedHashMap(String keyPrefix) {
+    BindingKeyedMapImpl(String keyPrefix) {
 	this.keyPrefix = keyPrefix;
     }
 
-    /**
-     * Returns the key prefix for this map.
-     *
-     * @return	the key prefix for this map
-     */
+    /* -- Implement BindingKeyedCollection -- */
+
+    /** {@inheritDoc} */
     public String getKeyPrefix() {
 	return keyPrefix;
     }
+
+    /** {@inheritDoc} */
+    public void addKeyStart() {
+    }
+
+    /** {@inheritDoc} */
+    public void addKeyStop() {
+    }
+
+    /** {@inheritDoc} */
+    public void removeKeyStart() {
+    }
+    
+    /** {@inheritDoc} */
+    public void removeKeyStop() {
+    }
+    
     /* -- Override AbstractMap methods -- */
 
     /** {@inheritDoc} */
@@ -117,15 +124,11 @@ public class BindingKeyedHashMap<V>
     }
 
     private void putInternal(String key, V value) {
-	if (value instanceof ManagedSerializable) {
-	    throw new IllegalArgumentException(
-		"value cannot be an instanceof ManagedSerializable");
-	}
 	ManagedObject v =
 	    value instanceof ManagedObject ?
 	    (ManagedObject) value :
-	    new ManagedSerializable<V>(value);
-	ChannelServiceImpl.getDataService().
+	    new Wrapper<V>(value);
+	BindingKeyedCollectionsImpl.getDataService().
 	    setServiceBinding(getBindingName(key), v);
     }
 
@@ -144,7 +147,7 @@ public class BindingKeyedHashMap<V>
     /** {@inheritDoc} */
     public boolean containsKey(Object key) {
 	checkNull("key", key);
-	DataService dataService = ChannelServiceImpl.getDataService();
+	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String bindingName = getBindingName(key.toString());
 	boolean containsKey = false;
 	try {
@@ -174,7 +177,7 @@ public class BindingKeyedHashMap<V>
     /** {@inheritDoc} */
     public V remove(Object key) {
 	checkNull("key", key);
-	DataService dataService = ChannelServiceImpl.getDataService();
+	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
@@ -398,7 +401,7 @@ public class BindingKeyedHashMap<V>
 	AbstractIterator(String prefix) {
 	    this.prefix = prefix;
 	    this.key = prefix;
-	    dataService = ChannelServiceImpl.getDataService();
+	    dataService = BindingKeyedCollectionsImpl.getDataService();
 	}
 
 	/** {@inheritDoc} */
@@ -479,21 +482,21 @@ public class BindingKeyedHashMap<V>
 	    throws IOException, ClassNotFoundException
 	{
 	    s.defaultReadObject();
-	    dataService = ChannelServiceImpl.getDataService();
+	    dataService = BindingKeyedCollectionsImpl.getDataService();
 	}
 	
 	@SuppressWarnings("unchecked")
 	private V getValue(String bindingName) {
 	    ManagedObject v = dataService. getServiceBinding(bindingName);
 	    return
-		v instanceof ManagedSerializable ?
-		(V) ((ManagedSerializable) v).get() :
+		v instanceof Wrapper ?
+		(V) ((Wrapper) v).get() :
 		(V) v;
 	}
 
 	private void removeValue(String bindingName) {
 	    ManagedObject v = dataService.getServiceBinding(bindingName);
-	    if (v instanceof ManagedSerializable) {
+	    if (v instanceof Wrapper) {
 		dataService.removeObject(v);
 	    }
 	}
@@ -580,7 +583,7 @@ public class BindingKeyedHashMap<V>
 	}
     }
 
-    /* -- Implement ManagedObjectValueMap -- */
+    /* -- Implement BindingKeyedMap -- */
 
     /** {@inheritDoc} */
     public boolean putOverride(String key, V value) {
@@ -597,10 +600,11 @@ public class BindingKeyedHashMap<V>
 	boolean previouslyMapped = containsKey(key);
 	if (previouslyMapped) {
 	    try {
-		DataService dataService = ChannelServiceImpl.getDataService();
+		DataService dataService =
+		    BindingKeyedCollectionsImpl.getDataService();
 		String bindingName = getBindingName(key);
 		ManagedObject v = dataService.getServiceBinding(bindingName);
-		if (v instanceof ManagedSerializable) {
+		if (v instanceof Wrapper) {
 		    dataService.removeObject(v);
 		}
 		dataService.removeServiceBinding(bindingName);
@@ -612,10 +616,19 @@ public class BindingKeyedHashMap<V>
     
     /* -- Private classes and methods. -- */
 
+    private static final class Wrapper<V> extends ManagedSerializable<V> {
+
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	Wrapper(V obj) {
+	    super(obj);
+	}
+    }
+
     private static final class KeyValuePair<K, V>
 	implements Entry<K, V>, Serializable
     {
-	
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
@@ -691,7 +704,7 @@ public class BindingKeyedHashMap<V>
      *		empty map 
      */
     private static boolean isEmptyInternal(String keyPrefix) {
-	DataService dataService = ChannelServiceImpl.getDataService();
+	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String key = dataService.nextServiceBoundName(keyPrefix);
 	return
 	    key == null ||
@@ -702,21 +715,21 @@ public class BindingKeyedHashMap<V>
     @SuppressWarnings("unchecked")
     private V getValue(String bindingName) {
 	ManagedObject v =
-	    ChannelServiceImpl.getDataService().
+	    BindingKeyedCollectionsImpl.getDataService().
 	        getServiceBinding(bindingName);
 	return
-	    v instanceof ManagedSerializable ?
-	    (V) ((ManagedSerializable) v).get() :
+	    v instanceof Wrapper ?
+	    (V) ((Wrapper) v).get() :
 	    (V) v;
     }
 
     @SuppressWarnings("unchecked")
     private V removeValue(String bindingName) {
 	V value = null;
-	DataService dataService = ChannelServiceImpl.getDataService();
+	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	ManagedObject v = dataService.getServiceBinding(bindingName);
-	if (v instanceof ManagedSerializable) {
-	    value = (V) ((ManagedSerializable) v).get();
+	if (v instanceof Wrapper) {
+	    value = (V) ((Wrapper) v).get();
 	    dataService.removeObject(v);
 	} else {
 	    value = (V) v;

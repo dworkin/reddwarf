@@ -33,16 +33,15 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
-import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.app.util.ManagedSerializable;
-import com.sun.sgs.impl.service.channel.BindingKeyedHashMap.ValueIterator;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
 import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.BindingKeyedMap;
+import com.sun.sgs.impl.util.BindingKeyedSet;
 import com.sun.sgs.impl.util.IoRunnable;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.service.DataService;
@@ -98,8 +97,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static final Random random = new Random();
 
     /** The map of channels, keyed by name. */
-    private static final BindingKeyedHashMap<ChannelImpl> channelsMap =
-	new BindingKeyedHashMap<ChannelImpl>(CHANNELS_MAP_PREFIX);
+    private static final BindingKeyedMap<ChannelImpl> channelsMap =
+	newMap(CHANNELS_MAP_PREFIX);
 
     /** The channel name. */
     protected final String name;
@@ -205,7 +204,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * Returns the channels map, keyed by channel name.
      */
-    private static BindingKeyedHashMap<ChannelImpl> getChannelsMap() {
+    private static BindingKeyedMap<ChannelImpl> getChannelsMap() {
 	return channelsMap;
     }
 
@@ -213,11 +212,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns the event queues map for the specified coordinator
      * {@code nodeId}.
      */
-    private static BindingKeyedHashMap<EventQueue>
+    private static BindingKeyedMap<EventQueue>
 	getEventQueuesMap(long nodeId)
     {
-	return new BindingKeyedHashMap<EventQueue>(
-	    EVENT_QUEUE_MAP_PREFIX + Long.toString(nodeId) + ".");
+	return newMap(EVENT_QUEUE_MAP_PREFIX + Long.toString(nodeId) + ".");
     }
 
     /* -- Factory methods -- */
@@ -278,10 +276,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /** Implements {@link Channel#getSessions}. */
     Iterator<ClientSession> getSessions() {
 	checkClosed();
-	return
-	    new ClientSessionIterator(
-		new ValueIterator<BigInteger>(
-		    SESSION_SET_PREFIX + channelRefId.toString() + "."));
+	return new ClientSessionIterator(channelRefId);
     }
 
     /** Implements {@link Channel#join(ClientSession)}. */
@@ -703,24 +698,33 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return coordNodeId == getLocalNodeId();
     }
 
+    private static <V> BindingKeyedSet<V> newSet(String keyPrefix) {
+	return ChannelServiceImpl.getCollectionsFactory().
+	    newSet(keyPrefix);
+    }
+
+    private static <V> BindingKeyedMap<V> newMap(String keyPrefix) {
+	return ChannelServiceImpl.getCollectionsFactory().
+	    newMap(keyPrefix);
+    }
     /**
      * Returns the sessions set for the specified {@code nodeId}, creating
      * one if not already present.
      */
-    private Set<BigInteger> getOrCreateSessionsSet(long nodeId) {
+    private Set<BigInteger> getOrCreateSessionSet(long nodeId) {
 	if (servers.add(nodeId)) {
 	    getDataService().markForUpdate(this);
 	}
-	return getSessionsSet(nodeId);
+	return getSessionSet(nodeId);
     }
     
     /**
      * Returns the sessions set for the specified {@code nodeId}, or null
      * if there is no sessions set for the specified {@code nodeId}.
      */
-    private Set<BigInteger> getSessionsSet(long nodeId) {
+    private Set<BigInteger> getSessionSet(long nodeId) {
 	return
-	    new BindingKeyedHashSet<BigInteger>(
+	    newSet(
 		SESSION_SET_PREFIX +
 		channelRefId.toString() + "." +
 		Long.toString(nodeId) + ".");
@@ -729,8 +733,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * Removes the sessions set for the specified {@code nodeId}.
      */
-    private void removeSessionsSet(long nodeId) {
-	getSessionsSet(nodeId).clear();
+    private void removeSessionSet(long nodeId) {
+	getSessionSet(nodeId).clear();
 	getDataService().markForUpdate(this);
 	servers.remove(nodeId);
     }
@@ -747,7 +751,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      */
     private boolean addSession(ClientSession session) {
 	boolean sessionAdded = 
-	    getOrCreateSessionsSet(getNodeId(session)).
+	    getOrCreateSessionSet(getNodeId(session)).
 	        add(getSessionRefId(session));
         if (sessionAdded && session.getMaxMessageLength() < maxMessageLength) {
             maxMessageLength = session.getMaxMessageLength();
@@ -767,12 +771,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private boolean removeSession(
 	final long nodeId, final BigInteger sessionRefId)
     {
-	Set<BigInteger> sessionsSet = getSessionsSet(nodeId);
-	if (sessionsSet != null) {
-	    if (sessionsSet.remove(sessionRefId)) {
+	Set<BigInteger> sessionSet = getSessionSet(nodeId);
+	if (sessionSet != null) {
+	    if (sessionSet.remove(sessionRefId)) {
 		sendLeaveNotification(nodeId, sessionRefId);
-		if (sessionsSet.isEmpty()) {
-		    removeSessionsSet(nodeId);
+		if (sessionSet.isEmpty()) {
+		    removeSessionSet(nodeId);
 		}
 		return true;
 	    }
@@ -808,7 +812,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    return;
 	}
 	
-	removeSessionsSet(failedCoordNodeId);
+	removeSessionSet(failedCoordNodeId);
 
 	/*
 	 * Assign a new coordinator, and store event queue in new
@@ -941,10 +945,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private void removeAllSessions() {
 
 	for (long nodeId : getMemberNodeIds()) {
-	    for (BigInteger sessionRefId : getSessionsSet(nodeId)) {
+	    for (BigInteger sessionRefId : getSessionSet(nodeId)) {
 		sendLeaveNotification(nodeId, sessionRefId);
 	    }
-	    removeSessionsSet(nodeId);
+	    removeSessionSet(nodeId);
 	}
     }
 
@@ -989,7 +993,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		dataService.removeObject(maybeWrappedListener);
 	    }
 	}
-	BindingKeyedHashMap<EventQueue> eventQueuesMap =
+	BindingKeyedMap<EventQueue> eventQueuesMap =
 	    getEventQueuesMap(coordNodeId);
 	eventQueuesMap.removeOverride(channelRefId.toString());
 	EventQueue eventQueue = eventQueueRef.get();
@@ -1001,8 +1005,8 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * a member of this channel.
      */
     private boolean hasSession(long nodeId, BigInteger sessionRefId) {
-	Set<BigInteger> sessionsSet = getSessionsSet(nodeId);
-	return sessionsSet != null && sessionsSet.contains(sessionRefId);
+	Set<BigInteger> sessionSet = getSessionSet(nodeId);
+	return sessionSet != null && sessionSet.contains(sessionRefId);
     }
 
     /* -- Other classes -- */
@@ -1023,8 +1027,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * Constructs an instance of this class with the specified
 	 * {@code iterator}.
 	 */
-	ClientSessionIterator(Iterator<BigInteger> iterator) {
-	    this.iterator = iterator;
+	ClientSessionIterator(BigInteger channelRefId) {
+	    Set<BigInteger> sessionSet =
+		newSet(SESSION_SET_PREFIX + channelRefId.toString() + ".");
+	    iterator = sessionSet.iterator();
 	}
 
 	/** {@inheritDoc} */
@@ -1751,7 +1757,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		for (long serverNodeId : channel.getMemberNodeIds()) {
 		    Node serverNode = watchdogService.getNode(serverNodeId);
 		    if (serverNode == null || !serverNode.isAlive()) {
-			channel.removeSessionsSet(serverNodeId);
+			channel.removeSessionSet(serverNodeId);
 		    }
 		}
 	    }
@@ -1847,7 +1853,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	public void run() {
 	    ChannelImpl channel =
 		(ChannelImpl) getObjectForId(channelRefId);
-	    channel.removeSessionsSet(failedNodeId);
+	    channel.removeSessionSet(failedNodeId);
 	}
     }
 
@@ -1862,6 +1868,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	BigInteger channelRefId, long nodeId)
     {
 	ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
-	return channel.getSessionsSet(nodeId);
+	return channel.getSessionSet(nodeId);
     }
 }

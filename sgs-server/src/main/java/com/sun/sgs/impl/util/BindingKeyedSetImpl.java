@@ -17,27 +17,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.channel;
+package com.sun.sgs.impl.util;
 
-import com.sun.sgs.app.AppContext;
-import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedObjectRemoval;
-import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Iterator;
 
 /**
- * An implementation of {@code Set} backed by a {@link BindingKeyedHashMap}.
+ * An implementation of {@code BindingKeyedSet} backed by a
+ * {@link BindingKeyedMap}.
  *
  * @param	<E> the element type
  */
-public class BindingKeyedHashSet<E>
+public class BindingKeyedSetImpl<E>
     extends AbstractSet<E>
-    implements Serializable
+    implements BindingKeyedSet<E>, Serializable
 {
 
     /** The version of the serialized form. */
@@ -48,32 +43,46 @@ public class BindingKeyedHashSet<E>
      *
      * @serial
      */
-    private final BindingKeyedHashMap<E> map;
+    private final BindingKeyedMapImpl<E> map;
 
     /**
      * Creates an empty set with the specified {@code keyPrefix}.
      *
      * @param keyPrefix the key prefix for a service binding name
      */
-    public BindingKeyedHashSet(String keyPrefix) {
-	map = new BindingKeyedHashMap<E>(keyPrefix);
+    BindingKeyedSetImpl(String keyPrefix) {
+	map = new BindingKeyedMapImpl<E>(keyPrefix);
     }
 
-    /**
-     * Creates a new set containing the elements in the specified collection.
-     *
-     * @param c the collection of elements to be added to the set
-     * @param keyPrefix the key prefix for a service binding name
-     *
-     * @throws IllegalArgumentException if any element contained in the
-     *	       specified collection is {@code null} or does not implement
-     *	       {@code Serializable}
-     */
-    public BindingKeyedHashSet(String keyPrefix, Collection<? extends E> c) {
-	this(keyPrefix);
-	addAll(c);
+    /* -- Implement BindingKeyedCollection -- */
+
+    /** {@inheritDoc} */
+    public String getKeyPrefix() {
+	return map.getKeyPrefix();
     }
 
+    /** {@inheritDoc} */
+    public void addKeyStart() {
+	map.addKeyStart();
+    }
+
+    /** {@inheritDoc} */
+    public void addKeyStop() {
+	map.addKeyStop();
+    }
+
+    /** {@inheritDoc} */
+    public void removeKeyStart() {
+	map.removeKeyStart();
+    }
+    
+    /** {@inheritDoc} */
+    public void removeKeyStop() {
+	map.removeKeyStop();
+    }
+
+    /* -- Implement AbstractSet overrides -- */
+    
     /**
      * Adds the specified element to this set if it was not already present.
      *
@@ -85,6 +94,7 @@ public class BindingKeyedHashSet<E>
      * @throws IllegalArgumentException if the argument is not {@code null} and
      *	       does not implement {@code Serializable}
      */
+    @Override
     public boolean add(E e) {
 	return map.put(e.toString(), e) == null;
     }
@@ -92,6 +102,7 @@ public class BindingKeyedHashSet<E>
     /**
      * Removes all the elements in this set.
      */
+    @Override
     public void clear() {
 	map.clear();
     }
@@ -103,6 +114,7 @@ public class BindingKeyedHashSet<E>
      *
      * @return {@code true} if this set contains the specified element
      */
+    @Override
     public boolean contains(Object o) {
 	return map.containsKey(o.toString());
     }
@@ -112,6 +124,7 @@ public class BindingKeyedHashSet<E>
      *
      * @return {@code true} if this set contains no elements
      */
+    @Override
     public boolean isEmpty() {
 	return map.isEmpty();
     }
@@ -133,6 +146,7 @@ public class BindingKeyedHashSet<E>
      *
      * @return {@code true} if the element was initially present in this set
      */
+    @Override
     public boolean remove(Object o) {
 	Object removed = map.remove(o.toString());
 	return removed != null &&  o.equals(removed);
