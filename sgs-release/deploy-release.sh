@@ -1,7 +1,6 @@
 #!/usr/xpg4/bin/sh -xe
 #
-# This script is used to automatically increment the version number of a project,
-# verify that the updates are correct, and then tag and deploy it to the
+# This script is used to tag and deploy a branch of a project to the
 # java.net maven repository.
 #
 # NOTE: This script is hardcoded to the Solaris /usr/xpg4/bin/sh shell
