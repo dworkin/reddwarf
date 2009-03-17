@@ -35,20 +35,20 @@
   <profiles>
 
 
-    <!-- The test-run profile enables the antrun plugin
+    <!-- The run-client profile enables the antrun plugin
 	 to run the application in the process-test-resources
 	 phase of the lifecycle
 	 In order to run, use the following command:
-	 mvn process-test-resources -Ptest-run -->
+	 mvn process-test-resources -Prun-client -->
     <profile>
-      <id>test-run</id>
+      <id>run-client</id>
       <build>
 	<plugins>
 	  <plugin>
             <artifactId>maven-antrun-plugin</artifactId>
 	    <executions>
 	      <execution>
-		<id>test-run</id>
+		<id>run-client</id>
 		<phase>process-test-resources</phase>
 		<goals>
 		  <goal>run</goal>
@@ -57,9 +57,9 @@
 		  <tasks>
 		    <java classname="com.sun.sgs.example.request.client.WandererClient"
 			  fork="true">
-		      <jvmarg line="${run.jvm.args}"/>
+		      <jvmarg line="${jvm.args} ${jvm.args.extra}"/>
 		      <sysproperty key="java.util.logging.config.file"
-				   file="${run.logging}"/>
+				   file="${logging.properties}"/>
 		      <sysproperty key="com.sun.sgs.example.request.client.wanderer.host"
 				   value="${wanderer.host}"/>
 		      <sysproperty key="com.sun.sgs.example.request.client.wanderer.clients"
@@ -80,8 +80,9 @@
   </profiles>
 
   <properties>
-    <run.jvm.args></run.jvm.args>
-    <run.logging>${basedir}/src/test/properties/logging.properties</run.logging>
+    <jvm.args></jvm.args>
+    <jvm.args.extra></jvm.args.extra>
+    <logging.properties>${basedir}/src/test/properties/logging.properties</logging.properties>
     <wanderer.host>localhost</wanderer.host>
     <wanderer.clients>10</wanderer.clients>
   </properties>
