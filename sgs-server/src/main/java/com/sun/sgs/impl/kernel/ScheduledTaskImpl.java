@@ -99,7 +99,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      *                  January 1, 1970
      */
     ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime) {
+                      Priority priority, long startTime)
+    {
         this(task, owner, priority, startTime, NON_RECURRING);
     }
 
@@ -115,7 +116,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      *               <code>NON_RECURRING</code>
      */
     ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime, long period) {
+                      Priority priority, long startTime, long period)
+    {
         if (task == null) {
             throw new NullPointerException("Task cannot be null");
         }
@@ -191,7 +193,7 @@ class ScheduledTaskImpl implements ScheduledTask {
                 }
             }
         }
-        if (! isDone()) {
+        if (!isDone()) {
             state = State.CANCELLED;
             notifyAll();
             return true;

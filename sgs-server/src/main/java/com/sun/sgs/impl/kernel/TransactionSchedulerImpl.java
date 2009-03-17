@@ -315,7 +315,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
-                                       Priority priority) {
+                                       Priority priority)
+    {
         ScheduledTaskImpl t = new ScheduledTaskImpl(task, owner, priority,
                                                     System.currentTimeMillis());
         return backingQueue.reserveTask(t);
@@ -325,7 +326,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public void scheduleTask(KernelRunnable task, Identity owner,
-                             Priority priority) {
+                             Priority priority)
+    {
         backingQueue.
             addTask(new ScheduledTaskImpl(task, owner, priority,
                                           System.currentTimeMillis()));
@@ -385,8 +387,9 @@ final class TransactionSchedulerImpl
             // hand-off the task and wait for the result if we wanted more
             // direct control over concurrent transactions
             executeTask(task, unbounded, false);
-            // wait for the task to complete now that it's been handed off
-            // to the scheduler pool to run
+            // wait for the task to complete...at this point it may have
+            // already completed, or else it is being re-tried in a
+            // scheduler thread
             t = task.get();
         } catch (InterruptedException ie) {
             // we were interrupted, so try to cancel the task, re-throwing

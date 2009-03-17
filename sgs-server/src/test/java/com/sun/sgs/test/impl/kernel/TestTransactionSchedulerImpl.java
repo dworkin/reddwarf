@@ -193,42 +193,6 @@ public class TestTransactionSchedulerImpl {
         assertEquals(i.get(), 1);
     }
 
-    /*
-      interrupt calling thread directly and...
-      1: task success means no exception raised
-      2: task failure means failure raised
-      3: task interruption means interruption raised
-      4: task interruption and retry always leads to interruption?
-    */
-
-    @Test public void runTransactionCallerInterruptedTaskSucceeded() {
-        /*
-        final AtomicInteger i = new AtomicInteger(0);
-        final AtomicBoolean interrupted = new AtomicBoolean(false);
-        Thread t = new Thread(new Runnable() {
-                public void run() {
-                    try {
-                        txnScheduler.runTask(new TestAbstractKernelRunnable() {
-                                public void run() throws Exception {
-                                    try {
-                                        i.getAndIncrement();
-                                        Thread.sleep(50L);
-                                    } catch (InterruptedException ie) {}
-                                }
-                            }, taskOwner);
-                    } catch (InterruptedException ie) {
-                        interrupted.set(true);
-                    }
-                }
-            });
-        t.start();
-        Thread.sleep(50L);
-        t.interrupt();
-        Thread.sleep(300L);
-        assertEquals(i.get(), 1);
-        */
-    }
-
     /**
      * Test transaction handling.
      */
