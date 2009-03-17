@@ -17,7 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.app;
+package com.sun.sgs.service;
+
+import com.sun.sgs.app.TransactionAbortedException;
 
 /**
  * Thrown when an operation fails because it was interrupted while it was

@@ -114,6 +114,17 @@ public abstract class BasicAccessCoordinatorTest
 	coordinator.registerAccessSource("a", null);
     }
 
+    @Test
+    public void testRegisterAccessSourceSuccess() {
+	AccessReporter<Integer> reporter =
+	    coordinator.registerAccessSource("test", Integer.class);
+	reporter.reportObjectAccess(1, AccessType.READ);
+	txn.abort(ABORT_EXCEPTION);
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "test", 1, AccessType.READ, null);
+    }
+
     /* -- Test getConflictingTransaction -- */
 
     @Test(expected=NullPointerException.class)
@@ -256,6 +267,17 @@ public abstract class BasicAccessCoordinatorTest
     }
 
     @Test
+    public void testReportObjectAccessWithTxnAndNonNullDesc()
+	throws Exception
+    {
+	reporter.reportObjectAccess(txn, "o1", AccessType.READ, "desc");
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "desc");
+    }
+
+    @Test
     public void testReportObjectAccessDescription() throws Exception {
 	reporter.reportObjectAccess("o1", AccessType.READ, "object 1 (a)");
 	reporter.reportObjectAccess("o1", AccessType.WRITE, "object 1 (b)");
@@ -393,6 +415,71 @@ public abstract class BasicAccessCoordinatorTest
 	    System.err.println(e);
 	}
 	txn2.abort(ABORT_EXCEPTION);
+    }
+
+    @Test
+    public void testSetObjectDescriptionNullAfterReport() throws Exception {
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	reporter.setObjectDescription("o1", null);
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, null);
+    }
+
+    @Test
+    public void testSetObjectDescriptionNonNullAfterReport() throws Exception {
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	reporter.setObjectDescription("o1", "desc");
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "desc");
+    }
+
+    @Test
+    public void testSetObjectDescriptionMultipleDescriptions() {
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	reporter.setObjectDescription("o1", "desc1");
+	reporter.setObjectDescription("o1", "desc2");
+	txn.abort(ABORT_EXCEPTION);
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "desc1");
+    }
+
+    @Test
+    public void testSetObjectDescriptionMultipleAccesses() throws Exception {
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	reporter.setObjectDescription("o1", "desc1");
+	reporter.reportObjectAccess("o2", AccessType.READ);
+	reporter.setObjectDescription("o2", "desc2");
+	reporter.reportObjectAccess("o3", AccessType.READ);
+	reporter.setObjectDescription("o3", "desc3");
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "desc1",
+			    "s", "o2", AccessType.READ, "desc2",
+			    "s", "o3", AccessType.READ, "desc3");
+    }
+
+    @Test
+    public void testSetObjectDescriptionBeforeAccess() throws Exception {
+	reporter.setObjectDescription("o1", "desc1");
+	reporter.reportObjectAccess("o1", AccessType.READ);
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail(),
+			    "s", "o1", AccessType.READ, "desc1");
+    }
+
+    @Test
+    public void testSetObjectDescriptionNoAccess() throws Exception {
+	reporter.setObjectDescription("o1", "desc1");
+	txn.commit();
+	txn = null;
+	assertObjectDetails(profileCollector.getAccessedObjectsDetail());
     }
 
     @Test

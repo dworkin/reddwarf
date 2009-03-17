@@ -20,7 +20,6 @@
 package com.sun.sgs.test.impl.kernel;
 
 import com.sun.sgs.app.TransactionConflictException;
-import com.sun.sgs.app.TransactionInterruptedException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator.LockConflict;
@@ -30,6 +29,7 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.util.Arrays;

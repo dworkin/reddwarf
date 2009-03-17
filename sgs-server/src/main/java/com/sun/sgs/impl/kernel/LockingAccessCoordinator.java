@@ -21,7 +21,6 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
-import com.sun.sgs.app.TransactionInterruptedException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
@@ -37,6 +36,7 @@ import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionInterruptedException;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collections;
