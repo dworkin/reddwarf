@@ -293,7 +293,7 @@ class Util {
         Process p = pb.start();
         
         //give time for process to shutdown
-        Thread.sleep(500);
+        Thread.sleep(1000);
         return p;
     }
     
