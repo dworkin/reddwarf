@@ -33,6 +33,7 @@
 package com.sun.sgs.impl.sharedutil;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 import java.util.Properties;
 
 /**
@@ -429,5 +430,35 @@ public class PropertiesWrapper {
 	    name != null ?
 	    ", specified by the property: " + name + "," :
 	    "";
+    }
+
+    /**
+     * Returns the value of an {@link Enum} property.
+     *
+     * @param	name the property name
+     * @param	enumType the enumeration type
+     * @param	defaultValue the default value
+     * @return	the value
+     * @throws	IllegalArgumentException if the value does not name a constant
+     *		of the enumeration type
+     */
+    public <T extends Enum<T>> T getEnumProperty(
+	String name, Class<T> enumType, T defaultValue)
+    {
+	Objects.checkNull("name", name);
+	Objects.checkNull("enumType", enumType);
+	Objects.checkNull("defaultValue", defaultValue);
+	String value = properties.getProperty(name);
+	if (value == null) {
+	    return defaultValue;
+	}
+	try {
+	    return Enum.valueOf(enumType, value);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalArgumentException(
+		"The value of the " + name + " property was \"" + value +
+		"\", but must be one of: " +
+		Arrays.toString(enumType.getEnumConstants()));
+	}
     }
 }	
