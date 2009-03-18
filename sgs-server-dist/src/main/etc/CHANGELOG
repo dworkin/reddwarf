@@ -18,7 +18,7 @@ Version 0.9.9:
   phases using a custom annotation and JUnit filters (issue #146)
 - Add support for specifying default logging properties in a
   configuration file embedded in application JAR (issue #147)
-- Also fix issues #125, #129, #132, #133
+- Also fix issues #125, #129, #132, #133, #137, #139, #140, #141, #150
 
 Version 0.9.8:
 - Add ScalableDeque and ScalableList implementations

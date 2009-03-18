@@ -186,11 +186,9 @@ class Reactor {
             try {
                 for (SelectionKey key : selector.keys()) {
                     try {
-                        Closeable asyncKey = (Closeable)key.attachment();
+                        Closeable asyncKey = (Closeable) key.attachment();
                         if (asyncKey != null) {
-                            synchronized (asyncKey) {
-                                asyncKey.close();
-                            }
+			    asyncKey.close();
                         }
                     } catch (IOException ignore) { }
                 }
@@ -735,16 +733,18 @@ class Reactor {
          */
         public void close() throws IOException {
             log.log(Level.FINER, "closing {0}", this);
-            if (!key.isValid()) {
-                log.log(Level.FINE, "key is already invalid {0}", this);
-            }
 
             try {
-                // Closing a channel does not require the selectorLock,
-                // because it does not touch the selector key set directly.
-                // (It does so indirectly via the cancelled key set, which
-                // is guaranteed to block only briefly at most).
-                key.channel().close();
+		synchronized (this) {
+		    if (!key.isValid()) {
+			log.log(Level.FINE, "key is already invalid {0}", this);
+		    }
+		    // Closing a channel does not require the selectorLock,
+		    // because it does not touch the selector key set directly.
+		    // (It does so indirectly via the cancelled key set, which
+		    // is guaranteed to block only briefly at most).
+		    key.channel().close();
+		}
             } finally {
                 // Wake up the selector to give it a chance to process our
                 // removal, if it's waiting for shutdown.  We don't obtain
@@ -753,11 +753,9 @@ class Reactor {
                 selector.wakeup();
 
                 // Awaken any and all pending operations
-		// FIXME: This can cause deadlock because a pending
-		// operation may already be locking the 'lock' field of the
-		// DelegatingCompletionHandler and when the pending
-		// operation resumes, it needs to lock the 'selectorLock'
-		// which is already held by this thread.  -- ann (2/10/09)
+		// NOTE: Neither the 'selectorLock' nor this instance's
+		// lock should be held when invoking the 'selected'  method
+		// below or deadlock can occur.  -- ann (3/17/09)
                 selected(OP_ACCEPT | OP_CONNECT | OP_READ | OP_WRITE);
             }
         }
