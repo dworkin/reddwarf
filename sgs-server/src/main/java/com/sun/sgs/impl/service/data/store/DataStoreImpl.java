@@ -1137,8 +1137,11 @@ public class DataStoreImpl extends AbstractDataStore {
 	 * likely that the class will be needed, even if that transaction
 	 * aborts, so it makes sense to commit this operation separately to
 	 * improve concurrency.  -tjb@sun.com (05/23/2007)
+	 *
+	 * Use full transaction isolation to insure consistency when
+	 * concurrently allocating new class IDs.  -tjb@sun.com (03/17/2009)
 	 */
-	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
+	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout(), true);
 	try {
 	    int result;
 	    byte[] hashValue = classesDb.get(dbTxn, hashKey, false);

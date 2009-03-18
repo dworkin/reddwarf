@@ -29,6 +29,7 @@ import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.LockNotGrantedException;
 import com.sleepycat.db.MessageHandler;
 import com.sleepycat.db.RunRecoveryException;
+import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.Scheduler;
@@ -105,6 +106,14 @@ import java.util.logging.Logger;
  *	that an attempt to obtain a lock will be allowed to continue before
  *	being aborted.  The value must be greater than <code>0</code>, and
  *	should be less than the transaction timeout. <p>
+ *
+ * <dt> <i>Property:</i> <b>{@value #TXN_ISOLATION_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@link TxnIsolationLevel#SERIALIZABLE SERIALIZABLE}
+ *
+ * <dd style="padding-top: .5em">The transaction isolation level, which should
+ *	be one of {@link TxnIsolationLevel#READ_UNCOMMITTED READ_UNCOMMITTED},
+ *	{@link TxnIsolationLevel#READ_COMMITTED READ_COMMITTED}, or
+ *	{@link TxnIsolationLevel#SERIALIZABLE SERIALIZABLE}. <p>
  *
  * </dl> <p>
  *
@@ -195,6 +204,37 @@ public class BdbEnvironment implements DbEnvironment {
      */
     public static final String REMOVE_LOGS_PROPERTY =
 	PACKAGE + ".remove.logs";
+
+    /** The property that specifies the default transaction isolation level. */
+    public static final String TXN_ISOLATION_PROPERTY =
+	PACKAGE + ".txn.isolation";
+
+    /** The supported transaction isolation levels. */
+    public enum TxnIsolationLevel {
+
+	/** The read uncommitted transaction isolation level. */
+	READ_UNCOMMITTED,
+
+	/** The read committed transaction isolation level. */
+	READ_COMMITTED,
+
+	/** The serializable transaction isolation level. */
+	SERIALIZABLE;
+    }
+
+    /**
+     * A Berkeley DB transaction configuration for beginning transactions that
+     * use serializable transaction isolation.
+     */
+    private static final TransactionConfig fullIsolationTxnConfig =
+	new TransactionConfig();
+    static {
+	fullIsolationTxnConfig.setReadCommitted(false);
+	fullIsolationTxnConfig.setReadUncommitted(false);
+    }
+
+    /** The default transaction configuration. */
+    private final TransactionConfig defaultTxnConfig = new TransactionConfig();
 
     /** The Berkeley DB environment. */
     private final Environment env;
@@ -288,6 +328,25 @@ public class BdbEnvironment implements DbEnvironment {
 	    ? lockTimeout * 1000 : 0;
 	boolean removeLogs = wrappedProps.getBooleanProperty(
 	    REMOVE_LOGS_PROPERTY, false);
+	TxnIsolationLevel txnIsolation = wrappedProps.getEnumProperty(
+	    TXN_ISOLATION_PROPERTY, TxnIsolationLevel.class,
+	    TxnIsolationLevel.SERIALIZABLE);
+	switch (txnIsolation) {
+	case READ_UNCOMMITTED:
+	    defaultTxnConfig.setReadUncommitted(true);
+	    defaultTxnConfig.setReadCommitted(false);
+	    break;
+	case READ_COMMITTED:
+	    defaultTxnConfig.setReadUncommitted(false);
+	    defaultTxnConfig.setReadCommitted(true);
+	    break;
+	case SERIALIZABLE:
+	    defaultTxnConfig.setReadUncommitted(false);
+	    defaultTxnConfig.setReadCommitted(false);
+	    break;
+	default:
+	    throw new AssertionError();
+	}
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setCacheSize(cacheSize);
@@ -366,7 +425,16 @@ public class BdbEnvironment implements DbEnvironment {
 
     /** {@inheritDoc} */
     public DbTransaction beginTransaction(long timeout) {
-	return new BdbTransaction(env, timeout);
+	return new BdbTransaction(env, timeout, defaultTxnConfig);
+    }
+
+    /** {@inheritDoc} */
+    public DbTransaction beginTransaction(
+	long timeout, boolean fullIsolation)
+    {
+	return new BdbTransaction(
+	    env, timeout,
+	    fullIsolation ? fullIsolationTxnConfig : defaultTxnConfig);
     }
 
     /** {@inheritDoc} */
