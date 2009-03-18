@@ -118,6 +118,15 @@ conf directory for additional details.
 
 RELEASE COMPATIBILITY
 
+Release 0.9.9:
+
+- The com.sun.sgs.app.port configuration property is no longer supported.
+  See the CHANGELOG and API-CHANGES files for a complete description of 
+  the new pluggable client session protocol and transport layer.
+  Applications written for previous releases should use the
+  com.sun.sgs.impl.transport.tcp.listen.port configuration property in
+  place of com.sun.sgs.app.port.
+
 Release 0.9.7:
 
 - Running an application using release 0.9.7 with persistent data
@@ -152,8 +161,6 @@ limitations:
   server to run out of memory.  As a temporary workaround, developers
   must ensure that clients do not send network traffic faster than the
   server application can process it.
-
-- It does not support pluggable I/O transports.
 
 - The API for customizing managers and services is incomplete and still
   under development.
