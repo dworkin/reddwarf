@@ -399,6 +399,18 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
+    public void testChannelToStringNoTxn() throws Exception {
+	final List<Channel> channel = new ArrayList<Channel>();
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		channel.add(
+		    channelService.createChannel(
+			"test", new DummyChannelListener(), Delivery.RELIABLE));
+		System.err.println(channel.get(0).toString());
+	    }}, taskOwner);
+	System.err.println(channel.get(0).toString());
+    }
+    
     // -- Test Channel serialization --
 
     public void testChannelWriteReadObject() throws Exception {
