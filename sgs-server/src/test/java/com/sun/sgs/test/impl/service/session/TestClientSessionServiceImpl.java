@@ -211,7 +211,9 @@ public class TestClientSessionServiceImpl extends TestCase {
      */
     private void addNodes(String... hosts) throws Exception {
         // Create the other nodes
-        additionalNodes = new HashMap<String, SgsTestNode>();
+	if (additionalNodes == null) {
+	    additionalNodes = new HashMap<String, SgsTestNode>();
+	}
 
         for (String host : hosts) {
             Properties props = SgsTestNode.getDefaultProperties(
@@ -886,17 +888,42 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
     }
-
+	
+    public void testClientSessionSendUnreliableMessages() throws Exception {
+	DummyClient client = new DummyClient("dummy");
+	int iterations = 3;
+	int numAdditionalNodes = 2;
+	Queue<byte[]> messages =
+	    sendMessagesFromNodesToClient(
+		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE);
+	int expectedMessages = (1 + numAdditionalNodes) * iterations;
+	assertEquals(messages.size(), expectedMessages);
+    }
+    
     public void testClientSessionSendSequence() throws Exception {
-	final String name = "dummy";
-	DummyClient client = new DummyClient(name);
+	DummyClient client = new DummyClient("dummy");
+	int iterations = 3;
+	int numAdditionalNodes = 2;
+	Queue<byte[]> messages =
+	    sendMessagesFromNodesToClient(
+		client, numAdditionalNodes, iterations, Delivery.RELIABLE);
+	int expectedMessages = (1 + numAdditionalNodes) * iterations;
+	client.validateMessageSequence(messages, expectedMessages);
+    }
+    
+    private Queue<byte[]> sendMessagesFromNodesToClient(
+	    final DummyClient client, int numAdditionalNodes, int iterations,
+	    final Delivery delivery)
+	throws Exception
+    {
 	try {
 	    final String counterName = "counter";
 	    client.connect(serverNode.getAppPort());
 	    client.login();
-	    addNodes("a", "b");
+	    for (int i = 0; i < numAdditionalNodes; i++) {
+		addNodes(Integer.toString(i));
+	    }
 	    
-	    int iterations = 3;
 	    final List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
@@ -929,7 +956,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			    key, new ManagedSerializable(delayingServer));
 		    }
 		}}, taskOwner);
-	    
+
 	    for (int i = 0; i < iterations; i++) {
 		for (SgsTestNode node : nodes) {
 		    TransactionScheduler localTxnScheduler = 
@@ -949,10 +976,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 				    throw new MaybeRetryException("retry", true);
 				}
 				ClientSession session = (ClientSession)
-				    dataManager.getBinding(name);
+				    dataManager.getBinding(client.name);
 				MessageBuffer buf = new MessageBuffer(4);
 				buf.putInt(counter.getAndIncrement());
-				session.send(ByteBuffer.wrap(buf.getBuffer()));
+				session.send(ByteBuffer.wrap(buf.getBuffer()),
+					     delivery);
 			    }},
 			
 			identity);
@@ -964,7 +992,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 			setBinding(counterName, new Counter());
 		}}, taskOwner);
 
-	    client.checkMessagesReceived(nodes.size() * iterations);
+	    return client.waitForClientToRecieveExpectedMessages(
+ 		nodes.size() * iterations);
 
 	} finally {
 	    client.disconnect();
@@ -1249,7 +1278,7 @@ public class TestClientSessionServiceImpl extends TestCase {
      */
     private class DummyClient {
 	
-	private String name;
+	final String name;
 	private String password;
 	private Connector<SocketAddress> connector;
 	private Listener listener;
@@ -1521,7 +1550,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	 * specified 'list', and validates that the expected number of messages
 	 * were received by the ClientSessionListener in the correct sequence.
 	 */
-	private void validateMessageSequence(
+	void validateMessageSequence(
 	    Queue<byte[]> messageQueue, int expectedMessages)
 	{
 	    waitForExpectedMessages(messageQueue, expectedMessages);

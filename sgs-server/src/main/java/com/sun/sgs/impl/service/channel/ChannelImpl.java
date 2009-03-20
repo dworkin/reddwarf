@@ -229,9 +229,13 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			       Delivery delivery,
                                int writeBufferCapacity)
     {
-	// TBD: create other channel types depending on delivery.
-	return new OrderedUnreliableChannelImpl(
-            name, listener, delivery, writeBufferCapacity).getWrappedChannel();
+	ChannelImpl channel =
+	    delivery.equals(Delivery.UNRELIABLE) ?
+	    new UnreliableChannel(name, listener, delivery,
+				  writeBufferCapacity) :
+	    new ReliableChannel(name, listener, delivery,
+				writeBufferCapacity);
+	return channel.getWrappedChannel();
     }
 
     /**
@@ -387,12 +391,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * and the event queue is empty, then service the event immediately
      * without adding it to the event queue.
      */
-    private void addEvent(ChannelEvent event) {
+    protected void addEvent(ChannelEvent event) {
 
 	EventQueue eventQueue = eventQueueRef.get();
 
 	if (isCoordinator() && eventQueue.isEmpty()) {
-	    event.serviceEvent(eventQueue);
+	    // TBD: This invocation circumvents the write buffer capacity
+	    // check in the EventQueue.offer method.  Is this OK?
+	    event.serviceEvent(this);
 	} else if (eventQueue.offer(event)) {
 	    notifyServiceEventQueue(eventQueue);
 	} else {
@@ -546,7 +552,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		sender != null ?
 		getSessionRefId(unwrapSession(sender)) :
 		null;
-	    addEvent(new SendEvent(senderRefId, msgBytes));
+	    handleSendEvent(new SendEvent(senderRefId, msgBytes));
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send channel:{0} message:{1} returns",
@@ -562,6 +568,15 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    throw e;
 	}
     }
+
+    /**
+     * Handles a send event containing a message and a sender (which may be
+     * {@code null}.  A subclass should handle the send event according to
+     * the channel's delivery guarantee.
+     *
+     * @param	sendEvent a send event
+     */
+    protected abstract void handleSendEvent(SendEvent sendEvent);
 
     /**
      * If this channel has a null {@code ChannelListener}, forwards the
@@ -1099,7 +1114,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static class EventQueue
 	implements ManagedObjectRemoval, Serializable
     {
-
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
@@ -1293,7 +1307,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 				   this, cost, writeBufferAvailable);
 		    }
 		}
-		event.serviceEvent(this);
+		event.serviceEvent(getChannel());
 
 	    } while (serviceAllEvents || --eventsToService > 0);
 	}
@@ -1313,7 +1327,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * Represents an event on a channel.
      */
-    private abstract static class ChannelEvent
+    protected abstract static class ChannelEvent
 	implements ManagedObject, Serializable
     {
 
@@ -1321,10 +1335,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Services this event, taken from the head of the given {@code
-	 * eventQueue}.
+	 * Services this event, taken from the head of the event queue
+	 * whose reference is specified during construction.
 	 */
-	abstract void serviceEvent(EventQueue eventQueue);
+	abstract void serviceEvent(ChannelImpl channel);
 
 	/**
 	 * Returns the cost of this event, which the {@code EventQueue}
@@ -1355,7 +1369,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(EventQueue eventQueue) {
+	public void serviceEvent(final ChannelImpl channel) {
 
 	    ClientSession session =
 		(ClientSession) getObjectForId(sessionRefId);
@@ -1365,7 +1379,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    "unable to obtain client session for ID:{0}", this);
 		return;
 	    }
-	    final ChannelImpl channel = eventQueue.getChannel();
 	    if (!channel.addSession(session)) {
 		return;
 	    }
@@ -1382,10 +1395,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		return;
 	    }
 	    final String channelName = channel.name;
-	    final BigInteger channelRefId = eventQueue.getChannelRefId();
+	    final BigInteger channelRefId = channel.channelRefId;
 	    final Delivery channelDelivery = channel.delivery;
 	    ChannelServiceImpl.getChannelService().addChannelTask(
-		eventQueue.getChannelRefId(),
+		channelRefId,
 		new IoRunnable() {
 		    public void run() throws IOException {
 			server.join(channelName, channelRefId,
@@ -1419,7 +1432,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(EventQueue eventQueue) {
+	public void serviceEvent(ChannelImpl channel) {
 
 	    ClientSession session =
 		(ClientSession) getObjectForId(sessionRefId);
@@ -1429,7 +1442,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		    "unable to obtain client session for ID:{0}", this);
 		return;
 	    }
-	    final ChannelImpl channel = eventQueue.getChannel();
 	    if (!channel.removeSession(getNodeId(session), sessionRefId)) {
 		return;
 	    }
@@ -1457,17 +1469,16 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(EventQueue eventQueue) {
+	public void serviceEvent(ChannelImpl channel) {
 
-	    ChannelImpl channel = eventQueue.getChannel();
 	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
 	    channel.removeAllSessions();
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
-	    final BigInteger channelRefId = eventQueue.getChannelRefId();
+	    final BigInteger channelRefId = channel.channelRefId;
 	    for (final long nodeId : serverNodeIds) {
 		channelService.addChannelTask(
-		    eventQueue.getChannelRefId(),
+		    channelRefId,					      
 		    new IoRunnable() {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
@@ -1489,7 +1500,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * A channel send event.
      */
-    private static class SendEvent extends ChannelEvent {
+    protected static class SendEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
@@ -1504,7 +1515,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * @param senderRefId a sender's session ID, or {@code null}
 	 * @param message a message
 	 */
-	SendEvent(BigInteger senderRefId, byte[] message) {
+	SendEvent( BigInteger senderRefId, byte[] message) {
 	    this.senderRefId = senderRefId;
 	    this.message = message;
 	}
@@ -1518,13 +1529,12 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * send event.  This could be repeated for multiple
 	 * send events appearing in the queue.
 	 */
-	public void serviceEvent(EventQueue eventQueue) {
+	public void serviceEvent(ChannelImpl channel) {
 
 	    /*
 	     * Verfiy that the sending session (if any) is a member of this
 	     * channel.
 	     */
-	    ChannelImpl channel = eventQueue.getChannel();
 	    if (senderRefId != null) {
 		ClientSession sender =
 		    (ClientSession) getObjectForId(senderRefId);
@@ -1540,10 +1550,10 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	     */
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
-	    final BigInteger channelRefId = eventQueue.getChannelRefId();
+	    final BigInteger channelRefId = channel.channelRefId;
 	    for (final long nodeId : channel.getMemberNodeIds()) {
 		channelService.addChannelTask(
-		    eventQueue.getChannelRefId(),
+		    channelRefId,
 		    new IoRunnable() {
 			public void run() throws IOException {
 			    ChannelServer server = getChannelServer(nodeId);
@@ -1595,10 +1605,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void serviceEvent(EventQueue eventQueue) {
+	public void serviceEvent(ChannelImpl channel) {
 
-	    ChannelImpl channel = eventQueue.getChannel();
-	    final BigInteger channelRefId = eventQueue.getChannelRefId();
+	    final BigInteger channelRefId = channel.channelRefId;
 	    Set<Long> serverNodeIds = channel.getMemberNodeIds();
 	    channel.removeChannel();
 	    final ChannelServiceImpl channelService =
