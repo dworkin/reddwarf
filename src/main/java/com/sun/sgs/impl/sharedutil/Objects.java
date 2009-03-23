@@ -142,4 +142,19 @@ public final class Objects {
     public static <T> T uncheckedCast(Object object) {
 	return (T) object;
     }
+
+    /**
+     * Checks that a variable is not {@code null}, throwing {@link
+     * NullPointerException} if it is.  The exception message includes the name
+     * of the variable.
+     *
+     * @param	variableName the name of the variable being checked
+     * @param	value the value of the variable to check
+     */
+    public static void checkNull(String variableName, Object value) {
+	if (value == null) {
+	    throw new NullPointerException(
+		"The value of " + variableName + " must not be null");
+	}
+    }
 }
