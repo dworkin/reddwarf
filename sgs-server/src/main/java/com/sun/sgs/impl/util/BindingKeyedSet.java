@@ -27,6 +27,12 @@ import java.util.Set;
  * @param	<E> the element type
  */
 public interface BindingKeyedSet<E>
-    extends Set<E>, BindingKeyedCollection
+    extends Set<E>
 {
+    /**
+     * Returns the key prefix for this set
+     *
+     * @return	the key prefix for this set
+     */
+    String getKeyPrefix();
 }

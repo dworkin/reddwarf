@@ -41,8 +41,8 @@ import java.util.Set;
  * bindings in the data service to store key/value pairs.  This map does
  * not permit {@code null} keys or values.
  *
- * <p>Note: Only a {@code String} can be used as a key for a {@code
- * BindingKeyedMap}.
+ * <p>Note: This map is parameterized by value type only.  A {@code String}
+ * is the only valid key type for a {@code BindingKeyedMap}.
  *
  * <p>A value is stored in the data service using its associated key (a
  * String) as a suffix to the {@code keyPrefix} specified during
@@ -63,9 +63,6 @@ public class BindingKeyedMapImpl<V>
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
-    /** The key stop (works for alphanumeric keys). */
-    private static final String KEY_STOP = "~";
-
     /** The key prefix. */
     private final String keyPrefix;
 
@@ -78,29 +75,6 @@ public class BindingKeyedMapImpl<V>
 	this.keyPrefix = keyPrefix;
     }
 
-    /* -- Implement BindingKeyedCollection -- */
-
-    /** {@inheritDoc} */
-    public String getKeyPrefix() {
-	return keyPrefix;
-    }
-
-    /** {@inheritDoc} */
-    public void addKeyStart() {
-    }
-
-    /** {@inheritDoc} */
-    public void addKeyStop() {
-    }
-
-    /** {@inheritDoc} */
-    public void removeKeyStart() {
-    }
-    
-    /** {@inheritDoc} */
-    public void removeKeyStop() {
-    }
-    
     /* -- Override AbstractMap methods -- */
 
     /** {@inheritDoc} */
@@ -413,9 +387,7 @@ public class BindingKeyedMapImpl<V>
 		return true;
 	    }
 	    String name = dataService.nextServiceBoundName(key);
-	    if (name != null && name.startsWith(prefix) &&
-		!name.equals(prefix + KEY_STOP))
-	    {
+	    if (name != null && name.startsWith(prefix)) {
 		nextName = name;
 		return true;
 	    } else {
@@ -586,6 +558,11 @@ public class BindingKeyedMapImpl<V>
     /* -- Implement BindingKeyedMap -- */
 
     /** {@inheritDoc} */
+    public String getKeyPrefix() {
+	return keyPrefix;
+    }
+
+    /** {@inheritDoc} */
     public boolean putOverride(String key, V value) {
 	checkSerializable("key", key);
 	checkSerializable("value", value);
@@ -706,10 +683,7 @@ public class BindingKeyedMapImpl<V>
     private static boolean isEmptyInternal(String keyPrefix) {
 	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String key = dataService.nextServiceBoundName(keyPrefix);
-	return
-	    key == null ||
-	    !key.startsWith(keyPrefix) ||
-	    key.equals(keyPrefix + KEY_STOP);
+	return key == null || !key.startsWith(keyPrefix);
     }
 
     @SuppressWarnings("unchecked")

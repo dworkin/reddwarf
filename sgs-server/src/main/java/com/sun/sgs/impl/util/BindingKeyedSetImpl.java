@@ -54,33 +54,13 @@ public class BindingKeyedSetImpl<E>
 	map = new BindingKeyedMapImpl<E>(keyPrefix);
     }
 
-    /* -- Implement BindingKeyedCollection -- */
+    /* -- Implement BindingKeyedSet -- */
 
     /** {@inheritDoc} */
     public String getKeyPrefix() {
 	return map.getKeyPrefix();
     }
-
-    /** {@inheritDoc} */
-    public void addKeyStart() {
-	map.addKeyStart();
-    }
-
-    /** {@inheritDoc} */
-    public void addKeyStop() {
-	map.addKeyStop();
-    }
-
-    /** {@inheritDoc} */
-    public void removeKeyStart() {
-	map.removeKeyStart();
-    }
     
-    /** {@inheritDoc} */
-    public void removeKeyStop() {
-	map.removeKeyStop();
-    }
-
     /* -- Implement AbstractSet overrides -- */
     
     /**

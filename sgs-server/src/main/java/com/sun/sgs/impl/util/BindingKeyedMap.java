@@ -29,14 +29,21 @@ import java.util.Map;
  * to store key/value pairs.  This map does not permit {@code null} keys or
  * values.
  *
- * <p>Note: Only a {@code String} can be used as a key for a {@code
- * BindingKeyedMap}.
+ * <p>Note: This map is parameterized by value type only.  A {@code String}
+ * is the only valid key type for a {@code BindingKeyedMap}.
  *
  * @param	V the type for the map's values
  */
 public interface BindingKeyedMap<V>
-     extends Map<String, V>, BindingKeyedCollection
+     extends Map<String, V>
 {
+    /**
+     * Returns the key prefix for this collection.
+     *
+     * @return	the key prefix for this collection
+     */
+    String getKeyPrefix();
+
     /**
      * Associates the specified {@code key} with the specified {@code value},
      * and returns {@code true} if the key was previously mapped.  This method
