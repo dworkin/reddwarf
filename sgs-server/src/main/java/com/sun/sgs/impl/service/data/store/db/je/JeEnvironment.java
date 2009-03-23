@@ -39,6 +39,7 @@ import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.TransactionParticipant;
@@ -90,7 +91,8 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * <dt> <i>Property:</i> <b>{@value #LOCK_TIMEOUT_PROPERTY}</b> <br>
  *	<i>Default:</i> {@value #DEFAULT_LOCK_TIMEOUT_PROPORTION} times the
  *	value of the <code>com.sun.sgs.txn.timeout</code> property, if
- *	specified, otherwise {@value #DEFAULT_LOCK_TIMEOUT}
+ *	specified, otherwise times the value of the default transaction
+ *	timeout.
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  * that an attempt to obtain a lock will be allowed to continue before being
@@ -171,16 +173,17 @@ public class JeEnvironment implements DbEnvironment {
 	PACKAGE + ".lock.timeout";
 
     /**
-     * The default value of the lock timeout property, if no transaction
-     * timeout is specified.
-     */
-    public static final long DEFAULT_LOCK_TIMEOUT = 10;
-
-    /**
      * The default proportion of the transaction timeout to use for the lock
      * timeout, if no lock timeout is specified.
      */
     public static final double DEFAULT_LOCK_TIMEOUT_PROPORTION = 0.1;
+
+    /**
+     * The default value of the lock timeout property, if no transaction
+     * timeout is specified.
+     */
+    public static final long DEFAULT_LOCK_TIMEOUT =
+	computeLockTimeout(TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT);
 
     /**
      * The property that specifies the interval in milliseconds between calls
@@ -284,12 +287,7 @@ public class JeEnvironment implements DbEnvironment {
 	long txnTimeout = wrappedProps.getLongProperty(
 	    TransactionCoordinator.TXN_TIMEOUT_PROPERTY, -1);
 	long defaultLockTimeout = (txnTimeout < 1)
-	    ? DEFAULT_LOCK_TIMEOUT
-	    : (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
-	/* Avoid underflow */
-	if (defaultLockTimeout < 1) {
-	    defaultLockTimeout = 1;
-	}
+	    ? DEFAULT_LOCK_TIMEOUT : computeLockTimeout(txnTimeout);
 	long lockTimeout = wrappedProps.getLongProperty(
 	    LOCK_TIMEOUT_PROPERTY, defaultLockTimeout, 1, Long.MAX_VALUE);
 	/* Avoid overflow -- BDB treats 0 as unlimited */
@@ -336,6 +334,19 @@ public class JeEnvironment implements DbEnvironment {
 	    statsTaskHandle = scheduler.scheduleRecurringTask(
 		statsTask, stats);
 	}
+    }
+
+    /**
+     * Computes the lock timeout based on the specified transaction timeout and
+     * {@link #DEFAULT_LOCK_TIMEOUT_PROPORTION}.
+     */
+    private static long computeLockTimeout(long txnTimeout) {
+	long result = (long) (txnTimeout * DEFAULT_LOCK_TIMEOUT_PROPORTION);
+	/* Lock timeout should be at least 1 */
+	if (result < 1) {
+	    result = 1;
+	}
+	return result;
     }
 
     /**
