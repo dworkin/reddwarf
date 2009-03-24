@@ -296,7 +296,10 @@
 
   <!-- OK to ignore exception in ClientSessionWrapper.toString method. -->
   <Match>
-    <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelWrapper"/>
+    </Or>
     <Method name="toString"/>
     <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
