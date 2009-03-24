@@ -54,6 +54,9 @@ import com.sun.sgs.tools.test.FilteredNameRunner;
 @RunWith(FilteredNameRunner.class)
 public class TestScalableList extends Assert {
 
+    private static long randomSeed = Long.getLong("test.random.seed",
+            System.currentTimeMillis());
+
     private static SgsTestNode serverNode;
     private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
@@ -231,12 +234,12 @@ public class TestScalableList extends Assert {
 		}
 
 		try {
-		    Random random = new Random();
+		    Random random = new Random(randomSeed);
 		    int rand1 = random.nextInt(999) + 2;
 		    int rand2 = random.nextInt(999) + 1;
 		    list = new ScalableList<String>(rand1, rand2);
 		} catch (Exception e) {
-		    fail("Did not expect exception: " +
+		    fail("(seed=" + randomSeed + ") Did not expect exception: " +
 			    e.getLocalizedMessage());
 		}
 
@@ -1219,7 +1222,7 @@ public class TestScalableList extends Assert {
 			    e.getLocalizedMessage());
 		}
 		assertEquals(4, list.size());
-		Random random = new Random();
+		Random random = new Random(randomSeed);
 		int randomIndex = random.nextInt(list.size() - 1);
 		String verify = list.get(randomIndex);
 		int i = 0;
@@ -1395,7 +1398,7 @@ public class TestScalableList extends Assert {
 		ListIterator<String> iter = list.listIterator();
 		ListIterator<String> shadowIter = shadow.listIterator();
 		assertEquals(shadowIter.hasNext(), iter.hasNext());
-		Random random = new Random();
+		Random random = new Random(randomSeed);
 		String newValue;
 		int count = 0;
 
@@ -1410,7 +1413,7 @@ public class TestScalableList extends Assert {
 		    assertEquals(shadow.get(count), list.get(count));
 		    count++;
 		}
-		assertEquals(shadow.size(), list.size());
+		assertEquals("(seed=" + randomSeed + ")", shadow.size(), list.size());
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -2065,8 +2068,7 @@ public class TestScalableList extends Assert {
 		ScalableList<String> list = new ScalableList<String>(3, 3);
 		ArrayList<String> shadow = new ArrayList<String>();
 
-		long time = System.currentTimeMillis();
-		Random random = new Random(time);
+		Random random = new Random(randomSeed);
 
 		String opList = "";
 		String indexList = "";
@@ -2103,7 +2105,7 @@ public class TestScalableList extends Assert {
 
 			// check integrity
 			for (int j = 0; j < shadow.size(); j++) {
-			    assertEquals("(" + time + ") iteration #" + i +
+			    assertEquals("(seed=" + randomSeed + ") iteration #" + i +
 				    ": ", shadow.get(j), list.get(j));
 			}
 		    }
@@ -3128,8 +3130,7 @@ public class TestScalableList extends Assert {
 	// try adding/removing
 	txnScheduler.runTask(new TestAbstractKernelRunnable() {
 	    public void run() throws Exception {
-		long time = System.currentTimeMillis();
-		Random random = new Random(time);
+		Random random = new Random(randomSeed);
 		ScalableList<String> list =
 			uncheckedCast(AppContext.getDataManager().getBinding(
 				name));
@@ -3160,7 +3161,7 @@ public class TestScalableList extends Assert {
 		    fail("Expecting a ConcurrentModificationException");
 		} catch (ConcurrentModificationException cme) {
 		} catch (Exception e) {
-		    fail("(seed = " + time + ") Not expecting exception: " +
+		    fail("(seed = " + randomSeed + ") Not expecting exception: " +
 			    e.getLocalizedMessage());
 		}
 
@@ -3286,7 +3287,7 @@ public class TestScalableList extends Assert {
 		    list.add(Integer.toString(i));
 		}
 
-		Random random = new Random();
+		Random random = new Random(randomSeed);
 		int startingPoint = random.nextInt(shadow.size() - 1);
 
 		// place iterators in the middle
@@ -3325,8 +3326,8 @@ public class TestScalableList extends Assert {
 		    } catch (Exception e) {
 			shadowResult = e.getCause();
 		    }
-		    assertEquals("Operations were: " + opList, shadowResult,
-			    listResult);
+		    assertEquals("(seed=" + randomSeed + ") Operations were: " + opList,
+                    shadowResult, listResult);
 		}
 		assertEquals(shadow.size(), list.size());
 
