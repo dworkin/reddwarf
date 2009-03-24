@@ -37,8 +37,6 @@ public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
 	synchronized (BindingKeyedCollectionsImpl.class) {
 	    if (BindingKeyedCollectionsImpl.txnProxy == null) {
 		BindingKeyedCollectionsImpl.txnProxy = txnProxy;
-	    } else {
-		assert BindingKeyedCollectionsImpl.txnProxy == txnProxy;
 	    }
 	}
     }

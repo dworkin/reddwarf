@@ -35,7 +35,7 @@ public interface BindingKeyedCollections {
      * @param	keyPrefix a key prefix
      * @return	a {@code BindingKeyedMap} with the specified
      *		{@code keyPrefix}
-     * @throws	IllegalStateException if {@code keyPrefix} is empty
+     * @throws	IllegalArgumentException if {@code keyPrefix} is empty
      */
     <V> BindingKeyedMap<V> newMap(String keyPrefix);
 
@@ -46,7 +46,7 @@ public interface BindingKeyedCollections {
      * @param	keyPrefix a key prefix
      * @return	a {@code BindingKeyedSet} with the specified
      *		{@code keyPrefix} 
-     * @throws	IllegalStateException if {@code keyPrefix} is empty
+     * @throws	IllegalArgumentException if {@code keyPrefix} is empty
      */
     <V> BindingKeyedSet<V> newSet(String keyPrefix);
 }

@@ -70,8 +70,14 @@ public class BindingKeyedMapImpl<V>
      * Constructs an instance with the specified {@code keyPrefix}.
      *
      * @param	keyPrefix a key prefix
+     * @throws	IllegalArgumentException if {@code keyPrefix}is empty
      */
     BindingKeyedMapImpl(String keyPrefix) {
+	if (keyPrefix == null) {
+	    throw new NullPointerException("null keyPrefix");
+	} else if (keyPrefix.isEmpty()) {
+	    throw new IllegalArgumentException("empty keyPrefix");
+	}
 	this.keyPrefix = keyPrefix;
     }
 
@@ -86,7 +92,7 @@ public class BindingKeyedMapImpl<V>
     public V put(String key, V value) {
 	checkNull("key", key);
 	checkSerializable("value", value);
-	
+
 	// Get previous value while removing entry.
 	// This is inefficient if there is a previous entry.
 	V previousValue = remove(key);

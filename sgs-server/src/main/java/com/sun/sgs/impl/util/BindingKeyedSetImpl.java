@@ -49,6 +49,7 @@ public class BindingKeyedSetImpl<E>
      * Creates an empty set with the specified {@code keyPrefix}.
      *
      * @param keyPrefix the key prefix for a service binding name
+     * @throws	IllegalArgumentException if {@code keyPrefix}is empty
      */
     BindingKeyedSetImpl(String keyPrefix) {
 	map = new BindingKeyedMapImpl<E>(keyPrefix);
