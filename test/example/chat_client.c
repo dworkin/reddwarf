@@ -253,10 +253,11 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
         timeout_tv.tv_usec = SELECT_TIMEOUT*1000;
 
         result = select(g_maxfd + 1, &readset, &writeset, &exceptset,
-            &timeout_tv);
+            NULL); //&timeout_tv);
 
         if (result == -1) {
-            perror("Error calling select()");
+            printf("error calling select with maxfd value of %d\n", g_maxfd+1);
+            //perror("Error calling select()");
         }
         else if (result > 0) {
             work = 0;
@@ -431,6 +432,7 @@ static void recv_msg_cb(sgs_connection *conn, const uint8_t *msg,
  * register_fd_cb()
  */
 static void register_fd_cb(sgs_connection *conn, int fd, short events) {
+
     if ((events & POLLIN) == POLLIN)
         FD_SET(fd, &g_master_readset);
 
@@ -701,6 +703,7 @@ static void doLogout(int force){
     if (!checkLogin())
         return;
     sgs_connection_logout(g_conn, force);
+    g_session = NULL;
 }
 
 /*

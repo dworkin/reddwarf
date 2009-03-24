@@ -10,7 +10,7 @@ all: $(EXE)
 
 include $(TOPDIR)/etc/sgs.mk
 
-#DBG += -g
+DBG += -g
 INCS += -I$(TOPDIR)
 CFLAGS += -Wno-unused
 LDFLAGS += -L$(TOPDIR)

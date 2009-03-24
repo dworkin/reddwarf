@@ -41,11 +41,20 @@
 
 /*
  * sgs_buffer_capacity()
+ *Returns the total capacity of the buffer. This does not take
+ *into account the current contents of the buffer, so the capacity
+ *may be greater than the amount of data that can be absorbed
+ *at the moment.
  */
 size_t sgs_buffer_capacity(const sgs_buffer_impl* buffer) {
     return buffer->capacity;
 }
 
+/*
+ *Returns the current cursor position within the buffer.
+ *This cursor states where any read will begin within the
+ *buffer
+ */
 size_t sgs_buffer_position(const sgs_buffer_impl* buffer) {
     return buffer->position;
 }
@@ -64,6 +73,8 @@ void sgs_buffer_dump(const sgs_buffer_impl* buf) { }
 
 /*
  * sgs_buffer_clear()
+ *Resets the buffer so that the current contents, if any,
+ *will be over-written. 
  */
 void sgs_buffer_clear(sgs_buffer_impl* buffer) {
     buffer->position = 0;  /** not necessary, but convenient */

@@ -48,6 +48,7 @@
 #include "sgs/protocol.h"
 #include "sgs/private/connection_impl.h"
 #include "sgs/private/io_utils.h"
+#include "private/connection_impl.h"
 
 #ifndef WIN32
 #include <netdb.h>
@@ -71,6 +72,12 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     sgs_socket_t sockfd;
     socklen_t optlen;
 
+    if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
+        /** Error: should not call do_io() when disconnected. */
+        errno = ENOTCONN;
+        return -1;
+    }
+
     sockfd = connection->socket_fd;
     
     FD_ZERO(&readset);
@@ -84,11 +91,6 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     timeout_tv.tv_sec = 0;
     timeout_tv.tv_usec = 0;
     
-    if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
-        /** Error: should not call do_io() when disconnected. */
-        errno = ENOTCONN;
-        return -1;
-    }
     
     result = select(sockfd + 1, &readset, &writeset, &exceptset, &timeout_tv);
     if (result <= 0) return result;  /** -1 or 0 */
@@ -130,17 +132,18 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     }
     
     /** If there is room in inbuf, then register interest in socket reads. */
-    if (sgs_buffer_remaining(connection->inbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
-    else
-        connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
-    
-    /** If there is data in outbuf, then register interest in socket writes. */
-    if (sgs_buffer_size(connection->outbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, sockfd, POLLOUT);
-    else
-        connection->ctx->unreg_fd_cb(connection, sockfd, POLLOUT);
-  
+    if (connection->state == SGS_CONNECTION_IMPL_CONNECTED) {
+        if (sgs_buffer_remaining(connection->inbuf) > 0)
+            connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
+        else
+            connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
+
+        /** If there is data in outbuf, then register interest in socket writes. */
+        if (sgs_buffer_size(connection->outbuf) > 0)
+            connection->ctx->reg_fd_cb(connection, sockfd, POLLOUT);
+        else
+            connection->ctx->unreg_fd_cb(connection, sockfd, POLLOUT);
+    }
     return 0;
 }
 
@@ -187,7 +190,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
     /** Initialize server_addr to all zeroes, then fill in fields. */
     memset((char*) &serv_addr, '\0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr_list[0], server->h_length);
     serv_addr.sin_port = htons(connection->ctx->port);
   
     /**
@@ -245,7 +248,6 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
     
     return 0;
 }
-
 /*
  * sgs_connection_logout()
  */
