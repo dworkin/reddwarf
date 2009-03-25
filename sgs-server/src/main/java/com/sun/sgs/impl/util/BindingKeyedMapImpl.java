@@ -170,13 +170,13 @@ public class BindingKeyedMapImpl<V>
 
     /** {@inheritDoc} */
     public void clear() {
-	Iterator<String> iter = new KeyIterator<V>(keyPrefix);
-	while (iter.hasNext()) {
-	    iter.next();
-	    iter.remove();
-	}
+	clearInternal(keyPrefix);
     }
 
+    /** {@inheritDoc} */
+    public int size() {
+	return sizeInternal(keyPrefix);
+    }
 
     /** {@inheritDoc} */
     public Set<Entry<String, V>> entrySet() {
@@ -217,20 +217,12 @@ public class BindingKeyedMapImpl<V>
 
 	/** {@inheritDoc} */
 	public int size() {
-	    int size = 0;
-	    for (Entry<String, V> entry : this) {
-		size++;
-	    }
-	    return size;
+	    return sizeInternal(keyPrefix);
 	}
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    Iterator<Entry<String, V>> iter = iterator();
-	    while (iter.hasNext()) {
-		iter.next();
-		iter.remove();
-	    }
+	    clearInternal(keyPrefix);
 	}
     }
 
@@ -273,20 +265,12 @@ public class BindingKeyedMapImpl<V>
 
 	/** {@inheritDoc} */
 	public int size() {
-	    int size = 0;
-	    for (String key : this) {
-		size++;
-	    }
-	    return size;
+	    return sizeInternal(keyPrefix);
 	}
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    Iterator<String> iter = iterator();
-	    while (iter.hasNext()) {
-		iter.next();
-		iter.remove();
-	    }
+	    clearInternal(keyPrefix);
 	}
     }
 
@@ -329,20 +313,12 @@ public class BindingKeyedMapImpl<V>
 
 	/** {@inheritDoc} */
 	public int size() {
-	    int size = 0;
-	    for (V value : this) {
-		size++;
-	    }
-	    return size;
+	    return sizeInternal(keyPrefix);
 	}
 
 	/** {@inheritDoc} */	
 	public void clear() {
-	    Iterator<V> iter = iterator();
-	    while (iter.hasNext()) {
-		iter.next();
-		iter.remove();
-	    }
+	    clearInternal(keyPrefix);
 	}
     }
     /**
@@ -692,6 +668,24 @@ public class BindingKeyedMapImpl<V>
 	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String key = dataService.nextServiceBoundName(keyPrefix);
 	return key == null || !key.startsWith(keyPrefix);
+    }
+
+    private static int sizeInternal(String keyPrefix) {
+	int size = 0;
+	Iterator<String> iter = new KeyIterator<Object>(keyPrefix);
+	while (iter.hasNext()) {
+	    iter.next();
+	    size++;
+	}
+	return size;	
+    }
+
+    private static void clearInternal(String keyPrefix) {
+	Iterator<String> iter = new KeyIterator<Object>(keyPrefix);
+	while (iter.hasNext()) {
+	    iter.next();
+	    iter.remove();
+	}
     }
 
     @SuppressWarnings("unchecked")

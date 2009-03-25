@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TreeMap;
@@ -94,6 +95,12 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    System.err.println(e);
 	}
 	
+    }
+
+    @Test
+    public void testGetKeyPrefix() {
+	String prefix = "prefix";
+	assertEquals(prefix, collectionsFactory.newMap(prefix).getKeyPrefix());
     }
 
     @Test
@@ -481,6 +488,67 @@ public class TestBindingKeyedMapImpl extends TestCase {
     }
     
     @Test
+    public void testContainsValueWithNullValue() {
+	try {
+	    collectionsFactory.newMap("x.").containsValue(null);
+	    fail("expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testContainsValueWithNonManagedValues() {
+	Map<String, Integer> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    String key = Integer.toString(i);
+	    assertFalse(map.containsKey(key));
+	    assertFalse(map.containsValue(i));
+	    map.put(key, i);
+	    assertTrue(map.containsKey(key));
+	    assertTrue(map.containsValue(i));
+	}
+    }
+
+    @Test
+    public void testContainsValueWithManagedValues() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    set.add(obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    assertFalse(map.containsValue(obj));
+	    map.put(key, obj);
+	    assertTrue(map.containsKey(key));
+	    assertTrue(map.containsValue(obj));
+	}
+    }
+    
+    @Test
+    public void testContainsValueWithRemovedObjects() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    set.add(obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    assertFalse(map.containsValue(obj));
+	    map.put(key, obj);
+	    assertTrue(map.containsKey(key));
+	    assertTrue(map.containsValue(obj));
+	}
+	for (Managed obj : set) {
+	    assertTrue(map.containsValue(obj));
+	    dataService.removeObject(obj);
+	    assertFalse(map.containsValue(obj));
+	}
+	assertEquals(10, dataService.removedObjectsCount());
+    }
+    
+    @Test
     public void testClearWithNonManagedValues() {
 	Map<String, Integer> map = collectionsFactory.newMap("x.");
 	for (int i = 0; i < 10; i++) {
@@ -533,6 +601,246 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	assertEquals(10, dataService.removedObjectsCount());
 	assertFalse(map.isEmpty());
 	map.clear();
+	assertTrue(map.isEmpty());
+    }
+
+    @Test
+    public void testKeySetWithNonManagedValues() {
+	Set<String> set = new HashSet<String>();
+	Map<String, Integer> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    String key = Integer.toString(i);
+	    map.put(key, i);
+	    set.add(key);
+	}
+	for (String key : map.keySet()) {
+	    set.remove(key);
+	}
+	assertTrue(set.isEmpty());
+	
+	assertFalse(map.keySet().isEmpty());
+	assertEquals(10, map.keySet().size());
+		    
+	Iterator<String> iter = map.keySet().iterator();
+	while (iter.hasNext()) {
+	    String key = iter.next();
+	    assertTrue(map.containsKey(key));
+	    iter.remove();
+	    assertFalse(map.containsKey(key));
+	}
+	assertTrue(map.isEmpty());
+	assertTrue(map.keySet().isEmpty());
+	assertEquals(0, map.keySet().size());
+	assertEquals(10, dataService.removedObjectsCount());
+    }
+
+    @Test
+    public void testKeySetWithManagedValues() {
+	Set<String> set = new HashSet<String>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    String key = obj.toString();
+	    map.put(key, obj);
+	    set.add(key);
+	}
+	assertFalse(map.isEmpty());
+	assertFalse(map.keySet().isEmpty());
+	assertEquals(10, map.keySet().size());
+	for (String key : map.keySet()) {
+	    set.remove(key);
+	}
+	assertTrue(set.isEmpty());
+	map.keySet().clear();
+	assertTrue(map.isEmpty());
+	assertTrue(map.keySet().isEmpty());
+	assertEquals(0, map.keySet().size());
+    }
+
+    @Test
+    public void TestKeySetWithRemovedObjects() {
+	Set<String> set = new HashSet<String>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    String key = obj.toString();
+	    map.put(key, obj);
+	    set.add(key);
+	    dataService.removeObject(obj);
+	}
+	assertEquals(10, map.keySet().size());
+	assertFalse(map.keySet().isEmpty());
+	for (String key : map.keySet()) {
+	    set.remove(key);
+	}
+	assertTrue(set.isEmpty());
+	map.keySet().clear();
+	assertEquals(0, map.keySet().size());
+	assertTrue(map.isEmpty());
+	assertTrue(map.keySet().isEmpty());
+    }
+    
+    @Test
+    public void testValuesWithNonManagedValues() {
+	Set<Integer> set = new HashSet<Integer>();
+	Map<String, Integer> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    String key = Integer.toString(i);
+	    map.put(key, i);
+	    set.add(i);
+	}
+	assertEquals(10, map.values().size());
+	assertFalse(map.values().isEmpty());
+	for (Integer i : map.values()) {
+	    set.remove(i);
+	}
+	assertTrue(set.isEmpty());
+	map.values().clear();
+	assertEquals(0, map.values().size());
+	assertTrue(map.values().isEmpty());
+    }
+
+    @Test
+    public void testValuesWithManagedValues() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    String key = obj.toString();
+	    map.put(key, obj);
+	    set.add(obj);
+	}
+	assertEquals(10, map.values().size());
+	assertFalse(map.values().isEmpty());
+	for (Managed obj : map.values()) {
+	    set.remove(obj);
+	}
+	assertTrue(set.isEmpty());
+	map.values().clear();
+	assertEquals(0, map.values().size());
+	assertTrue(map.values().isEmpty());
+	assertTrue(map.isEmpty());
+    }
+
+    @Test
+    public void TestValuesWithRemovedObjects() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    String key = obj.toString();
+	    map.put(key, obj);
+	    set.add(obj);
+	    dataService.removeObject(obj);
+	}
+	assertEquals(10, map.values().size());
+	assertFalse(map.values().isEmpty());
+	try {
+	    for (Managed obj : map.values()) {
+		System.err.println("obj: " + obj.toString());
+	    }
+	    fail("Excpected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	map.values().clear();
+	assertEquals(0, map.values().size());
+	assertTrue(map.values().isEmpty());
+	assertTrue(map.isEmpty());
+    }
+    
+    @Test
+    public void testEntrySetWithNonManagedValues() {
+	Set<Integer> set = new HashSet<Integer>();
+	Map<String, Integer> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    String key = Integer.toString(i);
+	    map.put(key, i);
+	    set.add(i);
+	}
+
+	for (Entry<String, Integer> entry : map.entrySet()) {
+	    assertEquals(entry.getKey(), entry.getValue().toString());
+	    set.remove(entry.getValue());
+	}
+	assertTrue(set.isEmpty());
+	assertFalse(map.entrySet().isEmpty());
+	assertEquals(10, map.entrySet().size());
+
+	Iterator<Entry<String, Integer>> iter = map.entrySet().iterator();
+	while (iter.hasNext()) {
+	    Entry<String, Integer> entry = iter.next();
+	    assertEquals(entry.getKey(), entry.getValue().toString());
+	    assertTrue(map.containsKey(entry.getKey()));
+	    assertTrue(map.containsValue(entry.getValue()));
+	    iter.remove();
+	    assertFalse(map.containsKey(entry.getKey()));
+	    assertFalse(map.containsValue(entry.getValue()));
+	}
+	assertTrue(map.isEmpty());
+	assertTrue(map.entrySet().isEmpty());
+	assertEquals(0, map.entrySet().size());
+	assertEquals(10, dataService.removedObjectsCount());
+    }
+
+    @Test
+    public void testEntrySetWithManagedValues() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    String key = obj.toString();
+	    map.put(key, obj);
+	    set.add(obj);
+	}
+	for (Entry<String, Managed> entry : map.entrySet()) {
+	    assertEquals(entry.getKey(), entry.getValue().toString());
+	    set.remove(entry.getValue());
+	}
+	assertTrue(set.isEmpty());
+	assertFalse(map.entrySet().isEmpty());
+	assertEquals(10, map.entrySet().size());
+	Iterator<Entry<String, Managed>> iter = map.entrySet().iterator();
+	while (iter.hasNext()) {
+	    Entry<String, Managed> entry = iter.next();
+	    assertEquals(entry.getKey(), entry.getValue().toString());
+	    assertTrue(map.containsKey(entry.getKey()));
+	    assertTrue(map.containsValue(entry.getValue()));
+	    iter.remove();
+	    assertFalse(map.containsKey(entry.getKey()));
+	    assertFalse(map.containsValue(entry.getValue()));
+	}
+	assertTrue(map.isEmpty());
+	assertTrue(map.entrySet().isEmpty());
+	assertEquals(0, map.entrySet().size());
+	assertEquals(0, dataService.removedObjectsCount());
+    }
+
+    @Test
+    public void TestEntrySetWithRemovedObjects() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    String key = obj.toString();
+	    map.put(key, obj);
+	    set.add(obj);
+	    dataService.removeObject(obj);
+	}
+
+	assertFalse(map.entrySet().isEmpty());
+	assertEquals(10, map.entrySet().size());
+	try {
+	    for (Entry<String, Managed> entry : map.entrySet()) {
+		System.err.println("obj: " + entry.toString());
+	    }
+	    fail("Excpected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	map.entrySet().clear();
+	assertEquals(0, map.entrySet().size());
+	assertTrue(map.entrySet().isEmpty());
 	assertTrue(map.isEmpty());
     }
     
