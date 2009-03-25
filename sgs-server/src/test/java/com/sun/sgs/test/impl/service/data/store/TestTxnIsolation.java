@@ -21,38 +21,24 @@ package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
-import com.sun.sgs.impl.service.data.store.AbstractDataStore;
-import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
-import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.test.util.InMemoryDataStore;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Properties;
-import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -67,22 +53,23 @@ public class TestTxnIsolation extends Assert {
     /**
      * The number of milliseconds to wait to see if an operation is blocked.
      */
-    protected static final long BLOCK_TIMEOUT = 4;
+    protected static final long BLOCK_TIMEOUT = 40;
 
     /**
      * The number of milliseconds to wait to see if an operation was
      * successful.
      */
-    protected static final long SUCCESS_TIMEOUT = 200;
+    protected static final long SUCCESS_TIMEOUT = 2000;
 
     /**
      * The number of milliseconds to wait until a lock times out.  For this
      * test, set this number to the transaction timeout to make sure it has
      * plenty of time to perform operations.
      */
-    protected static final long LOCK_TIMEOUT = 200;
+    protected static final long LOCK_TIMEOUT = 2000;
 
-    protected static final long TXN_TIMEOUT = 400;
+    /** The number of milliseconds to allow for a transaction. */
+    protected static final long TXN_TIMEOUT = 4000;
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -128,11 +115,16 @@ public class TestTxnIsolation extends Assert {
 
     protected Runner runner;
 
+    /** Clean the database directory. */
     @BeforeClass
     public static void beforeClass() {
 	cleanDirectory(dbDirectory);
     }
 
+    /**
+     * Create the access coordinator and data store if needed, then create a
+     * transaction, create an object, and clear existing bindings.
+     */
     @Before
     public void before() {
 	if (store == null) {
@@ -179,7 +171,7 @@ public class TestTxnIsolation extends Assert {
     }
 
     protected DataStore createDataStore() {
-	return new DummyDataStore(accessCoordinator);
+	return new InMemoryDataStore(props, accessCoordinator);
 	//return new DataStoreImpl(props, accessCoordinator);
     }
 
@@ -967,6 +959,32 @@ public class TestTxnIsolation extends Assert {
      * 	     write lock b
      *	     write lock end
      *
+     * (There are two cases depending on whether tid:2's lock on b blocks
+     * tid:3's lock on c, due to a false lock conflict in the data store.)
+     *
+     * False conflict:
+     *
+     * tid:3 create c
+     *       write lock c (blocks in data store)
+     *
+     * tid:4 next a
+     *	     get next a (blocks in data store)
+     *
+     * tid:2 abort
+     *       release lock b
+     *       release lock end
+     *
+     * tid:4 [next a]
+     *       read lock end (get next a returned null)
+     *
+     * tid:4 commit
+     *	     release lock end
+     *
+     * tid:3 [create c]
+     *       write lock end
+     *
+     * No false conflict:
+     *
      * tid:3 create c
      *       write lock c
      *       write lock end (blocks)
@@ -1008,14 +1026,22 @@ public class TestTxnIsolation extends Assert {
 	runner3.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
-	runner2.getResult();
-	runner3.assertBlocked();
-	runner2.abort();
-	assertSame(null, runner3.getResult());
-	runner3.commit();
+	if (runner2.blocked()) {
+	    /* False lock conflicts might mean that runner3 blocks runner2 */
+	    runner3.getResult();
+	    runner3.commit();
+	    assertSame(null, runner2.getResult());
+	    runner2.commit();
+	} else {
+	    runner2.getResult();
+	    runner3.assertBlocked();
+	    runner2.abort();
+	    assertSame(null, runner3.getResult());
+	    runner3.commit();
+	}
     }
 
-    /* -- Other methods -- */
+    /* -- Other methods and classes -- */
 
     /** Creates a transaction. */
     protected static DummyTransaction createTransaction() {
@@ -1044,16 +1070,33 @@ public class TestTxnIsolation extends Assert {
 		"Failed to create directory: " + dir);
 	}
     }
+
+    /** Runs actions in another thread. */
     static class Runner {
+
+	/** The action to run. */
 	private TxnCallable<Object> action;
+
+	/** A task for running the action, or null if the runner is done. */
 	private FutureTask<Object> task;
+
+	/** The transaction for this thread. */
 	private DummyTransaction txn;
+
+	/** The thread. */
 	private final Thread thread =
 	    new Thread() {
 		public void run() {
 		    runInternal();
 		}
 	    };
+
+	/**
+	 * Creates an instance of this class that initially runs the specified
+	 * action.
+	 *
+	 * @param	action the action to run
+	 */
 	Runner(TxnCallable<? extends Object> action) {
 	    @SuppressWarnings("unchecked")
 	    TxnCallable<Object> a = (TxnCallable<Object>) action;
@@ -1063,6 +1106,13 @@ public class TestTxnIsolation extends Assert {
 	    };
 	    thread.start();
 	}
+
+	/**
+	 * Specifies another action to run.  This method should only be called
+	 * if the previous action has completed.
+	 *
+	 * @param	action the action to run
+	 */
 	void setAction(TxnCallable<? extends Object> action) {
 	    @SuppressWarnings("unchecked")
 	    TxnCallable<Object> a = (TxnCallable<Object>) action;
@@ -1075,26 +1125,74 @@ public class TestTxnIsolation extends Assert {
 		notifyAll();
 	    }
 	}
-	void setDone() {
-	    synchronized (this) {
-		if (!task.isDone()) {
-		    throw new RuntimeException("Task is not done");
-		}
-		task = null;
-		notifyAll();
-	    }
-	}
+
+	/**
+	 * Commits the transaction.  This method should only be called if the
+	 * previous action has completed.
+	 */
 	void commit() throws InterruptedException, TimeoutException {
 	    setAction(new Commit());
 	    getResult();
 	    setDone();
 	}
+
+	/**
+	 * Aborts the transaction.  This method should only be called if the
+	 * previous action has completed.
+	 */
 	void abort() throws InterruptedException, TimeoutException {
 	    setAction(new Abort());
 	    getResult();
 	    setDone();
 	}
-	void runInternal() {
+
+	/**
+	 * Checks if the runner is blocked.
+	 *
+	 * @return	whether the runner is blocked
+	 */
+	boolean blocked() throws InterruptedException {
+	    try {
+		getTask().get(BLOCK_TIMEOUT, TimeUnit.MILLISECONDS);
+		return false;
+	    } catch (TimeoutException e) {
+		return true;
+	    } catch (RuntimeException e) {
+		throw e;
+	    } catch (Exception e) {
+		throw new RuntimeException("Unexpected exception: " + e, e);
+	    }
+	}
+
+	/** Asserts that the runner is blocked. */
+	void assertBlocked() throws InterruptedException {
+	    assertTrue("The operation did not block", blocked());
+	}
+
+	/**
+	 * Returns the result of the last action, throwing an exception if it
+	 * is blocked.
+	 *
+	 * @return	the result of the last action
+	 */
+	Object getResult()
+	    throws InterruptedException, TimeoutException
+	{
+	    try {
+		return getTask().get(SUCCESS_TIMEOUT, TimeUnit.MILLISECONDS);
+	    } catch (RuntimeException e) {
+		throw e;
+	    } catch (TimeoutException e) {
+		throw e;
+	    } catch (Exception e) {
+		throw new RuntimeException("Unexpected exception: " + e, e);
+	    }
+	}
+
+	/* -- Private methods -- */
+
+	/** The main method to run in the thread. */
+	private void runInternal() {
 	    TxnCallable a;
 	    FutureTask<?> t;
 	    synchronized (this) {
@@ -1123,6 +1221,10 @@ public class TestTxnIsolation extends Assert {
 		}
 	    }
 	}
+
+	/**
+	 * Returns the current task, waiting for the transaction to start.
+	 */
 	private synchronized FutureTask<Object> getTask()
 	    throws InterruptedException
 	{
@@ -1131,33 +1233,14 @@ public class TestTxnIsolation extends Assert {
 	    }
 	    return task;
 	}
-	boolean blocked() throws InterruptedException {
-	    try {
-		getTask().get(BLOCK_TIMEOUT, TimeUnit.MILLISECONDS);
-		return false;
-	    } catch (TimeoutException e) {
-		return true;
-	    } catch (RuntimeException e) {
-		throw e;
-	    } catch (Exception e) {
-		throw new RuntimeException("Unexpected exception: " + e, e);
+
+	/** Sets task to null to signify that the runner is done. */
+	private synchronized void setDone() {
+	    if (!task.isDone()) {
+		throw new RuntimeException("Task is not done");
 	    }
-	}
-	void assertBlocked() throws InterruptedException {
-	    assertTrue("The operation did not block", blocked());
-	}
-	Object getResult()
-	    throws InterruptedException, TimeoutException
-	{
-	    try {
-		return getTask().get(SUCCESS_TIMEOUT, TimeUnit.MILLISECONDS);
-	    } catch (RuntimeException e) {
-		throw e;
-	    } catch (TimeoutException e) {
-		throw e;
-	    } catch (Exception e) {
-		throw new RuntimeException("Unexpected exception: " + e, e);
-	    }
+	    task = null;
+	    notifyAll();
 	}
     }
 
@@ -1337,214 +1420,6 @@ public class TestTxnIsolation extends Assert {
 	public Void call() {
 	    getTransaction().abort(new RuntimeException());
 	    return null;
-	}
-    }
-
-    /**
-     * An implementation of {@link DataStore} that does no locking, to check
-     * that the access coordinator is doing all of the locking correctly.
-     */
-    static class DummyDataStore extends AbstractDataStore {
-
-	/** The logger to pass to AbstractDataStore. */
-	private static final LoggerWrapper logger =
-	    new LoggerWrapper(Logger.getLogger(DummyDataStore.class.getName()));
-
-	/** Maps object IDs to data. */
-	private final NavigableMap<Long, byte[]> oids =
-	    new TreeMap<Long, byte[]>();
-
-	/** Maps names to object IDs. */
-	private final NavigableMap<String, Long> names =
-	    new TreeMap<String, Long>();
-
-	/** Maps transactions to their undo lists. */
-	private final Map<Transaction, List<Object>> txnEntries =
-	    new HashMap<Transaction, List<Object>>();
-
-	/** Stores the next object ID. */
-	private final AtomicLong nextOid = new AtomicLong(1);
-
-	/** Creates an instance of this class. */
-	DummyDataStore(AccessCoordinator accessCoordinator) {
-	    super(accessCoordinator, logger, logger);
-	}
-
-	/* -- Implement AbstractDataStore methods -- */
-
-	protected long createObjectInternal(Transaction txn) {
-	    txn.join(this);
-	    return nextOid.getAndIncrement();
-	}
-
-	protected void markForUpdateInternal(Transaction txn, long oid) { 
-	    txn.join(this);
-	}
-
-	protected synchronized byte[] getObjectInternal(
-	    Transaction txn, long oid, boolean forUpdate)
-	{
-	    txn.join(this);
-	    if (oids.containsKey(oid)) {
-		return oids.get(oid);
-	    } else {
-		throw new ObjectNotFoundException("");
-	    }
-	}
-
-	protected synchronized void setObjectInternal(
-	    Transaction txn, long oid, byte[] data)
-	{
-	    txn.join(this);
-	    List<Object> txnEntry = getTxnEntry(txn);
-	    txnEntry.add(oid);
-	    txnEntry.add(oids.get(oid));
-	    oids.put(oid, data);
-	}
-
-	protected synchronized void setObjectsInternal(
-	    Transaction txn, long[] oids, byte[][] dataArray)
-	{
-	    txn.join(this);
-	    List<Object> txnEntry = getTxnEntry(txn);
-	    for (int i = 0; i < oids.length; i++) {
-		byte[] oldValue = this.oids.put(oids[i], dataArray[i]);
-		txnEntry.add(oids[i]);
-		txnEntry.add(oldValue);
-	    }
-	}
-
-	protected synchronized void removeObjectInternal(
-	    Transaction txn, long oid)
-	{
-	    txn.join(this);
-	    byte[] oldValue = oids.remove(oid);
-	    if (oldValue != null) {
-		List<Object> txnEntry = getTxnEntry(txn);
-		txnEntry.add(oid);
-		txnEntry.add(oldValue);
-	    } else {
-		throw new ObjectNotFoundException("");
-	    }
-	}
-
-	protected synchronized BindingValue getBindingInternal(
-	    Transaction txn, String name)
-	{
-	    txn.join(this);
-	    if (names.containsKey(name)) {
-		return new BindingValue(names.get(name), null);
-	    } else {
-		return new BindingValue(-1, names.higherKey(name));
-	    }
-	}
-
-	protected synchronized BindingValue setBindingInternal(
-	    Transaction txn, String name, long oid)
-	{
-	    txn.join(this);
-	    Long oldValue = names.put(name, oid);
-	    List<Object> txnEntry = getTxnEntry(txn);
-	    txnEntry.add(name);
-	    txnEntry.add(oldValue);
-	    if (oldValue != null) {
-		return new BindingValue(1, null);
-	    } else {
-		return new BindingValue(-1, names.higherKey(name));
-	    }
-	}
-
-	protected synchronized BindingValue removeBindingInternal(
-	    Transaction txn, String name)
-	{
-	    System.err.println("removeBindingInternal " +
-			       "name:" + name + ", names:" + names);
-	    txn.join(this);
-	    Long oldValue = names.remove(name);
-	    if (oldValue != null) {
-		List<Object> txnEntry = getTxnEntry(txn);
-		txnEntry.add(name);
-		txnEntry.add(oldValue);
-		return new BindingValue(1, names.higherKey(name));
-	    } else {
-		return new BindingValue(-1, names.higherKey(name));
-	    }
-	}
-	    
-	protected synchronized String nextBoundNameInternal(
-	    Transaction txn, String name)
-	{
-	    txn.join(this);
-	    return names.higherKey(name);
-	}
-
-	protected void shutdownInternal() { }
-
-	protected int getClassIdInternal(Transaction txn, byte[] classInfo) {
-	    throw new UnsupportedOperationException();
-	}
-
-	protected byte[] getClassInfoInternal(Transaction txn, int classId) {
-	    throw new UnsupportedOperationException();	    
-	}
-
-	protected synchronized long nextObjectIdInternal(
-	    Transaction txn, long oid)
-	{
-	    txn.join(this);
-	    Long higherKey = oids.higherKey(oid);
-	    return (higherKey != null) ? higherKey.longValue() : -1;
-	}
-
-	protected boolean prepareInternal(Transaction txn) {
-	    return false;
-	}
-
-	protected void commitInternal(Transaction txn) {
-	    removeTxnEntry(txn);
-	}
-
-	protected void prepareAndCommitInternal(Transaction txn) {
-	    commitInternal(txn);
-	}
-
-	protected void abortInternal(Transaction txn) {
-	    logger.log(Level.FINEST, "Entering abortInternal");
-	    List<Object> txnEntry = getTxnEntry(txn);
-	    for (int i = txnEntry.size() - 2; i >= 0; i -= 2) {
-		Object key = txnEntry.get(i);
-		Object value = txnEntry.get(i + 1);
-		if (key instanceof Long) {
-		    if (value != null) {
-			oids.put((Long) key, (byte[]) value);
-		    } else {
-			oids.remove((Long) key);
-		    }
-		} else if (value != null) {
-		    names.put((String) key, (Long) value);
-		} else {
-		    names.remove((String) key);
-		}
-	    }
-	    removeTxnEntry(txn);
-	    logger.log(Level.FINEST, "After abort: names: " + names);
-	}
-
-	/* -- Other methods -- */
-
-	/** Returns the undo list for the specified transaction. */
-	private List<Object> getTxnEntry(Transaction txn) {
-	    List<Object> result = txnEntries.get(txn);
-	    if (result == null) {
-		result = new ArrayList<Object>();
-		txnEntries.put(txn, result);
-	    }
-	    return result;
-	}
-
-	/** Removes the undo list for the specified transaction. */
-	private void removeTxnEntry(Transaction txn) {
-	    txnEntries.remove(txn);
 	}
     }
 }
