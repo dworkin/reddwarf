@@ -67,12 +67,6 @@ public final class StandardProperties {
     public static final String APP_LISTENER = NS + "app.listener";
 
     /**
-     * The value for the null <code>AppListener</code>, used to start an
-     * application context with no running application.
-     */
-    public static final String APP_LISTENER_NONE = "NONE";
-
-    /**
      * An optional key specifying a specific class to use for the
      * <code>DataService</code>.
      */
@@ -148,17 +142,10 @@ public final class StandardProperties {
     public static final String MANAGERS = NS + "managers";
 
     /**
-     * An optional property to specify that no <code>Service</code>s should
-     * be configured past the one specified. This may only be used if the
-     * <code>AppListener</code> has the value <code>APP_LISTENER_NONE</code>.
-     * Valid values for this property are specified by
-     * <code>StandardService</code>.
-     */
-    public static final String FINAL_SERVICE = NS + "finalService";
-
-    /**
-     * An enumeration of the known, standard <code>Service</code>s. The
+     * An enumeration of the known, standard {@code Service}s. The
      * ordering represents the order in which the services are configured.
+     * For core server nodes in a multi-node configuration, the services
+     * through the {@code TaskService} are started.
      */
     public enum StandardService {
         /** Enumeration for the Data Service. */
@@ -193,15 +180,8 @@ public final class StandardProperties {
      *  property settings to be overridden.
      *  <p>
      *  In particular, setting this property to {@code coreServerNode} causes
-     *  the following properties to be set:
+     *  the following property to be set:
      * <ul>
-     * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE} whose value
-     *      is {@value #APP_LISTENER_NONE} to indicate that no application code
-     *      will run on the server node
-     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to
-     *      indicate the set of services to run on the server node
-     * <li> {@value #SERVER_START} set to {@code true} to indicate that the
-     *       services' servers should be started
      * <li>
      *   {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
      *   set to {@code com.sun.sgs.impl.service.data.store.net.DataStoreClient}
@@ -209,22 +189,10 @@ public final class StandardProperties {
      *
      * </ul>
      * <p>
-     * Setting this property to {@code appNode} causes the following to be
-     * set:
-     * <ul>
-     * <li> {@value #SERVER_START} set to {@code false} 
-     * </ul>
-     * <p>
      * The unit tests rely on the default not modifying any other properties.
      */
     public static final String NODE_TYPE = NS + "node.type";
     
-    /**
-     * An optional property that specifies the default for whether to start the
-     * servers associated with services.
-     */
-    public static final String SERVER_START = NS + "server.start";
-
     /**
      * An optional property that specifies the default for the name of the host
      * running the servers associated with services.
@@ -236,6 +204,6 @@ public final class StandardProperties {
      * enables remote JMX monitoring, and specifies the port JMX is listening
      * on.
      */
-    public static final String SYSTEM_JMX_REMOTE_PORT = 
-            "com.sun.management.jmxremote.port";
+    public static final String SYSTEM_JMX_REMOTE_PORT =
+        "com.sun.management.jmxremote.port";
 }

@@ -33,6 +33,7 @@ import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NodeMappingService;
@@ -411,8 +412,14 @@ public class SgsTestNode {
                                            Class<?> listenerClass) 
         throws Exception
     {
+        // The SgsTestNode currently starts single node (in a network config
+        // for the data store) or an app node.  If a core server node is
+        // desired, it's best to set the property explicitly.
         boolean isServerNode = serverNode == null;
-        String startServer = String.valueOf(isServerNode);
+        String nodeType = 
+            isServerNode ? 
+            NodeType.singleNode.toString() : 
+            NodeType.appNode.toString();
 
         int requestedDataPort =
             isServerNode ?
@@ -436,7 +443,7 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             StandardProperties.APP_NAME, appName,
-            StandardProperties.SERVER_START, startServer,
+            StandardProperties.NODE_TYPE, nodeType,
             StandardProperties.SERVER_HOST, "localhost",
             com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 String.valueOf(getNextUniquePort()),
@@ -459,12 +466,12 @@ public class SgsTestNode {
             "com.sun.sgs.impl.service.watchdog.server.renew.interval", "500",
             "com.sun.sgs.impl.service.nodemap.server.port",
                 String.valueOf(requestedNodeMapPort),
-            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250",
-	    StandardProperties.APP_LISTENER,
-	        (listenerClass != null ?
-		 listenerClass.getName() :
-		 StandardProperties.APP_LISTENER_NONE)
+            "com.sun.sgs.impl.service.nodemap.remove.expire.time", "250"
         );
+        if (listenerClass != null) {
+            retProps.setProperty(StandardProperties.APP_LISTENER, 
+                                 listenerClass.getName());
+        }
 
         return retProps;
     }

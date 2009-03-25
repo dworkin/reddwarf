@@ -21,7 +21,9 @@ package com.sun.sgs.test.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskReservation;
@@ -71,7 +73,8 @@ public class TestTaskSchedulerImpl {
         Properties properties =
             SgsTestNode.getDefaultProperties("TestTaskSchedulerImpl",
 					     null, null);
-        properties.setProperty("com.sun.sgs.finalService", "DataService");
+        properties.setProperty(StandardProperties.NODE_TYPE, 
+                               NodeType.coreServerNode.name());
         serverNode = new SgsTestNode("TestTaskSchedulerImpl", null, properties);
         taskScheduler = serverNode.getSystemRegistry().
             getComponent(TaskScheduler.class);

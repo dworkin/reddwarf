@@ -25,14 +25,13 @@ import com.sun.sgs.impl.auth.IdentityImpl;
 import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.watchdog.WatchdogServerImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.util.AbstractService;
 import com.sun.sgs.impl.util.AbstractService.Version;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
@@ -49,7 +48,6 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.BindException;
-import java.rmi.server.ExportException;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 
 import java.util.ArrayList;
@@ -69,7 +67,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.junit.runner.RunWith;
 
 /** Test the {@link WatchdogServiceImpl} class. */
@@ -284,7 +281,7 @@ public class TestWatchdogServiceImpl extends Assert {
         int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            WatchdogServerPropertyPrefix + ".start", "false",
+            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
         try {
             WatchdogServiceImpl watchdog =
@@ -336,7 +333,7 @@ public class TestWatchdogServiceImpl extends Assert {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "true",
+            StandardProperties.NODE_TYPE, NodeType.coreServerNode.name(),
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval", "0");
 	try {
@@ -357,7 +354,7 @@ public class TestWatchdogServiceImpl extends Assert {
         WatchdogServiceImpl watchdog = null;
 	Properties properties = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-	    WatchdogServerPropertyPrefix + ".start", "true",
+            StandardProperties.NODE_TYPE, NodeType.coreServerNode.name(),
 	    WatchdogServerPropertyPrefix + ".port", "0",
 	    WatchdogServerPropertyPrefix + ".renew.interval",
 		Integer.toString(Integer.MAX_VALUE));
@@ -450,7 +447,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            WatchdogServerPropertyPrefix + ".start", "false",
+            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -496,7 +493,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
 	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            WatchdogServerPropertyPrefix + ".start", "false",
+            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	final WatchdogServiceImpl watchdog =
@@ -568,7 +565,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	        String.valueOf(SgsTestNode.getNextUniquePort()),
 	    "com.sun.sgs.impl.service.watchdog.client.port",
 	        String.valueOf(SgsTestNode.getNextUniquePort()),
-            WatchdogServerPropertyPrefix + ".start", "false",
+            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 	WatchdogServiceImpl watchdog =
@@ -852,7 +849,7 @@ public class TestWatchdogServiceImpl extends Assert {
 	int port = watchdogService.getServer().getPort();
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            WatchdogServerPropertyPrefix + ".start", "false",
+            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port", Integer.toString(port));
 
@@ -1573,7 +1570,7 @@ public class TestWatchdogServiceImpl extends Assert {
     {
 	Properties props = createProperties(
  	    StandardProperties.APP_NAME, "TestWatchdogServiceImpl",
-            WatchdogServerPropertyPrefix + ".start", "false",
+            StandardProperties.NODE_TYPE, NodeType.appNode.name(),
             WatchdogServerPropertyPrefix + ".host", "localhost",
 	    WatchdogServerPropertyPrefix + ".port",
 	    Integer.toString(watchdogService.getServer().getPort()));
@@ -1593,9 +1590,9 @@ public class TestWatchdogServiceImpl extends Assert {
 	Properties props =
 	    SgsTestNode.getDefaultProperties(
 		"TestWatchdogServiceImpl", null, null);
-	props.setProperty(
-	    StandardProperties.FINAL_SERVICE,
-	    StandardProperties.StandardService.NodeMappingService.toString());
+        props.setProperty(
+            StandardProperties.NODE_TYPE,
+            NodeType.coreServerNode.name());
 	setUp(props, false);
     }
     

@@ -33,6 +33,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 
 import com.sun.sgs.service.DataService;
@@ -336,12 +337,17 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
 					  (serverNode.getDataService()));
         String portStr = String.valueOf(port);
 
+        String nodeType = 
+            server ?  NodeType.singleNode.name() : 
+                      NodeType.appNode.name();
+        
         return UtilProperties.createProperties(
             StandardProperties.APP_NAME, appName,
             com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 Integer.toString(SgsTestNode.getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dbDirectory,
+            StandardProperties.NODE_TYPE, nodeType,
             StandardProperties.APP_LISTENER,
                 SgsTestNode.DummyAppListener.class.getName(),
             StandardProperties.NODE_MAPPING_SERVICE,

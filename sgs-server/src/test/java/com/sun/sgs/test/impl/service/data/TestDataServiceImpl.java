@@ -60,11 +60,14 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -100,6 +103,19 @@ public class TestDataServiceImpl{
     /** An instance of the data service, to test. */
     static DataServiceImpl service;
 
+    private static Method stateRunning;
+    private static Method stateShuttingDown;
+    static {
+        try {
+            stateRunning = DataServiceImpl.class.getDeclaredMethod("setRunningState");
+            stateRunning.setAccessible(true);
+            
+            stateShuttingDown = DataServiceImpl.class.getDeclaredMethod("setShuttingDownState");
+            stateShuttingDown.setAccessible(true);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     /**
      * Boolean to say we'll *always* need a new node for each run;  this
      * allows us to ensure that each test is independent.  We don't run in
@@ -2063,16 +2079,25 @@ public class TestDataServiceImpl{
 
         final Semaphore mainFlag = new Semaphore(0);
         final Semaphore threadFlag = new Semaphore(0);
+        
+        final List errorList = 
+            Collections.synchronizedList(new ArrayList<AssertionError>());
+        
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
-                dummy = (DummyManagedObject) service.getBinding("dummy");
-                assertEquals("a", dummy.value);
-                assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
-                mainFlag.release();
-                assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+                try {
+                    dummy = (DummyManagedObject) service.getBinding("dummy");
+                    assertEquals("a", dummy.value);
+                    assertTrue(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
+                    mainFlag.release();
+                    assertFalse(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
+                } catch (AssertionError e) {
+                    errorList.add(e);
+                }
         }}, taskOwner);
 
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
+            AssertionError error;
             public void run() throws Exception {
                 try {
                     DummyManagedObject dummy2 =
@@ -2082,18 +2107,22 @@ public class TestDataServiceImpl{
                     assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
                     service.markForUpdate(dummy2);
                     threadFlag.release();
-                } catch (Exception e) {
-                    fail("Unexpected exception: " + e);
+                } catch (AssertionError e) {
+                    errorList.add(e);
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new RuntimeException("abort"));
+
         }}, taskOwner);
 
-        assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+        assertTrue(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
+        if (!errorList.isEmpty()) {
+            throw new AssertionError(errorList.get(0));
+        }
     }
 
     /* -- Test createReference -- */
-
+    
     @Test 
     public void testCreateReferenceNull() throws Exception {
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
@@ -3202,33 +3231,41 @@ public class TestDataServiceImpl{
         final Semaphore mainFlag = new Semaphore(0);
         final Semaphore threadFlag = new Semaphore(0);
 
+        final List errorList = 
+            Collections.synchronizedList(new ArrayList<AssertionError>());
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
-                dummy = (DummyManagedObject) service.getBinding("dummy");
-                dummy.getNext();
-                assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
-                mainFlag.release();
-                assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+                try {
+                    dummy = (DummyManagedObject) service.getBinding("dummy");
+                    dummy.getNext();
+                    assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+                    mainFlag.release();
+                    assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+                } catch (AssertionError e) {
+                    errorList.add(e);
+                }
         }}, taskOwner);
 
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
-
                     DummyManagedObject dummy2 =
                         (DummyManagedObject) service.getBinding("dummy");
                     threadFlag.release();
                     assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
                     dummy2.getNextForUpdate();
                     threadFlag.release();
-                } catch (Exception e) {
-                    fail("Unexpected exception: " + e);
+                } catch (AssertionError e) {
+                    errorList.add(e);
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new TestAbortedTransactionException("abort"));
         }}, taskOwner);
 
         assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+        if (!errorList.isEmpty()) {
+            throw new AssertionError(errorList.get(0));
+        }
     }
 
     /* -- Test ManagedReference.getId -- */
@@ -3351,29 +3388,15 @@ public class TestDataServiceImpl{
 
     @Test 
     public void testConcurrentShutdownInterrupt() throws Exception {
-        class TestTask extends InitialTestRunnable {
-            ShutdownServiceAction action1, action2;
-            public void run() throws Exception {
-                super.run();
-                action1 = new ShutdownServiceAction(service);
-                action1.assertBlocked();
-                action2 = new ShutdownServiceAction(service);
-                action2.assertBlocked();
-                action1.interrupt(); // shutdown should not unblock
-                action1.assertBlocked(); 
-                action2.assertBlocked();
-                Transaction txn = txnProxy.getCurrentTransaction();
-                txn.abort(new TestAbortedTransactionException("abort"));
-            }
-        }
-
         try {
-            TestTask task = new TestTask();
-            txnScheduler.runTask(task, taskOwner);
-            task.action1.assertDone();
-            task.action2.assertDone();
-        } catch (TestAbortedTransactionException e) {
-            // this is expected:  we threw it above
+            txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
+            ShutdownServiceAction action1 = new ShutdownServiceAction(service);
+            action1.assertBlocked();
+            ShutdownServiceAction action2 = new ShutdownServiceAction(service);
+            action2.assertBlocked();
+            action1.interrupt(); // shutdown should not unblock
+            action1.assertBlocked(); 
+            action2.assertBlocked();
         } finally {
             try {
                 serverNode.shutdown(false);
@@ -3980,7 +4003,10 @@ public class TestDataServiceImpl{
     /** Returns the default properties to use for creating data services. */
     protected Properties getProperties() throws Exception {
         Properties p = SgsTestNode.getDefaultProperties(APP_NAME, null, null);
-        p.setProperty("com.sun.sgs.finalService", "DataService");
+        p.setProperty("com.sun.sgs.node.type", "coreServerNode");
+        p.remove("com.sun.sgs.impl.service.data.DataServiceImpl." +
+                 "data.store.class");
+  
         p.setProperty(
             DataServiceImplClassName + ".debug.check.interval", "0");
         p.setProperty(
@@ -4265,61 +4291,71 @@ public class TestDataServiceImpl{
         throws Exception
     {
         class ShutdownTask extends InitialTestRunnable {
-            ShutdownAction shutdownAction;
             public void run() throws Exception {
                 super.run();
                 action.setUp();
-                shutdownAction = new ShutdownAction();
-                shutdownAction.assertBlocked();
+
+                stateShuttingDown.invoke(service);
                 action.run();
+                stateRunning.invoke(service);
             }
         }
         ShutdownTask task = new ShutdownTask();
         txnScheduler.runTask(task, taskOwner);
-
-        task.shutdownAction.assertDone();
     }
 
     /** Tests running the action with a new transaction while shutting down. */
     private void testShuttingDownNewTxn(final Action action) throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
+        final List errorList = 
+            Collections.synchronizedList(new ArrayList<AssertionError>());
+        
         class ShutdownTask extends TestAbstractKernelRunnable {
-            ShutdownAction shutdownAction;
             ThreadAction threadAction;
             public void run() throws Exception {
                 service.createReference(new DummyManagedObject());
                 action.setUp();
-                shutdownAction = new ShutdownAction();
-                shutdownAction.assertBlocked();
+                stateShuttingDown.invoke(service);
 
                 threadAction = new ThreadAction() {
                     protected void action() {
                         try {
-                            txnScheduler.runTask(new TestAbstractKernelRunnable() {
-                                public void run() {
-                                    try {
-                                        action.run();
-                                        fail("Expected IllegalStateException");
-                                    } catch (IllegalStateException e) {
-                                        if (!e.getMessage().equals("Service " +
-                                                "is shutting down") && !e.
-                                                getMessage().equals("Sevice " +
-                                                "is shut down"))
-                                            fail("Invalid exception message");
-                                    }
-                            }}, taskOwner);
-                        } catch (Exception e) {
-                            fail("Unexpected exception " + e);
+                            try {
+                                txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                                    public void run() {
+                                        try {
+                                            action.run();
+                                            fail("Expected IllegalStateException");
+                                        } catch (IllegalStateException e) {
+                                            if (!e.getMessage().equals("Service " +
+                                                    "is shutting down") && !e.
+                                                    getMessage().equals("Sevice " +
+                                                    "is shut down"))
+                                                fail("Invalid exception message");
+                                        }
+                                }}, taskOwner);
+                            } catch (Exception e) {
+                                fail("Unexpected exception " + e);
+                            }
+                        } catch (AssertionError ae) {
+                            errorList.add(ae);
+                            
                         }
                     }
                 };
             }
         }
         ShutdownTask task = new ShutdownTask();
-        txnScheduler.runTask(task, taskOwner);
-        task.threadAction.assertDone();
-        task.shutdownAction.assertDone();
+        try {
+            txnScheduler.runTask(task, taskOwner);
+            if (!errorList.isEmpty()) {
+                throw new AssertionError(errorList.get(0));
+            }
+        } finally {
+            stateRunning.invoke(service);
+            task.threadAction.assertDone();
+        }
     }
 
     /** Tests running the action after shutdown. */
@@ -4497,8 +4533,8 @@ public class TestDataServiceImpl{
 
     /** Use this thread to control a call to shutdown that may block. */
     class ShutdownServiceAction extends ThreadAction {
-        final DataService service;
-	ShutdownServiceAction(DataService service) {
+        final DataServiceImpl service;
+	ShutdownServiceAction(DataServiceImpl service) {
             this.service = service;
         }
         

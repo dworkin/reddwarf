@@ -28,6 +28,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.Exceptions;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
@@ -230,10 +231,13 @@ public final class DataStoreClient
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+        NodeType nodeType = 
+                NodeType.valueOf(
+                    wrappedProps.getProperty(StandardProperties.NODE_TYPE,
+                                         NodeType.singleNode.name()));
 	boolean serverStart = wrappedProps.getBooleanProperty(
-	    SERVER_START_PROPERTY,
-	    wrappedProps.getBooleanProperty(
-		StandardProperties.SERVER_START, true));
+	    SERVER_START_PROPERTY, 
+            (nodeType != NodeType.appNode));
         if (serverStart) {
             // we default to localHost;  this is useful for starting
             // single node systems

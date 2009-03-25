@@ -43,6 +43,7 @@ import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
@@ -75,7 +76,7 @@ import javax.management.JMException;
  *	</b></code> <br>
  *	<i>Default:</i>
  *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
- *	the {@code com.sun.sgs.server.start} property is {@code false}, else
+ *	the {@code com.sun.sgs.node.type} property is {@code appNode}, else
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
@@ -435,8 +436,12 @@ public final class DataServiceImpl implements DataService {
 		systemRegistry.getComponent(TaskScheduler.class);
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
-	    boolean serverStart = wrappedProps.getBooleanProperty(
-		StandardProperties.SERVER_START, true);
+            NodeType nodeType = 
+                NodeType.valueOf(
+                    wrappedProps.getProperty(StandardProperties.NODE_TYPE,
+                                         NodeType.singleNode.name()));
+            boolean serverStart = nodeType != NodeType.appNode;
+
 	    DataStore baseStore;
 	    if (dataStoreClassName != null) {
 		baseStore = wrappedProps.getClassInstanceProperty(
@@ -1114,6 +1119,24 @@ public final class DataServiceImpl implements DataService {
 	}
     }
 
+    /**
+     * Sets the current state to running.  Used during testing.
+     */
+    void setRunningState() {
+        synchronized (stateLock) {
+            state = State.RUNNING;
+        }
+    }
+    
+    /**
+     * Sets the current state to shutting down.  Used during testing.
+     */
+    void setShuttingDownState() {
+        synchronized (stateLock) {
+            state = State.SHUTTING_DOWN;  
+        }
+    }
+    
     /**
      * Checks that the specified context is currently active.  Throws
      * TransactionNotActiveException if there is no current transaction or if
