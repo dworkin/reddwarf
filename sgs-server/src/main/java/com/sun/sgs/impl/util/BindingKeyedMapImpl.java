@@ -103,6 +103,14 @@ public class BindingKeyedMapImpl<V>
 	return previousValue;
     }
 
+    /**
+     * Puts the specified {@code key}/{@code value} pair in this map,
+     * wrapping the value if the value does not implement {@code
+     * ManagedObject}.
+     *
+     * @param	key a key
+     * @param	value a value
+     */
     private void putInternal(String key, V value) {
 	ManagedObject v =
 	    value instanceof ManagedObject ?
@@ -577,6 +585,9 @@ public class BindingKeyedMapImpl<V>
     
     /* -- Private classes and methods. -- */
 
+    /**
+     * A wrapper for a serializable, but not managed, object.
+     */
     private static final class Wrapper<V> extends ManagedSerializable<V> {
 
 	/** The serialVersionUID for this class. */
@@ -587,6 +598,9 @@ public class BindingKeyedMapImpl<V>
 	}
     }
 
+    /**
+     * A serializable {@code Entry} used in entry sets for this map.
+     */
     private static final class KeyValuePair<K, V>
 	implements Entry<K, V>, Serializable
     {
@@ -670,6 +684,12 @@ public class BindingKeyedMapImpl<V>
 	return key == null || !key.startsWith(keyPrefix);
     }
 
+    /**
+     * Returns the size of the map with the specified {@code keyPrefix}.
+     *
+     * @param	keyPrefix a key prefix
+     * @return	the size of the map
+     */
     private static int sizeInternal(String keyPrefix) {
 	int size = 0;
 	Iterator<String> iter = new KeyIterator<Object>(keyPrefix);
@@ -680,6 +700,9 @@ public class BindingKeyedMapImpl<V>
 	return size;	
     }
 
+    /**
+     * Clears the map with the specified {@code keyPrefix}.
+     */
     private static void clearInternal(String keyPrefix) {
 	Iterator<String> iter = new KeyIterator<Object>(keyPrefix);
 	while (iter.hasNext()) {
@@ -688,6 +711,10 @@ public class BindingKeyedMapImpl<V>
 	}
     }
 
+    /**
+     * Returns the value associated with the specified {@code bindingName}.
+     * removing the wrapper if applicable.
+     */
     @SuppressWarnings("unchecked")
     private V getValue(String bindingName) {
 	ManagedObject v =
@@ -699,6 +726,10 @@ public class BindingKeyedMapImpl<V>
 	    (V) v;
     }
 
+    /**
+     * Returns the value associated with the specified {@code bindingName},
+     * removing the wrapper if applicable.
+     */
     @SuppressWarnings("unchecked")
     private V removeValue(String bindingName) {
 	V value = null;
@@ -713,12 +744,20 @@ public class BindingKeyedMapImpl<V>
 	return value;
     }
 
+    /**
+     * Throws {@code NullPointerException} of {@code obj} is {@code
+     * null}
+     */
     private static void checkNull(String name, Object obj) {
 	if (obj == null) {
 	    throw new NullPointerException("null " + name);
 	}
     }
 
+    /**
+     * Throws {@code IllegalArgumentException} of {@code obj} is not
+     * serializable.
+     */
     private static void checkSerializable(String name, Object obj) {
 	checkNull(name, obj);
 	if (!(obj instanceof Serializable)) {
@@ -726,6 +765,10 @@ public class BindingKeyedMapImpl<V>
 	}
     }
 
+    /**
+     * Throws {@code ClassCastException} if (@code key) is not an instance
+     * of {@code String}.
+     */
     private static void checkKey(String keyName, Object key) {
 	checkNull(keyName, key);
 	if (!(key instanceof String)) {
@@ -734,5 +777,4 @@ public class BindingKeyedMapImpl<V>
 		key.getClass().getName());
 	}
     }
-    
 }
