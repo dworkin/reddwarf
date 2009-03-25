@@ -51,6 +51,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Assert;
@@ -141,6 +142,22 @@ public class TestTxnIsolation extends Assert {
 	txn = createTransaction();
 	id = store.createObject(txn);
 	store.setObject(txn, id, value);
+	try {
+	    store.removeBinding(txn, "a");
+	} catch (NameNotBoundException e) {
+	}
+	try {
+	    store.removeBinding(txn, "b");
+	} catch (NameNotBoundException e) {
+	}
+	try {
+	    store.removeBinding(txn, "c");
+	} catch (NameNotBoundException e) {
+	}
+	try {
+	    store.removeBinding(txn, "d");
+	} catch (NameNotBoundException e) {
+	}
     }
 
     @After
@@ -449,10 +466,6 @@ public class TestTxnIsolation extends Assert {
 
     @Test
     public void testGetBindingNotFoundGetBindingNotFound() throws Exception {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	try {
@@ -482,10 +495,6 @@ public class TestTxnIsolation extends Assert {
 
     @Test
     public void testSetBindingCreateGetBindingNotFound() throws Exception {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	try {
@@ -525,10 +534,6 @@ public class TestTxnIsolation extends Assert {
    
     @Test
     public void testSetBindingFoundSetBindingCreate() throws Exception {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.setBinding(txn, "a", 100);
@@ -560,10 +565,6 @@ public class TestTxnIsolation extends Assert {
 
     @Test
     public void testRemoveBindingNotFoundGetBindingNotFound() throws Exception {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	try {
@@ -582,10 +583,6 @@ public class TestTxnIsolation extends Assert {
 
     @Test
     public void testRemoveBindingNotFoundSetBindingCreate() throws Exception {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.setBinding(txn, "a", 100);
@@ -600,10 +597,6 @@ public class TestTxnIsolation extends Assert {
     public void testRemoveBindingNotFoundRemoveBindingNotFound()
 	throws Exception
     {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	try {
@@ -641,10 +634,6 @@ public class TestTxnIsolation extends Assert {
     public void testRemoveBindingFoundSetBindingCreate()
 	throws Exception
     {
-	try {
-	    store.removeBinding(txn, "a");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.setBinding(txn, "a", 100);
@@ -662,10 +651,6 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameGetBindingNotFound() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
 	store.setBinding(txn, "c", 300);
 	txn.commit();
 	txn = createTransaction();
@@ -692,10 +677,6 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameSetBindingCreate() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.setBinding(txn, "b", 200);
@@ -723,10 +704,6 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameRemoveBindingNotFound() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
 	store.setBinding(txn, "c", 300);
 	txn.commit();
 	txn = createTransaction();
@@ -773,14 +750,6 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameLastGetBindingNotFound() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
-	try {
-	    store.removeBinding(txn, "c");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	try {
@@ -797,14 +766,6 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameLastSetBindingCreate() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
-	try {
-	    store.removeBinding(txn, "c");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.setBinding(txn, "b", 200);
@@ -820,14 +781,6 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameLastRemoveBindingNotFound() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
-	try {
-	    store.removeBinding(txn, "c");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	try {
@@ -846,10 +799,6 @@ public class TestTxnIsolation extends Assert {
     public void testNextBoundNameLastRemoveBindingFound() throws Exception {
 	store.setBinding(txn, "a", 100);
 	store.setBinding(txn, "b", 200);
-	try {
-	    store.removeBinding(txn, "c");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.removeBinding(txn, "b");
@@ -865,19 +814,205 @@ public class TestTxnIsolation extends Assert {
     @Test
     public void testNextBoundNameLastNextBoundNameLast() throws Exception {
 	store.setBinding(txn, "a", 100);
-	try {
-	    store.removeBinding(txn, "b");
-	} catch (NameNotBoundException e) {
-	}
-	try {
-	    store.removeBinding(txn, "c");
-	} catch (NameNotBoundException e) {
-	}
 	txn.commit();
 	txn = createTransaction();
 	store.nextBoundName(txn, "a");
 	runner = new Runner(new NextBoundName("a"));
 	assertSame(null, runner.getResult());
+    }
+
+    /* -- Tests for Phantoms -- */
+
+    /**
+     * Test that removing a binding locks the next name even when the identity
+     * of that name changes because a conflicting transaction aborts.
+     *
+     * Here's the blow-by-blow:
+     *
+     * tid:1 create a
+     * tid:1 create b
+     *
+     * tid:2 create c
+     * 	     write lock c
+     *	     write lock end
+     *
+     * tid:3 remove b
+     *       write lock b
+     *       write lock c (blocks)
+     *
+     * tid:2 abort
+     *       release lock c
+     *       release lock end
+     *
+     * tid:3 [remove b]
+     *       write lock c (but it is now missing, so check next again)
+     *       write lock end
+     *
+     * tid:4 next a
+     *       read lock end (blocks)
+     *
+     * tid:3 commit
+     *       release lock b
+     *       release lock end
+     *
+     * tid:4 [next a]
+     *       write lock end
+     *       return null
+     *
+     * So, this test will fail if removeBinding does not make sure to check
+     * that the next key exists after it obtains a lock on it.  This test only
+     * requires it to check once.
+     */
+    @Test
+    public void testRemoveBindingFoundPhantom()
+	throws Exception
+    {
+	store.setBinding(txn, "a", 200);
+	store.setBinding(txn, "b", 200);
+	txn.commit();
+	txn = createTransaction();				// tid:2
+	store.setBinding(txn, "c", 300);
+	Runner runner2 = new Runner(new RemoveBinding("b"));	// tid:3
+	runner2.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertTrue((Boolean) runner2.getResult());
+	runner = new Runner(new NextBoundName("a"));		// tid:4
+	runner.assertBlocked();
+	runner2.commit();
+	assertSame(null, runner.getResult());
+    }
+
+    /**
+     * A similar test, but this one requiring that removeBinding check
+     * repeatedly for the latest next key.
+     *
+     * tid:1 create a
+     * tid:1 create b
+     *
+     * tid:2 create c
+     * 	     write lock c
+     *	     write lock end
+     *
+     * tid:3 create d
+     *       write lock d
+     *       write lock end (blocks)
+     *
+     * tid:4 remove b
+     *       write lock b
+     *       write lock c (blocks)
+     *
+     * tid:2 abort
+     *       release lock c
+     *       release lock end
+     *
+     * tid:3 [create d]
+     *	     write lock end
+     *
+     * tid:4 [remove b]
+     *       write lock c (but it is now missing, so check next again)
+     *       write lock d (blocks)
+     *
+     * tid:3 abort
+     *       release lock d
+     *       release lock end
+     *
+     * tid:4 [remove b]
+     *       write lock d
+     *       write lock end
+     *
+     * tid:5 next a
+     *       read lock end (blocks)
+     *
+     * tid:4 commit
+     *       release lock b
+     *       release lock end
+     *
+     * tid:5 [next a]
+     *       write lock end
+     *       return null
+     */
+    @Test
+    public void testRemoveBindingFoundPhantom2()
+	throws Exception
+    {
+	store.setBinding(txn, "a", 200);
+	store.setBinding(txn, "b", 200);
+	txn.commit();
+	txn = createTransaction();				// tid:2
+	store.setBinding(txn, "c", 300);
+	Runner runner2 = new Runner(new SetBinding("d", 400));	// tid:3
+	runner2.assertBlocked();
+	Runner runner3 = new Runner(new RemoveBinding("b"));	// tid:4
+	runner3.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	runner2.getResult();
+	runner3.assertBlocked();
+	runner2.abort();
+	assertTrue((Boolean) runner3.getResult());
+	runner = new Runner(new NextBoundName("a"));		// tid:5
+	runner.assertBlocked();
+	runner3.commit();
+	assertSame(null, runner.getResult());
+    }
+
+    /**
+     * Test that nextBoundName checks repeatedly to be sure that the next name
+     * exists.
+     *
+     * tid:1 create a
+     *
+     * tid:2 create b
+     * 	     write lock b
+     *	     write lock end
+     *
+     * tid:3 create c
+     *       write lock c
+     *       write lock end (blocks)
+     *
+     * tid:4 next a
+     *       read lock b (blocks)
+     *
+     * tid:2 abort
+     *       release lock b
+     *       release lock end
+     *
+     * tid:3 [create c]
+     *	     write lock end
+     *
+     * tid:4 [next a]
+     *       read lock b (but it is now missing, so check next again)
+     *       read lock c (blocks)
+     *
+     * tid:3 abort
+     *       release lock c
+     *       release lock end
+     *
+     * tid:4 [next a]
+     *       read lock c (but it is now missing, so check next again)
+     *	     read lock end
+     *	     return null
+     */
+    @Test
+    public void testNextBoundNameLastPhantom()
+	throws Exception
+    {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();				// tid:2
+	store.setBinding(txn, "b", 200);
+	Runner runner2 = new Runner(new SetBinding("c", 300));	// tid:3
+	runner2.assertBlocked();
+	Runner runner3 = new Runner(new NextBoundName("a"));	// tid:4
+	runner3.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	runner2.getResult();
+	runner3.assertBlocked();
+	runner2.abort();
+	assertSame(null, runner3.getResult());
+	runner3.commit();
     }
 
     /* -- Other methods -- */
@@ -954,11 +1089,11 @@ public class TestTxnIsolation extends Assert {
 	    getResult();
 	    setDone();
 	}
-// 	void abort() throws InterruptedException, TimeoutException {
-// 	    setAction(new Abort());
-// 	    getResult();
-// 	    setDone();
-// 	}
+	void abort() throws InterruptedException, TimeoutException {
+	    setAction(new Abort());
+	    getResult();
+	    setDone();
+	}
 	void runInternal() {
 	    TxnCallable a;
 	    FutureTask<?> t;
@@ -1018,13 +1153,6 @@ public class TestTxnIsolation extends Assert {
 		return getTask().get(SUCCESS_TIMEOUT, TimeUnit.MILLISECONDS);
 	    } catch (RuntimeException e) {
 		throw e;
-// 	    } catch (ExecutionException e) {
-// 		if (e.getCause() instanceof RuntimeException) {
-// 		    throw (RuntimeException) e.getCause();
-// 		} else {
-// 		    throw new RuntimeException(
-// 			"Unexpected exception: " + e, e);
-// 		}
 	    } catch (TimeoutException e) {
 		throw e;
 	    } catch (Exception e) {
@@ -1203,14 +1331,14 @@ public class TestTxnIsolation extends Assert {
 	}
     }
 
-//     /** Calls {@link DummyTransaction#abort}. */
-//     static class Abort extends TxnCallable<Void> {
-// 	Abort() { }
-// 	public Void call() {
-// 	    getTransaction().abort(new RuntimeException());
-// 	    return null;
-// 	}
-//     }
+    /** Calls {@link DummyTransaction#abort}. */
+    static class Abort extends TxnCallable<Void> {
+	Abort() { }
+	public Void call() {
+	    getTransaction().abort(new RuntimeException());
+	    return null;
+	}
+    }
 
     /**
      * An implementation of {@link DataStore} that does no locking, to check
@@ -1381,7 +1509,7 @@ public class TestTxnIsolation extends Assert {
 	}
 
 	protected void abortInternal(Transaction txn) {
-	    System.err.println("Entering abortInternal");
+	    logger.log(Level.FINEST, "Entering abortInternal");
 	    List<Object> txnEntry = getTxnEntry(txn);
 	    for (int i = txnEntry.size() - 2; i >= 0; i -= 2) {
 		Object key = txnEntry.get(i);
@@ -1399,7 +1527,7 @@ public class TestTxnIsolation extends Assert {
 		}
 	    }
 	    removeTxnEntry(txn);
-	    System.err.println("After abort: names: " + names);
+	    logger.log(Level.FINEST, "After abort: names: " + names);
 	}
 
 	/* -- Other methods -- */

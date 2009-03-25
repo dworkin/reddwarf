@@ -492,26 +492,9 @@ public abstract class AbstractDataStore
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = removeBindingInternal(txn, name);
 	    if (!result.getNameBound()) {
-		/*
-		 * Only need read access to the name and the next name if the
-		 * name can't be removed because it is not present.  No
-		 * modifications are made in this case.
-		 */
-		String next = result.getNextName();
-		while (true) {
-		    reportNameAccess(txn, next, READ);
-		    String check = nextBoundNameInternal(txn, name);
-		    if (check == null ? next == null : check.equals(next)) {
-			break;
-		    }
-		    next = check;
-		}
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
-	    /*
-	     * Otherwise, need write access to the next name if really doing
-	     * the remove.
-	     */
+	    /* Need write access to the next name if really doing the remove */
 	    String next = result.getNextName();
 	    while (true) {
 		reportNameAccess(txn, next, WRITE);
@@ -522,8 +505,7 @@ public abstract class AbstractDataStore
 		next = check;
 	    }
 	    if (logger.isLoggable(FINEST)) {
-		logger.log(FINEST,
-			   "removeBinding txn:{0}, name:{1} returns",
+		logger.log(FINEST, "removeBinding txn:{0}, name:{1} returns",
 			   txn, name);
 	    }
 	} catch (RuntimeException e) {
