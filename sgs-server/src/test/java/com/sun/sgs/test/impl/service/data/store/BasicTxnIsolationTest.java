@@ -24,16 +24,10 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.test.util.InMemoryDataStore;
-import static com.sun.sgs.test.util.UtilProperties.createProperties;
-import com.sun.sgs.tools.test.FilteredNameRunner;
-import java.io.File;
+import com.sun.sgs.test.util.UtilProperties;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -42,13 +36,16 @@ import java.util.concurrent.TimeoutException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 
-/** Tests the isolation that the data store enforces between transactions. */
-@RunWith(FilteredNameRunner.class)
-public class TestTxnIsolation extends Assert {
+/**
+ * A superclass for tests of the isolation that the data store enforces between
+ * transactions.
+ */
+public abstract class BasicTxnIsolationTest extends Assert {
+
+    /** The configuration properties. */
+    protected static Properties props;
 
     /**
      * The number of milliseconds to wait to see if an operation is blocked.
@@ -71,30 +68,13 @@ public class TestTxnIsolation extends Assert {
     /** The number of milliseconds to allow for a transaction. */
     protected static final long TXN_TIMEOUT = 4000;
 
-    /** The name of the DataStoreImpl class. */
-    private static final String DataStoreImplClassName =
-	DataStoreImpl.class.getName();
-
-    /** The directory used for the database shared across multiple tests. */
-    private static final String dbDirectory =
-	System.getProperty("java.io.tmpdir") + File.separator +
-	"TestTxnIsolation.db";
-
-    /** The configuration properties. */
-    private static final Properties props = createProperties(
-	DataStoreImplClassName + ".directory", dbDirectory,
-	LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
-	String.valueOf(LOCK_TIMEOUT),
-	"com.sun.sgs.txn.timeout", String.valueOf(TXN_TIMEOUT),
-	BdbEnvironment.LOCK_TIMEOUT_PROPERTY, String.valueOf(LOCK_TIMEOUT),
-	JeEnvironment.LOCK_TIMEOUT_PROPERTY, String.valueOf(LOCK_TIMEOUT),
-	BdbEnvironment.TXN_ISOLATION_PROPERTY, "READ_UNCOMMITTED",
-	JeEnvironment.TXN_ISOLATION_PROPERTY, "READ_UNCOMMITTED");
-
+    /** A test value for an object ID. */
     private static final byte[] value = { 1 };
 
+    /** Another test value for an object ID. */
     private static final byte[] secondValue = { 2 };
 
+    /** Another test value for an object ID. */
     private static final byte[] thirdValue = { 3 };
 
     /** The transaction proxy. */
@@ -105,28 +85,27 @@ public class TestTxnIsolation extends Assert {
     protected static AccessCoordinatorHandle accessCoordinator;
 
     /** The data store to test. */
-    protected static DataStore store;
+    private static DataStore store;
 
     /** An initial, open transaction. */
-    protected DummyTransaction txn;
+    private DummyTransaction txn;
     
     /** The object ID of a new object created in the transaction. */
-    protected long id;
+    private long id;
 
-    protected Runner runner;
-
-    /** Clean the database directory. */
-    @BeforeClass
-    public static void beforeClass() {
-	cleanDirectory(dbDirectory);
-    }
+    /** The runner used in the test, or {@code null} if not used or done. */
+    private Runner runner;
 
     /**
-     * Create the access coordinator and data store if needed, then create a
-     * transaction, create an object, and clear existing bindings.
+     * Create the properties, access coordinator, and data store if needed;
+     * then create a transaction, create an object, and clear existing
+     * bindings.
      */
     @Before
     public void before() {
+	if (props == null) {
+	    props = createProperties();
+	}
 	if (store == null) {
 	    accessCoordinator = createAccessCoordinator();
 	    store = createDataStore();
@@ -152,6 +131,7 @@ public class TestTxnIsolation extends Assert {
 	}
     }
 
+    /** Commit the transaction and the runner, if not null. */
     @After
     public void after() throws Exception {
 	if (txn != null) {
@@ -165,15 +145,24 @@ public class TestTxnIsolation extends Assert {
 	}
     }
 
+    /** Creates the configuration properties. */
+    protected Properties createProperties() {
+	props = UtilProperties.createProperties();
+	props.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
+			  String.valueOf(LOCK_TIMEOUT));
+	props.setProperty("com.sun.sgs.txn.timeout",
+			  String.valueOf(TXN_TIMEOUT));
+	return props;
+    }
+
+    /** Creates the access coordinator. */
     protected AccessCoordinatorHandle createAccessCoordinator() {
 	return new LockingAccessCoordinator(
 	    props, txnProxy, new DummyProfileCollectorHandle());
     }
 
-    protected DataStore createDataStore() {
-	return new InMemoryDataStore(props, accessCoordinator);
-	//return new DataStoreImpl(props, accessCoordinator);
-    }
+    /** Creates the data store. */
+    protected abstract DataStore createDataStore();
 
     /* -- Tests -- */
 
@@ -1049,26 +1038,6 @@ public class TestTxnIsolation extends Assert {
 	txnProxy.setCurrentTransaction(txn);
 	accessCoordinator.notifyNewTransaction(txn, 0, 1);
 	return txn;
-    }
-
-    /** Insures an empty version of the directory exists. */
-    private static void cleanDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-	if (!dir.mkdir()) {
-	    throw new RuntimeException(
-		"Failed to create directory: " + dir);
-	}
     }
 
     /** Runs actions in another thread. */
