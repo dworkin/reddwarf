@@ -41,6 +41,8 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.TreeMap;
 import junit.framework.TestCase;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /** Test the BoundNamesUtil class. */
@@ -64,6 +66,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
     }
 
     /** Prints the test case and sets the service field to a new instance. */
+    @Before
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
 	dataService = new DummyDataService();
@@ -72,6 +75,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 
     /* -- Tests -- */
 
+    @Test
     public void testNewMapWithNullPrefix() {
 	try {
 	    collectionsFactory.newMap(null);
@@ -81,6 +85,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testNewMapWithEmptyPrefix() {
 	try {
 	    collectionsFactory.newMap("");
@@ -91,6 +96,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	
     }
 
+    @Test
     public void testPutWithNullKey() {
 	try {
 	    collectionsFactory.newMap("x.").
@@ -101,6 +107,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
     
+    @Test
     public void testPutWithNullValue() {
 	try {
 	    collectionsFactory.newMap("x.").put("a", null);
@@ -110,6 +117,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutWithNonSerializableValue() {
 	try {
 	    collectionsFactory.newMap("x.").put("a", new Object());
@@ -119,6 +127,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutWithRemovedObject() {
 	ManagedObject obj = new Managed();
 	dataService.removeObject(obj);
@@ -130,6 +139,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutWithPreviousValueRemoved() {
 	Managed obj = new Managed();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
@@ -143,28 +153,37 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutWithNonManagedValue() {
 	Map<String, Integer> map = collectionsFactory.newMap("x.");
 	for (int i = 0; i < 10; i++) {
-	    map.put(Integer.toString(i), i);
+	    String key = Integer.toString(i);
+	    assertFalse(map.containsKey(key));
+	    map.put(key, i);
+	    assertTrue(map.containsKey(key));
 	}
 	for (int i = 0; i < 10; i++) {
 	    String key = Integer.toString(i);
 	    Integer first = new Integer(i);
 	    Integer second = new Integer(i*100);
+	    assertTrue(map.containsKey(key));
 	    assertEquals(first, map.get(key));
 	    assertEquals(first, map.put(key, second));
 	    assertEquals(second, map.get(key));
 	}
     }
 
+    @Test
     public void testPutWithManagedValue() {
 	Set<Managed> set = new HashSet<Managed>();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
 	for (int i = 0; i < 10; i++) {
 	    Managed obj = new Managed();
 	    set.add(obj);
-	    map.put(obj.toString(), obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    map.put(key, obj);
+	    assertTrue(map.containsKey(key));
 	}
 	
 	for (Managed obj : set) {
@@ -172,6 +191,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutOverrideWithNullKey() {
 	try {
 	    collectionsFactory.newMap("x.").
@@ -182,6 +202,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
     
+    @Test
     public void testPutOverrideWithNullValue() {
 	try {
 	    collectionsFactory.newMap("x.").putOverride("a", null);
@@ -191,6 +212,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutOverrideWithNonSerializableValue() {
 	try {
 	    collectionsFactory.newMap("x.").putOverride("a", new Object());
@@ -200,6 +222,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutOverrideWithRemovedObject() {
 	ManagedObject obj = new Managed();
 	dataService.removeObject(obj);
@@ -211,6 +234,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testPutOverrideWithPreviousValueRemoved() {
 	Managed obj = new Managed();
 	BindingKeyedMap<Managed> map = collectionsFactory.newMap("x.");
@@ -219,16 +243,21 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	map.putOverride("a", new Managed());
     }
 
+    @Test
     public void testPutOverrideWithNonManagedValue() {
 	BindingKeyedMap<Integer> map = collectionsFactory.newMap("x.");
 	for (int i = 0; i < 10; i++) {
-	    map.putOverride(Integer.toString(i), i);
+	    String key = Integer.toString(i);
+	    assertFalse(map.containsKey(key));
+	    map.putOverride(key, i);
+	    assertTrue(map.containsKey(key));	    
 	}
 	for (int i = 0; i < 10; i++) {
 	    assertEquals(new Integer(i), map.get(Integer.toString(i)));
 	}
     }
 
+    @Test
     public void testPutOverrideWithManagedValue() {
 	Set<Managed> set = new HashSet<Managed>();
 	BindingKeyedMap<Managed> map =
@@ -236,7 +265,10 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	for (int i = 0; i < 10; i++) {
 	    Managed obj = new Managed();
 	    set.add(obj);
-	    map.putOverride(obj.toString(), obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    map.putOverride(key, obj);
+	    assertTrue(map.containsKey(key));
 	}
 	
 	for (Managed obj : set) {
@@ -244,6 +276,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
     
+    @Test
     public void testGetWithNullKey() {
 	try {
 	    collectionsFactory.newMap("x.").get(null);
@@ -253,10 +286,22 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
+    public void testGetWithNonStringKey() {
+	try {
+	    collectionsFactory.newMap("x.").get(new Object());
+	    fail("expected ClassCastException");
+	} catch (ClassCastException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    @Test
     public void testGetWithNonExistentKey() {
 	assertNull(collectionsFactory.newMap("x.").get("a"));
     }
 
+    @Test
     public void testGetWithRemovedObject() {
 	Managed obj = new Managed();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
@@ -270,6 +315,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
     
+    @Test
     public void testRemoveWithNullKey() {
 	try {
 	    collectionsFactory.newMap("x.").remove(null);
@@ -279,10 +325,22 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
+    public void testRemoveWithNonStringKey() {
+	try {
+	    collectionsFactory.newMap("x.").remove(new Object());
+	    fail("expected ClassCastException");
+	} catch (ClassCastException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
     public void testRemoveWithNonExistentKey() {
 	assertNull(collectionsFactory.newMap("x.").remove("a"));
     }
-
+ 
+    @Test
     public void testRemoveWithRemovedObject() {
 	Managed obj = new Managed();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
@@ -296,6 +354,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
     }
 
+    @Test
     public void testRemoveWithNonManagedValue() {
 	Map<String, Integer> map = collectionsFactory.newMap("x.");
 	for (int i = 0; i < 10; i++) {
@@ -303,29 +362,178 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	}
 	for (int i = 0; i < 10; i++) {
 	    String key = Integer.toString(i);
+	    assertTrue(map.containsKey(key));
 	    assertEquals(new Integer(i), map.remove(key));
+	    assertFalse(map.containsKey(key));
 	    assertNull(map.remove(key));
 	}
+	assertTrue(map.isEmpty());
 	// Make sure wrappers are removed.
 	assertEquals(10, dataService.removedObjectsCount());
     }
     
+    @Test
     public void testRemoveWithManagedValue() {
 	Set<Managed> set = new HashSet<Managed>();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
 	for (int i = 0; i < 10; i++) {
 	    Managed obj = new Managed();
 	    set.add(obj);
-	    map.put(obj.toString(), obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    map.put(key, obj);
+	    assertTrue(map.containsKey(key));
 	}
 	
 	for (Managed obj : set) {
 	    String key = obj.toString();
+	    assertTrue(map.containsKey(key));
 	    assertEquals(obj, map.remove(key));
+	    assertFalse(map.containsKey(key));
 	    assertNull(map.remove(key));
 	}
+	assertTrue(map.isEmpty());
 	// Make sure managed objects aren't removed.
 	assertEquals(0, dataService.removedObjectsCount());
+    }
+
+    @Test
+    public void testRemoveOverrideWithNullKey() {
+	try {
+	    collectionsFactory.newMap("x.").removeOverride(null);
+	    fail("expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testRemoveOverrideWithNonExistentKey() {
+	assertFalse(collectionsFactory.newMap("x.").removeOverride("a"));
+    }
+ 
+    @Test
+    public void testRemoveOverrideWithRemovedObject() {
+	Managed obj = new Managed();
+	BindingKeyedMap<Managed> map = collectionsFactory.newMap("x.");
+	map.put("a", obj);
+	dataService.removeObject(obj);
+	map.removeOverride("a");
+    }
+
+    @Test
+    public void testRemoveOverrideWithNonManagedValue() {
+	BindingKeyedMap<Integer> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    map.put(Integer.toString(i), i);
+	}
+	for (int i = 0; i < 10; i++) {
+	    String key = Integer.toString(i);
+	    assertTrue(map.containsKey(key));
+	    assertTrue(map.removeOverride(key));
+	    assertFalse(map.containsKey(key));
+	    assertFalse(map.removeOverride(key));
+	}
+	assertTrue(map.isEmpty());
+	// Make sure wrappers are removed.
+	assertEquals(10, dataService.removedObjectsCount());
+    }
+    
+    @Test
+    public void testRemoveOverrideWithManagedValue() {
+	Set<Managed> set = new HashSet<Managed>();
+	BindingKeyedMap<Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    set.add(obj);
+	    map.put(obj.toString(), obj);
+	}	
+	for (Managed obj : set) {
+	    String key = obj.toString();
+	    assertTrue(map.containsKey(key));
+	    assertTrue(map.removeOverride(key));
+	    assertFalse(map.containsKey(key));
+	    assertFalse(map.removeOverride(key));
+	}
+	assertTrue(map.isEmpty());
+	// Make sure managed objects aren't removed.
+	assertEquals(0, dataService.removedObjectsCount());
+    }
+
+    @Test
+    public void testContainsKeyWithNullKey() {
+	try {
+	    collectionsFactory.newMap("x.").containsKey(null);
+	    fail("expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    @Test
+    public void testContainsKeyWithNonStringKey() {
+	try {
+	    collectionsFactory.newMap("x.").containsKey(new Object());
+	    fail("expected ClassCastException");
+	} catch (ClassCastException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    @Test
+    public void testClearWithNonManagedValues() {
+	Map<String, Integer> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    String key = Integer.toString(i);
+	    assertFalse(map.containsKey(key));
+	    map.put(key, i);
+	    assertTrue(map.containsKey(key));
+	}
+	assertFalse(map.isEmpty());
+	map.clear();
+	assertTrue(map.isEmpty());
+	// Make sure wrappers are removed.
+	assertEquals(10, dataService.removedObjectsCount());
+    }
+    
+    @Test
+    public void testClearWithManagedValues() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    set.add(obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    map.put(key, obj);
+	    assertTrue(map.containsKey(key));
+	}
+	assertFalse(map.isEmpty());
+	map.clear();
+	assertTrue(map.isEmpty());
+	// Make sure managed objects aren't removed.
+	assertEquals(0, dataService.removedObjectsCount());
+    }
+
+    @Test
+    public void testClearWithRemovedObjects() {
+	Set<Managed> set = new HashSet<Managed>();
+	Map<String, Managed> map = collectionsFactory.newMap("x.");
+	for (int i = 0; i < 10; i++) {
+	    Managed obj = new Managed();
+	    set.add(obj);
+	    String key = obj.toString();
+	    assertFalse(map.containsKey(key));
+	    map.put(key, obj);
+	    assertTrue(map.containsKey(key));
+	}
+	for (Managed obj : set) {
+	    dataService.removeObject(obj);
+	}
+	assertEquals(10, dataService.removedObjectsCount());
+	assertFalse(map.isEmpty());
+	map.clear();
+	assertTrue(map.isEmpty());
     }
     
     /* -- Other classes -- */
@@ -374,10 +582,11 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	public <T> ManagedReference<T> createReference(T object) {
 	    throw new UnsupportedOperationException();
 	}
+	
 	/* -- Implement DataService -- */
 	public ManagedObject getServiceBinding(String name) {
 	    ManagedObject obj = get(name);
-	    if (name == null) {
+	    if (obj == null) {
 		throw new NameNotBoundException(name);
 	    } else if (removedObjectsContains(obj)) {
 		throw new ObjectNotFoundException(obj.toString());
@@ -454,6 +663,11 @@ public class TestBindingKeyedMapImpl extends TestCase {
 		}
 	    }
 	    return false;
+	}
+
+	void printServiceBindings() {
+	    System.err.println("--------- bindings ---------");
+	    System.err.println(toString());
 	}
     }
 }

@@ -114,7 +114,7 @@ public class BindingKeyedMapImpl<V>
 
     /** {@inheritDoc} */
     public V get(Object key) {
-	checkNull("key", key);
+	checkKey("key", key);
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
@@ -126,9 +126,9 @@ public class BindingKeyedMapImpl<V>
 
     /** {@inheritDoc} */
     public boolean containsKey(Object key) {
-	checkNull("key", key);
+	checkKey("key", key);
 	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
-	String bindingName = getBindingName(key.toString());
+	String bindingName = getBindingName((String) key);
 	boolean containsKey = false;
 	try {
 	    dataService.getServiceBinding(bindingName);
@@ -156,15 +156,12 @@ public class BindingKeyedMapImpl<V>
     
     /** {@inheritDoc} */
     public V remove(Object key) {
-	checkNull("key", key);
+	checkKey("key", key);
 	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String bindingName = getBindingName(key.toString());
 	V value = null;
 	try {
-	    
 	    value = removeValue(bindingName);
-	    // TBD: should this catching ONFE?  If not, how does the
-	    // binding get removed if the value has been removed?
 	    dataService.removeServiceBinding(bindingName);
 	} catch (NameNotBoundException e) {
 	}
@@ -465,7 +462,7 @@ public class BindingKeyedMapImpl<V>
 	
 	@SuppressWarnings("unchecked")
 	private V getValue(String bindingName) {
-	    ManagedObject v = dataService. getServiceBinding(bindingName);
+	    ManagedObject v = dataService.getServiceBinding(bindingName);
 	    return
 		v instanceof Wrapper ?
 		(V) ((Wrapper) v).get() :
@@ -473,9 +470,14 @@ public class BindingKeyedMapImpl<V>
 	}
 
 	private void removeValue(String bindingName) {
-	    ManagedObject v = dataService.getServiceBinding(bindingName);
-	    if (v instanceof Wrapper) {
-		dataService.removeObject(v);
+	    ManagedObject v = null;
+	    try {
+		v = dataService.getServiceBinding(bindingName);
+		if (v instanceof Wrapper) {
+		    dataService.removeObject(v);
+		}
+	    } catch (ObjectNotFoundException ignore) {
+		// object has been removed already.
 	    }
 	}
     }
@@ -729,4 +731,14 @@ public class BindingKeyedMapImpl<V>
 	    throw new IllegalArgumentException(name + " not serializable");
 	}
     }
+
+    private static void checkKey(String keyName, Object key) {
+	checkNull(keyName, key);
+	if (!(key instanceof String)) {
+	    throw new ClassCastException(
+		"key is not an instance of String: " +
+		key.getClass().getName());
+	}
+    }
+    
 }
