@@ -115,6 +115,10 @@ sgs_buffer_impl* sgs_buffer_create(size_t capacity) {
 
 /*
  * sgs_buffer_peek()
+ *Copy the contents of the data array passed in to the indicated buffer, up
+ *to the specified length. The length of the data to be copied must be
+ *smaller than the amount of space remaining in the buffer, or a value of -1
+ *is returned. Otherwise, the number of bytes actually copied is returned.
  */
 int sgs_buffer_peek(const sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
     size_t readable = readable_len(buffer);
@@ -133,6 +137,10 @@ int sgs_buffer_peek(const sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
 
 /*
  * sgs_buffer_read()
+ *Reads len bytes from a buffer, and returns them in the array data. It
+ *is up to the caller to allocate the data array of at least len size. After
+ *reading, the current buffer position and size are updated. Returns the
+ *number of bytes copied into the buffer, or -1 if there was an error.
  */
 int sgs_buffer_read(sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
     if (sgs_buffer_peek(buffer, data, len) == -1) return -1;
@@ -144,6 +152,9 @@ int sgs_buffer_read(sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
 
 /*
  * sgs_buffer_remaining()
+ *Returns the amount of free space that remains available within a
+ *buffer. Free space is defined as space that has been written to the buffer
+ *but not yet used.
  */
 size_t sgs_buffer_remaining(const sgs_buffer_impl* buffer) {
     return buffer->capacity - buffer->size;
@@ -151,6 +162,9 @@ size_t sgs_buffer_remaining(const sgs_buffer_impl* buffer) {
 
 /*
  * sgs_buffer_size()
+ *Returns the amount of data stored in the buffer that has not yet
+ *been used. This is space that should not be used in the buffer, since
+ *it contains data that needs to be passed on to some recipient.
  */
 size_t sgs_buffer_size(const sgs_buffer_impl* buffer) {
     return buffer->size;
@@ -158,6 +172,11 @@ size_t sgs_buffer_size(const sgs_buffer_impl* buffer) {
 
 /*
  * sgs_buffer_write()
+ *Write data of size len from data to the indicated buffer. Once written,
+ *the size of the buffer is increased by the amount of data written. If the
+ *amount of data to be written is greater than the amount of free space in
+ *the buffer, the routine returns -1 and sets errno; otherwise the number of
+ *bytes written is returned.
  */
 int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
     size_t writable = writable_len(buffer);
@@ -184,6 +203,9 @@ int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
 
 /*
  * readable_len()
+ *Returns the amount of contiguous data that can be read from
+ *the buffer, which can be used in memcpy to directly
+ *copy from the buffer to some other data array.
  */
 size_t readable_len(const sgs_buffer_impl* buffer) {
     if (buffer->size == 0) return 0;
@@ -205,6 +227,9 @@ size_t readable_len(const sgs_buffer_impl* buffer) {
 
 /*
  * tailpos()
+ *Returns the last position of the data that is held in the array.
+ *Note that if the data has wrapped, this may be less than the
+ *current position of reading in the buffer.
  */
 size_t tailpos(const sgs_buffer_impl* buffer) {
     return (buffer->position + buffer->size) % buffer->capacity;
@@ -212,6 +237,9 @@ size_t tailpos(const sgs_buffer_impl* buffer) {
 
 /*
  * writable_len()
+ *Returns the number of consecutive bytes that can be  written
+ *into the buffer, which can be used by memcpy to transfer
+ *data from some array directly into the buffer.
  */
 size_t writable_len(const sgs_buffer_impl* buffer) {
     size_t mytailpos;
