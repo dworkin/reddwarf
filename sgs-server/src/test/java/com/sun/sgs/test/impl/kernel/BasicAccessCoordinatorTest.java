@@ -20,17 +20,13 @@
 package com.sun.sgs.test.impl.kernel;
 
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
-import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
-import com.sun.sgs.profile.ProfileCollector;
-import com.sun.sgs.profile.ProfileParticipantDetail;
+import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.util.List;
@@ -552,61 +548,6 @@ public abstract class BasicAccessCoordinatorTest
 	    assertEquals(expected[i + 1], result.getObjectId());
 	    assertEquals(expected[i + 2], result.getAccessType());
 	    assertEquals(expected[i + 3], result.getDescription());
-	}
-    }
-
-    /**
-     * A dummy implementation of {@code ProfileCollectorHandle}, just to
-     * accept and provide access to the AccessedObjectsDetail.
-     */
-    public static class DummyProfileCollectorHandle
-	implements ProfileCollectorHandle
-    {
-	private AccessedObjectsDetail detail;
-
-	public DummyProfileCollectorHandle() { }
-
-	/**
-	 * Returns the AccessedObjectsDetail last supplied to a call to
-	 * setAccessedObjectsDetail.
-	 */
-	public synchronized AccessedObjectsDetail getAccessedObjectsDetail() {
-	    AccessedObjectsDetail result = detail;
-	    detail = null;
-	    return result;
-	}
-
-	/* -- Implement ProfileCollectorHandle -- */
-
-	public synchronized void setAccessedObjectsDetail(
-	    AccessedObjectsDetail detail)
-	{
-	    this.detail = detail;
-	}
-
-	/* -- Unsupported methods -- */
-
-	public void notifyThreadAdded() { fail("Not supported"); }
-	public void notifyThreadRemoved() { fail("Not supported"); }
-	public void startTask(KernelRunnable task, Identity owner,
-			      long scheduledStartTime, int readyCount)
-	{
-	    fail("Not supported");
-	}
-	public void noteTransactional(byte[] transactionId) {
-	    fail("Not supported");
-	}
-	public void addParticipant(
-	    ProfileParticipantDetail participantDetail)
-	{
-	    fail("Not supported");
-	}
-	public void finishTask(int tryCount) { fail("Not supported"); }
-	public void finishTask(int tryCount, Throwable t) {
-	    fail("Not supported");
-	}
-	public ProfileCollector getCollector() {
-	    throw new AssertionError("Not supported");
 	}
     }
 }

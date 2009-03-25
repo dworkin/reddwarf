@@ -489,6 +489,7 @@ public abstract class AbstractDataStore
 	}
 	try {
 	    checkNonNull(name, "name");
+	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = removeBindingInternal(txn, name);
 	    if (!result.getNameBound()) {
 		/*
@@ -496,16 +497,30 @@ public abstract class AbstractDataStore
 		 * name can't be removed because it is not present.  No
 		 * modifications are made in this case.
 		 */
-		reportNameAccess(txn, name, READ);
-		reportNameAccess(txn, result.getNextName(), READ);
+		String next = result.getNextName();
+		while (true) {
+		    reportNameAccess(txn, next, READ);
+		    String check = nextBoundNameInternal(txn, name);
+		    if (check == null ? next == null : check.equals(next)) {
+			break;
+		    }
+		    next = check;
+		}
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
 	    /*
-	     * Otherwise, need write access to the name and the next name if
-	     * really doing the remove.
+	     * Otherwise, need write access to the next name if really doing
+	     * the remove.
 	     */
-	    reportNameAccess(txn, name, WRITE);
-	    reportNameAccess(txn, result.getNextName(), WRITE);
+	    String next = result.getNextName();
+	    while (true) {
+		reportNameAccess(txn, next, WRITE);
+		String check = nextBoundNameInternal(txn, name);
+		if (check == null ? next == null : check.equals(next)) {
+		    break;
+		}
+		next = check;
+	    }
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "removeBinding txn:{0}, name:{1} returns",
@@ -549,7 +564,19 @@ public abstract class AbstractDataStore
 	}
 	try {
 	    String result = nextBoundNameInternal(txn, name);
-	    reportNameAccess(txn, result, READ);
+	    /*
+	     * Since we need to obtain the name before checking for access
+	     * conflicts, make sure that the result stays the same after the
+	     * access check.
+	     */
+	    while (true) {
+		reportNameAccess(txn, result, READ);
+		String check = nextBoundNameInternal(txn, name);
+		if (check == null ? result == null : check.equals(result)) {
+		    break;
+		}
+		result = check;
+	    }
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "nextBoundName txn:{0}, name:{1} returns {2}",
