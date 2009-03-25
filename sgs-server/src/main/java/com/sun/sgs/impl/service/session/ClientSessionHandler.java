@@ -24,6 +24,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -1015,20 +1016,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	void done() {
 	    super.done();
 	    completionHandler.completed(this);
-	}
-    }
-
-    /**
-     * Throws a {@code NullPointerException} if the specified
-     * {@code var} is null.  The exception's detail message will
-     * include the specified variable's name, {@code varName}.
-     *
-     * @param	varName the variable's name
-     * @param	var the variable to check
-     */
-    private static void checkNull(String varName, Object var) {
-	if (var == null) {
-	    throw new NullPointerException("null " + varName);
 	}
     }
 }

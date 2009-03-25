@@ -20,6 +20,7 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 
@@ -117,15 +118,17 @@ public interface Transaction {
     /**
      * Aborts the transaction, specifying the cause. This notifies all
      * participants that the transaction has aborted, and invalidates all
-     * future use of this transaction. The caller should always follow a
-     * call to <code>abort</code> by throwing an exception that details
-     * why the transaction was aborted, which is typically the same exception
-     * provided to this method. This is needed not only to communicate the
-     * cause of the abort and whether to retry the exception, but also
-     * because the application code associated with this transaction will
-     * continue to execute normally unless an exception is raised. Supplying
-     * the cause to this method allows future calls to the transaction to
-     * include the cause to explain why the transaction is no longer active.
+     * future use of this transaction. The caller should always follow a call
+     * to <code>abort</code> by throwing an exception that details why the
+     * transaction was aborted. If the exception could be caught by application
+     * code, then the exception thrown should be a {@link
+     * TransactionAbortedException}, created by wrapping the original cause if
+     * needed. Throwing an exception is needed not only to communicate the
+     * cause of the abort and whether to retry the exception, but also because
+     * the application code associated with this transaction will continue to
+     * execute normally unless an exception is raised. Supplying the cause to
+     * this method allows future calls to the transaction to include the cause
+     * to explain why the transaction is no longer active.
      * <p>
      * If the transaction has been aborted, then the exception thrown will have
      * as its cause the value provided in the first call to {@link #abort

@@ -45,9 +45,9 @@ import java.util.Properties;
  * accesses for that transaction and the accesses, if known, for the
  * transaction that caused the conflict.
  * <p>
- * Note that in the current implementation, conflict detail will only be
- * provided if the {@code AccessCoordinator} is using a backlog to track
- * finished transactions. See {@code AccessCoordinatorImpl} for more
+ * Note that in the current default implementation, conflict detail will only
+ * be provided if the {@code AccessCoordinator} is using a backlog to track
+ * finished transactions. See {@code TrackingAccessCoordinator} for more
  * detail.
  * <p>
  * By default, the set of accesses displayed for a given transaction
@@ -90,7 +90,7 @@ public class AccessedObjectsListener implements ProfileListener {
 
         String backlogProp =
             properties.getProperty("com.sun.sgs.impl.kernel." +
-                                   "AccessCoordinatorImpl.queue.size");
+                                   "TrackingAccessCoordinator.queue.size");
         if (backlogProp != null) {
             try {
                 backlogMap = new BoundedLinkedHashMap
@@ -199,7 +199,9 @@ public class AccessedObjectsListener implements ProfileListener {
      * 
      * @return a formatted representation of the accessed objects
      */
-    private String formatAccesses(List<AccessedObject> accessedObjects) {
+    private String formatAccesses(
+	List<? extends AccessedObject> accessedObjects)
+    {
         StringBuilder formatted = new StringBuilder();
         int count = 0;
 

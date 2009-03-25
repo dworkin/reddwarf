@@ -44,6 +44,7 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.Version;
@@ -93,6 +94,14 @@ import javax.management.JMException;
  * {@value com.sun.sgs.impl.kernel.Kernel#PROFILE_LISTENERS} property with 
  * a colon-separated list of fully-qualified class names, each of which 
  * implements {@link ProfileListener}.
+ * <p>
+ * By default, creates an instance of {@link TrackingAccessCoordinator} to
+ * track access to shared objects.  The {@value #ACCESS_COORDINATOR_PROPERTY}
+ * configuration property can be used to specify another implementation.  The
+ * value of the property should be the name of a public, non-abstract class
+ * that implements the {@link AccessCoordinatorHandle} interface, and that
+ * provides a public constructor with the three parameters {@link Properties},
+ * {@link TransactionProxy}, and {@link ProfileCollectorHandle}.
  */
 class Kernel {
 
@@ -106,6 +115,9 @@ class Kernel {
     // the property for setting the profile listeners
     public static final String PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.listeners";
+    // The property for specifying the access coordinator
+    public static final String ACCESS_COORDINATOR_PROPERTY =
+	"com.sun.sgs.impl.kernel.access.coordinator";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -250,9 +262,20 @@ class Kernel {
 	    }
 
             // create the access coordinator
-            AccessCoordinatorImpl accessCoordinator =
-                new AccessCoordinatorImpl(appProperties, proxy,
-                                          profileCollectorHandle);
+            AccessCoordinatorHandle accessCoordinator =
+		new PropertiesWrapper(appProperties).getClassInstanceProperty(
+		    ACCESS_COORDINATOR_PROPERTY,
+		    AccessCoordinatorHandle.class,
+		    new Class[] {
+			Properties.class,
+			TransactionProxy.class,
+			ProfileCollectorHandle.class
+		    },
+		    appProperties, proxy, profileCollectorHandle);
+	    if (accessCoordinator == null) {
+		accessCoordinator = new TrackingAccessCoordinator(
+		    appProperties, proxy, profileCollectorHandle);
+	    }
 
             // create the schedulers, and provide an empty context in case
             // any profiling components try to do transactional work
