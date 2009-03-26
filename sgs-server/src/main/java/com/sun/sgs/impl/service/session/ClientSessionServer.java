@@ -45,6 +45,7 @@ public interface ClientSessionServer extends Remote {
      * guarantee with the corresponding {@code deliveryOrdinal} (the ordinal
      * representing the {@link Delivery} enum).
      *
+     * @param	sessionId a session ID
      * @param	message a message
      * @param	deliveryOrdinal a delivery guarantee (the
      *		ordinal representing the {@link Delivery} enum)

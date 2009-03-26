@@ -19,10 +19,15 @@
 
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TransactionProxy;
 
-
+/**
+ * An implementation of the collections factory.  The kernel constructs
+ * this factory during server initialization, and it is available to
+ * services via the {@link ComponentRegistry}.
+ */
 public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
 
     /** The transaction proxy, or null if configure has not been called. */    
@@ -55,7 +60,9 @@ public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
 
     /**
      * Returns the data service relevant to the current context.  This
-     * method should be invoked within a transaction.
+     * method should be invoked within a transaction.  This method is used
+     * by {@link BindingKeyedMapImpl} to obtain the data service to store
+     * key/value pairs.
      *
      * @return the data service relevant to the current context
      */

@@ -1262,8 +1262,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 		final String channelName = channel.name;
 		final Delivery channelDelivery = channel.delivery;
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "sending refresh, channel:{0}",
-			       HexDumper.toHexString(channelRefId.toByteArray()));
+		    logger.log(
+			Level.FINEST, "sending refresh, channel:{0}",
+			HexDumper.toHexString(channelRefId.toByteArray()));
 		}
 		for (final long nodeId : channel.getMemberNodeIds()) {
 		    channelService.addChannelTask(
@@ -1515,7 +1516,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	 * @param senderRefId a sender's session ID, or {@code null}
 	 * @param message a message
 	 */
-	SendEvent( BigInteger senderRefId, byte[] message) {
+	SendEvent(BigInteger senderRefId, byte[] message) {
 	    this.senderRefId = senderRefId;
 	    this.message = message;
 	}
@@ -1644,8 +1645,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * Returns the event queue for the channel that has the specified
      * {@code channelRefId} and coordinator {@code nodeId}.
      */
-    private static EventQueue getEventQueue(long nodeId, BigInteger channelRefId) {
-
+    private static EventQueue getEventQueue(
+ 	long nodeId, BigInteger channelRefId)
+    {
 	EventQueue eventQueue =
 	    getEventQueuesMap(nodeId).get(channelRefId.toString());
 	if (eventQueue == null) {
@@ -1749,7 +1751,6 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    WatchdogService watchdogService =
 		ChannelServiceImpl.getWatchdogService();
 	    TaskService taskService = ChannelServiceImpl.getTaskService();
-	    DataService dataService = getDataService();	
 	    BigInteger channelRefId = new BigInteger(channelIter.next());
 	    channelIter.remove();
 	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);

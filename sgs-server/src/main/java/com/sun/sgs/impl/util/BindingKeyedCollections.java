@@ -24,7 +24,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 /**
  * A factory for creating collections whose key/value pairs are stored as
  * service bindings.  This factory may be obtained from the service {@link
- * ComponentRegistry}. 
+ * ComponentRegistry}.
  */
 public interface BindingKeyedCollections {
 
@@ -32,6 +32,7 @@ public interface BindingKeyedCollections {
      * Constructs an instance of a {@link BindingKeyedMap}
      * with the specified {@code keyPrefix}.
      *
+     * @param	<V> the type of the map's values
      * @param	keyPrefix a key prefix
      * @return	a {@code BindingKeyedMap} with the specified
      *		{@code keyPrefix}
@@ -43,6 +44,7 @@ public interface BindingKeyedCollections {
      * Constructs an instance of a {@link BindingKeyedSet}
      * with the specified {@code keyPrefix}.
      *
+     * @param	<V> the type of the set's values
      * @param	keyPrefix a key prefix
      * @return	a {@code BindingKeyedSet} with the specified
      *		{@code keyPrefix} 

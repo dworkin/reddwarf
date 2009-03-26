@@ -128,6 +128,7 @@
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
@@ -222,6 +223,16 @@
   <Match>
     <Class name="com.sun.sgs.impl.service.channel.ChannelServerWrapper"/>
     <Field name="server"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$ReassignCoordinatorsTask"/>
+    <Field name="channelIter"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$RemoveFailedSessionsFromLocalChannelsTask"/>
+    <Field name="iter"/>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
 

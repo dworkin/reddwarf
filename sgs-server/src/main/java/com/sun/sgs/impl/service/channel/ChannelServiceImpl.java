@@ -28,7 +28,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.app.util.ManagedObjectValueMap;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -141,10 +140,10 @@ public final class ChannelServiceImpl
     private static TransactionContextMap<Context> contextMap = null;
 
     /** The factory for creating BindingKeyedCollections. */
-    private static BindingKeyedCollections collectionsFactory;
+    private static BindingKeyedCollections collectionsFactory = null;
 
     /** The map of node ID (string) to ChannelServer proxy. */
-    private static BindingKeyedMap<ChannelServer> channelServerMap;
+    private static BindingKeyedMap<ChannelServer> channelServerMap = null;
 
     /** The transaction context factory. */
     private final TransactionContextFactory<Context> contextFactory;
@@ -245,8 +244,11 @@ public final class ChannelServiceImpl
 		if (contextMap == null) {
 		    contextMap = new TransactionContextMap<Context>(txnProxy);
 		}
-		collectionsFactory =
-		    systemRegistry.getComponent(BindingKeyedCollections.class);
+		if (collectionsFactory == null) {
+		    collectionsFactory =
+			systemRegistry.getComponent(
+			    BindingKeyedCollections.class);
+		}
 		if (channelServerMap == null) {
 		    channelServerMap =
 			collectionsFactory.newMap(CHANNEL_SERVER_MAP_PREFIX);
@@ -442,8 +444,9 @@ public final class ChannelServiceImpl
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "serviceEventQueue channelId:{0}",
-			       HexDumper.toHexString(channelRefId.toByteArray()));
+		    logger.log(
+			Level.FINEST, "serviceEventQueue channelId:{0}",
+			HexDumper.toHexString(channelRefId.toByteArray()));
 		}
 
 		TaskQueue taskQueue = coordinatorTaskQueues.get(channelRefId);
@@ -496,7 +499,7 @@ public final class ChannelServiceImpl
 				newLocalMembers.addAll(
 				    ChannelImpl.getSessionRefIdsForNode(
 					channelRefId, localNodeId));
-			    }}, taskOwner);
+			    } }, taskOwner);
 
 		} catch (Exception e) {
 		    // FIXME: what is the right thing to do here?
@@ -507,8 +510,9 @@ public final class ChannelServiceImpl
 		}
 
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "newLocalMembers for channel:{0}",
-			       HexDumper.toHexString(channelRefId.toByteArray()));
+		    logger.log(
+			Level.FINEST, "newLocalMembers for channel:{0}",
+			HexDumper.toHexString(channelRefId.toByteArray()));
 		    for (BigInteger sessionRefId : newLocalMembers) {
 			logger.log(
 			   Level.FINEST, "member:{0}",
@@ -541,7 +545,6 @@ public final class ChannelServiceImpl
 			leavers = oldLocalMembers;
 		    }
 		}
-		byte[] channelId = channelRefId.toByteArray();
 		if (joiners != null) {
 		    for (BigInteger sessionRefId : joiners) {
 			SessionProtocol protocol =
@@ -591,9 +594,10 @@ public final class ChannelServiceImpl
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "join channelId:{0} sessionId:{1}",
-			       HexDumper.toHexString(channelRefId.toByteArray()),
-			       HexDumper.toHexString(sessionRefId.toByteArray()));
+		    logger.log(
+			Level.FINEST, "join channelId:{0} sessionId:{1}",
+			HexDumper.toHexString(channelRefId.toByteArray()),
+			HexDumper.toHexString(sessionRefId.toByteArray()));
 		}
 
 		// Update local channel membership cache.
@@ -700,12 +704,12 @@ public final class ChannelServiceImpl
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "leaveAll channelId:{0}",
-			       HexDumper.toHexString(channelRefId.toByteArray()));
+		    logger.log(
+			Level.FINEST, "leaveAll channelId:{0}",
+			HexDumper.toHexString(channelRefId.toByteArray()));
 		}
 		Set<BigInteger> localMembers;
 		localMembers = localChannelMembersMap.remove(channelRefId);
-		byte[] channelId = channelRefId.toByteArray();
 		if (localMembers != null) {
 		    for (BigInteger sessionRefId : localMembers) {
 			SessionProtocol protocol =
@@ -738,9 +742,10 @@ public final class ChannelServiceImpl
 	    callStarted();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "send channelId:{0} message:{1}",
-			       HexDumper.toHexString(channelRefId.toByteArray()),
-			       HexDumper.format(message, 0x50));
+		    logger.log(
+			Level.FINEST, "send channelId:{0} message:{1}",
+			HexDumper.toHexString(channelRefId.toByteArray()),
+			HexDumper.format(message, 0x50));
 		}
 		/*
 		 * TBD: (optimization) this should enqueue the send

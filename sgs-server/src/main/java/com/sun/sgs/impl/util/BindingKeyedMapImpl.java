@@ -54,7 +54,7 @@ import java.util.Set;
  * <p>Instances of {@code BindingKeyedMap} as well as its associated
  * iterators are serializable, but not managed, objects.
  *
- * @param	V the type for the map's values
+ * @param	<V> the type for the map's values
  */
 public class BindingKeyedMapImpl<V>
     extends AbstractMap<String, V>
