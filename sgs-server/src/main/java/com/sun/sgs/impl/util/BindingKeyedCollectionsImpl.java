@@ -40,9 +40,7 @@ public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
      */
     public BindingKeyedCollectionsImpl(TransactionProxy txnProxy) {
 	synchronized (BindingKeyedCollectionsImpl.class) {
-	    if (BindingKeyedCollectionsImpl.txnProxy == null) {
-		BindingKeyedCollectionsImpl.txnProxy = txnProxy;
-	    }
+	    BindingKeyedCollectionsImpl.txnProxy = txnProxy;
 	}
     }
 

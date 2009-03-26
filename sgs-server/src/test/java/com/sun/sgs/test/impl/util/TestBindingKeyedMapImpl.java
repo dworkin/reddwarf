@@ -23,7 +23,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
-import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedCollectionsImpl;
 import com.sun.sgs.impl.util.BindingKeyedMap;
@@ -31,16 +30,11 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.Serializable;
-import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.TreeMap;
 import junit.framework.TestCase;
 import org.junit.Before;
 import org.junit.Test;
@@ -55,7 +49,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	new DummyTransactionProxy();
 
     /** The collections factory. */
-    private static final BindingKeyedCollections collectionsFactory =
+    private BindingKeyedCollections collectionsFactory =
 	new BindingKeyedCollectionsImpl(txnProxy);
 
     /** The data service. */
@@ -848,134 +842,5 @@ public class TestBindingKeyedMapImpl extends TestCase {
 
     private static class Managed implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
-    }
-    
-    private static class DummyDataService
-	extends TreeMap<String, ManagedObject>
-	implements DataService
-    {
-	private static final long serialVersionUID = 1;
-
-	private final List<Object> removedObjects =
-	    new ArrayList<Object>();
-	
-	/* -- Implement for DataManager -- */
-	public ManagedObject getBinding(String name) {
-	    throw new UnsupportedOperationException();
-	}
-	public void setBinding(String name, Object object) {
-	    throw new UnsupportedOperationException();
-	}
-	public void removeBinding(String name) {
-	    throw new UnsupportedOperationException();
-	}
-	public String nextBoundName(String name) {
-	    throw new UnsupportedOperationException();
-	}
-	public void removeObject(Object object) {
-	    System.err.println("removeObject: " + object.toString());
-	    if (!removedObjectsContains(object)) {
-		System.err.println("removeObject: adding: " +
-				   object.toString());
-		removedObjects.add(object);
-	    } else {
-		System.err.println("removedObject: already present: " +
-				   object.toString());
-		throw new ObjectNotFoundException(object.toString());
-	    }
-	}
-	public void markForUpdate(Object object) {
-	    throw new UnsupportedOperationException();
-	}
-	public <T> ManagedReference<T> createReference(T object) {
-	    throw new UnsupportedOperationException();
-	}
-	
-	/* -- Implement DataService -- */
-	public ManagedObject getServiceBinding(String name) {
-	    ManagedObject obj = get(name);
-	    if (obj == null) {
-		throw new NameNotBoundException(name);
-	    } else if (removedObjectsContains(obj)) {
-		throw new ObjectNotFoundException(obj.toString());
-	    }
-	    return obj;
-	}
-	public void setServiceBinding(String name, Object object) {
-	    if (removedObjectsContains(object)) {
-		throw new ObjectNotFoundException(object.toString());
-	    } else if (object instanceof ManagedObject &&
-		       object instanceof Serializable)
-	    {
-		put(name, (ManagedObject) object);
-	    } else {
-		throw new IllegalArgumentException("object");
-	    }
-	}
-	public ManagedReference<?> createReferenceForId(BigInteger id) {
-	    throw new UnsupportedOperationException();
-	}
-	public BigInteger nextObjectId(BigInteger objectId) {
-	    throw new UnsupportedOperationException();
-	}
-	
-	/** Get the next name from the set. */
-	public String nextServiceBoundName(String name) {
-	    if (name == null) {
-		try {
-		    return firstKey();
-		} catch (NoSuchElementException e) {
-		    return null;
-		}
-	    } else {
-		Iterator<String> iter = tailMap(name).keySet().iterator();
-		if (iter.hasNext()) {
-		    String n = iter.next();
-		    if (!n.equals(name)) {
-			return n;
-		    } else if (iter.hasNext()) {
-			return iter.next();
-		    }
-		}
-		return null;
-	    }
-	}
-	
-	/** Remove the name from the set. */
-	public void removeServiceBinding(String name) {
-	    if (remove(name) == null) {
-		throw new NameNotBoundException(name);
-	    }
-	}
-
-	/* -- Implement Service -- */
-	public String getName() {
-	    throw new UnsupportedOperationException();
-	}
-	public void ready() {
-	    throw new UnsupportedOperationException();
-	}
-	public void shutdown() {
-	    throw new UnsupportedOperationException();
-	}
-
-	/** -- Other methods -- */
-	int removedObjectsCount() {
-	    return removedObjects.size();
-	}
-
-	private boolean removedObjectsContains(Object object) {
-	    for (Object obj : removedObjects) {
-		if (obj == object) {
-		    return true;
-		}
-	    }
-	    return false;
-	}
-
-	void printServiceBindings() {
-	    System.err.println("--------- bindings ---------");
-	    System.err.println(toString());
-	}
     }
 }
