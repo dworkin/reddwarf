@@ -46,9 +46,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
-import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -79,7 +77,8 @@ import javax.management.JMException;
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
  *	DataStore}.  The class should be public, not abstract, and should
- *	provide a public constructor with a {@link Properties} parameter. <p>
+ *	provide a public constructor with {@link Properties} and {@link
+ *	AccessCoordinator} parameters. <p>
  *
  * <dt> <i>Property:</i> <code><b>{@value #DETECT_MODIFICATIONS_PROPERTY}
  *	</b></code> <br>
@@ -173,7 +172,7 @@ public final class DataServiceImpl implements DataService {
 
     /**
      * The property that specifies the name of the class that implements
-     * DataStore.
+     * {@link DataStore}.
      */
     public static final String DATA_STORE_CLASS_PROPERTY =
 	CLASSNAME + ".data.store.class";

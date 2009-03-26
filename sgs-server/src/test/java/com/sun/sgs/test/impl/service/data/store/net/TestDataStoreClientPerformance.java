@@ -66,7 +66,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props, /* XXX */ new NullAccessCoordinator()),
+	    new DataStoreClient(props, new NullAccessCoordinator()),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;

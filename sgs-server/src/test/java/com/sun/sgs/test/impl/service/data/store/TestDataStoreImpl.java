@@ -1899,7 +1899,8 @@ public class TestDataStoreImpl extends TestCase {
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props, /* FIXME */ new NullAccessCoordinator()), DummyProfileCoordinator.getCollector());
+	    new DataStoreImpl(props, new NullAccessCoordinator()),
+	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }

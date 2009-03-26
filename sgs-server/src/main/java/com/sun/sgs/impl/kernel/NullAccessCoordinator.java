@@ -19,17 +19,39 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionProxy;
+import java.util.Properties;
 
-/** Define an {@link AccessCoordinator} that does nothing. */
+/**
+ * Define an {@link AccessCoordinator} that does not detect conflicts, report
+ * accesses to the profiling system, or perform any error checking on its
+ * arguments.
+ */
 public class NullAccessCoordinator
     implements AccessCoordinator, AccessReporter<Object>
 {
     /** Creates an instance of this class. */
     public NullAccessCoordinator() { }
+
+    /**
+     * Creates an instance of this class, specifying the standard arguments for
+     * access coordinators, which are ignored.
+     *
+     * @param	properties the configuration properties
+     * @param	txnProxy the transaction proxy
+     * @param	profileCollectorHandle the profile collector handle
+     */
+    public NullAccessCoordinator(
+	Properties properties,
+	TransactionProxy txnProxy,
+	ProfileCollectorHandle profileCollectorHandle)
+    {
+    }
 
     /* -- Implement AccessCoordinator -- */
 

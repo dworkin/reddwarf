@@ -88,7 +88,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
     @BeforeClass
     public static void initialize() throws Exception {
 	cleanDirectory(dbDirectory);
-	store = new DataStoreImpl(props, /* XXX */ new NullAccessCoordinator());
+	store = new DataStoreImpl(props, new NullAccessCoordinator());
     }
 
     /** Create a transaction and an object in the data store. */

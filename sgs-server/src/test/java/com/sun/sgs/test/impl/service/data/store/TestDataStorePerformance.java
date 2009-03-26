@@ -340,7 +340,8 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props, /* XXX */ new NullAccessCoordinator()), DummyProfileCoordinator.getCollector());
+	    new DataStoreImpl(props, new NullAccessCoordinator()),
+	    DummyProfileCoordinator.getCollector());
         DummyProfileCoordinator.startProfiling();
 	return store;
     }

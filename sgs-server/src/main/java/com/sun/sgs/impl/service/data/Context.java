@@ -176,12 +176,11 @@ final class Context extends TransactionContext implements TransactionListener {
     public boolean prepare() throws Exception {
 	try {
 	    isPrepared = true;
-	    boolean result = true;
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "prepare tid:{0,number,#} returns {1}",
-			   getTxnId(), result);
+		logger.log(Level.FINER,
+			   "prepare tid:{0,number,#} returns true");
 	    }
-	    return result;
+	    return true;
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.logThrow(Level.FINER, e,

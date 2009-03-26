@@ -1895,9 +1895,8 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
     /**
      * A transaction listener that calls {@link #endTransaction} when called
      * after the transaction completes.  Use a listener instead of a
-     * transaction participant because we need to be sure that locks are
-     * released only after all of the transaction participants have finished
-     * their work.
+     * transaction participant to make sure that locks are released only after
+     * all of the transaction participants have finished their work.
      */
     private class TxnListener implements TransactionListener {
 
@@ -1910,7 +1909,6 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	 * @param	txn the transaction we're listening for
 	 */
 	TxnListener(Transaction txn) {
-	    assert txn != null;
 	    this.txn = txn;
 	}
 
