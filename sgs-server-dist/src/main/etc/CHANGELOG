@@ -1,6 +1,7 @@
 Version 0.9.10:
 - Add a locking AccessCoordinator and add a configuration option for
   specifying the access coordinator (issue #138)
+- Also fix issue #82
 
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)
