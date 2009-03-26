@@ -495,15 +495,7 @@ public abstract class AbstractDataStore
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
 	    /* Need write access to the next name if really doing the remove */
-	    String next = result.getNextName();
-	    while (true) {
-		reportNameAccess(txn, next, WRITE);
-		String check = nextBoundNameInternal(txn, name);
-		if (check == null ? next == null : check.equals(next)) {
-		    break;
-		}
-		next = check;
-	    }
+	    reportNextNameAccess(txn, name, result.getNextName(), WRITE);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST, "removeBinding txn:{0}, name:{1} returns",
 			   txn, name);
@@ -545,20 +537,8 @@ public abstract class AbstractDataStore
 		FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
 	}
 	try {
-	    String result = nextBoundNameInternal(txn, name);
-	    /*
-	     * Since we need to obtain the name before checking for access
-	     * conflicts, make sure that the result stays the same after the
-	     * access check.
-	     */
-	    while (true) {
-		reportNameAccess(txn, result, READ);
-		String check = nextBoundNameInternal(txn, name);
-		if (check == null ? result == null : check.equals(result)) {
-		    break;
-		}
-		result = check;
-	    }
+	    String result = reportNextNameAccess(
+		txn, name, nextBoundNameInternal(txn, name), READ);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST,
 			   "nextBoundName txn:{0}, name:{1} returns {2}",
@@ -986,6 +966,34 @@ public abstract class AbstractDataStore
 	if (arg == null) {
 	    throw new NullPointerException(
 		"The " + parameterName + " argument must not be null");
+	}
+    }
+
+    /**
+     * Reports access to what should be the next name after a given name.
+     * Confirms that the next name is correct after obtaining access, repeating
+     * the operation if the name has changed, and returning actual next name.
+     * Note that the next name may change if the one obtained prior to checking
+     * access was created by a transaction that aborts.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	name the name
+     * @param	next the next name after {@code name}
+     * @param	accessType the type of access to the next name to report
+     * @return	the actual next name
+     */
+    private String reportNextNameAccess(Transaction txn,
+					String name,
+					String next,
+					AccessType accessType)
+    {
+	while (true) {
+	    reportNameAccess(txn, next, accessType);
+	    String check = nextBoundNameInternal(txn, name);
+	    if (check == null ? next == null : check.equals(next)) {
+		return next;
+	    }
+	    next = check;
 	}
     }
 }

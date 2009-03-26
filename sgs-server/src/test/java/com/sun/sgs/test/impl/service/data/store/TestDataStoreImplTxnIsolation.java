@@ -56,13 +56,9 @@ public class TestDataStoreImplTxnIsolation extends BasicTxnIsolationTest {
 	Properties props = super.createProperties();
 	props.setProperty(DataStoreImplClassName + ".directory", dbDirectory);
 	props.setProperty(BdbEnvironment.LOCK_TIMEOUT_PROPERTY,
-			  String.valueOf(LOCK_TIMEOUT));
+			  String.valueOf(timeoutSuccess));
 	props.setProperty(JeEnvironment.LOCK_TIMEOUT_PROPERTY,
-			  String.valueOf(LOCK_TIMEOUT));
-	props.setProperty(BdbEnvironment.TXN_ISOLATION_PROPERTY,
-			  "READ_UNCOMMITTED");
-	props.setProperty(JeEnvironment.TXN_ISOLATION_PROPERTY,
-			  "READ_UNCOMMITTED");
+			  String.valueOf(timeoutSuccess));
 	return props;
     }
 
