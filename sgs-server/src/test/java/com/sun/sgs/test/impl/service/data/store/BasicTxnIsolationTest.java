@@ -23,7 +23,9 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
+import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -50,23 +52,12 @@ public abstract class BasicTxnIsolationTest extends Assert {
     /**
      * The number of milliseconds to wait to see if an operation is blocked.
      */
-    protected static final long BLOCK_TIMEOUT = 40;
+    protected static long timeoutBlock;
 
     /**
-     * The number of milliseconds to wait to see if an operation was
-     * successful.
+     * The number of milliseconds to wait to see if an operation is successful.
      */
-    protected static final long SUCCESS_TIMEOUT = 2000;
-
-    /**
-     * The number of milliseconds to wait until a lock times out.  For this
-     * test, set this number to the transaction timeout to make sure it has
-     * plenty of time to perform operations.
-     */
-    protected static final long LOCK_TIMEOUT = 2000;
-
-    /** The number of milliseconds to allow for a transaction. */
-    protected static final long TXN_TIMEOUT = 4000;
+    protected static long timeoutSuccess;
 
     /** A test value for an object ID. */
     private static final byte[] value = { 1 };
@@ -148,21 +139,54 @@ public abstract class BasicTxnIsolationTest extends Assert {
     /** Creates the configuration properties. */
     protected Properties createProperties() {
 	props = UtilProperties.createProperties();
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
+	timeoutBlock = wrappedProps.getLongProperty(
+	    "test.timeout.block", getDefaultTimeoutBlock());
+	timeoutSuccess = wrappedProps.getLongProperty(
+	    "com.sun.sgs.txn.timeout", getDefaultTimeoutSuccess());
 	props.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
-			  String.valueOf(LOCK_TIMEOUT));
-	props.setProperty("com.sun.sgs.txn.timeout",
-			  String.valueOf(TXN_TIMEOUT));
+			  String.valueOf(timeoutSuccess));
 	return props;
     }
 
-    /** Creates the access coordinator. */
+    /**
+     * Creates the access coordinator.
+     *
+     * @return	the access coordinator
+     */
     protected AccessCoordinatorHandle createAccessCoordinator() {
 	return new LockingAccessCoordinator(
 	    props, txnProxy, new DummyProfileCollectorHandle());
     }
 
-    /** Creates the data store. */
+    /**
+     * Creates the data store.
+     *
+     * @return	the data store
+     */
     protected abstract DataStore createDataStore();
+
+    /**
+     * Returns the default number of milliseconds to wait to see if an
+     * operation is blocked.  This implementation returns {@code 1/10} of the
+     * value of the timeout for a successful operation.
+     *
+     * @return	the number of milliseconds for a blocked operation
+     */
+    protected long getDefaultTimeoutBlock() {
+	return (long) (getDefaultTimeoutSuccess() * 0.1);
+    }
+
+    /**
+     * Returns the default number of milliseconds to wait to see if an
+     * operation is successful.  This implementation returns the default
+     * transaction timeout for bounded operations.
+     *
+     * @return	the number of milliseconds for a successful operation
+     */
+    protected long getDefaultTimeoutSuccess() {
+	return TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
+    }
 
     /* -- Tests -- */
 
@@ -1034,7 +1058,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 
     /** Creates a transaction. */
     protected static DummyTransaction createTransaction() {
-	DummyTransaction txn = new DummyTransaction(TXN_TIMEOUT);
+	DummyTransaction txn = new DummyTransaction(timeoutSuccess);
 	txnProxy.setCurrentTransaction(txn);
 	accessCoordinator.notifyNewTransaction(txn, 0, 1);
 	return txn;
@@ -1122,7 +1146,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	 */
 	boolean blocked() throws InterruptedException {
 	    try {
-		getTask().get(BLOCK_TIMEOUT, TimeUnit.MILLISECONDS);
+		getTask().get(timeoutBlock, TimeUnit.MILLISECONDS);
 		return false;
 	    } catch (TimeoutException e) {
 		return true;
@@ -1148,7 +1172,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	    throws InterruptedException, TimeoutException
 	{
 	    try {
-		return getTask().get(SUCCESS_TIMEOUT, TimeUnit.MILLISECONDS);
+		return getTask().get(timeoutSuccess, TimeUnit.MILLISECONDS);
 	    } catch (RuntimeException e) {
 		throw e;
 	    } catch (TimeoutException e) {
