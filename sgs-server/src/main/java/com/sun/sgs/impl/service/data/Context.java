@@ -27,6 +27,7 @@ import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.math.BigInteger;
 import java.util.IdentityHashMap;
@@ -34,7 +35,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Stores information for a specific transaction. */
-final class Context extends TransactionContext {
+final class Context extends TransactionContext implements TransactionListener {
 
     /** The logger for the data service class. */
     private static final LoggerWrapper logger =
@@ -114,6 +115,7 @@ final class Context extends TransactionContext {
 	this.detectModifications = detectModifications;
 	this.oidAccesses = oidAccesses;
 	classSerial = classesTable.createClassSerialization(this.txn);
+	txn.registerListener(this);
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "join tid:{0,number,#}, thread:{1}",
 		       getTxnId(), Thread.currentThread().getName());
@@ -184,6 +186,10 @@ final class Context extends TransactionContext {
 
 	public Throwable getAbortCause() {
 	    return originalTxn.getAbortCause();
+	}
+
+	public void registerListener(TransactionListener listener) {
+	    originalTxn.registerListener(listener);
 	}
 
 	/* -- Object methods -- */
@@ -280,7 +286,6 @@ final class Context extends TransactionContext {
 	try {
 	    isPrepared = true;
 	    txn.setInactive();
-	    ManagedReferenceImpl.flushAll(this);
 	    boolean result;
 	    if (storeParticipant == null) {
 		isCommitted = true;
@@ -328,7 +333,6 @@ final class Context extends TransactionContext {
 	try {
 	    isCommitted = true;
 	    txn.setInactive();
-	    ManagedReferenceImpl.flushAll(this);
 	    if (storeParticipant != null) {
 		storeParticipant.prepareAndCommit(txn);
 	    }
@@ -366,6 +370,27 @@ final class Context extends TransactionContext {
 	    throw e;
 	}
     }
+
+    /* -- Implement TransactionListener -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation flushes managed references and marks the transaction
+     * inactive so that we'll notice if other beforeCompletion methods attempt
+     * to call the data service.
+     */
+    public void beforeCompletion() {
+	txn.setInactive();
+	ManagedReferenceImpl.flushAll(this);
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation does nothing.
+     */
+    public void afterCompletion(boolean commit) { }
 
     /* -- Other methods -- */
 

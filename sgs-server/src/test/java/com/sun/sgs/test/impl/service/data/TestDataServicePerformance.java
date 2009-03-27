@@ -29,11 +29,14 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.IntegrationTest;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /**
  * Performance tests for the DataServiceImpl class.
@@ -58,6 +61,8 @@ import junit.framework.TestCase;
  * Testcase: testWriteNoDetectMods
  * Time: 9.4 ms per transaction
  */
+@IntegrationTest
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataServicePerformance extends TestCase {
 
     /** The name of the DataStoreImpl class. */

@@ -22,6 +22,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.impl.kernel.KernelShutdownController;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
@@ -30,7 +31,6 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServerImpl;
 import com.sun.sgs.impl.service.nodemap.NodeMappingServiceImpl;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.watchdog.WatchdogServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.ClientSessionService;
@@ -69,6 +69,8 @@ public class SgsTestNode {
     private static Field kernelProxy;
     /** system registry */
     private static Field kernelReg;
+    /** shutdown controller */
+    private static Field kernelShutdownCtrl;
 
     static {
         try {
@@ -87,6 +89,9 @@ public class SgsTestNode {
 
             kernelReg = kernelClass.getDeclaredField("systemRegistry");
             kernelReg.setAccessible(true);
+            
+            kernelShutdownCtrl = kernelClass.getDeclaredField("shutdownCtrl");
+            kernelShutdownCtrl.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -132,6 +137,9 @@ public class SgsTestNode {
     private final TaskService taskService;
     private final ClientSessionService sessionService;
     private final ChannelManager channelService;
+    
+    /** Shutdown controller. */
+    private final KernelShutdownController shutdownCtrl;
 
     /** The listen port for the client session service. */
     private int appPort;
@@ -175,7 +183,8 @@ public class SgsTestNode {
     }
 
     /**
-     * Creates additional SgsTestNode instances in this VM.
+     * Creates additional SgsTestNode instances in this VM. This node will be
+     * part of the same cluster as the node specified in the firstNode parameter.
      *
      * @param firstNode  the first {@code SgsTestNode} created in this VM
      * @param listenerClass the class of the listener object, or null if a
@@ -265,10 +274,19 @@ public class SgsTestNode {
         sessionService = getService(ClientSessionService.class);
         channelService = getService(ChannelServiceImpl.class);
 
-	if (sessionService != null) {
-	    appPort =
-		((ClientSessionServiceImpl) sessionService).getListenPort();
-	}
+        shutdownCtrl = (KernelShutdownController)
+                kernelShutdownCtrl.get(kernel);
+
+        // If an app node, we assume SimpleSgsProtocol and TcpTransport transport
+        // for the client IO stack.
+        if (sessionService != null) {
+            String portProp =
+                    props.getProperty(
+                       com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY);
+            appPort = portProp == null ?
+                            com.sun.sgs.impl.transport.tcp.TcpTransport.DEFAULT_PORT :
+                            Integer.parseInt(portProp);
+        }
     }
 
     /**
@@ -378,6 +396,13 @@ public class SgsTestNode {
     }
 
     /**
+     * Returns the shutdown controller for this node.
+     */
+    public KernelShutdownController getShutdownCtrl() {
+        return shutdownCtrl;
+    }
+
+    /**
      * Returns the default properties for a server node, useful for
      * adding additional properties as required.
      */
@@ -411,9 +436,10 @@ public class SgsTestNode {
 
         Properties retProps = createProperties(
             StandardProperties.APP_NAME, appName,
-            StandardProperties.APP_PORT, Integer.toString(getNextAppPort()),
             StandardProperties.SERVER_START, startServer,
             StandardProperties.SERVER_HOST, "localhost",
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
+                String.valueOf(getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
                 dir,
             "com.sun.sgs.impl.service.data.store.net.server.port", 
@@ -451,17 +477,10 @@ public class SgsTestNode {
     }
 
     /**
-     * Returns the bound app port.
+     * Returns a bound app port.
      */
     public int getAppPort() {
 	return appPort;
-    }
-    
-    /**
-     * Returns a unique port number.
-     */
-    public static int getNextAppPort() {
-        return getNextUniquePort();
     }
     
     /**

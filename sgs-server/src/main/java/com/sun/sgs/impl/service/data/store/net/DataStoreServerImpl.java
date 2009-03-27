@@ -28,6 +28,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -353,6 +354,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    return abortCause;
 	}
 
+	/**
+	 * Don't bother to support transaction listeners for just the data
+	 * store, which doesn't use them.
+	 */
+	public void registerListener(TransactionListener listener) {
+	    throw new UnsupportedOperationException(
+		"DataStoreServerImpl doesn't support transaction listeners");
+	}
+
 	/* -- Other methods -- */
 
 	public String toString() {
@@ -601,10 +611,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    remote = new DataStoreServerRemote(server, port);
 	    return remote.getLocalPort();
 	}
-	public boolean unexport() {
+	public void unexport() {
 	    if (remote == null) {
-		throw new IllegalStateException(
-		    "The server is already shut down");
+		return;
 	    }
 	    try {
 		remote.shutdown();
@@ -612,9 +621,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    } catch (IOException e) {
 		logger.logThrow(
 		    Level.FINE, e, "Problem shutting down server");
-		return false;
+		return;
 	    }
-	    return true;
 	}
     }
 
@@ -858,20 +866,14 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Other public methods -- */
 
     /**
-     * Attempts to shut down this server, returning a value that specifies
-     * whether the attempt was successful.
+     * Shuts down this server. Calls to this method will block until the
+     * shutdown is complete.
      *
-     * @return	{@code true} if the shut down was successful, else
-     *		{@code false}
-     * @throws	IllegalStateException if the {@code shutdown} method has
-     *		already been called and returned {@code true}
      */
-    public synchronized boolean shutdown() {
-	if (!store.shutdown()) {
-	    return false;
-	}
+    public synchronized void shutdown() {
+        store.shutdown();
 	executor.shutdownNow();
-	return exporter.unexport();
+	exporter.unexport();
     }
 
     /**

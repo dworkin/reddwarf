@@ -28,7 +28,7 @@ import java.rmi.Remote;
 public interface WatchdogServer extends Remote {
 
     /**
-     * Registers a node with the corresponding {@code host}, {@code port}, and
+     * Registers a node with the corresponding {@code host} and
      * {@code client}, and returns and array containing two {@code
      * long} values consisting of:
      *
@@ -48,7 +48,6 @@ public interface WatchdogServer extends Remote {
      * WatchdogClient#nodeStatusChanges nodeStatusChanges} method.
      *
      * @param	host  a host name
-     * @param   port  a port number
      * @param	client a watchdog client
      * @param   jmxPort the port JMX is listening on, or -1 if JMX is not
      *                   enabled for remote listening on the node
@@ -61,8 +60,7 @@ public interface WatchdogServer extends Remote {
      * @throws	NodeRegistrationFailedException if there is a problem
      * 		registering the node
      */
-    long[] registerNode(String host, int port, WatchdogClient client, 
-                        int jmxPort)
+    long[] registerNode(String host, WatchdogClient client, int jmxPort)
 	throws NodeRegistrationFailedException, IOException;
 
     /**
@@ -97,4 +95,24 @@ public interface WatchdogServer extends Remote {
      * 		invoking this method
      */
     void recoveredNode(long nodeId, long backupId) throws IOException;
+
+    /**
+     * Notifies the node with the given ID that it has failed and should
+     * shutdown. If the given node is a remote node, this notification is a 
+     * result of a server running into difficulty communicating with a remote 
+     * node, so the server's watchdog service is responsible for notifying the 
+     * watchdog service in order to issue the shutdown.
+     * 
+     * @param nodeId the failed node's ID
+     * @param isLocal specifies if the node is reporting a failure on itself or
+     * a remote node
+     * @param className the class issuing the failure
+     * @param maxNumberOfAttempts the maximum number of attempts to try and
+     * resolve an {@code IOException}
+     * @throws IOException if a communication error occurs while trying to set
+     * the node as failed
+     */
+    void setNodeAsFailed(long nodeId, boolean isLocal, String className,
+            int maxNumberOfAttempts)
+	    throws IOException;
 }

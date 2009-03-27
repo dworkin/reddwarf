@@ -20,10 +20,13 @@
 package com.sun.sgs.test.impl.service.data.store.db;
 
 import com.sun.sgs.impl.service.data.store.db.DataEncoding;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.util.Arrays;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test the DataEncoding class. */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataEncoding extends TestCase {
 
     /** The byte value 0 */

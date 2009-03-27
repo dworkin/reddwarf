@@ -27,11 +27,14 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutMicros;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
 import java.util.Properties;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
 
 /** Test the DbEnvironment class. */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDbEnvironment extends TestCase {
 
     /** Directory used for database. */
