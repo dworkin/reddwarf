@@ -45,13 +45,13 @@ import java.util.logging.Logger;
  *
  * This class uses a next key locking scheme when reporting accesses to name
  * bindings.  This scheme is a way to insure isolation when different
- * transactions are creating, removing, and checking the existence of name
- * bindings at the same time.  The idea is to use the next key after the one in
- * question as a proxy for the current key even when that current key does not
- * exist.  That way, everyone who wants to create or delete a particular key
- * agrees to lock the currently existing next key.  See the individual methods
- * for getting, setting, and removing bindings for details of how each
- * operation fits into this scheme. <p>
+ * transactions are creating, removing, and iterating over name bindings at the
+ * same time.  The idea is to use the next key after the one in question as a
+ * proxy for the current key even when that current key does not exist.  That
+ * way, iterators know they can lock the next existing key as a proxy for the
+ * key following a particular key, and others that create or remove keys will
+ * do the same.  See the individual methods for getting, setting, and removing
+ * bindings for details of how each operation fits into this scheme. <p>
  *
  * Note that this class does not perform next key locking for objects, because
  * the way objects are allocated and used makes it unnecessary.  Because there
@@ -380,13 +380,20 @@ public abstract class AbstractDataStore
 	}
 	try {
 	    checkNonNull(name, "name");
+	    /*
+	     * Read lock the name even though we don't know yet if it is bound.
+	     * Doing this means that the value we obtain, if there is one, is
+	     * known to be correct.
+	     */
 	    reportNameAccess(txn, name, READ);
 	    BindingValue result = getBindingInternal(txn, name);
 	    if (!result.getNameBound()) {
 		/*
-		 * Read lock the next name if the requested name is not found.
+		 * Read lock the next name if the requested name is not bound
+		 * to prevent a concurrent transaction from observing a
+		 * different next name than this transaction would.
 		 */
-		reportNameAccess(txn, result.getNextName(), READ);
+		reportNextNameAccess(txn, name, result.getNextName(), READ);
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
 	    if (logger.isLoggable(FINEST)) {
@@ -440,8 +447,13 @@ public abstract class AbstractDataStore
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = setBindingInternal(txn, name, oid);
 	    if (!result.getNameBound()) {
-		/* Lock the next name if the requested name was unbound */
-		reportNameAccess(txn, result.getNextName(), WRITE);
+		/*
+		 * Write lock the next name if the requested name was unbound
+		 * to prevent other transactions from binding it, from getting
+		 * it's value, or even from determining if it is bound, until
+		 * this transaction commits.
+		 */
+		reportNextNameAccess(txn, name, result.getNextName(), WRITE);
 	    }
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(
@@ -489,12 +501,23 @@ public abstract class AbstractDataStore
 	}
 	try {
 	    checkNonNull(name, "name");
+	    /*
+	     * Write lock the name even though we don't know yet if it is
+	     * bound.  Doing this means that another transaction cannot change
+	     * or observe the existence of the binding until this transaction
+	     * commits.  Without performing this check first, we would need to
+	     * recheck the existence after locking the next key.
+	     */
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = removeBindingInternal(txn, name);
 	    if (!result.getNameBound()) {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
-	    /* Need write access to the next name if really doing the remove */
+	    /*
+	     * Write lock the next name if the binding is being removed to
+	     * prevent other transactions from observing its status as the next
+	     * binding until this transaction commits.
+	     */
 	    reportNextNameAccess(txn, name, result.getNextName(), WRITE);
 	    if (logger.isLoggable(FINEST)) {
 		logger.log(FINEST, "removeBinding txn:{0}, name:{1} returns",

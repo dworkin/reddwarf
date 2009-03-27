@@ -538,7 +538,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
     }
    
     @Test
-    public void testSetBindingFoundSetBindingCreate() throws Exception {
+    public void testSetBindingExistingSetBindingCreate() throws Exception {
 	txn.commit();
 	txn = createTransaction();
 	store.setBinding(txn, "a", 100);
@@ -552,7 +552,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
     }
 
     @Test
-    public void testSetBindingFoundSetBindingFound() throws Exception {
+    public void testSetBindingExistingSetBindingFound() throws Exception {
 	store.setBinding(txn, "a", 100);
 	txn.commit();
 	txn = createTransaction();
@@ -826,7 +826,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	assertSame(null, runner.getResult());
     }
 
-    /* -- Tests for Phantoms -- */
+    /* -- Tests for phantom bindings -- */
 
     /**
      * Test that removing a binding locks the next name even when the identity
@@ -869,9 +869,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
      * requires it to check once.
      */
     @Test
-    public void testRemoveBindingFoundPhantom()
-	throws Exception
-    {
+    public void testRemoveBindingFoundPhantom() throws Exception {
 	store.setBinding(txn, "a", 200);
 	store.setBinding(txn, "b", 200);
 	txn.commit();
@@ -938,9 +936,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
      *       return null
      */
     @Test
-    public void testRemoveBindingFoundPhantom2()
-	throws Exception
-    {
+    public void testRemoveBindingFoundPhantom2() throws Exception {
 	store.setBinding(txn, "a", 200);
 	store.setBinding(txn, "b", 200);
 	txn.commit();
@@ -968,12 +964,14 @@ public abstract class BasicTxnIsolationTest extends Assert {
      *
      * tid:1 create a
      *
+     * tid:1 commit
+     *
      * tid:2 create b
      * 	     write lock b
      *	     write lock end
      *
-     * (There are two cases depending on whether tid:2's lock on b blocks
-     * tid:3's lock on c, due to a false lock conflict in the data store.)
+     * There are two cases depending on whether tid:2's lock on b blocks
+     * tid:3's lock on c, due to a false lock conflict in the data store.
      *
      * False conflict:
      *
@@ -989,11 +987,13 @@ public abstract class BasicTxnIsolationTest extends Assert {
      *
      * tid:4 [next a]
      *       read lock end (get next a returned null)
+     *	     return null
      *
      * tid:4 commit
      *	     release lock end
      *
      * tid:3 [create c]
+     *	     write lock c (returns from data store)
      *       write lock end
      *
      * No false conflict:
@@ -1026,9 +1026,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
      *	     return null
      */
     @Test
-    public void testNextBoundNameLastPhantom()
-	throws Exception
-    {
+    public void testNextBoundNameLastPhantom() throws Exception {
 	store.setBinding(txn, "a", 100);
 	txn.commit();
 	txn = createTransaction();				// tid:2
@@ -1052,6 +1050,369 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	    assertSame(null, runner3.getResult());
 	    runner3.commit();
 	}
+    }
+
+    /**
+     * Test that getBinding resamples the next key properly.
+     *
+     * tid:2 create b
+     * 	     write lock b
+     *	     write lock end
+     *
+     * There are two cases depending on whether tid:2's lock on b blocks
+     * tid:3's lock on c, due to a false lock conflict in the data store.
+     *
+     * False conflict:
+     *
+     * tid:3 create c
+     *       write lock c (blocks in data store)
+     *
+     * tid:4 get a
+     *	     read lock a (blocks in data store)
+     *
+     * tid:2 abort
+     *       release lock b
+     *       release lock end
+     *
+     * tid:4 [get a]
+     *       read lock a (get a returned not found)
+     *	     read lock end
+     *
+     * tid:4 commit
+     *	     release lock a
+     *	     release lock end
+     *
+     * tid:3 [create c]
+     *	     write lock c (returns from data store)
+     *       write lock end
+     *
+     * No false conflict:
+     *
+     * tid:3 create c
+     *       write lock c
+     *       write lock end (blocks)
+     *
+     * tid:4 get a
+     *       read lock a
+     *       read lock b (blocks)
+     *
+     * tid:2 abort
+     *       release lock b
+     *       release lock end
+     *
+     * tid:3 [create c]
+     *	     write lock end
+     *
+     * tid:4 [get a]
+     *       read lock b (but it is now missing, so check next again)
+     *       read lock c (blocks)
+     *
+     * tid:3 abort
+     *       release lock c
+     *       release lock end
+     *
+     * tid:4 [get a]
+     *       read lock c (but it is now missing, so check again)
+     *       read lock end
+     *
+     * tid:5 next a
+     *       read lock end (blocks)
+     *
+     * tid:4 commit
+     *       release lock b
+     *       release lock end
+     *
+     * tid:5 [next a]
+     *       write lock end
+     *       return null
+     */
+    @Test
+    public void testNextBoundNameLastPhantom2() throws Exception {
+	txn.commit();
+	txn = createTransaction();				// tid:2
+	store.setBinding(txn, "b", 200);
+	Runner runner2 = new Runner(new SetBinding("c", 300));	// tid:3
+	runner2.assertBlocked();
+	Runner runner3 = new Runner(new GetBinding("a"));	// tid:4
+	runner3.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	if (runner2.blocked()) {
+	    /* False lock conflicts might mean that runner3 blocks runner2 */
+	    assertSame(null, runner3.getResult());
+	    runner3.commit();
+	    runner2.getResult();
+	    runner2.commit();
+	} else {
+	    runner2.getResult();
+	    runner3.assertBlocked();
+	    runner2.abort();
+	    assertSame(null, runner3.getResult());
+	    runner3.commit();
+	}
+    }
+
+    /**
+     * Test that setBinding resamples the next key properly.
+     *
+     * tid:2 create b
+     * 	     write lock b
+     *	     write lock end
+     *
+     * tid:3 create c
+     *       write lock c
+     *       write lock end (blocks)
+     *
+     * tid:4 create a
+     *       write lock a
+     *       write lock b (blocks)
+     *
+     * tid:2 abort
+     *       release lock b
+     *       release lock end
+     *
+     * tid:3 [create c]
+     *	     write lock end
+     *
+     * tid:4 [create a]
+     *       write lock b (but it is now missing, so check next again)
+     *       write lock c (blocks)
+     *
+     * tid:3 abort
+     *       release lock c
+     *       release lock end
+     *
+     * tid:4 [create a]
+     *       write lock c (but it is now missing, so check next again)
+     *       write lock end
+     *
+     * tid:5 next a
+     *       read lock end (blocks)
+     *
+     * tid:4 commit
+     *       release lock b
+     *       release lock end
+     *
+     * tid:5 [next a]
+     *       write lock end
+     *       return null
+     */
+    @Test
+    public void testNextBoundNameLastPhantom3() throws Exception {
+	txn.commit();
+	txn = createTransaction();				// tid:2
+	store.setBinding(txn, "b", 200);
+	Runner runner2 = new Runner(new SetBinding("c", 300));	// tid:3
+	runner2.assertBlocked();
+	Runner runner3 = new Runner(new SetBinding("a", 100));	// tid:4
+	runner3.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	runner2.getResult();
+	runner3.assertBlocked();
+	runner2.abort();
+	assertSame(null, runner3.getResult());
+	runner3.commit();
+    }
+
+    /* -- Tests for isolation with multiple binding operations -- */
+
+    @Test
+    public void testGetBindingCreateSetBinding() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	store.setBinding(txn, "a", 200);
+	txn.commit();
+	txn = null;
+	assertEquals(Long.valueOf(200), runner.getResult());
+    }
+
+    @Test
+    public void testGetBindingSetBindingTwice() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 200);
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	store.setBinding(txn, "a", 300);
+	txn.commit();
+	txn = null;
+	assertEquals(Long.valueOf(300), runner.getResult());
+    }
+
+    @Test
+    public void testGetBindingCreateRemoveBinding() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	store.removeBinding(txn, "a");
+	txn.commit();
+	txn = null;
+	assertSame(null, runner.getResult());
+    }
+
+    @Test
+    public void testGetBindingRemoveCreateBinding() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.removeBinding(txn, "a");
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	store.setBinding(txn, "a", 200);
+	txn.commit();
+	txn = null;
+	assertEquals(Long.valueOf(200), runner.getResult());
+    }
+
+    @Test
+    public void testRemoveBindingCreateRemoveBinding() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new RemoveBinding("a"));
+	runner.assertBlocked();
+	store.removeBinding(txn, "a");
+	txn.commit();
+	txn = null;
+	assertFalse((Boolean) runner.getResult());
+    }
+
+    @Test
+    public void testRemoveBindingRemoveCreateBinding() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.removeBinding(txn, "a");
+	runner = new Runner(new RemoveBinding("a"));
+	runner.assertBlocked();
+	store.setBinding(txn, "a", 200);
+	txn.commit();
+	txn = null;
+	assertTrue((Boolean) runner.getResult());
+    }
+
+    @Test
+    public void testNextBoundNameCreateRemoveBinding() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new NextBoundName(null));
+	runner.assertBlocked();
+	store.removeBinding(txn, "a");
+	txn.commit();
+	txn = null;
+	assertSame(null, runner.getResult());
+    }
+
+    @Test
+    public void testNextBoundNameRemoveCreateBinding() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.removeBinding(txn, "a");
+	runner = new Runner(new NextBoundName(null));
+	runner.assertBlocked();
+	store.setBinding(txn, "a", 200);
+	txn.commit();
+	txn = null;
+	assertEquals("a", runner.getResult());
+    }
+
+    /* -- Test for isolation with aborted binding operations -- */
+
+    @Test
+    public void testGetBindingCreateBindingAborted() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertSame(null, runner.getResult());
+    }
+
+    @Test
+    public void testGetBindingSetBindingAborted() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 200);
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertEquals(Long.valueOf(100), runner.getResult());
+    }
+
+    @Test
+    public void testGetBindingRemoveBindingAborted() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.removeBinding(txn, "a");
+	runner = new Runner(new GetBinding("a"));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertEquals(Long.valueOf(100), runner.getResult());
+    }
+
+    @Test
+    public void testRemoveBindingCreateBindingAborted() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new RemoveBinding("a"));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertFalse((Boolean) runner.getResult());
+    }
+
+    @Test
+    public void testRemoveBindingRemoveBindingAborted() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.removeBinding(txn, "a");
+	runner = new Runner(new RemoveBinding("a"));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertTrue((Boolean) runner.getResult());
+    }
+
+    @Test
+    public void testNextBoundNameCreateBindingAborted() throws Exception {
+	txn.commit();
+	txn = createTransaction();
+	store.setBinding(txn, "a", 100);
+	runner = new Runner(new NextBoundName(null));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertSame(null, runner.getResult());
+    }
+
+    @Test
+    public void testNextBoundNameRemoveBindingAborted() throws Exception {
+	store.setBinding(txn, "a", 100);
+	txn.commit();
+	txn = createTransaction();
+	store.removeBinding(txn, "a");	
+	runner = new Runner(new NextBoundName(null));
+	runner.assertBlocked();
+	txn.abort(new RuntimeException());
+	txn = null;
+	assertEquals("a", runner.getResult());
     }
 
     /* -- Other methods and classes -- */

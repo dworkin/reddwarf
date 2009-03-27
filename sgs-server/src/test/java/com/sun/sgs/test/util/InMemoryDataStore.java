@@ -186,7 +186,13 @@ public class InMemoryDataStore extends AbstractDataStore {
 	Transaction txn, String name)
     {
 	txn.join(this);
-	return names.higherKey(name);
+	if (name != null) {
+	    return names.higherKey(name);
+	} else if (!names.isEmpty()) {
+	    return names.firstKey();
+	} else {
+	    return null;
+	}
     }
 
     protected void shutdownInternal() { }
@@ -228,15 +234,15 @@ public class InMemoryDataStore extends AbstractDataStore {
 	return false;
     }
 
-    protected void commitInternal(Transaction txn) {
+    protected synchronized void commitInternal(Transaction txn) {
 	removeTxnEntry(txn);
     }
 
-    protected void prepareAndCommitInternal(Transaction txn) {
+    protected synchronized void prepareAndCommitInternal(Transaction txn) {
 	removeTxnEntry(txn);
     }
 
-    protected void abortInternal(Transaction txn) {
+    protected synchronized void abortInternal(Transaction txn) {
 	List<Object> txnEntry = getTxnEntry(txn);
 	for (int i = txnEntry.size() - 2; i >= 0; i -= 2) {
 	    Object key = txnEntry.get(i);
