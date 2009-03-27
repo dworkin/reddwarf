@@ -31,7 +31,12 @@
  */
 
 /*
- * This file provides an implementation of a circular byte-buffer.
+ * This file provides an implementation of a circular byte-buffer. The buffer is
+ *created with a call to sgs_buffer_create, which indicates the size of the buffer.
+ *When data is written to the buffer, it can then be read by someone else. The current
+ *starting point for reading is updated by reads, and the buffer keeps track of the
+ *amount of unread data that is stored in the buffer. Attempts to write over data that
+ *has not been read will result in an error. 
  */
 
 #include "sgs/config.h"
@@ -91,6 +96,8 @@ void sgs_buffer_destroy(sgs_buffer_impl* buffer) {
 
 /*
  * sgs_buffer_create()
+ * Allocates a buffer with the specified capacity (in bytes).  NULL is
+ * returned if allocation fails.
  */
 sgs_buffer_impl* sgs_buffer_create(size_t capacity) {
     sgs_buffer_impl* buffer;
@@ -139,8 +146,8 @@ int sgs_buffer_peek(const sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
  * sgs_buffer_read()
  *Reads len bytes from a buffer, and returns them in the array data. It
  *is up to the caller to allocate the data array of at least len size. After
- *reading, the current buffer position and size are updated. Returns the
- *number of bytes copied into the buffer, or -1 if there was an error.
+ *reading, the current buffer position and size are updated. Returns 0 if
+ * the bytes are successfully copied, or -1 if there was an error.
  */
 int sgs_buffer_read(sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
     if (sgs_buffer_peek(buffer, data, len) == -1) return -1;
@@ -153,8 +160,9 @@ int sgs_buffer_read(sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
 /*
  * sgs_buffer_remaining()
  *Returns the amount of free space that remains available within a
- *buffer. Free space is defined as space that has been written to the buffer
- *but not yet used.
+ *buffer. Free space is defined as space that has had nothing written to
+ *it, or which has had something written to it that has subsequently been
+ *read
  */
 size_t sgs_buffer_remaining(const sgs_buffer_impl* buffer) {
     return buffer->capacity - buffer->size;
@@ -175,8 +183,7 @@ size_t sgs_buffer_size(const sgs_buffer_impl* buffer) {
  *Write data of size len from data to the indicated buffer. Once written,
  *the size of the buffer is increased by the amount of data written. If the
  *amount of data to be written is greater than the amount of free space in
- *the buffer, the routine returns -1 and sets errno; otherwise the number of
- *bytes written is returned.
+ *the buffer, the routine returns -1 and sets errno; otherwise returns 0
  */
 int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
     size_t writable = writable_len(buffer);
