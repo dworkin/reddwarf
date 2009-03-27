@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ByteArrayInputStream;
@@ -184,6 +185,11 @@ final class SerialUtil {
 	} catch (ObjectIOException e) {
 	    check(object, e);
 	    throw e;
+	} catch (TransactionNotActiveException e) {
+	    throw new TransactionNotActiveException(
+		"Attempt to perform an operation during serialization that " +
+		"requires a active transaction: " + e.getMessage(),
+		e);
 	} catch (IOException e) {
 	    throw new ObjectIOException(
 		"Problem serializing object: " + e.getMessage(), e, false);

@@ -19,6 +19,7 @@
 
 package com.sun.sgs.test.impl.service.data;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -3730,6 +3731,93 @@ public class TestDataServiceImpl{
 		private static final long serialVersionUID = 1;
 	    }
 	    return new Local();
+	}
+    }
+
+    /**
+     * Test what happens if a we store a managed object in the data service
+     * that has a writeObject method that attempts to dereference a managed
+     * reference.  This fails!
+     */
+    @Test
+    public void testSerializeWriteObjectMethodCallsDataManager()
+	throws Exception
+    {
+	try {
+	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    service.setBinding(
+			"a", new WriteObjectMethodCallsDataManager());
+		}
+	    }, taskOwner);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /**
+     * A class with a writeObject method that attempts to dereference a managed
+     * reference.
+     */
+    private static class WriteObjectMethodCallsDataManager
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	private final ManagedReference<DummyManagedObject> dummy;
+
+	WriteObjectMethodCallsDataManager() {
+	    dummy = AppContext.getDataManager().createReference(
+		new DummyManagedObject());
+	}
+	private void writeObject(ObjectOutputStream out) throws IOException {
+	    dummy.get();
+	    out.defaultWriteObject();
+	}
+    }
+
+    /**
+     * Test what happens if a we store a managed object in the data service
+     * that has a readObject method that attempts to dereference a managed
+     * reference.  This should work!
+     */
+    @Test
+    public void testSerializeReadObjectMethodCallsDataManager()
+	throws Exception
+    {
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		service.setBinding(
+		    "a", new ReadObjectMethodCallsDataManager());
+	    }
+	}, taskOwner);
+	txnScheduler.runTask(new TestAbstractKernelRunnable() {
+	    public void run() {
+		service.getBinding(
+		    "a");
+	    }
+	}, taskOwner);
+    }
+
+    /**
+     * A class with a readObject method that attempts to dereference a managed
+     * reference.
+     */
+    private static class ReadObjectMethodCallsDataManager
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	private final ManagedReference<DummyManagedObject> dummy;
+
+	ReadObjectMethodCallsDataManager() {
+	    dummy = AppContext.getDataManager().createReference(
+		new DummyManagedObject());
+	}
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	    dummy.get();
 	}
     }
 
