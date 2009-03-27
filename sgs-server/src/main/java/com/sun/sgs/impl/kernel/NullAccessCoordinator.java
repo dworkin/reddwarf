@@ -20,7 +20,6 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
-import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.service.Transaction;
@@ -33,7 +32,7 @@ import java.util.Properties;
  * arguments.
  */
 public class NullAccessCoordinator
-    implements AccessCoordinator, AccessReporter<Object>
+    implements AccessCoordinatorHandle, AccessReporter<Object>
 {
     /** Creates an instance of this class. */
     public NullAccessCoordinator() { }
@@ -53,7 +52,7 @@ public class NullAccessCoordinator
     {
     }
 
-    /* -- Implement AccessCoordinator -- */
+    /* -- Implement AccessCoordinatorHandle -- */
 
     /** {@inheritDoc} */
     public <T> AccessReporter<T> registerAccessSource(
@@ -65,6 +64,11 @@ public class NullAccessCoordinator
     /** {@inheritDoc} */
     public Transaction getConflictingTransaction(Transaction txn) {
 	return null;
+    }
+
+    /** {@inheritDoc} */
+    public void notifyNewTransaction(
+	Transaction txn, long requestedStartTime, int tryCount) {
     }
 
     /* -- Implement AccessReporter -- */

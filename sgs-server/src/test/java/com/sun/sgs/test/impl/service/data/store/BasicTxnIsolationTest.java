@@ -179,13 +179,13 @@ public abstract class BasicTxnIsolationTest extends Assert {
 
     /**
      * Returns the default number of milliseconds to wait to see if an
-     * operation is successful.  This implementation returns the default
+     * operation is successful.  This implementation returns twice the default
      * transaction timeout for bounded operations.
      *
      * @return	the number of milliseconds for a successful operation
      */
     protected long getDefaultTimeoutSuccess() {
-	return TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
+	return 2 * TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
     }
 
     /* -- Tests -- */
