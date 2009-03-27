@@ -435,6 +435,7 @@ public class PropertiesWrapper {
     /**
      * Returns the value of an {@link Enum} property.
      *
+     * @param	<T> the enumeration type
      * @param	name the property name
      * @param	enumType the enumeration type
      * @param	defaultValue the default value
