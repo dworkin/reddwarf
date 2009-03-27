@@ -20,8 +20,6 @@
 package com.sun.sgs.test.impl.util;
 
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedCollectionsImpl;
@@ -45,12 +43,10 @@ import org.junit.runner.RunWith;
 public class TestBindingKeyedMapImpl extends TestCase {
 
     /** The transaction proxy. */
-    private static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+    private DummyTransactionProxy txnProxy;
 
     /** The collections factory. */
-    private BindingKeyedCollections collectionsFactory =
-	new BindingKeyedCollectionsImpl(txnProxy);
+    private BindingKeyedCollections collectionsFactory;
 
     /** The data service. */
     private DummyDataService dataService;
@@ -64,8 +60,10 @@ public class TestBindingKeyedMapImpl extends TestCase {
     @Before
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
+	txnProxy = new DummyTransactionProxy();
 	dataService = new DummyDataService();
 	txnProxy.setComponent(DataService.class, dataService);
+	collectionsFactory = new BindingKeyedCollectionsImpl(txnProxy);
     }
 
     /* -- Tests -- */
