@@ -124,11 +124,11 @@ import java.util.logging.Logger;
  * the following logging levels: <p>
  *
  * <ul>
- * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
- *	application restart and recovery
- * <li> {@link Level#WARNING WARNING} - Berkeley DB errors
- * <li> {@link Level#CONFIG CONFIG} - Constructor properties
- * <li> {@link Level#FINE FINE} - Berkeley DB messages
+ * <li> {@link java.util.logging.Level#SEVERE SEVERE} - Berkeley DB failures
+ *	that require application restart and recovery
+ * <li> {@link java.util.logging.Level#WARNING WARNING} - Berkeley DB errors
+ * <li> {@link java.util.logging.Level#CONFIG CONFIG} - Constructor properties
+ * <li> {@link java.util.logging.Level#FINE FINE} - Berkeley DB messages
  * </ul>
  */
 public class BdbEnvironment implements DbEnvironment {

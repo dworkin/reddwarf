@@ -149,11 +149,12 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * the following logging levels: <p>
  *
  * <ul>
- * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
- *	application restart and recovery
- * <li> {@link Level#WARNING WARNING} - Berkeley DB exceptions
- * <li> {@link Level#INFO INFO} - Berkeley DB statistics
- * <li> {@link Level#CONFIG CONFIG} - Constructor properties
+ * <li> {@link java.util.logging.Level#SEVERE SEVERE} - Berkeley DB failures
+ *	that require application restart and recovery
+ * <li> {@link java.util.logging.Level#WARNING WARNING} - Berkeley DB
+ *	exceptions
+ * <li> {@link java.util.logging.Level#INFO INFO} - Berkeley DB statistics
+ * <li> {@link java.util.logging.Level#CONFIG CONFIG} - Constructor properties
  * </ul>
  */
 public class JeEnvironment implements DbEnvironment {

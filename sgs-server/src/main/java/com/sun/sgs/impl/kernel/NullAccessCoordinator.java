@@ -27,9 +27,9 @@ import com.sun.sgs.service.TransactionProxy;
 import java.util.Properties;
 
 /**
- * Define an {@link AccessCoordinator} that does not detect conflicts, report
- * accesses to the profiling system, or perform any error checking on its
- * arguments.
+ * Define an {@link AccessCoordinatorHandle} that does not detect conflicts,
+ * report accesses to the profiling system, or perform any error checking on
+ * its arguments.
  */
 public class NullAccessCoordinator
     implements AccessCoordinatorHandle, AccessReporter<Object>
