@@ -345,23 +345,17 @@ int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
  * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS
  * (these are functions that can only be called within this file)
  */
-
 /*
  * function: conn_closed()
  *
  * Called whenever the connection is closed by the server.
  */
 static void conn_closed(sgs_connection_impl *connection) {
-	/**if this is part of a redirect sequence, do nothing*/
-	if (connection->in_redirect == 1)
-		return;
-    if (connection->expecting_disconnect) {
-        /** Expected close of connection... */
-        sgs_connection_impl_disconnect(connection);
-    } else {
-        /** Unexpected close of connection... */
-        sgs_connection_impl_disconnect(connection);
-    }
+    /**if this is part of a redirect sequence, do nothing*/
+    if (connection->in_redirect == 1)
+        return;
+
+    sgs_connection_impl_disconnect(connection);
 
     if (connection->ctx->disconnected_cb != NULL)
         connection->ctx->disconnected_cb(connection);
