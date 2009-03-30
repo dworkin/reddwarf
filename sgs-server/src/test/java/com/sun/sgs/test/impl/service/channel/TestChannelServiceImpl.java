@@ -1977,7 +1977,7 @@ public class TestChannelServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
-	    printServiceBindings("afte exception");
+	    printServiceBindings("after exception");
 	    fail("unexpected failure: " + e);
 	}
     }
