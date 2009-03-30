@@ -61,7 +61,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -3654,6 +3653,12 @@ public class TestDataServiceImpl{
 	static final ManagedObject staticAnonymous =
 	    new DummyManagedObjectFailingMethods() {
 	        private static final long serialVersionUID = 1L;
+		public String toString() {
+		    if (failures != Failures.NONE) {
+			throw new RuntimeException("toString fails");
+		    }
+		    return "StaticAnonymous[hashCode=" + hashCode() + "]";
+		}
 	    };
 	static class Member extends FailingMethods
 	    implements ManagedObject, Serializable
@@ -3674,6 +3679,12 @@ public class TestDataServiceImpl{
 	ManagedObject createAnonymous() {
 	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
+		public String toString() {
+		    if (failures != Failures.NONE) {
+			throw new RuntimeException("toString fails");
+		    }
+		    return "Anonymous[hashCode=" + hashCode() + "]";
+		}
             };
 	}
 	ManagedObject createLocal() {
@@ -3702,6 +3713,12 @@ public class TestDataServiceImpl{
 	static final ManagedObject staticAnonymous =
 	    new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
+		public String toString() {
+		    if (failures != Failures.NONE) {
+			throw new RuntimeException("toString fails");
+		    }
+		    return "StaticAnonymous[hashCode=" + hashCode() + "]";
+		}
             };
 	static class Member extends FailingMethods
 	    implements ManagedObject, Serializable
@@ -3722,6 +3739,12 @@ public class TestDataServiceImpl{
 	ManagedObject createAnonymous() {
 	    return new DummyManagedObjectFailingMethods() {
                 private static final long serialVersionUID = 1L;
+		public String toString() {
+		    if (failures != Failures.NONE) {
+			throw new RuntimeException("toString fails");
+		    }
+		    return "Anonymous[hashCode=" + hashCode() + "]";
+		}
             };
 	}
 	ManagedObject createLocal() {
