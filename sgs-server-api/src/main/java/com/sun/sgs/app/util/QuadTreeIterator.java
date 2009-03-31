@@ -31,9 +31,9 @@ import java.util.NoSuchElementException;
  * When the iterator is first initialized, the first element can be obtained
  * by calling {@code next()} or, {@link #nextNoReturn nextNoReturn()} and then
  * {@link #current current()} immediately afterwards. Either {@code next()} or
- * {@code nextNoReturn()} should be called first before {@link #currentX currentX()},
- * {@link #currentY currentY()} or {@code current()} can be called, otherwise an
- * {@link IllegalStateException} will be thrown. An
+ * {@code nextNoReturn()} should be called first before {@link #currentX 
+ * currentX()}, {@link #currentY currentY()} or {@code current()} can be
+ * called, otherwise an {@link IllegalStateException} will be thrown. An
  * {@code IllegalStateException} is also thrown in the case when a call
  * to {@code current()}, {@code currentX()} or {@code currentY()} is made
  * after the element has been removed due to a call to {@code remove()}.
@@ -69,9 +69,7 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
 
     /**
      * Advances the iterator without returning the next element in the
-     * sequence. If the element is missing, the iterator does not remove it 
-     * from the tree and it can still be removed through a call to the
-     * <tt>remove()</tt> method
+     * sequence. 
      * @throws NoSuchElementException iteration has no more elements.
      */
     void nextNoReturn();
@@ -89,4 +87,10 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
      * current element has been removed
      */
     E current();
+
+    /**
+     * Checks if the current element the iterator is pointing to exists.
+     * @return true if the current element exists and false otherwise
+     * */
+    boolean hasCurrent();
 }
