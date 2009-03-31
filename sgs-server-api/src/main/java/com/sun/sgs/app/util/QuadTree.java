@@ -21,10 +21,10 @@ package com.sun.sgs.app.util;
 
 
 /**
- * An interface which defines some common functionality for all Quadtrees. A
- * <code>Quadtree</code> is a data structure used to partition 2-Dimensional
- * space where each node has at most four children, dividing a region into
- * four sub-regions.
+ * An interface which defines some common functionality for all 
+ * <code>Quadtree</code>. A <code>Quadtree</code> is a data structure used to
+ * partition 2-Dimensional space where each node has at most four children,
+ * dividing a region into four sub-regions.
  *
  * <p>
  * Implementations need to use a "bounding box" to restrict elements to a
@@ -53,7 +53,7 @@ package com.sun.sgs.app.util;
  * {@code boundingBoxIterator()} by specifying a bounding box where
  * <code>x1==x2</code> and <code>y1==y2</code>.
  *
- * <p> Therefore, classes implementing this interface need access to a
+ * <p> Consequently, classes implementing this interface need access to a
  * class which implements the {@link QuadTreeIterator} to accommodate the
  * return value of {@code boundingBoxIterator()} and {@code pointIterator()}
  * methods.
@@ -81,7 +81,7 @@ public interface QuadTree<E> {
    /**
      * Returns an iterator for all the elements contained in the tree. The
      * iterator returns elements in no particular order and it may be
-     * emtpy.
+     * empty.
      * @return an iterator over all the elements in the tree
      */
     QuadTreeIterator<E> iterator();
@@ -90,11 +90,12 @@ public interface QuadTree<E> {
      * Returns an iterator over the entries at the specified point, defined
      * by the {@code x} and {@code y} parameters. The
      * iterator returns elements in no particular order and it may be
-     * emtpy.
+     * empty.
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @return an iterator which can traverse over the entries that exist
+     * @return an iterator which can traverse over the entries that exist at
+     *          the point defined by {@code x} and {@code y}
      * @throws IllegalArgumentException if the coordinates are not contained
      * within the bounding box defined by the quadtree
      */
@@ -104,7 +105,7 @@ public interface QuadTree<E> {
      * Returns an iterator over the entries contained in the bounding box,
      * defined by {@code x1}, {@code y1}, {@code x2} and {@code y2} parameters.
      * The iterator returns elements in no particular order and it may be
-     * emtpy.
+     * empty.
      * 
      * @param x1 the x-coordinate of the first corner
      * @param y1 the y-coordinate of the first corner
@@ -125,11 +126,11 @@ public interface QuadTree<E> {
     
     /**
      * Returns {@code true} if there is an element at the given coordinates,
-     * or {@code false} otherwise.
+     * and {@code false} otherwise.
      * @param x the x-coordinate
      * @param y the y-coordinate
      * @return {@code true} if there is an element at the given coordinates,
-     * or {@code false} otherwise
+     * and {@code false} otherwise
      * @throws IllegalArgumentException if the coordinates are not contained
      * within the bounding box defined by the quadtree
      */
@@ -149,7 +150,7 @@ public interface QuadTree<E> {
      * For example, getBoundingBox()[0] contains the smallest X coordinate
      * value of the bounding box.
      *
-     * @return a double array representing the four coordinates
+     * @return a {@code double} array representing the four coordinates
      * of the bounding box's four boundary values
      */
     double[] getBoundingBox();
@@ -170,8 +171,8 @@ public interface QuadTree<E> {
      * @return {@code true} if there was at least one element removed, and
      * {@code false} otherwise
      * @throws IllegalArgumentException if the coordinates are not contained
-     * within the bounding box defined by the quadtree
+     * within the bounding box defined by the <code>Quadtree</code>
      */
     boolean removeAll(double x, double y);
-    
+
 }
