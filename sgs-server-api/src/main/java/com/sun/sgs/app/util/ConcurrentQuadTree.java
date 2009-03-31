@@ -20,60 +20,61 @@ package com.sun.sgs.app.util;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.ConcurrentModificationException;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.TreeMap;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 
 /**
- * The {@code ConcurrentQuadTree} is a data structure which organizes a
- * defined type and its Cartesian position in a rectangular, two-dimensional
- * region. More specifically, the data structure subdivides existing regions
- * into four, equally-sized regions in order to allot one region for a desired
- * number of elements. These sub-regions are also referred to as quadrants,
- * and are represented by leaf nodes in the tree. Therefore, each
- * {@code Point} inserted into the {@code ConcurrentQuadTree} will be located
- * in a region containing no more than the specified number of points for
- * each leaf node. This parameter is defined in the constructor of the
- * quadtree, and is referred to as the {@code bucketSize}.
+ * The {@code ConcurrentQuadTree} is a data structure which is used to represent
+ * elements and their respective Cartesian positions in rectangular,
+ * two-dimensional regions. More specifically, the data structure subdivides
+ * existing regions into four, equally-sized regions in order to allot one
+ * region for a desired number of elements. These sub-regions are also
+ * referred to as quadrants, and are represented by leaf nodes in the tree.
+ * Therefore, each {@code Point} inserted into the {@code ConcurrentQuadTree}
+ * will be located in a region containing no more than the specified number of
+ * points for each leaf node. This parameter is defined in the constructor of
+ * the {@code ConcurrentQuadTree}, and is referred to as the {@code bucketSize}.
  * <p>
  * This type of organization is best interpreted as a tree whereby "deeper"
  * nodes correspond to smaller regions. Elements can only exist at the leaf
  * nodes; if a node overflows its bucket size, then it splits into smaller
  * regions at an incremented depth and the elements are reallocated.
  * <p>
- * A quadtree enables a two-dimensional space to efficiently hold onto a
- * certain number of {@code Point}s using a relatively simple and low-cost
- * scheme. The quadtree does not support null elements; that is, calling
- * {@code add(x, y, null)} is not permitted. The quadtree does, however,
- * support multiple elements at the same coordinate location. In other words,
- * it is legal to do the following:
+ * A {@code ConcurrentQuadTree} enables a two-dimensional space to efficiently
+ * hold onto a certain number of {@code Point}s using a relatively simple and
+ * low-cost scheme. The {@code ConcurrentQuadTree} does support null elements;
+ * that is, calling {@code put(x, y, null)} is permitted. The
+ * {@code ConcurrentQuadTree} also supports multiple elements at the same
+ * coordinate location. In other words, it is legal to do the following:
  * <p>
- * {@code add(1, 1, object1);}<br>
- * {@code add(1, 1, object2);}, etc.
+ * {@code put(1, 1, object1);}<br>
+ * {@code put(1, 1, object2);}, etc.
  *
  * <p>
  * Although it is legal to place multiple elements at the same coordinate
  * location, placing a large number of elements at single point is discouraged
- * because the scalability of the tree will be negatively impacted since it
- * takes linear time to search through elements at a single point. Too many
- * elements at a single coordinate location might also be too much to read in a
- * single task.
+ * because  too many elements at a single coordinate location might also be too
+ * much to read in a single task.
  *
  * <p>
  * Overall, many of the methods occur in logarithmic time because the tree has
  * to be walked in order to locate the correct region to manipulate. This is
- * not very costly because the quadtree has a tendency to grow horizontally,
- * especially if values are spaced far enough apart.
+ * not very costly because the {@code ConcurrentQuadTree} has a tendency to
+ * grow horizontally, especially if values are spaced far enough apart.
  * 
  * <p>
  * An iterator scheme is used to retrieve all elements in a particular 
@@ -91,17 +92,23 @@ import com.sun.sgs.app.Task;
  * between each task. 
  *
  * <p>
- * To ensure data integrity and allow for concurrency, the iterator throws
- * {@link ConcurrentModificationException} if the next entry to be returned
- * has been changed while the iterator was serialized. The iterator will also
- * throw {@link com.sun.sgs.app.ObjectNotFoundException} when it attempts to 
- * get an object, if that object was removed from the data manager without
- * updating the tree. Consequently, the copy constructor can also throw
- * {@code ObjectNotFoundException} since it uses an iterator to copy the
- * tree elements.
+ * To allow for concurrency, the iterator throws
+ * {@link ConcurrentModificationException} if the current leaf it was on
+ * has split or was replaced by a new leaf because the iterator will no
+ * longer be able to accurately determine its position in the tree. The iterator
+ * will also throw {@link CurrentConcurrentRemovedException} if the current
+ * element no longer exists and it was not removed by the iterator through
+ * a call to {@code remove()}. Whenever an iterator has just been deserialized,
+ * it is recommended that {@code hasCurrent()} and {@code hasNext()} be called
+ * before a call to {@code current()} and {@code next()} or 
+ * {@code nextNoReturn()} respectively since both the current or next element
+ * may have been removed concurrently while the iterator was serialized. This
+ * will allow for more concurrency by avoiding exceptions when iterating
+ * through the {@code ConcurrentQuadTree} if it is being modified.
  *
  *
- * @param <E> the type of element the quadtree is to hold
+ *
+ * @param <E> the type of element the {@code ConcurrentQuadTree} is to hold
  */
 public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         ManagedObjectRemoval {
@@ -120,15 +127,14 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * unless they are removed (in other words, collapsed or pruned). 
      * 
      * As suggested above, a tree depth of 0 corresponds to a single node
-     * (the root), without any children. Each subsequent level incurs its
-     * parent's incremented depth. Nodes are removed from the tree (and thus,
-     * data manager) when they have neither children containing elements, nor
-     * children containing children. By definition, this also means that the
+     * (the root), without any children. Nodes are removed from the tree (and 
+     * thus, DataManager) when they have neither children containing elements,
+     * nor children containing children. By definition, this also means that the
      * size of the node and all its children are 0. This measure is taken to
      * improve the performance of walking the tree in the future and reduces
-     * memory requirements.
+     * memory requirements. 
      **/
-    
+
     private static final long serialVersionUID = 1L;
 
     /*
@@ -161,7 +167,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
     private ManagedReference<Node<E>> root;
 
     /**
-     * The five-argument constructor which defines a quadtree with a depth
+     * A five-argument constructor which defines a Quadtree with a bucketSize
      * supplied as a parameter. The area corresponding to this instance is
      * defined by the supplied coordinates whereby ({@code x1}, {@code y1})
      * represent the first {@code Point} and ({@code x2}, {@code y2})
@@ -176,16 +182,17 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * bounding box
      * @param y2 the x-coordinate of the second point defining the tree's
      * bounding box
+     * @throws IllegalArgumentException if bucketSize is not positive.
      */
     public ConcurrentQuadTree(int bucketSize, double x1, double y1,
             double x2, double y2) {
 
-        if (bucketSize < 0) {
-            throw new IllegalArgumentException(
-                    "Bucket size cannot be negative");
+        if (bucketSize <= 0) {
+            throw new IllegalArgumentException("Bucket size must be " +
+                    "positive.");
         }
-        this.bucketSize = bucketSize;
 
+        this.bucketSize = bucketSize;
         DataManager dm = AppContext.getDataManager();
         boundingBox =
                 new BoundingBox(new Point(x1, y1), new Point(x2, y2));
@@ -195,15 +202,13 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
     /**
      * A copy constructor which adds all elements within the {@code tree}
-     * parameter into the new quadtree. For trees with very many elements,
+     * parameter into the new {@code ConcurrentQuadTree}. For trees with many elements,
      * this operation can take a long time since all elements need to be
-     * iterated through. Only elements with valid references are added to the
-     * new quadtree. That is, if there are elements whose underlying
-     * references are missing from the data manager, they are not added to the
-     * new quadtree.
+     * iterated through. If the tree is very large, it may take more time than
+     * the maximum allowed for a single task to copy the tree.
      *
-     * @param tree the quadtree whose elements are to be added into the new
-     * quadtree
+     * @param tree the {@code ConcurrentQuadTree} whose elements are to be added into the new
+     * {@code ConcurrentQuadTree}
      */
     public ConcurrentQuadTree(ConcurrentQuadTree<E> tree) {
         boundingBox = tree.boundingBox;
@@ -211,13 +216,10 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         QuadTreeIterator<E> iter = tree.iterator();
         E element;
         while (iter.hasNext()) {
-            // Add element to the tree if a reference exists
-            if (iter.hasNext()) {
                 element = iter.next();
                 double x = iter.currentX();
                 double y = iter.currentY();
                 put(x, y, element);
-            }
         }
     }
 
@@ -226,12 +228,12 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      */
     public boolean isEmpty() {
         return (root.get().getChildren().isEmpty() &&
-                root.get().values == null);
+                root.get().getValues() == null);
     }
 
     /**
      * A method which checks if the {@code point} parameter is within this
-     * quadtree's bounding box.
+     * {@code ConcurrentQuadTree}'s bounding box.
      *
      * @param point the {@code Point} which will be examined to see if it
      * falls within the bounds of the bounding box
@@ -260,7 +262,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         // Check to see that the point is within bounds
         checkBounds(point);
         Node<E> leaf = root.get().getLeafNode(point);
-
         leaf.add(point, element, true);
     }
 
@@ -275,7 +276,10 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         checkBounds(point);
 
         Node<E> leaf = root.get().getLeafNode(point);
-        while (leaf.isLeaf() && leaf.remove(point) != null) {
+
+        //Keep removing elements from point while there are still elements
+        //left
+        while (leaf.isLeaf() && leaf.remove(point, 0) != null) {
             result = true;
         }
         return result;
@@ -289,26 +293,11 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * @return the value of the reference, or null if either the reference is
      * {@code null} or the object no longer exists
      */
-    static Object getReferenceValue(ManagedReference<?> ref) {
+    private static Object getReferenceValue(ManagedReference<?> ref) {
         if (ref != null) {
             return ref.get();
         }
         return null;
-    }
-
-    /**
-     * Creates a reference to the supplied argument if it is not {@code null}.
-     *
-     * @param <E> the type of the object
-     * @param t the object to reference
-     * @return a {@code ManagedReference} of the object, or {@code null} if
-     * the argument is null.
-     */
-    static <E> ManagedReference<E> createReferenceIfNecessary(E t) {
-        if (t == null) {
-            return null;
-        }
-        return AppContext.getDataManager().createReference(t);
     }
 
     /**
@@ -322,26 +311,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
     @SuppressWarnings("unchecked")
     private static <E> E uncheckedCast(Object object) {
         return (E) object;
-    }
-
-    /**
-     * Removes an element from the quadtree corresponding to the provided
-     * coordinate and returns the result of the operation.
-     *
-     * @param x the x-coordinate of the element to remove
-     * @param y the y-coordinate of the element to remove
-     * @return {@code true} if the object was removed, and {@code false}
-     * otherwise
-     */
-    public boolean removeNoReturn(double x, double y) {
-        Point point = new Point(x, y);
-        Node<E> node = root.get().getLeafNode(point);
-
-        //If node is not a leaf, then it must be that
-        //the actual leaf is null and that the parent was returned
-        //because there is no leaf containing the point
-        //specified by the x and y coordinates yet
-        return (node.isLeaf() && node.delete(point));
     }
 
     /**
@@ -370,8 +339,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         checkBounds(corner2);
 
         BoundingBox box = new BoundingBox(corner1, corner2);
-
-        return new ElementIterator<E>(root.get(), box);
+        return new ElementIterator<E>(root, box);
     }
 
     /**
@@ -384,7 +352,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         checkBounds(point);
 
         BoundingBox box = new BoundingBox(point, point);
-        return new ElementIterator<E>(root.get(), box);
+        return new ElementIterator<E>(root, box);
     }
 
     /**
@@ -395,13 +363,11 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         if (isEmpty()) {
             return;
         }
-
         // Delete the old tree completely
         removingObject();
 
         // Create a new root for the new tree
         Node<E> newRoot = new Node<E>(boundingBox, bucketSize);
-        AppContext.getDataManager().markForUpdate(this);
         root = AppContext.getDataManager().createReference(newRoot);
     }
 
@@ -425,11 +391,12 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * {@inheritDoc}
      */
     public void removingObject() {
+
         AsynchronousClearTask<E> clearTask =
-                new AsynchronousClearTask<E>(root.get());
+                new AsynchronousClearTask<E>(root);
 
         // Schedule asynchronous task here
-        // which will delete the list
+        // which will delete the tree
         AppContext.getTaskManager().scheduleTask(clearTask);
     }
 
@@ -437,16 +404,16 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * {@inheritDoc}
      */
     public QuadTreeIterator<E> iterator() {
-        return new ElementIterator<E>(root.get(), boundingBox);
+        return new ElementIterator<E>(root, boundingBox);
     }
 
-    /** Used to print out the tree for debugging purposes.
+    /** Used to print out the tree for debugging and testing purposes.
      * @param node   The node which will be printed out
      * @param isRoot True if node passed in is the tree root, false otherwise
      * */
-    public void printTree(Node node, boolean isRoot) {
+    private void printTree(Node node, boolean isRoot) {
         if (isRoot) {
-            printTree(this.root.get(), false);
+            printTree(root.get(), false);
         } else if (node == null || node.isLeaf()) {
             System.out.println(" leaf " + node);
         } else {
@@ -462,18 +429,39 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
     }
 
+    /* Returns a new {@code ManagedReferenceComparator}, used to avoid
+     * unchecked conversion warnings
+     * */
+    @SuppressWarnings("unchecked")
+    private static ManagedReferenceComparator getComparator() {
+        return new ManagedReferenceComparator();
+    }
+
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     // ;;;;;;;;;;;;;; Nested Class Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;;
     // ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     /**
-     * An iterator which walks through the entries stored in the quadtree.
-     * This implementation allows for serialization, while also reporting
-     * consistency problems in the form of a
-     * {@code ConcurrentModificationException}. Data integrity checks are
-     * performed at the beginning of each iterator operation to ensure that
-     * the data integrity is consistent. If changes have occurred, such as a
-     * node removed while the iterator was serialized, then a
-     * {@code ConcurrentModificationException} is thrown.
+     * An iterator which walks through the elements stored in 
+     * {@code ConcurrentQuadTree}. This implementation allows for
+     * serialization, while also reporting consistency problems in the form of
+     * {@code ConcurrentModificationException} and 
+     * {@code CurrentConcurrentRemovedException}.
+     *
+     * The next element is reloaded everytime {@code next()}, {@code hasNext()}
+     * and {@code nextNoReturn()} is called in case the next element has
+     * changed. If the current leaf the iterator was on has split or was
+     * removed then replaced by an entirely new leaf node, then
+     * {@code ConcurrentModificationException} would be thrown because the
+     * iterator would no longer be able guarantee its location in the
+     * tree because the structure of the tree may have significantly changed.
+     * 
+     * If {@code current()} is called and the current element the iterator
+     * was on no longer exists but the element was not removed by the iterator,
+     * then a {@code CurrentConcurrentRemovedException} will be thrown instead
+     * of an {@code IllegalStateException}. This is to let the user know the
+     * difference between the iterator itself removing the element and the
+     * element being removed by a different thread or while the iterator was
+     * serialized.
      *
      * The iterator is optimized to not search needlessly down a particular 
      * branch if the {@code boundingBox} specified by the iterator does not
@@ -489,17 +477,20 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         private static final long serialVersionUID = 4L;
         /** A region specific to this iterator */
         private final BoundingBox box;
-        /** The data integrity value of the node examined */
-        private int dataIntegrityValue;
         /** Whether the current entry exists */
         private boolean currExists;
         /** The current node being examined */
-        private Node<E> current;
+        private ManagedReference<Node<E>> current;
         /**
          * The next node to be examined. This can be equal to {@code current}
          * if the next entry is located in the same node.
          */
-        private Node<E> next;
+        private ManagedReference<Node<E>> next;
+        /**
+         * Root of the tree being iterated over by this iterator. Used to
+         * determine the leaf node containing a point, after deserialization.
+         */
+        private ManagedReference<Node<E>> root;
         /**
          * The current entry (the last entry returned from a call to
          * {@code next})
@@ -510,67 +501,58 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * {@code next})
          */
         private Entry<E> nextEntry;
-        /** An iterator over the elements belonging to a node */
-        private Iterator<Point> entryIterator;
         /**
-         * An iterator for the ManagedReferences to values of a list storing
-         * the elements at a given coordinate
+         * A {@code Point} object representing the next point about to be
+         * examined in a node's underlying {@code Map}
          */
-        private Iterator<ManagedReference<ManagedSerializable<E>>>
-                valueReferenceIterator;
+        private Point nextPoint;
         /**
          * A {@code Point} object representing the current point being
          * examined in a node's underlying {@code Map}
          */
         private Point currentPoint;
+        /**
+         * Index of the next element in the list
+         */
+        private int nextIndex;
 
         /**
          * Two-argument constructor which permits specification of a bounding
          * box specific to the iterator.
          *
-         * @param root the root node of the quadtree, used to locate the first
+         * @param root the root node of the {@code ConcurrentQuadTree}, used to locate the first
          * child
          * @param box the region which specifies the qualified entries that
          * this iterator is to iterate over; a value of {@code null} means all
          * entries are valid (no bounding box)
          */
-        ElementIterator(Node<E> root, BoundingBox box) {
+        ElementIterator(ManagedReference<Node<E>> root, BoundingBox box) {
             this.box = box;
-            current =
-                    uncheckedCast(getReferenceValue(
-                    getFirstQualifiedLeafNode(root)));
-            currentPoint = null;
-            valueReferenceIterator = null;
-
-            // Check for edge case where there are no qualified leaf nodes
-            if (current == null) {
-                current = root;
-                entryIterator = null;
-            } else {
-                entryIterator = current.getValues().keySet().iterator();
-            }
-            dataIntegrityValue = current.getDataIntegrityValue();
-            next = current;
-            nextEntry = getNextQualifiedElement();
-
+            this.root = root;
+            current = null;
             currExists = false;
             entry = null;
+            nextPoint = null;
+            nextIndex = 0;
         }
 
         /**
-         * Checks whether the node has been modified while the iterator was
-         * serialized. If so, a {@code ConcurrentModificationException} is
-         * thrown
-         *
-         * @throws ConcurrentModificationException if the node had been
-         * modified while this iterator was serialized
+         * {@inheritDoc}
          */
-        private void checkDataIntegrity() {
-            if (current.getDataIntegrityValue() == dataIntegrityValue) {
-                return;
+        public boolean hasCurrent() {
+
+            //Check if the original leaf, point and finally element still exists
+            try {
+                Node<E> currentNode = current.get();
+                TreeMap<Point, List<ManagedReference<ManagedSerializable<E>>>>
+                        map = currentNode.getValues();
+                if (map != null && map.containsKey(currentPoint) &&
+                        map.get(currentPoint).contains(entry.getValue())) {
+                    return true;
+                }
+            } catch (ObjectNotFoundException onfe) {
             }
-            throw new ConcurrentModificationException(
-                    "The Node has been modified or removed");
+            return false;
         }
 
         /**
@@ -581,77 +563,246 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * @return <tt>true</tt> if the iterator has more elements.
          */
         public boolean hasNext() {
+            //Try to reload the next element, in case it has changed
+            reload();
             return (nextEntry != null);
         }
 
         /**
-         * Returns the next element which is contained in the bounding box
-         * defined at the iterator's instantiation. If there are no more
-         * qualified elements, then {@code null} is returned.
-         *
-         * @return the next entry located in the specified bounding box (if an
-         * bounding box is defined) or {@code null} if no next qualified entry
-         * exists
+         * Used to reload the next entry, in case the next element has changed.
          */
-        private Entry<E> getNextQualifiedElement() {
-            if (entryIterator == null) {
-                return null;
-            }
+        private Entry<E> reloadNext() {
+            Node<E> currentNode;
+            try {
+                currentNode = current.get();
 
-            // Return the next qualified elements in the list
-            ManagedReference<ManagedSerializable<E>> valueReference;
-            valueReference = getNextElement();
-            if (valueReference != null) {
-                return new Entry<E>(currentPoint, valueReference);
-            }
+                //If the current leaf the iterator is on has not split
+                //to become a non-leaf node
+                if (currentNode.isLeaf()) {
 
-            // If there are no more qualified elements contained at
-            // the current point, fetch the next point and try again
-            while (entryIterator.hasNext()) {
-                currentPoint = entryIterator.next();
+                    TreeMap<Point, 
+                            List<ManagedReference<ManagedSerializable<E>>>> map
+                            = currentNode.getValues();
 
-                // Check if the next point sits inside the bounding box
-                if (box.contains(currentPoint)) {
-                    List<ManagedReference<ManagedSerializable<E>>> list =
-                            next.getValues().get(currentPoint);
+                    //Assume there are still elements left to be iterated over
+                    //on the current leaf and at the current point
+                    next = current;
+                    nextPoint = currentPoint;
 
-                    // Go to next map entry if the list is null
-                    if (list == null) {
-                        continue;
+                    //currentNode is empty root, there is no nextEntry
+                    if (map == null) {
+                        return null;
                     }
 
-                    valueReferenceIterator = list.iterator();
-                    valueReference = getNextElement();
-                    if (valueReference != null) {
-                        return new Entry<E>(currentPoint, valueReference);
+                    //If the current point still exists
+                    if (map.containsKey(currentPoint)) {
+                        List<ManagedReference<ManagedSerializable<E>>> list =
+                                map.get(currentPoint);
+                        nextIndex =
+                                Collections.binarySearch(list, entry.getValue(),
+                                getComparator());
+                        //If current element still exists in the list of
+                        //elements corresponding to currentPoint
+                        if (nextIndex >= 0) {
+                            nextIndex++;
+                        } else {
+                            //If the current element no longer exists in the
+                            //list, find the index of where the current
+                            //element should go if it had been in the list
+                            nextIndex = (nextIndex + 1) * (-1);
+                        }
+                    } else {
+                        //If currentPoint has been removed, find the next
+                        //valid point. If there are no more valid points left
+                        //return null
+                        nextPoint = map.higherKey(currentPoint);
+                        getNextPoint();
+                        if (nextPoint == null) {
+                            return null;
+                        }
                     }
+                    //Get the next element
+                    return getNextElement();
+                } else {
+                    //Throw ConcurrentModificationException if the current
+                    //leaf has split
+                    throw new ConcurrentModificationException("Current node " +
+                            "had split!");
                 }
-            }
+            } catch (ObjectNotFoundException onfe) {
 
-            // If there are no more points, we need to fetch a new node
-            // and try again
-            next =
-                    uncheckedCast(getReferenceValue(
-                    getNextQualifiedLeafNode(next)));
-            if (next != null) {
-                entryIterator = next.getValues().keySet().iterator();
-                return getNextQualifiedElement();
+                //If current leaf the iterator was on has been removed,
+                //get the parent of the node that should contain currentPoint
+                currentNode = root.get().getLeafNode(currentPoint);
+
+                //If the parent is a root and also a leaf
+                if (currentNode.getParent() == null && currentNode.isLeaf()) {
+                    //If the root is empty, return null, there are no more
+                    //elements to iterate over
+                    if (currentNode.getValues() == null) {
+                        return null;
+                    } else {
+                        //If the root still contains values, try to find the 
+                        //next element in root's values
+                        next = root;
+                        nextPoint = currentPoint;
+                        getNextPoint();
+                        return getNextElement();
+                    }
+                } else if (currentNode.isLeaf()) {
+                    //If a leaf was returned while looking for the node 
+                    //containing currentPoint, the original current leaf must
+                    //have been replaced by a newer leaf, iteration order is no
+                    //longer guaranteed
+                    throw new ConcurrentModificationException("Current node " +
+                            "was removed and replaced with a new node.");
+                }
+
+                //Go through the siblings of the removed current node, first,
+                //looking for the next element
+                int nextQuadrant =
+                        Node.nextQuadrant(
+                        Node.determineQuadrant(currentNode.getBoundingBox(),
+                        currentPoint));
+                next = null;
+                while (nextQuadrant != Node.INVALID_QUADRANT && next == null) {
+                    Node<E> child = currentNode.getChild(nextQuadrant);
+                    if (child != null) {
+                        next = getFirstQualifiedLeafNode(child);
+                    }
+                    nextQuadrant = Node.nextQuadrant(nextQuadrant);
+                }
+
+                //If a qualified leaf node could not be found within the
+                //siblings of the removed current node, search for the
+                //next qualified leaf through the entire tree
+                if (next == null) {
+                    next = getNextQualifiedLeafNode(currentNode);
+                }
+
+                //If a qualified leaf was found, look through it for a
+                //qualified point, findNextQualifiedPoint also
+                //looks for a qualified point in other leaves if one isn't found
+                //in this qulaified leaf
+                nextPoint = null;
+                if (next != null) {
+                    findNextQualifiedPoint();
+                    nextIndex = 0;
+                }
+
+                //If no qualified point was found in the entire tree,
+                //there is no more elements to iterate over
+                if (nextPoint == null) {
+                    return null;
+                }
+                //Get the next element if a qualified next point was found
+                return getNextElement();
             }
-            return null;
         }
 
         /**
-         * Returns the next element in the iteration.
-         * 
-         * @return the next element in the iteration, or {@code null} if no
-         * more exist
+         * Sets nextPoint to the next qualified point by first trying to
+         * find it in the next qualified leaf node, then other qualified
+         * leaf nodes if one cannot be found in the next qualified leaf node
          */
-        private ManagedReference<ManagedSerializable<E>> getNextElement() {
-            if (valueReferenceIterator != null) {
+        private void getNextPoint() {
+            assert (next != null) : "Next leaf node cannot be null";
+            Node<E> nextNode = next.get();
+            //Search through the next leaf node, trying to find a
+            //qualified point
+            while (nextPoint != null && !box.contains(nextPoint)) {
+                nextPoint = nextNode.getValues().higherKey(nextPoint);
+            }
 
-                // If there are elements remaining, return the next one
-                while (valueReferenceIterator.hasNext()) {
-                    return valueReferenceIterator.next();
+            //If next leaf node does not contain a qulaified point, get
+            //the next qualified leaf node and try to find a qualified point
+            //again
+            if (nextPoint == null) {
+                next = getNextQualifiedLeafNode(nextNode);
+                findNextQualifiedPoint();
+            }
+            //Reset next index of the iterator's position in the list
+            //of elements corresponding to the next point
+            nextIndex = 0;
+        }
+
+        /**
+         * Loads the next element when next() or nextNoReturn() is called
+         * for the very first time after this iterator has been initialized.
+         */
+        private void loadFirst() {
+
+            //Get the first qualified leaf node
+            next = getFirstQualifiedLeafNode(root.get());
+            current = next;
+
+            //find the first qualified point
+            findNextQualifiedPoint();
+            Node<E> node = uncheckedCast(getReferenceValue(
+                    next));
+
+            //Stop, if there are no qualified leaf nodes
+            //set nextEntry to null
+            if (node == null) {
+                nextEntry = null;
+                return;
+            }
+
+            
+            //Get the first element
+            nextEntry = getNextElement();
+            current = null;
+        }
+
+        /**
+         * Starting at the leaf node "next", search through the entire tree
+         * for the next qualified point
+         */
+        private void findNextQualifiedPoint() {
+            Node<E> node = uncheckedCast(getReferenceValue(
+                    next));
+
+            //Keep looping until a qualified point is found or there are no
+            //more qualified leaf nodes left
+            while (nextPoint == null && node != null) {
+                nextPoint = node.getValues().firstKey();
+                //Go through the points in the leaf node lookin for
+                //qualified points
+                while (nextPoint != null && !box.contains(nextPoint)) {
+                    nextPoint = node.getValues().higherKey(nextPoint);
+                }
+
+                //Get the next qualified leaf node if the previous leaf node
+                //did not contain any qualified points
+                if (nextPoint == null) {
+                    next = getNextQualifiedLeafNode(next.get());
+                    node = uncheckedCast(getReferenceValue(
+                            next));
+                }
+            }
+        }
+
+        /** Gets the next qualified element
+         * @return An Entry containing the next element
+         */
+        private Entry<E> getNextElement() {
+            assert (next != null) : "Next leaf node cannot be null";
+            Node<E> nextNode = next.get();
+            List<ManagedReference<ManagedSerializable<E>>> list =
+                    nextNode.getValues().get(nextPoint);
+
+            //Get the next element in the list if there are any elements left
+            if (nextIndex < list.size()) {
+                return new Entry(nextPoint, list.get(nextIndex));
+            } else {
+
+                //Get the next qualified point if there are no more elements
+                //leftin the list
+                nextPoint = nextNode.getValues().higherKey(nextPoint);
+                getNextPoint();
+                if (nextPoint != null) {
+                    list = next.get().getValues().get(nextPoint);
+                    return new Entry(currentPoint, list.get(nextIndex));
                 }
             }
             return null;
@@ -662,15 +813,28 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          *
          * @return the next element in the iteration.
          * @exception NoSuchElementException iteration has no more elements.
-         * @throws ConcurrentModificationException if the next node in the
-         * sequence was removed, or after deserialization, if this node was
-         * modified or removed.
-         * @throws ObjectNotFoundException if the object referenced
-         * by the ManagedReference has been removed
+         * @throws ConcurrentModificationException if the current leaf was has
+         * split or was replaced by a different leaf, iteration order is no
+         * longer guaranteed
          */
         public E next() {
             loadNext();
             return entry.getValue().get().get();
+        }
+
+        /**
+         * Reloads the next element depending on whether it is the very first
+         * element to be loaded
+         * */
+        private void reload() {
+            //If the first element has not loaded yet, call loadFirst() again
+            //to reload it
+            if (current == null) {
+                nextPoint = null;
+                loadFirst();
+            } else {
+                nextEntry = reloadNext();
+            }
         }
 
         /**
@@ -679,22 +843,21 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * the value or not
          */
         private void loadNext() {
-            checkDataIntegrity();
-            if (!hasNext()) {
+            //Reload next element in case it has changed
+            reload();
+
+            //Check if there are any elements left to iterate over
+            if (nextEntry == null) {
                 throw new NoSuchElementException();
             }
 
-            // since we called next(), we are now allowed to call
-            // a subsequent Iterator.remove()
             currExists = true;
-
 
             // fetch the next element and adjust the
             // references accordingly.
             entry = nextEntry;
+            currentPoint = nextPoint;
             current = next;
-            nextEntry = getNextQualifiedElement();
-            dataIntegrityValue = current.getDataIntegrityValue();
         }
 
         /**
@@ -709,8 +872,9 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * {@inheritDoc}
-         * @throws ObjectNotFoundException if the object referenced
-         * by the ManagedReference has been removed
+         * @throws CurrentConcurrentRemovedException if the current element
+         *         no longer exists but was not removed by the iterator
+         *  
          */
         public E current() {
 
@@ -722,27 +886,15 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * {@inheritDoc}
-         * @throws ObjectNotFoundException if the object referenced
-         * by the ManagedReference has been removed
          */
         public double currentX() {
-
-            // Check if current element has been removed or next() method has
-            // not been called
-            checkCurrentEntry();
             return currentPoint.getX();
         }
 
         /**
          * {@inheritDoc}
-         * @throws ObjectNotFoundException if the object referenced
-         * by the ManagedReference has been removed
          */
         public double currentY() {
-
-            // Check if current element has been removed or next() method has
-            // not been called
-            checkCurrentEntry();
             return currentPoint.getY();
         }
 
@@ -750,45 +902,59 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * Checks if the current entry exists.
          */
         private void checkCurrentEntry() {
-            checkDataIntegrity();
+
+            //If the iterator has removed the current element or the very first
+            //element has never been loaded
             if (!currExists) {
                 throw new IllegalStateException("There is no current" +
                         "element.");
             }
+
+            //If currExists is still set to true, but the current element
+            //is gone, it must have been removed concurrently and not by
+            //the iterator
+            if (!hasCurrent()) {
+                throw new CurrentConcurrentRemovedException("Current" +
+                        " element in the tree was removed concurrently.");
+            }
+
         }
 
         /**
          * Removes from the underlying collection the last element returned by
          * the iterator (optional operation). This method can be called only
-         * once per call to <tt>next</tt>. The behavior of an iterator is
-         * unspecified if the underlying collection is modified while the
-         * iteration is in progress in any way other than by calling this
-         * method.
+         * once per call to <tt>next</tt>. 
          *
-         * @exception IllegalStateException if the <tt>next</tt> method has
+         * @throws CurrentConcurrentRemovedException if the current element
+         * no longer exists and was no removed by the iterator
+         * @throws IllegalStateException if the <tt>next</tt> method has
          * not yet been called or if the current element has been removed
          * already
          */
         public void remove() {
-            checkDataIntegrity();
-
-            // Check if current element has been removed or next() method has
-            // not been called
             checkCurrentEntry();
-
             currExists = false;
-            current.remove(entry.coordinate);
-            dataIntegrityValue = current.getDataIntegrityValue();
+            List<ManagedReference<ManagedSerializable<E>>> list =
+                    current.get().getValues().get(currentPoint);
+
+            //Find the index of the element last returned and remove it
+            int index =
+                    Collections.binarySearch(list, entry.getValue(),
+                    getComparator());
+            current.get().remove(currentPoint, index);
         }
 
         /**
          * Retrieves the first non-null leaf node in a tree, rooted
-         * by {@code node}. This method can never return null.
+         * by {@code node}. If the box
+         * parameter is null, then it is assumed that there is no BoundingBox
+         * limiting the area of search.
          *
          * @param node the root of the tree or subtree
          * @param box  the boundingBox to search in for the leaf node
-         * @return the first child of {@code node} that is a leaf
-         * @throws IllegalStateException if a leaf node could not be found
+         * @return the first child of {@code node} that is a leaf or null if
+         *          the node does not have any children with leaves in the
+         *          boundingBox
          */
         static <E> ManagedReference<Node<E>> getFirstLeafNode(Node<E> node,
                 BoundingBox box) {
@@ -803,21 +969,20 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             // the specified bounding box
             for (int i = 0; i < Node.NUM_CHILDREN; i++) {
                 Node<E> child = node.getChild(i);
-                if (child != null && checkBoxRegion(box,
-                        child.getBoundingBox())) {
+                if (child != null && (box == null || checkBoxRegion(box,
+                        child.getBoundingBox()))) {
                     return getFirstLeafNode(child, box);
                 }
             }
-
-            // shouldn't get here
-            throw new IllegalStateException(
-                    "Problem retrieving first leaf node");
+            return null;
         }
 
         /**
          * Returns the next node using a depth-first traversal scheme. If we
          * try to retrieve the next node while on the root, {@code null} is
-         * returned, specifying our exit condition.
+         * returned, specifying our exit condition. If the box parameter is
+         * null, then it is assumed that there is no BoundingBox limiting the
+         * area of search.
          *
          * @param node the current node, whose next element we are interested
          * in finding
@@ -841,26 +1006,30 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
             //Check through all the children of parent for a non-null node
             while (quadrant != Node.INVALID_QUADRANT) {
-                child = parent.getChild(quadrant);
-
-                if (child != null) {
+                child = parent.getChild(quadrant);             
                     // Dig deeper only if the child's bounding box
                     // intersects with the specified bounding box to save
                     // time and avoid needless traversals
-                    if (checkBoxRegion(box, child.getBoundingBox())) {
+                    if (child != null &&
+                            (box == null ||
+                            checkBoxRegion(box, child.getBoundingBox()))) {
 
                         // Dig deeper if child is not a leaf,
                         // or if it is a leaf return it. Otherwise,
                         // keep searching this level.
                         if (!child.isLeaf()) {
-                            return getFirstLeafNode(child, box);
+                            ManagedReference<Node<E>> possibleNode =
+                                    getFirstLeafNode(child, box);
+                            if (possibleNode != null)
+                            {
+                                return possibleNode;
+                            }
                         } else {
                             return AppContext.getDataManager().
                                     createReference(child);
                         }
                     }
-                }
-
+              
                 //Get quadrant of next child
                 quadrant = Node.nextQuadrant(quadrant);
             }
@@ -884,7 +1053,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             if (leaf != null) {
 
                 //Check for case where leaf is the root and has no values
-                if (leaf.get().values != null) {
+                if (leaf.get().getValues() != null) {
                     return leaf;
                 }
                 // Otherwise, try getting the next qualified node
@@ -904,9 +1073,8 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * {@code null}
          * if none exists
          */
-        private ManagedReference<Node<E>> getNextQualifiedLeafNode(
-                Node<E> node) {
-
+        private ManagedReference<Node<E>> getNextQualifiedLeafNode(Node<E> node)
+        {
             ManagedReference<Node<E>> child = getNextLeafNode(node, this.box);
 
             // Go through all the nodes of the tree, child is only null if
@@ -952,13 +1120,13 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         private static final long serialVersionUID = 3L;
         /** The node currently being examined */
         private ManagedReference<Node<E>> current;
+        /** The root of the tree being cleared */
+        private ManagedReference<Node<E>> root;
         /** The total number of elements to remove for each task iteration */
         private static final int MAX_OPERATIONS = 50;
-        /** The iterator which traverses the unique coordinates in a map */
-        private ManagedReference<ManagedSerializable<Iterator<Point>>>
-                keyIterator;
         /** The point currently being examined */
         private Point currentPoint;
+        private boolean firstTime;
 
         /**
          * The constructor of the clear task, which requires the root element
@@ -966,33 +1134,35 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          *
          * @param root the root of the tree, which must not be {@code null}
          */
-        AsynchronousClearTask(Node<E> root) {
+        AsynchronousClearTask(ManagedReference<Node<E>> root) {
             assert (root != null) : "The root parameter must not be null";
-
-            current = ElementIterator.getFirstLeafNode(root, null);
-            ManagedSerializable<Iterator<Point>> iter =
-                    new ManagedSerializable<Iterator<Point>>(
-                    setupKeyIterator(current));
-            keyIterator = createReferenceIfNecessary(iter);
-            currentPoint =
-                    (keyIterator == null ||
-                    !keyIterator.get().get().hasNext() ? null
-                    : keyIterator.get().get().next());
+            current = ElementIterator.getFirstLeafNode(root.get(), null);
+            currentPoint = null;
+            firstTime = true;
+            this.root = root;
         }
 
         /**
          * The entry point into the task
          */
         public void run() {
-            // Perform some work and check if we need to reschedule
+
+            // Mark task for update
             DataManager dm = AppContext.getDataManager();
             dm.markForUpdate(this);
+            //If the task is run for the first time, setup first currentPoint
+            if (firstTime) {
+                currentPoint = getFirstPoint(current);
+                firstTime = false;
+            }
 
             // Check if there is more work to be done. If so, reschedule.
-            // Otherwise, remove the task object from the data manager.
             if (doWork()) {
                 AppContext.getTaskManager().scheduleTask(this);
             } else {
+                // If all the clearing work has been done, remove the root
+                // and then this task
+                dm.removeObject(root.get());
                 dm.removeObject(this);
 
                 Runnable r = noteDoneRemoving;
@@ -1003,96 +1173,127 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
 
         /**
-         * Removes MAX_OPERATION number of elements from the quadtree using a
-         * post-order depth-first traversal and returns {@code true} if there
-         * is more work to be done. If there are no more elements to remove,
-         * then it will return {@code false}.
+         * Removes MAX_OPERATION number of elements from the
+         * {@code ConcurrentQuadTree} using a post-order depth-first traversal
+         * and returns {@code true} if there is more work to be done. If
+         * there are no more elements to remove, then it will
+         * return {@code false}.
          *
          * @return {@code true} if more work needs to be done, and
          * {@code false} if there are no more elements to remove.
          */
         private boolean doWork() {
             int count = 0;
-
+             TreeMap<Point, List<ManagedReference<ManagedSerializable<E>>>>
+                     values;
             // Loop to remove elements. We'll stop when we reach the
-            // end or if we max out our operations, which ever comes first
-            while (current != null && ++count < MAX_OPERATIONS) {
-
+            // end, if we max out our operations or if
+            // currentPoint is null meaning there are no
+            // elements to iterate over, whichever comes first
+            while (current != null && ++count < MAX_OPERATIONS &&
+                    currentPoint != null) {
+                
                 // If we ran out of elements to remove, fetch the next
                 // Point to try and remove.
-                if (!removeElement()) {
-                    currentPoint =
-                            (keyIterator == null ||
-                            !keyIterator.get().get().hasNext() ? null
-                            : keyIterator.get().get().next());
-
-                    // We are done with this node; delete it from
-                    // the data manager and then get the next one
-                    if (currentPoint == null) {
-                        ManagedReference<Node<E>> nextNode =
-                                ElementIterator.getNextLeafNode(current.get(),
+                if (removeElement()) {
+                    try {
+                        values = current.get().getValues();
+                        //If the node is the root and its values is null,
+                        //there are no more elements to remove
+                        if (root.getId().equals(current.getId()) &&
+                                values == null) {
+                            return false;
+                        }
+                        //If all the elements in the list associated with
+                        //the currentPoint have been removed, then currentPoint
+                        //must have been removed, fetch next point
+                        if (!values.containsKey(currentPoint)) {
+                            currentPoint = values.higherKey(currentPoint);
+                        }
+                    } catch (ObjectNotFoundException onfe) {
+                        //If current leaf no longer exists, it must have been
+                        //removed after all of its elements were cleared,
+                        //fetch next leaf
+                        current = ElementIterator.getFirstLeafNode(root.get(),
                                 null);
-                        AppContext.getDataManager().removeObject(
-                                current.get());
-                        current = nextNode;
-                        ManagedSerializable<Iterator<Point>> iter =
-                                new ManagedSerializable<Iterator<Point>>(
-                                setupKeyIterator(current));
-                        keyIterator = createReferenceIfNecessary(iter);
-                        currentPoint =
-                                (keyIterator == null ||
-                                !keyIterator.get().get().hasNext()
-                                ? null : keyIterator.get().get().next());
+
+                        //If only leaf left is the root, there are no more
+                        //leaves left, set current to null, otherwise get the
+                        //first point of the next leaf
+                        if (!root.getId().equals(current.getId())) {
+                            currentPoint = getFirstPoint(current);
+                         } else {
+                            current = null;
+                        }
                     }
                 }
             }
+            //Return whether or not there are more leaves left to be cleared
             return (current != null);
         }
 
         /**
-         * Returns the iterator over the {@code Points} belonging to the node,
-         * or {@code null} if there are no {@code Points} to examine.
+         * Returns the first {@code Point} belonging to the node,
+         * or {@code null} if there are no {@code Point}s to examine.
          *
          * @param <E> the type of elements stored
          * @param node the current node being examined
-         * @return an iterator over the points in the bucket, or {@code null}
+         * @return the first point in the leaf node, or {@code null}
          * if there are none
          */
-        private static <E> Iterator<Point> setupKeyIterator(
+        private static <E> Point getFirstPoint(
                 ManagedReference<Node<E>> node) {
-            if (node == null) {
+            TreeMap<Point, List<ManagedReference<ManagedSerializable<E>>>>
+                    values = node.get().getValues();
+
+            //If the node is an empty root, there are no elements to clear,
+            //values will be null
+            if (values == null) {
                 return null;
             }
-            Map<Point, List<ManagedReference<ManagedSerializable<E>>>> values =
-                    node.get().getValues();
-            if (values.isEmpty()) {
-                return null;
-            }
-            return values.keySet().iterator();
+            return values.firstKey();
         }
 
         /**
          * Removes an element from the current node and returns {@code true}
-         * if it was performed. {@code False} is returned if no element was
+         * if it was removed. {@code False} is returned if no element was
          * removed, indicating that a new node should be fetched.
          *
          * @return {@code true} if an element was removed and {@code false}
          * otherwise
          */
         private boolean removeElement() {
-            // No elements to iterate; return false indicating
-            // no elements were removed
-            if (currentPoint == null) {
-                return false;
-            }
-
             // Deletes the next element located at currentPoint
             return (current.get().delete(currentPoint));
         }
     }
 
     /**
-     * A region, defined by two {@code Points}, which represents the area
+     * A comparator used to define behaviour when comparing two
+     * ManagedObjects. Used to keep list of elements corresponding to a point
+     * sorted.
+     */
+    static class ManagedReferenceComparator implements Comparator,
+    Serializable {
+
+        private static final long serialVersionUID = 2L;
+        /**
+         * Compares the {@code ManagedObject} Id of two {@code ManagedObject}s
+         * @param obj1 a {@code ManagedReference}
+         * @param obj2 another {@code ManagedReference}
+         * @return positive integer if obj1 has a {@code ManagedObject} Id
+         * greater than obj2, 0 if the two {@code ManagedObject}s have the
+         * same Id and a negative integer otherwise
+         */
+        public int compare(Object obj1, Object obj2) {
+            ManagedReference mr1 = (ManagedReference) obj1;
+            ManagedReference mr2 = (ManagedReference) obj2;
+            return mr1.getId().compareTo(mr2.getId());
+        }
+    }
+
+    /**
+     * A region, defined by two {@code Point}s, which represents the area
      * belonging to a certain object. The two {@code Point}s representing the
      * bounding box are Cartesian points which correspond to corner points of
      * an imaginary box. Each x and y coordinate for both points represent the
@@ -1192,7 +1393,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          *
          */
         private void organizeCoordinates() {
-
             Point[] newBounds = {
                 new Point(Math.min(bounds[MIN_POINT].x,
                 bounds[MAX_POINT].x),
@@ -1267,7 +1467,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * Determines a value to represent whether or not the region defined by
-         * coordinates of args is within the region defined by coords. Note: 
+         * coordinates of args is within the region defined by coords. Note:
          * this method will not return an appropriate value if the region
          * defined by coords is smaller and contained within (subset of)
          * the region defined by arg.
@@ -1301,7 +1501,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
 
         /**
-         * 
          * Determines if the parameter {@code arg} is contained between the
          * two bounds.
          *
@@ -1347,6 +1546,11 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
                     d[Y_MIN] + ((d[Y_MAX] - d[Y_MIN]) / 2));
         }
 
+        /**
+         * Returns a Point representing the middle of the region
+         *
+         * @return the {@code Point} representing the middle
+         */
         public String toString() {
             StringBuffer strBuf = new StringBuffer();
             for (int i = 0; i < bounds.length; i++) {
@@ -1357,7 +1561,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
     }
 
     /**
-     * Represents an entry in the quadtree by maintaining a
+     * Represents an entry in the {@code ConcurrentQuadTree} by maintaining a
      * {@code ManagedReference} to the stored object and its coordinates
      * in the form of a {@code Point} object.
      */
@@ -1419,7 +1623,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * A class that represents a point as an ({@code x}, {@code y})
      * coordinate pair.
      */
-    public static class Point implements Serializable {
+    public static class Point implements Serializable, Comparable<Point> {
 
         private static final long serialVersionUID = 7L;
         /** the x-coordinate */
@@ -1429,7 +1633,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * Constructor which creates a new {@code Point} instance given an x
-         * and y-coordinate. 
+         * and y-coordinate.
          *
          * @param x x-coordinate of the point
          * @param y y-coordinate of the point
@@ -1509,20 +1713,26 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         public int hashCode() {
             return (int) (x + y);
         }
-        /*
-        public int compareTo(Point point)
-        {
-        if (point.x > this.x || (point.x == this.x && point.y > this.y))
-        {
-            return -1;
+
+        /**
+         * Compares the x and y values of two points using a dictionary order
+         * system where the x value is compared first and then the y value
+         * if the x values are equal.
+         * @param point the point which will be compared with this point
+         * @return 0 if two Points are equal, -1 if this Point is less than
+         *          the point passed in and 1 if this point is greather than
+         *          the poin passed in
+         */
+        public int compareTo(Point point) {
+            if (point.getX() > this.x ||
+                    (point.getX() == this.x && point.getY() > this.y)) {
+                return -1;
+            }
+            if (point.getX() == this.x && point.getY() == this.y) {
+                return 0;
+            }
+            return 1;
         }
-        if (point.x == this.x && point.y == this.y)
-        {
-            return 0;
-        }
-        return 1;
-        }
-*/
     } // end Point class
 
     /**
@@ -1546,9 +1756,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         // -1 is used to indicate an invalid quadrant.
         private static final int INVALID_QUADRANT = -1;
-        /** the default starting value for the data integrity variable */
-        private static final int DEFAULT_INTEGRITY_START_VALUE =
-                Integer.MIN_VALUE;
         /** the parent of this node */
         private final ManagedReference<Node<E>> parent;
         /** the depth of the node, which will not change */
@@ -1556,11 +1763,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         private final int bucketSize;
         /** the branching factor for each node */
         static final int NUM_CHILDREN = 4;
-        /**
-         * the integrity value used by the iterators to check for a
-         * {@code ConcurrentModificationException}
-         */
-        private int dataIntegrityValue;
         /**
          * the area (determined by two corner points) representing the node's
          * bounds
@@ -1573,7 +1775,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * {@code ManagedReference}s which point to
          * {@code ManagedSerializable} objects containing the stored entries.
          */
-        private Map<Point, List<ManagedReference<ManagedSerializable<E>>>>
+        private TreeMap<Point, List<ManagedReference<ManagedSerializable<E>>>>
                 values;
         /** references to the children */
         private ArrayList<ManagedReference<Node<E>>> children;
@@ -1589,7 +1791,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             this.boundingBox = box;
             this.parent = null;
             this.bucketSize = bucketSize;
-            dataIntegrityValue = DEFAULT_INTEGRITY_START_VALUE;
             myQuadrant = INVALID_QUADRANT;
             children = new ArrayList<ManagedReference<Node<E>>>();
             values = null;
@@ -1618,7 +1819,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             this.parent = dm.createReference(parent);
             //this.depth = parent.depth + 1;
             this.bucketSize = bucketSize;
-            dataIntegrityValue = DEFAULT_INTEGRITY_START_VALUE;
             myQuadrant = quadrant;
             children = new ArrayList<ManagedReference<Node<E>>>();
             values = null;
@@ -1736,6 +1936,8 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
                             if (i > 0) {
                                 sb.append(", ");
                             }
+                            sb.append(values.get(p).get(i).getId());
+                            sb.append(" ");
                             sb.append(values.get(p).get(i).get());
                         }
                         if (iter.hasNext()) {
@@ -1769,20 +1971,10 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * Returns the children of this node. This is intended to be used by
          * the {@code isEmpty} method.
          *
-         * @return the children of this node, or {@code null} if no children
-         * exist
+         * @return the children of this node
          */
         List<ManagedReference<Node<E>>> getChildren() {
             return children;
-        }
-
-        /**
-         * Retrieves the data integrity value for this node.
-         *
-         * @return the data integrity value
-         */
-        int getDataIntegrityValue() {
-            return dataIntegrityValue;
         }
 
         /**
@@ -1863,7 +2055,8 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          *
          * @return this node's {@code Map} of values
          */
-        Map<Point, List<ManagedReference<ManagedSerializable<E>>>> getValues() {
+        TreeMap<Point, List<ManagedReference<ManagedSerializable<E>>>>
+                getValues() {
             return values;
         }
 
@@ -1908,7 +2101,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             } else if (isLeaf() && values == null) {
 
                 //Initialize leaf's values if it has not been initialized yet
-                values = new HashMap<Point,
+                values = new TreeMap<Point,
                         List<ManagedReference<ManagedSerializable<E>>>>();
                 insert(point, element);
             } else if (size(this) == bucketSize && !values.containsKey(point)) {
@@ -1944,7 +2137,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * extract the old value and clear; it no longer should have a value
          * since this node will soon have children
          *
-         * @param leaf the node to split
          * @param point the coordinate to add the element
          * @param element the element to add
          * @return {@code true} if the element was successfully added, and
@@ -1961,15 +2153,19 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             // Add back the old elements to the appropriate new leaves.
             // Since we have four new quadrants, we have to add each
             // one individually to allocate it in the correct quadrant.
-            Iterator<Point> keyIter = existingValues.keySet().iterator();
+            Iterator<Map.Entry<Point, 
+                    List<ManagedReference<ManagedSerializable<E>>>>> keyIter
+                    = existingValues.entrySet().iterator();
             Point key;
             List<ManagedReference<ManagedSerializable<E>>> list;
 
             // Iterate through all the keys. They hold onto lists
             // which each contain at least one element
             while (keyIter.hasNext()) {
-                key = keyIter.next();
-                list = existingValues.get(key);
+                Map.Entry mapEntry = keyIter.next();
+                key = (Point) mapEntry.getKey();
+                list = (List<ManagedReference<ManagedSerializable<E>>>)
+                        mapEntry.getValue();
                 quadrant =
                         Node.determineQuadrant(boundingBox,
                         key);
@@ -1978,10 +2174,11 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
                 // to the new children.
                 Iterator<ManagedReference<ManagedSerializable<E>>> iter =
                         list.iterator();
-                E value;
+                ManagedReference<ManagedSerializable<E>> ref;
                 while (iter.hasNext()) {
-                    value = iter.next().get().get();
-                    addValue(quadrant, key, value);
+                    ref = iter.next();
+                    addValue(quadrant, key, ref.get().get());
+                    dm.removeObject(ref.get());
                 }
             }
 
@@ -2015,29 +2212,33 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
 
         /**
-         * Appends the entry to the leaf node's list
+         * Adds an element to the leaf node's list
          *
-         * @param entry the new entry to append
+         * @param point the point at which the new element will be inserted
+         * @param element the new element to be inserted
          */
-        private void insert(Point point, E value) {
+        private void insert(Point point, E element) {
             assert (isLeaf()) : "The node is a leaf";
-            assert (value != null) : "The value cannot be null";
+            assert (element != null) : "The value cannot be null";
             List<ManagedReference<ManagedSerializable<E>>> list =
                     values.get(point);
 
             // Decide if we need to make a new instance or not
             if (list == null) {
                 list =
-                   new ArrayList<ManagedReference<ManagedSerializable<E>>>();
+                      new ArrayList<ManagedReference<ManagedSerializable<E>>>();
                 values.put(point, list);
             }
-            ManagedSerializable<E> ms = new ManagedSerializable<E>(value);
+            ManagedSerializable<E> ms = new ManagedSerializable<E>(element);
             ManagedReference<ManagedSerializable<E>> ref =
                     AppContext.getDataManager().createReference(ms);
-            list.add(ref);
+            int index = Collections.binarySearch(list, ref,
+                    getComparator());
+            index = (index + 1) * (-1);
+            list.add(index, ref);
 
             AppContext.getDataManager().markForUpdate(this);
-            dataIntegrityValue++;
+
         }
 
         /**
@@ -2067,10 +2268,9 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
             if (isLeaf()) {
 
-                //Stop if this is a leaf with null values, there are no nodes to
-                //remove
+                //Stop if this is not a leaf with null values, there are no
+                //nodes to remove
                 if (values != null) {
-                    dataIntegrityValue++;
                     return;
                 }
             } else {
@@ -2086,6 +2286,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
                         children.set(i, null);
                         dm.removeObject(child);
                         numNull++;
+
                     }
                 }
 
@@ -2096,7 +2297,6 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
                     //Can stop moving up to remove leaves with null values if
                     //this node does not have all null children, since this
                     //node will not become a leaf with null values.
-                    dataIntegrityValue++;
                     return;
                 }
             }
@@ -2111,11 +2311,12 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * Removes the element from the tree if it exists.
          *
          * @param coordinate the coordinate of the element to remove
+         * @param index index of the element to be removed in the point's list
          * @return the element that was removed, or {@code null} if none was
          * removed
          */
-        E remove(Point coordinate) {
-            E old = removeEntry(coordinate, this);
+        E remove(Point coordinate, int index) {
+            E old = removeEntry(coordinate, this, index);
 
             // If we found an entry, remove it and return it
             if (old != null) {
@@ -2126,18 +2327,17 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
 
         /**
-         * Retrieves the {@code entry} from the quadtree that corresponds to
-         * the given point. Since there may be more than one element stored at
-         * the given coordinate, this method pops the head element, which does
-         * not guarantee the resulting element.
+         * Retrieves the {@code entry} from the {@code ConcurrentQuadTree} that corresponds to
+         * the given point and index.
          *
          * @param <E> the type of object stored
          * @param point the coordinate of the {@code entry}
          * @param node the node to search within
+         * @param index index of the element to be removed in the point's list
          * @return the entry, or {@code null} if none matches the given
          * coordinate
          */
-        private static <E> E removeEntry(Point point, Node<E> node) {
+        private static <E> E removeEntry(Point point, Node<E> node, int index) {
             assert (node.isLeaf()) : "The node is not a leaf";
             Map<Point, List<ManagedReference<ManagedSerializable<E>>>> values =
                     node.getValues();
@@ -2161,7 +2361,14 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             System.err.println("~~ test: " + list.size());
 
             // extract the element from the list, and delete the wrapper
-            ManagedReference<ManagedSerializable<E>> ref = list.remove(0);
+            ManagedReference<ManagedSerializable<E>> ref = list.remove(index);
+            //If element at the specified index has already been removed
+            //(doesn't exist) return null
+            if (ref == null) {
+                return null;
+
+
+            }
             E old = ref.get().get();
             dm.removeObject(ref.get());
 
@@ -2182,17 +2389,16 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
 
         /**
-         * Removes the element at the given point without returning it. This
-         * method is used to avoid any {@code ObjectNotFoundException}s in
-         * the event that the underlying element was removed from the data
-         * manager without updating the quadtree.
+         * Removes the element at the given point without returning it. Also
+         * performs remove work to propagate any changes up the tree.
          *
          * @param point the coordinate of the element to remove
          * @return {@code true} if an element was removed, and {@code false}
          * otherwise
          */
         boolean delete(Point point) {
-            E old = removeEntry(point, this);
+
+            E old = removeEntry(point, this, 0);
             if (old != null) {
                 doRemoveWork();
                 return true;
