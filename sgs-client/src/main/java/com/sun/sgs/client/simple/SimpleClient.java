@@ -74,14 +74,6 @@ public class SimpleClient implements ServerSession {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SimpleClient.class.getName()));
     
-    /**
-     * The listener for the {@code ClientConnection} the session
-     * is communicating on.  If our login attempt is redirected to
-     * another host, we will use a different listener for the connection
-     * to the new host.
-     */
-    private ClientConnectionListener connListener;
-    
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
 
@@ -91,13 +83,6 @@ public class SimpleClient implements ServerSession {
      */
     private volatile ClientConnection clientConnection = null;
 
-    /** The password authentication used for the initial client
-     *  login attempt.  If the client receives a LOGIN_REDIRECT
-     *  message, we don't want the user (typing at a keyboard)
-     *  to have to supply their login information again.
-     */
-    PasswordAuthentication authentication = null;
-    
     /**
      * Indicates that either a connection or disconnection attempt
      * is in progress.
@@ -131,7 +116,6 @@ public class SimpleClient implements ServerSession {
             throw new NullPointerException(
                 "The SimpleClientListener argument must not be null");
         }
-        connListener = new SimpleClientConnectionListener();
         this.clientListener = listener;
     }
 
@@ -200,7 +184,7 @@ public class SimpleClient implements ServerSession {
             connectionStateChanging = true;
         }
         ClientConnector connector = ClientConnector.create(props);
-        connector.connect(connListener);
+        connector.connect(new SimpleClientConnectionListener());
     }
 
     /* -- Implement ServerSession -- */
@@ -254,6 +238,13 @@ public class SimpleClient implements ServerSession {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>Note: The server does not guarantee delivery of any session
+     * message (sent via this method) that is received by the server before
+     * the sending client is logged in.  Therefore messages sent before this
+     * client is logged in, that is, before the {@link
+     * SimpleClientListener#loggedIn SimpleClientListener.loggedIn} method
+     * is invoked, may be dropped by the server.
      */
     public void send(ByteBuffer message) throws IOException {
         checkConnected();
@@ -309,6 +300,10 @@ public class SimpleClient implements ServerSession {
         implements ClientConnectionListener
     {
             
+	/** The password authentication used for login.
+	 */
+	private volatile PasswordAuthentication authentication = null;
+    
         /** Indicates whether this listener expects a disconnect message. */
         private volatile boolean expectingDisconnect = false;
 
@@ -323,6 +318,20 @@ public class SimpleClient implements ServerSession {
          *  when we're in this state.
          */
         private volatile boolean redirect = false;
+
+	/** Constructs an instance. */
+	SimpleClientConnectionListener() {
+	}
+
+	/**
+	 * Constructs an instance with the specified password {@code
+	 * authentication}.  This is used in the redirect case, so the
+	 * password authentication doesn't need to be reobtained from the
+	 * user.
+	 */
+	SimpleClientConnectionListener(PasswordAuthentication authentication) {
+	    this.authentication = authentication;
+	}
         
         /* -- Implement ClientConnectionListener -- */
         /**
@@ -572,11 +581,9 @@ public class SimpleClient implements ServerSession {
             props.setProperty("host", host);
             props.setProperty("port", String.valueOf(port));
             ClientConnector connector = ClientConnector.create(props);
-            // We use a new listener so we don't have to worry about
-            // "redirect" being incorrect.
-            connListener = new SimpleClientConnectionListener();
             // This eventually causes connected to be called
-            connector.connect(connListener);
+            connector.connect(
+		new SimpleClientConnectionListener(authentication));
         }
         
         /**
