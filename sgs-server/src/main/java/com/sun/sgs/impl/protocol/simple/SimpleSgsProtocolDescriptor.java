@@ -76,5 +76,13 @@ public class SimpleSgsProtocolDescriptor
     public byte[] getConnectionData() {
 	return transportDesc.getConnectionData();
     }
-    
+
+    /**
+     * Returns a string representation of this descriptor.
+     *
+     * @return	a string representation of this descriptor
+     */
+    public String toString() {
+	return "SimpleSgsProtocolDescriptor[" + transportDesc.toString() + "]";
+    }
 }

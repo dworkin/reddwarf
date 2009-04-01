@@ -24,9 +24,9 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.management.ChannelServiceMXBean;
 import com.sun.sgs.management.ClientSessionServiceMXBean;
@@ -423,7 +423,7 @@ public class TestMBeans {
                 (String) mbsc.getAttribute(name, "NodeType"));
         String serverHost = (String) mbsc.getAttribute(name, "ServerHostName");
         long timeout = (Long) mbsc.getAttribute(name, "StandardTxnTimeout");
-        
+        String desc = (String) mbsc.getAttribute(name, "ProtocolDescriptor");
         System.out.println("This node's data:");
         System.out.println("  node type: " + type);
         System.out.println("  app listener: " + appListener);
@@ -434,6 +434,7 @@ public class TestMBeans {
         System.out.println("  host name: " + hostName);
         System.out.println("  jmx port: " + jmxPort);
         System.out.println("  server host:" + serverHost);
+	System.out.println("  protocol descriptor:" + desc);
         
         // Create the proxy for the object
         ConfigMXBean proxy = 
@@ -446,6 +447,7 @@ public class TestMBeans {
         assertEquals(type, proxy.getNodeType());
         assertEquals(serverHost, proxy.getServerHostName());
         assertEquals(timeout, proxy.getStandardTxnTimeout());
+	assertEquals(desc, proxy.getProtocolDescriptor());
         
         assertEquals(appListener, bean.getAppListener());
         assertEquals(appName, bean.getAppName());
@@ -455,6 +457,7 @@ public class TestMBeans {
         assertEquals(type, bean.getNodeType());
         assertEquals(serverHost, bean.getServerHostName());
         assertEquals(timeout, bean.getStandardTxnTimeout());
+	assertEquals(desc, bean.getProtocolDescriptor());
     }
     
     @Test

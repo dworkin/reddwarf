@@ -26,6 +26,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -345,6 +346,16 @@ public final class ClientSessionServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
             
+            /* Set the protocol descriptor in the ConfigMXBean. */
+            ConfigManager config = (ConfigManager)
+                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            if (config == null) {
+                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
+            } else {
+                config.setProtocolDescriptor(
+		    protocolAcceptor.getDescriptor().toString());
+            }
+	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(

@@ -93,5 +93,11 @@ public interface ConfigMXBean {
      * @return the standard transaction timeout, in milliseconds
      */
     long getStandardTxnTimeout();
-    
+
+    /**
+     * Returns the protocol descriptor, as a {@code String}.
+     *
+     * @return the protocol descriptor, as a {@code String}
+     */
+    String getProtocolDescriptor();
 }
