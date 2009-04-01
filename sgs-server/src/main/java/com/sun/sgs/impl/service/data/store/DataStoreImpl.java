@@ -41,6 +41,7 @@ import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
@@ -130,6 +131,10 @@ public class DataStoreImpl extends AbstractDataStore {
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /** The logger for transaction abort exceptions. */
+    static final LoggerWrapper abortLogger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort"));
 
     /** The number of bytes in a SHA-1 message digest. */
     private static final int SHA1_SIZE = 20;
@@ -781,8 +786,7 @@ public class DataStoreImpl extends AbstractDataStore {
 			 AccessCoordinator accessCoordinator,
 			 Scheduler scheduler)
     {
-	super(accessCoordinator, logger,
-	      new LoggerWrapper(Logger.getLogger(CLASSNAME + ".abort")));
+	super(accessCoordinator, logger, abortLogger);
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -1298,7 +1302,7 @@ public class DataStoreImpl extends AbstractDataStore {
 
     /** {@inheritDoc} */
     protected void abortInternal(Transaction txn) {
-	checkNonNull(txn, "txn");
+	checkNull("txn", txn);
 	TxnInfo txnInfo = txnInfoTable.remove(txn);
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");

@@ -65,9 +65,6 @@ public class InMemoryDataStore extends AbstractDataStore {
     /** Stores the next object ID. */
     private long nextOid = 1;
 
-    /** Synchronize on this field when accessing the next three fields. */
-    private final Object classInfoLock = new Object();
-
     /** Maps class IDs to class info arrays. */
     private final Map<Integer, byte[]> classIdMap =
 	new HashMap<Integer, byte[]>();
@@ -98,8 +95,9 @@ public class InMemoryDataStore extends AbstractDataStore {
 	Transaction txn, long oid, boolean forUpdate)
     {
 	txn.join(this);
-	if (oids.containsKey(oid)) {
-	    return oids.get(oid);
+	byte[] value = oids.get(oid);
+	if (value != null) {
+	    return value;
 	} else {
 	    throw new ObjectNotFoundException("");
 	}
@@ -109,10 +107,10 @@ public class InMemoryDataStore extends AbstractDataStore {
 	Transaction txn, long oid, byte[] data)
     {
 	txn.join(this);
+	byte[] oldValue = oids.put(oid, data);
 	List<Object> txnEntry = getTxnEntry(txn);
 	txnEntry.add(oid);
-	txnEntry.add(oids.get(oid));
-	oids.put(oid, data);
+	txnEntry.add(oldValue);
     }
 
     protected synchronized void setObjectsInternal(

@@ -171,7 +171,7 @@ public interface DataStoreServer extends Remote {
 
     /**
      * Binds an object ID to a name.  If the name is bound, the return value
-     * contains an arbitrary positive object ID and a next name of {@code
+     * contains an arbitrary non-negative object ID and a next name of {@code
      * null}.  If the name is not bound, the return value contains an object ID
      * of {@code -1} and the next name found, which may be {@code null}.
      *
@@ -194,9 +194,9 @@ public interface DataStoreServer extends Remote {
 
     /**
      * Removes the binding for a name.  If the name is bound, the return value
-     * contains an arbitrary positive object ID, otherwise it contains {@code
-     * -1}.  In all cases, the return value contains the next name found, which
-     * may be {@code null}.
+     * contains an arbitrary non-negative object ID, otherwise it contains
+     * {@code -1}.  In all cases, the return value contains the next name
+     * found, which may be {@code null}.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place

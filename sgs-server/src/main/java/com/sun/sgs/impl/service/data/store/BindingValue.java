@@ -41,6 +41,22 @@ public final class BindingValue implements Serializable {
     private final String nextName;
 
     /**
+     * Creates an instance of this class.
+     *
+     * @param	oid the value of the requested name or {@code -1}
+     * @param	nextName the next name or {@code null}
+     * @throws	IllegalStateException if {@code oid} is less than {@code -1}
+     */
+    public BindingValue(long oid, String nextName) {
+	if (oid < -1) {
+	    throw new IllegalArgumentException(
+		"The oid must not be less than -1");
+	}
+	this.oid = oid;
+	this.nextName = nextName;
+    }
+
+    /**
      * Returns whether the name was bound.
      *
      * @return	{@code true} if the name was bound, otherwise {@code false}
@@ -71,18 +87,12 @@ public final class BindingValue implements Serializable {
     }
 
     /**
-     * Creates an instance of this class.
+     * Returns a string representation of this object.
      *
-     * @param	oid the value of the requested name or {@code -1}
-     * @param	nextName the next name or {@code null}
-     * @throws	IllegalStateException if {@code oid} is less than {@code -1}
+     * @return	a string representation of this object
      */
-    public BindingValue(long oid, String nextName) {
-	if (oid < -1) {
-	    throw new IllegalArgumentException(
-		"The oid must not be less than -1");
-	}
-	this.oid = oid;
-	this.nextName = nextName;
+    @Override
+    public String toString() {
+	return "BindingValue[oid=" + oid + ", nextName=" + nextName + "]";
     }
 }

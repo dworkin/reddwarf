@@ -24,6 +24,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
@@ -39,31 +40,32 @@ import java.util.logging.Logger;
 
 /**
  * A skeletal implementation of {@code DataStore} that does logging, checks
- * arguments, reports object accesses, and is a transaction participant.
- * Object and name accesses are logged to {@link AccessReporter}s whose source
- * name includes the concrete name of the class. <p>
+ * arguments, reports object accesses, implements the next key locking scheme
+ * for name bindings, and is a transaction participant.  Object and name
+ * accesses are logged to {@link AccessReporter}s whose source name includes
+ * the name of the concrete class. <p>
  *
  * This class uses a next key locking scheme when reporting accesses to name
  * bindings.  This scheme is a way to insure isolation when different
  * transactions are creating, removing, and iterating over name bindings at the
- * same time.  The idea is to use the next key after the one in question as a
- * proxy for the current key even when that current key does not exist.  That
- * way, iterators know they can lock the next existing key as a proxy for the
- * key following a particular key, and others that create or remove keys will
- * do the same.  See the individual methods for getting, setting, and removing
+ * same time.  The idea is to use the next key after a given key as a proxy for
+ * the existence of the given key even when that key does not exist.  That way,
+ * iterators know when they lock the next key after a particular key that they
+ * will prevent others from changing what that next key ought to be.  See the
+ * individual methods for getting, setting, removing, and iterating over
  * bindings for details of how each operation fits into this scheme. <p>
  *
  * Note that this class does not perform next key locking for objects, because
- * the way objects are allocated and used makes it unnecessary.  Because there
- * is no API for obtaining objects by object ID provided at the application
- * level, applications can only officially obtain objects that are stored as
- * the value of a name binding, or that are reachable by navigation from a name
+ * the way objects are allocated and used makes that unnecessary.  Because
+ * there is no method at the application level for obtaining objects by object
+ * ID, applications can only officially obtain objects that are stored as the
+ * value of a name binding, or that are reachable by navigation from a name
  * binding.  In addition, object IDs are never reused.  The combination of
  * these two factors means that applications cannot ask to see an object that
  * was created simultaneously by another transaction, which is what next key
  * locking is intended to prevent.  This lack of consistency enforcement for
  * objects does mean that services, which can access objects by ID, need to
- * make sure to not ask questions about objects that they don't have other
+ * make sure not to ask questions about objects that they don't have other
  * reasons to believe exist.  In particular, it means that object iteration may
  * return inconsistent results.
  */
@@ -93,8 +95,8 @@ public abstract class AbstractDataStore
 				LoggerWrapper logger,
 				LoggerWrapper abortLogger)
     {
-	checkNonNull(logger, "logger");
-	checkNonNull(abortLogger, "abortLogger");
+	checkNull("logger", logger);
+	checkNull("abortLogger", abortLogger);
 	this.logger = logger;
 	this.abortLogger = logger;
 	String className = getClass().getName();
@@ -241,7 +243,7 @@ public abstract class AbstractDataStore
 		FINEST, "setObject txn:{0}, oid:{1,number,#}", txn, oid);
 	}
 	try {
-	    checkNonNull(data, "data");
+	    checkNull("data", data);
 	    reportObjectAccess(txn, oid, WRITE);
 	    setObjectInternal(txn, oid, data);
 	    if (logger.isLoggable(FINEST)) {
@@ -371,7 +373,7 @@ public abstract class AbstractDataStore
      * {@inheritDoc} <p>
      *
      * This implementation does logging, checks that {@code name} is not {@code
-     * null}, reports object accesses, and calls {@link #getBindingInternal
+     * null}, reports name accesses, and calls {@link #getBindingInternal
      * getBindingInternal} to perform the actual operation.
      */
     public long getBinding(Transaction txn, String name) {
@@ -379,11 +381,11 @@ public abstract class AbstractDataStore
 	    logger.log(FINEST, "getBinding txn:{0}, name:{1}", txn, name);
 	}
 	try {
-	    checkNonNull(name, "name");
+	    checkNull("name", name);
 	    /*
 	     * Read lock the name even though we don't know yet if it is bound.
-	     * Doing this means that the value we obtain, if there is one, is
-	     * known to be correct.
+	     * Doing this means that the value we obtain, if there is one, will
+	     * be known to be correct.
 	     */
 	    reportNameAccess(txn, name, READ);
 	    BindingValue result = getBindingInternal(txn, name);
@@ -432,7 +434,7 @@ public abstract class AbstractDataStore
      * {@inheritDoc} <p>
      *
      * This implementation does logging, checks that {@code name} is not {@code
-     * null} and that {@code oid} is valid, reports object accesses, and calls
+     * null} and that {@code oid} is valid, reports name accesses, and calls
      * {@link #setBindingInternal setBindingInternal} to perform the actual
      * operation.
      */
@@ -443,7 +445,7 @@ public abstract class AbstractDataStore
 		txn, name, oid);
 	}
 	try {
-	    checkNonNull(name, "name");
+	    checkNull("name", name);
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = setBindingInternal(txn, name, oid);
 	    if (!result.getNameBound()) {
@@ -470,7 +472,7 @@ public abstract class AbstractDataStore
 
     /**
      * Performs the actual operation for {@link #setBinding setBinding}.  If
-     * the name is bound, the return value contains an arbitrary positive
+     * the name is bound, the return value contains an arbitrary non-negative
      * object ID and a next name of {@code null}.  If the name is not bound,
      * the return value contains an object ID of {@code -1} and the next name
      * found, which may be {@code null}.
@@ -492,7 +494,7 @@ public abstract class AbstractDataStore
      * {@inheritDoc} <p>
      *
      * This implementation does logging, checks that {@code name} is not {@code
-     * null}, reports object accesses, and calls {@link #removeBindingInternal
+     * null}, reports name accesses, and calls {@link #removeBindingInternal
      * removeBindingInternal} to perform the actual operation.
      */
     public void removeBinding(Transaction txn, String name) {
@@ -500,7 +502,7 @@ public abstract class AbstractDataStore
 	    logger.log(FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
 	}
 	try {
-	    checkNonNull(name, "name");
+	    checkNull("name", name);
 	    /*
 	     * Write lock the name even though we don't know yet if it is
 	     * bound.  Doing this means that another transaction cannot change
@@ -531,9 +533,10 @@ public abstract class AbstractDataStore
 
     /**
      * Performs the actual operation for {@link #removeBinding removeBinding}.
-     * If the name is bound, the return value contains an arbitrary positive
-     * object ID, otherwise it contains {@code -1}.  In all cases, the return
-     * value contains the next name found, which may be {@code null}.
+     * If the name is bound, the return value contains an arbitrary
+     * non-negative object ID, otherwise it contains {@code -1}.  In all cases,
+     * the return value contains the next name found, which may be {@code
+     * null}.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
@@ -550,14 +553,13 @@ public abstract class AbstractDataStore
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation does logging, reports object accesses, and calls
+     * This implementation does logging, reports name accesses, and calls
      * {@link #nextBoundNameInternal nextBoundNameInternal} to perform the
      * actual operation.
      */
     public String nextBoundName(Transaction txn, String name) {
 	if (logger.isLoggable(FINEST)) {
-	    logger.log(
-		FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
+	    logger.log(FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
 	}
 	try {
 	    String result = reportNextNameAccess(
@@ -620,7 +622,7 @@ public abstract class AbstractDataStore
     public int getClassId(Transaction txn, byte[] classInfo) {
 	logger.log(FINER, "getClassId txn:{0}", txn);
 	try {
-	    checkNonNull(classInfo, "classInfo");
+	    checkNull("classInfo", classInfo);
 	    int result = getClassIdInternal(txn, classInfo);
 	    if (logger.isLoggable(FINER)) {
 		logger.log(
@@ -753,7 +755,7 @@ public abstract class AbstractDataStore
 	Transaction txn, long oid, Object description)
     {
 	checkOid(oid);
-	checkNonNull(description, "description");
+	checkNull("description", description);
 	objectAccesses.setObjectDescription(txn, oid, description);
     }
 
@@ -761,8 +763,8 @@ public abstract class AbstractDataStore
     public void setBindingDescription(
 	Transaction txn, String name, Object description)
     {
-	checkNonNull(name, "name");
-	checkNonNull(description, "description");
+	checkNull("name", name);
+	checkNull("description", description);
 	nameAccesses.setObjectDescription(
 	    txn, getNameForAccess(name), description);
     }
@@ -980,19 +982,6 @@ public abstract class AbstractDataStore
     }
 
     /**
-     * Throws {@link NullPointerException} if the argument is {@code null}.
-     *
-     * @param	arg the argument
-     * @param	parameterName the parameter name for the argument
-     */
-    protected static void checkNonNull(Object arg, String parameterName) {
-	if (arg == null) {
-	    throw new NullPointerException(
-		"The " + parameterName + " argument must not be null");
-	}
-    }
-
-    /**
      * Reports access to what should be the next name after a given name.
      * Confirms that the next name is correct after obtaining access, repeating
      * the operation if the name has changed, and returning actual next name.
@@ -1000,10 +989,11 @@ public abstract class AbstractDataStore
      * access was created by a transaction that aborts.
      *
      * @param	txn the transaction under which the operation should take place
-     * @param	name the name
-     * @param	next the next name after {@code name}
+     * @param	name the name, which may be {@code null}
+     * @param	next the next name after {@code name}, which may be
+     *		{@code null}
      * @param	accessType the type of access to the next name to report
-     * @return	the actual next name
+     * @return	the actual next name, which may be {@code null}
      */
     private String reportNextNameAccess(Transaction txn,
 					String name,

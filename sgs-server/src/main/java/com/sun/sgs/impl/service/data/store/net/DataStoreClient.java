@@ -117,6 +117,10 @@ public final class DataStoreClient extends AbstractDataStore {
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client"));
 
+    /** The logger for transaction abort exceptions. */
+    static final LoggerWrapper abortLogger =
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort"));
+
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
 	PACKAGE + ".server.host";
@@ -229,8 +233,7 @@ public final class DataStoreClient extends AbstractDataStore {
 			   AccessCoordinator accessCoordinator)
 	throws IOException, NotBoundException
     {
-	super(accessCoordinator, logger,
-	      new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort")));
+	super(accessCoordinator, logger, abortLogger);
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -711,7 +714,6 @@ public final class DataStoreClient extends AbstractDataStore {
 	}
 	return txnInfo;
     }
-
 
     /** Returns the current transaction count. */
     private int getTxnCount() {

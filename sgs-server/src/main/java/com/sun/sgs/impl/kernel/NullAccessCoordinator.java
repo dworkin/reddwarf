@@ -38,7 +38,7 @@ public class NullAccessCoordinator
     public NullAccessCoordinator() { }
 
     /**
-     * Creates an instance of this class, specifying the standard arguments for
+     * Creates an instance of this class, accepting the standard arguments for
      * access coordinators, which are ignored.
      *
      * @param	properties the configuration properties

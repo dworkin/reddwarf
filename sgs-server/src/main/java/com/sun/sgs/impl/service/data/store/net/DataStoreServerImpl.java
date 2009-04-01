@@ -27,6 +27,7 @@ import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
@@ -611,7 +612,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		logger.log(FINEST, "getBinding txn:{0}, name:{1}", txn, name);
 	    }
 	    try {
-		checkNonNull(name, "name");
+		checkNull("name", name);
 		BindingValue result = super.getBindingInternal(txn, name);
 		if (logger.isLoggable(FINEST)) {
 		    logger.log(FINEST,
@@ -642,7 +643,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    txn, name, oid);
 	    }
 	    try {
-		checkNonNull(name, "name");
+		checkNull("name", name);
 		BindingValue result = super.setBindingInternal(txn, name, oid);
 		if (logger.isLoggable(FINEST)) {
 		    logger.log(FINEST,
@@ -672,12 +673,12 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
 	    }
 	    try {
-		checkNonNull(name, "name");
+		checkNull("name", name);
 		BindingValue result = super.removeBindingInternal(txn, name);
 		if (logger.isLoggable(FINEST)) {
 		    logger.log(FINEST,
 			       "removeBinding txn:{0}, name:{1} returns {2}",
-			       txn, name, result.getNameBound());
+			       txn, name, result);
 		}
 		return result;
 	    } catch (RuntimeException e) {

@@ -84,7 +84,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
     /** The object ID of a new object created in the transaction. */
     private long id;
 
-    /** The runner used in the test, or {@code null} if not used or done. */
+    /** The runner used in the test, or {@code null} if not used or if done. */
     private Runner runner;
 
     /**
