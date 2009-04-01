@@ -15,7 +15,7 @@
   <artifactId>sgs-shared</artifactId>
   <name>Project Darkstar Shared</name>
   <packaging>jar</packaging>
-  <version>1.5</version>
+  <version>1.6</version>
   <inceptionYear>2007</inceptionYear>
   <url>http://www.projectdarkstar.com</url>
   <scm>

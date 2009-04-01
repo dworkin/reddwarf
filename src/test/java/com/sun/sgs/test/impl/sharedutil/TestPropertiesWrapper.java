@@ -265,5 +265,70 @@ public class TestPropertiesWrapper extends TestCase {
 	assertEquals(100L, wrapper.getLongProperty("p", 199, 100, 200));
 	assertEquals(100L, wrapper.getLongProperty("p", 100, 100, 100));
     }
+
+    /* -- Test getEnumProperty -- */
+
+    public void testGetEnumNullArgs() {
+	try {
+	    wrapper.getEnumProperty(null, Fruit.class, Fruit.APPLE);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    wrapper.getEnumProperty("fruit", null, Fruit.APPLE);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    wrapper.getEnumProperty("fruit", Fruit.class, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetEnumUnknownValue() {
+	props.setProperty("fruit", "");
+	try {
+	    wrapper.getEnumProperty("fruit", Fruit.class, Fruit.APPLE);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	props.setProperty("fruit", "null");
+	try {
+	    wrapper.getEnumProperty("fruit", Fruit.class, Fruit.APPLE);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	props.setProperty("fruit", "DOG");
+	try {
+	    wrapper.getEnumProperty("fruit", Fruit.class, Fruit.APPLE);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	props.setProperty("fruit", "apple");
+	try {
+	    wrapper.getEnumProperty("fruit", Fruit.class, Fruit.APPLE);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetEnumSuccess() {
+	assertSame(Fruit.APPLE,
+		   wrapper.getEnumProperty("fruit", Fruit.class, Fruit.APPLE));
+	props.setProperty("fruit", "ORANGE");
+	assertSame(Fruit.ORANGE,
+		   wrapper.getEnumProperty("fruit", Fruit.class, Fruit.APPLE));
+    }
+
+    /* -- Other classes and methods -- */
+
+    enum Fruit { APPLE, ORANGE, PEAR; }
 }
-	
