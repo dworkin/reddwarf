@@ -83,6 +83,6 @@ public class SimpleSgsProtocolDescriptor
      * @return	a string representation of this descriptor
      */
     public String toString() {
-	return getClass().getName() + "[" + transportDesc.toString() + "]";
+	return "SimpleSgsProtocolDescriptor[" + transportDesc.toString() + "]";
     }
 }

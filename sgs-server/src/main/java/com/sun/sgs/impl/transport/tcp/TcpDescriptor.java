@@ -74,7 +74,6 @@ class TcpDescriptor implements TransportDescriptor, Serializable {
      * @return	a string representation of this descriptor
      */
     public String toString() {
-	return getClass().getName() + "[host:" + hostName + ", port:" +
-	    listeningPort + "]";
+	return "TCP[host:" + hostName + ", port:" + listeningPort + "]";
     }
 }
