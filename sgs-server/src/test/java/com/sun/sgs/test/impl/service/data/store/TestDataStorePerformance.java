@@ -19,14 +19,17 @@
 
 package com.sun.sgs.test.impl.service.data.store;
 
+import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
+import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
+import com.sun.sgs.test.util.DummyTransactionProxy;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import com.sun.sgs.tools.test.IntegrationTest;
@@ -68,6 +71,10 @@ public class TestDataStorePerformance extends TestCase {
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
+    /** The transaction proxy. */
+    protected static final DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
+
     /** The number of objects to read in a transaction. */
     protected int items = Integer.getInteger("test.items", 100);
 
@@ -97,6 +104,9 @@ public class TestDataStorePerformance extends TestCase {
     /** Properties for creating the DataStore. */
     protected Properties props;
 
+    /** The access coordinator. */
+    protected AccessCoordinatorHandle accessCoordinator;
+
     /** The store to test. */
     private DataStore store;
 
@@ -115,6 +125,8 @@ public class TestDataStorePerformance extends TestCase {
 			   "\n  test.count=" + count);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory());
+	accessCoordinator = new NullAccessCoordinator(
+	    props, txnProxy, new DummyProfileCollectorHandle());
     }
 
     /** Sets passed if the test passes. */
@@ -151,7 +163,7 @@ public class TestDataStorePerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
-	DummyTransaction txn = new DummyTransaction(1000);
+	DummyTransaction txn = createTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -161,7 +173,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(1000);
+		txn = createTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getObject(txn, ids[i], false);
 		}
@@ -178,7 +190,7 @@ public class TestDataStorePerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
-	DummyTransaction txn = new DummyTransaction(1000);
+	DummyTransaction txn = createTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -188,7 +200,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(1000);
+		txn = createTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getObject(txn, ids[i], true);
 		}
@@ -206,7 +218,7 @@ public class TestDataStorePerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
-	DummyTransaction txn = new DummyTransaction(1000);
+	DummyTransaction txn = createTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -216,7 +228,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(1000);
+		txn = createTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getObject(txn, ids[i], false);
 		    store.markForUpdate(txn, ids[i]);
@@ -257,7 +269,7 @@ public class TestDataStorePerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();
-	DummyTransaction txn = new DummyTransaction(1000);
+	DummyTransaction txn = createTransaction(1000);
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -267,7 +279,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(1000);
+		txn = createTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    byte[] result = store.getObject(txn, ids[i], update);
@@ -287,7 +299,7 @@ public class TestDataStorePerformance extends TestCase {
 
     public void testReadNames() throws Exception {
 	store = getDataStore();
-	DummyTransaction txn = new DummyTransaction(1000);
+	DummyTransaction txn = createTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -295,7 +307,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(1000);
+		txn = createTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    store.getBinding(txn, "name" + i);
 		}
@@ -310,7 +322,7 @@ public class TestDataStorePerformance extends TestCase {
 
     public void testWriteNames() throws Exception {
 	store = getDataStore();
-	DummyTransaction txn = new DummyTransaction(1000);
+	DummyTransaction txn = createTransaction(1000);
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -318,7 +330,7 @@ public class TestDataStorePerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(1000);
+		txn = createTransaction(1000);
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    long result = store.getBinding(txn, "name" + i);
@@ -340,7 +352,7 @@ public class TestDataStorePerformance extends TestCase {
     /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props, new NullAccessCoordinator()),
+	    new DataStoreImpl(props, accessCoordinator),
 	    DummyProfileCoordinator.getCollector());
         DummyProfileCoordinator.startProfiling();
 	return store;
@@ -378,5 +390,19 @@ public class TestDataStorePerformance extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
+    }
+
+    /**
+     * Creates a transaction with a specific-standard timeout.
+     */
+    DummyTransaction createTransaction(long timeout) {
+	return initTransaction(new DummyTransaction(timeout));
+    }
+
+    /** Initializes a transaction. */
+    DummyTransaction initTransaction(DummyTransaction txn) {
+	txnProxy.setCurrentTransaction(txn);
+	accessCoordinator.notifyNewTransaction(txn, 0, 1);
+	return txn;
     }
 }
