@@ -926,7 +926,7 @@ class Kernel {
                 AppListener listener =
                     (new PropertiesWrapper(properties)).
                     getClassInstanceProperty(StandardProperties.APP_LISTENER,
-                                             AppListener.class, null);
+                                             AppListener.class, new Class[] {});
                 dataService.setServiceBinding(StandardProperties.APP_LISTENER,
                                               listener);
 
