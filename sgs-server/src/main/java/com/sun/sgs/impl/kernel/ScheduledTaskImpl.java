@@ -185,8 +185,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      * thread to run a task. In this case calling cancel() will always
      * return, so no extra logic has been implemented to make sure that
      * canceling the task keeps it from re-trying. Were this method to be
-     * used when a task could be handedied-off between threads or
-     * re-tried many times than this implementation should probably be
+     * used when a task could be handed-off between threads or
+     * re-tried many times then this implementation should probably be
      * extended to note the cancelation request and disallow further
      * attempts at execution.
      */
