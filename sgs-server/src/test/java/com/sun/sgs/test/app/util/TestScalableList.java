@@ -75,6 +75,7 @@ public class TestScalableList extends Assert {
 			TransactionScheduler.class);
 	taskOwner = serverNode.getProxy().getCurrentOwner();
 	dataService = serverNode.getDataService();
+        System.err.println("Random seed = " + randomSeed);
     }
 
     @AfterClass
