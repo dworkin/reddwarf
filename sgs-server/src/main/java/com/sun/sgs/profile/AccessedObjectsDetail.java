@@ -53,7 +53,7 @@ public interface AccessedObjectsDetail {
      *
      * @return a {@code List} of {@code AccessedObject}s
      */
-    List<AccessedObject> getAccessedObjects();
+    List<? extends AccessedObject> getAccessedObjects();
 
     /**
      * The type of conflict, if any, caused by these object accesses.

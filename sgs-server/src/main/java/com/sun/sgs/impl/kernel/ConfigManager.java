@@ -42,6 +42,7 @@ public class ConfigManager implements ConfigMXBean {
     private final String serverHost;
     private int jmxPort;
     private long standardTxnTimeout;
+    private String protocolDesc;
 
     /** 
      * Creates a config manager instance.
@@ -111,6 +112,11 @@ public class ConfigManager implements ConfigMXBean {
     public long getStandardTxnTimeout() {
         return standardTxnTimeout;
     }
+
+    /** {@inheritDoc} */
+    public String getProtocolDescriptor() {
+	return protocolDesc;
+    }
     
     /**
      * Sets the standard timeout value.
@@ -128,5 +134,14 @@ public class ConfigManager implements ConfigMXBean {
      */
     public void setJmxPort(int jmxPort) {
         this.jmxPort = jmxPort;
+    }
+    
+    /**
+     * Sets the protocol descriptor.
+     *
+     * @param	desc the protocol descriptor
+     */
+    public void setProtocolDescriptor(String desc) {
+	this.protocolDesc = desc;
     }
 }
