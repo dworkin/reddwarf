@@ -168,7 +168,6 @@ public class TestTransactionSchedulerImpl {
     {
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
-                public int runCount = 0;
                 public void run() throws Exception {
                     if (i.getAndIncrement() == 0)
                         throw new InterruptedException("test");
@@ -182,7 +181,6 @@ public class TestTransactionSchedulerImpl {
     @Test public void runTransactionInterrupted() throws Exception {
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
-                public int runCount = 0;
                 public void run() throws Exception {
                     if (i.getAndIncrement() == 0)
                         throw new InterruptedException("test");
