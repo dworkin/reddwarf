@@ -1547,28 +1547,25 @@ public abstract class BasicTxnIsolationTest extends Assert {
 
 	/** The main method to run in the thread. */
 	private void runInternal() {
-	    TxnCallable a;
 	    FutureTask<?> t;
 	    synchronized (this) {
 		txn = createTransaction();
-		a = action;
+		action.setTransaction(txn);
 		t = task;
 		notifyAll();
 	    }
 	    while (true) {
-		if (t == null) {
-		    break;
-		} else if (!t.isDone()) {
-		    a.setTransaction(txn);
-		    t.run();
-		    continue;
-		}
+		t.run();
 		try {
 		    synchronized (this) {
-			wait();
-			a = action;
+			while (task != null && task.isDone()) {
+			    wait();
+			}
+			if (task == null) {
+			    break;
+			}
+			action.setTransaction(txn);
 			t = task;
-			continue;
 		    }
 		} catch (InterruptedException e) {
 		    break;
