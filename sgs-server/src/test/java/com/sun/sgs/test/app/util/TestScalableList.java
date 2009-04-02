@@ -54,9 +54,7 @@ import com.sun.sgs.tools.test.FilteredNameRunner;
 @RunWith(FilteredNameRunner.class)
 public class TestScalableList extends Assert {
 
-    private static long randomSeed = Long.getLong("test.random.seed",
-            System.currentTimeMillis());
-
+    private static long randomSeed;
     private static SgsTestNode serverNode;
     private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
@@ -75,7 +73,9 @@ public class TestScalableList extends Assert {
 			TransactionScheduler.class);
 	taskOwner = serverNode.getProxy().getCurrentOwner();
 	dataService = serverNode.getDataService();
-        System.err.println("Random seed = " + randomSeed);
+        randomSeed = Long.getLong("test.seed",
+            System.currentTimeMillis());
+        System.err.println("test.seed=" + randomSeed);
     }
 
     @AfterClass
@@ -240,7 +240,7 @@ public class TestScalableList extends Assert {
 		    int rand2 = random.nextInt(999) + 1;
 		    list = new ScalableList<String>(rand1, rand2);
 		} catch (Exception e) {
-		    fail("(seed=" + randomSeed + ") Did not expect exception: " +
+		    fail("(test.seed=" + randomSeed + ") Did not expect exception: " +
 			    e.getLocalizedMessage());
 		}
 
@@ -1414,7 +1414,7 @@ public class TestScalableList extends Assert {
 		    assertEquals(shadow.get(count), list.get(count));
 		    count++;
 		}
-		assertEquals("(seed=" + randomSeed + ")", shadow.size(), list.size());
+		assertEquals("(test.seed=" + randomSeed + ")", shadow.size(), list.size());
 		AppContext.getDataManager().removeObject(list);
 	    }
 	}, taskOwner);
@@ -2106,7 +2106,7 @@ public class TestScalableList extends Assert {
 
 			// check integrity
 			for (int j = 0; j < shadow.size(); j++) {
-			    assertEquals("(seed=" + randomSeed + ") iteration #" + i +
+			    assertEquals("(test.seed=" + randomSeed + ") iteration #" + i +
 				    ": ", shadow.get(j), list.get(j));
 			}
 		    }
@@ -3327,7 +3327,7 @@ public class TestScalableList extends Assert {
 		    } catch (Exception e) {
 			shadowResult = e.getCause();
 		    }
-		    assertEquals("(seed=" + randomSeed + ") Operations were: " + opList,
+		    assertEquals("(test.seed=" + randomSeed + ") Operations were: " + opList,
                     shadowResult, listResult);
 		}
 		assertEquals(shadow.size(), list.size());
