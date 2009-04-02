@@ -189,6 +189,43 @@ public class TestSimpleClient extends TestCase {
 	}
     }
 
+    public void testLoginObtainsPasswordAuthenticationAfterFailure()
+	throws Exception
+    {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+ 		new PasswordAuthentication("guest", new char[] {'!'}));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loginFailed);
+	    assertEquals(1, listener.getPasswordAuthentication);
+
+	    listener.auth = new PasswordAuthentication("guest", password);
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertEquals(1, listener.loggedInCount);
+	    assertEquals(2, listener.getPasswordAuthentication);
+	    
+	} finally {
+	    server.shutdown();
+	}
+    }
+    
     public void testRedirectDoesNotObtainPasswordAuthentication()
 	throws Exception
     {
@@ -295,7 +332,7 @@ public class TestSimpleClient extends TestCase {
 	private volatile String loginFailedReason = null;
 	private volatile boolean loggedIn = false;
 	private volatile int loggedInCount = 0;
-	private final PasswordAuthentication auth;
+	private volatile PasswordAuthentication auth;
 
 	DummySimpleClientListener() {
 	    this(null);
