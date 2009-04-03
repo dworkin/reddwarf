@@ -23,7 +23,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
-import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.test.util.DummyProfileCollectorHandle;
@@ -865,14 +864,14 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	store.setBinding(txn, "a", 200);
 	store.setBinding(txn, "b", 200);
 	txn.commit();
-	txn = createTransaction();				// tid:2
+	txn = createTransaction();			// tid:2
 	store.setBinding(txn, "c", 300);
 	runner2 = new Runner(new RemoveBinding("b"));	// tid:3
 	runner2.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
 	assertTrue((Boolean) runner2.getResult());
-	runner = new Runner(new NextBoundName("a"));		// tid:4
+	runner = new Runner(new NextBoundName("a"));	// tid:4
 	runner.assertBlocked();
 	runner2.commit();
 	runner2 = null;
@@ -933,7 +932,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	store.setBinding(txn, "a", 200);
 	store.setBinding(txn, "b", 200);
 	txn.commit();
-	txn = createTransaction();				// tid:2
+	txn = createTransaction();			// tid:2
 	store.setBinding(txn, "c", 300);
 	runner2 = new Runner(new SetBinding("d", 400));	// tid:3
 	runner2.assertBlocked();
@@ -946,7 +945,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	runner2.abort();
 	runner2 = null;
 	assertTrue((Boolean) runner3.getResult());
-	runner = new Runner(new NextBoundName("a"));		// tid:5
+	runner = new Runner(new NextBoundName("a"));	// tid:5
 	runner.assertBlocked();
 	runner3.commit();
 	runner3 = null;
@@ -1024,9 +1023,9 @@ public abstract class BasicTxnIsolationTest extends Assert {
     public void testNextBoundNameLastPhantom() throws Exception {
 	store.setBinding(txn, "a", 100);
 	txn.commit();
-	txn = createTransaction();				// tid:2
+	txn = createTransaction();			// tid:2
 	store.setBinding(txn, "b", 200);
-	runner2 = new Runner(new SetBinding("c", 300));		// tid:3
+	runner2 = new Runner(new SetBinding("c", 300));	// tid:3
 	runner2.assertBlocked();
 	runner3 = new Runner(new NextBoundName("a"));	// tid:4
 	runner3.assertBlocked();
@@ -1113,24 +1112,13 @@ public abstract class BasicTxnIsolationTest extends Assert {
      * tid:4 [get a]
      *       read lock c (but it is now missing, so check again)
      *       read lock end
-     *
-     * tid:5 next a
-     *       read lock end (blocks)
-     *
-     * tid:4 commit
-     *       release lock b
-     *       release lock end
-     *
-     * tid:5 [next a]
-     *       write lock end
-     *       return null
      */
     @Test
-    public void testNextBoundNameLastPhantom2() throws Exception {
+    public void testGetBindingPhantom() throws Exception {
 	txn.commit();
-	txn = createTransaction();				// tid:2
+	txn = createTransaction();			// tid:2
 	store.setBinding(txn, "b", 200);
-	runner2 = new Runner(new SetBinding("c", 300));		// tid:3
+	runner2 = new Runner(new SetBinding("c", 300));	// tid:3
 	runner2.assertBlocked();
 	runner3 = new Runner(new GetBinding("a"));	// tid:4
 	runner3.assertBlocked();
@@ -1188,20 +1176,9 @@ public abstract class BasicTxnIsolationTest extends Assert {
      * tid:4 [create a]
      *       write lock c (but it is now missing, so check next again)
      *       write lock end
-     *
-     * tid:5 next a
-     *       read lock end (blocks)
-     *
-     * tid:4 commit
-     *       release lock b
-     *       release lock end
-     *
-     * tid:5 [next a]
-     *       write lock end
-     *       return null
      */
     @Test
-    public void testNextBoundNameLastPhantom3() throws Exception {
+    public void testSetingBindingPhantom() throws Exception {
 	txn.commit();
 	txn = createTransaction();				// tid:2
 	store.setBinding(txn, "b", 200);
