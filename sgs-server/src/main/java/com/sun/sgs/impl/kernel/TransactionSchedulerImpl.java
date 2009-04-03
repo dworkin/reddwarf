@@ -315,7 +315,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(KernelRunnable task, Identity owner,
-                                       Priority priority) {
+                                       Priority priority)
+    {
         ScheduledTaskImpl t = new ScheduledTaskImpl(task, owner, priority,
                                                     System.currentTimeMillis());
         return backingQueue.reserveTask(t);
@@ -325,7 +326,8 @@ final class TransactionSchedulerImpl
      * {@inheritDoc}
      */
     public void scheduleTask(KernelRunnable task, Identity owner,
-                             Priority priority) {
+                             Priority priority)
+    {
         backingQueue.
             addTask(new ScheduledTaskImpl(task, owner, priority,
                                           System.currentTimeMillis()));
@@ -378,8 +380,16 @@ final class TransactionSchedulerImpl
         Throwable t = null;
 
         try {
-            // wait for the task to complete
-            executeTask(task, unbounded);
+            // NOTE: calling executeTask() directly means that we're trying
+            // to run the transaction in the calling thread, so there are
+            // actually more threads running tasks simulaneously than there
+            // are threads in the scheduler pool. This could be changed to
+            // hand-off the task and wait for the result if we wanted more
+            // direct control over concurrent transactions
+            executeTask(task, unbounded, false);
+            // wait for the task to complete...at this point it may have
+            // already completed, or else it is being re-tried in a
+            // scheduler thread
             t = task.get();
         } catch (InterruptedException ie) {
             // we were interrupted, so try to cancel the task, re-throwing
@@ -485,7 +495,7 @@ final class TransactionSchedulerImpl
                         (ScheduledTaskImpl) (backingQueue.getNextTask(true));
 
                     // run the task, checking if it completed
-                    if (executeTask(task, false)) {
+                    if (executeTask(task, false, true)) {
                         // if it's a recurring task, schedule the next run
                         if (task.isRecurring()) {
                             long nextStart =
@@ -518,8 +528,10 @@ final class TransactionSchedulerImpl
     /**
      * Private method that executes a single task, creating the transaction
      * state and handling re-try as appropriate. If the thread calling this
-     * method is interrupted before the task can complete, then the associated
-     * {@code InterruptedException} is re-thrown. Providing {@code true} for
+     * method is interrupted before the task can complete then this method
+     * attempts to re-schedule the task to run in another thread if
+     * {@code retryOnInterruption} is {@code true} and always re-throws
+     * the associated {@code InterruptedException}. Providing {@code true} for
      * the {@code unbounded} parameter results in a transaction with timeout
      * value as specified by the value of the
      * {@code TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY} property.
@@ -531,7 +543,8 @@ final class TransactionSchedulerImpl
      * status of the task and wait for the task to complete or fail permanently
      * through the {@code ScheduledTaskImpl} interface.
      */
-    private boolean executeTask(ScheduledTaskImpl task, boolean unbounded)
+    private boolean executeTask(ScheduledTaskImpl task, boolean unbounded,
+                                boolean retryOnInterruption)
         throws InterruptedException
     {
         logger.log(Level.FINEST, "starting a new transactional task");
@@ -605,13 +618,12 @@ final class TransactionSchedulerImpl
                     }
                     profileCollectorHandle.finishTask(task.getTryCount(), ie);
                     // if the task didn't finish because of the interruption
-                    // then we want to re-queue it to run in a usable thread
-                    if (!task.isDone()) {
-                        task.setRunning(false);
+                    // then we want to note that and possibly re-queue the
+                    // task to run in a usable thread
+                    if (task.setInterrupted() && retryOnInterruption) {
                         if (!handoffRetry(task, ie)) {
                             // if the task couldn't be re-queued, then there's
                             // nothing left to do but drop it
-                            task.setRunning(true);
                             task.setDone(ie);
                             if (logger.isLoggable(Level.WARNING)) {
                                 logger.logThrow(Level.WARNING, ie, "dropping " +
