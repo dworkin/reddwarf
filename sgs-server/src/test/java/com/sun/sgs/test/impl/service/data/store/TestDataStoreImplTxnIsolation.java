@@ -23,7 +23,6 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
-import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.File;
 import java.util.Properties;
 import org.junit.BeforeClass;
@@ -31,9 +30,11 @@ import org.junit.runner.RunWith;
 
 /**
  * Tests the isolation that {@link DataStoreImpl} enforces between
- * transactions.
+ * transactions.  The unpredictability of the page-level locking used in the
+ * native edition of Berkeley DB makes it difficult to write the test to pass
+ * predictably for that environment, so only run it for BDB Java edition.
  */
-@RunWith(FilteredNameRunner.class)
+@RunWith(JeOnlyFilteredNameRunner.class)
 public class TestDataStoreImplTxnIsolation extends BasicTxnIsolationTest {
 
     /** The name of the DataStoreImpl class. */

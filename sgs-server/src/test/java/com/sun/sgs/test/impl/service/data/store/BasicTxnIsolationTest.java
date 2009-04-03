@@ -50,14 +50,14 @@ public abstract class BasicTxnIsolationTest extends Assert {
     protected static Properties props;
 
     /**
-     * The number of milliseconds to wait to see if an operation is blocked.
-     */
-    protected static long timeoutBlock;
-
-    /**
      * The number of milliseconds to wait to see if an operation is successful.
      */
     protected static long timeoutSuccess;
+
+    /**
+     * The number of milliseconds to wait to see if an operation is blocked.
+     */
+    protected static long timeoutBlock;
 
     /** A test value for an object ID. */
     private static final byte[] value = { 1 };
@@ -86,6 +86,12 @@ public abstract class BasicTxnIsolationTest extends Assert {
 
     /** The runner used in the test, or {@code null} if not used or if done. */
     private Runner runner;
+
+    /** A second runner. */
+    private Runner runner2;
+
+    /** A third runner. */
+    private Runner runner3;
 
     /**
      * Create the properties, access coordinator, and data store if needed;
@@ -122,17 +128,25 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	}
     }
 
-    /** Commit the transaction and the runner, if not null. */
+    /** Abort the transaction and the runners, if not null. */
     @After
     public void after() throws Exception {
 	if (txn != null) {
-	    txn.commit();
+	    txn.abort(new RuntimeException());
 	    txn = null;
 	}
 	txnProxy.setCurrentTransaction(null);
 	if (runner != null) {
-	    runner.commit();
+	    runner.abort();
 	    runner = null;
+	}
+	if (runner2 != null) {
+	    runner2.abort();
+	    runner2 = null;
+	}
+	if (runner3 != null) {
+	    runner3.abort();
+	    runner3 = null;
 	}
     }
 
@@ -140,10 +154,10 @@ public abstract class BasicTxnIsolationTest extends Assert {
     protected Properties createProperties() {
 	props = UtilProperties.createProperties();
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(props);
-	timeoutBlock = wrappedProps.getLongProperty(
-	    "test.timeout.block", getDefaultTimeoutBlock());
 	timeoutSuccess = wrappedProps.getLongProperty(
-	    "com.sun.sgs.txn.timeout", getDefaultTimeoutSuccess());
+	    "test.timeout.success", 1000);
+	timeoutBlock = wrappedProps.getLongProperty(
+	    "test.timeout.block", timeoutSuccess / 10);
 	props.setProperty(LockingAccessCoordinator.LOCK_TIMEOUT_PROPERTY,
 			  String.valueOf(timeoutSuccess));
 	return props;
@@ -165,28 +179,6 @@ public abstract class BasicTxnIsolationTest extends Assert {
      * @return	the data store
      */
     protected abstract DataStore createDataStore();
-
-    /**
-     * Returns the default number of milliseconds to wait to see if an
-     * operation is blocked.  This implementation returns {@code 1/10} of the
-     * value of the timeout for a successful operation.
-     *
-     * @return	the number of milliseconds for a blocked operation
-     */
-    protected long getDefaultTimeoutBlock() {
-	return (long) (getDefaultTimeoutSuccess() * 0.1);
-    }
-
-    /**
-     * Returns the default number of milliseconds to wait to see if an
-     * operation is successful.  This implementation returns twice the default
-     * transaction timeout for bounded operations.
-     *
-     * @return	the number of milliseconds for a successful operation
-     */
-    protected long getDefaultTimeoutSuccess() {
-	return 2 * TransactionCoordinatorImpl.BOUNDED_TIMEOUT_DEFAULT;
-    }
 
     /* -- Tests -- */
 
@@ -875,7 +867,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	txn.commit();
 	txn = createTransaction();				// tid:2
 	store.setBinding(txn, "c", 300);
-	Runner runner2 = new Runner(new RemoveBinding("b"));	// tid:3
+	runner2 = new Runner(new RemoveBinding("b"));	// tid:3
 	runner2.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
@@ -883,6 +875,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	runner = new Runner(new NextBoundName("a"));		// tid:4
 	runner.assertBlocked();
 	runner2.commit();
+	runner2 = null;
 	assertSame(null, runner.getResult());
     }
 
@@ -942,19 +935,21 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	txn.commit();
 	txn = createTransaction();				// tid:2
 	store.setBinding(txn, "c", 300);
-	Runner runner2 = new Runner(new SetBinding("d", 400));	// tid:3
+	runner2 = new Runner(new SetBinding("d", 400));	// tid:3
 	runner2.assertBlocked();
-	Runner runner3 = new Runner(new RemoveBinding("b"));	// tid:4
+	runner3 = new Runner(new RemoveBinding("b"));	// tid:4
 	runner3.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
 	runner2.getResult();
 	runner3.assertBlocked();
 	runner2.abort();
+	runner2 = null;
 	assertTrue((Boolean) runner3.getResult());
 	runner = new Runner(new NextBoundName("a"));		// tid:5
 	runner.assertBlocked();
 	runner3.commit();
+	runner3 = null;
 	assertSame(null, runner.getResult());
     }
 
@@ -1031,9 +1026,9 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	txn.commit();
 	txn = createTransaction();				// tid:2
 	store.setBinding(txn, "b", 200);
-	Runner runner2 = new Runner(new SetBinding("c", 300));	// tid:3
+	runner2 = new Runner(new SetBinding("c", 300));		// tid:3
 	runner2.assertBlocked();
-	Runner runner3 = new Runner(new NextBoundName("a"));	// tid:4
+	runner3 = new Runner(new NextBoundName("a"));	// tid:4
 	runner3.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
@@ -1041,14 +1036,18 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	    /* False lock conflicts might mean that runner3 blocks runner2 */
 	    runner3.getResult();
 	    runner3.commit();
+	    runner3 = null;
 	    assertSame(null, runner2.getResult());
 	    runner2.commit();
+	    runner2 = null;
 	} else {
 	    runner2.getResult();
 	    runner3.assertBlocked();
 	    runner2.abort();
+	    runner2 = null;
 	    assertSame(null, runner3.getResult());
 	    runner3.commit();
+	    runner3 = null;
 	}
     }
 
@@ -1131,9 +1130,9 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	txn.commit();
 	txn = createTransaction();				// tid:2
 	store.setBinding(txn, "b", 200);
-	Runner runner2 = new Runner(new SetBinding("c", 300));	// tid:3
+	runner2 = new Runner(new SetBinding("c", 300));		// tid:3
 	runner2.assertBlocked();
-	Runner runner3 = new Runner(new GetBinding("a"));	// tid:4
+	runner3 = new Runner(new GetBinding("a"));	// tid:4
 	runner3.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
@@ -1141,14 +1140,18 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	    /* False lock conflicts might mean that runner3 blocks runner2 */
 	    assertSame(null, runner3.getResult());
 	    runner3.commit();
+	    runner3 = null;
 	    runner2.getResult();
 	    runner2.commit();
+	    runner2 = null;
 	} else {
 	    runner2.getResult();
 	    runner3.assertBlocked();
 	    runner2.abort();
+	    runner2 = null;
 	    assertSame(null, runner3.getResult());
 	    runner3.commit();
+	    runner3 = null;
 	}
     }
 
@@ -1202,17 +1205,19 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	txn.commit();
 	txn = createTransaction();				// tid:2
 	store.setBinding(txn, "b", 200);
-	Runner runner2 = new Runner(new SetBinding("c", 300));	// tid:3
+	runner2 = new Runner(new SetBinding("c", 300));		// tid:3
 	runner2.assertBlocked();
-	Runner runner3 = new Runner(new SetBinding("a", 100));	// tid:4
+	runner3 = new Runner(new SetBinding("a", 100));		// tid:4
 	runner3.assertBlocked();
 	txn.abort(new RuntimeException());
 	txn = null;
 	runner2.getResult();
 	runner3.assertBlocked();
 	runner2.abort();
+	runner2 = null;
 	assertSame(null, runner3.getResult());
 	runner3.commit();
+	runner3 = null;
     }
 
     /* -- Tests for isolation with multiple binding operations -- */
@@ -1556,19 +1561,19 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	    }
 	    while (true) {
 		t.run();
-		try {
-		    synchronized (this) {
-			while (task != null && task.isDone()) {
+		synchronized (this) {
+		    try {
+			while (task == t) {
 			    wait();
 			}
-			if (task == null) {
-			    break;
-			}
-			action.setTransaction(txn);
-			t = task;
+		    } catch (InterruptedException e) {
+			break;
 		    }
-		} catch (InterruptedException e) {
-		    break;
+		    if (task == null) {
+			break;
+		    }
+		    action.setTransaction(txn);
+		    t = task;
 		}
 	    }
 	}
@@ -1586,12 +1591,18 @@ public abstract class BasicTxnIsolationTest extends Assert {
 	}
 
 	/** Sets task to null to signify that the runner is done. */
-	private synchronized void setDone() {
+	private void setDone() throws InterruptedException {
+	    FutureTask<Object> t = getTask();
 	    if (!task.isDone()) {
 		throw new RuntimeException("Task is not done");
 	    }
-	    task = null;
-	    notifyAll();
+	    synchronized (this) {
+		if (task != t) {
+		    throw new RuntimeException("Task changed");
+		}
+		task = null;
+		notifyAll();
+	    }
 	}
     }
 
