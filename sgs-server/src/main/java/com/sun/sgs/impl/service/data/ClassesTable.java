@@ -120,11 +120,11 @@ final class ClassesTable {
 	private final boolean hasReadResolve;
 
 	/**
-	 * The name of a non-serializable superclass without an accessible
-	 * no-argument constructor, or {@code null} if there is no such class.
-	 * Note that it is illegal to deserialize an instance of a class with
-	 * such a superclass, but serialization does not enforce that
-	 * restriction.
+	 * The name of the first non-serializable superclass if it lacks an
+	 * accessible no-argument constructor, or {@code null} if there is no
+	 * such class.  Note that it is illegal to deserialize an instance of a
+	 * class with such a superclass, but serialization does not enforce
+	 * that restriction.
 	 */
 	private final String missingConstructorSuperclass;
 
@@ -467,8 +467,8 @@ final class ClassesTable {
     }
 
     /**
-     * Returns the name of a non-serializable superclass which does not have an
-     * accessible no-arguments constructor, if any, else null.
+     * Returns the name of the first non-serializable superclass if it lacks an
+     * accessible no-arguments constructor, else null.
      */
     private static String computeMissingConstructorSuperclass(Class<?> cl) {
 	assert cl != null;
