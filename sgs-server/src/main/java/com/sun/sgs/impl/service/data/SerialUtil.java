@@ -33,6 +33,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -246,7 +247,7 @@ final class SerialUtil {
     private static class CustomClassDescriptorObjectOutputStream
 	extends ObjectOutputStream
     {
-	private final ClassSerialization classSerial;
+	final ClassSerialization classSerial;
 
 	CustomClassDescriptorObjectOutputStream(OutputStream out,
 						ClassSerialization classSerial)
@@ -297,28 +298,32 @@ final class SerialUtil {
 
 	/** Check for references to managed objects. */
 	protected Object replaceObject(Object object) throws IOException {
+	    if (object == null) {
+		return null;
+	    }
+	    Class<?> cl = object.getClass();
 	    if (object != topLevelObject && object instanceof ManagedObject) {
 		throw new ObjectIOException(
 		    "ManagedObject was not referenced through a " +
 		    "ManagedReference: " + Objects.safeToString(object),
 		    false);
-	    } else if (object != null) {
-		Class<?> cl = object.getClass();
-		if (cl.isAnonymousClass()) {
-		    if (logger.isLoggable(Level.FINE)) {
-			logger.log(
-			    Level.FINE,
-			    "Storing an instance of an anonymous class: " +
-			    "{0}, {1}",
-			    Objects.safeToString(object), cl);
-		    }
-		} else if (cl.isLocalClass()) {
-		    if (logger.isLoggable(Level.FINE)) {
-			logger.log(
-			    Level.FINE,
-			    "Storing an instance of a local class: {0}, {1}",
-			    Objects.safeToString(object), cl);
-		    }
+	    } else if (object instanceof Serializable) {
+		classSerial.checkInstantiable(ObjectStreamClass.lookup(cl));
+	    }
+	    if (cl.isAnonymousClass()) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Storing an instance of an anonymous class: " +
+			"{0}, {1}",
+			Objects.safeToString(object), cl);
+		}
+	    } else if (cl.isLocalClass()) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Storing an instance of a local class: {0}, {1}",
+			Objects.safeToString(object), cl);
 		}
 	    }
 	    return object;

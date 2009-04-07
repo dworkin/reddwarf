@@ -39,6 +39,17 @@ interface ClassSerialization {
 	throws IOException;
 
     /**
+     * Checks if it is permitted to instantiate an instance of the specified
+     * class.
+     *
+     * @param	classDesc the class descriptor
+     * @throws	IOException if it is not permitted to create instances of the
+     *		specified class
+     */
+    void checkInstantiable(ObjectStreamClass classDesc)
+	throws IOException;
+
+    /**
      * Reads a class descriptor from an object input stream.
      *
      * @param	in the object input stream

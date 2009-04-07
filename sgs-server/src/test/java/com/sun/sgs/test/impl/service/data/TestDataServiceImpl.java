@@ -45,17 +45,20 @@ import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.PackageReadResolve;
-import com.sun.sgs.test.util.PrivateReadResolve;
-import com.sun.sgs.test.util.ProtectedReadResolve;
-import com.sun.sgs.test.util.PublicReadResolve;
+import com.sun.sgs.test.util.PackageSuperclassConstructor;
 import com.sun.sgs.test.util.PackageWriteReplace;
+import com.sun.sgs.test.util.PrivateReadResolve;
 import com.sun.sgs.test.util.PrivateWriteReplace;
+import com.sun.sgs.test.util.ProtectedConstructor;
+import com.sun.sgs.test.util.ProtectedReadResolve;
 import com.sun.sgs.test.util.ProtectedWriteReplace;
+import com.sun.sgs.test.util.PublicConstructor;
+import com.sun.sgs.test.util.PublicReadResolve;
 import com.sun.sgs.test.util.PublicWriteReplace;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
-import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
+import com.sun.sgs.tools.test.ParameterizedFilteredNameRunner;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -70,11 +73,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import static org.junit.Assert.*;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
@@ -3559,35 +3562,9 @@ public class TestDataServiceImpl{
                 service.setBinding("c", new NonManaged().createMember());
         }}, taskOwner);
 
-	try {
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-                public void run() {
-                    service.setBinding("a", new Managed().createInner());
-            }}, taskOwner);
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
-
-	try {
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-                public void run() {
-                    service.setBinding("b", new Managed().createAnonymous());
-            }}, taskOwner);
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
-
-	try {
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-                public void run() {
-                    service.setBinding("b", new Managed().createLocal());
-            }}, taskOwner);
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
+	objectIOExceptionOnCommit(new Managed().createInner());
+	objectIOExceptionOnCommit(new Managed().createAnonymous());
+	objectIOExceptionOnCommit(new Managed().createLocal());
     }
 
     /** Which methods should fail. */
@@ -3841,6 +3818,135 @@ public class TestDataServiceImpl{
 	{
 	    in.defaultReadObject();
 	    dummy.get();
+	}
+    }
+
+    /* -- Test checking legal non-serializable superclasses -- */
+
+    /**
+     * Test serializing an object with a non-serializable superclass that does
+     * not have a no-argument constructor.
+     */
+    @Test
+    public void testSerializeMissingSuperclassConstructor()
+	throws Exception
+    {
+	DummyManagedObject dummy = new DummyManagedObject();
+	dummy.value = new MissingSuperclassConstructor();
+	objectIOExceptionOnCommit(dummy);
+    }
+
+    static class MissingSuperclassConstructor extends MissingNoArgsConstructor
+	implements Serializable
+    {
+	private static final long serialVersionUID = 1;
+	MissingSuperclassConstructor() {
+	    super(1);
+	}
+    }
+
+    private static class MissingNoArgsConstructor {
+	MissingNoArgsConstructor(int i) { }
+    }
+
+    /**
+     * Test serializing an object with a non-serializable superclass that has a
+     * private no-argument constructor.
+     */
+    @Test
+    public void testSerializePrivateSuperclassConstructor()
+	throws Exception
+    {
+	DummyManagedObject dummy = new DummyManagedObject();
+	dummy.value = new PrivateSuperclassConstructor();
+	objectIOExceptionOnCommit(dummy);
+    }
+
+    static class PrivateSuperclassConstructor extends PrivateConstructor
+	implements Serializable
+    {
+	private static final long serialVersionUID = 1;
+	PrivateSuperclassConstructor() {
+	    super(1);
+	}
+    }
+
+    private static class PrivateConstructor {
+	private PrivateConstructor() { }
+	PrivateConstructor(int i) { }
+    }
+
+    /**
+     * Test serializing an object with a non-serializable superclass that has a
+     * default access constructor in a different package.
+     */
+    @Test
+    public void testWrongPackageSuperclassConstructor() throws Exception {
+	objectIOExceptionOnCommit(new WrongPackageSuperclassConstructor());
+    }
+
+    static class WrongPackageSuperclassConstructor
+	extends PackageSuperclassConstructor
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	WrongPackageSuperclassConstructor() { }
+    }
+
+    /**
+     * Test serializing an object with a non-serializable superclass that has a
+     * protected constructor in a different package.
+     */
+    @Test
+    public void testProtectedWrongPackageSuperclassConstructor()
+	throws Exception
+    {
+	okOnCommit(new ProtectedSuperclassConstructor());
+    }
+
+    static class ProtectedSuperclassConstructor
+	extends ProtectedConstructor
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	ProtectedSuperclassConstructor() { }
+    }
+
+    /**
+     * Test serializing an object with a non-serializable superclass that has a
+     * public constructor in a different package.
+     */
+    @Test
+    public void testPublicWrongPackageSuperclassConstructor()
+	throws Exception
+    {
+	okOnCommit(new PublicSuperclassConstructor());
+    }
+
+    static class PublicSuperclassConstructor
+	extends PublicConstructor
+	implements ManagedObject, Serializable
+    {
+	private static final long serialVersionUID = 1;
+	PublicSuperclassConstructor() { }
+    }
+
+    /**
+     * Test that it is OK to serialize class objects for classes for which it
+     * would be illegal to serialize instances.
+     */
+    @Test
+    public void testNonInstantiatedClassProblems() throws Exception {
+	final Object[] objects = {
+	    MissingSuperclassConstructor.class,
+	    PrivateSuperclassConstructor.class,
+	    WrongPackageSuperclassConstructor.class,
+	    MOPublicReadResolve.class
+	};
+	for (Object object : objects) {
+	    DummyManagedObject dummy = new DummyManagedObject();
+	    dummy.value = object;
+	    okOnCommit(dummy);
 	}
     }
 
@@ -4729,13 +4835,17 @@ public class TestDataServiceImpl{
 
     /**
      * Check that committing succeeds after setting a name binding to the
-     * specified object.
+     * specified object and for reading it as well.
      */
     private void okOnCommit(final ManagedObject object) throws Exception {
         txnScheduler.runTask(new InitialTestRunnable() {
             public void run() throws Exception {
                 super.run();
                 service.setBinding("foo", object);
+        }}, taskOwner);
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+            public void run() throws Exception {
+                service.getBinding("foo");
         }}, taskOwner);
     }
 }
