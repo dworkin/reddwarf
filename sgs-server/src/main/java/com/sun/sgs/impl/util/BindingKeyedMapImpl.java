@@ -124,17 +124,7 @@ public class BindingKeyedMapImpl<V>
     /** {@inheritDoc} */
     public boolean containsKey(Object key) {
 	checkKey("key", key);
-	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
-	String bindingName = getBindingName((String) key);
-	boolean containsKey = false;
-	try {
-	    dataService.getServiceBinding(bindingName);
-	    containsKey = true;
-	} catch (NameNotBoundException e) {
-	} catch (ObjectNotFoundException e) {
-	    containsKey = true;
-	}
-	return containsKey;
+	return containsKeyInternal(getBindingName((String) key));
     }
 
     /** {@inheritDoc} */
@@ -153,13 +143,20 @@ public class BindingKeyedMapImpl<V>
     }
     
     /** {@inheritDoc} */
+    @SuppressWarnings("unchecked")
     public V remove(Object key) {
 	checkKey("key", key);
 	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
 	String bindingName = getBindingName((String) key);
 	V value = null;
 	try {
-	    value = removeValue(bindingName);
+	    ManagedObject v = dataService.getServiceBinding(bindingName);
+	    if (v instanceof Wrapper) {
+		value = (V) ((Wrapper) v).get();
+		dataService.removeObject(v);
+	    } else {
+		value = (V) v;
+	    }
 	    dataService.removeServiceBinding(bindingName);
 	} catch (NameNotBoundException e) {
 	}
@@ -222,6 +219,20 @@ public class BindingKeyedMapImpl<V>
 	public void clear() {
 	    clearInternal(keyPrefix);
 	}
+	
+	/** {@inheritDoc} */
+	@SuppressWarnings("unchecked")
+	public boolean contains(Object o) {
+	    Entry<String, V> entry = (Entry<String, V>) o;
+	    return containsKeyInternal(keyPrefix + entry.getKey());
+	}
+	
+	/** {@inheritDoc} */
+	@SuppressWarnings("unchecked")
+	public boolean remove(Object o) {
+	    Entry<String, V> entry = (Entry<String, V>) o;
+	    return removeOverrideInternal(keyPrefix + entry.getKey());
+	}
     }
 
     /** {@inheritDoc} */
@@ -269,6 +280,16 @@ public class BindingKeyedMapImpl<V>
 	/** {@inheritDoc} */	
 	public void clear() {
 	    clearInternal(keyPrefix);
+	}
+	
+	/** {@inheritDoc} */
+	public boolean contains(Object o) {
+	    return containsKeyInternal(keyPrefix + (String) o);
+	}
+
+	/** {@inheritDoc} */
+	public boolean remove(Object o) {
+	    return removeOverrideInternal(keyPrefix + (String) o);
 	}
     }
 
@@ -381,8 +402,7 @@ public class BindingKeyedMapImpl<V>
 	    if (keyReturnedByNext == null) {
 		throw new IllegalStateException();
 	    }
-	    removeValue(keyReturnedByNext);
-	    dataService.removeServiceBinding(keyReturnedByNext);
+	    removeOverrideInternal(keyReturnedByNext);
 	    keyReturnedByNext = null;
 	}
 
@@ -453,18 +473,6 @@ public class BindingKeyedMapImpl<V>
 		v instanceof Wrapper ?
 		(V) ((Wrapper) v).get() :
 		(V) v;
-	}
-
-	private void removeValue(String bindingName) {
-	    ManagedObject v = null;
-	    try {
-		v = dataService.getServiceBinding(bindingName);
-		if (v instanceof Wrapper) {
-		    dataService.removeObject(v);
-		}
-	    } catch (ObjectNotFoundException ignore) {
-		// object has been removed already.
-	    }
 	}
     }
 
@@ -568,21 +576,7 @@ public class BindingKeyedMapImpl<V>
     /** {@inheritDoc} */
     public boolean removeOverride(String key) {
 	Objects.checkNull("key", key);
-	boolean previouslyMapped = containsKey(key);
-	if (previouslyMapped) {
-	    DataService dataService =
-		BindingKeyedCollectionsImpl.getDataService();
-	    String bindingName = getBindingName(key);
-	    try {
-		ManagedObject v = dataService.getServiceBinding(bindingName);
-		if (v instanceof Wrapper) {
-		    dataService.removeObject(v);
-		}
-	    } catch (ObjectNotFoundException ignore) {
-	    }
-	    dataService.removeServiceBinding(bindingName);
-	}
-	return previouslyMapped;
+	return removeOverrideInternal(getBindingName(key));
     }
     
     /* -- Private classes and methods. -- */
@@ -724,6 +718,46 @@ public class BindingKeyedMapImpl<V>
     }
 
     /**
+     * Returns {@code true} if a service binding with the specified
+     * {@code bindingName} exists.
+     */
+    private static boolean containsKeyInternal(String bindingName) {
+	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
+	boolean containsKey = false;
+	try {
+	    dataService.getServiceBinding(bindingName);
+	    containsKey = true;
+	} catch (NameNotBoundException e) {
+	} catch (ObjectNotFoundException e) {
+	    containsKey = true;
+	}
+	return containsKey;
+    }
+
+    /**
+     * If a service binding with the specified {@code bindingName} exists,
+     * removes the binding (and the wrapper for the associated value if
+     * applicable) and returns {@code true}.  Otherwise, returns
+     * {@code false}.
+     */
+    private static boolean removeOverrideInternal(String bindingName) {
+	boolean previouslyMapped = containsKeyInternal(bindingName);
+	if (previouslyMapped) {
+	    DataService dataService =
+		BindingKeyedCollectionsImpl.getDataService();
+	    try {
+		ManagedObject v = dataService.getServiceBinding(bindingName);
+		if (v instanceof Wrapper) {
+		    dataService.removeObject(v);
+		}
+	    } catch (ObjectNotFoundException ignore) {
+	    }
+	    dataService.removeServiceBinding(bindingName);
+	}
+	return previouslyMapped;
+    }
+    
+    /**
      * Puts the specified {@code key}/{@code value} pair in this map,
      * wrapping the value if the value does not implement {@code
      * ManagedObject}.
@@ -755,25 +789,7 @@ public class BindingKeyedMapImpl<V>
 	    (V) ((Wrapper) v).get() :
 	    (V) v;
     }
-
-    /**
-     * Returns the value associated with the specified {@code bindingName},
-     * removing the wrapper if applicable.
-     */
-    @SuppressWarnings("unchecked")
-    private V removeValue(String bindingName) {
-	V value = null;
-	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
-	ManagedObject v = dataService.getServiceBinding(bindingName);
-	if (v instanceof Wrapper) {
-	    value = (V) ((Wrapper) v).get();
-	    dataService.removeObject(v);
-	} else {
-	    value = (V) v;
-	}
-	return value;
-    }
-
+    
     /**
      * Throws {@code IllegalArgumentException} of {@code obj} is not
      * serializable.

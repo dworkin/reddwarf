@@ -619,10 +619,11 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	
 	assertFalse(map.keySet().isEmpty());
 	assertEquals(10, map.keySet().size());
-		    
+
 	Iterator<String> iter = map.keySet().iterator();
 	while (iter.hasNext()) {
 	    String key = iter.next();
+	    assertTrue(map.keySet().contains(key));
 	    assertTrue(map.containsKey(key));
 	    iter.remove();
 	    assertFalse(map.containsKey(key));
@@ -647,6 +648,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	assertFalse(map.keySet().isEmpty());
 	assertEquals(10, map.keySet().size());
 	for (String key : map.keySet()) {
+	    assertTrue(map.keySet().contains(key));
 	    set.remove(key);
 	}
 	assertTrue(set.isEmpty());
@@ -663,17 +665,21 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	for (int i = 0; i < 10; i++) {
 	    Managed obj = new Managed();
 	    String key = obj.toString();
+	    assertFalse(map.keySet().contains(key));
 	    map.put(key, obj);
 	    set.add(key);
 	    dataService.removeObject(obj);
+	    assertTrue(map.keySet().contains(key));
 	}
 	assertEquals(10, map.keySet().size());
 	assertFalse(map.keySet().isEmpty());
 	for (String key : map.keySet()) {
+	    assertTrue(map.keySet().contains(key));
 	    set.remove(key);
+	    assertTrue(map.keySet().remove(key));
+	    assertFalse(map.keySet().contains(key));
 	}
 	assertTrue(set.isEmpty());
-	map.keySet().clear();
 	assertEquals(0, map.keySet().size());
 	assertTrue(map.isEmpty());
 	assertTrue(map.keySet().isEmpty());
@@ -767,13 +773,20 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	assertEquals(10, map.entrySet().size());
 
 	Iterator<Entry<String, Integer>> iter = map.entrySet().iterator();
+	int i = 0;
 	while (iter.hasNext()) {
 	    Entry<String, Integer> entry = iter.next();
 	    assertEquals(entry.getKey(), entry.getValue().toString());
+	    assertTrue(map.entrySet().contains(entry));
 	    assertTrue(map.containsKey(entry.getKey()));
 	    assertTrue(map.containsValue(entry.getValue()));
 	    Integer value = entry.getValue();
-	    iter.remove();
+	    if (i++ % 2 == 0) {
+		iter.remove();
+	    } else {
+		assertTrue(map.entrySet().remove(entry));
+	    }
+	    assertFalse(map.entrySet().contains(entry));
 	    assertFalse(map.containsKey(entry.getKey()));
 	    assertFalse(map.containsValue(value));
 	}
@@ -801,13 +814,20 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	assertFalse(map.entrySet().isEmpty());
 	assertEquals(10, map.entrySet().size());
 	Iterator<Entry<String, Managed>> iter = map.entrySet().iterator();
+	int i = 0;
 	while (iter.hasNext()) {
 	    Entry<String, Managed> entry = iter.next();
 	    assertEquals(entry.getKey(), entry.getValue().toString());
+	    assertTrue(map.entrySet().contains(entry));
 	    assertTrue(map.containsKey(entry.getKey()));
 	    assertTrue(map.containsValue(entry.getValue()));
 	    Managed value = entry.getValue();
-	    iter.remove();
+	    if (i++ % 2 == 0) {
+		iter.remove();
+	    } else {
+		assertTrue(map.entrySet().remove(entry));
+	    }
+	    assertFalse(map.entrySet().contains(entry));
 	    assertFalse(map.containsKey(entry.getKey()));
 	    assertFalse(map.containsValue(value));
 	}
