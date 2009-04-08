@@ -230,7 +230,8 @@ public class SmokeTestListener implements Serializable,
         case LOGOUT:
             if (!graceful)
                 fail("Ungraceful logout");
-            performNextStep();
+            else
+                performNextStep();
             break;
 
         default:
