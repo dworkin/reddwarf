@@ -40,6 +40,7 @@ import com.sun.sgs.impl.service.session.NodeAssignment;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.BindingKeyedCollections;
 import com.sun.sgs.impl.util.BindingKeyedMap;
 import com.sun.sgs.impl.util.BindingKeyedSet;
 import com.sun.sgs.impl.util.IoRunnable;
@@ -55,13 +56,10 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.logging.Level;
@@ -69,6 +67,43 @@ import java.util.logging.Logger;
 
 /**
  * Channel implementation for use within a single transaction.
+ *
+ * <p>This implementation uses several {@link BindingKeyedCollections}
+ * as follows:
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Map:</i> <b><code>channelsMap</code></b> <br>
+ *	<i>Prefix:</i> <code>{@value #CHANNELS_MAP_PREFIX}</code> <br>
+ *	<i>Key:</i> <i>{@code name}</i><br>
+ *	<i>Value:</i> <b>{@link ChannelImpl}</b>
+ *
+ * <dd style="padding-top: .5em">Map for accessing a {@code ChannelImpl}
+ *	 by name. <p>
+ *
+ * <dt> <i>Map:</i> <b><code>eventQueuesMap</code></b> <br>
+ *	<i>Prefix:</i> <code>{@value
+ *	#EVENT_QUEUE_MAP_PREFIX}<i>coordinatorNodeId.</i></code> <br>
+ *	<i>Key:</i> <i>{@code channelId}</i> (as string form of
+ *	{@code BigInteger})<br>
+ *	<i>Value:</i> <b>{@code EventQueue}</b>
+ *
+ * <dd style="padding-top: .5em">Map for accessing an event queue for a
+ * 	channel on a given node.  The map is also used during recovery to
+ * 	determine which channels are coordinated on a failed node so that
+ * 	each channel can be reassigned a new coordinator.<p>
+ *
+ * <dt> <i>Set:</i> <b><code>sessionSet</code></b><br>
+ *	<i>Prefix:</i> <code>{@value
+ *	#SESSION_SET_PREFIX}<i>channelId.nodeId.</i></code> <br>
+ *	<i>Element:</i> <i>{@code sessionId}</i> (as {@code BigInteger})
+ *
+ * <dd style="padding-top: .5em">Set containing the IDs of a channel's
+ *	member sessions connected to a given node.  All members of a given
+ * 	channel can be accessed using a set with the prefix {@value
+ * 	#SESSION_SET_PREFIX}<i>{@code channelId.}</i><p>
+ *
+ * </dl> <p>
  */
 abstract class ChannelImpl implements ManagedObject, Serializable {
 
@@ -84,21 +119,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     private static final String PKG_NAME = "com.sun.sgs.impl.service.channel.";
 
     /** The channels map prefix. */
-    private static final String CHANNELS_MAP_PREFIX = PKG_NAME + "channel.";
+    static final String CHANNELS_MAP_PREFIX = PKG_NAME + "name.";
 
     /** An event queue map prefix. */
-    private static final String EVENT_QUEUE_MAP_PREFIX =
-	PKG_NAME + "eventQueue.";
+    static final String EVENT_QUEUE_MAP_PREFIX = PKG_NAME + "eventQueue.";
 
-    private static final String SESSION_SET_PREFIX =
-	PKG_NAME + "session.";
+    /** A prefix for a channel's session set. */
+    static final String SESSION_SET_PREFIX = PKG_NAME + "session.";
 
     /** The random number generator for choosing a new coordinator. */
     private static final Random random = new Random();
 
     /** The map of channels, keyed by name. */
-    private static final BindingKeyedMap<ChannelImpl> channelsMap =
-	newMap(CHANNELS_MAP_PREFIX);
+    private static BindingKeyedMap<ChannelImpl> channelsMap = null;
 
     /** The channel name. */
     protected final String name;
@@ -204,13 +237,19 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * Returns the channels map, keyed by channel name.
      */
-    private static BindingKeyedMap<ChannelImpl> getChannelsMap() {
+    private static synchronized  BindingKeyedMap<ChannelImpl> getChannelsMap() {
+	if (channelsMap == null) {
+	    channelsMap = newMap(CHANNELS_MAP_PREFIX);
+
+	}
 	return channelsMap;
     }
 
     /**
-     * Returns the event queues map for the specified coordinator
-     * {@code nodeId}.
+     * Returns the event queues map for the specified coordinator {@code
+     * nodeId}, keyed by channel ID.  In the returned map, each key is a
+     * channel ID (as a BigInteger converted to string form) and is mapped
+     * to its corresponding {@code EventQueue}.
      */
     private static BindingKeyedMap<EventQueue>
 	getEventQueuesMap(long nodeId)
@@ -713,11 +752,27 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	return coordNodeId == getLocalNodeId();
     }
 
+    /**
+     * Returns a new {@code BindingKeyedSet} with the specified {@code
+     * keyPrefix}.
+     *
+     * @param	<V> the value type
+     * @param	keyPrefix a key prefix for the set's service bindings
+     * @return	a new {@code BindingKeyedSet}
+     */
     private static <V> BindingKeyedSet<V> newSet(String keyPrefix) {
 	return ChannelServiceImpl.getCollectionsFactory().
 	    newSet(keyPrefix);
     }
 
+    /**
+     * Returns a new {@code BindingKeyedMap} with the specified {@code
+     * keyPrefix}.
+     *
+     * @param	<V> the value type
+     * @param	keyPrefix a key prefix for the map's service bindings
+     * @return	a new {@code BindingKeyedSet}
+     */
     private static <V> BindingKeyedMap<V> newMap(String keyPrefix) {
 	return ChannelServiceImpl.getCollectionsFactory().
 	    newMap(keyPrefix);
@@ -734,8 +789,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
     
     /**
-     * Returns the sessions set for the specified {@code nodeId}, or null
-     * if there is no sessions set for the specified {@code nodeId}.
+     * Returns the sessions set for the specified {@code nodeId}.
      */
     private Set<BigInteger> getSessionSet(long nodeId) {
 	return
@@ -844,7 +898,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
 	EventQueue eventQueue = eventQueueRef.get();
 	getEventQueuesMap(coordNodeId).
-	    put(channelRefId.toString(), eventQueueRef.get());
+	    put(channelRefId.toString(), eventQueue);
 
 	/*
 	 * Mark the event queue to indicate that a refresh must be sent to
@@ -867,10 +921,9 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      * This method should be called within a transaction.
      */
     private long chooseCoordinatorNode() {
-	Set<Long> serverIdSet = getMemberNodeIds();
-	if (!serverIdSet.isEmpty()) {
-	    int numServers = serverIdSet.size();
-	    Long[] serverIds = serverIdSet.toArray(new Long[numServers]);
+	if (!servers.isEmpty()) { 
+	    int numServers = servers.size();
+	    Long[] serverIds = servers.toArray(new Long[numServers]);
 	    int startIndex = random.nextInt(numServers);
 	    WatchdogService watchdogService =
 		ChannelServiceImpl.getWatchdogService();
@@ -945,7 +998,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     }
 
     /**
-     * Returns a list containing the node IDs of the channel servers for
+     * Returns a set containing the node IDs of the channel servers for
      * this channel. 
      */
     private Set<Long> getMemberNodeIds() {
@@ -967,10 +1020,14 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	}
     }
 
+    /**
+     * Sends a leave notification for the session with the specified {@code
+     * sessionRefId} to the channel server with the specified {@code
+     * nodeId}.
+     */
     private void sendLeaveNotification(long nodeId,
 				       final BigInteger sessionRefId)
     {
-
 	final ChannelServer server = getChannelServer(nodeId);
 	/*
 	 * If there is no channel server for the session's node,
@@ -1040,7 +1097,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 
 	/**
 	 * Constructs an instance of this class with the specified
-	 * {@code iterator}.
+	 * {@code channelRefId}.
 	 */
 	ClientSessionIterator(BigInteger channelRefId) {
 	    Set<BigInteger> sessionSet =
@@ -1328,7 +1385,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * Represents an event on a channel.
      */
-    protected abstract static class ChannelEvent
+    abstract static class ChannelEvent
 	implements ManagedObject, Serializable
     {
 
@@ -1501,7 +1558,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
     /**
      * A channel send event.
      */
-    protected static class SendEvent extends ChannelEvent {
+    static class SendEvent extends ChannelEvent {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
@@ -1721,27 +1778,28 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/** The node ID of the failed node. */
-	private final long nodeId;
+	private final long failedNodeId;
 
 	/** The iterator for channels on the failed node. */
 	private final Iterator<String> channelIter;
 
 	/**
 	 * Constructs an instance of this class with the specified
-	 * {@code nodeId} of the failed node.
+	 * {@code failedNodeId}.
 	 */
-	ReassignCoordinatorsTask(long nodeId) {
-	    this.nodeId = nodeId;
-	    this.channelIter = getChannelsIterator(nodeId);
+	ReassignCoordinatorsTask(long failedNodeId) {
+	    this.failedNodeId = failedNodeId;
+	    this.channelIter = getChannelsIterator(failedNodeId);
 	}
 
 	/**
-	 * Reassigns the next coordinator for the {@code nodeId} to another
-	 * node with member sessions (or the local node if there are no
-	 * member sessions), schedules a task to remove failed sessions for
-	 * the channel, and then reschedules this task to reassign the next
-	 * coordinator.  If there are no more coordinators for the
-	 * specified {@code nodeId}, then no action is taken.
+	 * Reassigns the next coordinator for the {@code failedNodeId} to
+	 * another node with member sessions (or the local node if there
+	 * are no member sessions), schedules a task to remove failed
+	 * sessions for the channel, and then reschedules this task to
+	 * reassign the next coordinator.  If there are no more
+	 * coordinators for the specified {@code failedNodeId}, then no
+	 * action is taken.
 	 */
 	public void run() {
 	    if (!channelIter.hasNext()) {
@@ -1755,7 +1813,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    channelIter.remove();
 	    ChannelImpl channel = (ChannelImpl) getObjectForId(channelRefId);
 	    if (channel != null) {
-		channel.reassignCoordinator(nodeId);
+		channel.reassignCoordinator(failedNodeId);
 		
 		/*
 		 * If other channel servers have failed, remove their sessions

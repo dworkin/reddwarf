@@ -24,8 +24,6 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -45,10 +43,8 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.protocol.SessionProtocol;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import com.sun.sgs.service.NodeListener;
 import com.sun.sgs.service.RecoveryCompleteFuture;
@@ -302,9 +298,8 @@ public final class ChannelServiceImpl
 		    } },  taskOwner);
 	    
 	    /*
-	     * Create global maps: channels map, keyed by name, and channel
-	     * server map, keyed by node ID.  Then store channel server in
-	     * the channel server map.
+	     * Create channel server map, keyed by node ID.  Then store
+	     * channel server in the channel server map.
 	     */
 	    transactionScheduler.runTask(
 		new AbstractKernelRunnable("StoreChannelServerProxy") {
@@ -1253,7 +1248,7 @@ public final class ChannelServiceImpl
 	}
 
 	/**
-	 * Removes the channel server proxy and for the node ID
+	 * Removes the channel server proxy for the node ID
 	 * specified during construction.
 	 */
 	public void run() {

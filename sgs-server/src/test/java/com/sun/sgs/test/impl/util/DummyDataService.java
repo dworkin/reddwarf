@@ -30,8 +30,12 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 
+/**
+ * A dummy implementation of the data service that implements only the
+ * methods that the {@code BindingKeyedMap} and {@code BindingKeyedSet}
+ * implementations need.
+ */
 class DummyDataService
     extends TreeMap<String, ManagedObject>
     implements DataService
@@ -88,9 +92,9 @@ class DummyDataService
 	    throw new ObjectNotFoundException(object.toString());
 	} else if (object instanceof ManagedObject &&
 		   object instanceof Serializable)
-	    {
-		put(name, (ManagedObject) object);
-	    } else {
+	{
+	    put(name, (ManagedObject) object);
+	} else {
 	    throw new IllegalArgumentException("object");
 	}
     }
@@ -103,24 +107,13 @@ class DummyDataService
 	
     /** Get the next name from the set. */
     public String nextServiceBoundName(String name) {
-	if (name == null) {
-	    try {
-		return firstKey();
-	    } catch (NoSuchElementException e) {
-		return null;
-	    }
-	} else {
-	    Iterator<String> iter = tailMap(name).keySet().iterator();
-	    if (iter.hasNext()) {
-		String n = iter.next();
-		if (!n.equals(name)) {
-		    return n;
-		} else if (iter.hasNext()) {
-		    return iter.next();
-		}
-	    }
+	if (isEmpty()) {
 	    return null;
 	}
+	return
+	    name == null ?
+	    firstKey() :
+	    higherKey(name);
     }
 	
     /** Remove the name from the set. */

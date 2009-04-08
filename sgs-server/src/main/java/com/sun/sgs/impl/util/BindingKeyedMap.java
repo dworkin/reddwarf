@@ -23,6 +23,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import java.io.Serializable;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -32,8 +33,18 @@ import java.util.Map;
  * {@link Serializable}, and may (but are not required to) implement {@link
  * ManagedObject}. This map does not permit {@code null} keys or values.
  *
+ * <p>A value is stored in the data service using its associated key (a
+ * String) as a suffix to the {@code keyPrefix} specified during construction
+ * (see {@link BindingKeyedCollections#newMap}). If a value implements {@code
+ * Serializable}, but does not implement {@link ManagedObject}, the value will
+ * be wrapped in an instance of {@code ManagedSerializable} when storing it in
+ * the data service.  Note: users of this map must use this map's APIs to
+ * avoid leaking wrappers for non-managed, serializable objects.
+ *
  * <p>The iterators of an {@link #entrySet}, {@link #keySet}, or {@link
- * #values} view of this map implement {@link Serializable}.
+ * #values} view of this map implement {@link Serializable}. None of the
+ * iterators of this map throw {@link ConcurrentModificationException} for any
+ * of their methods.
  *
  * <p>The iterators of an {@link #entrySet} or {@link #values} view of
  * this map throw {@code ObjectNotFoundException} during an attempt to
@@ -66,11 +77,9 @@ public interface BindingKeyedMap<V>
      *		{@code null} if there was no such mapping
      * @throws	IllegalArgumentException if {@code value} does not implement
      *		{@code Serializable} 
-     * @throws	ClassCastException if {@code key} is not an instance of
-     *		{@code String}
      * @throws	ObjectNotFoundException if {@code value} is a managed
-     *		object that has been removed from the {@code DataManager}
-     *		or, the key was previously mapped to a {@link ManagedObject}
+     *		object that has been removed from the {@code DataManager},
+     *		or the key was previously mapped to a {@link ManagedObject}
      *		that has been removed
      */
     V put(String key, V value);
@@ -138,4 +147,34 @@ public interface BindingKeyedMap<V>
      *		false} otherwise
      */
     boolean removeOverride(String key);
+
+    /**
+     * Returns {@code true} if this map maps one or more keys to the specified
+     * value.  Values that have been removed from the data manager will be
+     * ignored.
+     *
+     * @param	value	value whose presence in this map is to be tested
+     * @return	{@code true} if this map maps one or more keys to the specified
+     *		value
+     * @throws	ClassCastException if {@code value} is of an inappropriate
+     *		type for this map (optional)
+     */
+    boolean containsValue(Object value);
+
+    /**
+     * Removes all mappings from this map.  This operation may be expensive
+     * because all of the map entries need to be traversed.
+     */
+    void clear();
+
+    /**
+     * Returns the number of key-value mappings in this map. This operation
+     * may be expensive because all of the map entries may need to be
+     * traversed to determine the map's size.
+     *
+     * @return	the number of key-value mappings in this map
+     */
+    int size();
+    
+
 }

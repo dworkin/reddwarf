@@ -632,8 +632,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
 	    client.logout();
-	    assertEquals(client.isConnected(), true);
-	    assertEquals(client.waitForDisconnect(), true);
+	    assertTrue(client.isConnected());
+	    assertTrue(client.waitForDisconnect());
 	} finally {
 	    client.disconnect();
 	}
@@ -895,9 +895,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int numAdditionalNodes = 2;
 	Queue<byte[]> messages =
 	    sendMessagesFromNodesToClient(
-		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE);
+ 		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE,
+		false);
 	int expectedMessages = (1 + numAdditionalNodes) * iterations;
-	assertEquals(messages.size(), expectedMessages);
+	assertEquals(expectedMessages, messages.size());
+    }
+
+    public void testClientSessionSendUnreliableMessagesWithFailure()
+	throws Exception
+    {
+	DummyClient client = new DummyClient("dummy");
+	int iterations = 3;
+	int numAdditionalNodes = 2;
+	Queue<byte[]> messages =
+	    sendMessagesFromNodesToClient(
+		client, numAdditionalNodes, iterations, Delivery.UNRELIABLE,
+		true);
+	int expectedMessages = iterations;
+	assertEquals(expectedMessages, messages.size());
     }
     
     public void testClientSessionSendSequence() throws Exception {
@@ -906,14 +921,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	int numAdditionalNodes = 2;
 	Queue<byte[]> messages =
 	    sendMessagesFromNodesToClient(
-		client, numAdditionalNodes, iterations, Delivery.RELIABLE);
+		client, numAdditionalNodes, iterations, Delivery.RELIABLE,
+		false);
 	int expectedMessages = (1 + numAdditionalNodes) * iterations;
 	client.validateMessageSequence(messages, expectedMessages);
     }
     
     private Queue<byte[]> sendMessagesFromNodesToClient(
 	    final DummyClient client, int numAdditionalNodes, int iterations,
-	    final Delivery delivery)
+	    final Delivery delivery, final boolean oneUnreliableServer)
 	throws Exception
     {
 	try {
@@ -927,6 +943,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    final List<SgsTestNode> nodes = new ArrayList<SgsTestNode>();
 	    nodes.add(serverNode);
 	    nodes.addAll(additionalNodes.values());
+	    int expectedMessages = 
+		oneUnreliableServer ?
+		iterations :
+		nodes.size() * iterations;
 	    
 	    // Replace each node's ClientSessionServer, bound in the data
 	    // service, with a wrapped server that delays before sending
@@ -938,14 +958,21 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
 		@SuppressWarnings("unchecked")
 		public void run() {
+		    boolean setUnreliableServer = oneUnreliableServer;
 		    for (SgsTestNode node : nodes) {
 			String key = "com.sun.sgs.impl.service.session.server." +
 			    node.getNodeId();
-			ManagedSerializable<ClientSessionServer> managedServer =
-			    (ManagedSerializable<ClientSessionServer>)
-			    dataService.getServiceBinding(key);
-			DelayingInvocationHandler handler =
-			    new DelayingInvocationHandler(managedServer.get());
+			ClientSessionServer sessionServer =
+			    ((ManagedSerializable<ClientSessionServer>)
+			     dataService.getServiceBinding(key)).get();
+			InvocationHandler handler;
+			if (setUnreliableServer) {
+			    handler = new HungryInvocationHandler(sessionServer);
+			    setUnreliableServer = false;
+			} else {
+			    handler =
+				new DelayingInvocationHandler(sessionServer);
+			}
 			ClientSessionServer delayingServer =
 			    (ClientSessionServer)
 			    Proxy.newProxyInstance(
@@ -993,7 +1020,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}}, taskOwner);
 
 	    return client.waitForClientToRecieveExpectedMessages(
- 		nodes.size() * iterations);
+		expectedMessages);
 
 	} finally {
 	    client.disconnect();
@@ -1929,6 +1956,39 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    throws Exception
 	{
 	    Thread.sleep(100);
+	    try {
+		return method.invoke(obj, args);
+	    } catch (InvocationTargetException e) {
+		Throwable cause = e.getCause();
+		if (cause instanceof Exception) {
+		    throw (Exception) cause;
+		} else if (cause instanceof Error) {
+		    throw (Error) cause;
+		} else {
+		    throw new RuntimeException(
+			"Unexpected exception:" + cause, cause);
+		}
+	    }
+	}
+    }
+    
+    private static class HungryInvocationHandler
+	implements InvocationHandler, Serializable
+    {
+	private final static long serialVersionUID = 1L;
+	private Object obj;
+	
+	HungryInvocationHandler(Object obj) {
+	    this.obj = obj;
+	}
+	
+	public Object invoke(Object proxy, Method method, Object[] args)
+	    throws Exception
+	{
+	    String name = method.getName();
+	    if (name.equals("send") || name.equals("serviceEventQueue")) {
+		return null;
+	    }
 	    try {
 		return method.invoke(obj, args);
 	    } catch (InvocationTargetException e) {

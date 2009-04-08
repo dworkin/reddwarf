@@ -31,8 +31,8 @@ import java.util.Set;
  * Elements stored in this map must implement {@link Serializable}, and may
  * (but are not required to) implement {@link ManagedObject}.  The elements
  * stored in this map must have a unique string representation (returned by
- * the {@link Object#toString toString} method), which is used the element's key
- * in the backing map.
+ * the {@link Object#toString toString} method), which is used as the
+ * element's key in the backing map.
  *
  * @param	<E> the element type
  */

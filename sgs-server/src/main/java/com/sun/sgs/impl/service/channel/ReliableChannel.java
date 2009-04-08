@@ -23,7 +23,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.Delivery;
 
 /**
- * Represents a reliable channel. . Instances of this class handle message
+ * Represents a reliable channel.  Instances of this class handle message
  * delivery details for reliable channel messages.
  */
 class ReliableChannel extends ChannelImpl {
@@ -32,8 +32,8 @@ class ReliableChannel extends ChannelImpl {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Constructs an instance with the specified {@code delivery}
-     * requirement and write capacity.
+     * Constructs an instance with the specified {@code name}, {@code listener},
+     * {@code delivery} guarantee, write capacity.
      */
     ReliableChannel(String name, ChannelListener listener,
 		    Delivery delivery, int writeBufferCapacity)

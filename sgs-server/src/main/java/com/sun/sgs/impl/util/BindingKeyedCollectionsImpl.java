@@ -30,7 +30,7 @@ import com.sun.sgs.service.TransactionProxy;
  */
 public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
 
-    /** The transaction proxy, or null if configure has not been called. */    
+    /** The transaction proxy, or null if the constructor has not been called. */    
     private static TransactionProxy txnProxy;
 
     /**
@@ -39,30 +39,30 @@ public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
      * @param	txnProxy the transaction proxy
      */
     public BindingKeyedCollectionsImpl(TransactionProxy txnProxy) {
+	assert txnProxy != null;
 	synchronized (BindingKeyedCollectionsImpl.class) {
 	    BindingKeyedCollectionsImpl.txnProxy = txnProxy;
 	}
     }
 
     /** {@inheritDoc} */
-    @SuppressWarnings("unchecked")
     public <V> BindingKeyedMap<V> newMap(String keyPrefix) {
 	return new BindingKeyedMapImpl<V>(keyPrefix);
     }
 
     /** {@inheritDoc} */
-    @SuppressWarnings("unchecked")    
     public <V> BindingKeyedSet<V> newSet(String keyPrefix) {
 	return new BindingKeyedSetImpl<V>(keyPrefix);
     }
 
     /**
-     * Returns the data service relevant to the current context.  This
-     * method should be invoked within a transaction.  This method is used
-     * by {@link BindingKeyedMapImpl} to obtain the data service to store
-     * key/value pairs.
+     * Returns the data service relevant to the current context. This
+     * method is used by {@link BindingKeyedMapImpl} to obtain the data
+     * service to store key/value pairs.
      *
-     * @return the data service relevant to the current context
+     * @return	the data service relevant to the current context
+     * @throws	IllegalStateException if an instance of this class has not
+     *		been initialized
      */
     static synchronized DataService getDataService() {
 	if (txnProxy == null) {

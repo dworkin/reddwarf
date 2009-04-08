@@ -23,8 +23,14 @@ import com.sun.sgs.kernel.ComponentRegistry;
 
 /**
  * A factory for creating collections whose key/value pairs are stored as
- * service bindings.  This factory may be obtained from the service {@link
+ * service bindings.  This factory may be obtained from the {@link
  * ComponentRegistry}.
+ *
+ * <p>The {@code keyPrefix} supplied to the {@link #newMap newMap} and
+ * {@link #newSet set} methods specifies the service binding name prefix to
+ * use for each key in the map.  That is, a value in the map (or set) is
+ * stored in the data service using its associated key (a String) as a
+ * suffix to the {@code keyPrefix} specified during construction.
  */
 public interface BindingKeyedCollections {
 

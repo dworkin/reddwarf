@@ -23,6 +23,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.util.ManagedSerializable;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -49,7 +50,9 @@ import java.util.Set;
  * construction.  All values must implement {@code Serializable}.  If a
  * value implements {@code Serializable}, but does not implement {@link
  * ManagedObject}, the value will be wrapped in an instance of {@code
- * ManagedSerializable} when storing it in the data service.
+ * ManagedSerializable} when storing it in the data service.  Note: users of
+ * this map must use this map's APIs to avoid leaking wrappers for
+ * non-managed, serializable objects.
  *
  * <p>Instances of {@code BindingKeyedMap} as well as its associated
  * iterators are serializable, but not managed, objects.
@@ -70,7 +73,7 @@ public class BindingKeyedMapImpl<V>
      * Constructs an instance with the specified {@code keyPrefix}.
      *
      * @param	keyPrefix a key prefix
-     * @throws	IllegalArgumentException if {@code keyPrefix}is empty
+     * @throws	IllegalArgumentException if {@code keyPrefix} is empty
      */
     BindingKeyedMapImpl(String keyPrefix) {
 	if (keyPrefix == null) {
@@ -90,40 +93,26 @@ public class BindingKeyedMapImpl<V>
     
     /** {@inheritDoc} */
     public V put(String key, V value) {
-	checkNull("key", key);
+	Objects.checkNull("key", key);
 	checkSerializable("value", value);
 
 	// Get previous value while removing entry.
 	// This is inefficient if there is a previous entry.
-	V previousValue = remove(key);
+	V previousValue = get(key);
+	if (previousValue != null) {
+	    remove(key);
+	}
 
 	// Store key/value pair.
-	putInternal(key, value);
+	putKeyValue(getBindingName(key), value);
 	
 	return previousValue;
-    }
-
-    /**
-     * Puts the specified {@code key}/{@code value} pair in this map,
-     * wrapping the value if the value does not implement {@code
-     * ManagedObject}.
-     *
-     * @param	key a key
-     * @param	value a value
-     */
-    private void putInternal(String key, V value) {
-	ManagedObject v =
-	    value instanceof ManagedObject ?
-	    (ManagedObject) value :
-	    new Wrapper<V>(value);
-	BindingKeyedCollectionsImpl.getDataService().
-	    setServiceBinding(getBindingName(key), v);
     }
 
     /** {@inheritDoc} */
     public V get(Object key) {
 	checkKey("key", key);
-	String bindingName = getBindingName(key.toString());
+	String bindingName = getBindingName((String) key);
 	V value = null;
 	try {
 	    value = getValue(bindingName);
@@ -143,13 +132,14 @@ public class BindingKeyedMapImpl<V>
 	    containsKey = true;
 	} catch (NameNotBoundException e) {
 	} catch (ObjectNotFoundException e) {
+	    containsKey = true;
 	}
 	return containsKey;
     }
 
     /** {@inheritDoc} */
     public boolean containsValue(Object value) {
-	checkNull("value", value);
+	Objects.checkNull("value", value);
 	Iterator iter = new ValueIterator<V>(keyPrefix);
 	while (iter.hasNext()) {
 	    try {
@@ -166,7 +156,7 @@ public class BindingKeyedMapImpl<V>
     public V remove(Object key) {
 	checkKey("key", key);
 	DataService dataService = BindingKeyedCollectionsImpl.getDataService();
-	String bindingName = getBindingName(key.toString());
+	String bindingName = getBindingName((String) key);
 	V value = null;
 	try {
 	    value = removeValue(bindingName);
@@ -288,7 +278,7 @@ public class BindingKeyedMapImpl<V>
     }
     
     /**
-     * A serializable {@code Set} for this map's entries.
+     * A serializable {@code Collection} for this map's values.
      */
     private static final class Values<V>
 	extends AbstractCollection<V>
@@ -391,28 +381,35 @@ public class BindingKeyedMapImpl<V>
 	    if (keyReturnedByNext == null) {
 		throw new IllegalStateException();
 	    }
-
 	    removeValue(keyReturnedByNext);
 	    dataService.removeServiceBinding(keyReturnedByNext);
 	    keyReturnedByNext = null;
 	}
-	
-	public Entry<String, V> nextEntry() {
+
+	/**
+	 * Returns the next entry or throws {@code NoSuchElementException} if
+	 * there is no next entry.
+	 */
+	Entry<String, V> nextEntry() {
 	    try {
 		if (!hasNext()) {
 		    throw new NoSuchElementException();
 		}
 		keyReturnedByNext = nextName;
 		key = nextName;
-		return new KeyValuePair<String, V>(
-		    keyReturnedByNext.substring(prefix.length()),
-		    getValue(keyReturnedByNext));
+		return new KeyValuePair<V>(
+		    prefix,
+		    keyReturnedByNext.substring(prefix.length()));
 	    } finally {
 		nextName = null;
 	    }
 	}
 
-	public String nextKey() {
+	/**
+	 * Returns the next key or throws {@code NoSuchElementException} if
+	 * there is no next key.
+	 */
+	String nextKey() {
 	    try {
 		if (!hasNext()) {
 		    throw new NoSuchElementException();
@@ -424,7 +421,12 @@ public class BindingKeyedMapImpl<V>
 		nextName = null;
 	    }
 	}
-	public V nextValue() {
+
+	/**
+	 * Returns the next value or throws {@code NoSuchElementException} if
+	 * there is no next value.
+	 */
+	V nextValue() {
 	    try {
 		if (!hasNext()) {
 		    throw new NoSuchElementException();
@@ -556,29 +558,29 @@ public class BindingKeyedMapImpl<V>
 
     /** {@inheritDoc} */
     public boolean putOverride(String key, V value) {
-	checkSerializable("key", key);
+	Objects.checkNull("key", key);
 	checkSerializable("value", value);
-	boolean previouslyMapped = containsKey(key);
-	putInternal(key, value);
+	boolean previouslyMapped = removeOverride(key);
+	putKeyValue(getBindingName(key), value);
 	return previouslyMapped;
     }
 
     /** {@inheritDoc} */
     public boolean removeOverride(String key) {
-	checkNull("key", key);
+	Objects.checkNull("key", key);
 	boolean previouslyMapped = containsKey(key);
 	if (previouslyMapped) {
+	    DataService dataService =
+		BindingKeyedCollectionsImpl.getDataService();
+	    String bindingName = getBindingName(key);
 	    try {
-		DataService dataService =
-		    BindingKeyedCollectionsImpl.getDataService();
-		String bindingName = getBindingName(key);
 		ManagedObject v = dataService.getServiceBinding(bindingName);
 		if (v instanceof Wrapper) {
 		    dataService.removeObject(v);
 		}
-		dataService.removeServiceBinding(bindingName);
 	    } catch (ObjectNotFoundException ignore) {
 	    }
+	    dataService.removeServiceBinding(bindingName);
 	}
 	return previouslyMapped;
     }
@@ -601,36 +603,36 @@ public class BindingKeyedMapImpl<V>
     /**
      * A serializable {@code Entry} used in entry sets for this map.
      */
-    private static final class KeyValuePair<K, V>
-	implements Entry<K, V>, Serializable
+    private static final class KeyValuePair<V>
+	implements Entry<String, V>, Serializable
     {
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	private final K k;
-	private V v;
+	private final String prefix;
+	private final String k;
 
-	KeyValuePair(K key, V value) {
+	KeyValuePair(String prefix, String key) {
+	    this.prefix = prefix;
 	    this.k = key;
-	    this.v = value;
 	}
-
 	
 	/** {@inheritDoc} */
-	public K getKey() {
+	public String getKey() {
 	    return k;
 	}
 
 	/** {@inheritDoc} */
 	public V getValue() {
-	    return v;
+	    return getValue(prefix + k);
 	}
 
 	/** {@inheritDoc} */
 	public V setValue(V value) {
 	    checkSerializable("value", value);
-	    V previousValue = this.v;
-	    this.v = value;
+	    String bindingName = prefix + k;
+	    V previousValue = getValue(bindingName);
+	    putKeyValue(bindingName, value);
 	    return previousValue;
 	}
 
@@ -655,7 +657,17 @@ public class BindingKeyedMapImpl<V>
 
 	/** {@inheritDoc} */
 	public String toString() {
-	    return k.toString() + "=" + v.toString();
+	    return k.toString() + "=" + getValue().toString();
+	}
+	
+	@SuppressWarnings("unchecked")
+	private V getValue(String bindingName) {
+	    ManagedObject v = BindingKeyedCollectionsImpl.getDataService().
+		getServiceBinding(bindingName);
+	    return
+		v instanceof Wrapper ?
+		(V) ((Wrapper) v).get() :
+		(V) v;
 	}
     }
 
@@ -712,6 +724,24 @@ public class BindingKeyedMapImpl<V>
     }
 
     /**
+     * Puts the specified {@code key}/{@code value} pair in this map,
+     * wrapping the value if the value does not implement {@code
+     * ManagedObject}.
+     *
+     * @param	key a key
+     * @param	value a value
+     */
+    private static void putKeyValue(String bindingName, Object value) {
+	assert value != null && value instanceof Serializable;
+	ManagedObject v =
+	    value instanceof ManagedObject ?
+	    (ManagedObject) value :
+	    new Wrapper<Object>(value);
+	BindingKeyedCollectionsImpl.getDataService().
+	    setServiceBinding(bindingName, v);
+    }
+
+    /**
      * Returns the value associated with the specified {@code bindingName}.
      * removing the wrapper if applicable.
      */
@@ -745,21 +775,11 @@ public class BindingKeyedMapImpl<V>
     }
 
     /**
-     * Throws {@code NullPointerException} of {@code obj} is {@code
-     * null}
-     */
-    private static void checkNull(String name, Object obj) {
-	if (obj == null) {
-	    throw new NullPointerException("null " + name);
-	}
-    }
-
-    /**
      * Throws {@code IllegalArgumentException} of {@code obj} is not
      * serializable.
      */
     private static void checkSerializable(String name, Object obj) {
-	checkNull(name, obj);
+	Objects.checkNull(name, obj);
 	if (!(obj instanceof Serializable)) {
 	    throw new IllegalArgumentException(name + " not serializable");
 	}
@@ -770,7 +790,7 @@ public class BindingKeyedMapImpl<V>
      * of {@code String}.
      */
     private static void checkKey(String keyName, Object key) {
-	checkNull(keyName, key);
+	Objects.checkNull(keyName, key);
 	if (!(key instanceof String)) {
 	    throw new ClassCastException(
 		"key is not an instance of String: " +

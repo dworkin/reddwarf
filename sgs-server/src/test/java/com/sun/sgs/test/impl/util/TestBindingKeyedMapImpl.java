@@ -26,7 +26,7 @@ import com.sun.sgs.impl.util.BindingKeyedCollectionsImpl;
 import com.sun.sgs.impl.util.BindingKeyedMap;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -38,8 +38,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-/** Test the BoundNamesUtil class. */
-@RunWith(FilteredJUnit3TestRunner.class)
+/** Test the BindingKeyedMapImpl class. */
+@RunWith(FilteredNameRunner.class)
 public class TestBindingKeyedMapImpl extends TestCase {
 
     /** The transaction proxy. */
@@ -52,14 +52,13 @@ public class TestBindingKeyedMapImpl extends TestCase {
     private DummyDataService dataService;
 
     /** Creates an instance. */
-    public TestBindingKeyedMapImpl(String name) {
-	super(name);
+    public TestBindingKeyedMapImpl() {
+	super();
     }
 
     /** Prints the test case and sets the service field to a new instance. */
     @Before
-    protected void setUp() {
-	System.err.println("Testcase: " + getName());
+    public void setUp() {
 	txnProxy = new DummyTransactionProxy();
 	dataService = new DummyDataService();
 	txnProxy.setComponent(DataService.class, dataService);
@@ -142,7 +141,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
     public void testPutWithPreviousValueRemoved() {
 	Managed obj = new Managed();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
-	map.put("a", obj);
+	assertNull(map.put("a", obj));
 	dataService.removeObject(obj);
 	try {
 	    map.put("a", new Managed());
@@ -158,7 +157,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	for (int i = 0; i < 10; i++) {
 	    String key = Integer.toString(i);
 	    assertFalse(map.containsKey(key));
-	    map.put(key, i);
+	    assertNull(map.put(key, i));
 	    assertTrue(map.containsKey(key));
 	}
 	for (int i = 0; i < 10; i++) {
@@ -181,7 +180,9 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    set.add(obj);
 	    String key = obj.toString();
 	    assertFalse(map.containsKey(key));
-	    map.put(key, obj);
+	    assertNull(map.put(key, obj));
+	    assertTrue(map.containsKey(key));
+	    assertEquals(obj, map.put(key, obj));
 	    assertTrue(map.containsKey(key));
 	}
 	
@@ -237,9 +238,9 @@ public class TestBindingKeyedMapImpl extends TestCase {
     public void testPutOverrideWithPreviousValueRemoved() {
 	Managed obj = new Managed();
 	BindingKeyedMap<Managed> map = collectionsFactory.newMap("x.");
-	map.putOverride("a", obj);
+	assertFalse(map.putOverride("a", obj));
 	dataService.removeObject(obj);
-	map.putOverride("a", new Managed());
+	assertTrue(map.putOverride("a", new Managed()));
     }
 
     @Test
@@ -248,9 +249,11 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	for (int i = 0; i < 10; i++) {
 	    String key = Integer.toString(i);
 	    assertFalse(map.containsKey(key));
-	    map.putOverride(key, i);
-	    assertTrue(map.containsKey(key));	    
+	    assertFalse(map.putOverride(key, i));
+	    assertTrue(map.containsKey(key));
+	    assertTrue(map.putOverride(key, i));
 	}
+	assertEquals(10, dataService.removedObjectsCount());
 	for (int i = 0; i < 10; i++) {
 	    assertEquals(new Integer(i), map.get(Integer.toString(i)));
 	}
@@ -266,7 +269,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    set.add(obj);
 	    String key = obj.toString();
 	    assertFalse(map.containsKey(key));
-	    map.putOverride(key, obj);
+	    assertFalse(map.putOverride(key, obj));
 	    assertTrue(map.containsKey(key));
 	}
 	
@@ -341,16 +344,18 @@ public class TestBindingKeyedMapImpl extends TestCase {
  
     @Test
     public void testRemoveWithRemovedObject() {
+	String key = "a";
 	Managed obj = new Managed();
 	Map<String, Managed> map = collectionsFactory.newMap("x.");
-	map.put("a", obj);
+	map.put(key, obj);
 	dataService.removeObject(obj);
 	try {
-	    map.remove("a");
+	    map.remove(key);
 	    fail("expected ObjectNotFoundException");
 	} catch (ObjectNotFoundException e) {
 	    System.err.println(e);
 	}
+	assertTrue(map.containsKey(key));
     }
 
     @Test
@@ -414,10 +419,12 @@ public class TestBindingKeyedMapImpl extends TestCase {
     @Test
     public void testRemoveOverrideWithRemovedObject() {
 	Managed obj = new Managed();
+	String key = "a";
 	BindingKeyedMap<Managed> map = collectionsFactory.newMap("x.");
-	map.put("a", obj);
+	assertNull(map.put(key, obj));
 	dataService.removeObject(obj);
-	map.removeOverride("a");
+	assertTrue(map.removeOverride(key));
+	assertFalse(map.containsKey(key));
     }
 
     @Test
@@ -765,9 +772,10 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    assertEquals(entry.getKey(), entry.getValue().toString());
 	    assertTrue(map.containsKey(entry.getKey()));
 	    assertTrue(map.containsValue(entry.getValue()));
+	    Integer value = entry.getValue();
 	    iter.remove();
 	    assertFalse(map.containsKey(entry.getKey()));
-	    assertFalse(map.containsValue(entry.getValue()));
+	    assertFalse(map.containsValue(value));
 	}
 	assertTrue(map.isEmpty());
 	assertTrue(map.entrySet().isEmpty());
@@ -798,9 +806,10 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    assertEquals(entry.getKey(), entry.getValue().toString());
 	    assertTrue(map.containsKey(entry.getKey()));
 	    assertTrue(map.containsValue(entry.getValue()));
+	    Managed value = entry.getValue();
 	    iter.remove();
 	    assertFalse(map.containsKey(entry.getKey()));
-	    assertFalse(map.containsValue(entry.getValue()));
+	    assertFalse(map.containsValue(value));
 	}
 	assertTrue(map.isEmpty());
 	assertTrue(map.entrySet().isEmpty());

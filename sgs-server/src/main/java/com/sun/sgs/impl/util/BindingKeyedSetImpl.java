@@ -48,8 +48,8 @@ public class BindingKeyedSetImpl<E>
     /**
      * Creates an empty set with the specified {@code keyPrefix}.
      *
-     * @param keyPrefix the key prefix for a service binding name
-     * @throws	IllegalArgumentException if {@code keyPrefix}is empty
+     * @param	keyPrefix the key prefix for a service binding name
+     * @throws	IllegalArgumentException if {@code keyPrefix} is empty
      */
     BindingKeyedSetImpl(String keyPrefix) {
 	map = new BindingKeyedMapImpl<E>(keyPrefix);
@@ -67,7 +67,12 @@ public class BindingKeyedSetImpl<E>
     /** {@inheritDoc} */
     @Override
     public boolean add(E e) {
-	return map.put(e.toString(), e) == null;
+	if (contains(e)) {
+	    return false;
+	} else {
+	    map.put(e.toString(), e);
+	    return true;
+	}
     }
 
     /** {@inheritDoc} */
@@ -82,8 +87,7 @@ public class BindingKeyedSetImpl<E>
 	if (o == null) {
 	    throw new NullPointerException("null object");
 	}
-	Object obj = map.get(o.toString());
-	return obj != null && obj.equals(o);
+	return map.containsKey(o.toString());
     }
 
     /** {@inheritDoc} */
@@ -100,8 +104,7 @@ public class BindingKeyedSetImpl<E>
     /** {@inheritDoc} */
     @Override
     public boolean remove(Object o) {
-	Object removed = map.remove(o.toString());
-	return removed != null &&  o.equals(removed);
+	return map.removeOverride(o.toString());
     }
 
     /** {@inheritDoc} */
