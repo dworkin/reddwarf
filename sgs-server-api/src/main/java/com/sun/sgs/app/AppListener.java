@@ -31,7 +31,8 @@ import java.util.Properties;
  * the {@link Serializable} interface, so that application listeners
  * can be stored persistently.  If a given listener has mutable state,
  * that listener should also implement the {@link ManagedObject}
- * interface.
+ * interface.  An implementation must be public and non-abstract, and
+ * have a public, no-argument constructor.
  *
  * <p>The methods of this listener are called within the context of a
  * {@link Task} being executed by the {@link TaskManager}.  If, during
