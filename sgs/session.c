@@ -428,3 +428,7 @@ int sgs_session_impl_send_msg(sgs_session_impl *session) {
 
     return 0;
 }
+
+void sgs_session_channel_clear (sgs_session_impl *session){
+    sgs_map_clear(session->channels);
+}

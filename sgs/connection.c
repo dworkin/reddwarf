@@ -48,8 +48,6 @@
 #include "sgs/protocol.h"
 #include "sgs/private/connection_impl.h"
 #include "sgs/private/io_utils.h"
-#include "private/connection_impl.h"
-#include "private/context_impl.h"
 
 #ifndef WIN32
 #include <netdb.h>
@@ -94,7 +92,9 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     
     
     result = select(sockfd + 1, &readset, &writeset, &exceptset, &timeout_tv);
-    if (result <= 0) return result;  /** -1 or 0 */
+    if (result <= 0) {
+        return result;  /** -1 or 0 */
+    }
     
     if (FD_ISSET(sockfd, &exceptset)) {
         optlen = sizeof(errno);  /* SO_ERROR should return an int */
@@ -109,7 +109,9 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     if (FD_ISSET(sockfd, &readset)) {
         /** Read stuff off the socket and write it to the in-buffer. */
         result = sgs_impl_read_from_fd(connection->inbuf, sockfd);
-        if (result == -1) return -1;
+        if (result == -1) {
+            return -1;
+        }
         
         /* Return value of 0 may or may not mean that EOF was read. */
         if ((result == 0) && (sgs_buffer_remaining(connection->inbuf) > 0)) {
@@ -129,7 +131,9 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         
         /** Read stuff out of the out-buffer and write it to the socket. */
         result = sgs_impl_write_to_fd(connection->outbuf, sockfd);
-        if (result == -1) return -1;
+        if (result == -1) {
+            return -1;
+        }
     }
     
     /** If there is room in inbuf, then register interest in socket reads. */
@@ -328,7 +332,10 @@ void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
 
     sgs_socket_destroy(connection->socket_fd);
     connection->expecting_disconnect = 0;
+    sgs_buffer_clear(connection->inbuf);
+    sgs_buffer_clear(connection->outbuf);
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
+    sgs_session_channel_clear(connection->session);
     if (connection->in_redirect == 1)
         sgs_connection_destroy(connection);
 }

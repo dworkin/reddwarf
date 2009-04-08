@@ -703,6 +703,7 @@ static void doLogout(int force){
     if (!checkLogin())
         return;
     sgs_connection_logout(g_conn, force);
+    sgs_map_clear(g_channel_map);
     g_session = NULL;
 }
 

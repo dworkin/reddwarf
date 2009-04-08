@@ -72,6 +72,17 @@ int sgs_session_direct_send(sgs_session* session, const uint8_t* data,
  */
 const sgs_id* sgs_session_get_reconnectkey(const sgs_session* session);
 
+/*
+ * function : sgs_session_channel_clear
+ *
+ * Clears the channels that are associated with the session
+ *
+ */
+
+void sgs_session_channel_clear(sgs_session * session);
+
+
+
 #ifdef __cplusplus
 }
 #endif
