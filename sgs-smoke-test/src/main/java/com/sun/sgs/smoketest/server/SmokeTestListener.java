@@ -52,7 +52,7 @@ public class SmokeTestListener implements Serializable,
     private enum State {
         INIT, LOGIN, SEND_SESSION_MSG, JOIN_CHANNEL, SEND_CHANNEL_MSG, 
         LEAVE_CHANNEL, LOGOUT, DONE, 
-        RECONNECT, RECONNECTING;
+        RECONNECT, RECONNECTING, LOGIN_REDIRECT;
 
         /** Get the next state, but stop at DONE */
         public State next()
@@ -204,7 +204,6 @@ public class SmokeTestListener implements Serializable,
         logger.log(Level.WARNING, "\n\n[[Client " + sessionName
                 + " Failed Smoke Test]]: {0}\n", errorMsg);
 
-//      AppContext.getDataManager().removeObject(getSession()); // disconnect
         curState = State.DONE;
     }
 
@@ -251,8 +250,6 @@ public class SmokeTestListener implements Serializable,
     @Override
     synchronized public void receivedMessage(ByteBuffer message)
     {
-
-        
         if (logger.isLoggable(Level.INFO)) {
             logger.log(Level.INFO, "Message from {0} in state " + curState
                     + ": " + bufferToString(message), sessionName);
