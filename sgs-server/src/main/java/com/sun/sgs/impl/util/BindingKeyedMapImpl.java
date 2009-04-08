@@ -651,7 +651,7 @@ public class BindingKeyedMapImpl<V>
 
 	/** {@inheritDoc} */
 	public String toString() {
-	    return k.toString() + "=" + getValue().toString();
+	    return k + "=" + getValue().toString();
 	}
 	
 	@SuppressWarnings("unchecked")

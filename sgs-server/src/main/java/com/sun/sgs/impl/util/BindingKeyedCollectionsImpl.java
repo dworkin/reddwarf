@@ -30,7 +30,7 @@ import com.sun.sgs.service.TransactionProxy;
  */
 public class BindingKeyedCollectionsImpl implements BindingKeyedCollections {
 
-    /** The transaction proxy, or null if the constructor has not been called. */    
+    /** The transaction proxy, or null if the constructor hasn't been called. */
     private static TransactionProxy txnProxy;
 
     /**
