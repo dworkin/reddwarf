@@ -781,6 +781,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    assertTrue(map.containsKey(entry.getKey()));
 	    assertTrue(map.containsValue(entry.getValue()));
 	    Integer value = entry.getValue();
+	    entry.setValue(new Integer(10 + i));
 	    if (i++ % 2 == 0) {
 		iter.remove();
 	    } else {
@@ -793,7 +794,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	assertTrue(map.isEmpty());
 	assertTrue(map.entrySet().isEmpty());
 	assertEquals(0, map.entrySet().size());
-	assertEquals(10, dataService.removedObjectsCount());
+	assertEquals(20, dataService.removedObjectsCount());
     }
 
     @Test
@@ -822,6 +823,7 @@ public class TestBindingKeyedMapImpl extends TestCase {
 	    assertTrue(map.containsKey(entry.getKey()));
 	    assertTrue(map.containsValue(entry.getValue()));
 	    Managed value = entry.getValue();
+	    entry.setValue(new Managed());
 	    if (i++ % 2 == 0) {
 		iter.remove();
 	    } else {

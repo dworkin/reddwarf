@@ -96,15 +96,14 @@ public class BindingKeyedMapImpl<V>
 	Objects.checkNull("key", key);
 	checkSerializable("value", value);
 
-	// Get previous value while removing entry.
-	// This is inefficient if there is a previous entry.
+	String bindingName = getBindingName(key);
 	V previousValue = get(key);
 	if (previousValue != null) {
-	    remove(key);
+	    removeValue(bindingName);
 	}
 
 	// Store key/value pair.
-	putKeyValue(getBindingName(key), value);
+	putKeyValue(bindingName, value);
 	
 	return previousValue;
     }
@@ -524,9 +523,6 @@ public class BindingKeyedMapImpl<V>
 	 * {@inheritDoc}
 	 */
 	public String next() {
-
-
-
 	    return nextKey();
 	}
     }
@@ -568,7 +564,14 @@ public class BindingKeyedMapImpl<V>
     public boolean putOverride(String key, V value) {
 	Objects.checkNull("key", key);
 	checkSerializable("value", value);
-	boolean previouslyMapped = removeOverride(key);
+	String bindingName = getBindingName(key);
+	boolean previouslyMapped = containsKeyInternal(bindingName);
+	if (previouslyMapped) {
+	    try {
+		removeValue(bindingName);
+	    } catch (ObjectNotFoundException e) {
+	    }
+	} 
 	putKeyValue(getBindingName(key), value);
 	return previouslyMapped;
     }
@@ -625,7 +628,10 @@ public class BindingKeyedMapImpl<V>
 	public V setValue(V value) {
 	    checkSerializable("value", value);
 	    String bindingName = prefix + k;
-	    V previousValue = getValue(bindingName);
+	    V previousValue =  getValue(bindingName);
+	    if (previousValue != null) {
+		removeValue(bindingName);
+	    }
 	    putKeyValue(bindingName, value);
 	    return previousValue;
 	}
@@ -656,12 +662,16 @@ public class BindingKeyedMapImpl<V>
 	
 	@SuppressWarnings("unchecked")
 	private V getValue(String bindingName) {
-	    ManagedObject v = BindingKeyedCollectionsImpl.getDataService().
-		getServiceBinding(bindingName);
-	    return
-		v instanceof Wrapper ?
-		(V) ((Wrapper) v).get() :
-		(V) v;
+	    try {
+		ManagedObject v = BindingKeyedCollectionsImpl.getDataService().
+		    getServiceBinding(bindingName);
+		return
+		    v instanceof Wrapper ?
+		    (V) ((Wrapper) v).get() :
+		    (V) v;
+	    } catch (NameNotBoundException e) {
+		throw new IllegalStateException("entry has been removed");
+	    }
 	}
     }
 
@@ -746,21 +756,36 @@ public class BindingKeyedMapImpl<V>
 	    DataService dataService =
 		BindingKeyedCollectionsImpl.getDataService();
 	    try {
-		ManagedObject v = dataService.getServiceBinding(bindingName);
-		if (v instanceof Wrapper) {
-		    dataService.removeObject(v);
-		}
+		removeValue(bindingName);
 	    } catch (ObjectNotFoundException ignore) {
 	    }
 	    dataService.removeServiceBinding(bindingName);
 	}
 	return previouslyMapped;
     }
+
+    /**
+     * Removes the wrapper (if applicable) for the value associated with
+     * the specified {@code bindingName}.
+     *
+     * @throws	NameNotBoundException if the service binding does not exist
+     * @throws	ObjectNotFoundException if the value associated with the
+     *		specified {@code bindingName} has been removed
+     */
+    private static void removeValue(String bindingName) {
+	DataService dataService =
+	    BindingKeyedCollectionsImpl.getDataService();
+	ManagedObject v = dataService.getServiceBinding(bindingName);
+	if (v instanceof Wrapper) {
+	    dataService.removeObject(v);
+	}
+    }
     
     /**
      * Puts the specified {@code key}/{@code value} pair in this map,
      * wrapping the value if the value does not implement {@code
-     * ManagedObject}.
+     * ManagedObject}.  The caller is responsible for removing the wrapper
+     * for the old value, if applicable.
      *
      * @param	key a key
      * @param	value a value

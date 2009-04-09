@@ -67,12 +67,7 @@ public class BindingKeyedSetImpl<E>
     /** {@inheritDoc} */
     @Override
     public boolean add(E e) {
-	if (contains(e)) {
-	    return false;
-	} else {
-	    map.put(e.toString(), e);
-	    return true;
-	}
+	return !map.putOverride(e.toString(), e);
     }
 
     /** {@inheritDoc} */

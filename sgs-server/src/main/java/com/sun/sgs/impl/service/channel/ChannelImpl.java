@@ -771,7 +771,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
      *
      * @param	<V> the value type
      * @param	keyPrefix a key prefix for the map's service bindings
-     * @return	a new {@code BindingKeyedSet}
+     * @return	a new {@code BindingKeyedMap}
      */
     private static <V> BindingKeyedMap<V> newMap(String keyPrefix) {
 	return ChannelServiceImpl.getCollectionsFactory().
@@ -1323,7 +1323,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 			Level.FINEST, "sending refresh, channel:{0}",
 			HexDumper.toHexString(channelRefId.toByteArray()));
 		}
-		for (final long nodeId : channel.getMemberNodeIds()) {
+		for (final long nodeId : channel.servers) {
 		    channelService.addChannelTask(
 		    	channelRefId,
 			new IoRunnable() {
@@ -1609,7 +1609,7 @@ abstract class ChannelImpl implements ManagedObject, Serializable {
 	    ChannelServiceImpl channelService =
 		ChannelServiceImpl.getChannelService();
 	    final BigInteger channelRefId = channel.channelRefId;
-	    for (final long nodeId : channel.getMemberNodeIds()) {
+	    for (final long nodeId : channel.servers) {
 		channelService.addChannelTask(
 		    channelRefId,
 		    new IoRunnable() {
