@@ -47,6 +47,8 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.BindingKeyedCollections;
+import com.sun.sgs.impl.util.BindingKeyedCollectionsImpl;
 import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -286,6 +288,9 @@ class Kernel {
                                              accessCoordinator);
             taskScheduler =
                 new TaskSchedulerImpl(appProperties, profileCollectorHandle);
+
+	    BindingKeyedCollections collectionsFactory =
+		new BindingKeyedCollectionsImpl(proxy);
                         
             KernelContext ctx = new StartupKernelContext("Kernel");
             transactionScheduler.setContext(ctx);
@@ -297,6 +302,7 @@ class Kernel {
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
             systemRegistry.addComponent(profileCollector);
+	    systemRegistry.addComponent(collectionsFactory);
 
             // create the profiling listeners.  It is important to not
             // do this until we've finished adding components to the
