@@ -32,7 +32,13 @@ import java.io.Serializable;
  * Classes that implement {@code ManagedObject} should not provide {@code
  * writeReplace} or {@code readRestore} methods to designate replacement
  * objects during serialization.  Object replacement would interfere with the
- * object identity maintained by the {@code DataManager}, and is not permitted.
+ * object identity maintained by the {@code DataManager}, and is not
+ * permitted. <p>
+ *
+ * Classes that implement {@code ManagedObject} can provide {@code readObject}
+ * and {@code writeObject} methods to customize their serialization behavior,
+ * but the {@code writeObject} methods should not perform calls to methods that
+ * require a current transaction.
  *
  * @see		DataManager
  * @see		ManagedReference
