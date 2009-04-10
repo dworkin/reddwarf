@@ -118,6 +118,13 @@ conf directory for additional details.
 
 RELEASE COMPATIBILITY
 
+Release 0.9.10:
+
+- The persistent data stored by the ChannelService is incompatible with
+  previous releases.  The ChannelService's persistent data created using
+  releases prior to 0.9.10 will not be automatically upgraded to the
+  current release format.
+
 Release 0.9.9:
 
 - The com.sun.sgs.app.port configuration property is no longer supported.

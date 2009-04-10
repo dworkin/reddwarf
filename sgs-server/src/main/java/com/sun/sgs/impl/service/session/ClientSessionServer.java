@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.Delivery;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -37,4 +38,20 @@ public interface ClientSessionServer extends Remote {
      * 		invoking this method
      */
     void serviceEventQueue(byte[] sessionId) throws IOException;
+
+    /**
+     * Forwards the specified {@code message} to be sent to the session
+     * with the specified {@code sessionId} according to the delivery
+     * guarantee with the corresponding {@code deliveryOrdinal} (the ordinal
+     * representing the {@link Delivery} enum).
+     *
+     * @param	sessionId a session ID
+     * @param	message a message
+     * @param	deliveryOrdinal a delivery guarantee (the
+     *		ordinal representing the {@link Delivery} enum)
+     * @throws	IOException if a communication problem occurs while
+     * 		invoking this method
+     */
+    void send(byte[] sessionId, byte[] message, byte deliveryOrdinal)
+	throws IOException;
 }
