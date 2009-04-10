@@ -202,7 +202,7 @@ public class ClientSessionImpl
      *
      * Enqueues a send event to this client session's event queue for servicing.
      */
-    public ClientSession send(ByteBuffer message, Delivery delivery) {
+    public ClientSession send(ByteBuffer message, final Delivery delivery) {
 	try {
             if (!isConnected()) {
 		throw new IllegalStateException("client session not connected");
@@ -223,9 +223,35 @@ public class ClientSessionImpl
              * receivedMessage callback, or we could add a special API to
              * pre-allocate buffers. -JM
              */
-	    byte[] msgBytes = new byte[message.remaining()];
+	    final byte[] msgBytes = new byte[message.remaining()];
 	    message.asReadOnlyBuffer().get(msgBytes);
-	    addEvent(new SendEvent(msgBytes, delivery));
+	    if (delivery.equals(Delivery.UNRELIABLE)) {
+		// Forward unreliable message directly to client session's
+		// server node.
+		final ClientSessionServer server =
+		    sessionService.getClientSessionServer(nodeId);
+		sessionService.taskService.scheduleNonDurableTask(
+		    new AbstractKernelRunnable("SendUnreliableMessage") {
+		        public void run() {
+			    try {
+				server.send(idBytes, msgBytes, (byte)
+					    delivery.ordinal());
+			    } catch (IOException e) {
+				if (logger.isLoggable(Level.FINE)) {
+				    logger.logThrow(
+					Level.FINE, e,
+					"send message:{0} throws",
+					HexDumper.format(msgBytes, 0x50));
+				}
+			    }
+			}
+		    }, false);
+		
+	    } else {
+		// Enqueue reliable message for ordered delivery by the
+		// client session's server node.
+		addEvent(new SendEvent(msgBytes, delivery));
+	    }
 
 	    return getWrappedClientSession();
 

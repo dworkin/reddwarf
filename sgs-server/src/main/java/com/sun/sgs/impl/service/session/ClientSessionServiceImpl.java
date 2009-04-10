@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.Task;
@@ -26,6 +27,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
@@ -345,6 +347,16 @@ public final class ClientSessionServiceImpl
                 logger.logThrow(Level.CONFIG, e, "Could not register MBean");
             }
             
+            /* Set the protocol descriptor in the ConfigMXBean. */
+            ConfigManager config = (ConfigManager)
+                    collector.getRegisteredMBean(ConfigManager.MXBEAN_NAME);
+            if (config == null) {
+                logger.log(Level.CONFIG, "Could not find ConfigMXBean");
+            } else {
+                config.setProtocolDescriptor(
+		    protocolAcceptor.getDescriptor().toString());
+            }
+	    
 	} catch (Exception e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -952,7 +964,8 @@ public final class ClientSessionServiceImpl
     /**
      * Implements the {@code ClientSessionServer} that receives
      * requests from {@code ClientSessionService}s on other nodes to
-     * forward messages to or disconnect local client sessions.
+     * forward messages local client sessions or to service a client
+     * session's event queue. 
      */
     private class SessionServerImpl implements ClientSessionServer {
 
@@ -985,6 +998,51 @@ public final class ClientSessionServiceImpl
 		callFinished();
 	    }
 	    
+	}
+
+	/** {@inheritDoc} */
+	public void send(byte[] sessionId,
+			 byte[] message,
+			 byte deliveryOrdinal)
+        {
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "sessionId:{0} message:{1}",
+			       HexDumper.toHexString(sessionId),
+			       HexDumper.toHexString(message));
+		}
+		SessionProtocol sessionProtocol =
+		    getSessionProtocol(new BigInteger(1, sessionId));
+		if (sessionProtocol != null) {
+		    try {
+			sessionProtocol.sessionMessage(
+			    ByteBuffer.wrap(message),
+			    Delivery.values()[deliveryOrdinal]);
+		    } catch (IOException e) {
+			if (logger.isLoggable(Level.FINE)) {
+			    logger.logThrow(
+				Level.FINE, e,
+				"sending message: sessionId:{0} message:{1} " +
+				"throws", 
+				HexDumper.toHexString(sessionId),
+				HexDumper.toHexString(message));
+					    
+			}
+		    }
+		} else {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE,
+			    "nonexistent session: dropping message for " +
+			    "sessionId:{0} message:{1}",
+			    HexDumper.toHexString(sessionId),
+			    HexDumper.toHexString(message));
+		    }
+		}
+	    } finally {
+		callFinished();
+	    }
 	}
     }
     
