@@ -23,14 +23,12 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionNotActiveException;
 
 /**
- * A subclass of <code>TransactionNotActiveException</code> that implements
- * <code>ExceptionRetryStatus</code>, and whose {@link #shouldRetry
- * shouldRetry} method determines its value based on the cause specified in the
- * constructor.
+ * A subclass of {@code TransactionNotActiveException} whose {@link
+ * #shouldRetry shouldRetry} method determines its value based on the cause
+ * specified in the constructor.
  */
 public class MaybeRetryableTransactionNotActiveException
     extends TransactionNotActiveException
-    implements ExceptionRetryStatus
 {
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
