@@ -39,6 +39,13 @@ import com.sun.sgs.app.TransactionTimeoutException;
  * <code>equals</code> and <code>hashCode</code>. Two
  * <code>Transaction</code>s are equal if and only if they represent
  * the same transaction.
+ * <p>
+ * Implementations of this interface are not thread-safe, with the exception of
+ * the methods {@link #getId getId}, {@link #getCreationTime getCreationTime},
+ * and {@link #getTimeout getTimeout}, as well as methods on the {@link Object}
+ * class.  Callers should insure that calls they make to any other methods
+ * defined by this interface are made from the thread that created the
+ * transaction.
  */
 public interface Transaction {
 
@@ -77,6 +84,8 @@ public interface Transaction {
      *
      * @throws TransactionNotActiveException if the transaction is not active
      * @throws TransactionTimeoutException if the transaction has timed out
+     * @throws IllegalStateException if called from a thread that is not the
+     *				     thread that created this transaction
      */
     void checkTimeout();
 
@@ -106,7 +115,9 @@ public interface Transaction {
      * @throws IllegalStateException if {@link TransactionParticipant#prepare
      *				     prepare} has been called on any
      *				     transaction participant and the
-     *				     transaction has not been aborted
+     *				     transaction has not been aborted, or if
+     *				     called from a thread that is not the
+     *				     thread that created this transaction
      *
      * @throws UnsupportedOperationException if <code>participant</code> does
      *         not implement {@link NonDurableTransactionParticipant} and the
@@ -144,7 +155,9 @@ public interface Transaction {
      *
      * @throws IllegalStateException if all transaction participants have been
      *                               prepared and {@link #abort abort} has not
-     *                               been called
+     *                               been called, or if called from a thread
+     *				     that is not the thread that created this
+     *				     transaction
      */
     void abort(Throwable cause);
 
@@ -155,6 +168,8 @@ public interface Transaction {
      * @return {@code true} if {@code abort} has been called on this
      *         transaction, else {@code false}
      *
+     * @throws IllegalStateException if called from a thread that is not the
+     *				     thread that created this transaction
      */
     boolean isAborted();
 
@@ -163,6 +178,9 @@ public interface Transaction {
      * this transaction, or {@code null} if {@code abort} has not been called.
      *
      * @return the exception that caused the abort or {@code null}
+     *
+     * @throws IllegalStateException if called from a thread that is not the
+     *				     thread that created this transaction
      */
     Throwable getAbortCause();
 
@@ -194,6 +212,8 @@ public interface Transaction {
      * @param	listener the listener
      * @throws	TransactionNotActiveException if this transaction is not
      *		active
+     * @throws	IllegalStateException if called from a thread that is not the
+     *		thread that created this transaction
      */
     void registerListener(TransactionListener listener);
 }

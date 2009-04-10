@@ -154,7 +154,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void checkTimeout() {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("checkTimeout");
 	logger.log(Level.FINEST, "checkTimeout {0}", this);
 	switch (state) {
 	case ABORTED:
@@ -182,7 +182,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void join(TransactionParticipant participant) {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("join");
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "join {0} participant:{1}", this,
 		       participant);
@@ -219,7 +219,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void abort(Throwable cause) {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("abort");
 	if (cause == null) {
 	    throw new NullPointerException("The cause cannot be null");
 	}
@@ -274,17 +274,19 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public boolean isAborted() {
+	checkThread("isAborted");
 	return state == State.ABORTED || state == State.ABORTING;
     }
 
     /** {@inheritDoc} */
     public Throwable getAbortCause() {
+	checkThread("getAbortCause");
 	return abortCause;
     }
 
     /** {@inheritDoc} */
     public void registerListener(TransactionListener listener) {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("registerListener");
 	if (listener == null) {
 	    throw new NullPointerException("The listener must not be null");
 	} else if (state != State.ACTIVE) {
@@ -348,13 +350,14 @@ final class TransactionImpl implements Transaction {
      *		transaction but does not throw an exception
      * @throws	IllegalStateException if {@code prepare} has been called on any
      *		transaction participant and {@link Transaction#abort abort} has
-     *		not been called on the transaction
+     *		not been called on the transaction, or if called from a thread
+     *		that is not the thread that created this transaction
      * @throws	Exception any exception thrown when calling {@code prepare} on
      *		a participant or {@code beforeCompletion} on a listener
      * @see	TransactionHandle#commit TransactionHandle.commit
      */
     void commit() throws Exception {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("commit");
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state == State.ABORTED) {
 	    throw new MaybeRetryableTransactionNotActiveException(
@@ -510,6 +513,15 @@ final class TransactionImpl implements Transaction {
 		    }
 		}
 	    }
+	}
+    }
+
+    /** Checks that current thread is the one that created this transaction. */
+    private void checkThread(String methodName) {
+	if (Thread.currentThread() != owner) {
+	    throw new IllegalStateException(
+		"The " + methodName + " method must be called from the" +
+		" thread that created the transaction");
 	}
     }
 }
