@@ -2080,7 +2080,11 @@ public class TestDataServiceImpl{
         final Semaphore mainFlag = new Semaphore(0);
         final Semaphore threadFlag = new Semaphore(0);
         
-        final List errorList = 
+        // Semaphore to let us know when we are done; both threads must release
+        final Semaphore doneFlag = new Semaphore(2); 
+        doneFlag.acquire(2);
+        
+        final List<AssertionError> errorList = 
             Collections.synchronizedList(new ArrayList<AssertionError>());
         
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
@@ -2093,11 +2097,13 @@ public class TestDataServiceImpl{
                     assertFalse(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
                 } catch (AssertionError e) {
                     errorList.add(e);
+                    throw e;
+                } finally {
+                    doneFlag.release();
                 }
         }}, taskOwner);
 
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
-            AssertionError error;
             public void run() throws Exception {
                 try {
                     DummyManagedObject dummy2 =
@@ -2109,13 +2115,16 @@ public class TestDataServiceImpl{
                     threadFlag.release();
                 } catch (AssertionError e) {
                     errorList.add(e);
+                    throw e;
+                } finally {
+                    doneFlag.release();
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new RuntimeException("abort"));
-
         }}, taskOwner);
 
-        assertTrue(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
+        assertTrue(doneFlag.tryAcquire(2, 1, TimeUnit.SECONDS));
+
         if (!errorList.isEmpty()) {
             throw new AssertionError(errorList.get(0));
         }
@@ -3231,7 +3240,11 @@ public class TestDataServiceImpl{
         final Semaphore mainFlag = new Semaphore(0);
         final Semaphore threadFlag = new Semaphore(0);
 
-        final List errorList = 
+        // Semaphore to let us know when we are done; both threads must release
+        final Semaphore doneFlag = new Semaphore(2); 
+        doneFlag.acquire(2);
+        
+        final List<AssertionError> errorList = 
             Collections.synchronizedList(new ArrayList<AssertionError>());
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -3243,6 +3256,9 @@ public class TestDataServiceImpl{
                     assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
                 } catch (AssertionError e) {
                     errorList.add(e);
+                    throw e;
+                } finally {
+                    doneFlag.release();
                 }
         }}, taskOwner);
 
@@ -3257,12 +3273,15 @@ public class TestDataServiceImpl{
                     threadFlag.release();
                 } catch (AssertionError e) {
                     errorList.add(e);
+                    throw e;
+                } finally {
+                    doneFlag.release();
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new TestAbortedTransactionException("abort"));
         }}, taskOwner);
 
-        assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
+        assertTrue(doneFlag.tryAcquire(2, 1, TimeUnit.SECONDS));
         if (!errorList.isEmpty()) {
             throw new AssertionError(errorList.get(0));
         }
@@ -4308,7 +4327,7 @@ public class TestDataServiceImpl{
     private void testShuttingDownNewTxn(final Action action) throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        final List errorList = 
+        final List<AssertionError> errorList = 
             Collections.synchronizedList(new ArrayList<AssertionError>());
         
         class ShutdownTask extends TestAbstractKernelRunnable {
@@ -4316,6 +4335,9 @@ public class TestDataServiceImpl{
             public void run() throws Exception {
                 service.createReference(new DummyManagedObject());
                 action.setUp();
+                
+                // JANE the problem with this scheme is the data store also
+                // needs to know.
                 stateShuttingDown.invoke(service);
 
                 threadAction = new ThreadAction() {
@@ -4326,6 +4348,7 @@ public class TestDataServiceImpl{
                                     public void run() {
                                         try {
                                             action.run();
+                                            System.out.println("JJJ");
                                             fail("Expected IllegalStateException");
                                         } catch (IllegalStateException e) {
                                             if (!e.getMessage().equals("Service " +
@@ -4340,10 +4363,12 @@ public class TestDataServiceImpl{
                             }
                         } catch (AssertionError ae) {
                             errorList.add(ae);
-                            
                         }
                     }
                 };
+                // how do we know that the threadAction is done?
+                // maybe best to go back to the original scheme, but shut
+                // down a different server (not serverNode)?
             }
         }
         ShutdownTask task = new ShutdownTask();
