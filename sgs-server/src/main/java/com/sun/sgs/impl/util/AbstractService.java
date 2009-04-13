@@ -593,8 +593,8 @@ public abstract class AbstractService implements Service {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }
-     
-   /**
+
+    /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
      */   
