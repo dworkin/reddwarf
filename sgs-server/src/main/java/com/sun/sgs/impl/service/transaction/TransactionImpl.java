@@ -19,12 +19,11 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
-import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
@@ -190,7 +189,7 @@ final class TransactionImpl implements Transaction {
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
 	} else if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
@@ -231,7 +230,7 @@ final class TransactionImpl implements Transaction {
 	case ABORTING:
 	    return;
 	case ABORTED:
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	case COMMITTING:
 	case COMMITTED:
@@ -361,7 +360,7 @@ final class TransactionImpl implements Transaction {
 	checkThread("commit");
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
@@ -427,7 +426,7 @@ final class TransactionImpl implements Transaction {
 		throw e;
 	    }
 	    if (state == State.ABORTED) {
-		throw new MaybeRetryableTransactionAbortedException(
+		throw new TransactionAbortedException(
 		    "Transaction has been aborted: " + abortCause, abortCause);
 	    }
 	}
@@ -492,7 +491,7 @@ final class TransactionImpl implements Transaction {
 		    throw e;
 		}
 		if (state == State.ABORTED) {
-		    throw new MaybeRetryableTransactionAbortedException(
+		    throw new TransactionAbortedException(
 			"Transaction has been aborted: " + abortCause,
 			abortCause);
 		}

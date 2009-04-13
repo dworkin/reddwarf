@@ -23,7 +23,6 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
@@ -185,7 +184,7 @@ public class DummyTransaction implements Transaction {
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
 	} else if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
@@ -203,7 +202,7 @@ public class DummyTransaction implements Transaction {
 	if (state == State.ABORTING) {
 	    return;
 	} else if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE &&
 		   state != State.PREPARING &&
@@ -298,7 +297,7 @@ public class DummyTransaction implements Transaction {
 		}
 	    }
 	} else if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
