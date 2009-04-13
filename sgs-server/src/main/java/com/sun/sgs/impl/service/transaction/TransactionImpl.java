@@ -185,7 +185,7 @@ final class TransactionImpl implements Transaction {
 	checkThread("join");
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "join {0} participant:{1}", this,
-		       participant);
+		       getParticipantInfo(participant));
 	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
@@ -246,7 +246,7 @@ final class TransactionImpl implements Transaction {
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "abort {0} participant:{1}",
-			   this, participant);
+			   this, getParticipantInfo(participant));
 	    }
 	    if (detailMap != null) {
 		startTime = System.currentTimeMillis();
@@ -256,8 +256,9 @@ final class TransactionImpl implements Transaction {
 	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, e, "abort {0} participant:{1} failed",
-			this, participant);
+			Level.WARNING, e,
+			"abort {0} participant:{1} failed",
+			this, getParticipantInfo(participant));
 		}
 	    }
 	    if (detailMap != null) {
@@ -394,7 +395,8 @@ final class TransactionImpl implements Transaction {
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
 				   "prepare {0} participant:{1} returns {2}",
-				   this, participant, readOnly);
+				   this, getParticipantInfo(participant),
+				   readOnly);
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
@@ -409,7 +411,7 @@ final class TransactionImpl implements Transaction {
 			logger.log(
 			    Level.FINEST,
 			    "prepareAndCommit {0} participant:{1} returns",
-			    this, participant);
+			    this, getParticipantInfo(participant));
 		    }
 		}
 	    } catch (Exception e) {
@@ -417,7 +419,7 @@ final class TransactionImpl implements Transaction {
 		    logger.logThrow(
 			Level.FINEST, e, "{0} {1} participant:{1} throws",
 			iter.hasNext() ? "prepare" : "prepareAndCommit",
-			this, participant);
+			this, getParticipantInfo(participant));
 		}
 		if (state != State.ABORTED) {
 		    abort(e);
@@ -433,7 +435,7 @@ final class TransactionImpl implements Transaction {
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "commit {0} participant:{1}",
-			   this, participant);
+			   this, getParticipantInfo(participant));
 	    }
 	    if (detailMap != null) {
 		detail = detailMap.get(participant.getTypeName());
@@ -450,7 +452,7 @@ final class TransactionImpl implements Transaction {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e, "commit {0} participant:{1} failed",
-			this, participant);
+			this, getParticipantInfo(participant));
 		}
 	    }
 	}
@@ -523,5 +525,16 @@ final class TransactionImpl implements Transaction {
 		"The " + methodName + " method must be called from the" +
 		" thread that created the transaction");
 	}
+    }
+
+    /**
+     * Returns a string that describes the participant.  Returns null if the
+     * participant is null.
+     */
+    private static String getParticipantInfo(
+	TransactionParticipant participant)
+    {
+	return participant == null ? null
+	    : (participant.getTypeName() + " (" + participant + ")");
     }
 }
