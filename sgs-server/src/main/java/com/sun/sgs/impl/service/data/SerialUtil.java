@@ -458,9 +458,7 @@ final class SerialUtil {
 	     * classes could cause a non-managed reference to the enclosing
 	     * class, so don't check that case here.  -tjb@sun.com (03/30/2009)
 	     */
-	    if (!cl.isLocalClass() &&
-		!Modifier.isStatic(cl.getModifiers()))
-	    {
+	    if (!cl.isLocalClass() && !Modifier.isStatic(cl.getModifiers())) {
 		Class<?> enclosingClass = cl.getEnclosingClass();
 		if (enclosingClass != null &&
 		    ManagedObject.class.isAssignableFrom(enclosingClass))

@@ -398,7 +398,7 @@ final class ManagedReferenceImpl<T>
 		    DataServiceImpl.typeName(object));
 	    }
 	    @SuppressWarnings("unchecked")
-		T result = (T) object;
+	    T result = (T) object;
 	    context.oidAccesses.setObjectDescription(getId(), result);
 	    return result;
 	} else {
@@ -472,7 +472,7 @@ final class ManagedReferenceImpl<T>
 		    DataServiceImpl.typeName(object));
 	    }
 	    @SuppressWarnings("unchecked")
-		T result = (T) object;
+	    T result = (T) object;
 	    context.oidAccesses.setObjectDescription(getId(), result);
 	    return result;
 	} else {
