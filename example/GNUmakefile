@@ -1,6 +1,6 @@
 # Project Darkstar Example C Chat Client Makefile
 
-TOPDIR=../..
+TOPDIR=../
 
 SRCS = chat_client.c
 
