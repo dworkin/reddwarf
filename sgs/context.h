@@ -178,7 +178,7 @@ void sgs_ctx_set_recv_msg_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, const uint8_t*, size_t));
 
 /*
- *  function sgs_ctx_set_ret_fb_cb()
+ *  function sgs_ctx_set_reg_fb_cb()
  *
  * Registers a function to be called when a file descriptor
  * is to be set to be read from. If the file descriptor is already
