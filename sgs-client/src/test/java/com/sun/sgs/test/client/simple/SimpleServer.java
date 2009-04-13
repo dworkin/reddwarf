@@ -58,7 +58,11 @@ public class SimpleServer implements ConnectionListener {
 
     private static int DEFAULT_PORT_NUMBER = 10002;
 
+    private static String host = "localhost";
+
     private int port;
+
+    volatile boolean redirect = false;
     
     final String TEST_CHANNEL_NAME = "Test Channel";
 
@@ -194,17 +198,23 @@ public class SimpleServer implements ConnectionListener {
                     + password);
 
             MessageBuffer reply;
-            if (password.equals("guest")) {
+            if (password.equals("guest") || redirect) {
 
                 byte[] reconnectKey = new byte[] {
                     0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
                 };
 
-                reply =
-                    new MessageBuffer(1 + reconnectKey.length);
+                reply = new MessageBuffer(1 + reconnectKey.length);
                 reply.putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 		      putBytes(reconnectKey);
-            } else {
+            } else if (password.equals("redirect")) {
+
+		redirect = true;
+		reply = new MessageBuffer(1 + MessageBuffer.getSize(host) + 4);
+		reply.putByte(SimpleSgsProtocol.LOGIN_REDIRECT).
+		      putString(host).
+		      putInt(port);
+	    } else {
                 String reason = "Bad password";
                 reply =
                     new MessageBuffer(1 + MessageBuffer.getSize(reason));

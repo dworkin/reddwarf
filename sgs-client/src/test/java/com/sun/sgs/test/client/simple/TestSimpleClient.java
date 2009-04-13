@@ -46,6 +46,9 @@ public class TestSimpleClient extends TestCase {
 
     private static final char[] password = { 'g', 'u', 'e', 's', 't' };
 
+    private static final char[] redirectPassword =
+    	{ 'r', 'e', 'd', 'i', 'r', 'e', 'c', 't' };
+
     private static final long TIMEOUT = 1000;
 
     public TestSimpleClient(String name) {
@@ -74,7 +77,7 @@ public class TestSimpleClient extends TestCase {
 	    client.wait(TIMEOUT * 2);
 	}
 	assertTrue(listener.disconnected);
-	assertFalse(listener.getPasswordAuthentication);
+	assertEquals(0, listener.getPasswordAuthentication);
 	if (listener.disconnectReason == null) {
 	    fail("Received null disconnect reason");
 	}
@@ -140,6 +143,114 @@ public class TestSimpleClient extends TestCase {
 		client.wait(TIMEOUT);
 	    }
 	    assertTrue(listener.loggedIn);
+	} finally {
+	    server.shutdown();
+	}
+    }
+
+    public void testLoginObtainsPasswordAuthentication() throws Exception {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+		new PasswordAuthentication("guest", password));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertEquals(1, listener.loggedInCount);
+	    assertEquals(1, listener.getPasswordAuthentication);
+	    
+	    client.logout(false);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.disconnected);
+	    assertTrue(listener.disconnectGraceful);
+	    
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertEquals(2, listener.loggedInCount);
+	    assertEquals(2, listener.getPasswordAuthentication);
+	    
+	} finally {
+	    server.shutdown();
+	}
+    }
+
+    public void testLoginObtainsPasswordAuthenticationAfterFailure()
+	throws Exception
+    {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+ 		new PasswordAuthentication("guest", new char[] {'!'}));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(listener.loginFailed);
+	    assertEquals(1, listener.getPasswordAuthentication);
+
+	    listener.auth = new PasswordAuthentication("guest", password);
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertEquals(1, listener.loggedInCount);
+	    assertEquals(2, listener.getPasswordAuthentication);
+	    
+	} finally {
+	    server.shutdown();
+	}
+    }
+    
+    public void testRedirectDoesNotObtainPasswordAuthentication()
+	throws Exception
+    {
+	DummySimpleClientListener listener =
+	    new DummySimpleClientListener(
+		new PasswordAuthentication("redirect", redirectPassword));
+
+	SimpleClient client = new SimpleClient(listener);
+	int port = 5383;
+	Properties props =
+	    createProperties(
+		"host", "localhost",
+		"port", Integer.toString(port),
+		"connectTimeout", Long.toString(TIMEOUT));
+	SimpleServer server = new SimpleServer(port);
+	try {
+	    server.start();
+	    client.login(props);
+	    synchronized (client) {
+		client.wait(TIMEOUT);
+	    }
+	    assertTrue(server.redirect);
+	    assertTrue(listener.loggedIn);
+	    assertEquals(1, listener.loggedInCount);
+	    assertEquals(1, listener.getPasswordAuthentication);
 	} finally {
 	    server.shutdown();
 	}
@@ -213,14 +324,15 @@ public class TestSimpleClient extends TestCase {
     
     private class DummySimpleClientListener implements SimpleClientListener {
 
-	private volatile boolean getPasswordAuthentication = false;
+	private volatile int getPasswordAuthentication = 0;
 	private volatile boolean disconnected = false;
 	private volatile boolean disconnectGraceful = false;
 	private volatile String disconnectReason = null;
 	private volatile boolean loginFailed = false;
 	private volatile String loginFailedReason = null;
 	private volatile boolean loggedIn = false;
-	private final PasswordAuthentication auth;
+	private volatile int loggedInCount = 0;
+	private volatile PasswordAuthentication auth;
 
 	DummySimpleClientListener() {
 	    this(null);
@@ -231,13 +343,14 @@ public class TestSimpleClient extends TestCase {
 	}
 	
 	public PasswordAuthentication getPasswordAuthentication() {
-	    getPasswordAuthentication = true;
+	    getPasswordAuthentication++;
 	    return auth;
 	}
 
 	public void loggedIn() {
 	    System.err.println("TestSimpleClient.loggedIn");
 	    loggedIn = true;
+	    loggedInCount++;
 	    synchronized (this) {
 		notify();
 	    }

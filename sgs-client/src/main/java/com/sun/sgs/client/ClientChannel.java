@@ -77,17 +77,23 @@ public interface ClientChannel {
     String getName();
 
     /**
-     * Sends the message contained in the specified {@code ByteBuffer}
-     * to all channel members, including the sender.  The message starts at
-     * the buffer's current position and ends at the buffer's limit.
-     * The buffer's position is not modified by this operation.
+     * Sends the message contained in the specified {@code ByteBuffer} to
+     * this channel.  The message starts at the buffer's current position
+     * and ends at the buffer's limit.  The buffer's position is not
+     * modified by this operation.
      *
-     * <p>The server-side application associated with this client <i>may
-     * alter</i> the message being sent, or <i>may discard</i> the message
-     * for application-specific reasons.  In the latter case, there will be
-     * no notification of the message being sent. <p>
+     * <p>If the server-side application does not filter messages on this
+     * channel, the message will be delivered unaltered to all channel
+     * members, including the sender. However, the server-side application
+     * may <i>alter the message</i>, <i>discard the message</i>,
+     * or <i>modify the list of recipients</i> for application-specific
+     * reasons.  If the channel message is not delivered to the sender
+     * (because it is discarded by the application, for example), the
+     * sender's {@link ClientChannelListener} will not receive a {@link
+     * ClientChannelListener#receivedMessage receivedMessage} notification
+     * for that message.
      *
-     * The {@code ByteBuffer} may be reused immediately after this method
+     * <p>The {@code ByteBuffer} may be reused immediately after this method
      * returns.  Changes made to the buffer after this method returns will
      * have no effect on the message sent to the channel by this invocation.
      *
