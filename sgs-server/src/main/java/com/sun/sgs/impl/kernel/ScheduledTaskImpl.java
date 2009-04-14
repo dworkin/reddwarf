@@ -61,6 +61,8 @@ class ScheduledTaskImpl implements ScheduledTask {
         RUNNABLE,
         /* The task is currently running. */
         RUNNING,
+        /* The task was interrupted while running but can be tried again. */
+        INTERRUPTED,
         /* The task has completed. */
         COMPLETED,
         /* The task was cancelled. */
@@ -97,7 +99,8 @@ class ScheduledTaskImpl implements ScheduledTask {
      *                  January 1, 1970
      */
     ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime) {
+                      Priority priority, long startTime)
+    {
         this(task, owner, priority, startTime, NON_RECURRING);
     }
 
@@ -113,13 +116,17 @@ class ScheduledTaskImpl implements ScheduledTask {
      *               <code>NON_RECURRING</code>
      */
     ScheduledTaskImpl(KernelRunnable task, Identity owner,
-                      Priority priority, long startTime, long period) {
-        if (task == null)
+                      Priority priority, long startTime, long period)
+    {
+        if (task == null) {
             throw new NullPointerException("Task cannot be null");
-        if (owner == null)
+        }
+        if (owner == null) {
             throw new NullPointerException("Owner cannot be null");
-        if (priority == null)
+        }
+        if (priority == null) {
             throw new NullPointerException("Priority cannot be null");
+        }
 
         this.task = task;
         this.owner = owner;
@@ -170,21 +177,35 @@ class ScheduledTaskImpl implements ScheduledTask {
         return state == State.CANCELLED;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * Note that in the current scheduler implementation this is only
+     * called at the point where {@code runTask()} is using its calling
+     * thread to run a task. In this case calling cancel() will always
+     * return, so no extra logic has been implemented to make sure that
+     * canceling the task keeps it from re-trying. Were this method to be
+     * used when a task could be handed-off between threads or
+     * re-tried many times then this implementation should probably be
+     * extended to note the cancelation request and disallow further
+     * attempts at execution.
+     */
     public synchronized boolean cancel(boolean allowInterrupt)
         throws InterruptedException
     {
-        if (isDone())
-            return false;
+        if (isDone()) {
+            return false; 
+        }
         while (state == State.RUNNING) {
             try {
                 wait();
             } catch (InterruptedException ie) {
-                if (allowInterrupt)
+                if (allowInterrupt) {
                     throw ie;
+                }
             }
         }
-        if (state != State.CANCELLED) {
+        if (!isDone()) {
             state = State.CANCELLED;
             notifyAll();
             return true;
@@ -209,10 +230,12 @@ class ScheduledTaskImpl implements ScheduledTask {
      */
     synchronized Throwable get() throws InterruptedException {
         // wait for the task to finish
-        while (! isDone())
+        while (!isDone()) {
             wait();
-        if (state == State.CANCELLED)
+        }
+        if (state == State.CANCELLED) {
             throw new InterruptedException("interrupted while getting result");
+        }
         return result;
     }
 
@@ -222,16 +245,41 @@ class ScheduledTaskImpl implements ScheduledTask {
     }
 
     /**
-     * Sets the state of this task to running, returning {@code false} if
-     * the task has already been cancelled or has completed.
+     * Sets the state of this task to {@code running}, returning {@code false}
+     * if the task has already been cancelled or has completed, or if the
+     * state is not being changed.
      */
     synchronized boolean setRunning(boolean running) {
-        if (isDone())
+        if (isDone()) {
             return false;
-        state = running ? State.RUNNING : State.RUNNABLE;
-        if (! running)
+        }
+        if (running) {
+            if ((state != State.RUNNABLE) && (state != State.INTERRUPTED)) {
+                return false;
+            }
+            state = State.RUNNING;
+        } else {
+            if (state != State.RUNNING) {
+                return false;
+            }
+            state = State.RUNNABLE;
             notifyAll();
+        }
         return true;
+    }
+
+    /**
+     * Similar to calling {@code setRunning(false)} except that no waiters
+     * are notified of the state change. This is used when the task's thread
+     * is interrupted and we don't know if the task is going to be re-runnable
+     * in a new thread or has to be dropped.
+     */
+    synchronized boolean setInterrupted() {
+        if (state == State.RUNNING) {
+            state = State.INTERRUPTED;
+            return true;
+        }
+        return false;
     }
 
     /** Returns whether this task is currently running. */
@@ -243,13 +291,13 @@ class ScheduledTaskImpl implements ScheduledTask {
      * Sets the state of this task to done, with the result of the task being
      * the provided {@code Throwable} which may be {@code null} to indicate
      * that the task completed successfully. If the task is not currently
-     * running, or has already been cancelled then this method does not set
-     * the result. Otherwise, the result and state state change are set and
-     * the task is set as no longer running.
+     * running or was not previously interrupted then this method has no effect.
+     * Otherwise, the result is set and the task is marked as completed.
      */
     synchronized void setDone(Throwable result) {
-        if (state != State.RUNNING)
+        if ((state != State.RUNNING) && (state != State.INTERRUPTED)) {
             return;
+        }
         state = State.COMPLETED;
         this.result = result;
         notifyAll();
@@ -260,8 +308,9 @@ class ScheduledTaskImpl implements ScheduledTask {
      * the task is not recurring.
      */
     void setRecurringTaskHandle(RecurringTaskHandle handle) {
-        if (! isRecurring())
+        if (!isRecurring()) {
             throw new IllegalStateException("Not a recurring task");
+        }
         recurringTaskHandle = handle;
     }
 

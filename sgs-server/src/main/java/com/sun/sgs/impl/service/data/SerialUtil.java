@@ -22,6 +22,7 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.Objects;
 import java.io.ByteArrayInputStream;
@@ -32,6 +33,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -184,6 +186,11 @@ final class SerialUtil {
 	} catch (ObjectIOException e) {
 	    check(object, e);
 	    throw e;
+	} catch (TransactionNotActiveException e) {
+	    throw new TransactionNotActiveException(
+		"Attempt to perform an operation during serialization that " +
+		"requires a active transaction: " + e.getMessage(),
+		e);
 	} catch (IOException e) {
 	    throw new ObjectIOException(
 		"Problem serializing object: " + e.getMessage(), e, false);
@@ -240,7 +247,7 @@ final class SerialUtil {
     private static class CustomClassDescriptorObjectOutputStream
 	extends ObjectOutputStream
     {
-	private final ClassSerialization classSerial;
+	final ClassSerialization classSerial;
 
 	CustomClassDescriptorObjectOutputStream(OutputStream out,
 						ClassSerialization classSerial)
@@ -291,28 +298,32 @@ final class SerialUtil {
 
 	/** Check for references to managed objects. */
 	protected Object replaceObject(Object object) throws IOException {
+	    if (object == null) {
+		return null;
+	    }
+	    Class<?> cl = object.getClass();
 	    if (object != topLevelObject && object instanceof ManagedObject) {
 		throw new ObjectIOException(
 		    "ManagedObject was not referenced through a " +
 		    "ManagedReference: " + Objects.safeToString(object),
 		    false);
-	    } else if (object != null) {
-		Class<?> cl = object.getClass();
-		if (cl.isAnonymousClass()) {
-		    if (logger.isLoggable(Level.FINE)) {
-			logger.log(
-			    Level.FINE,
-			    "Storing an instance of an anonymous class: " +
-			    "{0}, {1}",
-			    Objects.safeToString(object), cl);
-		    }
-		} else if (cl.isLocalClass()) {
-		    if (logger.isLoggable(Level.FINE)) {
-			logger.log(
-			    Level.FINE,
-			    "Storing an instance of a local class: {0}, {1}",
-			    Objects.safeToString(object), cl);
-		    }
+	    } else if (object instanceof Serializable) {
+		classSerial.checkInstantiable(ObjectStreamClass.lookup(cl));
+	    }
+	    if (cl.isAnonymousClass()) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Storing an instance of an anonymous class: " +
+			"{0}, {1}",
+			Objects.safeToString(object), cl);
+		}
+	    } else if (cl.isLocalClass()) {
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(
+			Level.FINE,
+			"Storing an instance of a local class: {0}, {1}",
+			Objects.safeToString(object), cl);
 		}
 	    }
 	    return object;
@@ -438,6 +449,28 @@ final class SerialUtil {
 	    Class<?> cl = object.getClass();
 	    stack.push("object (class \"" + cl.getName() + "\", " +
 		       Objects.safeToString(object) + ")");
+	    /*
+	     * According to the JLS 3.0, all local classes are considered to be
+	     * inner classes, even if they appear in a static context.  Testing
+	     * shows, though, that instances of local classes created in a
+	     * static context do not contain a pointer to the enclosing class.
+	     * For that reason, there is no good way to distinguish which local
+	     * classes could cause a non-managed reference to the enclosing
+	     * class, so don't check that case here.  -tjb@sun.com (03/30/2009)
+	     */
+	    Class<?> enclosingClass;
+	    if (!cl.isLocalClass() &&
+		!Modifier.isStatic(cl.getModifiers()) &&
+		(enclosingClass = cl.getEnclosingClass()) != null &&
+		ManagedObject.class.isAssignableFrom(enclosingClass))
+	    {
+		throw new ObjectIOException(
+		    "ManagedObject of type " + enclosingClass.getName() +
+		    " was not referenced through a ManagedReference because" +
+		    " of a reference from an inner class:\n" +
+		    stack,
+		    cause, false);
+	    }
 	    for ( ; cl != null; cl = cl.getSuperclass()) {
 		for (Field f : cl.getDeclaredFields()) {
 		    if (!Modifier.isStatic(f.getModifiers()) &&

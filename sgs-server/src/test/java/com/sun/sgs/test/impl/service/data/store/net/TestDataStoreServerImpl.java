@@ -26,6 +26,7 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,11 +38,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
+import org.junit.runner.RunWith;
 
 /**
  * Performs specific tests for the DataStoreServerImpl class that can't easily
  * be performed from via the DataStore interface from the client.
  */
+@RunWith(FilteredJUnit3TestRunner.class)
 public class TestDataStoreServerImpl extends TestCase {
 
     /** If this property is set, then only run the single named test method. */
@@ -505,7 +508,6 @@ public class TestDataStoreServerImpl extends TestCase {
     protected class ShutdownAction extends Thread {
 	private boolean done;
 	private Throwable exception;
-	private boolean result;
 
 	/** Creates an instance of this class and starts the thread. */
 	protected ShutdownAction() {
@@ -515,7 +517,7 @@ public class TestDataStoreServerImpl extends TestCase {
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = shutdown();
+		shutdown();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -525,8 +527,8 @@ public class TestDataStoreServerImpl extends TestCase {
 	    }
 	}
 
-	protected boolean shutdown() {
-	    return server.shutdown();
+	protected void shutdown() {
+	    server.shutdown();
 	}
 
 	/** Asserts that the shutdown call is blocked. */
@@ -542,25 +544,12 @@ public class TestDataStoreServerImpl extends TestCase {
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
 		throw (Error) exception;
 	    }
-	}
-
-	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
-	 */
-	public synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
-	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
-	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
 	/** Wait until done, but give up after a while. */

@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.kernel.NodeType;
 
 /**
  * This class contains the standard property keys that the kernel looks for
@@ -29,8 +30,7 @@ package com.sun.sgs.impl.kernel;
  * set the associated behavior for that application. If no value is provided
  * for a given key, then the default or system-provided value is used.
  * Note that some keys are required to have values, specifically
- * <code>APP_NAME</code>, <code>APP_ROOT</code>, <code>APP_LISTENER</code>,
- * and <code>APP_PORT</code>.
+ * <code>APP_NAME</code>, <code>APP_ROOT</code> and <code>APP_LISTENER</code>.
  * <p>
  * Default values can be provided for all applications by using any of the
  * properties specified in this class as a system property.
@@ -38,9 +38,16 @@ package com.sun.sgs.impl.kernel;
  * A deprecated property is <code>CONFIG_FILE</code>, which, if present,
  * will be combined with the application property file.
  */
-public class StandardProperties {
+public final class StandardProperties {
+    
+    /**
+     * This class should not be instantiated
+     */
+    private StandardProperties() {
+        
+    }
 
-    // the root of all the properties
+    // the root of all the Darkstar properties
     private static final String NS = "com.sun.sgs.";
     
     /**
@@ -64,12 +71,6 @@ public class StandardProperties {
      * application context with no running application.
      */
     public static final String APP_LISTENER_NONE = "NONE";
-
-    /**
-     * A key specifying the listening port for the application.  Required
-     * unless a null <code>AppListener</code> is specified.
-     */
-    public static final String APP_PORT = NS + "app.port";
 
     /**
      * An optional key specifying a specific class to use for the
@@ -135,7 +136,7 @@ public class StandardProperties {
      * An optional colon-separated key that specifies extra managers to use.
      * This must contain the same number of classes as
      * <code>SERVICES</code>. Each manager in this list will be paired with
-     * the cooresponding <code>Service</code> from the <code>SERVICES</code>
+     * the corresponding <code>Service</code> from the <code>SERVICES</code>
      * list. To specify a <code>Service</code> with no manager, leave the
      * appropriate element in the list empty. E.g.:
      * <pre>
@@ -197,11 +198,12 @@ public class StandardProperties {
      * <li> {@value #APP_LISTENER} set to {@link #APP_LISTENER_NONE} whose value
      *      is {@value #APP_LISTENER_NONE} to indicate that no application code
      *      will run on the server node
-     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to indicate
-     *      the set of services to run on the server node
+     * <li> {@value #FINAL_SERVICE} set to {@code NodeMappingService} to
+     *      indicate the set of services to run on the server node
      * <li> {@value #SERVER_START} set to {@code true} to indicate that the
      *       services' servers should be started
-     * <li> {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
+     * <li>
+     *   {@code com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class}
      *   set to {@code com.sun.sgs.impl.service.data.store.net.DataStoreClient}
      *   to indicate the multi-node data service should be used
      *
@@ -218,17 +220,6 @@ public class StandardProperties {
     public static final String NODE_TYPE = NS + "node.type";
     
     /**
-     *  The valid choices for {@link #NODE_TYPE}.
-     */
-    public enum NodeType {
-        /** A single node configuration. */
-        singleNode,
-        /** The core server for multi-node configurations. */
-        coreServerNode,
-        /** An application node for multi-node configurations. */
-        appNode,
-    }
-    /**
      * An optional property that specifies the default for whether to start the
      * servers associated with services.
      */
@@ -239,4 +230,12 @@ public class StandardProperties {
      * running the servers associated with services.
      */
     public static final String SERVER_HOST = NS + "server.host";
+    
+    /**
+     * An optional system property (this is not a Darkstar property) which
+     * enables remote JMX monitoring, and specifies the port JMX is listening
+     * on.
+     */
+    public static final String SYSTEM_JMX_REMOTE_PORT = 
+            "com.sun.management.jmxremote.port";
 }

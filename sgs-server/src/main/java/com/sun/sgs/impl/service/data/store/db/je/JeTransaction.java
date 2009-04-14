@@ -36,6 +36,9 @@ class JeTransaction implements DbTransaction {
     /** The Berkeley DB transaction. */
     private final Transaction txn;
 
+    /** The XID if the transaction was prepared, else null. */
+    private Xid xid = null;
+
     /**
      * Implement an Xid whose format is 1, and whose branch qualifier is null.
      */
@@ -119,7 +122,7 @@ class JeTransaction implements DbTransaction {
     /** {@inheritDoc} */
     public void prepare(byte[] gid) {
 	try {
-	    Xid xid = new SimpleXid(gid);
+	    xid = new SimpleXid(gid);
 	    env.setXATransaction(xid, txn);
  	    env.prepare(xid);
 	} catch (DatabaseException e) {
@@ -132,8 +135,14 @@ class JeTransaction implements DbTransaction {
     /** {@inheritDoc} */
     public void commit() {
 	try {
-	    txn.commit();
+	    if (xid != null) {
+		env.commit(xid, true /* ignored */);
+	    } else {
+		txn.commit();
+	    }
 	} catch (DatabaseException e) {
+	    throw JeEnvironment.convertException(e, false);
+	} catch (XAException e) {
 	    throw JeEnvironment.convertException(e, false);
 	}
     }
@@ -141,8 +150,14 @@ class JeTransaction implements DbTransaction {
     /** {@inheritDoc} */
     public void abort() {
 	try {
-	    txn.abort();
+	    if (xid != null) {
+		env.rollback(xid);
+	    } else {
+		txn.abort();
+	    }
 	} catch (DatabaseException e) {
+	    throw JeEnvironment.convertException(e, false);
+	} catch (XAException e) {
 	    throw JeEnvironment.convertException(e, false);
 	}
     }

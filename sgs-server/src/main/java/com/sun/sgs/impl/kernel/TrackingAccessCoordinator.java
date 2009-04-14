@@ -20,6 +20,7 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
+import com.sun.sgs.impl.sharedutil.Objects;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.kernel.AccessReporter;
@@ -57,15 +58,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * past transactions to discover what may have caused conflict. This is
  * currently only useful for {@code ProfileListener}s that wish to diplay
  * this detail. By default this backlog tracking is disabled. To enable,
- * set the {@code com.sun.sgs.impl.kernel.AccessCoordinatorImpl.queue.size}
+ * set the {@code com.sun.sgs.impl.kernel.TrackingAccessCoordinator.queue.size}
  * property to some positive value indicating the length of backlog to use.
  * Note that with each transaction failure this backlog will be scanned
  * to find a conflicting transaction, so a larger backlog may provide more
  * detail about failure but will also be more compute-intensive.
  */
-class AccessCoordinatorImpl implements AccessCoordinator,
-                                       NonDurableTransactionParticipant {
-
+class TrackingAccessCoordinator extends AbstractAccessCoordinator
+    implements NonDurableTransactionParticipant
+{
     /**
      * The map from active transactions to associated detail
      */
@@ -95,30 +96,19 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * property must be non-negative.
      */
     static final String BACKLOG_QUEUE_PROPERTY =
-        AccessCoordinatorImpl.class.getName() + ".queue.size";
+        TrackingAccessCoordinator.class.getName() + ".queue.size";
 
-    // system components
-    private final TransactionProxy txnProxy;
-    private final ProfileCollectorHandle profileCollectorHandle;
- 
     /**
-     * Creates an instance of {@code AccessCoordinatorImpl}.
+     * Creates an instance of {@code TrackingAccessCoordinator}.
      *
      * @throws IllegalArgumentException if the requested backlog queue size
      *                                  is not a valid number greater than 0
      */
-    AccessCoordinatorImpl(Properties properties, TransactionProxy txnProxy,
-                          ProfileCollectorHandle profileCollector) 
+    TrackingAccessCoordinator(Properties properties, TransactionProxy txnProxy,
+			      ProfileCollectorHandle profileCollector) 
     {
-        if (properties == null) {
-            throw new NullPointerException("Properties cannot be null");
-        }
-        if (txnProxy == null) {
-            throw new NullPointerException("Proxy cannot be null");
-        }
-        if (profileCollector == null) {
-            throw new NullPointerException("Collector cannot be null");
-        }
+	super(txnProxy, profileCollector);
+	Objects.checkNull("properties", properties);
         String backlogProp = properties.getProperty(BACKLOG_QUEUE_PROPERTY);
         if (backlogProp != null) {
             try {
@@ -132,9 +122,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         } else {
             backlog = null;
         }
-
-        this.txnProxy = txnProxy;
-        this.profileCollectorHandle = profileCollector;
     }
 
     /*
@@ -147,12 +134,8 @@ class AccessCoordinatorImpl implements AccessCoordinator,
     public <T> AccessReporter<T> registerAccessSource(String sourceName, 
                                                       Class<T> objectIdType)
     {
-	if (sourceName == null) {
-	    throw new NullPointerException("source name cannot be null");
-        }
-	if (objectIdType == null) {
-	    throw new NullPointerException("objectIdType cannot be null");
-        }
+	Objects.checkNull("sourceName", sourceName);
+	Objects.checkNull("objectIdType", objectIdType);
         return new AccessReporterImpl<T>(sourceName);
     }
 
@@ -160,9 +143,7 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * {@inheritDoc} 
      */
     public Transaction getConflictingTransaction(Transaction txn) {
-	if (txn == null) {
-	    throw new NullPointerException("txn cannot be null");
-        }
+	Objects.checkNull("txn", txn);
         // given that we're not actively managing contention yet (which
         // means that there aren't many active conflicts) and the scheduler
         // isn't trying to optimize using this interface, we don't try
@@ -187,6 +168,31 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      */
     //public List<> getCurrentReaders(Object obj);
     //public List<> getCurrentWriters(Object obj);
+
+    /*
+     * Implement AccessCoordinatorHandle
+     */
+
+    /** 
+     * {@inheritDoc}
+     */
+    public void notifyNewTransaction(
+	Transaction txn, long requestedStartTime, int tryCount)
+    {
+	if (requestedStartTime < 0) {
+	    throw new IllegalArgumentException(
+		"The requestedStartTime must not be less than 0");
+	}
+	if (tryCount < 1) {
+	    throw new IllegalArgumentException(
+		"The tryCount must not be less than 1");
+	}
+	if (txnMap.containsKey(txn)) {
+	    throw new IllegalStateException("Transaction already started");
+	}		
+        txn.join(this);
+        txnMap.put(txn, new AccessedObjectsDetailImpl(txn));
+    }
 
     /*
      * Implement NonDurableTransactionParticipant interface.
@@ -273,25 +279,6 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 
         profileCollectorHandle.setAccessedObjectsDetail(detail);
     }
-
-    /*
-     * Package-private methods.
-     */
-
-    /** 
-     * Notifies the coordinator that a new transaction is starting. 
-     */
-    void notifyNewTransaction(long requestedStartTime, int tryCount) {
-        // NOTE: the parameters are here for the next step, where we want
-        // input to decide how to resolve conflict
-        Transaction txn = txnProxy.getCurrentTransaction();
-        txn.join(this);
-        txnMap.put(txn, new AccessedObjectsDetailImpl(txn));
-    }
-
-    // NOTE: there will be another version of the notifyNewTransaction
-    // method that takes a specific resolution policy (once we get that
-    // feature implemented)
 
     /*
      * Class implementations.
@@ -484,18 +471,10 @@ class AccessCoordinatorImpl implements AccessCoordinator,
         /** Creates an instance of {@code AccessedObjectImpl}. */
         AccessedObjectImpl(Object objId, AccessType type, String source,
                            AccessedObjectsDetailImpl parent) {
-	    if (objId == null) {
-		throw new NullPointerException("objId must not be null");
-            }
-	    if (type == null) {
-		throw new NullPointerException("type must not be null");
-            }
-	    if (source == null) {
-		throw new NullPointerException("source must not be null");
-            }
-            if (parent == null) {
-		throw new NullPointerException("parent must not be null");
-            }
+	    Objects.checkNull("objId", objId);
+	    Objects.checkNull("type", type);
+	    Objects.checkNull("source", source);
+            Objects.checkNull("parent", parent);
 	    
             this.objId = objId;
             this.type = type;
@@ -554,48 +533,19 @@ class AccessCoordinatorImpl implements AccessCoordinator,
      * will need to start tracking access and check that this doesn't cause
      * some transaction to fail.
      */
-    private class AccessReporterImpl<T> implements AccessReporter<T> {
-	private final String source;
+    private class AccessReporterImpl<T> extends AbstractAccessReporter<T> {
 
 	/** Creates an instance of {@code AccessReporter}. */
         AccessReporterImpl(String source) {
-	    if (source == null) {
-		throw new NullPointerException("source cannot be null");
-            }
-            this.source = source;
+	    super(source);
         }
-
-        /** {@inheritDoc} */
-        public void reportObjectAccess(T objId, AccessType type) {
-	    reportObjectAccess(txnProxy.getCurrentTransaction(), objId, type,
-                               null);
-        }
-
-        /** {@inheritDoc} */
-        public void reportObjectAccess(Transaction txn, T objId,
-                                       AccessType type) {
-            reportObjectAccess(txn, objId, type, null);
-        }
-
-        /** {@inheritDoc} */
-	public void reportObjectAccess(T objId, AccessType type, 
-				       Object description) {
-	    reportObjectAccess(txnProxy.getCurrentTransaction(), 
-			       objId, type, description);
-	}
 
         /** {@inheritDoc} */
 	public void reportObjectAccess(Transaction txn, T objId,
                                        AccessType type, Object description) {
-	    if (txn == null) {
-		throw new NullPointerException("txn cannot be null");
-            }
-	    if (objId == null) {
-		throw new NullPointerException("objId cannot be null");
-            }
-	    if (type == null) {
-		throw new NullPointerException("type cannot be null");
-            }
+	    Objects.checkNull("txn", txn);
+	    Objects.checkNull("objId", objId);
+	    Objects.checkNull("type", type);
 
 	    AccessedObjectsDetailImpl detail = txnMap.get(txn);
             if (detail == null) {
@@ -610,31 +560,20 @@ class AccessCoordinatorImpl implements AccessCoordinator,
 	}
 
         /** {@inheritDoc} */
-	public void setObjectDescription(T objId, Object description) {
-	    setObjectDescription(txnProxy.getCurrentTransaction(), 
-				 objId, description);
-        }
-
-        /** {@inheritDoc} */
 	public void setObjectDescription(Transaction txn, T objId,
                                          Object description) {
-	    if (txn == null) {
-		throw new NullPointerException("txn cannot be null");
-            }
-	    if (objId == null) {
-		throw new NullPointerException("objId cannot be null");
-            }
-
-            if (description == null) {
-                return;
-            }
+	    Objects.checkNull("txn", txn);
+	    Objects.checkNull("objId", objId);
 
             AccessedObjectsDetailImpl detail = txnMap.get(txn);
             if (detail == null) {
                 throw new IllegalArgumentException("Unknown transaction: " +
                                                    txn);
             }
-            detail.setDescription(source, objId, description);
+
+            if (description != null) {
+		detail.setDescription(source, objId, description);
+	    }
         }
     }
 

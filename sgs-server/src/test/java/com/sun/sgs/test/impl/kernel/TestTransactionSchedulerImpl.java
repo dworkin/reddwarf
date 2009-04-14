@@ -30,9 +30,9 @@ import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
-import com.sun.sgs.test.util.NameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 
 import java.util.Properties;
 
@@ -52,7 +52,7 @@ import org.junit.runner.RunWith;
  * and scheduling methods are already tested from the tests specific to the
  * {@code ApplicationScheduler}s, so there are no duplicated tests here.
  */
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestTransactionSchedulerImpl {
 
     private SgsTestNode serverNode = null;
@@ -168,7 +168,6 @@ public class TestTransactionSchedulerImpl {
     {
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
-                public int runCount = 0;
                 public void run() throws Exception {
                     if (i.getAndIncrement() == 0)
                         throw new InterruptedException("test");
@@ -182,7 +181,6 @@ public class TestTransactionSchedulerImpl {
     @Test public void runTransactionInterrupted() throws Exception {
         final AtomicInteger i = new AtomicInteger(0);
         final KernelRunnable r = new TestAbstractKernelRunnable() {
-                public int runCount = 0;
                 public void run() throws Exception {
                     if (i.getAndIncrement() == 0)
                         throw new InterruptedException("test");

@@ -13,8 +13,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-
-
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -30,11 +28,11 @@ import com.sun.sgs.app.util.QuadTreeIterator;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.TransactionScheduler;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.util.NameRunner;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import com.sun.sgs.test.util.SgsTestNode;
 import com.sun.sgs.test.util.TestAbstractKernelRunnable;
 
-@RunWith(NameRunner.class)
+@RunWith(FilteredNameRunner.class)
 public class TestConcurrentQuadTree extends Assert {
 
     private static final double DELTA = Double.MIN_VALUE;
@@ -42,7 +40,6 @@ public class TestConcurrentQuadTree extends Assert {
     private static TransactionScheduler txnScheduler;
     private static Identity taskOwner;
     private static DataService dataService;
-
     private final Random random = new Random(System.currentTimeMillis());
 
     /**
@@ -76,6 +73,7 @@ public class TestConcurrentQuadTree extends Assert {
     @Test
     public void testConstructorFourArgs() throws Exception {
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
+
             public void run() throws Exception {
 
                 ConcurrentQuadTree<String> tree;
@@ -200,8 +198,7 @@ public class TestConcurrentQuadTree extends Assert {
 
                 while (treeCopyIter.hasNext()) {
                     String s = treeCopyIter.next();
-                    assertTrue(s.equals("A") || s.equals("B") || s.equals("C")
-                            || s.equals("D") || s.equals("E"));
+                    assertTrue(s.equals("A") || s.equals("B") || s.equals("C") || s.equals("D") || s.equals("E"));
                     treeCopyIter.remove();
                 }
                 assertTrue(tree.isEmpty());
@@ -692,8 +689,49 @@ public class TestConcurrentQuadTree extends Assert {
                     String s = iter.next();
                     assertTrue(s.equals("A") || s.equals("D"));
                 }
-                // only "A", "D", "E" should be in this envelope
+                // only "A", "D" should be in this envelope
                 assertEquals(2, i);
+            }
+        }, taskOwner);
+    }
+
+    @Test
+    public void testBoundingBoxIterator() throws Exception {
+        txnScheduler.runTask(new TestAbstractKernelRunnable() {
+
+            public void run() throws Exception {
+
+                //Test some elements on the edge of the iterator's boundingBox
+                ConcurrentQuadTree<String> tree = makeEmptyTree();
+                tree.put(25, 25, "A");
+                tree.put(0, 0, "D");
+                tree.put(35, 35, "E");
+                assertFalse(tree.isEmpty());
+                QuadTreeIterator<String> iter =
+                        tree.boundingBoxIterator(25, 25, 0, 0);
+                int i = 0;
+                while (iter.hasNext()) {
+                    i++;
+                    String s = iter.next();
+                    assertTrue(s.equals("A") || s.equals("D"));
+                }
+                // only "A", "D" should be in this envelope
+                assertEquals(2, i);
+
+                //Test no elements inside the iterator's boundingBox
+                tree = makeEmptyTree();
+                tree.put(35, 0, "A");
+                tree.put(0, 35, "D");
+                tree.put(35, 35, "E");
+                assertFalse(tree.isEmpty());
+                iter = tree.boundingBoxIterator(25, 25, 0, 0);
+                assertFalse(iter.hasNext());
+                try {
+                    iter.next();
+                    fail("Expecting NoSuchElementException");
+                } catch (NoSuchElementException nsee) {
+                }
+
             }
         }, taskOwner);
     }
@@ -983,18 +1021,40 @@ public class TestConcurrentQuadTree extends Assert {
                 // test with an empty tree
                 ConcurrentQuadTree<String> tree = makeEmptyTree();
                 QuadTreeIterator<String> iter = tree.iterator();
+                assertFalse(iter.hasCurrent());
                 try {
                     iter.current();
                     fail("Expecting IllegalStateException");
                 } catch (IllegalStateException ise) {
                 }
 
-                // test current having not called next()
+                // test current before calling next()
                 tree = makeEmptyTree();
                 tree.put(1, 1, "A");
                 iter = tree.iterator();
                 try {
                     iter.current();
+                    fail("Expecting IllegalStateException");
+                } catch (IllegalStateException ise) {
+                }
+
+                //test currentX before calling next()
+                tree = makeEmptyTree();
+                tree.put(1, 1, "A");
+                iter = tree.iterator();
+                try {
+                    iter.currentX();
+                    fail("Expecting IllegalStateException");
+                } catch (IllegalStateException ise) {
+                }
+
+
+                //test currentY before calling next()
+                tree = makeEmptyTree();
+                tree.put(1, 1, "A");
+                iter = tree.iterator();
+                try {
+                    iter.currentY();
                     fail("Expecting IllegalStateException");
                 } catch (IllegalStateException ise) {
                 }
@@ -1775,8 +1835,10 @@ public class TestConcurrentQuadTree extends Assert {
                         dataService.createReferenceForId(next);
                 String name = ref.get().getClass().getName();
                 if (!name.equals("com.sun.sgs.impl.service.task.PendingTask")) {
-                //    System.err.println(count + ": " + ref.get());
-                    count++;
+                    if (name.equals("com.sun.sgs.app.util.ManagedSerializable")) {
+                        // System.err.println(count + ": " + ref.get());
+                        count++;
+                    }
                 }
                 last = next;
             }
@@ -1923,6 +1985,7 @@ public class TestConcurrentQuadTree extends Assert {
                     int y = random.nextInt(100);
                     tree.put(x, y, Integer.toString(i));
                 }
+                System.err.println("Before");
             }
         }, taskOwner);
         int countAfterAdds = getObjectCount();
@@ -1954,6 +2017,7 @@ public class TestConcurrentQuadTree extends Assert {
                 DataManager dm = AppContext.getDataManager();
                 ConcurrentQuadTree<Integer> tree =
                         uncheckedCast(dm.getBinding(name));
+                System.err.println("After");
                 dm.removeObject(tree);
                 dm.removeBinding(name);
             }

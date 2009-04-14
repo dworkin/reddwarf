@@ -68,8 +68,8 @@ class ChannelWrapper
     }
     
     /** {@inheritDoc} */
-    public Delivery getDeliveryRequirement() {
-	return getChannel().getDeliveryRequirement();
+    public Delivery getDelivery() {
+	return getChannel().getDelivery();
     }
 
     /** {@inheritDoc} */
@@ -166,12 +166,15 @@ class ChannelWrapper
 	ChannelImpl channelImpl = null;
 	try {
 	    channelImpl = channelRef.get();
-	} catch (ObjectNotFoundException e) {
+	} catch (Exception e) {
 	}
 	return getClass().getName() + "[" +
-	    (channelImpl == null ? "(not found)" : channelImpl.toString()) +
+	    (channelImpl == null ?
+	     channelRef.toString() :
+	     channelImpl.toString()) +
 	    "]";
     }
+    
     /* -- Other methods -- */
 
     /**

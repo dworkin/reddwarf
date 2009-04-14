@@ -22,7 +22,9 @@ package com.sun.sgs.impl.service.watchdog;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.management.NodeInfo;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
 import java.io.Serializable;
@@ -46,7 +48,7 @@ class NodeImpl
     private static final long serialVersionUID = 1L;
 
     /** The ID for an unknown node. */
-    static final long INVALID_ID = -1L;
+    public static final long INVALID_ID = -1L;
 
     /** The name of this class. */
     private static final String PKG_NAME =
@@ -61,9 +63,9 @@ class NodeImpl
     /** The host name, or {@code null}. */
     private final String host;
     
-    /** The port, or {@code null}. */
-    private final int port;
-
+    /** The port JMX can listen on, or {@code -1}. */
+    private final int jmxPort;
+    
     /** The watchdog client, or {@code null}. */
     private final WatchdogClient client;
     
@@ -85,17 +87,18 @@ class NodeImpl
 
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code port}, and {@code client}.  
+     * nodeId}, {@code hostName}, and {@code client}.  
      * This instance's alive status is set to {@code true}.  The expiration 
      * time for this instance should be set as soon as it is known.
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name
-     * @param   port     a port
+     * @param   jmxPort  the port JMX is listening on for the node, 
+     *                   or {@code -1}
      * @param	client a watchdog client
      */
-    NodeImpl(long nodeId, String hostName, int port, WatchdogClient client) {
-        this (nodeId, hostName, port, client, true, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, int jmxPort, WatchdogClient client) {
+        this (nodeId, hostName, jmxPort, client, true, INVALID_ID);
     }
 
     /**
@@ -106,55 +109,50 @@ class NodeImpl
      *
      * @param 	nodeId a node ID
      * @param 	hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      */
-    NodeImpl(long nodeId, String hostName, int port, boolean isAlive) {
-	this(nodeId, hostName, port, null, isAlive, INVALID_ID);
+    NodeImpl(long nodeId, String hostName, boolean isAlive) {
+	this(nodeId, hostName, -1, null, isAlive, INVALID_ID);
     }
 	
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code port}, {@code isAlive} status, and 
+     * nodeId}, {@code hostName}, {@code isAlive} status, and 
      * {@code backupId}.  This instance's watchdog client is set to
      * {@code null}.
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    NodeImpl(long nodeId, String hostName, int port, 
-             boolean isAlive, long backupId) 
-    {
-        this(nodeId, hostName, port, null, isAlive, backupId);
+    NodeImpl(long nodeId, String hostName, boolean isAlive, long backupId) {
+        this(nodeId, hostName, -1, null, isAlive, backupId);
     }
     
     /**
      * Constructs an instance of this class with the given {@code
-     * nodeId}, {@code hostName}, {@code port}, {@code client}, 
+     * nodeId}, {@code hostName}, {@code jmxPort}, {@code client}, 
      * {@code isAlive} status, and {@code backupId}.
      *
      * @param 	nodeId a node ID
      * @param   hostName a host name, or {@code null}
-     * @param   port     a port, or {@code null}
+     * @param   jmxPort  the port JMX is listening on, or {@code -1}
      * @param	client   a watchdog client
      * @param	isAlive if {@code true}, this node is considered alive
      * @param	backupId the ID of the node's backup (-1 if no backup
      *		is assigned)
      */
-    private NodeImpl(long nodeId, String hostName, int port, 
+    private NodeImpl(long nodeId, String hostName, int jmxPort,
                      WatchdogClient client, boolean isAlive, long backupId) 
     {
         this.id = nodeId;
-
 	this.host = hostName;
-        this.port = port;
         this.client = client;
         this.isAlive = isAlive;
         this.backupId = backupId;
+        this.jmxPort = jmxPort;
     }
 
     /* -- Implement Node -- */
@@ -169,11 +167,6 @@ class NodeImpl
 	return host;
     }
     
-    /** {@inheritDoc} */
-    public int getPort() {
-        return port;
-    }
-
     /** {@inheritDoc} */
     public synchronized boolean isAlive() {
 	return isAlive;
@@ -203,8 +196,15 @@ class NodeImpl
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    NodeImpl node = (NodeImpl) obj;
-	    return id == node.id && compareStrings(host, node.host) == 0 &&
-                     port == node.port;
+            if (id == node.id) {
+                if (compareStrings(host, node.host) != 0) {
+                    throw new RuntimeException("two node objects with ID " +
+                                               id +
+                                               " have different host names: " +
+                                               host + " and " + node.host);
+                }
+                return true;
+            }
 	}
 	return false;
     }
@@ -219,7 +219,7 @@ class NodeImpl
 	return getClass().getName() + "[" + id + "," +
 	    (isAlive() ? "alive" : "failed") + ",backup:" +
 	    (backupId == INVALID_ID ? "(none)" : backupId) + 
-            "]@" + host + ":" + port;
+            "]@" + host;
     }
 
     /* -- package access methods -- */
@@ -347,15 +347,36 @@ class NodeImpl
      *		current transaction
      */
      private NodeImpl getForUpdate(DataService dataService) {
-	NodeImpl nodeImpl = getNode(dataService, id);
+	NodeImpl nodeImpl = getNodeForUpdate(dataService, id);
 	if (nodeImpl == null) {
 	    throw new ObjectNotFoundException("node is removed");
 	}
-	// update non-final fields before
-	dataService.markForUpdate(nodeImpl);
 	return nodeImpl;
     }
 
+     /**
+      * Returns the port used for remote JMX monitoring, or {@code -1}
+      * if only local monitoring is allowed.
+      * 
+      * @return the port used for remote JMX monitoring of this node
+      */
+    private int getJmxPort() {
+        return jmxPort;
+    }
+    
+    /**
+     * Returns the management information for this node.
+     * 
+     * @return the management information for this node
+     */
+    NodeInfo getNodeInfo() {
+        return new NodeInfo(getHostName(),
+                            getId(),
+                            isAlive(),
+                            getBackupId(),
+                            getJmxPort());
+    }
+     
     /**
      * Removes the node with the specified {@code nodeId} and its
      * binding from the specified {@code dataService}.  If the binding
@@ -396,6 +417,29 @@ class NodeImpl
 	NodeImpl node = null;
 	try {
 	    node = (NodeImpl) dataService.getServiceBinding(key);
+	} catch (NameNotBoundException e) {
+	}
+	return node;
+    }
+    
+    /**
+     * Returns the {@code Node} instance for the given {@code nodeId},
+     * retrieved from the specified {@code dataService} for update.
+     * This method returns {@code null} if the node isn't bound in the data
+     * service .  This method must only be called within a transaction.
+     *
+     * @param	dataService a data service
+     * @param	nodeId a node ID
+     * @return	the node for the given {@code nodeId}, or {@code null}
+     * @throws 	TransactionException if there is a problem with the
+     *		current transaction
+     */
+    static NodeImpl getNodeForUpdate(DataService dataService, long nodeId) {
+	String key = getNodeKey(nodeId);
+	NodeImpl node = null;
+	try {
+	    node = (NodeImpl) dataService.getServiceBinding(key);
+	    dataService.markForUpdate(node);
 	} catch (NameNotBoundException e) {
 	}
 	return node;
@@ -469,7 +513,7 @@ class NodeImpl
      * Node} instance with the specified {@code nodeId}.
      *
      * @param	a node ID
-     * @return	a key for acessing the {@code Node} instance
+     * @return	a key for accessing the {@code Node} instance
      */
     private static String getNodeKey(long nodeId) {
 	return NODE_PREFIX + "." + nodeId;

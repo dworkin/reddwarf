@@ -97,8 +97,8 @@ public class DummyNodeMappingService implements NodeMappingService,
     }
 
     /** {@inheritDoc} */
-    public boolean shutdown() {
-        return true;
+    public void shutdown() {
+        
     }
 
     /** {@inheritDoc} */

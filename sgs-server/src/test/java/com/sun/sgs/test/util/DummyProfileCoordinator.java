@@ -21,6 +21,7 @@ package com.sun.sgs.test.util;
 
 import com.sun.sgs.auth.Identity;
 
+import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.profile.ProfileCollectorHandleImpl;
 import com.sun.sgs.impl.profile.ProfileCollectorImpl;
@@ -30,6 +31,8 @@ import com.sun.sgs.impl.profile.listener.OperationLoggingProfileOpListener;
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
+import java.util.Properties;
+import javax.management.JMException;
 
 
 /** Simple profiling utility to support tests. */
@@ -58,13 +61,19 @@ public class DummyProfileCoordinator {
 
     /** Creates an instance of DummyProfileCoordinator */
     private DummyProfileCoordinator() {
-        collector = new ProfileCollectorImpl(ProfileLevel.MIN, 
-                                             System.getProperties(), null);
+        Properties props = System.getProperties();
+        collector = new ProfileCollectorImpl(ProfileLevel.MIN, props, null);
         collectorHandle = new ProfileCollectorHandleImpl(collector);
         OperationLoggingProfileOpListener listener =
-            new OperationLoggingProfileOpListener(System.getProperties(),
-                                                  owner, null);
+            new OperationLoggingProfileOpListener(props, owner, null);
         collector.addListener(listener, true);
+        
+        ConfigManager config = new ConfigManager(props);
+        try {
+            collector.registerMBean(config, ConfigManager.MXBEAN_NAME);
+        } catch (JMException e) {
+            System.out.println("Could not register ConfigManager" + e);
+        }
     }
 
     /** Get the singleton, backing collector. */

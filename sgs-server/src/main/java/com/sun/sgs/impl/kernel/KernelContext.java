@@ -124,9 +124,10 @@ class KernelContext {
      * @return the context's <code>ChannelManager</code>
      */
     ChannelManager getChannelManager() {
-        if (channelManager == null)
+        if (channelManager == null) {
             throw new ManagerNotFoundException("this application is running " +
                                                "without a ChannelManager");
+        }
         return channelManager;
     }
 
@@ -136,9 +137,10 @@ class KernelContext {
      * @return the context's <code>DataManager</code>
      */
     DataManager getDataManager() {
-        if (dataManager == null)
+        if (dataManager == null) {
             throw new ManagerNotFoundException("this application is running " +
                                                "without a DataManager");
+        }
         return dataManager;
     }
 
@@ -148,9 +150,10 @@ class KernelContext {
      * @return the context's <code>TaskManager</code>
      */
     TaskManager getTaskManager() {
-        if (taskManager == null)
+        if (taskManager == null) {
             throw new ManagerNotFoundException("this application is running " +
                                                "without a TaskManager");
+        }
         return taskManager;
     }
 
@@ -202,8 +205,9 @@ class KernelContext {
      * @throws Exception if there is any failure during notification
      */
     void notifyReady() throws Exception {
-        for (Object service : serviceComponents)
-            ((Service)service).ready();
+        for (Object service : serviceComponents) {
+            ((Service) service).ready();
+        }
     }
 
     /**

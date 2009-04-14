@@ -30,6 +30,36 @@
     <Bug pattern="DM_CONVERT_CASE"/>
   </Match>
   
+  <!-- Findbugs can't tell why we're doing a notify at this point, but
+       it is because we have identified new lock owners that need to be
+       informed of their new status. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator"/>
+    <Method name="endTransaction"/>
+    <Bug pattern="NN_NAKED_NOTIFY"/>
+  </Match>
+
+  <!-- There really is only one waiter, so no need to use notifyAll, and
+       notify is faster -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator"/>
+    <Method name="endTransaction"/>
+    <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL"/>
+  </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator$Locker"/>
+    <Method name="setConflict"/>
+    <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL"/>
+  </Match>
+
+  <!-- AccessedObjectsDetail.getConflictingId is documented to return
+       null -->
+  <Match>
+    <Class name="com.sun.sgs.impl.kernel.LockingAccessCoordinator$Locker"/>
+    <Method name="getConflictingId"/>
+    <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+  </Match>
+
   <!-- Return value can be ignored, since it always true. -->
   <!-- Findbugs 1.2.1 lists this as RV_RETURN_VALUE_IGNORED, 1.3.0
        has it as RV_RETURN_VALUE_IGNORED_BAD_PRACTICE -->
@@ -46,12 +76,12 @@
 
   <!-- Return value is intentionally being thrown out. -->
   <Match>
-    <Class name="com.sun.sgs.impl.kernel.AccessCoordinatorImpl"/>
+    <Class name="com.sun.sgs.impl.kernel.TrackingAccessCoordinator"/>
     <Method name="reportDetail"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE"/>
   </Match>
   <Match>
-    <Class name="com.sun.sgs.impl.kernel.AccessCoordinatorImpl"/>
+    <Class name="com.sun.sgs.impl.kernel.TrackingAccessCoordinator"/>
     <Method name="reportDetail"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED"/>
   </Match>
@@ -128,6 +158,7 @@
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
@@ -136,6 +167,7 @@
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServerImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelServiceImpl$ChannelServiceRecoveryListener$1"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$1"/>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$7"/>
       <Class name="com.sun.sgs.impl.service.session.ClientSessionHandler$LoginTask$1"/>
     </Or>
     <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
@@ -223,6 +255,16 @@
     <Field name="server"/>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$ReassignCoordinatorsTask"/>
+    <Field name="channelIter"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$RemoveFailedSessionsFromLocalChannelsTask"/>
+    <Field name="iter"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
 
   <!-- Thread is not created with a default empty run method. -->
   <Match>
@@ -265,7 +307,10 @@
 
   <!-- OK to ignore exception in ClientSessionWrapper.toString method. -->
   <Match>
-    <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
+    <Or>
+      <Class name="com.sun.sgs.impl.service.session.ClientSessionWrapper"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelWrapper"/>
+    </Or>
     <Method name="toString"/>
     <Bug pattern="DE_MIGHT_IGNORE"/>
   </Match>
@@ -296,4 +341,19 @@
     <Bug pattern="URF_UNREAD_FIELD"/>
   </Match>
 
+  <!-- Dead but overwritten parameter. -->
+  <Match>
+    <Class name="com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolImpl"/>
+    <Method name="loginFailure"/>
+    <Parameter name="reason"/>
+    <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
+  </Match>
+
+  <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
+  <Match>
+    <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
+    <Feild name="txnProxy"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+  </Match>
+  
 </FindBugsFilter>

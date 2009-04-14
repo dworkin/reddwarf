@@ -35,7 +35,10 @@ import java.util.Collection;
 import java.util.EmptyStackException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -44,7 +47,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * data to a backing <code>ProfileCollectorImpl</code>.
  */
 class ProfileConsumerImpl implements ProfileConsumer {
-    public static final int DEFAULT_SAMPLE_AGGREGATE_CAPACITY = 1000;
+    /** The default aggregate sample capacity. */
+    public static final int DEFAULT_SAMPLE_AGGREGATE_CAPACITY = 0;
+    /** 
+     * The default aggregate sample smoothing capacity, for calculating
+     * the exponential weighted average of the samples.
+     */
+    public static final double DEFAULT_SAMPLE_AGGREGATE_SMOOTHING = 0.7;
     
     // the fullName of the consumer
     private final String name;
@@ -210,7 +219,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
      * {@inheritDoc}
      * <p>
      * The default capacity of the created {@code ProfileSample} is 
-     * {@value #DEFAULT_SAMPLE_AGGREGATE_CAPACITY}.
+     * {@value #DEFAULT_SAMPLE_AGGREGATE_CAPACITY} and can be modified
+     * by calling {@link AggregateProfileSample#setCapacity}.
+     * <p>
+     * These samples use an exponential weighted average to calculate
+     * their averages.  The default smoothing factor for the aggregate sample
+     * is {@value #DEFAULT_SAMPLE_AGGREGATE_SMOOTHING} and can be modified
+     * by calling {@link AggregateProfileSample#setSmoothingFactor}.
      */
     public synchronized ProfileSample createSample(String name, 
             ProfileDataType type, ProfileLevel minLevel) 
@@ -566,17 +581,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
     private class AggregateProfileSampleImpl
             extends AbstractProfileData 
             implements AggregateProfileSample
-    {    
-        private final LinkedList<Long> samples = new LinkedList<Long>();
-	private int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;       
-	
-        /** 
-         * Smoothing factor for exponential smoothing, between 0 and 1.
-         * A value closer to one provides less smoothing of the data, and
-         * more weight to recent data;  a value closer to zero provides more
-         * smoothing but is less responsive to recent changes.
-         */
-        private float smoothingFactor = (float) 0.7;
+    {
+        private final Queue<Long> samples =
+                new ConcurrentLinkedQueue<Long>();
+        private final AtomicInteger roughSize = new AtomicInteger();
+	private volatile int capacity = DEFAULT_SAMPLE_AGGREGATE_CAPACITY;   
+        private volatile double smoothingFactor = 
+                        DEFAULT_SAMPLE_AGGREGATE_SMOOTHING;
         private long minSampleValue = Long.MAX_VALUE;
         private long maxSampleValue = Long.MIN_VALUE;
         private final ExponentialAverage avgSampleValue = 
@@ -595,11 +606,16 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 return;
             }
             
-            synchronized (this) {
-                if (samples.size() == capacity) {
-                    samples.removeFirst(); // remove oldest
+            if (capacity > 0) {
+                if (samples.size() >= capacity) {
+                    samples.remove(); // remove oldest
+                } else {
+                    roughSize.incrementAndGet();
                 }
                 samples.add(value);
+            }
+            
+            synchronized (this) {
                 // Update the statistics
                 if (value > maxSampleValue) {
                     maxSampleValue = value;
@@ -607,9 +623,9 @@ class ProfileConsumerImpl implements ProfileConsumer {
                 if (value < minSampleValue) {
                     minSampleValue = value;
                 }
+            
                 avgSampleValue.update(value);
             }
-
         }
         
         /** {@inheritDoc} */
@@ -618,13 +634,14 @@ class ProfileConsumerImpl implements ProfileConsumer {
          }
          
          /** {@inheritDoc} */
-         public synchronized int getNumSamples() {
-             return samples.size();
+         public int getNumSamples() {
+             return roughSize.intValue();
          }
          
          /** {@inheritDoc} */
          public synchronized void clearSamples() {
              samples.clear();
+             roughSize.set(0);
              avgSampleValue.clear();
              maxSampleValue = Long.MIN_VALUE;
              minSampleValue = Long.MAX_VALUE;
@@ -652,10 +669,26 @@ class ProfileConsumerImpl implements ProfileConsumer {
         
         /** {@inheritDoc} */
         public void setCapacity(int capacity) {
-            if (capacity <= 0) {
-                throw new IllegalArgumentException("capacity must be positive");
+            if (capacity < 0) {
+                throw new IllegalArgumentException(
+                                        "capacity must not be negative");
             }
             this.capacity = capacity; 
+        }
+        
+        /** {@inheritDoc} */
+        public void setSmoothingFactor(double smooth) {
+            if (smooth < 0.0 || smooth > 1.0) {
+                throw new IllegalArgumentException(
+                        "Smoothing factor must be between 0.0 and 1.0, was " 
+                      + smooth);
+            }
+            smoothingFactor = smooth;
+        }
+        
+        /** {@inheritDoc} */
+        public double getSmoothingFactor() {
+            return smoothingFactor;
         }
         
         private class ExponentialAverage {
@@ -684,7 +717,6 @@ class ProfileConsumerImpl implements ProfileConsumer {
                     avg = (sample - last) * smoothingFactor + last;
                 }
                 last = avg;
-//                System.out.println("avg: " + avg);
             }
             
             void clear() {
