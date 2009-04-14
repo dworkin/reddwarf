@@ -37,18 +37,11 @@
   
   <fileSets>
 
-    <!-- Include the example properties files used in
+    <!-- Include the example configuration files used in
 	 the tutorial -->
     <fileSet>
-      <directory>src/main/properties</directory>
-      <outputDirectory>tutorial</outputDirectory>
-    </fileSet>
-
-    <!-- Include the data directories used for the datastores
-	 in the tutorials -->
-    <fileSet>
-      <directory>src/main/data</directory>
-      <outputDirectory>tutorial/data</outputDirectory>
+      <directory>src/main/conf</directory>
+      <outputDirectory>tutorial/conf</outputDirectory>
     </fileSet>
 
     <!-- Include the tutorial pdf file -->
