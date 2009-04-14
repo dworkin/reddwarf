@@ -65,7 +65,7 @@ package com.sun.sgs.app.util;
  */
 
 
-public interface QuadTree<E> {
+public interface QuadTree<E> extends Iterable<E> {
 
     /**
      * Adds the element to the quadtree given the coordinate values.
@@ -141,12 +141,12 @@ public interface QuadTree<E> {
      * Returns an array of four coordinates which represent the individual x-
      * and y- coordinates specifying the bounding box of the quadtree.
      * The indices and values of the array are as follows:
-     * 
-     * Index 0 corresponds to the smallest X coordinate value.
-     * Index 1 corresponds to the smallest Y coordinate value.
-     * Index 2 corresponds to the largest X coordinate value.
-     * Index 3 corresponds to the largest Y coordinate value.
-     *
+     * <ul>
+     * <li>Index 0 corresponds to the smallest X coordinate value.
+     * <li>Index 1 corresponds to the smallest Y coordinate value.
+     * <li>Index 2 corresponds to the largest X coordinate value.
+     * <li>Index 3 corresponds to the largest Y coordinate value.
+     * </ul>
      * For example, getBoundingBox()[0] contains the smallest X coordinate
      * value of the bounding box.
      *
@@ -171,7 +171,7 @@ public interface QuadTree<E> {
      * @return {@code true} if there was at least one element removed, and
      * {@code false} otherwise
      * @throws IllegalArgumentException if the coordinates are not contained
-     * within the bounding box defined by the <code>Quadtree</code>
+     * within the bounding box defined by the {@code Quadtree}
      */
     boolean removeAll(double x, double y);
 

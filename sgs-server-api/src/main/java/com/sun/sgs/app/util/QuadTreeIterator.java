@@ -70,7 +70,7 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
     /**
      * Advances the iterator without returning the next element in the
      * sequence. 
-     * @throws NoSuchElementException iteration has no more elements.
+     * @throws NoSuchElementException if iteration has no more elements
      */
     void nextNoReturn();
 
@@ -89,7 +89,11 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
     E current();
 
     /**
-     * Checks if the current element the iterator is pointing to exists.
+     * Checks if the current element the iterator is pointing to exists 
+     * (if removed by the iterator or concurrently by something else). Used
+     * to check if calling {@code current()} will throw 
+     * {@code IllegalStateException} or 
+     * {@code CurrentConcurrentRemovedException}.
      * @return true if the current element exists and false otherwise
      * */
     boolean hasCurrent();

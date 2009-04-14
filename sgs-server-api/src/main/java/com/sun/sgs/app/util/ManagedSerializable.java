@@ -130,7 +130,7 @@ public class ManagedSerializable<T> implements ManagedObject, Serializable {
 
     /**
      * Constructs an instance of this class that wraps the specified object,
-     * which must not implement {@link ManagedObject}, but must either
+     * which  implement {@link ManagedObject}, but must either
      * implement {@link Serializable} or be {@code null}.
      *
      * @param object the object to wrap
