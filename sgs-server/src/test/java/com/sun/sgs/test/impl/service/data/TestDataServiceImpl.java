@@ -4548,30 +4548,31 @@ public class TestDataServiceImpl{
         final List<AssertionError> errorList = 
             Collections.synchronizedList(new ArrayList<AssertionError>());
         
+        // Semaphore to let us know when we are done
+        final Semaphore doneFlag = new Semaphore(0); 
+
         class ShutdownTask extends TestAbstractKernelRunnable {
             ThreadAction threadAction;
             public void run() throws Exception {
                 service.createReference(new DummyManagedObject());
                 action.setUp();
-                
-                // JANE the problem with this scheme is the data store also
-                // needs to know.
+
                 stateShuttingDown.invoke(service);
 
                 threadAction = new ThreadAction() {
                     protected void action() {
                         try {
                             try {
-                                txnScheduler.runTask(new TestAbstractKernelRunnable() {
+                                txnScheduler.runTask(
+                                    new TestAbstractKernelRunnable() {
                                     public void run() {
                                         try {
                                             action.run();
-                                            System.out.println("JJJ");
                                             fail("Expected IllegalStateException");
                                         } catch (IllegalStateException e) {
                                             if (!e.getMessage().equals("Service " +
                                                     "is shutting down") && !e.
-                                                    getMessage().equals("Sevice " +
+                                                    getMessage().equals("Service " +
                                                     "is shut down"))
                                                 fail("Invalid exception message");
                                         }
@@ -4581,6 +4582,8 @@ public class TestDataServiceImpl{
                             }
                         } catch (AssertionError ae) {
                             errorList.add(ae);
+                        } finally {
+                            doneFlag.release();
                         }
                     }
                 };
@@ -4592,6 +4595,7 @@ public class TestDataServiceImpl{
         ShutdownTask task = new ShutdownTask();
         try {
             txnScheduler.runTask(task, taskOwner);
+            assertTrue(doneFlag.tryAcquire(200, TimeUnit.MILLISECONDS));
             if (!errorList.isEmpty()) {
                 throw new AssertionError(errorList.get(0));
             }

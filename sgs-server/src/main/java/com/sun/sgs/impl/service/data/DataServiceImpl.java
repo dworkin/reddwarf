@@ -1135,7 +1135,6 @@ public final class DataServiceImpl implements DataService {
         synchronized (stateLock) {
             state = State.SHUTTING_DOWN;  
         }
-        // JANE also need to tell the data store to set its internal state
     }
     
     /**
