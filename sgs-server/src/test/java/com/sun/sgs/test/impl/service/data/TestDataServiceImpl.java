@@ -111,10 +111,12 @@ public class TestDataServiceImpl{
     private static Method stateShuttingDown;
     static {
         try {
-            stateRunning = DataServiceImpl.class.getDeclaredMethod("setRunningState");
+            stateRunning = DataServiceImpl.class.
+                                getDeclaredMethod("setRunningState");
             stateRunning.setAccessible(true);
             
-            stateShuttingDown = DataServiceImpl.class.getDeclaredMethod("setShuttingDownState");
+            stateShuttingDown = DataServiceImpl.class.
+                                getDeclaredMethod("setShuttingDownState");
             stateShuttingDown.setAccessible(true);
         } catch (Exception e) {
             e.printStackTrace();
@@ -4587,9 +4589,6 @@ public class TestDataServiceImpl{
                         }
                     }
                 };
-                // how do we know that the threadAction is done?
-                // maybe best to go back to the original scheme, but shut
-                // down a different server (not serverNode)?
             }
         }
         ShutdownTask task = new ShutdownTask();
