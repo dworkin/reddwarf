@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007 - 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -58,14 +58,13 @@ void sgs_ctx_destroy(sgs_context_impl *ctx) {
  * to a null-terminated character array. 
  */
 sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
-    void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
-    void (*unreg_fd)(sgs_connection*, sgs_socket_t, short))
-{
+        void (*reg_fd)(sgs_connection*, sgs_socket_t, short),
+        void (*unreg_fd)(sgs_connection*, sgs_socket_t, short)) {
     int name_len;
-    
+
     sgs_context_impl *ctx = NULL;
-  
-    ctx = malloc(sizeof(struct sgs_context_impl));
+
+    ctx = malloc(sizeof (struct sgs_context_impl));
     if (ctx == NULL) return NULL;
 
     //Get the length of the string, then add one for the null terminator
@@ -77,15 +76,14 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
     }
 
     strncpy(ctx->hostname, hostname, name_len);
-	
+
     ctx->port = port;
-  
-    ctx->reg_fd_cb = reg_fd;
-    ctx->unreg_fd_cb = unreg_fd;
-  
+
     /* initialize all callback functions to NULL */
     sgs_ctx_unset_all_cbs(ctx);
-  
+
+    ctx->reg_fd_cb = reg_fd;
+    ctx->unreg_fd_cb = unreg_fd;
     return ctx;
 }
 
@@ -93,8 +91,7 @@ sgs_context_impl *sgs_ctx_create(const char *hostname, const int port,
  * sgs_ctx_set_channel_joined_cb()
  */
 void sgs_ctx_set_channel_joined_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, sgs_channel*))
-{
+        void (*callback)(sgs_connection*, sgs_channel*)) {
     ctx->channel_joined_cb = callback;
 }
 
@@ -102,8 +99,7 @@ void sgs_ctx_set_channel_joined_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_channel_left_cb()
  */
 void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, sgs_channel*))
-{
+        void (*callback)(sgs_connection*, sgs_channel*)) {
     ctx->channel_left_cb = callback;
 }
 
@@ -111,8 +107,7 @@ void sgs_ctx_set_channel_left_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_channel_recv_msg_cb()
  */
 void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, sgs_channel*, const uint8_t*, size_t))
-{
+        void (*callback)(sgs_connection*, sgs_channel*, const uint8_t*, size_t)) {
     ctx->channel_recv_msg_cb = callback;
 }
 
@@ -120,8 +115,7 @@ void sgs_ctx_set_channel_recv_msg_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_disconnected_cb()
  */
 void sgs_ctx_set_disconnected_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*))
-{
+        void (*callback)(sgs_connection*)) {
     ctx->disconnected_cb = callback;
 }
 
@@ -129,8 +123,7 @@ void sgs_ctx_set_disconnected_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_logged_in_cb()
  */
 void sgs_ctx_set_logged_in_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, sgs_session*))
-{
+        void (*callback)(sgs_connection*, sgs_session*)) {
     ctx->logged_in_cb = callback;
 }
 
@@ -138,8 +131,7 @@ void sgs_ctx_set_logged_in_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_login_failed_cb()
  */
 void sgs_ctx_set_login_failed_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, const uint8_t*, size_t))
-{
+        void (*callback)(sgs_connection*, const uint8_t*, size_t)) {
     ctx->login_failed_cb = callback;
 }
 
@@ -147,8 +139,7 @@ void sgs_ctx_set_login_failed_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_reconnected_cb()
  */
 void sgs_ctx_set_reconnected_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*))
-{
+        void (*callback)(sgs_connection*)) {
     ctx->reconnected_cb = callback;
 }
 
@@ -156,23 +147,39 @@ void sgs_ctx_set_reconnected_cb(sgs_context_impl *ctx,
  * sgs_ctx_set_recv_msg_cb()
  */
 void sgs_ctx_set_recv_msg_cb(sgs_context_impl *ctx,
-    void (*callback)(sgs_connection*, const uint8_t*, size_t))
-{
+        void (*callback)(sgs_connection*, const uint8_t*, size_t)) {
     ctx->recv_message_cb = callback;
+}
+
+/*
+ * sgs_ctx_set_reg_fb_cb()
+ */
+void sgs_ctx_set_reg_fb_cb(sgs_context *ctx,
+        void (*callback)(sgs_connection *, sgs_socket_t, short)) {
+    ctx->reg_fd_cb = callback;
+}
+
+/*
+ *sgs_ctx_set_unreg_fb_cb
+ */
+void sgs_ctx_set_unreg_fb_cb(sgs_context *ctx,
+        void ( *callback)(sgs_connection *, sgs_socket_t, short)) {
+    ctx->unreg_fd_cb = callback;
 }
 
 /*
  * sgs_ctx_unset_all_cbs()
  */
-void sgs_ctx_unset_all_cbs(sgs_context_impl *ctx)
-{
-    ctx->channel_joined_cb   = NULL;
-    ctx->channel_left_cb     = NULL;
+void sgs_ctx_unset_all_cbs(sgs_context_impl *ctx) {
+    ctx->channel_joined_cb = NULL;
+    ctx->channel_left_cb = NULL;
     ctx->channel_recv_msg_cb = NULL;
-    ctx->disconnected_cb     = NULL;
-    ctx->logged_in_cb        = NULL;
-    ctx->login_failed_cb     = NULL;
-    ctx->reconnected_cb      = NULL;
-    ctx->recv_message_cb     = NULL;
+    ctx->disconnected_cb = NULL;
+    ctx->logged_in_cb = NULL;
+    ctx->login_failed_cb = NULL;
+    ctx->reconnected_cb = NULL;
+    ctx->recv_message_cb = NULL;
+    ctx->reg_fd_cb = NULL;
+    ctx->unreg_fd_cb = NULL;
 }
 

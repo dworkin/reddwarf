@@ -16,6 +16,8 @@ CONTENTS
 - test
   Source code for tests
 
+- example
+    Source code for an example program using the C client
 
 BUILDING
 

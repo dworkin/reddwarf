@@ -1,3 +1,11 @@
+Version 0.9.10
+ - Fixed a number of bugs in the handling of throttling and in logout,
+    these deal with the root causes of issue 13.
+ - Changed the data structure used in the login for connection.c to
+    use h_addr_list[] rather than the deprecated hostent; this fixes
+    the root cause of issue 12.
+ - Added the chat client example; this partially addresses issue 14
+
 Version 0.9.9
 - Bug fix in session.c; repairs a problem with names and fixes a memory leak
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007 - 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -176,6 +176,35 @@ void sgs_ctx_set_reconnected_cb(sgs_context* ctx,
  */
 void sgs_ctx_set_recv_msg_cb(sgs_context* ctx,
     void (*callback)(sgs_connection*, const uint8_t*, size_t));
+
+/*
+ *  function sgs_ctx_set_reg_fb_cb()
+ *
+ * Registers a function to be called when a file descriptor
+ * is to be set to be read from. If the file descriptor is already
+ * active for reading, this function should have no effect; if
+ * it is currently inactive (most likely because input from this
+ * descriptor needed to be throttled to keep from overwhelming
+ * the client) then the file descriptor will be added to the
+ * set of file descriptors that will be fed into the select calls
+ */
+void sgs_ctx_set_reg_fb_cb(sgs_context *ctx,
+        void (*callback)(sgs_connection *, sgs_socket_t, short));
+
+/*
+ * function sgs_ctx_set_unreg_fb_cb()
+ *
+ * Registers a function to be called when a file descriptor
+ * is to be removed from the set of descriptors to be read from.
+ * If the file descriptor is already inactive for reading (most
+ * likely to throttle input to avoid swamping the client) the
+ * call will have no effect. Otherwise, the callback should
+ * remove the file descriptor from the set of active file
+ * descriptors
+ */
+
+void sgs_ctx_set_unreg_fb_cb(sgs_context *ctx,
+        void ( *callback)(sgs_connection *, sgs_socket_t, short));
 
 /*
  * function: sgs_ctx_unset_all_cbs()

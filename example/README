@@ -1,0 +1,46 @@
+The chat client is an example client communicating
+with a Project Darkstar server using the C client
+library. The client is a simple chat program that
+connects with the server constructed as part of the
+Project Darkstar Server tutorial. The particular
+server program is the Hello_Channels server.
+
+Once the Hello_Channels server is started (see the
+tutorial for instructions), the chat_client program
+can be run. The chat client is a simple command-
+line program that will connect to the server. If the
+chat client is started with no arguments, it will
+attempt to connect to a server on the same computer
+that is listening on 1139 (which is the default
+port for the tutorial server). The host and port
+can also be specified on the command line, by using
+the -h HOST -p PORT options (where HOST is replaced
+with the appropriate host, and PORT with the
+appropriate port). A full list of other command line
+options can be obtained by running the program
+with the "-u" option.
+
+Once the program is started, it will print out the
+host and port that it is attempting to use, and then
+prompt the user for input. A list of the accepted
+commands can be obtained by entering "help". The
+user can log in to the server (use any login name and
+password), send messages on the two channels that
+are established on login, receive messages from
+others send on those channels, or send messages
+directly to the server. The user can also log out,
+and quit the program.
+
+Note that the commands to join and leave a channel
+will only result in a confirmation from the server
+that the command was received. Channels will not
+actually be left or joined; this functionality has not
+been implemented in the server.
+
+The purpose of this client is to be an example of
+how one can use the Project Darkstar C client. There
+are no claims made as to the correctness or
+aptness of the program; users are invited to enhance
+or improve the example if they wish and submit
+their code to the project for inclusion in a later
+release.

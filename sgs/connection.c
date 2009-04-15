@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2008, Sun Microsystems, Inc.
+ * Copyright (c) 2007 - 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -71,6 +71,12 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     sgs_socket_t sockfd;
     socklen_t optlen;
 
+    if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
+        /** Error: should not call do_io() when disconnected. */
+        errno = ENOTCONN;
+        return -1;
+    }
+
     sockfd = connection->socket_fd;
     
     FD_ZERO(&readset);
@@ -84,14 +90,11 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     timeout_tv.tv_sec = 0;
     timeout_tv.tv_usec = 0;
     
-    if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
-        /** Error: should not call do_io() when disconnected. */
-        errno = ENOTCONN;
-        return -1;
-    }
     
     result = select(sockfd + 1, &readset, &writeset, &exceptset, &timeout_tv);
-    if (result <= 0) return result;  /** -1 or 0 */
+    if (result <= 0) {
+        return result;  /** -1 or 0 */
+    }
     
     if (FD_ISSET(sockfd, &exceptset)) {
         optlen = sizeof(errno);  /* SO_ERROR should return an int */
@@ -106,7 +109,9 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
     if (FD_ISSET(sockfd, &readset)) {
         /** Read stuff off the socket and write it to the in-buffer. */
         result = sgs_impl_read_from_fd(connection->inbuf, sockfd);
-        if (result == -1) return -1;
+        if (result == -1) {
+            return -1;
+        }
         
         /* Return value of 0 may or may not mean that EOF was read. */
         if ((result == 0) && (sgs_buffer_remaining(connection->inbuf) > 0)) {
@@ -126,21 +131,34 @@ int sgs_connection_do_work(sgs_connection_impl *connection) {
         
         /** Read stuff out of the out-buffer and write it to the socket. */
         result = sgs_impl_write_to_fd(connection->outbuf, sockfd);
-        if (result == -1) return -1;
+        if (result == -1) {
+            return -1;
+        }
     }
     
     /** If there is room in inbuf, then register interest in socket reads. */
-    if (sgs_buffer_remaining(connection->inbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
-    else
-        connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
-    
-    /** If there is data in outbuf, then register interest in socket writes. */
-    if (sgs_buffer_size(connection->outbuf) > 0)
-        connection->ctx->reg_fd_cb(connection, sockfd, POLLOUT);
-    else
-        connection->ctx->unreg_fd_cb(connection, sockfd, POLLOUT);
-  
+    if (connection->state == SGS_CONNECTION_IMPL_CONNECTED) {
+        if (sgs_buffer_remaining(connection->inbuf) > 0){
+            if (connection->input_enabled == 0){
+                connection->ctx->reg_fd_cb(connection, sockfd, POLLIN);
+                connection->input_enabled = 1;
+            }
+        } else if (connection->input_enabled == 1){
+            connection->ctx->unreg_fd_cb(connection, sockfd, POLLIN);
+            connection->input_enabled = 0;
+        }
+
+        /** If there is data in outbuf, then register interest in socket writes. */
+        if (sgs_buffer_size(connection->outbuf) > 0) {
+            if (connection->output_enabled == 0) {
+                connection->ctx->reg_fd_cb(connection, sockfd, POLLOUT);
+                connection->output_enabled = 1;
+            }
+        } else if (connection->output_enabled == 1){
+            connection->ctx->unreg_fd_cb(connection, sockfd, POLLOUT);
+            connection->output_enabled = 0;
+        }
+    }
     return 0;
 }
 
@@ -187,7 +205,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
     /** Initialize server_addr to all zeroes, then fill in fields. */
     memset((char*) &serv_addr, '\0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr_list[0], server->h_length);
     serv_addr.sin_port = htons(connection->ctx->port);
   
     /**
@@ -215,6 +233,7 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
              */
             connection->ctx->reg_fd_cb(connection, connection->socket_fd,
                 POLLOUT);
+            connection->output_enabled = 1;
 
             /*
              * Under Windows we also registerinterest in error checking the socket
@@ -242,29 +261,28 @@ int sgs_connection_login(sgs_connection_impl *connection, const char *login,
   
     /** Register interest in socket writes to send the login request. */
     connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
+    connection->output_enabled = 1;
     
     return 0;
 }
-
 /*
  * sgs_connection_logout()
  */
 int sgs_connection_logout(sgs_connection_impl *connection, int force) {
     if (force) {
         conn_closed(connection);
-    }
-    else {
+    } else {
         if (connection->state == SGS_CONNECTION_IMPL_DISCONNECTED) {
             errno = ENOTCONN;
             return -1;
         }
 
         connection->expecting_disconnect = 1;
-		if (connection->in_redirect)
-			return 0;
+        if (connection->in_redirect)
+            return 0;
         sgs_session_impl_logout(connection->session);
     }
-  
+
     return 0;
 }
 
@@ -278,7 +296,7 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx) {
     if (connection == NULL) return NULL;
 
     connection->expecting_disconnect = 0;
-	connection->in_redirect = 0;
+    connection->in_redirect = 0;
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
     connection->ctx = ctx;
     connection->session = sgs_session_impl_create(connection);
@@ -294,6 +312,7 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx) {
         sgs_connection_destroy(connection);
         return NULL;
     }
+    connection->input_enabled = connection->output_enabled = 0;
   
     return connection;
 }
@@ -302,20 +321,23 @@ sgs_connection_impl *sgs_connection_create(sgs_context *ctx) {
 /*
  * PRIVATE IMPL FUNCTIONS
  */
-
 /*
  * sgs_connection_impl_disconnect()
  */
 void sgs_connection_impl_disconnect(sgs_connection_impl *connection) {
     /** Unregister interest in this socket */
     connection->ctx->unreg_fd_cb(connection, connection->socket_fd,
-        POLLIN | POLLOUT | POLLERR);
-    
+            POLLIN | POLLOUT | POLLERR);
+    connection->input_enabled = connection->output_enabled = 0;
+
     sgs_socket_destroy(connection->socket_fd);
     connection->expecting_disconnect = 0;
+    sgs_buffer_clear(connection->inbuf);
+    sgs_buffer_clear(connection->outbuf);
     connection->state = SGS_CONNECTION_IMPL_DISCONNECTED;
-	if (connection->in_redirect == 1)
-		sgs_connection_destroy(connection);
+    sgs_session_channel_clear(connection->session);
+    if (connection->in_redirect == 1)
+        sgs_connection_destroy(connection);
 }
 
 
@@ -332,8 +354,10 @@ int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
      * Make sure that we have registered interest in writing to the socket
      * (unless we have not yet connected).
      */
-    if (connection->state == SGS_CONNECTION_IMPL_CONNECTED) {
+    if ((connection->state == SGS_CONNECTION_IMPL_CONNECTED) &&
+            (connection->output_enabled == 0)) {
         connection->ctx->reg_fd_cb(connection, connection->socket_fd, POLLOUT);
+        connection->output_enabled = 1;
     }
   
     return 0;
@@ -344,23 +368,17 @@ int sgs_connection_impl_io_write(sgs_connection_impl *connection, uint8_t *buf,
  * INTERNAL (STATIC) FUNCTION IMPLEMENTATIONS
  * (these are functions that can only be called within this file)
  */
-
 /*
  * function: conn_closed()
  *
  * Called whenever the connection is closed by the server.
  */
 static void conn_closed(sgs_connection_impl *connection) {
-	/**if this is part of a redirect sequence, do nothing*/
-	if (connection->in_redirect == 1)
-		return;
-    if (connection->expecting_disconnect) {
-        /** Expected close of connection... */
-        sgs_connection_impl_disconnect(connection);
-    } else {
-        /** Unexpected close of connection... */
-        sgs_connection_impl_disconnect(connection);
-    }
+    /**if this is part of a redirect sequence, do nothing*/
+    if (connection->in_redirect == 1)
+        return;
+
+    sgs_connection_impl_disconnect(connection);
 
     if (connection->ctx->disconnected_cb != NULL)
         connection->ctx->disconnected_cb(connection);
