@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Sun Microsystems, Inc.
+ * Copyright (c) 2007 - 2009, Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -320,6 +320,9 @@ ilent Mode (no command prompts)\n  -u    Print usage\n",
 
 /*
  * channel_joined_cb()
+ * Called automatically when confirmation of a channel join is received.
+ * In this case, it simply adds the channel to a shadow structure that
+ * keeps track of all of the channels joined.
  */
 static void channel_joined_cb(sgs_connection *conn, sgs_channel *channel) {
     int result;

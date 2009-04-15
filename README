@@ -1,5 +1,5 @@
 Project Darkstar Example C Client
-Version 0.9.8
+Version 0.9.9
 
 INTRODUCTION
 
@@ -16,6 +16,8 @@ CONTENTS
 - test
   Source code for tests
 
+- example
+    Source code for an example program using the C client
 
 BUILDING
 

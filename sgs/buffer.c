@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, 2008 Sun Microsystems, Inc.
+ * Copyright (c) 2007 - 2009 Sun Microsystems, Inc.
  *
  * All rights reserved.
  *
@@ -65,7 +65,8 @@ size_t sgs_buffer_position(const sgs_buffer_impl* buffer) {
 }
 
 #ifndef NDEBUG
-# include <stdio.h>
+#include <stdio.h>
+
 void sgs_buffer_dump(const sgs_buffer_impl* buf) {
     size_t i;
     for (i = 0; i < buf->size; ++i) {
@@ -73,7 +74,9 @@ void sgs_buffer_dump(const sgs_buffer_impl* buf) {
     }
 }
 #else /* NDEBUG */
-void sgs_buffer_dump(const sgs_buffer_impl* buf) { }
+
+void sgs_buffer_dump(const sgs_buffer_impl* buf) {
+}
 #endif /* NDEBUG */
 
 /*
@@ -82,7 +85,7 @@ void sgs_buffer_dump(const sgs_buffer_impl* buf) { }
  *will be over-written. 
  */
 void sgs_buffer_clear(sgs_buffer_impl* buffer) {
-    buffer->position = 0;  /** not necessary, but convenient */
+    buffer->position = 0; /** not necessary, but convenient */
     buffer->size = 0;
 }
 
@@ -101,22 +104,22 @@ void sgs_buffer_destroy(sgs_buffer_impl* buffer) {
  */
 sgs_buffer_impl* sgs_buffer_create(size_t capacity) {
     sgs_buffer_impl* buffer;
-  
-    buffer = (sgs_buffer_impl*)malloc(sizeof(struct sgs_buffer_impl));
+
+    buffer = (sgs_buffer_impl*) malloc(sizeof (struct sgs_buffer_impl));
     if (buffer == NULL) return NULL;
-  
-    buffer->buf = (uint8_t*)malloc(capacity);
-  
+
+    buffer->buf = (uint8_t*) malloc(capacity);
+
     if (buffer->buf == NULL) {
         /** "roll back" allocation of memory for buffer struct itself. */
         free(buffer);
         return NULL;
     }
-  
+
     buffer->capacity = capacity;
     buffer->position = 0;
     buffer->size = 0;
-  
+
     return buffer;
 }
 
@@ -125,20 +128,20 @@ sgs_buffer_impl* sgs_buffer_create(size_t capacity) {
  *Copy the contents of the data array passed in to the indicated buffer, up
  *to the specified length. The length of the data to be copied must be
  *smaller than the amount of space remaining in the buffer, or a value of -1
- *is returned. Otherwise, the number of bytes actually copied is returned.
+ *is returned. Otherwise, the function returns 0
  */
 int sgs_buffer_peek(const sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
     size_t readable = readable_len(buffer);
-  
+
     if (len > buffer->size) return -1;
-  
+
     if (readable >= len) {
         memcpy(data, buffer->buf + buffer->position, len);
     } else {
         memcpy(data, buffer->buf + buffer->position, readable);
         memcpy(data + readable, buffer->buf, len - readable);
     }
-  
+
     return 0;
 }
 
@@ -151,7 +154,7 @@ int sgs_buffer_peek(const sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
  */
 int sgs_buffer_read(sgs_buffer_impl* buffer, uint8_t* data, size_t len) {
     if (sgs_buffer_peek(buffer, data, len) == -1) return -1;
-  
+
     buffer->position = (buffer->position + len) % buffer->capacity;
     buffer->size -= len;
     return 0;
@@ -187,19 +190,19 @@ size_t sgs_buffer_size(const sgs_buffer_impl* buffer) {
  */
 int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
     size_t writable = writable_len(buffer);
-    
+
     if (len > sgs_buffer_remaining(buffer)) {
         errno = EINVAL;
         return -1;
     }
-    
+
     if (writable >= len) {
         memcpy(buffer->buf + tailpos(buffer), data, len);
     } else {
         memcpy(buffer->buf + tailpos(buffer), data, writable);
         memcpy(buffer->buf, data + writable, len - writable);
     }
-    
+
     buffer->size += len;
     return 0;
 }
@@ -216,7 +219,7 @@ int sgs_buffer_write(sgs_buffer_impl* buffer, const uint8_t* data, size_t len) {
  */
 size_t readable_len(const sgs_buffer_impl* buffer) {
     if (buffer->size == 0) return 0;
-  
+
     if (tailpos(buffer) > buffer->position) {
         /*
          * The stored data has not wrapped yet, so we can read until we read the
@@ -251,10 +254,10 @@ size_t tailpos(const sgs_buffer_impl* buffer) {
 size_t writable_len(const sgs_buffer_impl* buffer) {
     size_t mytailpos;
 
-	if (buffer->size == buffer->capacity) return 0;
+    if (buffer->size == buffer->capacity) return 0;
 
-	mytailpos = tailpos(buffer);
-  
+    mytailpos = tailpos(buffer);
+
     if (mytailpos >= buffer->position) {
         /*
          * The stored data has not wrapped yet, so we can write until we reach
@@ -265,7 +268,7 @@ size_t writable_len(const sgs_buffer_impl* buffer) {
         /**
          * The stored data HAS wrapped, so we can write until we reach the
          * head.
-        */
+         */
         return buffer->position - mytailpos;
     }
 }
