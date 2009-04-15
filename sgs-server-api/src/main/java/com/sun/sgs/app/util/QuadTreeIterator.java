@@ -90,11 +90,12 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
 
     /**
      * Checks if the current element the iterator is pointing to exists 
-     * (if removed by the iterator or concurrently by something else). Used
-     * to check if calling {@code current()} will throw 
-     * {@code IllegalStateException} or 
+     * (if removed from the {@code QuadTree} by the iterator or concurrently
+     * by something else). Used to check if calling {@code current()} will throw
+     * {@code IllegalStateException} or
      * {@code CurrentConcurrentRemovedException}.
-     * @return true if the current element exists and false otherwise
+     * @return {@code true} if the current element still exists in the
+     * {@code QuadTree} and {@code false} otherwise
      * */
     boolean hasCurrent();
 }

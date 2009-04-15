@@ -198,7 +198,8 @@ public class TestConcurrentQuadTree extends Assert {
 
                 while (treeCopyIter.hasNext()) {
                     String s = treeCopyIter.next();
-                    assertTrue(s.equals("A") || s.equals("B") || s.equals("C") || s.equals("D") || s.equals("E"));
+                    assertTrue(s.equals("A") || s.equals("B") || s.equals("C")
+                            || s.equals("D") || s.equals("E"));
                     treeCopyIter.remove();
                 }
                 assertTrue(tree.isEmpty());

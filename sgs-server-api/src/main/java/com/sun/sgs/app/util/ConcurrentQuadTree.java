@@ -80,14 +80,14 @@ import com.sun.sgs.app.Task;
  * 
  * <p>
  * An iterator scheme is used to retrieve all elements in a particular 
- * sub-region (also known as an {@code boundingBox}) of the tree. Therefore,
+ * sub-region (also known as an bounding box}) of the tree. Therefore,
  * the order of elements in the iteration is not guaranteed to be
- * the same for each iterator constructed since a different {@code boundingBox}
+ * the same for each iterator constructed since a different bounding box}
  * may be used for each iterator. 
  *
  * <p>
  * The iterator used to go through elements in the tree is serializable but
- * not a ManagedObject. There may be many elements that will need to be
+ * not a {@link ManagedObject}. There may be many elements that will need to be
  * iterated over which could take more time than the minimum allowed for a
  * single {@link Task}. As a result, several tasks may be needed to iterate
  * over all the necessary elements, requiring the iterator to be serialized
@@ -103,10 +103,10 @@ import com.sun.sgs.app.Task;
  * Whenever an iterator has just been deserialized, it is recommended that
  * {@code hasCurrent()} and {@code hasNext()} be called before a call to
  * {@code current()} and {@code next()} or {@code nextNoReturn()} respectively
- * since both the current or next element may have been removed concurrently
+ * since the current or next element may have been removed concurrently
  * while the iterator was serialized. This will allow for more concurrency by
  * avoiding exceptions when iterating through the {@code ConcurrentQuadTree} if
- * it is being modified.
+ * it is being modified simultaneously.
  *
  *
  *
@@ -159,7 +159,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * the sample space
      */
     private final BoundingBox boundingBox;
-    /** The root element of the quadtree */
+    /** The root element of the Quadtree */
     private ManagedReference<Node<E>> root;
 
     /**
@@ -534,7 +534,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
                         return true;
                     } else {
                     //Check if the original leaf, point and finally element
-                    //still exists
+                    //is still in the tree
                         TreeMap<Point, List<ManagedWrapper<E>>> map =
                                 currentNode.getValues();
                         if (map != null) {
@@ -1276,9 +1276,11 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
         }
 
         /**
-         * Returns the next leaf using a post-order traversal scheme. If we
-         * try to retrieve the next leaf while on the root, {@code null} is
-         * returned, specifying our exit condition. 
+         * Returns the next leaf using a post-order traversal scheme while also
+         * removing {@code node} (parent of current leaf) if {@code node} has
+         * no more children. If we try to retrieve the next leaf while on the
+         * root, {@code null} is returned, specifying
+         * our exit condition.
          *
          * @param node the current leaf's parent which will be used as a
          * reference to find the next leaf
@@ -1450,7 +1452,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * @return the object cast to type {@code E}
      * */
     @SuppressWarnings("unchecked")
-    public static <E> E uncheckedCast(Object object) {
+    static <E> E uncheckedCast(Object object) {
         return (E) object;
     }
 
@@ -1545,9 +1547,9 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * Organizes the coordinates of the two Points given to the
-         * {@code BoundingBox} constructor such that minPoint contains the
-         * minimum x and y values of the bounding box while maxPoint contains
-         * the maximum x and y values of the bounding box
+         * {@code BoundingBox} constructor such that {@code minPoint} contains
+         * the minimum x and y values of the bounding box while {@code maxPoint}
+         * contains the maximum x and y values of the bounding box
          */
         void organizeCoordinates(Point a, Point b) {
             minPoint = new Point(Math.min(a.x, b.x),
