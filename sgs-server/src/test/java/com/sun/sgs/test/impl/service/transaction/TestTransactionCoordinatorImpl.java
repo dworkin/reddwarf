@@ -2243,6 +2243,29 @@ public class TestTransactionCoordinatorImpl {
 	assertSame(null, exception.get());
     }
 
+    /* -- Test thread-safety for isAborted and getAbortCause -- */
+
+    @Test
+    public void testGetAbortCauseOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	Thread thread = new Thread() {
+	    public void run() {
+		assertNotAborted();
+	    }
+	};
+	thread.start();
+	thread.join();
+	thread = new Thread() {
+	    public void run() {
+		assertAborted(abortXcp);
+	    }
+	};
+	txn.abort(abortXcp);
+	thread.start();
+	thread.join();
+    }
+
     /* -- Other methods -- */
 
     void assertAborted(Throwable abortCause) {

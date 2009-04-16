@@ -90,7 +90,9 @@ final class TransactionImpl implements Transaction {
 
     /**
      * The exception that caused the transaction to be aborted, or null if no
-     * abort occurred.
+     * abort occurred.  Callers should synchronize on the current instance when
+     * accessing this field unless they have checked that they are being called
+     * from the creating thread.
      */
     private Throwable abortCause = null;
 
@@ -240,7 +242,9 @@ final class TransactionImpl implements Transaction {
 	    throw new AssertionError();
 	}
 	state = State.ABORTING;
-	abortCause = cause;
+	synchronized (this) {
+	    abortCause = cause;
+	}
 	long startTime = 0;
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -273,14 +277,12 @@ final class TransactionImpl implements Transaction {
     }
 
     /** {@inheritDoc} */
-    public boolean isAborted() {
-	checkThread("isAborted");
-	return state == State.ABORTED || state == State.ABORTING;
+    public synchronized boolean isAborted() {
+	return abortCause != null;
     }
 
     /** {@inheritDoc} */
-    public Throwable getAbortCause() {
-	checkThread("getAbortCause");
+    public synchronized Throwable getAbortCause() {
 	return abortCause;
     }
 

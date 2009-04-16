@@ -40,12 +40,10 @@ import com.sun.sgs.app.TransactionTimeoutException;
  * <code>Transaction</code>s are equal if and only if they represent
  * the same transaction.
  * <p>
- * Implementations of this interface are not thread-safe, with the exception of
- * the methods {@link #getId getId}, {@link #getCreationTime getCreationTime},
- * and {@link #getTimeout getTimeout}, as well as methods on the {@link Object}
- * class.  Callers should insure that calls they make to any other methods
- * defined by this interface are made from the thread that created the
- * transaction.
+ * The implementations of the {@link #join join}, {@link #abort abort}, and
+ * {@link #registerListener registerListener} methods of this interface are not
+ * thread-safe.  Callers should insure that calls they make to these methods
+ * are made from the thread that created the transaction.
  */
 public interface Transaction {
 
@@ -167,9 +165,6 @@ public interface Transaction {
      *
      * @return {@code true} if {@code abort} has been called on this
      *         transaction, else {@code false}
-     *
-     * @throws IllegalStateException if called from a thread that is not the
-     *				     thread that created this transaction
      */
     boolean isAborted();
 
@@ -178,9 +173,6 @@ public interface Transaction {
      * this transaction, or {@code null} if {@code abort} has not been called.
      *
      * @return the exception that caused the abort or {@code null}
-     *
-     * @throws IllegalStateException if called from a thread that is not the
-     *				     thread that created this transaction
      */
     Throwable getAbortCause();
 
