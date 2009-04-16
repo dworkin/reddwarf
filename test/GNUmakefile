@@ -6,9 +6,10 @@ SRCS = \
 	buffer_test.c \
 	id_test.c \
 	map_test.c \
-	message_test.c
+	message_test.c\
+	smokeTestClient.c
 
-EXES = buffer_test id_test map_test message_test
+EXES = buffer_test id_test map_test message_test smokeTestClient
 
 all: $(EXES)
 
