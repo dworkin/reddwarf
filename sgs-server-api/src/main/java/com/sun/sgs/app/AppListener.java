@@ -49,7 +49,7 @@ import java.util.Properties;
  * <p>For a full description of task execution behavior, see the
  * documentation for {@link TaskManager#scheduleTask(Task)}.
  */
-public interface AppListener extends ManagedObject {
+public interface AppListener {
 
     /**
      * Notifies this listener that the application has been started

@@ -1780,7 +1780,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public static class DummyAppListener implements AppListener, Serializable {
+    public static class DummyAppListener implements AppListener, 
+                                                    ManagedObject,
+                                                    Serializable {
 
 	private final static long serialVersionUID = 1L;
 
