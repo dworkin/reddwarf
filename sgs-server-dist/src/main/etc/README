@@ -125,6 +125,9 @@ Release 0.9.10:
   releases prior to 0.9.10 will not be automatically upgraded to the
   current release format.
 
+- The AppListener interface no longer extends ManagedObject.  AppListener
+  classes with mutable state should now explicitly implement ManagedObject.
+
 Release 0.9.9:
 
 - The com.sun.sgs.app.port configuration property is no longer supported.
