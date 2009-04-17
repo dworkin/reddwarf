@@ -31,12 +31,16 @@
 #define DEFAULT_PORT 1139;
 
 static fd_set g_master_readset, g_master_writeset, g_master_exceptset;
-static int g_maxfd
+static int g_maxfd;
 
 /*
  * register_fd_cb()
+ * This callback is used in the throttling code; this will be
+ * called when throttling is turned off (that is, when reading
+ * from the file descriptor is re-enabled after being turned off
+ * via a call to unregister_fd_cb)
  */
-static void register_fd_cb(sgs_connection *conn, int fd, short events) {
+void register_fd_cb(sgs_connection *conn, int fd, short events) {
 
     if ((events & POLLIN) == POLLIN)
         FD_SET(fd, &g_master_readset);
@@ -52,8 +56,11 @@ static void register_fd_cb(sgs_connection *conn, int fd, short events) {
 
 /*
  * unregister_fd_cb()
+ * This callback is used in the throttling code; this will be
+ * called when things are getting clogged to turn off the
+ * reading of the indicated file descriptor.
  */
-static void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
+void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
     int i, new_max;
 
     if ((events & POLLIN) == POLLIN)
