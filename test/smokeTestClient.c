@@ -30,8 +30,12 @@
 #define DEFAULT_HOST "localhost"
 #define DEFAULT_PORT 1139;
 
+/* Some global variables, declared to make life easier */
+
 static fd_set g_master_readset, g_master_writeset, g_master_exceptset;
 static int g_maxfd;
+static char *g_hostname = DEFAULT_HOST;
+static int g_port = DEFAULT_PORT;
 
 /*
  * register_fd_cb()
@@ -87,9 +91,37 @@ void unregister_fd_cb(sgs_connection *conn, int fd, short events) {
     }
 }
 
+void getCommandArgs(int count, char *args[]){
+    int c;
+    while ((c = getopt(count, args, "h:p:u"))){
+        switch (c){
+            case 'h': /* set the global hostname variable*/
+                g_hostname = optarg;
+                break;
 
+            case 'p': /* set the global port variable */
+                g_port = atoi(optarg);
+                break;
+
+            case 'u' : /*print usage*/
+                printf("Usage: %s [-h HOST] [-p PORT] [-u] \n", args[0]);
+                printf (""-h specify remote host for server (default %s)\n", DEFAULT_HOST);
+                printf("-p specify port for server (default %d)\n", DEFAULT_PORT);
+                printf("-u Print usage\n"); -
+                 break;
+        }
+    }
+}
 int main(int argc, char** argv) {
 
+    FD_ZERO(&g_master_readset);
+    FD_ZERO(&g_master_writeset);
+    FD_ZERO(&g_master_exceptset);
+
+    getCommandArgs(argc, argv);
+
+    printf("parsed command line; hostname = %s, port = %d", g_hostname, g_port);
+    
     return (EXIT_SUCCESS);
 }
 
