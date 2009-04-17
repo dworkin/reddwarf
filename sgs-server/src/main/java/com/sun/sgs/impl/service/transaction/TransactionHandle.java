@@ -60,7 +60,8 @@ public interface TransactionHandle {
      *		listener aborts the transaction but does not throw an exception
      * @throws	IllegalStateException if {@code prepare} has been called on any
      *		transaction participant and {@link Transaction#abort abort} has
-     *		not been called on the transaction
+     *		not been called on the transaction, or if called from a thread
+     *		that is not the thread that created the transaction
      * @throws	Exception any exception thrown when calling {@code prepare} on
      *		a participant or {@code beforeCompletion} on a listener
      */

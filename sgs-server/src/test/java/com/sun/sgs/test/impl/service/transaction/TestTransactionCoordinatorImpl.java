@@ -32,17 +32,19 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyNonDurableTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionListener;
 import com.sun.sgs.test.util.DummyTransactionListener.CalledAfter;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionParticipant.State;
-import com.sun.sgs.tools.test.FilteredNameRunner;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
+import com.sun.sgs.tools.test.FilteredNameRunner;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.AfterClass;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -168,6 +170,27 @@ public class TestTransactionCoordinatorImpl {
     }
 
     /* -- Test TransactionHandle.commit -- */
+
+    @Test
+    public void testCommitOtherThread() throws Exception {
+	final AtomicReference<Exception> exception =
+	    new AtomicReference<Exception>(null);
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    handle.commit();
+		} catch (Exception e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	Exception e = exception.get();
+	assertEquals(
+	    IllegalStateException.class, e == null ? null : e.getClass());
+    }
 
     @Test
     public void testCommitActive() throws Exception {
@@ -677,6 +700,29 @@ public class TestTransactionCoordinatorImpl {
     /* -- Test TransactionHandle.getTransaction -- */
 
     @Test
+    public void testGetTransactionOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    Transaction t = handle.getTransaction();
+		    if (txn != t) {
+			throw new RuntimeException(
+			    "Expected " + txn + ", got " + t);
+		    }
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	assertSame(null, exception.get());
+    }
+
+    @Test
     public void testGetTransactionActive() {
 	handle.getTransaction();
     }
@@ -745,6 +791,31 @@ public class TestTransactionCoordinatorImpl {
 	assertFalse(Arrays.equals(txn.getId(), txn2.getId()));
     }
 
+    @Test
+    public void testGetIdOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	final byte[] id = txn.getId();
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    byte[] b = txn.getId();
+		    if (!Arrays.equals(id, b)) {
+			throw new RuntimeException(
+			    "Expected " + Arrays.toString(id) + ", got " +
+			    Arrays.toString(b));
+		    }
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	assertSame(null, exception.get());
+    }
+
     /* -- Test Transaction.getCreationTime -- */
 
     @Test
@@ -762,6 +833,30 @@ public class TestTransactionCoordinatorImpl {
 	assertTrue("Transaction creation times out-of-order: " +
             txn1.getCreationTime() + " vs " + txn2.getCreationTime(),
             txn1.getCreationTime() < txn2.getCreationTime());
+    }
+
+    @Test
+    public void testGetCreationTimeOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	final long time = txn.getCreationTime();
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    long t = txn.getCreationTime();
+		    if (time != t) {
+			throw new RuntimeException(
+			    "Expected " + time + ", got " + t);
+		    }
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	assertSame(null, exception.get());
     }
 
     /*  -- Test Transaction.getTimeout -- */
@@ -785,6 +880,30 @@ public class TestTransactionCoordinatorImpl {
 		   txn.getTimeout() == 100000);
     }
 
+    @Test
+    public void testGetTimeoutTimeOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	final long time = txn.getTimeout();
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    long t = txn.getTimeout();
+		    if (time != t) {
+			throw new RuntimeException(
+			    "Expected " + time + ", got " + t);
+		    }
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	assertSame(null, exception.get());
+    }
+
     /* -- Test Transaction.join -- */
 
     @Test
@@ -795,6 +914,29 @@ public class TestTransactionCoordinatorImpl {
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
+    }
+
+    @Test
+    public void testJoinOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	final TransactionParticipant participant =
+	    new DummyTransactionParticipant();
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    txn.join(participant);
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	RuntimeException e = exception.get();
+	assertEquals(
+	    IllegalStateException.class, e == null ? null : e.getClass());
     }
 
     @Test
@@ -1017,6 +1159,27 @@ public class TestTransactionCoordinatorImpl {
     }
 
     /* -- Test Transaction.abort -- */
+
+    @Test
+    public void testAbortOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    txn.abort(abortXcp);
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	RuntimeException e = exception.get();
+	assertEquals(
+	    IllegalStateException.class, e == null ? null : e.getClass());
+    }
 
     @Test
     public void testAbortActive() throws Exception {
@@ -1431,6 +1594,27 @@ public class TestTransactionCoordinatorImpl {
     /* -- Test checkTimeout -- */
 
     @Test
+    public void testCheckTimeoutOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    txn.checkTimeout();
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	RuntimeException e = exception.get();
+	assertEquals(
+	    IllegalStateException.class, e == null ? null : e.getClass());
+    }
+
+    @Test
     public void testCheckTimeoutActive() throws Exception {
 	txn.checkTimeout();
 	Thread.sleep(TIMED_OUT);
@@ -1674,6 +1858,29 @@ public class TestTransactionCoordinatorImpl {
 	    System.err.println(e);
 	}
     }
+
+    @Test
+    public void testRegisterListenerOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	final TransactionListener listener = new DummyTransactionListener();
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    txn.registerListener(listener);
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	RuntimeException e = exception.get();
+	assertEquals(
+	    IllegalStateException.class, e == null ? null : e.getClass());
+    }
+
 
     @Test
     public void testRegisterListenerCommit() throws Exception {
@@ -2005,6 +2212,58 @@ public class TestTransactionCoordinatorImpl {
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));
 	assertFalse(txn.equals(txn2));
+    }
+
+    @Test
+    public void testEqualsOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	final int hashCode = txn.hashCode();
+	Thread thread = new Thread() {
+	    public void run() {
+		try {
+		    if (txn.equals(null)) {
+			throw new RuntimeException(
+			    "Expected equals to return false");
+		    }
+		    int h = txn.hashCode();
+		    if (hashCode != h) {
+			throw new RuntimeException(
+			    "Expected hash code of " + hashCode + ", got " +
+			    h);
+		    }
+		} catch (RuntimeException e) {
+		    e.printStackTrace();
+		    exception.set(e);
+		}
+	    }
+	};
+	thread.start();
+	thread.join();
+	assertSame(null, exception.get());
+    }
+
+    /* -- Test thread-safety for isAborted and getAbortCause -- */
+
+    @Test
+    public void testGetAbortCauseOtherThread() throws Exception {
+	final AtomicReference<RuntimeException> exception =
+	    new AtomicReference<RuntimeException>(null);
+	Thread thread = new Thread() {
+	    public void run() {
+		assertNotAborted();
+	    }
+	};
+	thread.start();
+	thread.join();
+	thread = new Thread() {
+	    public void run() {
+		assertAborted(abortXcp);
+	    }
+	};
+	txn.abort(abortXcp);
+	thread.start();
+	thread.join();
     }
 
     /* -- Other methods -- */

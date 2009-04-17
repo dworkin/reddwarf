@@ -458,18 +458,18 @@ final class SerialUtil {
 	     * classes could cause a non-managed reference to the enclosing
 	     * class, so don't check that case here.  -tjb@sun.com (03/30/2009)
 	     */
-	    Class<?> enclosingClass;
-	    if (!cl.isLocalClass() &&
-		!Modifier.isStatic(cl.getModifiers()) &&
-		(enclosingClass = cl.getEnclosingClass()) != null &&
-		ManagedObject.class.isAssignableFrom(enclosingClass))
-	    {
-		throw new ObjectIOException(
-		    "ManagedObject of type " + enclosingClass.getName() +
-		    " was not referenced through a ManagedReference because" +
-		    " of a reference from an inner class:\n" +
-		    stack,
-		    cause, false);
+	    if (!cl.isLocalClass() && !Modifier.isStatic(cl.getModifiers())) {
+		Class<?> enclosingClass = cl.getEnclosingClass();
+		if (enclosingClass != null &&
+		    ManagedObject.class.isAssignableFrom(enclosingClass))
+		{
+		    throw new ObjectIOException(
+			"ManagedObject of type " + enclosingClass.getName() +
+			" was not referenced through a ManagedReference" +
+			" because of a reference from an inner class:\n" +
+			stack,
+			cause, false);
+		}
 	    }
 	    for ( ; cl != null; cl = cl.getSuperclass()) {
 		for (Field f : cl.getDeclaredFields()) {

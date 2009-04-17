@@ -2,8 +2,8 @@ Version 0.9.10:
 - Add a locking AccessCoordinator and add a configuration option for
   specifying the access coordinator (issue #138)
 - AppListener no longer extends ManagedObject (issue #108)
-- Also fix issues #5, #73, #82, #130, #131, #136, #142, #143, #144, #151,
-  #153, #155, #158
+- Also fix issues #5, #44, #73, #82, #89, #98, #130, #131, #136, #142,
+  #143, #144, #151, #153, #155, #158
 
 Version 0.9.9:
 - Add pluggable client session protocol and transport layers (issue #26)

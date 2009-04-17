@@ -152,6 +152,14 @@
     <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
   </Match>
 
+  <!-- Suppress a complaint about an unchecked cast that seems to be
+       caused by generic types -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$ContextMap"/>
+    <Method name="checkContext"/>
+    <Bug pattern="BC_UNCONFIRMED_CAST"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.data.store -->
 
   <!-- Not worth replacing an anonymous class with a static inner class. -->

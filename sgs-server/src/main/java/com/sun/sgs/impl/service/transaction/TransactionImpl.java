@@ -19,12 +19,11 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.profile.ProfileCollectorHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
-import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
@@ -91,7 +90,9 @@ final class TransactionImpl implements Transaction {
 
     /**
      * The exception that caused the transaction to be aborted, or null if no
-     * abort occurred.
+     * abort occurred.  Callers should synchronize on the current instance when
+     * accessing this field unless they have checked that they are being called
+     * from the creating thread.
      */
     private Throwable abortCause = null;
 
@@ -154,7 +155,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void checkTimeout() {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("checkTimeout");
 	logger.log(Level.FINEST, "checkTimeout {0}", this);
 	switch (state) {
 	case ABORTED:
@@ -182,15 +183,15 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void join(TransactionParticipant participant) {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("join");
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "join {0} participant:{1}", this,
-		       participant);
+		       getParticipantInfo(participant));
 	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
 	} else if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
@@ -219,7 +220,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void abort(Throwable cause) {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("abort");
 	if (cause == null) {
 	    throw new NullPointerException("The cause cannot be null");
 	}
@@ -231,7 +232,7 @@ final class TransactionImpl implements Transaction {
 	case ABORTING:
 	    return;
 	case ABORTED:
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	case COMMITTING:
 	case COMMITTED:
@@ -241,12 +242,14 @@ final class TransactionImpl implements Transaction {
 	    throw new AssertionError();
 	}
 	state = State.ABORTING;
-	abortCause = cause;
+	synchronized (this) {
+	    abortCause = cause;
+	}
 	long startTime = 0;
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "abort {0} participant:{1}",
-			   this, participant);
+			   this, getParticipantInfo(participant));
 	    }
 	    if (detailMap != null) {
 		startTime = System.currentTimeMillis();
@@ -256,8 +259,9 @@ final class TransactionImpl implements Transaction {
 	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, e, "abort {0} participant:{1} failed",
-			this, participant);
+			Level.WARNING, e,
+			"abort {0} participant:{1} failed",
+			this, getParticipantInfo(participant));
 		}
 	    }
 	    if (detailMap != null) {
@@ -273,18 +277,18 @@ final class TransactionImpl implements Transaction {
     }
 
     /** {@inheritDoc} */
-    public boolean isAborted() {
-	return state == State.ABORTED || state == State.ABORTING;
+    public synchronized boolean isAborted() {
+	return abortCause != null;
     }
 
     /** {@inheritDoc} */
-    public Throwable getAbortCause() {
+    public synchronized Throwable getAbortCause() {
 	return abortCause;
     }
 
     /** {@inheritDoc} */
     public void registerListener(TransactionListener listener) {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("registerListener");
 	if (listener == null) {
 	    throw new NullPointerException("The listener must not be null");
 	} else if (state != State.ACTIVE) {
@@ -348,16 +352,17 @@ final class TransactionImpl implements Transaction {
      *		transaction but does not throw an exception
      * @throws	IllegalStateException if {@code prepare} has been called on any
      *		transaction participant and {@link Transaction#abort abort} has
-     *		not been called on the transaction
+     *		not been called on the transaction, or if called from a thread
+     *		that is not the thread that created this transaction
      * @throws	Exception any exception thrown when calling {@code prepare} on
      *		a participant or {@code beforeCompletion} on a listener
      * @see	TransactionHandle#commit TransactionHandle.commit
      */
     void commit() throws Exception {
-	assert Thread.currentThread() == owner : "Wrong thread";
+	checkThread("commit");
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state == State.ABORTED) {
-	    throw new MaybeRetryableTransactionNotActiveException(
+	    throw new TransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
@@ -391,7 +396,8 @@ final class TransactionImpl implements Transaction {
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
 				   "prepare {0} participant:{1} returns {2}",
-				   this, participant, readOnly);
+				   this, getParticipantInfo(participant),
+				   readOnly);
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
@@ -406,7 +412,7 @@ final class TransactionImpl implements Transaction {
 			logger.log(
 			    Level.FINEST,
 			    "prepareAndCommit {0} participant:{1} returns",
-			    this, participant);
+			    this, getParticipantInfo(participant));
 		    }
 		}
 	    } catch (Exception e) {
@@ -414,7 +420,7 @@ final class TransactionImpl implements Transaction {
 		    logger.logThrow(
 			Level.FINEST, e, "{0} {1} participant:{1} throws",
 			iter.hasNext() ? "prepare" : "prepareAndCommit",
-			this, participant);
+			this, getParticipantInfo(participant));
 		}
 		if (state != State.ABORTED) {
 		    abort(e);
@@ -422,7 +428,7 @@ final class TransactionImpl implements Transaction {
 		throw e;
 	    }
 	    if (state == State.ABORTED) {
-		throw new MaybeRetryableTransactionAbortedException(
+		throw new TransactionAbortedException(
 		    "Transaction has been aborted: " + abortCause, abortCause);
 	    }
 	}
@@ -430,7 +436,7 @@ final class TransactionImpl implements Transaction {
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "commit {0} participant:{1}",
-			   this, participant);
+			   this, getParticipantInfo(participant));
 	    }
 	    if (detailMap != null) {
 		detail = detailMap.get(participant.getTypeName());
@@ -447,7 +453,7 @@ final class TransactionImpl implements Transaction {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e, "commit {0} participant:{1} failed",
-			this, participant);
+			this, getParticipantInfo(participant));
 		}
 	    }
 	}
@@ -487,7 +493,7 @@ final class TransactionImpl implements Transaction {
 		    throw e;
 		}
 		if (state == State.ABORTED) {
-		    throw new MaybeRetryableTransactionAbortedException(
+		    throw new TransactionAbortedException(
 			"Transaction has been aborted: " + abortCause,
 			abortCause);
 		}
@@ -511,5 +517,25 @@ final class TransactionImpl implements Transaction {
 		}
 	    }
 	}
+    }
+
+    /** Checks that current thread is the one that created this transaction. */
+    private void checkThread(String methodName) {
+	if (Thread.currentThread() != owner) {
+	    throw new IllegalStateException(
+		"The " + methodName + " method must be called from the" +
+		" thread that created the transaction");
+	}
+    }
+
+    /**
+     * Returns a string that describes the participant.  Returns null if the
+     * participant is null.
+     */
+    private static String getParticipantInfo(
+	TransactionParticipant participant)
+    {
+	return participant == null ? null
+	    : (participant.getTypeName() + " (" + participant + ")");
     }
 }

@@ -379,17 +379,6 @@ final class ManagedReferenceImpl<T>
 	    default:
 		throw new AssertionError();
 	    }
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "get tid:{0,number,#}, oid:{1,number,#} returns" +
-		    " type:{2}",
-		    context.getTxnId(), oid, DataServiceImpl.typeName(object));
-	    }
-	    @SuppressWarnings("unchecked")
-	    T result = (T) object;
-	    context.oidAccesses.setObjectDescription(getId(), result);
-	    return result;
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
 		"Attempt to get the object associated with a managed" +
@@ -399,11 +388,26 @@ final class ManagedReferenceImpl<T>
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	DataServiceImpl.getExceptionLogger(exception).logThrow(
-	    Level.FINEST, exception,
-	    "get tid:{0,number,#}, oid:{1,number,#} throws",
-	    context.getTxnId(), oid);
-	throw exception;
+	if (exception == null) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "get tid:{0,number,#}, oid:{1,number,#} returns" +
+		    " type:{2}",
+		    context.getTxnId(), oid,
+		    DataServiceImpl.typeName(object));
+	    }
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    context.oidAccesses.setObjectDescription(getId(), result);
+	    return result;
+	} else {
+	    DataServiceImpl.getExceptionLogger(exception).logThrow(
+		Level.FINEST, exception,
+		"get tid:{0,number,#}, oid:{1,number,#} throws",
+		context.getTxnId(), oid);
+	    throw exception;
+	}
     }
 
     /** {@inheritDoc} */
@@ -449,20 +453,6 @@ final class ManagedReferenceImpl<T>
 	    default:
 		throw new AssertionError();
 	    }
-	    if (exception == null) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"getForUpdate tid:{0,number,#}, oid:{1,number,#}" +
-			" returns type:{2}",
-			context.getTxnId(), oid,
-			DataServiceImpl.typeName(object));
-		}
-		@SuppressWarnings("unchecked")
-		T result = (T) object;
-		context.oidAccesses.setObjectDescription(getId(), result);	    
-		return result;
-	    }
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
 		"Attempt to get the object associated with a managed" +
@@ -472,12 +462,27 @@ final class ManagedReferenceImpl<T>
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	DataServiceImpl.getExceptionLogger(exception).logThrow(
-	    Level.FINEST, exception,
-	    "getForUpdate tid:{0,number,#}, type:{1}, oid:{2,number,#}" +
-	    " throws",
-	    context.getTxnId(), DataServiceImpl.typeName(object), oid);
-	throw exception;
+	if (exception == null) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "getForUpdate tid:{0,number,#}, oid:{1,number,#}" +
+		    " returns type:{2}",
+		    context.getTxnId(), oid,
+		    DataServiceImpl.typeName(object));
+	    }
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    context.oidAccesses.setObjectDescription(getId(), result);
+	    return result;
+	} else {
+	    DataServiceImpl.getExceptionLogger(exception).logThrow(
+		Level.FINEST, exception,
+		"getForUpdate tid:{0,number,#}, type:{1}, oid:{2,number,#}" +
+		" throws",
+		context.getTxnId(), DataServiceImpl.typeName(object), oid);
+	    throw exception;
+	}
     }
 
     /** {@inheritDoc} */
