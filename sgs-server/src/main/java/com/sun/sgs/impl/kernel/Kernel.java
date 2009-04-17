@@ -22,6 +22,8 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.internal.InternalContext;
 
 import com.sun.sgs.auth.Identity;
@@ -933,8 +935,14 @@ class Kernel {
                     (new PropertiesWrapper(properties)).
                     getClassInstanceProperty(StandardProperties.APP_LISTENER,
                                              AppListener.class, new Class[] {});
-                dataService.setServiceBinding(StandardProperties.APP_LISTENER,
-                                              listener);
+                if (listener instanceof ManagedObject) {
+                    dataService.setServiceBinding(
+                            StandardProperties.APP_LISTENER, listener);
+                } else {
+                    dataService.setServiceBinding(
+                            StandardProperties.APP_LISTENER,
+                            new ManagedSerializable<AppListener>(listener));
+                }
 
                 // since we created the listener, we're the first one to
                 // start the app, so we also need to start it up

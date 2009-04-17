@@ -21,6 +21,8 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -758,6 +760,21 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	LoginTask() {
 	    super(null);
 	}
+        
+        /**
+         * Retrieve the {@code AppListener} from the {@code DataService},
+         * unwrapping it from its {@code ManagedSerializable} if necessary.
+         * 
+         * @return the {@code AppListener} for the application
+         */
+        @SuppressWarnings("unchecked")
+        private AppListener getAppListener() {
+            ManagedObject obj = dataService.getServiceBinding(
+                    StandardProperties.APP_LISTENER);
+            return (obj instanceof AppListener) ?
+                (AppListener) obj :
+                ((ManagedSerializable<AppListener>) obj).get();
+        }
 	
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}
@@ -780,9 +797,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 * caller.
 	 */
 	public void run() {
-	    AppListener appListener =
-		(AppListener) dataService.getServiceBinding(
-		    StandardProperties.APP_LISTENER);
+	    AppListener appListener = getAppListener();
 	    logger.log(
 		Level.FINEST,
 		"invoking AppListener.loggedIn session:{0}", identity);
