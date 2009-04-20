@@ -389,7 +389,7 @@ public abstract class AbstractDataStore
 	     */
 	    reportNameAccess(txn, name, READ);
 	    BindingValue result = getBindingInternal(txn, name);
-	    if (!result.getNameBound()) {
+	    if (!result.isNameBound()) {
 		/*
 		 * Read lock the next name if the requested name is not bound
 		 * to prevent a concurrent transaction from observing a
@@ -448,7 +448,7 @@ public abstract class AbstractDataStore
 	    checkNull("name", name);
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = setBindingInternal(txn, name, oid);
-	    if (!result.getNameBound()) {
+	    if (!result.isNameBound()) {
 		/*
 		 * Write lock the next name if the requested name was unbound
 		 * to prevent other transactions from binding it, from getting
@@ -512,7 +512,16 @@ public abstract class AbstractDataStore
 	     */
 	    reportNameAccess(txn, name, WRITE);
 	    BindingValue result = removeBindingInternal(txn, name);
-	    if (!result.getNameBound()) {
+	    if (!result.isNameBound()) {
+		/*
+		 * Read lock the next name to prevent another transaction from
+		 * creating the name.  We are locking the non-existent name
+		 * within AbstractDataStore, which will lock out others locally
+		 * from creating the name.  But the server side will only want
+		 * to lock existing items, so it depends on locking the next
+		 * name.
+		 */
+		reportNextNameAccess(txn, name, result.getNextName(), READ);
 		throw new NameNotBoundException("Name not bound: " + name);
 	    }
 	    /*
@@ -756,7 +765,12 @@ public abstract class AbstractDataStore
     {
 	checkOid(oid);
 	checkNull("description", description);
-	objectAccesses.setObjectDescription(txn, oid, description);
+	try {
+	    objectAccesses.setObjectDescription(txn, oid, description);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalStateException(
+		"Problem with transaction " + txn + ": " + e.getMessage(), e);
+	}
     }
 
     /** {@inheritDoc} */
@@ -765,8 +779,13 @@ public abstract class AbstractDataStore
     {
 	checkNull("name", name);
 	checkNull("description", description);
-	nameAccesses.setObjectDescription(
-	    txn, getNameForAccess(name), description);
+	try {
+	    nameAccesses.setObjectDescription(
+		txn, getNameForAccess(name), description);
+	} catch (IllegalArgumentException e) {
+	    throw new IllegalStateException(
+		"Problem with transaction " + txn + ": " + e.getMessage(), e);
+	}
     }
 
     /* -- Implement TransactionParticipant -- */

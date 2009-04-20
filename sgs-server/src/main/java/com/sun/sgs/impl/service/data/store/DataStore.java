@@ -291,6 +291,9 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
      * @param	description the description
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
      * @see	AccessReporter#setObjectDescription
      *		AccessReporter.setObjectDescription
      */
@@ -304,6 +307,8 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
      * @param	description the description
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
      * @see	AccessReporter#setObjectDescription
      *		AccessReporter.setObjectDescription
      */

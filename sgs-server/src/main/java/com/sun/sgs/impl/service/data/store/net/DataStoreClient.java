@@ -284,7 +284,7 @@ public final class DataStoreClient extends AbstractDataStore {
 	server = getServer();
     }
 
-    /* -- Implement AbstractDataStore DataStore methods -- */
+    /* -- Implement AbstractDataStore's DataStore methods -- */
 
     /** {@inheritDoc} */
     protected long createObjectInternal(Transaction txn) {
@@ -454,7 +454,7 @@ public final class DataStoreClient extends AbstractDataStore {
 	}
     }
 
-    /* -- Implement AbstractDataStore TransactionParticipant methods -- */
+    /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
 
     /** {@inheritDoc} */
     protected boolean prepareInternal(Transaction txn) {

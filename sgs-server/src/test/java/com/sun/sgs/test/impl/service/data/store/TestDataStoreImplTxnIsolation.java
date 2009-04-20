@@ -26,6 +26,7 @@ import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
 import java.io.File;
 import java.util.Properties;
 import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 
 /**
@@ -86,5 +87,56 @@ public class TestDataStoreImplTxnIsolation extends BasicTxnIsolationTest {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
+    }
+
+    /* -- Tests -- */
+
+    /* -- Test name access -- */
+    
+    /*
+     * From testing, it appears that BDB JE performs the following locking
+     * differently from AbstractDataStore:
+     *
+     * Operation			Lock	Lock next
+     * ---------			----	---------
+     *
+     * setBinding existing		WRITE   WRITE
+     * removeBinding notFound		WRITE	WRITE
+     * nextBoundName			READ	READ
+     */
+
+    @Override @Test
+    public void testSetBindingExistingReadNext() throws Exception {
+	store.setBinding(txn, "a", 100);
+	newTransaction();
+	getBindingNotFound("b");
+	Runner runner = new Runner(new SetBinding("a", 200));
+	runner.assertBlocked();
+	commitTransaction();
+	runner.getResult();
+	runner.setAction(new GetBinding("a"));
+	assertEquals(Long.valueOf(200), runner.getResult());
+    }
+    
+    @Override @Test
+    public void testRemoveBindingNotFoundReadNext() throws Exception {
+	store.setBinding(txn, "b", 200);
+	newTransaction();
+	store.getBinding(txn, "b");
+	Runner runner = new Runner(new RemoveBinding("a"));
+	runner.assertBlocked();
+	commitTransaction();
+	assertFalse((Boolean) runner.getResult());
+    }
+
+    @Override @Test
+    public void testNextBoundNameWrite() throws Exception {
+	store.setBinding(txn, "a", 100);
+	newTransaction();
+	store.setBinding(txn, "a", 200);
+	Runner runner = new Runner(new NextBoundName("a"));
+	runner.assertBlocked();
+	commitTransaction();
+	assertSame(null, runner.getResult());
     }
 }

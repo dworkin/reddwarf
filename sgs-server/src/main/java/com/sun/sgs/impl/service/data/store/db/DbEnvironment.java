@@ -29,8 +29,8 @@ import java.io.FileNotFoundException;
 public interface DbEnvironment {
 
     /**
-     * Begins a new transaction with the specified timeout and the default
-     * isolation level.
+     * Begins a new transaction with the specified timeout and the
+     * implementation-specific default isolation level.
      *
      * @param	timeout the number of milliseconds the transaction should be
      *		allowed to run

@@ -950,7 +950,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	}
     }
 
-    /* -- Implement AbstractDataStore DataStore methods -- */
+    /* -- Implement AbstractDataStore's DataStore methods -- */
 
     /** {@inheritDoc} */
     protected long createObjectInternal(Transaction txn) {
@@ -1215,7 +1215,7 @@ public class DataStoreImpl extends AbstractDataStore {
 	return txnInfo.nextObjectId(oid, oidsDb);
     }
 
-    /* -- Implement AbstractDataStore TransactionParticipant methods -- */
+    /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
 
     /** {@inheritDoc} */
     protected boolean prepareInternal(Transaction txn) {

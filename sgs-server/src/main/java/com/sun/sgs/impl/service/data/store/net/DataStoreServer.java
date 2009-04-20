@@ -178,7 +178,7 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	name the name
-     * @param	oid information about the object ID and the next name
+     * @param	oid the object ID
      * @return	information about the object ID and the next name
      * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
      *		negative

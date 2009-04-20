@@ -45,7 +45,7 @@ public final class BindingValue implements Serializable {
      *
      * @param	oid the value of the requested name or {@code -1}
      * @param	nextName the next name or {@code null}
-     * @throws	IllegalStateException if {@code oid} is less than {@code -1}
+     * @throws	IllegalArgumentException if {@code oid} is less than {@code -1}
      */
     public BindingValue(long oid, String nextName) {
 	if (oid < -1) {
@@ -61,7 +61,7 @@ public final class BindingValue implements Serializable {
      *
      * @return	{@code true} if the name was bound, otherwise {@code false}
      */
-    public boolean getNameBound() {
+    public boolean isNameBound() {
 	return oid != -1;
     }
 
@@ -76,9 +76,9 @@ public final class BindingValue implements Serializable {
     }
 
     /**
-     * Returns the next name, if the requested name was not found, or {@code
-     * null}.  The value will also be {@code null} if there was no bound name
-     * after the requested name.
+     * Returns the next name, if the requested name was not found, otherwise
+     * returns {@code null}.  The value will also be {@code null} if there was
+     * no bound name after the requested name.
      *
      * @return	the next name or {@code null}
      */
