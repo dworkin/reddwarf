@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.smoketest.server;
+package com.sun.sgs.dsptest;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -26,11 +26,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.logging.Logger;
 
-import com.sun.ds.NormalInteger;
-import com.sun.ds.ScalableCounter;
-import com.sun.ds.ScalableCounter2;
-import com.sun.ds.ScalableInteger;
-import com.sun.ds.ScalableStatCounter;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
@@ -38,6 +33,11 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.impl.counters.NormalInteger;
+import com.sun.sgs.impl.counters.ScalableCounter;
+import com.sun.sgs.impl.counters.ScalableCounter2;
+import com.sun.sgs.impl.counters.ScalableInteger;
+import com.sun.sgs.impl.counters.ScalableStatCounter;
 
 /**
  * Counter benchmarking by counting up to a specific number with a large number

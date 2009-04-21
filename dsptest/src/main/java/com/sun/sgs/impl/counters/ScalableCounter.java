@@ -1,4 +1,4 @@
-package com.sun.ds;
+package com.sun.sgs.impl.counters;
 /*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *

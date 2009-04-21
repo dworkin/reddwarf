@@ -1,4 +1,4 @@
-package com.sun.ds;
+package com.sun.sgs.impl.counters;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
