@@ -50,11 +50,7 @@
 	  </execution>
 	</executions>
       </plugin>
-
-
-
     </plugins>
-
   </build>
 
   <dependencyManagement>
@@ -103,8 +99,8 @@
   </pluginRepositories>
 
   <properties>
-    <sgs-server.version>0.9.8</sgs-server.version>
-    <sgs-client.version>0.9.8</sgs-client.version>
+    <sgs-server.version>0.9.9</sgs-server.version>
+    <sgs-client.version>0.9.9</sgs-client.version>
   </properties>
 
 </project>
