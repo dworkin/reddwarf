@@ -1,5 +1,15 @@
 Project Darkstar Server API Changes
 
+Version 0.9.10
+
+- Remove ManagedObject superinterface from AppListener
+
+  This change was made to make the behavior of the AppListener
+  consistent with that of ClientSessionListener and ChannelListener,
+  neither of which extend the ManagedObject interface.  Only
+  listeners with mutable state should explicitly implement 
+  the ManagedObject interface.
+
 Version 0.9.9
 
 - Add support for specifying a delivery guarantee on session messages

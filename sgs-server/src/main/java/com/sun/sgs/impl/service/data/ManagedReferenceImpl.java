@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -276,7 +276,8 @@ final class ManagedReferenceImpl<T>
 	    break;
 	case FLUSHED:
 	    throw new TransactionNotActiveException(
-		"No transaction is in progress");
+		"Attempt to remove a managed object when its transaction is" +
+		" not active");
 	case REMOVED_EMPTY:
 	case REMOVED_FETCHED:
 	    throw new ObjectNotFoundException("The object is not found");
@@ -317,7 +318,8 @@ final class ManagedReferenceImpl<T>
 	    break;
 	case FLUSHED:
 	    throw new TransactionNotActiveException(
-		"No transaction is in progress");
+		"Attempt to mark a managed object for update when its" +
+		" transaction is not active");
 	case REMOVED_EMPTY:
 	case REMOVED_FETCHED:
 	    throw new ObjectNotFoundException("The object is not found");
@@ -339,6 +341,7 @@ final class ManagedReferenceImpl<T>
      */
     @SuppressWarnings("fallthrough")
     T get(boolean checkContext) {
+	RuntimeException exception = null;
 	try {
 	    if (checkContext) {
 		DataServiceImpl.checkContext(context);
@@ -366,43 +369,51 @@ final class ManagedReferenceImpl<T>
 	    case MODIFIED:
 		break;
 	    case FLUSHED:
-		throw new TransactionNotActiveException(
-		    "No transaction is in progress");
+		exception = new TransactionNotActiveException(
+		    "Attempt to get the object associated with a managed" +
+		    " reference when its transaction is not active");
+		break;
 	    case REMOVED_EMPTY:
 	    case REMOVED_FETCHED:
 		throw new ObjectNotFoundException("The object is not found");
 	    default:
 		throw new AssertionError();
 	    }
+	} catch (TransactionNotActiveException e) {
+	    exception = new TransactionNotActiveException(
+		"Attempt to get the object associated with a managed" +
+		" reference when its transaction is not active: " +
+		e.getMessage(),
+		e);
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	if (exception == null) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
 		    "get tid:{0,number,#}, oid:{1,number,#} returns" +
 		    " type:{2}",
-		    context.getTxnId(), oid, DataServiceImpl.typeName(object));
+		    context.getTxnId(), oid,
+		    DataServiceImpl.typeName(object));
 	    }
 	    @SuppressWarnings("unchecked")
 	    T result = (T) object;
 	    context.oidAccesses.setObjectDescription(getId(), result);
 	    return result;
-	} catch (TransactionNotActiveException e) {
-	    throw new TransactionNotActiveException(
-		"Attempt to obtain the object associated with a managed " +
-		"reference that was created in another transaction",
-		e);
-	} catch (RuntimeException e) {
-	    DataServiceImpl.getExceptionLogger(e).logThrow(
-		Level.FINEST, e,
+	} else {
+	    DataServiceImpl.getExceptionLogger(exception).logThrow(
+		Level.FINEST, exception,
 		"get tid:{0,number,#}, oid:{1,number,#} throws",
 		context.getTxnId(), oid);
-	    throw e;
+	    throw exception;
 	}
     }
 
     /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public T getForUpdate() {
-	RuntimeException exception;
+	RuntimeException exception = null;
 	try {
 	    DataServiceImpl.checkContext(context);
 	    // mark that we acquired a write lock on the object
@@ -429,8 +440,10 @@ final class ManagedReferenceImpl<T>
 		state = State.MODIFIED;
 		break;
 	    case FLUSHED:
-		throw new TransactionNotActiveException(
-		    "No transaction is in progress");
+		exception = new TransactionNotActiveException(
+		    "Attempt to get the object associated with a managed" +
+		    " reference when its transaction is not active");
+		break;
 	    case NEW:
 	    case MODIFIED:
 		break;
@@ -440,31 +453,36 @@ final class ManagedReferenceImpl<T>
 	    default:
 		throw new AssertionError();
 	    }
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "getForUpdate tid:{0,number,#}, oid:{1,number,#}" +
-			   " returns type:{2}",
-			   context.getTxnId(), oid,
-			   DataServiceImpl.typeName(object));
-	    }
-	    @SuppressWarnings("unchecked")
-	    T result = (T) object;
-	    context.oidAccesses.setObjectDescription(getId(), result);	    
-	    return result;
 	} catch (TransactionNotActiveException e) {
 	    exception = new TransactionNotActiveException(
-		"Attempt to obtain the object associated with a managed " +
-		"reference that was created in another transaction",
+		"Attempt to get the object associated with a managed" +
+		" reference when its transaction is not active: " +
+		e.getMessage(),
 		e);
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	DataServiceImpl.getExceptionLogger(exception).logThrow(
-	    Level.FINEST, exception,
-	    "getForUpdate tid:{0,number,#}, type:{1}, oid:{2,number,#}" +
-	    " throws",
-	    context.getTxnId(), DataServiceImpl.typeName(object), oid);
-	throw exception;
+	if (exception == null) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "getForUpdate tid:{0,number,#}, oid:{1,number,#}" +
+		    " returns type:{2}",
+		    context.getTxnId(), oid,
+		    DataServiceImpl.typeName(object));
+	    }
+	    @SuppressWarnings("unchecked")
+	    T result = (T) object;
+	    context.oidAccesses.setObjectDescription(getId(), result);
+	    return result;
+	} else {
+	    DataServiceImpl.getExceptionLogger(exception).logThrow(
+		Level.FINEST, exception,
+		"getForUpdate tid:{0,number,#}, type:{1}, oid:{2,number,#}" +
+		" throws",
+		context.getTxnId(), DataServiceImpl.typeName(object), oid);
+	    throw exception;
+	}
     }
 
     /** {@inheritDoc} */

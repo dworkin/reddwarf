@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -20,6 +20,7 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 
@@ -38,6 +39,11 @@ import com.sun.sgs.app.TransactionTimeoutException;
  * <code>equals</code> and <code>hashCode</code>. Two
  * <code>Transaction</code>s are equal if and only if they represent
  * the same transaction.
+ * <p>
+ * The implementations of the {@link #join join}, {@link #abort abort}, and
+ * {@link #registerListener registerListener} methods of this interface are not
+ * thread-safe.  Callers should insure that calls they make to these methods
+ * are made from the thread that created the transaction.
  */
 public interface Transaction {
 
@@ -76,6 +82,8 @@ public interface Transaction {
      *
      * @throws TransactionNotActiveException if the transaction is not active
      * @throws TransactionTimeoutException if the transaction has timed out
+     * @throws IllegalStateException if called from a thread that is not the
+     *				     thread that created this transaction
      */
     void checkTimeout();
 
@@ -105,7 +113,9 @@ public interface Transaction {
      * @throws IllegalStateException if {@link TransactionParticipant#prepare
      *				     prepare} has been called on any
      *				     transaction participant and the
-     *				     transaction has not been aborted
+     *				     transaction has not been aborted, or if
+     *				     called from a thread that is not the
+     *				     thread that created this transaction
      *
      * @throws UnsupportedOperationException if <code>participant</code> does
      *         not implement {@link NonDurableTransactionParticipant} and the
@@ -117,15 +127,17 @@ public interface Transaction {
     /**
      * Aborts the transaction, specifying the cause. This notifies all
      * participants that the transaction has aborted, and invalidates all
-     * future use of this transaction. The caller should always follow a
-     * call to <code>abort</code> by throwing an exception that details
-     * why the transaction was aborted, which is typically the same exception
-     * provided to this method. This is needed not only to communicate the
-     * cause of the abort and whether to retry the exception, but also
-     * because the application code associated with this transaction will
-     * continue to execute normally unless an exception is raised. Supplying
-     * the cause to this method allows future calls to the transaction to
-     * include the cause to explain why the transaction is no longer active.
+     * future use of this transaction. The caller should always follow a call
+     * to <code>abort</code> by throwing an exception that details why the
+     * transaction was aborted. If the exception could be caught by application
+     * code, then the exception thrown should be a {@link
+     * TransactionAbortedException}, created by wrapping the original cause if
+     * needed. Throwing an exception is needed not only to communicate the
+     * cause of the abort and whether to retry the exception, but also because
+     * the application code associated with this transaction will continue to
+     * execute normally unless an exception is raised. Supplying the cause to
+     * this method allows future calls to the transaction to include the cause
+     * to explain why the transaction is no longer active.
      * <p>
      * If the transaction has been aborted, then the exception thrown will have
      * as its cause the value provided in the first call to {@link #abort
@@ -141,7 +153,9 @@ public interface Transaction {
      *
      * @throws IllegalStateException if all transaction participants have been
      *                               prepared and {@link #abort abort} has not
-     *                               been called
+     *                               been called, or if called from a thread
+     *				     that is not the thread that created this
+     *				     transaction
      */
     void abort(Throwable cause);
 
@@ -151,7 +165,6 @@ public interface Transaction {
      *
      * @return {@code true} if {@code abort} has been called on this
      *         transaction, else {@code false}
-     *
      */
     boolean isAborted();
 
@@ -191,6 +204,8 @@ public interface Transaction {
      * @param	listener the listener
      * @throws	TransactionNotActiveException if this transaction is not
      *		active
+     * @throws	IllegalStateException if called from a thread that is not the
+     *		thread that created this transaction
      */
     void registerListener(TransactionListener listener);
 }

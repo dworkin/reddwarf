@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -23,22 +23,33 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.Delivery;
 
 /**
- * Represents an ordered unreliable channel.  This is currently a
- * placeholder that will eventually handle message delivery details in the
- * subclass instead of handling them in the {@code ChannelImpl} superclass.
+ * Represents an unreliable channel. Instances of this class handle message
+ * delivery details for unreliable channel messages.
  */
-class OrderedUnreliableChannelImpl extends ChannelImpl {
+class UnreliableChannel extends ChannelImpl {
     
     /** The serialVersionUID for this class. */
     private static final long serialVersionUID = 1L;
 
     /**
-     * Constructs an instance with the specified {@code delivery}
-     * requirement and write capacity.
+     * Constructs an instance with the specified {@code name}, {@code listener},
+     * {@code delivery} guarantee, write capacity.
      */
-    OrderedUnreliableChannelImpl(String name, ChannelListener listener,
-				 Delivery delivery, int writeBufferCapacity)
+    UnreliableChannel(String name, ChannelListener listener,
+		      Delivery delivery, int writeBufferCapacity)
     {
 	super(name, listener, delivery, writeBufferCapacity);
+    }
+
+    /** {@inheritDoc}
+    *
+    * <p>This implementation services the channel send event immediately,
+    * even if the local node is not the coordinator node,  because central
+    * coordination of message ordering is not needed for unreliable
+    * messages.
+    */
+    @Override
+    protected void handleSendEvent(ChannelImpl.SendEvent sendEvent) {
+	sendEvent.serviceEvent(this);
     }
 }

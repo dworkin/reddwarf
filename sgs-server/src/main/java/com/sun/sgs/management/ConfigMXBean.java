@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -93,5 +93,11 @@ public interface ConfigMXBean {
      * @return the standard transaction timeout, in milliseconds
      */
     long getStandardTxnTimeout();
-    
+
+    /**
+     * Returns the protocol descriptor, as a {@code String}.
+     *
+     * @return the protocol descriptor, as a {@code String}
+     */
+    String getProtocolDescriptor();
 }

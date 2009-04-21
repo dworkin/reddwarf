@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -166,12 +166,15 @@ class ChannelWrapper
 	ChannelImpl channelImpl = null;
 	try {
 	    channelImpl = channelRef.get();
-	} catch (ObjectNotFoundException e) {
+	} catch (Exception e) {
 	}
 	return getClass().getName() + "[" +
-	    (channelImpl == null ? "(not found)" : channelImpl.toString()) +
+	    (channelImpl == null ?
+	     channelRef.toString() :
+	     channelImpl.toString()) +
 	    "]";
     }
+    
     /* -- Other methods -- */
 
     /**

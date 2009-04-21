@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -66,5 +66,14 @@ class TcpDescriptor implements TransportDescriptor, Serializable {
         buf.putString(hostName).
             putInt(listeningPort);
         return buf.getBuffer();
+    }
+
+    /**
+     * Returns a string representation of this descriptor.
+     *
+     * @return	a string representation of this descriptor
+     */
+    public String toString() {
+	return "TCP[host:" + hostName + ", port:" + listeningPort + "]";
     }
 }

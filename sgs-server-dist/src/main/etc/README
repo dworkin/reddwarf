@@ -66,7 +66,7 @@ processors:
 This distribution requires Java(TM) Platform, Standard Edition 6 (Java
 SE platform 6), or greater.
 
-It has been tested with version 1.6.0_11 of Java SE platform 6 on
+It has been tested with version 1.6.0_12 of Java SE platform 6 on
 Solaris, Windows, and Linux platforms, and version 1.6.0_07 on Mac OS X
 platforms.
 
@@ -118,6 +118,25 @@ conf directory for additional details.
 
 RELEASE COMPATIBILITY
 
+Release 0.9.10:
+
+- The persistent data stored by the ChannelService is incompatible with
+  previous releases.  The ChannelService's persistent data created using
+  releases prior to 0.9.10 will not be automatically upgraded to the
+  current release format.
+
+- The AppListener interface no longer extends ManagedObject.  AppListener
+  classes with mutable state should now explicitly implement ManagedObject.
+
+Release 0.9.9:
+
+- The com.sun.sgs.app.port configuration property is no longer supported.
+  See the CHANGELOG and API-CHANGES files for a complete description of 
+  the new pluggable client session protocol and transport layer.
+  Applications written for previous releases should use the
+  com.sun.sgs.impl.transport.tcp.listen.port configuration property in
+  place of com.sun.sgs.app.port.
+
 Release 0.9.7:
 
 - Running an application using release 0.9.7 with persistent data
@@ -152,8 +171,6 @@ limitations:
   server to run out of memory.  As a temporary workaround, developers
   must ensure that clients do not send network traffic faster than the
   server application can process it.
-
-- It does not support pluggable I/O transports.
 
 - The API for customizing managers and services is incomplete and still
   under development.

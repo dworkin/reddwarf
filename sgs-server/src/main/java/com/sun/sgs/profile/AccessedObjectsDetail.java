@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -53,7 +53,7 @@ public interface AccessedObjectsDetail {
      *
      * @return a {@code List} of {@code AccessedObject}s
      */
-    List<AccessedObject> getAccessedObjects();
+    List<? extends AccessedObject> getAccessedObjects();
 
     /**
      * The type of conflict, if any, caused by these object accesses.

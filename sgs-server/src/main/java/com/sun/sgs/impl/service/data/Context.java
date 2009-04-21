@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -21,9 +21,9 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.service.Transaction;
@@ -161,7 +161,7 @@ final class Context extends TransactionContext implements TransactionListener {
 
 	public void join(TransactionParticipant participant) {
 	    if (originalTxn.isAborted()) {
-		throw new MaybeRetryableTransactionNotActiveException(
+		throw new TransactionNotActiveException(
 		    "Transaction is not active", originalTxn.getAbortCause());
 	    } else if (inactive) {
 		throw new IllegalStateException(

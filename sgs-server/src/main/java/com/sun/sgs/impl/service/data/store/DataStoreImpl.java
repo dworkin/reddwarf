@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -714,6 +714,17 @@ public class DataStoreImpl
 	/** Implement Comparable<ObjectIdInfo>, ordered by object ID. */
 	public int compareTo(ObjectIdInfo other) {
 	    return Long.signum(lastObjectId - other.lastObjectId);
+	}
+
+	/** Use object ID for comparison. */
+	public boolean equals(Object object) {
+	    return object instanceof ObjectIdInfo &&
+		lastObjectId == ((ObjectIdInfo) object).lastObjectId;
+	}
+
+	/** Use object ID for hash code. */
+	public int hashCode() {
+	    return (int) (lastObjectId >> 32) & (int) lastObjectId;
 	}
 
 	/**
@@ -1900,7 +1911,7 @@ public class DataStoreImpl
      * @param	oid the object ID
      * @param	data the data
      */
-    private void setObjectRaw(Transaction txn, long oid, byte[] data) {
+    void setObjectRaw(Transaction txn, long oid, byte[] data) {
 	TxnInfo txnInfo = checkTxn(txn);
 	oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oid), data);
     }
@@ -1914,7 +1925,7 @@ public class DataStoreImpl
      * @param	oid the object ID
      * @return	the data or null if the object ID is not found
      */
-    private byte[] getObjectRaw(Transaction txn, long oid) {
+    byte[] getObjectRaw(Transaction txn, long oid) {
 	TxnInfo txnInfo = checkTxn(txn);
 	return oidsDb.get(txnInfo.dbTxn, DataEncoding.encodeLong(oid), false);
     }
@@ -1930,7 +1941,7 @@ public class DataStoreImpl
      * @param	oid the object ID or -1
      * @return	the next object ID or -1
      */
-    private long nextObjectIdRaw(Transaction txn, long oid) {
+    long nextObjectIdRaw(Transaction txn, long oid) {
 	TxnInfo txnInfo = checkTxn(txn);
 	DbCursor cursor = oidsDb.openCursor(txnInfo.dbTxn);
 	try {

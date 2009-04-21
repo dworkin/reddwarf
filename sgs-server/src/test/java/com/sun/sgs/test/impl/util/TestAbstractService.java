@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -68,7 +68,7 @@ public class TestAbstractService extends TestCase {
     /** Prints the test case and sets the service field to a new instance. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	serverNode = new SgsTestNode("TestAbstractSevice", null,  null);
+	serverNode = new SgsTestNode("TestAbstractService", null,  null);
 	txnScheduler = 
             serverNode.getSystemRegistry().
             getComponent(TransactionScheduler.class);

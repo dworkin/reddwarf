@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -593,8 +593,8 @@ public abstract class AbstractService implements Service {
 	return (e instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) e).shouldRetry();
     }
-     
-   /**
+
+    /**
      * An immutable class to hold the current version of the keys
      * and data persisted by a service.
      */   

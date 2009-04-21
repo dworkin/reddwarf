@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -76,5 +76,13 @@ public class SimpleSgsProtocolDescriptor
     public byte[] getConnectionData() {
 	return transportDesc.getConnectionData();
     }
-    
+
+    /**
+     * Returns a string representation of this descriptor.
+     *
+     * @return	a string representation of this descriptor
+     */
+    public String toString() {
+	return "SimpleSgsProtocolDescriptor[" + transportDesc.toString() + "]";
+    }
 }

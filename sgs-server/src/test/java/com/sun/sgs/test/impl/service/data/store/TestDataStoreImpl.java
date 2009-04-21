@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -191,15 +191,15 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testConstructorNonexistentDirectory() throws Exception {
-	props.setProperty(
-	    DataStoreImplClassName + ".directory",
-	    "/this-is-a-non-existent-directory/yup");
-	try {
-	    createDataStore(props);
-	    fail("Expected DataStoreException");
-	} catch (DataStoreException e) {
-	    System.err.println(e);	    
+        String directory = createDirectory();
+        File dir = new File(directory);
+        if (!dir.delete()) {
+	    throw new RuntimeException("Problem deleting directory: " + dir);
 	}
+	props.setProperty(
+                DataStoreImplClassName + ".directory", directory);
+        createDataStore(props);
+        assertTrue(dir.exists());
     }
 
     public void testConstructorDirectoryIsFile() throws Exception {
@@ -227,7 +227,12 @@ public class TestDataStoreImpl extends TestCase {
         }
 	String directory = createDirectory();
 	props.setProperty(DataStoreImplClassName + ".directory", directory);
-	new File(directory).setReadOnly();
+        File dir = new File(directory);
+	dir.setReadOnly();
+        if(dir.canWrite()) {
+            System.err.println("Skipping with superuser");
+            return;
+        }
 	try {
 	    createDataStore(props);
 	    fail("Expected DataStoreException");

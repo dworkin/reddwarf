@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -36,6 +36,17 @@ interface ClassSerialization {
      */
     void writeClassDescriptor(
 	ObjectStreamClass classDesc, ObjectOutputStream out)
+	throws IOException;
+
+    /**
+     * Checks if it is permitted to instantiate an instance of the specified
+     * class.
+     *
+     * @param	classDesc the class descriptor
+     * @throws	IOException if it is not permitted to create instances of the
+     *		specified class
+     */
+    void checkInstantiable(ObjectStreamClass classDesc)
 	throws IOException;
 
     /**
