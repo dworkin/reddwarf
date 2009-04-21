@@ -33,6 +33,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.impl.counters.EmptyCounter;
 import com.sun.sgs.impl.counters.NormalInteger;
 import com.sun.sgs.impl.counters.ScalableCounter;
 import com.sun.sgs.impl.counters.ScalableCounter2;
@@ -51,6 +52,9 @@ public class CounterPerformanceTest implements AppListener, Serializable
     /** Number of concurrent tasks to start with. **/
     public static final int INITIAL_CONCURRENT_TASKS = 10;
 
+    /** Number of concurrent tasks to end with. */
+    public static final int MAX_CONCURRENT_TASKS = 150;
+
     /** Number to count up to in each concurrent task. **/
     public static final int INITIAL_COUNT_NUM = 500;
 
@@ -59,7 +63,7 @@ public class CounterPerformanceTest implements AppListener, Serializable
 
     /** Counters to test. **/
     public static enum COUNTER_TYPE {
-        Warmup, ScalableCounterWithoutGet, ScalableCounterWithGet, None, NormalInteger, ScalableInteger, ScalableStatCounter, ScalableCounter2;
+        Warmup, ScalableCounterWithoutGet, ScalableCounterWithGet, None, NormalInteger, ScalableInteger, ScalableStatCounter, ScalableCounter2, EmptyCounter;
 
         public COUNTER_TYPE next()
         {
@@ -97,6 +101,8 @@ public class CounterPerformanceTest implements AppListener, Serializable
                 new ScalableStatCounter());
         dataManager.setBinding(COUNTER_TYPE.ScalableCounter2.toString(),
                 new ScalableCounter2());
+        dataManager.setBinding(COUNTER_TYPE.EmptyCounter.toString(),
+                new EmptyCounter());
 
         // Write output file header
         writeToFile("ConcurrentTasks ");
@@ -148,6 +154,8 @@ public class CounterPerformanceTest implements AppListener, Serializable
             return ((ScalableInteger) getObj(type.toString())).get();
         case ScalableStatCounter:
             return ((ScalableStatCounter) getObj(type.toString())).get();
+        case EmptyCounter:
+            return ((EmptyCounter) getObj(type.toString())).get();
         default:
             return 0;
         }
@@ -193,13 +201,13 @@ public class CounterPerformanceTest implements AppListener, Serializable
                 if (type == COUNTER_TYPE.values()[COUNTER_TYPE.values().length - 1]) {
                     numConcurrentTasks += 10;
                     type = COUNTER_TYPE.values()[0];
-                    logger.info("Now Running with concurrency: "
-                            + numConcurrentTasks);
-                    if (numConcurrentTasks == 110) {
+                    if (numConcurrentTasks > MAX_CONCURRENT_TASKS) {
                         System.exit(1);
                         return;
                     }
 
+                    logger.info("Now Running with concurrency: "
+                            + numConcurrentTasks);
                     writeToFile("\n" + numConcurrentTasks);
                 } else
                     type = type.next();
@@ -280,6 +288,9 @@ public class CounterPerformanceTest implements AppListener, Serializable
             } else if (type == COUNTER_TYPE.ScalableCounter2) {
                 ScalableCounter2 c = getObj(type.toString());
                 c.inc();
+            } else if (type == COUNTER_TYPE.EmptyCounter) {
+                EmptyCounter c = getObj(type.toString());
+                c.inc();
             } else {
                 throw new IllegalStateException("Unimplemented case: "
                         + type.toString());
@@ -289,7 +300,7 @@ public class CounterPerformanceTest implements AppListener, Serializable
                     new ScalableIncrementTask(count + 1, count_max, type));
         }
     }
-    
+
     /**
      * Get the object from data manager.
      * 
