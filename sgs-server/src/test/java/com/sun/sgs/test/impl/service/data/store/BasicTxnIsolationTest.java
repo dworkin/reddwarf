@@ -66,9 +66,6 @@ public abstract class BasicTxnIsolationTest extends Assert {
     /** Another test value for an object ID. */
     private static final byte[] secondValue = { 2 };
 
-    /** Another test value for an object ID. */
-    private static final byte[] thirdValue = { 3 };
-
     /** The transaction proxy. */
     protected static final DummyTransactionProxy txnProxy =
 	new DummyTransactionProxy();
@@ -1134,7 +1131,7 @@ public abstract class BasicTxnIsolationTest extends Assert {
      * use it as part of its operations.  When the runner is done running the
      * first action, it then waits for additional actions to be specified with
      * calls to {@link #setAction}, or until the transaction and thread are
-     * ended by calling {@link #commit} or {@link abort}. <p>
+     * ended by calling {@link #commit} or {@link #abort}. <p>
      *
      * Callers can use the {@link #blocked}, {@link #assertBlocked}, or {@link
      * #getResult} methods to interrogate the state of the runner's activities
