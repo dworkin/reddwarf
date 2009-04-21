@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -29,9 +29,13 @@ import java.util.Properties;
  *
  * <p>An implementation of a {@code AppListener} should implement
  * the {@link Serializable} interface, so that application listeners
- * can be stored persistently.  If a given listener has mutable state,
- * that listener should also implement the {@link ManagedObject}
- * interface.
+ * can be stored persistently.  When an application is started for the
+ * the first time, its {@link #initialize(java.util.Properties) initialize}
+ * method is called and it is then persisted.  If a given listener has mutable
+ * state that can be changed after this point, it should also implement 
+ * the {@link ManagedObject}
+ * interface.  An implementation must be public and non-abstract, and
+ * have a public, no-argument constructor.
  *
  * <p>The methods of this listener are called within the context of a
  * {@link Task} being executed by the {@link TaskManager}.  If, during
@@ -48,7 +52,7 @@ import java.util.Properties;
  * <p>For a full description of task execution behavior, see the
  * documentation for {@link TaskManager#scheduleTask(Task)}.
  */
-public interface AppListener extends ManagedObject {
+public interface AppListener {
 
     /**
      * Notifies this listener that the application has been started

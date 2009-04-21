@@ -152,12 +152,21 @@
     <Bug pattern="SF_SWITCH_FALLTHROUGH"/>
   </Match>
 
+  <!-- Suppress a complaint about an unchecked cast that seems to be
+       caused by generic types -->
+  <Match>
+    <Class name="com.sun.sgs.impl.service.data.DataServiceImpl$ContextMap"/>
+    <Method name="checkContext"/>
+    <Bug pattern="BC_UNCONFIRMED_CAST"/>
+  </Match>
+
   <!-- Package com.sun.sgs.impl.service.data.store -->
 
   <!-- Not worth replacing an anonymous class with a static inner class. -->
   <Match>
     <Or>
       <Class name="com.sun.sgs.impl.service.data.store.DataStoreImpl$BasicScheduler$1"/>
+      <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$LeaveAllEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$SendEvent$1"/>
       <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$CloseEvent$1"/>
@@ -254,6 +263,16 @@
     <Field name="server"/>
     <Bug pattern="SE_BAD_FIELD"/>
   </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$ReassignCoordinatorsTask"/>
+    <Field name="channelIter"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
+  <Match>
+    <Class name="com.sun.sgs.impl.service.channel.ChannelImpl$RemoveFailedSessionsFromLocalChannelsTask"/>
+    <Field name="iter"/>
+    <Bug pattern="SE_BAD_FIELD"/>
+  </Match>
 
   <!-- Thread is not created with a default empty run method. -->
   <Match>
@@ -338,4 +357,11 @@
     <Bug pattern="IP_PARAMETER_IS_DEAD_BUT_OVERWRITTEN"/>
   </Match>
 
+  <!-- BindingKeyedCollectionsImpl writes to static field in constructor -->
+  <Match>
+    <Class name="com.sun.sgs.impl.util.BindingKeyedCollectionsImpl"/>
+    <Feild name="txnProxy"/>
+    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+  </Match>
+  
 </FindBugsFilter>

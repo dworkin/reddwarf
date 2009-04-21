@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -87,4 +87,10 @@ public class IdentityImpl implements Identity, Serializable
         return name.hashCode();
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+	return getClass().getName() + "[" + name + "]";
+    }
 }

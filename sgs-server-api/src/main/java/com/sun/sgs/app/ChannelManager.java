@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -47,6 +47,10 @@ public interface ChannelManager {
     /**
      * Creates a new channel with the specified listener and delivery
      * guarantee, binds it to the specified name, and returns it.
+     * 
+     * <p>If the specified {@code listener} is {@code null}, then any
+     * messages sent on the returned channel by any client session will
+     * be automatically forwarded, unfiltered, to all channel members.
      *
      * <p>If the specified {@code listener} is
      * non-{@code null}, then when any client session sends a

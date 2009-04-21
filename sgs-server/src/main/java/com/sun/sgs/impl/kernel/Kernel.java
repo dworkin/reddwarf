@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -22,6 +22,8 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.util.ManagedSerializable;
 import com.sun.sgs.internal.InternalContext;
 
 import com.sun.sgs.auth.Identity;
@@ -47,6 +49,8 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.BindingKeyedCollections;
+import com.sun.sgs.impl.util.BindingKeyedCollectionsImpl;
 import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -286,6 +290,9 @@ class Kernel {
                                              accessCoordinator);
             taskScheduler =
                 new TaskSchedulerImpl(appProperties, profileCollectorHandle);
+
+	    BindingKeyedCollections collectionsFactory =
+		new BindingKeyedCollectionsImpl(proxy);
                         
             KernelContext ctx = new StartupKernelContext("Kernel");
             transactionScheduler.setContext(ctx);
@@ -297,6 +304,7 @@ class Kernel {
             systemRegistry.addComponent(taskScheduler);
             systemRegistry.addComponent(identityCoordinator);
             systemRegistry.addComponent(profileCollector);
+	    systemRegistry.addComponent(collectionsFactory);
 
             // create the profiling listeners.  It is important to not
             // do this until we've finished adding components to the
@@ -923,12 +931,18 @@ class Kernel {
                 dataService.getServiceBinding(StandardProperties.APP_LISTENER);
             } catch (NameNotBoundException nnbe) {
                 // ...if it's not, create and then bind the listener
-                String appClass =
-                    properties.getProperty(StandardProperties.APP_LISTENER);
                 AppListener listener =
-                    (AppListener) (Class.forName(appClass).newInstance());
-                dataService.setServiceBinding(StandardProperties.APP_LISTENER,
-                                              listener);
+                    (new PropertiesWrapper(properties)).
+                    getClassInstanceProperty(StandardProperties.APP_LISTENER,
+                                             AppListener.class, new Class[] {});
+                if (listener instanceof ManagedObject) {
+                    dataService.setServiceBinding(
+                            StandardProperties.APP_LISTENER, listener);
+                } else {
+                    dataService.setServiceBinding(
+                            StandardProperties.APP_LISTENER,
+                            new ManagedSerializable<AppListener>(listener));
+                }
 
                 // since we created the listener, we're the first one to
                 // start the app, so we also need to start it up
