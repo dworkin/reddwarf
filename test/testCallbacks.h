@@ -26,7 +26,7 @@ void channel_left_cb(sgs_connection *conn,
             sgs_channel *channel);
 
 void channel_recv_msg_cb(sgs_connection *conn,
-        sgs_channel *channel, const uint8_t msg, size_t msglen);
+        sgs_channel *channel, const uint8_t *msg, size_t msglen);
 
 void disconnected_cb(sgs_connection *conn);
 
