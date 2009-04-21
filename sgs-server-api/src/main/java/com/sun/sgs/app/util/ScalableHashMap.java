@@ -585,7 +585,7 @@ public class ScalableHashMap<K, V>
 	// rather than split repeatedly, this method inlines all splits at once
 	// and links the children together.  This is much more efficient.
 
-	setLeafNode(); // this node is no longer a leaf
+	setDirectoryNode(); // this node is no longer a leaf
 	nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 
 	// decide how many leaves to make based on the required depth.  Note
@@ -620,12 +620,12 @@ public class ScalableHashMap<K, V>
 	// edge updating - Note that since there are guaranteed to be at least
 	// two leaves, these absolute offset calls are safe
         ScalableHashMap<K, V> firstLeaf = uncheckedCast(leaves[0]);
-	firstLeaf.leftLeafRef = leftLeafRef;
+	firstLeaf.leftLeafRef = null;
 	firstLeaf.rightLeafRef = uncheckedCast(dm.createReference(leaves[1]));
         ScalableHashMap<K, V> lastLeaf = uncheckedCast(leaves[numLeaves - 1]);
 	lastLeaf.leftLeafRef =
                 uncheckedCast(dm.createReference(leaves[numLeaves - 2]));
-	lastLeaf.rightLeafRef = rightLeafRef;
+	lastLeaf.rightLeafRef = null;
 
 	// since this node is now a directory, invalidate its leaf-list
 	// references
@@ -649,10 +649,10 @@ public class ScalableHashMap<K, V>
     }
 
     /**
-     * Mark this node as a leaf node by setting its entry table to {@code
+     * Mark this node as a directory node by setting its entry table to {@code
      * null}.
      */
-    private void setLeafNode() {
+    private void setDirectoryNode() {
 	table = null;
     }
 
@@ -887,7 +887,7 @@ public class ScalableHashMap<K, V>
 	}
 
 	// null out the intermediate node's table
-	setLeafNode();
+	setDirectoryNode();
 	size = 0;
 
 	// create the references to the new children
@@ -944,7 +944,7 @@ public class ScalableHashMap<K, V>
 	    rightChild.parentRef = thisRef;
 	    leftChild.parentRef = thisRef;
 
-	    setLeafNode();
+	    setDirectoryNode();
 	    nodeDirectory = new ManagedReference[1 << getNodeDirBits()];
 
 	    int firstRightIndex = nodeDirectory.length / 2;

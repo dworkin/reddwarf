@@ -191,6 +191,19 @@ public class TestScalableHashMap extends Assert {
 	    }, taskOwner);
     }
 
+    /** This test reproduces the problem reported in sgs-server issue #160. */
+    @Test
+    public void testConstructorOneArgHighConcurrency() throws Exception {
+	txnScheduler.runTask(
+	    new TestAbstractKernelRunnable() {
+		public void run() throws Exception {
+		    Map<Integer, Integer> map =
+			new ScalableHashMap<Integer,Integer>(256);
+		    map.keySet().iterator();
+		}
+	    }, taskOwner);
+    }
+
     // NOTE: we do not test the maximum concurrency in the
     // constructor, as this would take far too long to test (hours).
 
