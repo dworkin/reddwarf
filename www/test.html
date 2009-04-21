@@ -1,0 +1,386 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title>Wanderer Performance Testing</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<style type="text/css">
+  body {
+    background: #ffffff;
+    color: #000000;
+    margin: 10px;
+  }
+  h1, h2, h3, h4 {
+    font-family: arial, helvetica, sans-serif;
+  }
+  table {
+    border: 2px solid grey;
+    border-collapse: collapse;
+    text-align: center;
+  }
+  th, td {
+    border: 1px solid grey;
+    padding: 3px;
+  }
+  table.results {
+    text-align: right;
+  }
+  tr.best {
+    font-weight: bold;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>Wanderer Performance Testing</h1>
+
+This page collects information about performance testing using the
+Wanderer client of the Request Example.
+
+<h2>Contents</h2>
+
+<ul>
+<li><a href="#results">Test Results</a>
+<li><a href="#machines">Machine Configurations</a>
+<li><a href="#directions">Testing Directions</a>
+<li><a href="#collect">Collecting Configuration Information</a>
+</ul>
+
+<a name="results"></a>
+<h2>Test Results</h2>
+
+This section lists the results of various runs of the example, sorted in
+reverse chronological order.
+
+<h3>10/16/2008</h3>
+
+<h4>SGS 0.9.7.1, single</h4>
+
+<table>
+  <tr>
+    <th>Host configuration<th>Java<th>File system<th>DB<th>SGS version
+    <th>SGS configuration
+  <tr>
+    <td>dstar1X-5-2008<td>1.6.0_06<td>UFS<td>BDB 4.5.20<td>0.9.7.1
+    <td>Single node
+</table> <p>
+
+<table class="results">
+  <tr>
+    <th>Clients<th>Sent<th>Received<th>Backlog<th>Throughput<th>Server CPU
+  <tr>
+    <td>    200<td> 980<td>    3600<td>      0<td>      3000<td>41%
+  <tr>
+    <td>    300<td>1500<td>    7100<td>	     0<td>	4400<td>65%
+  <tr class="best">
+    <td>    400<td>2000<td>   11000<td>	     0<td>	6000<td>89%
+  <tr>
+    <td>    500<td>1900<td>   13000<td>	     7<td>	5500<td>78%
+</table>
+
+<h4>SGS 0.9.7.1, one multi-node</h4>
+
+<table>
+  <tr>
+    <th>Host configuration<th>Java<th>File system<th>DB<th>SGS version
+    <th>SGS configuration
+  <tr>
+    <td>dstar1X-5-2008<td>1.6.0_06<td>UFS<td>BDB 4.5.20<td>0.9.7.1
+    <td>One multi-node
+</table> <p>
+
+<table class="results">
+  <tr>
+    <th>Clients<th>Sent<th>Received<th>Backlog<th>Throughput<th>Core Server CPU
+    <th>App Server CPU
+  <tr>
+    <td>    100<td> 490<td>    1300<td>      0<td>      1500<td>13%<td>27%
+  <tr>
+    <td>    150<td> 730<td>    2400<td>      0<td>      2200<td>21%<td>40%
+  <tr class="best">
+    <td>    200<td> 940<td>    3400<td>      7<td>      2900<td>26%<td>51%
+  <tr>
+    <td>    250<td> 920<td>    3900<td>      8<td>      2800<td>27%<td>49%
+</table>
+
+<h4>SGS 0.9.7.1, one multi-node, 16 threads</h4>
+
+This run specified the following configuration option in the
+<tt>RequestApp.properties</tt> file:
+
+<pre>
+  <tt>com.sun.sgs.impl.kernel.task.threads=16</tt>
+</pre> <p>
+
+<table>
+  <tr>
+    <th>Host configuration<th>Java<th>File system<th>DB<th>SGS version
+    <th>SGS configuration
+  <tr>
+    <td>dstar1X-5-2008<td>1.6.0_06<td>UFS<td>BDB 4.5.20<td>0.9.7.1
+    <td>One multi-node, 16 task threads
+</table> <p>
+
+<table class="results">
+  <tr>
+    <th>Clients<th>Sent<th>Received<th>Backlog<th>Throughput<th>Core Server CPU
+    <th>App Server CPU
+  <tr>
+    <td>    100<td> 490<td>    1300<td>      0<td>      1500<td>13%<td>29%
+  <tr>
+    <td>    150<td> 730<td>    2600<td>      0<td>      2200<td>20%<td>43%
+  <tr class="best">
+    <td>    200<td> 910<td>    3200<td>      7<td>      2800<td>26%<td>53%
+  <tr>
+    <td>    250<td> 890<td>    3800<td>      8<td>      2700<td>26%<td>53%
+</table>
+
+<h4>SGS 0.9.7.1, one multi-node, 16 threads, no RMI</h4>
+
+This run specified the following configuration option in the
+<tt>RequestApp.properties</tt> file:
+
+<pre>
+  <tt>com.sun.sgs.impl.kernel.task.threads=16</tt>
+</pre> <p>
+
+It was also run with the following command line option on the server
+nodes:
+
+<pre>
+  <tt>-Drun.jvm.args.profile=-Dcom.sun.sgs.impl.service.data.store.net.no.rmi=true</tt>
+</pre> <p>
+
+<table>
+  <tr>
+    <th>Host configuration<th>Java<th>File system<th>DB<th>SGS version
+    <th>SGS configuration
+  <tr>
+    <td>dstar1X-5-2008<td>1.6.0_06<td>UFS<td>BDB 4.5.20<td>0.9.7.1
+    <td>One multi-node, 16 task threads, no RMI
+</table> <p>
+
+<table class="results">
+  <tr>
+    <th>Clients<th>Sent<th>Received<th>Backlog<th>Throughput<th>Core Server CPU
+    <th>App Server CPU
+  <tr>
+    <td>    200<td> 980<td>    3800<td>      0<td>      3000<td>18%<td>46%
+  <tr class="best">
+    <td>    250<td>1100<td>    4800<td>      8<td>      3400<td>23%<td>53%
+  <tr>
+    <td>    300<td>1100<td>    5400<td>      8<td>      3400<td>23%<td>54%
+</table>
+
+<h4>tjb rev 5009, one multi-node, 16 threads, no RMI</h4>
+
+This run specified the following configuration option in the
+<tt>RequestApp.properties</tt> file:
+
+<pre>
+  <tt>com.sun.sgs.impl.kernel.task.threads=16</tt>
+</pre> <p>
+
+It was also run with the following command line option on the server
+nodes:
+
+<pre>
+  <tt>-Drun.jvm.args.profile=-Dcom.sun.sgs.impl.service.data.store.net.no.rmi=true</tt>
+</pre> <p>
+
+<table>
+  <tr>
+    <th>Host configuration<th>Java<th>File system<th>DB<th>SGS version
+    <th>SGS configuration
+  <tr>
+    <td>dstar1X-5-2008<td>1.6.0_06<td>UFS<td>BDB 4.5.20
+    <td>branch tjb, revision 5009
+    <td>One multi-node, 16 task threads, no RMI
+</table> <p>
+
+<table class="results">
+  <tr>
+    <th>Clients<th>Sent<th>Received<th>Backlog<th>Throughput<th>Core Server CPU
+    <th>App Server CPU
+  <tr>
+    <td>    200<td> 980<td>    3600<td>      0<td>      3900<td>17%<td>45%
+  <tr class="best">
+    <td>    250<td>1200<td>    5000<td>      6<td>      4800<td>22%<td>54%
+  <tr>
+    <td>    300<td>1200<td>    5600<td>      8<td>      4700<td>23%<td>56%
+</table>
+
+<a name="machines"></a>
+<h2>Machine Configurations</h2>
+
+This section lists the hardware and operating configurations of the
+machines used for testing. The names are intended to capture which set
+of machines were configured this way at a particular time, to cover the
+case that the machines are reconfigured. The per-test configuration
+information doesn't need to identify the exact machines used, just how
+the machines were configured.
+
+<h3>dstar1X05-2008</h3>
+
+<ul>
+
+<li>Machine type: Sunblade 6220
+<li>Processors: 2 dual-core AMD Opteron 2200, 2.8 GHz
+<li>Memory: 16 GB
+<li>Operating system: Solaris 10 8/07 
+
+</ul>
+
+<a name="directions"></a>
+<h2>Testing Directions</h2>
+
+The Wanderer example has both client and server portions.  The test is
+run with all clients running within a single VM on one machine.  The
+application is either run in single-node mode on another machine, or in
+multi-node mode with the core server and some number of application
+nodes each running on separate machines.
+
+<h3>Client command line</h3>
+
+<tt>
+&nbsp;&nbsp;mvn process-test-resources \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Ptest-run \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dwanderer.host=</tt><i>server-host</i><tt>
+\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dwanderer.clients=</tt><i>num-clients</i>
+
+<h3>Single-node server command line</h3>
+
+<tt>
+&nbsp;&nbsp;mvn process-test-resources \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Psingle-node-server \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Ddatastore.dir=</tt><i>local-directory</i>
+
+<h3>Multi-node core server command line</h3>
+<tt>
+&nbsp;&nbsp;mvn process-test-resources \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Pmulti-node-server-core \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Ddatastore.dir=</tt><i>local-directory</i>
+
+<h3>Multi-node application node command line</h3>
+
+<tt>
+&nbsp;&nbsp;mvn process-test-resources \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Pmulti-node-server-app \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsgs.version=</tt><i>sgs-version</i><tt>
+\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dcom.sun.sgs.server.host=</tt><i>core-server-host</i>
+
+<h3>Configuration</h3>
+
+Make sure to install the version of the <tt>sgs</tt>
+and <tt>sgs-client</tt> project that you are testing against. <p>
+
+Make sure to package the request project prior to running any of the
+command lines. <p>
+
+You can set the <tt>JAVA_HOME</tt> environment variable to control which
+version of Java gets used. <p>
+
+To characterize the performance of the system, start the server, and run
+the client with different numbers of clients for a few minutes.  The
+results for a particular number of clients are valid at the point that
+the values of "sent/sec" and "rcv/sec" stabilize on the client side.  On
+the server side, the "mean throughput" value should stabilize. <p>
+
+Then, determine the largest number of clients that can be run with the
+"backlog" number of the client side staying at zero.  That number of
+clients represents the current performance of the system as a whole for
+this example. <p>
+
+You can use the Solaris <tt>/usr/bin/prstat</tt> command to get the CPU
+usage.
+
+<h4>Using different databases</h4>
+
+Include <tt>bdb-java</tt> in the value of the <tt>-P</tt> option to use
+BDB Java Edition (JE).  For example:
+
+<pre>
+  -Psingle-node-server,bdb-java
+</pre> <p>
+
+To use different versions of BDB or JE, you need to install them in the
+local Maven repository: <p>
+
+<tt>
+&nbsp;&nbsp;mvn install:install-file \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DgroupId=com.projectdarkstar.ext.berkeleydb \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DartifactId=je \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dpackaging=jar \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DgeneratePom=true \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dfile=</tt><i>je-jar-file</i><tt> \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dversion=</tt><i>je-version</i>
+<p>
+
+<tt>
+&nbsp;&nbsp;mvn install:install-file \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DgroupId=com.projectdarkstar.ext.berkeleydb \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DartifactId=je \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dpackaging=jar \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DgeneratePom=true \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dfile=</tt><i>je-jar-file</i><tt> \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dversion=</tt><i>je-version</i>
+<p>
+
+<tt>
+&nbsp;&nbsp;mvn install:install-file \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DgroupId=com.projectdarkstar.ext.berkeleydb \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DartifactId=je \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dpackaging=jar \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-DgeneratePom=true \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dfile=</tt><i>je-jar-file</i><tt> \<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dversion=</tt><i>je-version</i>
+<p>
+
+<a name="collect"></a>
+<h2>Collecting Configuration Information</h2>
+
+This section describes how to collect the configuration information
+included for each test.
+
+<ul>
+
+<li>To get Solaris version:
+
+<pre>
+cat /etc/release
+</pre>
+
+<li>To get Solaris hardware info:
+
+<pre>
+prtdiag
+prtconf
+psrinfo -v
+</pre>
+
+<li>To get Solaris file system info:
+
+<pre>
+df -n
+</pre>
+
+<li>To get Java version:
+
+<pre>
+java -version
+</pre>
+
+</ul>
+
+</body>
+
+</html>
