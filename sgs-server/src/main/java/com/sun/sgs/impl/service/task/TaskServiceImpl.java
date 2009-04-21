@@ -24,6 +24,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
+import com.sun.sgs.app.RunWithNewIdentity;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskRejectedException;
 
@@ -70,6 +71,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import java.util.concurrent.ConcurrentHashMap;
+
+import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -483,7 +486,7 @@ public class TaskServiceImpl
         }
 
         // persist the task regardless of where it will ultimately run
-        Identity owner = txnProxy.getCurrentOwner();
+        Identity owner = getTaskOwner(task);
         TaskRunner runner = getRunner(task, owner, startTime, PERIOD_NONE);
 
         // check where the owner is active to get the task running
@@ -500,7 +503,8 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
-                                                   long period) {
+                                                   long period)
+    {
         serviceStats.scheduleTaskPeriodicOp.report();
         // note the start time
         long startTime = System.currentTimeMillis() + delay;
@@ -521,7 +525,7 @@ public class TaskServiceImpl
         }
 
         // persist the task regardless of where it will ultimately run
-        Identity owner = txnProxy.getCurrentOwner();
+        Identity owner = getTaskOwner(task);
         TaskRunner runner = getRunner(task, owner, startTime, period);
         BigInteger objId = runner.getObjId();
 
@@ -549,7 +553,8 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleNonDurableTask(KernelRunnable task,
-                                       boolean transactional) {
+                                       boolean transactional)
+    {
         if (task == null) {
             throw new NullPointerException("Task must not be null");
         }
@@ -558,7 +563,7 @@ public class TaskServiceImpl
         }
         serviceStats.scheduleNDTaskOp.report();
 
-        Identity owner = txnProxy.getCurrentOwner();
+        Identity owner = getTaskOwner(task);
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
                      START_NOW, false);
     }
@@ -567,7 +572,8 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleNonDurableTask(KernelRunnable task, long delay,
-                                       boolean transactional) {
+                                       boolean transactional)
+    {
         if (task == null) {
             throw new NullPointerException("Task must not be null");
         }
@@ -579,7 +585,7 @@ public class TaskServiceImpl
         }
         serviceStats.scheduleNDTaskDelayedOp.report();
 
-        Identity owner = txnProxy.getCurrentOwner();
+        Identity owner = getTaskOwner(task);
         scheduleTask(new NonDurableTask(task, owner, transactional), owner,
                      System.currentTimeMillis() + delay, false);
     }
@@ -590,7 +596,8 @@ public class TaskServiceImpl
      * associated {@code PendingTask}.
      */
     private TaskRunner getRunner(Task task, Identity identity, long startTime,
-                                 long period) {
+                                 long period)
+    {
         logger.log(Level.FINEST, "setting up a pending task");
 
         // create a new pending task that will be used when the runner runs
@@ -617,7 +624,8 @@ public class TaskServiceImpl
 
     /** Helper that allocates a pending task, re-using one if possible. */
     private BigInteger allocatePendingTask(Task task, Identity identity,
-                                           long startTime, long period) {
+                                           long startTime, long period)
+    {
         PendingTask ptask = null;
         BigInteger objId = null;
         Set<BigInteger> set = availablePendingMap.get(identity);
@@ -673,7 +681,8 @@ public class TaskServiceImpl
      * tasks, but not for periodic tasks.
      */
     private void scheduleTask(KernelRunnable task, Identity owner,
-                              long startTime, boolean transactional) {
+                              long startTime, boolean transactional)
+    {
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "reserving a task starting " +
                        (startTime == START_NOW ? "now" : "at " + startTime));
@@ -904,7 +913,8 @@ public class TaskServiceImpl
             // ... and start the periodic tasks
             if (addedRecurringMap != null) {
                 for (Entry<BigInteger, RecurringDetail> entry :
-                         addedRecurringMap.entrySet()) {
+                         addedRecurringMap.entrySet())
+                {
                     RecurringDetail detail = entry.getValue();
                     recurringMap.put(entry.getKey(), detail);
                     addHandleForIdentity(detail.handle, detail.identity);
@@ -938,7 +948,8 @@ public class TaskServiceImpl
             // return any taken pending tasks
             if (allocatedTaskIds != null) {
                 for (Entry<Identity, HashSet<BigInteger>> entry :
-                         allocatedTaskIds.entrySet()) {
+                         allocatedTaskIds.entrySet())
+                {
                     Set<BigInteger> localSet =
                         availablePendingMap.get(entry.getKey());
                     if (localSet != null) {
@@ -959,7 +970,8 @@ public class TaskServiceImpl
         }
         /** Adds a handle to start at commit-time. */
         void addRecurringTask(BigInteger objId, RecurringTaskHandle handle,
-                              Identity identity) {
+                              Identity identity)
+        {
             if (addedRecurringMap == null) {
                 addedRecurringMap = new HashMap<BigInteger, RecurringDetail>();
             }
@@ -1049,7 +1061,8 @@ public class TaskServiceImpl
         private final Identity taskIdentity;
         private boolean doLocalCheck = true;
         TaskRunner(BigInteger objId, String objTaskType,
-                   Identity taskIdentity) {
+                   Identity taskIdentity)
+        {
             this.objId = objId;
             this.objTaskType = objTaskType;
             this.taskIdentity = taskIdentity;
@@ -1121,7 +1134,8 @@ public class TaskServiceImpl
                 // to see if the task will be re-tried...if not, then we need
                 // to notify the service
                 if ((!(e instanceof ExceptionRetryStatus)) ||
-                        (!((ExceptionRetryStatus) e).shouldRetry())) {
+                        (!((ExceptionRetryStatus) e).shouldRetry()))
+                {
                     notifyNonRetry(objId);
                 }
                 throw e;
@@ -1140,7 +1154,8 @@ public class TaskServiceImpl
         private final Identity identity;
         private final boolean transactional;
         NonDurableTask(KernelRunnable runnable, Identity identity,
-                       boolean transactional) {
+                       boolean transactional)
+        {
             this.runnable = runnable;
             this.identity = identity;
             this.transactional = transactional;
@@ -1299,7 +1314,8 @@ public class TaskServiceImpl
 
     /** Private helper to add a recurring handle to the set for an identity. */
     private void addHandleForIdentity(RecurringTaskHandle handle,
-                                      Identity identity) {
+                                      Identity identity)
+    {
         synchronized (identityRecurringMap) {
             Set<RecurringTaskHandle> set = identityRecurringMap.get(identity);
             if (set == null) {
@@ -1315,7 +1331,8 @@ public class TaskServiceImpl
      * identity.
      */
     private void removeHandleForIdentity(RecurringTaskHandle handle,
-                                         Identity identity) {
+                                         Identity identity)
+    {
         synchronized (identityRecurringMap) {
             Set<RecurringTaskHandle> set = identityRecurringMap.get(identity);
             if (set != null) {
@@ -1612,7 +1629,8 @@ public class TaskServiceImpl
                             String objName =
                                 dataService.nextServiceBoundName(prefix);
                             while ((objName != null) &&
-                                   (objName.startsWith(prefix))) {
+                                   (objName.startsWith(prefix)))
+                            {
                                 Object obj =
                                     dataService.getServiceBinding(objName);
                                 dataService.removeServiceBinding(objName);
@@ -1671,6 +1689,49 @@ public class TaskServiceImpl
             } catch (NameNotBoundException nnbe) {
                 throw new ObjectNotFoundException("task was already cancelled");
             }
+        }
+    }
+
+    /** Private method to get or create an owner for a task. */
+    private Identity getTaskOwner(Object task) {
+        if (task.getClass().getAnnotation(RunWithNewIdentity.class) != null) {
+            return new DynamicIdentity(nodeId);
+        } else {
+            return txnProxy.getCurrentOwner();
+        }
+    }
+
+    /** Private implementation of {@code Identity} for new task owners. */
+    private static class DynamicIdentity implements Identity, Serializable {
+        private static final long serialVersionUID = 1L;
+        // a counter just to make all identity names unique
+        private static final AtomicLong counter = new AtomicLong(0);
+        // the name of this new identity
+        private final String name;
+        /** Create an instance of {@code DynamicIdentity}. */
+        DynamicIdentity(long nodeId) {
+            this.name = "id:" + nodeId + "." + counter.getAndIncrement();
+        }
+        /** {@inheritDoc} */
+        public String getName() {
+            return name;
+        }
+        /** This identity may never log in. */
+        public void notifyLoggedIn() {
+            throw new AssertionError("Logged in should not be called");
+        }
+        /** This identity may never log out. */
+        public void notifyLoggedOut() {
+            throw new AssertionError("Logged out should not be called");
+        }
+        /** {@inheritDoc} */
+        public boolean equals(Object o) {
+            return (o instanceof DynamicIdentity) &&
+                this.name.equals(((DynamicIdentity) o).name);
+        }
+        /** {@inheritDoc} */
+        public int hashCode() {
+            return name.hashCode();
         }
     }
 
