@@ -20,10 +20,14 @@
 package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
+import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.tools.test.FilteredNameRunner;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
@@ -74,6 +78,15 @@ public class TestDataStoreImplPlaceholders extends Assert {
     private static Properties props = createProperties(
 	DataStoreImplClassName + ".directory", dbDirectory);
 
+    /** The transaction proxy. */
+    protected static final DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
+
+    /** The access coordinator. */
+    protected static final AccessCoordinatorHandle accessCoordinator =
+	new NullAccessCoordinator(System.getProperties(), txnProxy,
+				  new DummyProfileCollectorHandle());
+
     /** The data store to test. */
     private static DataStoreImpl store;
 
@@ -87,13 +100,13 @@ public class TestDataStoreImplPlaceholders extends Assert {
     @BeforeClass
     public static void initialize() throws Exception {
 	cleanDirectory(dbDirectory);
-	store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props, accessCoordinator);
     }
 
     /** Create a transaction and an object in the data store. */
     @Before
     public void setUp() throws Exception {
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
 	id = store.createObject(txn);
     }
 
@@ -117,7 +130,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	for (int i = 0; i < 2; i++) {
 	    if (i == 1) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    store.markForUpdate(txn, id);
 	}
@@ -130,7 +143,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	for (int i = 0; i < 2; i++) {
 	    if (i == 1) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    try {
 		store.getObject(txn, id, false);
@@ -155,7 +168,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	    createPlaceholder(txn, id);
 	    if (i == 1) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    byte[] value = { 1, 2 };
 	    store.setObject(txn, id, value);
@@ -172,7 +185,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	    createPlaceholder(txn, ids[1]);
 	    if (i == 1) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    store.setObjects(txn, ids, dataArray);
 	    assertSameBytes(dataArray[0], store.getObject(txn, ids[0], false));
@@ -186,7 +199,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	    createPlaceholder(txn, id);
 	    if (i == 1) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    store.removeObject(txn, id);
 	}
@@ -202,7 +215,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	for (int i = 0; i < 1025; i++) {
 	    if (i % 25 == 0) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    store.createObject(txn);
 	}
@@ -214,7 +227,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 		} else {
 		    txn.commit();
 		}
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    store.setObject(
 		txn, store.createObject(txn), new byte[] { (byte) i });
@@ -223,7 +236,7 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	for (int i = 2050; i < 3075; i++) {
 	    if (i % 25 == 0) {
 		txn.commit();
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    store.setObject(
 		txn, store.createObject(txn), new byte[] { (byte) i });
@@ -231,14 +244,14 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	txn.commit();
 	txn = null;
 	store.shutdown();
-	store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props, accessCoordinator);
 	long nextId = -1;
 	for (int i = 0; true; i++) {
 	    if (i % 40 == 0) {
 		if (txn != null) {
 		    txn.commit();
 		}
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    nextId = nextObjectIdRaw(txn, nextId);
 	    if (nextId < 0) {
@@ -316,5 +329,30 @@ public class TestDataStoreImplPlaceholders extends Assert {
 	} catch (Exception e) {
 	    throw new RuntimeException(e.getMessage(), e);
 	}
+    }
+
+    /** Creates a transaction with explicit use of prepareAndCommit. */
+    static DummyTransaction createTransaction(
+	UsePrepareAndCommit usePrepareAndCommit)
+    {
+	return initTransaction(new DummyTransaction(usePrepareAndCommit));
+    }
+
+    /**
+     * Creates a transaction with explicit use of prepareAndCommit and a
+     * non-standard timeout.
+     */
+    static DummyTransaction createTransaction(
+	UsePrepareAndCommit usePrepareAndCommit, long timeout)
+    {
+	return initTransaction(
+	    new DummyTransaction(usePrepareAndCommit, timeout));
+    }
+
+    /** Initializes a transaction. */
+    static DummyTransaction initTransaction(DummyTransaction txn) {
+	txnProxy.setCurrentTransaction(txn);
+	accessCoordinator.notifyNewTransaction(txn, 0, 1);
+	return txn;
     }
 }

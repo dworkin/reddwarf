@@ -23,11 +23,13 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.store.AbstractDataStore;
+import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
-import com.sun.sgs.impl.sharedutil.Exceptions;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
@@ -44,9 +46,8 @@ import java.util.logging.Logger;
  * network to an implementation of {@link DataStoreServer}, and optionally runs
  * the server. <p>
  *
- * The {@link #DataStoreClient(Properties) constructor} supports the following
- * properties:
- * <p>
+ * The {@link #DataStoreClient(Properties, AccessCoordinator) constructor}
+ * supports the following properties: <p>
  *
  * <dl style="margin-left: 1em">
  *
@@ -106,9 +107,8 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Object operations
  * </ul>
  */
-public final class DataStoreClient
-    implements DataStore, TransactionParticipant
-{
+public final class DataStoreClient extends AbstractDataStore {
+
     /** The package for this class. */
     private static final String PACKAGE =
 	"com.sun.sgs.impl.service.data.store.net";
@@ -116,6 +116,10 @@ public final class DataStoreClient
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client"));
+
+    /** The logger for transaction abort exceptions. */
+    static final LoggerWrapper abortLogger =
+	new LoggerWrapper(Logger.getLogger(PACKAGE + ".client.abort"));
 
     /** The property that specifies the name of the server host. */
     private static final String SERVER_HOST_PROPERTY =
@@ -210,10 +214,11 @@ public final class DataStoreClient
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  See the {@link DataStoreClient class documentation} for a
-     * list of supported properties.
+     * properties and access coordinator.  See the {@link DataStoreClient class
+     * documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
+     * @param	accessCoordinator the access coordinator
      * @throws	IllegalArgumentException if the {@code
      *		com.sun.sgs.impl.service.data.store.net.server.host} property
      *		is not set, or if the value of the {@code
@@ -224,9 +229,11 @@ public final class DataStoreClient
      * @throws	NotBoundException if the server is not found in the Java RMI
      *		registry
      */
-    public DataStoreClient(Properties properties)
+    public DataStoreClient(Properties properties,
+			   AccessCoordinator accessCoordinator)
 	throws IOException, NotBoundException
     {
+	super(accessCoordinator, logger, abortLogger);
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -277,396 +284,182 @@ public final class DataStoreClient
 	server = getServer();
     }
 
-    /* -- Implement DataStore -- */
+    /* -- Implement AbstractDataStore's DataStore methods -- */
 
     /** {@inheritDoc} */
-    public long createObject(Transaction txn) {
-	logger.log(Level.FINEST, "createObject txn:{0}", txn);
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected long createObjectInternal(Transaction txn) {
 	try {
-	    txnInfo = checkTxn(txn);
-	    long result = server.createObject(txnInfo.tid);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "createObject txn:{0} returns oid:{1,number,#}",
-			   txn, result);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.createObject(txnInfo.tid);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(
-	    txn, txnInfo, Level.FINEST, exception, "createObject txn:" + txn);
     }
 
     /** {@inheritDoc} */
-    public void markForUpdate(Transaction txn, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void markForUpdateInternal(Transaction txn, long oid) {
 	try {
-	    txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    server.markForUpdate(txnInfo.tid, oid);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
-			   txn, oid);
-	    }
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "markForUpdate txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
-    public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST,
-		       "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2}",
-		       txn, oid, forUpdate);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected byte[] getObjectInternal(
+	Transaction txn, long oid, boolean forUpdate)
+    {
 	try {
-	    txnInfo = checkTxn(txn);
-	    byte[] result = server.getObject(txnInfo.tid, oid, forUpdate);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2} " +
-		    "returns",
-		    txn, oid, forUpdate);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.getObject(txnInfo.tid, oid, forUpdate);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "getObject txn:" + txn + ", oid:" + oid +
-			       ", forUpdate:" + forUpdate);
     }
 
     /** {@inheritDoc} */
-    public void setObject(Transaction txn, long oid, byte[] data) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "setObject txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void setObjectInternal(Transaction txn, long oid, byte[] data) {
 	try {
-	    if (data == null) {
-		throw new NullPointerException("The data must not be null");
-	    }
-	    txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    server.setObject(txnInfo.tid, oid, data);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "setObject txn:{0}, oid:{1,number,#} returns",
-			   txn, oid);
-	    }
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "setObject txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
-    public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "setObjects txn:{0}", txn);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void setObjectsInternal(
+	Transaction txn, long[] oids, byte[][] dataArray)
+    {
 	try {
-	    txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    server.setObjects(txnInfo.tid, oids, dataArray);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
-	    }
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "setObjects txn:" + txn);
     }
 
     /** {@inheritDoc} */
-    public void removeObject(Transaction txn, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "removeObject txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void removeObjectInternal(Transaction txn, long oid) {
 	try {
-	    txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn);
 	    server.removeObject(txnInfo.tid, oid);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "removeObject txn:{0}, oid:{1,number,#} returns",
-			   txn, oid);
-	    }
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "removeObject txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
-    public long getBinding(Transaction txn, String name) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "getBinding txn:{0}, name:{1}", txn, name);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected BindingValue getBindingInternal(Transaction txn, String name) {
 	try {
-	    txnInfo = checkTxn(txn);
-	    long result = server.getBinding(txnInfo.tid, name);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "getBinding txn:{0}, name:{1} returns oid:{2,number,#}",
-		    txn, name, result);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.getBinding(txnInfo.tid, name);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "getBinding txn:" + txn + ", name:" + name);
     }
 
     /** {@inheritDoc} */
-    public void setBinding(Transaction txn, String name, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "setBinding txn:{0}, name:{1}, oid:{2,number,#}",
-		txn, name, oid);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected BindingValue setBindingInternal(
+	Transaction txn, String name, long oid)
+    {
 	try {
-	    txnInfo = checkTxn(txn);
-	    server.setBinding(txnInfo.tid, name, oid);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "setBinding txn:{0}, name:{1}, oid:{2,number,#} returns",
-		    txn, name, oid);
-	    }
-	    return;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.setBinding(txnInfo.tid, name, oid);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(
-	    txn, txnInfo, Level.FINEST, exception,
-	    "setBinding txn:" + txn + ", name:" + name + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
-    public void removeBinding(Transaction txn, String name) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
-	}
-	Exception exception;
-	TxnInfo txnInfo = null;
+    protected BindingValue removeBindingInternal(
+	Transaction txn, String name)
+    {
 	try {
-	    txnInfo = checkTxn(txn);
-	    server.removeBinding(txnInfo.tid, name);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "removeBinding txn:{0}, name:{1} returns",
-		    txn, name);
-	    }
-	    return;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.removeBinding(txnInfo.tid, name);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "removeBinding txn:" + txn + ", name:" + name);
     }
 
     /** {@inheritDoc} */
-    public String nextBoundName(Transaction txn, String name) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected String nextBoundNameInternal(Transaction txn, String name) {
 	try {
-	    txnInfo = checkTxn(txn);
-	    String result = server.nextBoundName(txnInfo.tid, name);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "nextBoundName txn:{0}, name:{1} returns {2}",
-			   txn, name, result);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.nextBoundName(txnInfo.tid, name);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINEST, exception,
-			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
     /** {@inheritDoc} */
-    public void shutdown() {
-	logger.log(Level.FINER, "shutdown");
-	try {
-	    synchronized (txnCountLock) {
-		shuttingDown = true;
-		while (txnCount > 0) {
-		    try {
-			logger.log(Level.FINEST,
-				   "shutdown waiting for {0} transactions",
-				   txnCount);
-			txnCountLock.wait();
-		    } catch (InterruptedException e) {
-                        // loop until shutdown is complete
-			logger.log(Level.FINEST, "Interrupt ignored during" +
-                                "shutdown");
-		    }
+    protected void shutdownInternal() {
+	synchronized (txnCountLock) {
+	    shuttingDown = true;
+	    while (txnCount > 0) {
+		try {
+		    logger.log(Level.FINEST,
+			       "shutdown waiting for {0} transactions",
+			       txnCount);
+		    txnCountLock.wait();
+		} catch (InterruptedException e) {
+		    // loop until shutdown is complete
+		    logger.log(Level.FINEST, "Interrupt ignored during" +
+			       "shutdown");
 		}
-                if (txnCount < 0) {
-                    return; // return silently
-                }
-
-                txnCount = -1;
-                if (localServer != null) {
-                    localServer.shutdown();
-                    localServer = null;
-                }
 	    }
-	} catch (RuntimeException e) {
-	    throw convertException(null, null, Level.FINER, e, "shutdown");
+	    if (txnCount < 0) {
+		return; // return silently
+	    }
+	    
+	    txnCount = -1;
+	    if (localServer != null) {
+		localServer.shutdown();
+		localServer = null;
+	    }
 	}
     }
 
     /** {@inheritDoc} */
-    public int getClassId(Transaction txn, byte[] classInfo) {
-	logger.log(Level.FINER, "getClassId txn:{0}", txn);
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected int getClassIdInternal(Transaction txn, byte[] classInfo) {
 	try {
-	    txnInfo = checkTxn(txn);
-	    int result = server.getClassId(txnInfo.tid, classInfo);
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER,
-			   "getClassId txn:{0} returns {1}", txn, result);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.getClassId(txnInfo.tid, classInfo);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(
-	    txn, txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
     }
 
     /** {@inheritDoc} */
-    public byte[] getClassInfo(Transaction txn, int classId)
+    protected byte[] getClassInfoInternal(Transaction txn, int classId)
 	throws ClassInfoNotFoundException
     {
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER,
-		       "getClassInfo txn:{0}, classId:{1,number,#}",
-		       txn, classId);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
 	try {
-	    txnInfo = checkTxn(txn);
-	    byte[] result = server.getClassInfo(txnInfo.tid, classId);
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER,
-		    "getClassInfo txn:{0}, classId:{1,number,#} returns",
-		    txn, classId);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.getClassInfo(txnInfo.tid, classId);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(
-	    txn, txnInfo, Level.FINER, exception,
-	    "getClassInfo txn:" + txn + ", classId:" + classId);
     }
 
     /** {@inheritDoc} */
-    public long nextObjectId(Transaction txn, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "nextObjectId txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected long nextObjectIdInternal(Transaction txn, long oid) {
 	try {
-	    txnInfo = checkTxn(txn);
-	    long result = server.nextObjectId(txnInfo.tid, oid);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "nextObjectId txn:{0}, oid:{1,number,#} " +
-			   "returns oid:{2,number,#}",
-			   txn, oid, result);
-	    }
-	    return result;
+	    TxnInfo txnInfo = checkTxn(txn);
+	    return server.nextObjectId(txnInfo.tid, oid);
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(
-	    txn, txnInfo, Level.FINEST, exception,
-	    "nextObjectId txn:" + txn + ", oid:" + oid + " throws");
     }
 
-    /* -- Implement TransactionParticipant -- */
+    /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
 
     /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) {
-	logger.log(Level.FINER, "prepare txn:{0}", txn);
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected boolean prepareInternal(Transaction txn) {
 	try {
-	    txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
 	    checkTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
@@ -674,31 +467,20 @@ public final class DataStoreClient
 	    }
 	    boolean result = server.prepare(txnInfo.tid);
 	    txnInfo.prepared = true;
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER, "prepare txn:{0} returns {1}", txn, result);
-	    }
 	    if (result) {
 		threadTxnInfo.set(null);
 		decrementTxnCount();
 	    }
 	    return result;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINER, exception,
-			       "prepare txn:" + txn);
     }
 
     /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	logger.log(Level.FINER, "commit txn:{0}", txn);
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void commitInternal(Transaction txn) {
 	try {
-	    txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
 	    if (!txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has not been prepared");
@@ -706,24 +488,15 @@ public final class DataStoreClient
 	    server.commit(txnInfo.tid);
 	    threadTxnInfo.set(null);
 	    decrementTxnCount();
-	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINER, exception,
-			       "commit txn:" + txn);
     }
 
     /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) {
-	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void prepareAndCommitInternal(Transaction txn) {
 	try {
-	    txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
 	    checkTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
@@ -732,24 +505,15 @@ public final class DataStoreClient
 	    server.prepareAndCommit(txnInfo.tid);
 	    threadTxnInfo.set(null);
 	    decrementTxnCount();
-	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(txn, txnInfo, Level.FINER, exception,
-			       "prepareAndCommit txn:" + txn);
     }
 
     /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	logger.log(Level.FINER, "abort txn:{0}", txn);
-	TxnInfo txnInfo = null;
-	Exception exception;
+    protected void abortInternal(Transaction txn) {
 	try {
-	    txnInfo = checkTxnNoJoin(txn, false);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, false);
 	    if (!txnInfo.serverAborted) {
 		try {
 		    server.abort(txnInfo.tid);
@@ -762,20 +526,60 @@ public final class DataStoreClient
 	    }
 	    threadTxnInfo.set(null);
 	    decrementTxnCount();
-	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
-	    return;
 	} catch (IOException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
+	    throw new NetworkException("", e);
 	}
-	throw convertException(
-	    txn, txnInfo, Level.FINER, exception, "abort txn:" + txn);
     }
     
-    /** {@inheritDoc} */
-    public String getTypeName() {
-        return this.getClass().getName();
+    /* -- Other AbstractDataStore methods -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * In addition to the operations performed by the superclass, this
+     * implementation includes the operation in the exception message for
+     * {@link NetworkException}s, converts {@link
+     * TransactionNotActiveException} to {@link TransactionTimeoutException} if
+     * the transaction timeout has passed, and notes in the information for the
+     * transaction if the transaction has been aborted on the server side.
+     */
+    @Override
+    protected RuntimeException handleException(Transaction txn,
+					       Level level,
+					       RuntimeException e,
+					       String operation)
+    {
+	if (e instanceof NetworkException) {
+	    /* Include the operation in the message */
+	    Throwable cause = e.getCause();
+	    e = new NetworkException(
+		operation + " failed due to a communication problem: " +
+		cause.getMessage(), cause);
+	} else if (e instanceof TransactionNotActiveException && txn != null) {
+	    /*
+	     * If the transaction is not active on the server, then it may have
+	     * timed out.
+	     */
+	    long duration = System.currentTimeMillis() - txn.getCreationTime();
+	    if (duration > txn.getTimeout()) {
+		e = new TransactionTimeoutException(
+		    operation + " failed: Transaction timed out after " +
+		    duration + " ms",
+		    e);
+	    }
+	}
+	/*
+	 * If we're throwing an exception saying that the transaction was
+	 * aborted, then note that the server must already know about the
+	 * abort.
+	 */
+	if (e instanceof TransactionAbortedException) {
+	    TxnInfo txnInfo = threadTxnInfo.get();
+	    if (txnInfo != null) {
+		txnInfo.serverAborted = true;
+	    }
+	}
+	return super.handleException(txn, level, e, operation);
     }
 
     /* -- Other public methods -- */
@@ -909,67 +713,6 @@ public final class DataStoreClient
 	    throw new IllegalStateException("Wrong transaction");
 	}
 	return txnInfo;
-    }
-
-    /**
-     * Returns the correct SGS exception for a IOException thrown during an
-     * operation.  The txn argument, if non-null, is used to abort the
-     * transaction if a TransactionAbortedException is going to be thrown.  The
-     * txnInfo argument, if non-null, is used to mark the transaction as
-     * aborted.  The level argument is used to log the exception.  The
-     * operation argument will be included in newly created exceptions and the
-     * log, and should describe the operation that was underway when the
-     * exception was thrown.  The supplied exception may also be a
-     * RuntimeException, which will be logged and returned.
-     */
-    private RuntimeException convertException(
-	Transaction txn, TxnInfo txnInfo, Level level, Exception e,
-	String operation)
-    {
-	RuntimeException re;
-	if (e instanceof IOException) {
-	    re = new NetworkException(
-		operation + " failed due to a communication problem: " +
-		e.getMessage(),
-		e);
-	} else if (e instanceof TransactionAbortedException) {
-	    re = (RuntimeException) e;
-	} else if (e instanceof TransactionNotActiveException && txn != null) {
-	    /*
-	     * If the transaction is not active on the server, then it may have
-	     * timed out.
-	     */
-	    long duration = System.currentTimeMillis() - txn.getCreationTime();
-	    if (duration > txn.getTimeout()) {
-		re = new TransactionTimeoutException(
-		    operation + " failed: Transaction timed out after " +
-		    duration + " ms",
-		    e);
-	    } else {
-		re = (TransactionNotActiveException) e;
-	    }
-	} else if (e instanceof RuntimeException) {
-	    re = (RuntimeException) e;
-	} else {
-	    throw Exceptions.initCause(
-		new AssertionError(
-		    "Expected IOException or RuntimeException: " + e),
-		e);
-	}
-	/*
-	 * If we're throwing an exception saying that the transaction was
-	 * aborted, then make sure to abort the transaction now.
-	 */
-	if (re instanceof TransactionAbortedException) {
-	    if (txnInfo != null) {
-		txnInfo.serverAborted = true;
-	    }
-	    if (txn != null && !txn.isAborted()) {
-		txn.abort(re);
-	    }
-	}
-	logger.logThrow(level, re, "{0} throws", operation);
-	return re;
     }
 
     /** Returns the current transaction count. */

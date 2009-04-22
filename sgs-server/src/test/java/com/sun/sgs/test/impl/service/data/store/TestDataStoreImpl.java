@@ -25,6 +25,8 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.AccessCoordinatorHandle;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -34,7 +36,9 @@ import com.sun.sgs.impl.service.data.store.DataStoreProfileProducer;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyProfileCoordinator;
+import com.sun.sgs.test.util.DummyProfileCollectorHandle;
 import com.sun.sgs.test.util.DummyTransaction;
+import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;
 import com.sun.sgs.tools.test.FilteredJUnit3TestRunner;
@@ -83,6 +87,15 @@ public class TestDataStoreImpl extends TestCase {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
 
+    /** The transaction proxy. */
+    protected static final DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
+
+    /** The access coordinator. */
+    protected static final AccessCoordinatorHandle accessCoordinator =
+	new NullAccessCoordinator(System.getProperties(), txnProxy,
+				  new DummyProfileCollectorHandle());
+
     /** An instance of the data store, to test. */
     protected static DataStore store;
 
@@ -111,7 +124,7 @@ public class TestDataStoreImpl extends TestCase {
     /** Prints the test case, and creates the data store and an object. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY, 10000);
 	props = getProperties();
 	if (store == null) {
 	    store = createDataStore();
@@ -299,7 +312,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testCreateObjectMany() throws Exception {
 	for (int i = 0; i < 10; i++) {
 	    if (i != 0) {
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    for (int j = 0; j < 200; j++) {
 		store.createObject(txn);
@@ -366,7 +379,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testMarkForUpdateSuccess() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.markForUpdate(txn, id);
 	store.markForUpdate(txn, id);
 	assertTrue(
@@ -439,7 +452,7 @@ public class TestDataStoreImpl extends TestCase {
 	byte[] data = { 1, 2 };
 	store.setObject(txn, id, data);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	byte[] result =	store.getObject(txn, id, false);
 	assertTrue(
 	    txn.participants.contains(
@@ -459,7 +472,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, value);
 	assertSameBytes(value, store.getObject(txn, id, false));
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertSameBytes(value, store.getObject(txn, id, false));
 	long id2 = store.createObject(txn);
 	for (int i = 0; i < 256; i++) {
@@ -470,7 +483,7 @@ public class TestDataStoreImpl extends TestCase {
 	    assertSameBytes(value, store.getObject(txn, id, false));
 	    assertSameBytes(value2, store.getObject(txn, id2, false));
 	    txn.commit();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    assertSameBytes(value, store.getObject(txn, id, false));
 	    assertSameBytes(value2, store.getObject(txn, id2, false));
 	}
@@ -511,7 +524,7 @@ public class TestDataStoreImpl extends TestCase {
 	byte[] data = { };
 	store.setObject(txn, id, data);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	byte[] result = store.getObject(txn, id, false);
 	assertTrue(result.length == 0);
     }
@@ -550,18 +563,18 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, data);
 	assertFalse(txn.prepare());
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	byte[] result = store.getObject(txn, id, false);
 	assertTrue(Arrays.equals(data, result));
 	byte[] newData = new byte[] { 3 };
 	store.setObject(txn, id, newData);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
 	txn.abort(new RuntimeException("abort"));
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
 	store.setObject(txn, id, newData);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
     }
 
@@ -636,7 +649,7 @@ public class TestDataStoreImpl extends TestCase {
 	byte[][] dataArray = { { } };
 	store.setObjects(txn, ids, dataArray);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	byte[] result = store.getObject(txn, id, false);
 	assertTrue(result.length == 0);
     }
@@ -678,7 +691,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObjects(txn, ids, dataArray);
 	assertFalse(txn.prepare());
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	for (int i = 0; i < ids.length; i++) {
 	    long id = ids[i];
 	    byte[] data = dataArray[i];
@@ -688,11 +701,11 @@ public class TestDataStoreImpl extends TestCase {
 	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
 	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
 	    txn.abort(new RuntimeException("abort"));
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
 	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
 	    txn.commit();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
 	}
     }
@@ -759,11 +772,11 @@ public class TestDataStoreImpl extends TestCase {
     public void testRemoveObjectSuccess() throws Exception {
 	store.setObject(txn, id, new byte[] { 0 });
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	assertFalse(txn.prepare());
 	txn.abort(new RuntimeException("abort"));
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	try {
 	    store.getObject(txn, id, false);
@@ -771,7 +784,7 @@ public class TestDataStoreImpl extends TestCase {
 	} catch (ObjectNotFoundException e) {
 	}
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	try {
 	    store.getObject(txn, id, false);
 	    fail("Expected ObjectNotFoundException");
@@ -803,7 +816,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, new byte[] { 0 });
 	store.setBinding(txn, "", id);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	long result = store.getBinding(txn, "");
 	assertEquals(id, result);
     }
@@ -820,7 +833,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testGetBindingObjectNotFound() throws Exception {
 	store.setBinding(txn, "foo", id);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	long result = store.getBinding(txn, "foo");
 	assertEquals(id, result);
     }
@@ -859,7 +872,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, new byte[] { 0 });
 	store.setBinding(txn, "foo", id);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	long result = store.getBinding(txn, "foo");
 	assertEquals(id, result);
 	assertTrue(txn.prepare());
@@ -920,12 +933,12 @@ public class TestDataStoreImpl extends TestCase {
 	store.setBinding(txn, "foo", id);
 	assertFalse(txn.prepare());
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
 	store.setBinding(txn, "foo", newId);
 	assertEquals(newId, store.getBinding(txn, "foo"));
 	txn.abort(new RuntimeException("abort"));
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
     }
 
@@ -992,11 +1005,11 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, new byte[] { 0 });
 	store.setBinding(txn, "foo", id);
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeBinding(txn, "foo");
 	assertFalse(txn.prepare());
 	txn.abort(new RuntimeException("abort"));
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
 	store.removeBinding(txn, "foo");
 	try {
@@ -1006,7 +1019,7 @@ public class TestDataStoreImpl extends TestCase {
 	    System.err.println(e);
 	}
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	try {
 	    store.getBinding(txn, "foo");
 	    fail("Expected NameNotBoundException");
@@ -1081,7 +1094,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
 	store.setBinding(txn, "name-2", id);
 	txn.commit();
-	txn = new DummyTransaction();
+	txn = createTransaction();
 	assertEquals("name-1", store.nextBoundName(txn, null));
 	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
 	assertNull(store.nextBoundName(txn, "name-2"));
@@ -1101,7 +1114,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setBinding(txn, "name-1", id);
 	store.setBinding(txn, "name-2", id);
 	txn.commit();
-	txn = new DummyTransaction();
+	txn = createTransaction();
 	assertEquals("name-1", store.nextBoundName(txn, null));
 	assertEquals("name-1", store.nextBoundName(txn, null));
 	store.removeBinding(txn, "name-1");
@@ -1109,7 +1122,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.removeBinding(txn, "name-2");
 	assertNull(store.nextBoundName(txn, null));
 	txn.abort(new RuntimeException("abort"));
-	txn = new DummyTransaction();
+	txn = createTransaction();
 	assertEquals("name-1", store.nextBoundName(txn, null));
     }
 
@@ -1128,7 +1141,7 @@ public class TestDataStoreImpl extends TestCase {
 	    public void run() {
 		DummyTransaction txn2 = null;
 		try {
-		    txn2 = new DummyTransaction(
+		    txn2 = createTransaction(
 			UsePrepareAndCommit.ARBITRARY, 2000);
 		    /* Get write lock on name-299 and notify txn */
 		    store.setBinding(txn2, "name-299", id2);
@@ -1153,7 +1166,7 @@ public class TestDataStoreImpl extends TestCase {
 	thread.start();
 	flag.acquire();
 	String name = "name-100";
-	txn = new DummyTransaction();
+	txn = createTransaction();
 	try {
 	    /* Walk names, expecting to timeout on name-299 */
 	    while (name != null) {
@@ -1241,7 +1254,7 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testPrepareTimeout() throws Exception {
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.NO, 100);
+	txn = createTransaction(UsePrepareAndCommit.NO, 100);
 	store.setObject(txn, id, new byte[] { 1 });
 	Thread.sleep(200);
 	try {
@@ -1305,7 +1318,7 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testPrepareAndCommitTimeout() throws Exception {
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.YES, 100);
+	txn = createTransaction(UsePrepareAndCommit.YES, 100);
 	store.setObject(txn, id, new byte[] { 1 });
 	Thread.sleep(200);
 	try {
@@ -1405,6 +1418,7 @@ public class TestDataStoreImpl extends TestCase {
 		});
 	    }
 	};
+	initTransaction(txn);
 	store.setBinding(txn, "foo", id);
 	try {
 	    txn.commit();
@@ -1517,7 +1531,7 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	store.shutdown();
 	store = createDataStore();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	id = store.getBinding(txn, "foo");
 	byte[] value = store.getObject(txn, id, false);
 	assertTrue(Arrays.equals(bytes, value));
@@ -1625,7 +1639,7 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	store.shutdown();
 	store = createDataStore();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(Arrays.toString(bytes),
 		     Arrays.toString(store.getClassInfo(txn, id)));
     }
@@ -1706,7 +1720,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
 	store.setObject(txn, id, new byte[] { 1, 2, 3 });
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	long id2 = store.createObject(txn);
 	store.setObject(txn, id2, new byte[] { 4, 5, 6, 7 });
 	if (id > id2) {
@@ -1723,7 +1737,7 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	x = -1;
 	while (true) {
@@ -1742,7 +1756,7 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 	txn.commit();
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	x = -1;
 	while (true) {
 	    x = store.nextObjectId(txn, x);
@@ -1795,7 +1809,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
-		txn = new DummyTransaction(
+		txn = createTransaction(
 		    UsePrepareAndCommit.ARBITRARY, 1000);
 	    }
 	    final long id = store.createObject(txn);
@@ -1803,7 +1817,7 @@ public class TestDataStoreImpl extends TestCase {
 	    final long id2 = store.createObject(txn);
 	    store.setObject(txn, id2, new byte[] { 0 });
 	    txn.commit();
-	    txn = new DummyTransaction(
+	    txn = createTransaction(
 		UsePrepareAndCommit.ARBITRARY, 1000);
 	    store.getObject(txn, id, false);
 	    final Semaphore flag = new Semaphore(1);
@@ -1814,7 +1828,7 @@ public class TestDataStoreImpl extends TestCase {
 		public void run() {
 		    DummyTransaction txn2 = null;
 		    try {
-			txn2 = new DummyTransaction(
+			txn2 = createTransaction(
 			    UsePrepareAndCommit.ARBITRARY, 1000);
 			store.getObject(txn2, id2, false);
 			flag.release();
@@ -1903,7 +1917,8 @@ public class TestDataStoreImpl extends TestCase {
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreImpl(props), DummyProfileCoordinator.getCollector());
+	    new DataStoreImpl(props, accessCoordinator),
+	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;
     }
@@ -2001,7 +2016,7 @@ public class TestDataStoreImpl extends TestCase {
 	action.setUp();
 	store.createObject(txn);
 	DummyTransaction originalTxn = txn;
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 	try {
 	    action.run();
 	    fail("Expected IllegalStateException");
@@ -2038,7 +2053,7 @@ public class TestDataStoreImpl extends TestCase {
 	    new AtomicReference<Throwable>();
 	Thread t = new Thread() {
 	    public void run() {
-		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+		txn = createTransaction(UsePrepareAndCommit.ARBITRARY);
 		try {
 		    action.run();
 		} catch (Throwable t) {
@@ -2144,5 +2159,35 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected " + Arrays.toString(x) + ", got " +
 		 Arrays.toString(y));
 	}
+    }
+
+    /** Creates a transaction. */
+    protected static DummyTransaction createTransaction() {
+	return initTransaction(new DummyTransaction());
+    }
+
+    /** Creates a transaction with explicit use of prepareAndCommit. */
+    protected static DummyTransaction createTransaction(
+	UsePrepareAndCommit usePrepareAndCommit)
+    {
+	return initTransaction(new DummyTransaction(usePrepareAndCommit));
+    }
+
+    /**
+     * Creates a transaction with explicit use of prepareAndCommit and a
+     * non-standard timeout.
+     */
+    protected static DummyTransaction createTransaction(
+	UsePrepareAndCommit usePrepareAndCommit, long timeout)
+    {
+	return initTransaction(
+	    new DummyTransaction(usePrepareAndCommit, timeout));
+    }
+
+    /** Initializes a new transaction. */
+    protected static DummyTransaction initTransaction(DummyTransaction txn) {
+	txnProxy.setCurrentTransaction(txn);
+	accessCoordinator.notifyNewTransaction(txn, 0, 1);
+	return txn;
     }
 }
