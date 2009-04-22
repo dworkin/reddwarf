@@ -2816,10 +2816,9 @@ public class ScalableHashMap<K, V>
      * is intended for use in testing and debugging.
      */
     void checkLeafRefs() {
-	ScalableHashMap<K, V> first = leftMost();
 	ManagedReference<ScalableHashMap<K, V>> lastRef = null;
 	ManagedReference<ScalableHashMap<K, V>> nodeRef =
-	    uncheckedCast(AppContext.getDataManager().createReference(first));
+	    AppContext.getDataManager().createReference(leftMost());
 	while (nodeRef != null) {
 	    ScalableHashMap<K, V> node = nodeRef.get();
 	    if (!node.isLeafNode()) {
