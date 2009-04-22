@@ -29,7 +29,8 @@ import java.io.FileNotFoundException;
 public interface DbEnvironment {
 
     /**
-     * Begins a new transaction with the specified timeout.
+     * Begins a new transaction with the specified timeout and the
+     * implementation-specific default isolation level.
      *
      * @param	timeout the number of milliseconds the transaction should be
      *		allowed to run
@@ -38,6 +39,20 @@ public interface DbEnvironment {
      * @throws	DbDatabaseException if an unexpected database problem occurs
      */
     DbTransaction beginTransaction(long timeout);
+
+    /**
+     * Begins a transaction with the specified timeout and isolation level.
+     *
+     * @param	timeout the number of milliseconds the transaction should be
+     *		allowed to run
+     * @param	fullIsolation if {@code true}, requires the transaction to
+     *		support full serializable isolation, otherwise uses the default
+     *		transaction isolation level
+     * @return	the transaction
+     * @throws	IllegalArgumentException if timeout is less than {@code 1}
+     * @throws	DbDatabaseException if an unexpected database problem occurs
+     */
+    DbTransaction beginTransaction(long timeout, boolean fullIsolation);
 
     /**
      * Opens a database.  Relative database filenames will be interpreted
