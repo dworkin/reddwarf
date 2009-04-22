@@ -36,7 +36,6 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.impl.counters.EmptyCounter;
 import com.sun.sgs.impl.counters.NormalInteger;
 import com.sun.sgs.impl.counters.ScalableCounter;
-import com.sun.sgs.impl.counters.ScalableCounter2;
 import com.sun.sgs.impl.counters.ScalableInteger;
 import com.sun.sgs.impl.counters.ScalableStatCounter;
 
@@ -63,7 +62,7 @@ public class CounterPerformanceTest implements AppListener, Serializable
 
     /** Counters to test. **/
     public static enum COUNTER_TYPE {
-        Warmup, ScalableCounterWithoutGet, ScalableStatCounter, ScalableCounterWithGet, None, NormalInteger, ScalableInteger, ScalableCounter2, EmptyCounter;
+        Warmup, ScalableCounterWithoutGet, ScalableStatCounterWithGet, ScalableStatCounterWithoutGet, ScalableCounterWithGet, None, NormalInteger, ScalableInteger, EmptyCounter;
 
         public COUNTER_TYPE next()
         {
@@ -97,10 +96,10 @@ public class CounterPerformanceTest implements AppListener, Serializable
                 new ScalableInteger());
         dataManager.setBinding(COUNTER_TYPE.NormalInteger.toString(),
                 new NormalInteger());
-        dataManager.setBinding(COUNTER_TYPE.ScalableStatCounter.toString(),
+        dataManager.setBinding(COUNTER_TYPE.ScalableStatCounterWithGet.toString(),
                 new ScalableStatCounter());
-        dataManager.setBinding(COUNTER_TYPE.ScalableCounter2.toString(),
-                new ScalableCounter2());
+        dataManager.setBinding(COUNTER_TYPE.ScalableStatCounterWithoutGet.toString(),
+                new ScalableStatCounter());
         dataManager.setBinding(COUNTER_TYPE.EmptyCounter.toString(),
                 new EmptyCounter());
 
@@ -145,14 +144,13 @@ public class CounterPerformanceTest implements AppListener, Serializable
             return 0;
         case NormalInteger:
             return ((NormalInteger) getObj(type.toString())).get();
-        case ScalableCounter2:
-            return ((ScalableCounter2) getObj(type.toString())).get();
         case ScalableCounterWithGet:
         case ScalableCounterWithoutGet:
             return ((ScalableCounter) getObj(type.toString())).get();
         case ScalableInteger:
             return ((ScalableInteger) getObj(type.toString())).get();
-        case ScalableStatCounter:
+        case ScalableStatCounterWithGet:
+        case ScalableStatCounterWithoutGet:
             return ((ScalableStatCounter) getObj(type.toString())).get();
         case EmptyCounter:
             return ((EmptyCounter) getObj(type.toString())).get();
@@ -191,8 +189,8 @@ public class CounterPerformanceTest implements AppListener, Serializable
                 writeToFile(" " + time);
 
                 if (si.get() != numConcurrentTasks) {
-                    logger
-                            .warning("Number of completed concurrent tasks is incorrect");
+                    logger.warning("Number of completed concurrent "
+                            + "tasks is incorrect");
                 }
 
                 // reset
@@ -282,11 +280,12 @@ public class CounterPerformanceTest implements AppListener, Serializable
                 ((ScalableInteger) getObj(type.toString())).incrementAndGet();
             } else if (type == COUNTER_TYPE.NormalInteger) {
                 ((NormalInteger) getObj(type.toString())).inc();
-            } else if (type == COUNTER_TYPE.ScalableStatCounter) {
+            } else if (type == COUNTER_TYPE.ScalableStatCounterWithGet) {
                 ScalableStatCounter c = getObj(type.toString());
                 c.inc();
-            } else if (type == COUNTER_TYPE.ScalableCounter2) {
-                ScalableCounter2 c = getObj(type.toString());
+                c.get();
+            } else if (type == COUNTER_TYPE.ScalableStatCounterWithoutGet) {
+                ScalableStatCounter c = getObj(type.toString());
                 c.inc();
             } else if (type == COUNTER_TYPE.EmptyCounter) {
                 EmptyCounter c = getObj(type.toString());

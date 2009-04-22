@@ -101,7 +101,7 @@ public class ScalableStatCounter implements Serializable, ManagedObjectRemoval
             }
 
             counters[0].getForUpdate().addAndGet(value);
-            AppContext.getTaskManager().scheduleTask(this);
+            AppContext.getTaskManager().scheduleTask(this, 100);
         }
     }
 
