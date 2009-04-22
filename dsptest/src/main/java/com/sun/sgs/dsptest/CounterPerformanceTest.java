@@ -63,7 +63,7 @@ public class CounterPerformanceTest implements AppListener, Serializable
 
     /** Counters to test. **/
     public static enum COUNTER_TYPE {
-        Warmup, ScalableCounterWithoutGet, ScalableCounterWithGet, None, NormalInteger, ScalableInteger, ScalableStatCounter, ScalableCounter2, EmptyCounter;
+        Warmup, ScalableCounterWithoutGet, ScalableStatCounter, ScalableCounterWithGet, None, NormalInteger, ScalableInteger, ScalableCounter2, EmptyCounter;
 
         public COUNTER_TYPE next()
         {

@@ -1,6 +1,5 @@
 package com.sun.sgs.impl.counters;
 
-import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.sgs.app.ManagedObject;
@@ -8,8 +7,7 @@ import com.sun.sgs.app.ManagedObject;
 /**
  * ManagedObject wrapper for an AtomicInteger.
  */
-public class ScalableInteger extends AtomicInteger
-        implements Serializable, ManagedObject
+public class ScalableInteger extends AtomicInteger implements ManagedObject
 {
 
     /**
