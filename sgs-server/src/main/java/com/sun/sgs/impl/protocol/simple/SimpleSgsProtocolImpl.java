@@ -192,7 +192,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     
     /** {@inheritDoc} */
     public void sessionMessage(ByteBuffer message, Delivery delivery) {
-        final int messageLength = 1 + message.remaining();
+	int messageLength = 1 + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf = ByteBuffer.wrap(new byte[messageLength]);
 	buf.put(SimpleSgsProtocol.SESSION_MESSAGE).
@@ -241,8 +241,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
                                Delivery delivery)
     {
 	byte[] channelIdBytes = channelId.toByteArray();
-        final int messageLength = 3 + channelIdBytes.length +
-                                  message.remaining();
+	int messageLength = 3 + channelIdBytes.length + message.remaining();
         assert messageLength <= SimpleSgsProtocol.MAX_MESSAGE_LENGTH;
 	ByteBuffer buf =
 	    ByteBuffer.allocate(messageLength);
@@ -272,6 +271,17 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	writeOrEnqueueIfLoginNotHandled(buf);
     }
 
+    /** {@inheritDoc} */
+    public void relocate(Node newNode, ByteBuffer relocationKey) {
+	/*
+	int messageLength = ?;
+	ByteBuffer buf =
+	    ByteBuffer.allocate(messageLength);
+	*/
+	
+	
+    }
+    
     /** {@inheritDoc} */
     public void disconnect(DisconnectReason reason) throws IOException {
 	// TBD: The SimpleSgsProtocol does not yet support sending a

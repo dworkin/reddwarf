@@ -21,6 +21,7 @@ package com.sun.sgs.protocol;
 
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.DeliveryNotSupportedException;
+import com.sun.sgs.service.Node;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -166,6 +167,26 @@ public interface SessionProtocol extends Channel {
         throws IOException;
 
 
+    /**
+     * Notifies the associated client to relocate its session to the
+     * specified node using the given relocation key.  The session can be
+     * reestablished on the new node by notifying the {@link
+     * ProtocolListener} of this protocol's corresponding {@link
+     * ProtocolAcceptor} on the new node.  The {@link
+     * ProtocolListener#relocatedSession ProtocolListener.relocatedSession}
+     * method can be invoked on the new node with the given relocation key
+     * to reestablish the client session without having to log in again.<p>
+     *
+     * Once this method is invoked, the client should close any underlying
+     * local connection(s) in a timely fashion.
+     *
+     * @param	newNode the new node to establish a connection with
+     * @param	relocationKey the key to be supplied to the new node
+     * @throws	IOException if an I/O error occurs
+     */
+    void relocate(Node newNode, ByteBuffer relocationKey)
+	throws IOException;
+    
     /**
      * Disconnects the associated session for the specified {@code reason}.
      * The protocol may send a message to the associated client indicating

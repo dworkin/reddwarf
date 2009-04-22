@@ -21,6 +21,7 @@ package com.sun.sgs.protocol;
 
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.protocol.LoginFailureException.FailureReason;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -69,5 +70,9 @@ public interface ProtocolListener {
      */
     void newLogin(
 	Identity identity, SessionProtocol protocol,
+	RequestCompletionHandler<SessionProtocolHandler> completionHandler);
+
+    void relocatedSession(
+	ByteBuffer relocationKey, SessionProtocol protocol,
 	RequestCompletionHandler<SessionProtocolHandler> completionHandler);
 }

@@ -57,6 +57,7 @@ import com.sun.sgs.service.ClientSessionDisconnectListener;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Node;
+import com.sun.sgs.service.NodeMappingListener;
 import com.sun.sgs.service.NodeMappingService;
 import com.sun.sgs.service.RecoveryCompleteFuture;
 import com.sun.sgs.service.RecoveryListener;
@@ -319,6 +320,10 @@ public final class ClientSessionServiceImpl
 		    } },
 		taskOwner);
 
+	    /* Register the node mapping listener. */
+	    nodeMapService.addNodeMappingListener(
+		new NodeMappingListenerImpl());
+
 	    /*
 	     * Create the protocol listener and acceptor.
 	     */
@@ -485,6 +490,49 @@ public final class ClientSessionServiceImpl
 	return handler != null ? handler.getSessionProtocol() : null;
     }
 
+    /* -- Implement NodeMappingListener -- */
+
+    /**
+     * This listener receives notifications of identities being added or
+     * removed from this node. <p>
+     *
+     * If an identity is removed from this node ({@link
+     * #mappingRemoved}), and the identity corresponds to a local client
+     * session, then the client session should be relocated to the new
+     * node.<p>
+     *
+     * If an identity is added to this node ({@link #mappingAdded}, then
+     * its corresponding client session (if any) is being moved to this
+     * node from the old node.
+     */
+    private class NodeMappingListenerImpl implements NodeMappingListener {
+
+	/** {@inheritDoc} */
+	public void mappingAdded(Identity id, Node oldNode) {
+	}
+
+	/** {@inheritDoc} */
+	public void mappingRemoved(Identity id, final Node newNode) {
+	    final ClientSessionHandler handler = loggedInIdentityMap.get(id);
+	    if (handler != null) {
+		// This identity corresponds to a client session, so move it.
+		transactionScheduler.scheduleTask(
+		    new AbstractKernelRunnable("AddMoveEvent") {
+			public void run() {
+			    ClientSessionImpl session =
+				ClientSessionImpl.getSession(
+				    dataService, handler.sessionRefId);
+			    if (session != null) {
+				// TBD: if session already moving, need to put off
+				// this move.
+				session.move(newNode.getId());
+			    }
+			}},
+		    id);
+	    }
+	}
+    }
+
     /* -- Implement ProtocolListener -- */
 
     private class ProtocolListenerImpl implements ProtocolListener {
@@ -498,7 +546,14 @@ public final class ClientSessionServiceImpl
 		ClientSessionServiceImpl.this, dataService, protocol,
 		identity, completionHandler);
 	}
-	
+
+	/** {@inheritDoc} */
+	public void relocatedSession(
+	    ByteBuffer relocationKey, SessionProtocol protocol,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
+	{
+	    throw new AssertionError("not implemented");
+	}
     }
     
     /* -- Package access methods for adding commit actions -- */
@@ -998,6 +1053,23 @@ public final class ClientSessionServiceImpl
 		callFinished();
 	    }
 	    
+	}
+
+	/** {@inheritDoc} */
+	public byte[] relocateSession(
+	    Identity identity, byte[] sessionId, long oldNode)
+	{
+	    callStarted();
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "sessionId:{0} oldNode:{1}",
+			       HexDumper.toHexString(sessionId), oldNode);
+		}
+		// TBD: return relocation key
+		throw new AssertionError("not implemented");
+	    } finally {
+		callFinished();
+	    }
 	}
 
 	/** {@inheritDoc} */

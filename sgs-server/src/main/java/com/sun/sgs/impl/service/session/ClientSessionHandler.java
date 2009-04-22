@@ -88,7 +88,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private final SessionProtocol protocol;
     
     /** The session ID as a BigInteger. */
-    private volatile BigInteger sessionRefId;
+    volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
     private final Identity identity;

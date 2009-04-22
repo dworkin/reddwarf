@@ -99,16 +99,18 @@ public class ClientSessionImpl
     private final Set<Delivery> deliveries;
 
     /** The node ID for this session (final because sessions can't move yet). */
-    private final long nodeId;
+    private long nodeId;
 
     /** Indicates whether this session is connected. */
-    private volatile boolean connected = true;
+    private boolean connected = true;
 
     /** Maximum message length for session messages. */
     private final int maxMessageLength;
     
     /** The capacity of the write buffer, in bytes. */
     private final int writeBufferCapacity;
+
+    private boolean relocating = false;
 
     /*
      * TBD: Should a managed reference to the ClientSessionListener be
@@ -293,6 +295,19 @@ public class ClientSessionImpl
 	    "client session:" + this +
 	    " does not support the delivery guarantee",
 	    delivery);
+    }
+
+    /**
+     * Initiates a relocation of this client session from the current node
+     * to {@code newNode}.  If the client session is no longer connected,
+     * then this request is ignored because the session is disconnected.
+     *
+     * @param	newNode the node to relocate to
+     */
+    void move(long newNode) {
+	if (isConnected()) {
+	    addEvent(new MoveEvent(newNode));
+	}
     }
 
     /**
@@ -833,6 +848,28 @@ public class ClientSessionImpl
         @Override
 	public String toString() {
 	    return getClass().getName();
+	}
+    }
+
+    private static class MoveEvent extends SessionEvent {
+	/** The serialVersionUID for this class. */
+	private static final long serialVersionUID = 1L;
+
+	private final long newNode;
+
+	/** Constructs a move event. */
+	MoveEvent(long newNode) {
+	    this.newNode = newNode;
+	}
+
+	/** {@inheritDoc} */
+	void serviceEvent(EventQueue eventQueue) {
+	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
+	    sessionImpl.nodeId = newNode;
+	    sessionImpl.relocating = true;
+	    // TBD: add commit action to ClientSessionService's context to
+	    // obtain a relocation key from the newNode's ClientSessionServer
+	    // and notify the client to relocate to newNode.
 	}
     }
 
