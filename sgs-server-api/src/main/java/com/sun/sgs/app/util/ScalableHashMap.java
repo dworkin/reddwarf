@@ -620,12 +620,20 @@ public class ScalableHashMap<K, V>
 	// edge updating - Note that since there are guaranteed to be at least
 	// two leaves, these absolute offset calls are safe
         ScalableHashMap<K, V> firstLeaf = uncheckedCast(leaves[0]);
-	firstLeaf.leftLeafRef = null;
+	firstLeaf.leftLeafRef = leftLeafRef;
+	if (leftLeafRef != null) {
+	    ScalableHashMap<K, V> leftLeaf = leftLeafRef.get();
+	    leftLeaf.rightLeafRef = dm.createReference(firstLeaf);
+	}
 	firstLeaf.rightLeafRef = uncheckedCast(dm.createReference(leaves[1]));
         ScalableHashMap<K, V> lastLeaf = uncheckedCast(leaves[numLeaves - 1]);
 	lastLeaf.leftLeafRef =
                 uncheckedCast(dm.createReference(leaves[numLeaves - 2]));
-	lastLeaf.rightLeafRef = null;
+	lastLeaf.rightLeafRef = rightLeafRef;
+	if (rightLeafRef != null) {
+	    ScalableHashMap<K, V> rightLeaf = rightLeafRef.get();
+	    rightLeaf.leftLeafRef = dm.createReference(lastLeaf);
+	}
 
 	// since this node is now a directory, invalidate its leaf-list
 	// references
@@ -2801,5 +2809,45 @@ public class ScalableHashMap<K, V>
     @SuppressWarnings("unchecked")
     private static <T> T uncheckedCast(Object object) {
         return (T) object;
+    }
+
+    /**
+     * Verifies the state of the doubly linked list of leaf nodes.  This method
+     * is intended for use in testing and debugging.
+     */
+    void checkLeafRefs() {
+	ScalableHashMap<K, V> first = leftMost();
+	ManagedReference<ScalableHashMap<K, V>> lastRef = null;
+	ManagedReference<ScalableHashMap<K, V>> nodeRef =
+	    uncheckedCast(AppContext.getDataManager().createReference(first));
+	while (nodeRef != null) {
+	    ScalableHashMap<K, V> node = nodeRef.get();
+	    if (!node.isLeafNode()) {
+		throw new AssertionError(
+		    "Node " + nodeRef + " is not a leaf node");
+	    }
+	    ManagedReference<ScalableHashMap<K, V>> leftRef = node.leftLeafRef;
+	    if (lastRef == null) {
+		if (leftRef != null) {
+		    throw new AssertionError(
+			"Node " + nodeRef + " has left leaf " +
+			leftRef + " but should be null");
+		}
+	    } else if (!lastRef.equals(leftRef)) {
+		throw new AssertionError(
+		    "Node " + nodeRef + " has left leaf " + leftRef +
+		    " but should be " + lastRef);
+	    }
+	    lastRef = nodeRef;
+	    nodeRef = node.rightLeafRef;
+	}
+	if (lastRef != null) {
+	    ScalableHashMap<K, V> node = lastRef.get();
+	    if (node.rightLeafRef != null) {
+		throw new AssertionError(
+		    "Node " + lastRef + " has right leaf " +
+		    node.rightLeafRef + " but should be null");
+	    }
+	}
     }
 }
