@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -208,6 +208,22 @@ public class DataStoreProfileProducer
 	long result = dataStore.nextObjectId(txn, oid);
 	stats.nextObjectIdOp.report();
 	return result;
+    }
+
+    /** {@inheritDoc} */
+    public void setBindingDescription(
+	Transaction txn, String name, Object description)
+    {
+	/* No need for profiling here */
+	dataStore.setBindingDescription(txn, name, description);
+    }
+
+    /** {@inheritDoc} */
+    public void setObjectDescription(
+	Transaction txn, long oid, Object description)
+    {
+	/* No need for profiling here */
+	dataStore.setObjectDescription(txn, oid, description);
     }
 
     /* -- Implement TransactionParticipant -- */

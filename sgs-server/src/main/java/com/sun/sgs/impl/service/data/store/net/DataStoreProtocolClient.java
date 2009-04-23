@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -19,6 +19,7 @@
 
 package com.sun.sgs.impl.service.data.store.net;
 
+import com.sun.sgs.impl.service.data.store.BindingValue;
 import java.io.IOException;
 
 /**
@@ -95,20 +96,22 @@ abstract class DataStoreProtocolClient implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
-    public long getBinding(long tid, String name) throws IOException {
+    public BindingValue getBinding(long tid, String name) throws IOException {
 	return getHandler().getBinding(tid, name);
     }
 
     /** {@inheritDoc} */
-    public void setBinding(long tid, String name, long oid)
+    public BindingValue setBinding(long tid, String name, long oid)
 	throws IOException
     {
-	getHandler().setBinding(tid, name, oid);
+	return getHandler().setBinding(tid, name, oid);
     }
 
     /** {@inheritDoc} */
-    public void removeBinding(long tid, String name) throws IOException {
-	getHandler().removeBinding(tid, name);
+    public BindingValue removeBinding(long tid, String name)
+	throws IOException
+    {
+	return getHandler().removeBinding(tid, name);
     }
 
     /** {@inheritDoc} */
