@@ -18,6 +18,14 @@ extern "C" {
 
 static fd_set g_master_readset, g_master_writeset, g_master_exceptset;
 static int g_maxfd;
+/* A set of flags for the callback function tests-- the flag will
+ * be set before a call that should trigger a callback, and then will
+ * be reset by the callback; the main program can do the set, make the
+ * call, wait on the callback, and then check the flag.
+ */
+
+int loginFail, loginRedirect, loginSuccess, channelJoin, channelLeave,
+        channelMessage, sessionMessage;
 
 void channel_joined_cb(sgs_connection *conn,
             sgs_channel *channel);
