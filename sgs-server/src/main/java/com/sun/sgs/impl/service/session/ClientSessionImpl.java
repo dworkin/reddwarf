@@ -40,6 +40,7 @@ import com.sun.sgs.impl.util.IoRunnable;
 import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.impl.util.ManagedQueue;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Node;
 import com.sun.sgs.service.TaskService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -109,8 +110,6 @@ public class ClientSessionImpl
     
     /** The capacity of the write buffer, in bytes. */
     private final int writeBufferCapacity;
-
-    private boolean relocating = false;
 
     /*
      * TBD: Should a managed reference to the ClientSessionListener be
@@ -304,7 +303,7 @@ public class ClientSessionImpl
      *
      * @param	newNode the node to relocate to
      */
-    void move(long newNode) {
+    void move(Node newNode) {
 	if (isConnected()) {
 	    addEvent(new MoveEvent(newNode));
 	}
@@ -834,7 +833,7 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.
+	    sessionImpl.sessionService.checkContext().
 		addSessionMessage(sessionImpl, this);
 	}
 
@@ -855,21 +854,19 @@ public class ClientSessionImpl
 	/** The serialVersionUID for this class. */
 	private static final long serialVersionUID = 1L;
 
-	private final long newNode;
+	private final Node newNode;
 
 	/** Constructs a move event. */
-	MoveEvent(long newNode) {
+	MoveEvent(Node newNode) {
 	    this.newNode = newNode;
 	}
 
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.nodeId = newNode;
-	    sessionImpl.relocating = true;
-	    // TBD: add commit action to ClientSessionService's context to
-	    // obtain a relocation key from the newNode's ClientSessionServer
-	    // and notify the client to relocate to newNode.
+	    sessionImpl.nodeId = newNode.getId();
+	    sessionImpl.sessionService.checkContext().
+		addMoveRequest(sessionImpl, newNode);
 	}
     }
 
@@ -883,7 +880,8 @@ public class ClientSessionImpl
 	/** {@inheritDoc} */
 	void serviceEvent(EventQueue eventQueue) {
 	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.addDisconnectRequest(sessionImpl);
+	    sessionImpl.sessionService.checkContext().
+		addDisconnectRequest(sessionImpl);
 	}
 
 	/** {@inheritDoc} */

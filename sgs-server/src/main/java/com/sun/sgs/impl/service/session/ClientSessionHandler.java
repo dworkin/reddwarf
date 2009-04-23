@@ -91,7 +91,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     volatile BigInteger sessionRefId;
 
     /** The identity for this session. */
-    private final Identity identity;
+    final Identity identity;
 
     /** The login status. */
     private volatile boolean loggedIn;
@@ -107,6 +107,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
+    /** Indicates whether a session is relocating to a new node. */
+    volatile boolean relocating = false;
+    
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
@@ -375,7 +378,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	if (sessionRefId != null) {
-	    sessionService.removeHandler(sessionRefId);
+	    sessionService.removeHandler(sessionRefId, relocating);
 	}
 	
 	// TBD: Due to the scheduler's behavior, this notification
@@ -383,10 +386,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	// 'notifyLoggedIn' callback.  Also, this notification may
 	// also happen even though 'notifyLoggedIn' was not invoked.
 	// Are these behaviors okay?  -- ann (3/19/07)
-	scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
-		public void run() {
-		    identity.notifyLoggedOut();
-		} });
+	if (!relocating) {
+	    scheduleTask(new AbstractKernelRunnable("NotifyLoggedOut") {
+		    public void run() {
+			identity.notifyLoggedOut();
+		    } });
+	}
 	if (sessionService.removeUserLogin(identity, this)) {
 	    deactivateIdentity();
 	}
@@ -401,7 +406,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    }
 	}
 
-	if (sessionRefId != null) {
+	if (sessionRefId != null && !relocating) {
 	    scheduleTask(
 	      new AbstractKernelRunnable("NotifyListenerAndRemoveSession") {
 	        public void run() {
@@ -491,7 +496,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private void enqueueCompletionNotification(
 	final RequestCompletionHandler<Void> completionHandler,
 	final CompletionFutureImpl future)
-{
+    {
 	taskQueue.addTask(
 	    new AbstractKernelRunnable("ScheduleCompletionNotification") {
 		public void run() {
@@ -506,7 +511,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * the identity as inactive.  This method is invoked when a login is
      * redirected and also when a this client session is disconnected.
      */
-    private void deactivateIdentity() {
+    void deactivateIdentity() {
 	try {
 	    /*
 	     * Set identity's status for this class to 'false'.
@@ -822,7 +827,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		sessionImpl.putClientSessionListener(
 		    dataService, returnedListener);
 
-		sessionService.addLoginResult(sessionImpl, true, null);
+		sessionService.checkContext().
+		    addLoginResult(sessionImpl, true, null);
 		
 		sessionService.scheduleTaskOnCommit(
 		    new AbstractKernelRunnable("NotifyLoggedIn") {
@@ -857,8 +863,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		} else {
 		    throw ex;
 		}
-		sessionService.addLoginResult(
-		    sessionImpl, false, loginFailureEx);
+		sessionService.checkContext().
+		    addLoginResult(sessionImpl, false, loginFailureEx);
 
 		sessionImpl.disconnect();
 	    }

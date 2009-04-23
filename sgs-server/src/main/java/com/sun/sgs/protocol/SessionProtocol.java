@@ -181,10 +181,13 @@ public interface SessionProtocol extends Channel {
      * local connection(s) in a timely fashion.
      *
      * @param	newNode the new node to establish a connection with
+     * @param	descriptors protocol descriptors for {@code newNode}
      * @param	relocationKey the key to be supplied to the new node
      * @throws	IOException if an I/O error occurs
      */
-    void relocate(Node newNode, ByteBuffer relocationKey)
+    void relocate(Node newNode,
+		  Set<ProtocolDescriptor> descriptors,
+		  ByteBuffer relocationKey)
 	throws IOException;
     
     /**

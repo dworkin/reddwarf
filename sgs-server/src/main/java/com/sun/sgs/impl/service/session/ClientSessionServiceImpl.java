@@ -74,7 +74,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;   
 import java.util.Properties;
 import java.util.Queue;
@@ -509,6 +509,7 @@ public final class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public void mappingAdded(Identity id, Node oldNode) {
+	    // TBD: Keep track of pending move to node.
 	}
 
 	/** {@inheritDoc} */
@@ -525,7 +526,7 @@ public final class ClientSessionServiceImpl
 			    if (session != null) {
 				// TBD: if session already moving, need to put off
 				// this move.
-				session.move(newNode.getId());
+				session.move(newNode);
 			    }
 			}},
 		    id);
@@ -556,83 +557,6 @@ public final class ClientSessionServiceImpl
 	}
     }
     
-    /* -- Package access methods for adding commit actions -- */
-    
-    /**
-     * Enqueues the specified send event (containing a session {@code
-     * message}) in the current context for delivery to the specified
-     * client {@code session} when the context commits.  This method must
-     * be called within a transaction.
-     *
-     * @param	session	a client session
-     * @param	sendEvent a send event containing a message and delivery
-     *		guarantee 
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void addSessionMessage(
-	ClientSessionImpl session, SendEvent sendEvent)
-    {
-	checkContext().addMessage(session, sendEvent);
-    }
-
-    /**
-     *
-     * Records the login result in the current context, so that the specified
-     * client {@code session} can be notified when the context commits.  If
-     * {@code success} is {@code false}, the specified {@code exception} will be
-     * used as the cause of the {@code ExecutionException} in the {@code Future}
-     * passed to the {@link RequestCompletionHandler} for the login request, and
-     * no subsequent session messages will be forwarded to the session, even if
-     * they have been enqueued during the current transaction.  If success is
-     * {@code true}, then the {@code Future} passed to the {@code
-     * RequestCompletionHandler} for the login request will contain this {@link
-     * SessionProtocolHandler}.
-     *
-     * <p>When the transaction commits, the session's associated {@code
-     * ClientSessionHandler} is notified of the login result, and if {@code
-     * success} is {@code true}, all enqueued messages will be delivered to
-     * the client session.
-     *
-     * @param	session	a client session
-     * @param	success if {@code true}, login was successful
-     * @param	exception a login failure exception, or {@code null} (only valid
-     *		if {@code success} is {@code false}
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void addLoginResult(ClientSessionImpl session,
-			boolean success,
-			LoginFailureException exception)
-    {
-	checkContext().addLoginResult(session, success, exception);
-    }
-
-    /**
-     * Adds a request to disconnect the specified client {@code session} when
-     * the current context commits.  This method must be invoked within a
-     * transaction.
-     *
-     * @param	session a client session
-     *
-     * @throws 	TransactionException if there is a problem with the
-     *		current transaction
-     */
-    void addDisconnectRequest(ClientSessionImpl session) {
-	checkContext().requestDisconnect(session);
-    }
-
-    /**
-     * Returns the size of the write buffer to use for new connections.
-     * 
-     * @return the size of the write buffer to use for new connections
-     */
-    int getWriteBufferSize() {
-        return writeBufferSize;
-    }
-
     /* -- Implement TransactionContextFactory -- */
 
     private class ContextFactory extends TransactionContextFactory<Context> {
@@ -663,10 +587,29 @@ public final class ClientSessionServiceImpl
 	}
 
 	/**
-	 * Adds the specified login result be sent to the specified
-	 * session after this transaction commits.  If {@code success} is
-	 * {@code false}, no other messages are sent to the session after
-	 * the login acknowledgment.
+	 * Records the login result in this context, so that the specified
+	 * client {@code session} can be notified when this context
+	 * commits.  If {@code success} is {@code false}, the specified
+	 * {@code exception} will be used as the cause of the {@code
+	 * ExecutionException} in the {@code Future} passed to the {@link
+	 * RequestCompletionHandler} for the login request, and no
+	 * subsequent session messages will be forwarded to the session,
+	 * even if they have been enqueued during the current transaction.
+	 * If success is {@code true}, then the {@code Future} passed to
+	 * the {@code RequestCompletionHandler} for the login request will
+	 * contain this {@link SessionProtocolHandler}.
+	 *
+	 * <p>When the transaction commits, the session's associated {@code
+	 * ClientSessionHandler} is notified of the login result, and if
+	 * {@code success} is {@code true}, all enqueued messages will be
+	 * delivered to the client session.
+	 *
+	 * @param	session	a client session
+	 * @param	success if {@code true}, login was successful
+	 * @param	exception a login failure exception, or {@code null}
+	 *		(only valid if {@code success} is {@code false}
+	 * @throws 	TransactionException if there is a problem with the
+	 *		current transaction
 	 */
 	void addLoginResult(
 	    ClientSessionImpl session, boolean success,
@@ -681,68 +624,104 @@ public final class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		getCommitActions(session).addLoginResult(success, ex);
-
+		getCommitActions(session).
+		    addFirst(new LoginResultAction(success, ex));
 	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
 			Level.FINE, e,
-			"Context.addMessage exception");
+			"Context.addLoginResult exception");
                 }
                 throw e;
             }
 	}
 
 	/**
-	 * Enqueues a message to be sent to the specified session after
-	 * this transaction commits.
+	 * Enqueues the specified send event (containing a session {@code
+	 * message}) in this context for delivery to the specified client
+	 * {@code session} when this context commits.  This method must be
+	 * called within a transaction.
+	 *
+	 * @param	session	a client session
+	 * @param	sendEvent a send event containing a message and delivery
+	 *		guarantee 
+	 *
+	 * @throws 	TransactionException if there is a problem with the
+	 *		current transaction
 	 */
-	private void addMessage(
+	void addSessionMessage(
 	    ClientSessionImpl session, SendEvent sendEvent)
     	{
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.addMessage session:{0}, message:{1}",
+			"Context.addSessionMessage session:{0}, message:{1}",
 			session, sendEvent.message);
 		}
 		checkPrepared();
 
-		getCommitActions(session).addMessage(sendEvent);
+		getCommitActions(session).add(new SendMessageAction(sendEvent));
 	    
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
 			Level.FINE, e,
-			"Context.addMessage exception");
+			"Context.addSessionMessage exception");
                 }
                 throw e;
             }
 	}
 
-	/**
-	 * Requests that the specified session be disconnected when
-	 * this transaction commits, but only after all session
-	 * messages are sent.
-	 */
-	void requestDisconnect(ClientSessionImpl session) {
+	void addMoveRequest(ClientSessionImpl session, Node newNode) {
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
-			"Context.setDisconnect session:{0}", session);
+			"Context.addMoveRequest:{0}, newNode:{1}",
+			session, newNode);
 		}
 		checkPrepared();
 
-		getCommitActions(session).setDisconnect();
+		getCommitActions(session).add(new MoveAction(newNode));
+	    
+	    } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+			Level.FINE, e,
+			"Context.addMoveRequest exception");
+                }
+                throw e;
+            }
+	}
+	
+	/**
+	 * Adds a request to disconnect the specified client {@code
+	 * session} when the current context commits.  This method must be
+	 * invoked within a transaction.
+	 *
+	 * @param	session a client session
+	 *
+	 * @throws 	TransactionException if there is a problem with the
+	 *		current transaction
+	 */
+	void addDisconnectRequest(ClientSessionImpl session) {
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"Context.addDisconnectRequest session:{0}", session);
+		}
+		checkPrepared();
+
+		getCommitActions(session).add(new DisconnectAction());
 		
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
 			Level.FINE, e,
-			"Context.setDisconnect throws");
+			"Context.addDisconnectRequest throws");
                 }
                 throw e;
             }
@@ -840,30 +819,153 @@ public final class ClientSessionServiceImpl
 	    }
 	}
     }
+
+    /**
+     * An action to perform during commit.
+     */
+    private interface Action {
+	
+	/**
+	 * Performs the action using the given {@code handler} and
+	 * returns {@code true} if further actions should be
+	 * processed after this one, and returns {@code false}
+	 * otherwise. A {@code false} value would be returned, for
+	 * example, if an action disconnects the client session or
+	 * notifies the client of login failure.
+	 */
+	boolean flush(ClientSessionHandler handler);
+    }
+
+    /**
+     * An action to report the result of a login.
+     */
+    private class LoginResultAction implements Action {
+	/** The login result. */
+	private final boolean loginSuccess;
+
+	/** The login exception. */
+	private final LoginFailureException loginException;
+	
+	LoginResultAction(boolean success, LoginFailureException ex) {
+	    loginSuccess = success;
+	    loginException = ex;
+	}
+
+	public boolean flush(ClientSessionHandler handler) {
+	    if (loginSuccess) {
+		handler.loginSuccess();
+		return true;
+	    } else {
+		handler.loginFailure(loginException);
+		return false;
+	    }
+	}
+    }
+
+    /**
+     * An action to send a message.
+     */
+    private class SendMessageAction implements Action {
+
+	private final SendEvent sendEvent;
+
+	SendMessageAction(SendEvent sendEvent) {
+	    this.sendEvent = sendEvent;
+	}
+
+	public boolean flush(ClientSessionHandler handler) {
+	    try {
+		handler.getSessionProtocol().sessionMessage(
+		    ByteBuffer.wrap(sendEvent.message),
+		    sendEvent.delivery);
+	    } catch (Exception e) {
+		logger.logThrow(Level.WARNING, e,
+				"sessionMessage throws");
+	    }
+	    return true;
+	}
+    }
+
+    /**
+     * An action to move the associated client session from this node to
+     * another node.
+     */
+    private class  MoveAction implements Action {
+
+	private final Node newNode;
+	
+	MoveAction(Node newNode) {
+	    this.newNode = newNode;
+	}
+	
+	public boolean flush(final ClientSessionHandler handler) {
+	    ClientSessionServer server = getClientSessionServer(newNode.getId());
+	    BigInteger sessionRefId = handler.sessionRefId;
+	    Identity identity = handler.identity;
+	    try {
+		/*
+		 * Notify new node that session is being relocated there and
+		 * obtain relocation key.
+		 */
+		byte[] relocationKey =
+		    server.relocateSession(
+ 			identity, sessionRefId.toByteArray(), localNodeId);
+		/*
+		 * Notify client to relocate its session to the new node
+		 * specifying the relocation key.
+		 */
+		handler.relocating = true;
+		Set<ProtocolDescriptor> descriptors =
+		    getProtocolDescriptors(newNode.getId());
+		handler.getSessionProtocol().
+		    relocate(newNode, descriptors, ByteBuffer.wrap(relocationKey));
+
+		/*
+		 * Schedule a task to close the client session if it is not
+		 * closed in a timely fashion.  This will also clean up local
+		 * client session state if not done so already.
+		 */
+		taskScheduler.scheduleTask(
+		    new AbstractKernelRunnable("CloseMovedClientSession") {
+		    	public void run() {
+			    handler.handleDisconnect(false, true);
+			} },
+		    identity,
+		    System.currentTimeMillis() + 1000L);
+		
+	    } catch (Exception e) {
+		// If there is a problem contacting the destination node
+		// or client, then disconnect the client session immediately.
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, e,
+			"relocating client session:{0} throws", handler);
+		}
+		handler.handleDisconnect(false, true);
+	    }
+	    return false;
+	}
+    }
+
+    /**
+     * An action to disconnect the client session.
+     */
+    private class DisconnectAction implements Action {
+	public boolean flush(ClientSessionHandler handler) {
+	    handler.handleDisconnect(false, true);
+	    return false;
+	}
+    }
     
     /**
      * Contains pending changes for a given client session.
      */
-    private class CommitActions {
+    private class CommitActions extends LinkedList<Action> {
 
 	/** The client session ID as a BigInteger. */
 	private final BigInteger sessionRefId;
 
-	/** Indicates whether a login result should be sent. */
-	private boolean sendLoginResult = false;
-	
-	/** The login result. */
-	private boolean loginSuccess = false;
-
-	/** The login exception. */
-	private LoginFailureException loginException;
-	
-	/** List of messages to send on commit. */
-	private List<SendEvent> messages = new ArrayList<SendEvent>();
-
-	/** If true, disconnect after sending messages. */
-	private boolean disconnect = false;
-
+	/** Constructs an instance. */
 	CommitActions(ClientSessionImpl sessionImpl) {
 	    if (sessionImpl == null) {
 		throw new NullPointerException("null sessionImpl");
@@ -871,74 +973,17 @@ public final class ClientSessionServiceImpl
 	    this.sessionRefId = sessionImpl.getId();
 	}
 
-	void addMessage(SendEvent sendEvent) {
-	    messages.add(sendEvent);
-	}
-
-	void addLoginResult(boolean success, LoginFailureException ex) {
-	    sendLoginResult = true;
-	    loginSuccess = success;
-	    loginException = ex;
-	}
-	
-	void setDisconnect() {
-	    disconnect = true;
-	}
-
+	/**
+	 * Flushes all actions enqueued with this instance.
+	 */
 	void flush() {
-	    sendSessionMessages();
-	    if (disconnect) {
-		ClientSessionHandler handler = handlers.get(sessionRefId);
-		/*
-		 * If session is local, disconnect session; otherwise, log
-		 * error message. 
-		 */
-		if (handler != null) {
-		    handler.handleDisconnect(false, true);
-		} else {
-		    logger.log(
-		        Level.FINE,
-			"discarding request to disconnect unknown session:{0}",
-			sessionRefId);
-		}
-	    }
-	}
-
-	void sendSessionMessages() {
-
 	    ClientSessionHandler handler = handlers.get(sessionRefId);
-	    /*
-	     * If a local handler exists, forward messages to local
-	     * handler to send to client session; otherwise log
-	     * error message.
-	     */
 	    if (handler != null && handler.isConnected()) {
-		if (sendLoginResult) {
-		    if (loginSuccess) {
-			handler.loginSuccess();
-		    } else {
-			handler.loginFailure(loginException);
-			return;
+		for (Action action : this) {
+		    if (!action.flush(handler)) {
+			break;
 		    }
 		}
-		SessionProtocol protocol = handler.getSessionProtocol();
-		if (protocol != null) {
-		    for (SendEvent sendEvent : messages) {
-                        try {
-                            protocol.sessionMessage(
-				ByteBuffer.wrap(sendEvent.message),
-				sendEvent.delivery);
-                        } catch (Exception e) {
-                            logger.logThrow(Level.WARNING, e,
-                                            "sessionMessage throws");
-                        }
-		    }
-		}
-	    } else {
-		logger.log(
-		    Level.FINE,
-		    "Discarding messages for disconnected session:{0}",
-		    handler);
 	    }
 	}
     }
@@ -1133,6 +1178,15 @@ public final class ClientSessionServiceImpl
     }
     
     /**
+     * Returns the size of the write buffer to use for new connections.
+     * 
+     * @return the size of the write buffer to use for new connections
+     */
+    int getWriteBufferSize() {
+        return writeBufferSize;
+    }
+
+    /**
      * Returns the key for accessing the {@code ClientSessionServer}
      * instance (which is wrapped in a {@code ManagedSerializable})
      * for the specified {@code nodeId}.
@@ -1260,15 +1314,17 @@ public final class ClientSessionServiceImpl
      * map.  This method is invoked by the handler when the session becomes
      * disconnected.
      */
-    void removeHandler(BigInteger sessionRefId) {
+    void removeHandler(BigInteger sessionRefId, boolean relocating) {
 	if (shuttingDown()) {
 	    return;
 	}
 	// Notify session listeners of disconnection
-	for (ClientSessionDisconnectListener disconnectListener :
-		 sessionDisconnectListeners)
-	{
-	    disconnectListener.disconnected(sessionRefId);
+	if (!relocating) {
+	    for (ClientSessionDisconnectListener disconnectListener :
+		     sessionDisconnectListeners)
+	    {
+		disconnectListener.disconnected(sessionRefId);
+	    }
 	}
 	handlers.remove(sessionRefId);
 	sessionTaskQueues.remove(sessionRefId);
