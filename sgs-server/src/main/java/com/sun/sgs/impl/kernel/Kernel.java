@@ -815,7 +815,7 @@ class Kernel {
             // Throws IllegalArgumentException if not one of the enum types
             // but let's improve the error message
             try {
-                NodeType type = NodeType.valueOf(value);
+                NodeType.valueOf(value);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Illegal value for " +
                         StandardProperties.NODE_TYPE);

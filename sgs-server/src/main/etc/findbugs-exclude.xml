@@ -30,6 +30,22 @@
     <Bug pattern="DM_CONVERT_CASE"/>
   </Match>
   
+  <!-- Not worth replacing an anonymous class with a static inner class. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.kernel.Kernel$1"/>
+    </Or>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON"/>
+  </Match>
+  
+  <!-- We call System exit if a shutdown takes too long. -->
+  <Match>
+    <Or>
+      <Class name="com.sun.sgs.impl.kernel.Kernel$1"/>
+    </Or>
+    <Bug pattern="DM_EXIT"/>
+  </Match>
+     
   <!-- Findbugs can't tell why we're doing a notify at this point, but
        it is because we have identified new lock owners that need to be
        informed of their new status. -->
