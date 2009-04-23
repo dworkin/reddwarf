@@ -404,9 +404,9 @@ public class NodeMappingServiceImpl
             String localHost = 
                     InetAddress.getLocalHost().getHostName(); 
             NodeType nodeType = 
-                NodeType.valueOf(
-                    wrappedProps.getProperty(StandardProperties.NODE_TYPE,
-                                         NodeType.singleNode.name()));
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
             boolean instantiateServer = nodeType != NodeType.appNode;
             
             String host;

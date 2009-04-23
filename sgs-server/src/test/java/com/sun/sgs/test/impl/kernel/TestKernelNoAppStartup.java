@@ -23,8 +23,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 
 
 /**
- * Tests startup cases for running without an application and running with
- * a sub-set of services.
+ * Tests startup cases for running without an application.
  */
 public class TestKernelNoAppStartup extends KernelSimpleAppTestCase {
 

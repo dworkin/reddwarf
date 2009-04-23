@@ -20,6 +20,7 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
@@ -66,17 +67,14 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import static org.junit.Assert.*;
 import org.junit.Before;
@@ -108,21 +106,6 @@ public class TestDataServiceImpl{
     /** An instance of the data service, to test. */
     static DataServiceImpl service;
 
-    private static Method stateRunning;
-    private static Method stateShuttingDown;
-    static {
-        try {
-            stateRunning = DataServiceImpl.class.
-                                getDeclaredMethod("setRunningState");
-            stateRunning.setAccessible(true);
-            
-            stateShuttingDown = DataServiceImpl.class.
-                                getDeclaredMethod("setShuttingDownState");
-            stateShuttingDown.setAccessible(true);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
     /**
      * Boolean to say we'll *always* need a new node for each run;  this
      * allows us to ensure that each test is independent.  We don't run in
@@ -2093,8 +2076,8 @@ public class TestDataServiceImpl{
         final Semaphore doneFlag = new Semaphore(2); 
         doneFlag.acquire(2);
         
-        final List<AssertionError> errorList = 
-            Collections.synchronizedList(new ArrayList<AssertionError>());
+        final AtomicReference<Throwable> error = 
+            new AtomicReference<Throwable>();
         
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
@@ -2104,11 +2087,14 @@ public class TestDataServiceImpl{
                     assertTrue(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
                     mainFlag.release();
                     assertFalse(threadFlag.tryAcquire(500, TimeUnit.MILLISECONDS));
-                } catch (AssertionError e) {
-                    errorList.add(e);
-                    throw e;
-                } finally {
                     doneFlag.release();
+                } catch (Throwable t) {
+                    // We don't expect any non-retryable throwables
+                    if (!isRetryable(t)) {
+                        error.set(t);
+                        doneFlag.release();
+                    }
+                    throw new Exception(t);
                 }
         }}, taskOwner);
 
@@ -2122,11 +2108,13 @@ public class TestDataServiceImpl{
                     assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
                     service.markForUpdate(dummy2);
                     threadFlag.release();
-                } catch (AssertionError e) {
-                    errorList.add(e);
-                    throw e;
-                } finally {
                     doneFlag.release();
+                } catch (Throwable t) {
+                    if (!isRetryable(t)) {
+                        doneFlag.release();
+                        error.set(t);
+                    }
+                    throw new Exception(t);
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new RuntimeException("abort"));
@@ -2134,8 +2122,9 @@ public class TestDataServiceImpl{
 
         assertTrue(doneFlag.tryAcquire(2, 1, TimeUnit.SECONDS));
 
-        if (!errorList.isEmpty()) {
-            throw new AssertionError(errorList.get(0));
+        Throwable throwable = error.get();
+        if (throwable != null) {
+            throw new AssertionError(throwable);
         }
     }
 
@@ -3253,8 +3242,9 @@ public class TestDataServiceImpl{
         final Semaphore doneFlag = new Semaphore(2); 
         doneFlag.acquire(2);
         
-        final List<AssertionError> errorList = 
-            Collections.synchronizedList(new ArrayList<AssertionError>());
+        final AtomicReference<Throwable> error = 
+            new AtomicReference<Throwable>();
+
         txnScheduler.scheduleTask(new TestAbstractKernelRunnable() {
             public void run() throws Exception {
                 try {
@@ -3263,11 +3253,14 @@ public class TestDataServiceImpl{
                     assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
                     mainFlag.release();
                     assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
-                } catch (AssertionError e) {
-                    errorList.add(e);
-                    throw e;
-                } finally {
                     doneFlag.release();
+                } catch (Throwable t) {
+                    // We don't expect any non-retryable throwables
+                    if (!isRetryable(t)) {
+                        doneFlag.release();
+                        error.set(t);
+                    }
+                    throw new Exception(t);
                 }
         }}, taskOwner);
 
@@ -3280,19 +3273,23 @@ public class TestDataServiceImpl{
                     assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
                     dummy2.getNextForUpdate();
                     threadFlag.release();
-                } catch (AssertionError e) {
-                    errorList.add(e);
-                    throw e;
-                } finally {
                     doneFlag.release();
+                } catch (Throwable t) {
+                    // We don't expect any non-retryable throwables
+                    if (!isRetryable(t)) {
+                        doneFlag.release();
+                        error.set(t);
+                    }
+                    throw new Exception(t);
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new TestAbortedTransactionException("abort"));
         }}, taskOwner);
 
         assertTrue(doneFlag.tryAcquire(2, 1, TimeUnit.SECONDS));
-        if (!errorList.isEmpty()) {
-            throw new AssertionError(errorList.get(0));
+        Throwable throwable = error.get();
+        if (throwable != null) {
+            throw new AssertionError(throwable);
         }
     }
 
@@ -3374,16 +3371,10 @@ public class TestDataServiceImpl{
     @Test 
     public void testShutdownAgain() throws Exception {
         serverNode.shutdown(false);
-        // Note:  do not null out serverNode here;  it will be used
-        // again in the shutdown action.
-	ShutdownAction action = new ShutdownAction();
-        try {
-            // the expected behavior of a second shutdown is to return silently.
-            action.assertDone();
-        } finally {
-            // ensure that the next test will run
-            serverNode = null;
-        }
+        serverNode = null;
+	ShutdownServiceAction action = new ShutdownServiceAction(service);
+        // the expected behavior of a second shutdown is to return silently.
+        action.assertDone();
     }
 
     @Test 
@@ -3414,17 +3405,31 @@ public class TestDataServiceImpl{
         }
     }
 
-    @Test 
+    @Test
     public void testConcurrentShutdownInterrupt() throws Exception {
+        class TestTask extends InitialTestRunnable {
+            ShutdownServiceAction action1, action2;
+            public void run() throws Exception {
+                super.run();
+                action1 = new ShutdownServiceAction(service);
+                action1.assertBlocked();
+                action2 = new ShutdownServiceAction(service);
+                action2.assertBlocked();
+                action1.interrupt(); // shutdown should not unblock
+                action1.assertBlocked();
+                action2.assertBlocked();
+                Transaction txn = txnProxy.getCurrentTransaction();
+                txn.abort(new TestAbortedTransactionException("abort"));
+            }
+        }
+
         try {
-            txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
-            ShutdownServiceAction action1 = new ShutdownServiceAction(service);
-            action1.assertBlocked();
-            ShutdownServiceAction action2 = new ShutdownServiceAction(service);
-            action2.assertBlocked();
-            action1.interrupt(); // shutdown should not unblock
-            action1.assertBlocked(); 
-            action2.assertBlocked();
+            TestTask task = new TestTask();
+            txnScheduler.runTask(task, taskOwner);
+            task.action1.assertDone();
+            task.action2.assertDone();
+        } catch (TestAbortedTransactionException e) {
+            // this is expected:  we threw it above
         } finally {
             try {
                 serverNode.shutdown(false);
@@ -4533,36 +4538,48 @@ public class TestDataServiceImpl{
         throws Exception
     {
         class ShutdownTask extends InitialTestRunnable {
+            ShutdownServiceAction shutdownAction;
             public void run() throws Exception {
                 super.run();
                 action.setUp();
 
-                stateShuttingDown.invoke(service);
+                shutdownAction = new ShutdownServiceAction(service);
+                shutdownAction.assertBlocked();
                 action.run();
-                stateRunning.invoke(service);
             }
         }
         ShutdownTask task = new ShutdownTask();
-        txnScheduler.runTask(task, taskOwner);
+        try {
+            txnScheduler.runTask(task, taskOwner);
+        } finally {
+            try {
+                serverNode.shutdown(false);
+            } finally {
+                // we really want the serverNode set to null
+                serverNode = null;
+            }
+        }
     }
 
     /** Tests running the action with a new transaction while shutting down. */
     private void testShuttingDownNewTxn(final Action action) throws Exception {
         txnScheduler.runTask(new InitialTestRunnable(), taskOwner);
 
-        final List<AssertionError> errorList = 
-            Collections.synchronizedList(new ArrayList<AssertionError>());
+        final AtomicReference<Throwable> error =
+            new AtomicReference<Throwable>();
         
         // Semaphore to let us know when we are done
         final Semaphore doneFlag = new Semaphore(0); 
 
         class ShutdownTask extends TestAbstractKernelRunnable {
             ThreadAction threadAction;
+            ShutdownServiceAction shutdownAction;
             public void run() throws Exception {
                 service.createReference(new DummyManagedObject());
                 action.setUp();
 
-                stateShuttingDown.invoke(service);
+                shutdownAction = new ShutdownServiceAction(service);
+                shutdownAction.assertBlocked();
 
                 threadAction = new ThreadAction() {
                     protected void action() {
@@ -4585,8 +4602,8 @@ public class TestDataServiceImpl{
                             } catch (Exception e) {
                                 fail("Unexpected exception " + e);
                             }
-                        } catch (AssertionError ae) {
-                            errorList.add(ae);
+                        } catch (Throwable t) {
+                            error.set(t);
                         } finally {
                             doneFlag.release();
                         }
@@ -4598,12 +4615,19 @@ public class TestDataServiceImpl{
         try {
             txnScheduler.runTask(task, taskOwner);
             assertTrue(doneFlag.tryAcquire(200, TimeUnit.MILLISECONDS));
-            if (!errorList.isEmpty()) {
-                throw new AssertionError(errorList.get(0));
+            Throwable throwable = error.get();
+            if (throwable != null) {
+                throw new AssertionError(throwable);
             }
         } finally {
-            stateRunning.invoke(service);
             task.threadAction.assertDone();
+            task.shutdownAction.assertDone();
+            try {
+                serverNode.shutdown(false);
+            } finally {
+                // we really want the serverNode set to null
+                serverNode = null;
+            }
         }
     }
 
@@ -4772,15 +4796,6 @@ public class TestDataServiceImpl{
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends ThreadAction {
-	ShutdownAction() { }
-	protected void action() throws Exception {
-            serverNode.shutdown(false);
-            serverNode = null;
-	}
-    }
-
-    /** Use this thread to control a call to shutdown that may block. */
     class ShutdownServiceAction extends ThreadAction {
         final DataServiceImpl service;
 	ShutdownServiceAction(DataServiceImpl service) {
@@ -4921,5 +4936,16 @@ public class TestDataServiceImpl{
             public void run() throws Exception {
                 service.getBinding("foo");
         }}, taskOwner);
+    }
+    
+    /**
+     * Returns true if the given {@code Throwable} will be retried
+     * @param t the throwable to test
+     * @return true if {@code t} will be retried
+     */
+    private static boolean isRetryable(Throwable t) {
+	return
+	    t instanceof ExceptionRetryStatus &&
+	    ((ExceptionRetryStatus) t).shouldRetry();
     }
 }

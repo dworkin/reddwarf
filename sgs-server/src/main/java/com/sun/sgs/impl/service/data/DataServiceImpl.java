@@ -72,9 +72,10 @@ import javax.management.JMException;
  * <dt> <i>Property:</i> <code><b>{@value #DATA_STORE_CLASS_PROPERTY}
  *	</b></code> <br>
  *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> if
- *	the {@code com.sun.sgs.node.type} property is {@code appNode}, else
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
+ *	<code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> 
+ *      unless the {@code com.sun.sgs.node.type} property is {@code singleNode},
+ *      which defaults to 
+ *      <code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
  * <dd style="padding-top: .5em">The name of the class that implements {@link
  *	DataStore}.  The class should be public, not abstract, and should
@@ -412,10 +413,9 @@ public final class DataServiceImpl implements DataService {
 	    Identity taskOwner = txnProxy.getCurrentOwner();
 	    scheduler = new DelegatingScheduler(taskScheduler, taskOwner);
             NodeType nodeType = 
-                NodeType.valueOf(
-                    wrappedProps.getProperty(StandardProperties.NODE_TYPE,
-                                         NodeType.singleNode.name()));
-            boolean serverStart = nodeType != NodeType.appNode;
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
 
 	    AccessCoordinator accessCoordinator = 
 		systemRegistry.getComponent(AccessCoordinator.class);	    
@@ -426,7 +426,7 @@ public final class DataServiceImpl implements DataService {
 		    new Class[] { Properties.class, AccessCoordinator.class },
 		    properties, accessCoordinator);
 		logger.log(Level.CONFIG, "Using data store {0}", baseStore);
-	    } else if (serverStart) {
+	    } else if (nodeType == NodeType.singleNode) {
 		baseStore = new DataStoreImpl(
 		    properties, accessCoordinator, scheduler);
 	    } else {
@@ -957,24 +957,6 @@ public final class DataServiceImpl implements DataService {
 		throw new AssertionError();
 	    }
 	}
-    }
-
-    /**
-     * Sets the current state to running.  Used during testing.
-     */
-    void setRunningState() {
-        synchronized (stateLock) {
-            state = State.RUNNING;
-        }
-    }
-    
-    /**
-     * Sets the current state to shutting down.  Used during testing.
-     */
-    void setShuttingDownState() {
-        synchronized (stateLock) {
-            state = State.SHUTTING_DOWN;  
-        }
     }
     
     /**

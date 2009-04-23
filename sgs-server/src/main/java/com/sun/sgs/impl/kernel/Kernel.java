@@ -812,27 +812,13 @@ class Kernel {
                 properties.setProperty(StandardProperties.NODE_TYPE, value);
             }
 
-            NodeType type;
             // Throws IllegalArgumentException if not one of the enum types
             // but let's improve the error message
             try {
-                type = NodeType.valueOf(value);
+                NodeType type = NodeType.valueOf(value);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Illegal value for " +
                         StandardProperties.NODE_TYPE);
-            }
-            
-            switch (type) {
-                case singleNode:
-                case appNode:
-                default:
-                    break;    // do nothing, this is the default
-                case coreServerNode:
-                    properties.setProperty(
-                        DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
-                        "com.sun.sgs.impl.service.data." +
-                        "store.net.DataStoreClient");
-                    break;
             }
 
             return properties;

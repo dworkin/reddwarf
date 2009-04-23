@@ -367,7 +367,6 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             "com.sun.sgs.impl.service.task.TaskServiceImpl.handoff.period",
                 "50",
             "com.sun.sgs.impl.service.task.TaskServiceImpl.vote.delay", "50",
-            "com.sun.sgs.impl.service.data.store.net.server.start", isServer,
             "com.sun.sgs.impl.service.data.store.net.server.port", portStr,
             "DummyServer", isServer
         );
