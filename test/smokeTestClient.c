@@ -71,6 +71,11 @@ void loadContext(sgs_context *context)
     sgs_ctx_set_recv_msg_cb(context, recv_msg_cb);
 }
 
+int testLogin(sgs_connection *connection)
+{
+
+}
+
 int main(int argc, char** argv) {
     sgs_context *context;
     sgs_connection *connection;
@@ -113,6 +118,10 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
+    if (testLogin(context) != 0) {
+        printf ("unable to log into server\n");
+        exit(1);
+    }
 
 
     
