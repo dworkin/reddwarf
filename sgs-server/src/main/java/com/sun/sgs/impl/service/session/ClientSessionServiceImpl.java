@@ -234,6 +234,10 @@ public final class ClientSessionServiceImpl
     private final ConcurrentHashMap<BigInteger, TaskQueue>
 	sessionTaskQueues = new ConcurrentHashMap<BigInteger, TaskQueue>();
 
+    private final ConcurrentHashMap<BigInteger, RelocationInfo>
+	relocatingSessions =
+	    new ConcurrentHashMap<BigInteger, RelocationInfo>();
+
     /** The maximum number of session events to service per transaction. */
     final int eventsPerTxn;
 
@@ -517,7 +521,9 @@ public final class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public void mappingAdded(Identity id, Node oldNode) {
-	    // TBD: Keep track of pending move to node.
+	    // TBD: Keep track of pending move to node and clean up
+	    // session if it doesn't relocate to the local node in a
+	    // timely fashion.
 	}
 
 	/** {@inheritDoc} */
@@ -561,9 +567,16 @@ public final class ClientSessionServiceImpl
 	    ByteBuffer relocationKey, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
-	    // TBD: create new client session, update cached local state
-	    // for session, and make sure event queue gets serviced.
-	    throw new AssertionError("not implemented");
+	    RelocationInfo info = relocatingSessions.remove(relocationKey);
+	    new ClientSessionHandler(
+		ClientSessionServiceImpl.this, dataService, protocol,
+		info.identity, completionHandler,
+		new BigInteger(1, info.sessionId));
+
+	    // TBD: this services at least one event, but need to ensure
+	    // that other events get serviced if serviceEventQueue
+	    // messages got missed while the session was relocating.
+	    serverImpl.serviceEventQueue(info.sessionId);
 	}
     }
     
@@ -838,6 +851,11 @@ public final class ClientSessionServiceImpl
 		}
 
 		BigInteger sessionRefId = new BigInteger(1, sessionId);
+		if (!handlers.containsKey(sessionRefId)) {
+		    // The session is not local, so this node should not
+		    // service the event queue.
+		    return;
+		}
 		TaskQueue taskQueue = sessionTaskQueues.get(sessionRefId);
 		if (taskQueue == null) {
 		    TaskQueue newTaskQueue =
@@ -870,10 +888,12 @@ public final class ClientSessionServiceImpl
 			       HexDumper.toHexString(sessionId), oldNode);
 		}
 		byte[] relocationKey = getNextRelocationKey();
-		//relocatingSessions.put(new BigInteger(1, relocationKey),
-				       
-		// TBD: return relocation key
-		throw new AssertionError("not implemented");
+		relocatingSessions.put(
+ 		    new BigInteger(1, relocationKey),
+		    new RelocationInfo(identity, sessionId, oldNode));
+				      
+		return relocationKey;
+
 	    } finally {
 		callFinished();
 	    }
@@ -1325,5 +1345,22 @@ public final class ClientSessionServiceImpl
 	}
 	return protocolDescriptorsMap;
     }
+
+    /**
+     * Contains information about a client session relocating to the
+     * local node.
+     */
+    private static class RelocationInfo {
+	final Identity identity;
+	final byte[] sessionId;
+	final long oldNode;
+
+	RelocationInfo(Identity identity, byte[] sessionId, long oldNode) {
+	    this.identity = identity;
+	    this.sessionId = sessionId;
+	    this.oldNode = oldNode;
+	}
+    }
+    
 }
 

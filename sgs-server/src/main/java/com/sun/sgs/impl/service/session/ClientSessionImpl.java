@@ -710,6 +710,14 @@ public class ClientSessionImpl
     }
 
     /**
+     * Returns {@code true} if session is on local node, and returns
+     * {@code false} otherwise.
+     */
+    private boolean isLocalSession() {
+	return nodeId == sessionService.getLocalNodeId();
+    }
+
+    /**
      * Adds the specified session {@code event} to this session's event
      * queue and notifies the client session service on the session's node
      * that there is an event to service.
@@ -723,7 +731,7 @@ public class ClientSessionImpl
 		"event queue removed; session is disconnected");
 	}
 
-	boolean isLocalSession = nodeId == sessionService.getLocalNodeId();
+	boolean isLocalSession = isLocalSession();
 
 	/*
 	 * If this session is connected to the local node and the event
@@ -1008,13 +1016,29 @@ public class ClientSessionImpl
 	void serviceEvent() {
 	    checkState();
 
+	    ManagedQueue<SessionEvent> eventQueue = getQueue();
 	    ClientSessionServiceImpl sessionService =
 		ClientSessionServiceImpl.getInstance();
-	    ManagedQueue<SessionEvent> eventQueue = getQueue();
 	    DataService dataService =
 		ClientSessionServiceImpl.getDataService();
 	    ClientSessionHandler handler =
 		sessionService.getHandler(getSessionRefId());
+	    if (handler == null) {
+		// Only service events on the session's local node, so return.
+		// TBD: should this log a warning or redirect the
+		// serviceEventQueue request to the correct node (since the
+		// session has probably moved?
+		return;
+	    }
+	    if (!getClientSession().isLocalSession()) {
+		// The session may be moving, and this might be a left over
+		// serviceEventQueue request.  Need to check that only the
+		// client session's local node is processing its events.
+		// TBD: is there any way to determine this information from
+		// local information only without deserializing the client
+		// session? 
+		return;
+	    }
 
 	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
 		SessionEvent event = eventQueue.poll();

@@ -1324,6 +1324,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String redirectHost;
         private int redirectPort;
 	private byte[] reconnectKey = new byte[0];
+
+	private boolean relocateSession;
+	private String relocateHost;
+	private int relocatePort;
+	private byte[] relocateKey = new byte[0];
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -1719,6 +1724,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 			System.err.println("login redirected: " + name +
 					   ", host:" + redirectHost +
                                            ", port:" + redirectPort);
+			lock.notifyAll();
+		    }
+		    break;
+
+		    
+		case SimpleSgsProtocol.RELOCATE_SESSION:
+		    relocateHost = buf.getString();
+                    relocatePort = buf.getInt();
+		    relocateKey = buf.getBytes(buf.limit() - buf.position());
+		    synchronized (lock) {
+			relocateSession = true;
+			System.err.println("session to relocate: " + name +
+					   ", host:" + relocateHost +
+                                           ", port:" + relocatePort);
 			lock.notifyAll();
 		    } break;
 
