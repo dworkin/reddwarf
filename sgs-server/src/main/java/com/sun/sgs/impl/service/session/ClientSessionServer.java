@@ -74,6 +74,6 @@ public interface ClientSessionServer extends Remote {
      * @throws	IOException if a communication problem occurs while
      * 		invoking this method
      */
-    byte[] relocateSession(Identity identity, byte[] sessionId, long oldNode)
+    byte[] relocatingSession(Identity identity, byte[] sessionId, long oldNode)
 	throws IOException;
 }

@@ -1166,7 +1166,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * obtain relocation key.
 		 */
 		byte[] relocationKey =
-		    server.relocateSession(
+		    server.relocatingSession(
  			identity, sessionRefId.toByteArray(),
 			sessionService.getLocalNodeId());
 		/*
