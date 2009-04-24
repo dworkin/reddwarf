@@ -110,7 +110,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private boolean disconnectHandled = false;
 
     /** Indicates whether a session is relocating to a new node. */
-    volatile boolean relocating = false;
+    private volatile boolean relocating = false;
     
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
@@ -122,8 +122,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
     private volatile TaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class using the provided byte channel,
-     * and starts reading from the connection.
+     * Constructs an handler for a client session that is logging in.
      *
      * @param	sessionService the ClientSessionService instance
      * @param	dataService the DataService instance
@@ -138,6 +137,30 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	Identity identity,
 	RequestCompletionHandler<SessionProtocolHandler> completionHandler)
     {
+	this(sessionService, dataService, sessionProtocol, identity,
+	     completionHandler, null);
+    }
+
+    /**
+     * Constructs an handler for a client session.  If {@code sessionRefId}
+     * is non-{@code null}, then the associated client session is relocating
+     * from another node, otherwise it is considered a new client session.
+     *
+     * @param	sessionService the ClientSessionService instance
+     * @param	dataService the DataService instance
+     * @param	sessionProtocol a session protocol
+     * @param	identity an identity
+     * @param	completionHandler a completion handler for the login request
+     * @param	sessionRefId the client session ID, or {@code null}
+     */
+    ClientSessionHandler(
+	ClientSessionServiceImpl sessionService,
+	DataService dataService,
+	SessionProtocol sessionProtocol,
+	Identity identity,
+	RequestCompletionHandler<SessionProtocolHandler> completionHandler,
+	BigInteger sessionRefId)
+    {
 	checkNull("sessionService", sessionService);
 	checkNull("dataService", dataService);
 	checkNull("sessionProtocol", sessionProtocol);
@@ -147,6 +170,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
         this.dataService = dataService;
 	this.protocol = sessionProtocol;
 	this.identity = identity;
+	this.sessionRefId = sessionRefId;
 	loginCompletionFuture =
 	    new LoginCompletionFuture(this, completionHandler);
 	
@@ -162,7 +186,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		        sessionService.getLocalNodeId());
 	}
     }
-
+			 
     /* -- Implement SessionProtocolHandler -- */
     
     /** {@inheritDoc} */
@@ -275,7 +299,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @return	{@code true} if this handler is connected
      */
-    boolean isConnected() {
+    private boolean isConnected() {
 
 	State currentState = getCurrentState();
 	return
@@ -307,7 +331,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * indicating that the login request has been handled and the client is
      * logged in.
      */
-    void loginSuccess() {
+    private void loginSuccess() {
 	synchronized (lock) {
 	    checkConnectedState();
 	    loggedIn = true;
@@ -323,7 +347,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      *
      * @param	exception the login failure exception
      */
-    void loginFailure(LoginFailureException exception) {
+    private void loginFailure(LoginFailureException exception) {
 	checkNull("exception", exception);
 	synchronized (lock) {
 	    checkConnectedState();
@@ -593,21 +617,30 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		return;
 	    }
 	    taskQueue = sessionService.createTaskQueue();
-	    CreateClientSessionTask createTask =
-		new CreateClientSessionTask();
-	    try {
-		sessionService.runTransactionalTask(createTask, identity);
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "Storing ClientSession for identity:{0} throws", identity);
-		sendLoginFailureAndDisconnect(
-		    new LoginFailureException(LOGIN_REFUSED_REASON, e));
-		return;
+	    boolean isNewSession = sessionRefId == null;
+	    if (isNewSession) {
+		CreateClientSessionTask createTask =
+		    new CreateClientSessionTask();
+		try {
+		    sessionService.runTransactionalTask(createTask, identity);
+		} catch (Exception e) {
+		    logger.logThrow(
+		        Level.WARNING, e,
+			"Storing ClientSession for identity:{0} throws",
+			identity);
+		    sendLoginFailureAndDisconnect(
+			new LoginFailureException(LOGIN_REFUSED_REASON, e));
+		    return;
+		}
+		sessionRefId = createTask.getId();
 	    }
 	    sessionService.addHandler(
 		sessionRefId, ClientSessionHandler.this);
-	    scheduleTask(new LoginTask());
+	    if (isNewSession) {
+		scheduleTask(new LoginTask());
+	    } else {
+		loginSuccess();
+	    }
 	    
 	} else {
 	    /*
@@ -739,6 +772,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * Constructs the ClientSession.
      */
     private class CreateClientSessionTask extends AbstractKernelRunnable {
+	
+	private volatile BigInteger id;;
 
 	/** Constructs and instance. */
 	CreateClientSessionTask() {
@@ -752,7 +787,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
                                           identity,
                                           protocol.getDeliveries(),
                                           protocol.getMaxMessageLength());
-	    sessionRefId = sessionImpl.getId();
+	    id = sessionImpl.getId();
+	}
+
+	/**
+	 * Returns the session ID for the created client session.
+	 */
+	BigInteger getId() {
+	    return id;
 	}
     }
     
@@ -1183,6 +1225,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		 * Schedule a task to close the client session if it is not
 		 * closed in a timely fashion.  This will also clean up local
 		 * client session state if not done so already.
+		 *
+		 * TBD: is this taken care of by the protocol layer
+		 * already because it monitors disconnecting clients?
 		 */
 		sessionService.getTaskScheduler().scheduleTask(
 		    new AbstractKernelRunnable("CloseMovedClientSession") {

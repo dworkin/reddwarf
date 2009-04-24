@@ -272,14 +272,28 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     }
 
     /** {@inheritDoc} */
-    public void relocate(Node newNode, ByteBuffer relocationKey) {
-	/*
-	int messageLength = ?;
-	ByteBuffer buf =
-	    ByteBuffer.allocate(messageLength);
-	*/
-	
-	
+    public void relocate(Node newNode,
+			 Set<ProtocolDescriptor> descriptors,
+			 ByteBuffer relocationKey)
+    {
+        for (ProtocolDescriptor descriptor : descriptors) {
+            if (acceptor.getDescriptor().supportsProtocol(descriptor)) {
+		byte[] redirectionData =
+		    ((SimpleSgsProtocolDescriptor) descriptor).
+		        getConnectionData();
+		ByteBuffer buf =
+		    ByteBuffer.allocate(1 + redirectionData.length +
+					relocationKey.remaining());
+		buf.put(SimpleSgsProtocol.RELOCATE_SESSION).
+		    put(redirectionData).
+		    put(relocationKey).
+		    flip();
+		writeToWriteHandler(buf);
+		flushMessageQueue();
+		acceptor.monitorDisconnection(this);
+                return;
+            }
+        }
     }
     
     /** {@inheritDoc} */

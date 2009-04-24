@@ -187,7 +187,14 @@ public class TestSimpleSgsProtocol {
             this.protocol = protocol;
 	    this.completionHandler = completionHandler;
         }
-        
+
+	public void relocatedSession(
+	    ByteBuffer relocationKey, SessionProtocol protocol,
+	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
+
+	{
+	}
+	
         private class SessionHandler implements SessionProtocolHandler {
 
             public void sessionMessage(

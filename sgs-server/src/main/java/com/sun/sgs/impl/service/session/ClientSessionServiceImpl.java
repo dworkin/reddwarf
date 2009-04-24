@@ -68,6 +68,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -157,6 +158,14 @@ public final class ClientSessionServiceImpl
     private static final String DEFAULT_PROTOCOL_ACCEPTOR =
 	"com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor";
 
+    /** The default length of a relocation key, in bytes.
+     * TBD: the relocation key length should be configurable.
+     */
+    private static final int DEFAULT_RELOCATION_KEY_LENGTH = 16;
+
+    /** A random number generator for relocation keys. */
+    private static final SecureRandom random = new SecureRandom();
+    
     /** The write buffer size for new connections. */
     private final int writeBufferSize;
 
@@ -552,6 +561,8 @@ public final class ClientSessionServiceImpl
 	    ByteBuffer relocationKey, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
+	    // TBD: create new client session, update cached local state
+	    // for session, and make sure event queue gets serviced.
 	    throw new AssertionError("not implemented");
 	}
     }
@@ -603,15 +614,15 @@ public final class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		CommitActions actions = commitActions.get(sessionRefId);
-		if (actions == null) {
-		    actions = new CommitActions();
-		    commitActions.put(sessionRefId, actions);
+		CommitActions sessionActions = commitActions.get(sessionRefId);
+		if (sessionActions == null) {
+		    sessionActions = new CommitActions();
+		    commitActions.put(sessionRefId, sessionActions);
 		}
 		if (first) {
-		    actions.addFirst(action);
+		    sessionActions.addFirst(action);
 		} else {
-		    actions.add(action);
+		    sessionActions.add(action);
 		}
 	    
 	    } catch (RuntimeException e) {
@@ -849,7 +860,7 @@ public final class ClientSessionServiceImpl
 	}
 
 	/** {@inheritDoc} */
-	public byte[] relocateSession(
+	public byte[] relocatingSession(
 	    Identity identity, byte[] sessionId, long oldNode)
 	{
 	    callStarted();
@@ -858,6 +869,9 @@ public final class ClientSessionServiceImpl
 		    logger.log(Level.FINEST, "sessionId:{0} oldNode:{1}",
 			       HexDumper.toHexString(sessionId), oldNode);
 		}
+		byte[] relocationKey = getNextRelocationKey();
+		//relocatingSessions.put(new BigInteger(1, relocationKey),
+				       
 		// TBD: return relocation key
 		throw new AssertionError("not implemented");
 	    } finally {
@@ -942,6 +956,17 @@ public final class ClientSessionServiceImpl
      */
     ClientSessionHandler getHandler(BigInteger sessionRefId) {
 	return handlers.get(sessionRefId);
+    }
+
+    /**
+     * Returns the next relocation key.
+     *
+     * @return the next relocation key
+     */
+    private static byte[] getNextRelocationKey() {
+	byte[] key = new byte[DEFAULT_RELOCATION_KEY_LENGTH];
+	random.nextBytes(key);
+	return key;
     }
 
     /**
