@@ -33,6 +33,9 @@ import com.sun.sgs.app.ResourceUnavailableException;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.DisconnectAction;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.MoveAction;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.SendMessageAction;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
@@ -731,7 +734,10 @@ public class ClientSessionImpl
 	 * to service this session's event queue.
 	 */
 	if (isLocalSession && eventQueue.isEmpty()) {
-	    event.serviceEvent(eventQueue);
+	    event.serviceEvent(
+ 		eventQueue,
+		sessionService,
+		sessionService.getHandler(eventQueue.getSessionRefId()));
 
 	} else if (!eventQueue.offer(event)) {
 	    throw new ResourceUnavailableException(
@@ -753,7 +759,7 @@ public class ClientSessionImpl
 		 */
 		return;
 	    }
-	    sessionService.scheduleNonTransactionalTask(
+	    sessionService.getTaskScheduler().scheduleTask(
 	        new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
 			sessionService.runIoTask(
@@ -801,7 +807,9 @@ public class ClientSessionImpl
 	 * Services this event, taken from the head of the given {@code
 	 * eventQueue}.
 	 */
-	abstract void serviceEvent(EventQueue eventQueue);
+	abstract void serviceEvent(EventQueue eventQueue,
+				   ClientSessionServiceImpl sessionService,
+				   ClientSessionHandler handler);
 
 	/**
 	 * Returns the cost of this event, which the {@code EventQueue}
@@ -831,10 +839,14 @@ public class ClientSessionImpl
 	}
 
 	/** {@inheritDoc} */
-	void serviceEvent(EventQueue eventQueue) {
-	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.checkContext().
-		addSessionMessage(sessionImpl, this);
+	void serviceEvent(EventQueue eventQueue,
+			  ClientSessionServiceImpl sessionService,
+			  ClientSessionHandler handler)
+	{
+	    sessionService.checkContext().addCommitAction(
+ 		eventQueue.getSessionRefId(),
+		handler.new SendMessageAction(this),
+		false);
 	}
 
 	/** Use the message length as the cost for sending messages. */
@@ -862,11 +874,13 @@ public class ClientSessionImpl
 	}
 
 	/** {@inheritDoc} */
-	void serviceEvent(EventQueue eventQueue) {
-	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.nodeId = newNode.getId();
-	    sessionImpl.sessionService.checkContext().
-		addMoveRequest(sessionImpl, newNode);
+	void serviceEvent(EventQueue eventQueue,
+			  ClientSessionServiceImpl sessionService,
+			  ClientSessionHandler handler)
+	{
+	    sessionService.checkContext().addCommitAction(
+		eventQueue.getSessionRefId(),
+ 		handler.new MoveAction(newNode), false);
 	}
     }
 
@@ -878,10 +892,13 @@ public class ClientSessionImpl
 	DisconnectEvent() { }
 
 	/** {@inheritDoc} */
-	void serviceEvent(EventQueue eventQueue) {
-	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
-	    sessionImpl.sessionService.checkContext().
-		addDisconnectRequest(sessionImpl);
+	void serviceEvent(EventQueue eventQueue,
+			  ClientSessionServiceImpl sessionService,
+			  ClientSessionHandler handler)
+	{
+	    sessionService.checkContext().addCommitAction(
+		eventQueue.getSessionRefId(),
+ 		handler.new DisconnectAction(), false);
 	}
 
 	/** {@inheritDoc} */
@@ -996,6 +1013,8 @@ public class ClientSessionImpl
 	    ManagedQueue<SessionEvent> eventQueue = getQueue();
 	    DataService dataService =
 		ClientSessionServiceImpl.getDataService();
+	    ClientSessionHandler handler =
+		sessionService.getHandler(getSessionRefId());
 
 	    for (int i = 0; i < sessionService.eventsPerTxn; i++) {
 		SessionEvent event = eventQueue.poll();
@@ -1018,7 +1037,7 @@ public class ClientSessionImpl
 		    }
 		}
 
-		event.serviceEvent(this);
+		event.serviceEvent(this, sessionService, handler);
 	    }
 	}
 
