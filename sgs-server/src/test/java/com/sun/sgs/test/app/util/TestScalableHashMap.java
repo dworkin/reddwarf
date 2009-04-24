@@ -93,6 +93,10 @@ public class TestScalableHashMap extends Assert {
     private static final Method getAvgTreeDepth =
 	getMethod(ScalableHashMap.class, "getAvgTreeDepth");
 
+    /** The checkLeafRefs method. */
+    private static final Method checkLeafRefs =
+	getMethod(ScalableHashMap.class, "checkLeafRefs");
+
     /**
      * Test management.
      */
@@ -189,6 +193,21 @@ public class TestScalableHashMap extends Assert {
 		    }
 		}
 	    }, taskOwner);
+    }
+
+    /** This test reproduces the problem reported in sgs-server issue #160. */
+    @Test
+    public void testConstructorOneArgHighConcurrency() throws Exception {
+	for (final int concurrency : new int[] { 256, 1024 }) {
+	    txnScheduler.runTask(
+		new TestAbstractKernelRunnable() {
+		    public void run() throws Exception {
+			Map<Integer, Integer> map =
+			    new ScalableHashMap<Integer,Integer>(256);
+			map.keySet().iterator();
+		    }
+		}, taskOwner);
+	}
     }
 
     // NOTE: we do not test the maximum concurrency in the
@@ -1644,6 +1663,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 
 		    for (int i = 0; i < 12; i += 2) {
 			test.remove(a[i]);
@@ -1671,6 +1691,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 		}
 	    }, taskOwner);
     }
@@ -1679,7 +1700,7 @@ public class TestScalableHashMap extends Assert {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Integer,Integer> test =
+		    ScalableHashMap<Integer,Integer> test =
 			new ScalableHashMap<Integer,Integer>(16);
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
@@ -1697,6 +1718,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 		}
 	    }, taskOwner);
     }
@@ -1904,7 +1926,7 @@ public class TestScalableHashMap extends Assert {
 	txnScheduler.runTask(
 	    new TestAbstractKernelRunnable() {
 		public void run() throws Exception {
-		    Map<Integer,Integer> test =
+		    ScalableHashMap<Integer,Integer> test =
 			new ScalableHashMap<Integer,Integer>(16);
 		    Map<Integer,Integer> control =
 			new HashMap<Integer,Integer>();
@@ -1919,16 +1941,19 @@ public class TestScalableHashMap extends Assert {
 			test.put(inputs[j], inputs[j]);
 			control.put(inputs[j], inputs[j]);
 			assertEquals(control, test);
+			checkLeafRefs(test);
 
 			int k = RANDOM.nextInt(inputs.length);
 			test.remove(inputs[k]);
 			control.remove(inputs[k]);
 			assertEquals(control, test);
+			checkLeafRefs(test);
 
 			int m = RANDOM.nextInt(inputs.length);
 			test.put(inputs[m], inputs[m]);
 			control.put(inputs[m], inputs[m]);
 			assertEquals(control, test);
+			checkLeafRefs(test);
 		    }
 		}
 	    }, taskOwner);
@@ -2265,6 +2290,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 
 		    // remove 10
 		    for (int i = 0; i < 10; i++) {
@@ -2273,6 +2299,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 
 		    // add 32
 		    for (int i = 32; i < 64; i++) {
@@ -2281,6 +2308,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 
 		    // remove 10
 		    for (int i = 32; i < 42; i++) {
@@ -2289,6 +2317,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 
 		    // add 64
 		    for (int i = 64; i < 128; i++) {
@@ -2297,6 +2326,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 
 		    // remove 5
 		    for (int i = 64; i < 69; i++) {
@@ -2305,6 +2335,7 @@ public class TestScalableHashMap extends Assert {
 		    }
 
 		    assertEquals(control, test);
+		    checkLeafRefs(test);
 		}
 	    }, taskOwner);
     }
@@ -3233,6 +3264,17 @@ public class TestScalableHashMap extends Assert {
     private double getAvgTreeDepth(ScalableHashMap map) {
 	try {
 	    return (Integer) getAvgTreeDepth.invoke(map);
+	} catch (Exception e) {
+	    throw new RuntimeException("Unexpected exception: " + e, e);
+	}
+    }
+
+    /**
+     * Verifies the state of the doubly linked list of the map's leaf nodes.
+     */
+    private void checkLeafRefs(ScalableHashMap map) {
+	try {
+	    checkLeafRefs.invoke(map);
 	} catch (Exception e) {
 	    throw new RuntimeException("Unexpected exception: " + e, e);
 	}

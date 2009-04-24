@@ -34,9 +34,9 @@ import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.kernel.AccessedObject;
 import com.sun.sgs.profile.AccessedObjectsDetail;
 import com.sun.sgs.profile.AccessedObjectsDetail.ConflictType;
-import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionInterruptedException;
+import com.sun.sgs.service.TransactionListener;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -161,9 +161,8 @@ import java.util.logging.Logger;
  *
  * </ul>
  */
-public class LockingAccessCoordinator extends AbstractAccessCoordinator
-    implements NonDurableTransactionParticipant
-{
+public class LockingAccessCoordinator extends AbstractAccessCoordinator {
+
     /** The class name. */
     private static final String CLASS =
 	"com.sun.sgs.impl.kernel.LockingAccessCoordinator";
@@ -300,34 +299,7 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 		       "begin {0}, requestedStartTime:{1,number,#}",
 		       locker, requestedStartTime);
 	}
-	txn.join(this);
-    }
-
-    /* -- Implement NonDurableTransactionParticipant -- */
-
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) {
-	return false;
-    }
-
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	endTransaction(txn);
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) {
-	endTransaction(txn);
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	endTransaction(txn);
-    }
-
-    /** {@inheritDoc} */
-    public String getTypeName() {
-	return CLASS;
+	txn.registerListener(new TxnListener(txn));
     }
 
     /* -- Other public methods -- */
@@ -1917,6 +1889,43 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator
 	 */
 	WaiterInfo(LockRequest[] waitingFor) {
 	    this.waitingFor = waitingFor;
+	}
+    }
+
+    /**
+     * A transaction listener that calls {@link #endTransaction} when called
+     * after the transaction completes.  Use a listener instead of a
+     * transaction participant to make sure that locks are released only after
+     * all of the transaction participants have finished their work.
+     */
+    private class TxnListener implements TransactionListener {
+
+	/** The transaction. */
+	private final Transaction txn;
+
+	/**
+	 * Creates an instance of this class.
+	 *
+	 * @param	txn the transaction we're listening for
+	 */
+	TxnListener(Transaction txn) {
+	    this.txn = txn;
+	}
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation does nothing.
+	 */
+	public void beforeCompletion() { }
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation calls {@link #endTransaction}.
+	 */
+	public void afterCompletion(boolean committed) {
+	    endTransaction(txn);
 	}
     }
 }

@@ -23,6 +23,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import java.io.IOException;
 import java.io.ObjectStreamClass;
@@ -148,14 +149,17 @@ public interface DataStoreServer extends Remote {
     void removeObject(long tid, long oid) throws IOException;
 
     /**
-     * Obtains the object ID bound to a name.
+     * Obtains the object ID bound to a name.  If the name is bound, the return
+     * value contains the object ID that the name is bound to and a next name
+     * of {@code null}.  If the name is not bound, the return value contains an
+     * object ID of {@code -1} and the next name found, which may be {@code
+     * null}.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	name the name
-     * @return	the object ID
+     * @return	information about the object ID and the next name
      * @throws	IllegalArgumentException if {@code tid} is negative
-     * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -163,15 +167,19 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
-    long getBinding(long tid, String name) throws IOException;
+    BindingValue getBinding(long tid, String name) throws IOException;
 
     /**
-     * Binds an object ID to a name.
+     * Binds an object ID to a name.  If the name is bound, the return value
+     * contains an arbitrary non-negative object ID and a next name of {@code
+     * null}.  If the name is not bound, the return value contains an object ID
+     * of {@code -1} and the next name found, which may be {@code null}.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	name the name
      * @param	oid the object ID
+     * @return	information about the object ID and the next name
      * @throws	IllegalArgumentException if {@code tid} or {@code oid} is
      *		negative
      * @throws	TransactionAbortedException if the transaction was aborted due
@@ -181,16 +189,20 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
-    void setBinding(long tid, String name, long oid) throws IOException;
+    BindingValue setBinding(long tid, String name, long oid)
+	throws IOException;
 
     /**
-     * Removes the binding for a name.
+     * Removes the binding for a name.  If the name is bound, the return value
+     * contains an arbitrary non-negative object ID, otherwise it contains
+     * {@code -1}.  In all cases, the return value contains the next name
+     * found, which may be {@code null}.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
      * @param	name the name
+     * @return	information about the object ID and the next name
      * @throws	IllegalArgumentException if {@code tid} is negative
-     * @throws	NameNotBoundException if the name is not bound
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	TransactionNotActiveException if the transaction is not active
@@ -198,7 +210,7 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
-    void removeBinding(long tid, String name) throws IOException;
+    BindingValue removeBinding(long tid, String name) throws IOException;
 
     /**
      * Returns the next name after the specified name that has a binding, or

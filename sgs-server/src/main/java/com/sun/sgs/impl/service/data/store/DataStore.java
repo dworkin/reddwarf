@@ -23,6 +23,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
 import java.io.ObjectStreamClass;
@@ -39,9 +40,9 @@ public interface DataStore {
     /**
      * Reserves an object ID for a new object.  Note that calling other
      * operations using this ID are not required to find the object until
-     * {@link #setObject setObject} is called.  Aborting a transaction is also
-     * not required to unassign the ID so long as other operations treat it as
-     * a non-existent object.
+     * {@link #setObject setObject} or {@link #setObjects setObjects} is
+     * called.  Aborting a transaction is also not required to unassign the ID
+     * so long as other operations treat it as a non-existent object.
      *
      * @param	txn the transaction under which the operation should take place
      * @return	the new object ID
@@ -56,8 +57,9 @@ public interface DataStore {
     /**
      * Notifies the <code>DataStore</code> that an object is going to be
      * modified.  The implementation can use this information to obtain an
-     * exclusive lock on the object in order avoid contention when the object
-     * is modified.  This method does nothing if the object does not exist.
+     * exclusive lock on the object in order to avoid contention when the
+     * object is modified.  This method does nothing if the object does not
+     * exist.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
@@ -280,4 +282,36 @@ public interface DataStore {
      *		problem with the current transaction
      */
     long nextObjectId(Transaction txn, long oid);
+
+    /**
+     * Associates a description with an object ID, for use in describing object
+     * accesses.  The {@code description} should provide a meaningful {@code
+     * toString} method.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oid the object ID
+     * @param	description the description
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     * @see	AccessReporter#setObjectDescription
+     *		AccessReporter.setObjectDescription
+     */
+    void setObjectDescription(Transaction txn, long oid, Object description);
+
+    /**
+     * Associates a description with a bound name, for use in describing name
+     * accesses.  The {@code description} should provide a meaningful {@code
+     * toString} method.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	name the name
+     * @param	description the description
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     * @see	AccessReporter#setObjectDescription
+     *		AccessReporter.setObjectDescription
+     */
+    void setBindingDescription(
+	Transaction txn, String name, Object description);
 }

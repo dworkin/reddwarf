@@ -28,6 +28,7 @@ import com.sleepycat.je.ExceptionListener;
 import com.sleepycat.je.LockNotGrantedException;
 import com.sleepycat.je.RunRecoveryException;
 import com.sleepycat.je.StatsConfig;
+import com.sleepycat.je.TransactionConfig;
 import com.sleepycat.je.XAEnvironment;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
@@ -109,6 +110,15 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * property is set to {@code -1} by default, which disables statistics
  * logging. <p>
  *
+ * <dt> <i>Property:</i> <b>{@value #TXN_ISOLATION_PROPERTY}</b> <br>
+ *	<i>Default:</i> {@link TxnIsolationLevel#SERIALIZABLE SERIALIZABLE}
+ *
+ * <dd style="padding-top: .5em">The transaction isolation level, which should
+ *	be one of {@link TxnIsolationLevel#READ_UNCOMMITTED READ_UNCOMMITTED},
+ *	{@link TxnIsolationLevel#READ_COMMITTED READ_COMMITTED},
+ *	{@link TxnIsolationLevel#REPEATABLE_READ REPEATABLE_READ}, or
+ *	{@link TxnIsolationLevel#SERIALIZABLE SERIALIZABLE}. <p>
+ *
  * </dl> <p>
  *
  * The constructor also supports any initialization properties supported by the
@@ -139,11 +149,12 @@ import static javax.transaction.xa.XAException.XA_RBTIMEOUT;
  * the following logging levels: <p>
  *
  * <ul>
- * <li> {@link Level#SEVERE SEVERE} - Berkeley DB failures that require
- *	application restart and recovery
- * <li> {@link Level#WARNING WARNING} - Berkeley DB exceptions
- * <li> {@link Level#INFO INFO} - Berkeley DB statistics
- * <li> {@link Level#CONFIG CONFIG} - Constructor properties
+ * <li> {@link java.util.logging.Level#SEVERE SEVERE} - Berkeley DB failures
+ *	that require application restart and recovery
+ * <li> {@link java.util.logging.Level#WARNING WARNING} - Berkeley DB
+ *	exceptions
+ * <li> {@link java.util.logging.Level#INFO INFO} - Berkeley DB statistics
+ * <li> {@link java.util.logging.Level#CONFIG CONFIG} - Constructor properties
  * </ul>
  */
 public class JeEnvironment implements DbEnvironment {
@@ -192,6 +203,26 @@ public class JeEnvironment implements DbEnvironment {
      */
     public static final String STATS_PROPERTY = PACKAGE + ".stats";
     
+    /** The property that specifies the default transaction isolation level. */
+    public static final String TXN_ISOLATION_PROPERTY =
+	PACKAGE + ".txn.isolation";
+
+    /** The supported transaction isolation levels. */
+    public enum TxnIsolationLevel {
+
+	/** The read uncommitted transaction isolation level. */
+	READ_UNCOMMITTED,
+
+	/** The read committed transaction isolation level. */
+	READ_COMMITTED,
+
+	/** The repeatable read transaction isolation level. */
+	REPEATABLE_READ,
+
+	/** The serializable transaction isolation level. */
+	SERIALIZABLE;
+    }
+
     /**
      * Default values for Berkeley DB Java Edition properties that are
      * different from the BDB defaults.
@@ -202,6 +233,21 @@ public class JeEnvironment implements DbEnvironment {
 				      "1000000");
 	defaultProperties.setProperty("je.env.sharedLatches", "true");
     }
+
+    /**
+     * A Berkeley DB transaction configuration for beginning transactions that
+     * use serializable transaction isolation.
+     */
+    private static final TransactionConfig fullIsolationTxnConfig =
+	new TransactionConfig();
+    static {
+	fullIsolationTxnConfig.setReadCommitted(false);
+	fullIsolationTxnConfig.setReadUncommitted(false);
+	fullIsolationTxnConfig.setSerializableIsolation(true);
+    }
+
+    /** The default transaction configuration. */
+    private final TransactionConfig defaultTxnConfig = new TransactionConfig();
 
     /** The Berkeley DB environment. */
     private final XAEnvironment env;
@@ -294,6 +340,33 @@ public class JeEnvironment implements DbEnvironment {
 	long lockTimeoutMicros = (lockTimeout < (Long.MAX_VALUE / 1000))
 	    ? lockTimeout * 1000 : 0;
 	long stats = wrappedProps.getLongProperty(STATS_PROPERTY, -1);
+	TxnIsolationLevel txnIsolation = wrappedProps.getEnumProperty(
+	    TXN_ISOLATION_PROPERTY, TxnIsolationLevel.class,
+	    TxnIsolationLevel.SERIALIZABLE);
+	switch (txnIsolation) {
+	case READ_UNCOMMITTED:
+	    defaultTxnConfig.setReadUncommitted(true);
+	    defaultTxnConfig.setReadCommitted(false);
+	    defaultTxnConfig.setSerializableIsolation(false);
+	    break;
+	case READ_COMMITTED:
+	    defaultTxnConfig.setReadUncommitted(false);
+	    defaultTxnConfig.setReadCommitted(true);
+	    defaultTxnConfig.setSerializableIsolation(false);
+	    break;
+	case REPEATABLE_READ:
+	    defaultTxnConfig.setReadUncommitted(false);
+	    defaultTxnConfig.setReadCommitted(false);
+	    defaultTxnConfig.setSerializableIsolation(false);
+	    break;
+	case SERIALIZABLE:
+	    defaultTxnConfig.setReadUncommitted(false);
+	    defaultTxnConfig.setReadCommitted(false);
+	    defaultTxnConfig.setSerializableIsolation(true);
+	    break;
+	default:
+	    throw new AssertionError();
+	}
 	EnvironmentConfig config = new EnvironmentConfig();
 	config.setAllowCreate(true);
 	config.setExceptionListener(new LoggingExceptionListener());
@@ -305,7 +378,6 @@ public class JeEnvironment implements DbEnvironment {
 	 */
  	config.setLockTimeout(lockTimeoutMicros);
 	config.setTransactional(true);
-	config.setTxnSerializableIsolation(true);
 	config.setTxnWriteNoSync(!flushToDisk);
 	for (Enumeration<?> names = propertiesWithDefaults.propertyNames();
 	     names.hasMoreElements(); )
@@ -406,7 +478,16 @@ public class JeEnvironment implements DbEnvironment {
 
     /** {@inheritDoc} */
     public DbTransaction beginTransaction(long timeout) {
-	return new JeTransaction(env, timeout);
+	return new JeTransaction(env, timeout, defaultTxnConfig);
+    }
+
+    /** {@inheritDoc} */
+    public DbTransaction beginTransaction(
+	long timeout, boolean fullIsolation)
+    {
+	return new JeTransaction(
+	    env, timeout,
+	    fullIsolation ? fullIsolationTxnConfig : defaultTxnConfig);
     }
 
     /** {@inheritDoc} */
