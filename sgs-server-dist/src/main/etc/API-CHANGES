@@ -10,6 +10,11 @@ Version 0.9.10
   listeners with mutable state should explicitly implement 
   the ManagedObject interface.
 
+- Add @RunWithNewIdentity annotation to com.sun.sgs.app package
+
+  This addresses issue #48, allowing an application to start tasks
+  that are owned by new identities.
+
 Version 0.9.9
 
 - Add support for specifying a delivery guarantee on session messages
