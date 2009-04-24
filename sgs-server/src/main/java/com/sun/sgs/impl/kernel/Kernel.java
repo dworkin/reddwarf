@@ -194,7 +194,13 @@ class Kernel {
         throws Exception 
     {
         logger.log(Level.CONFIG, "Booting the Kernel");
-
+                
+        // filter the properties with appropriate defaults
+        filterProperties(appProperties);
+        
+        // check the standard properties
+        checkProperties(appProperties);
+        
         this.appProperties = appProperties;
 
         try {
@@ -672,9 +678,7 @@ class Kernel {
         NodeType type = 
             NodeType.valueOf(
                 appProperties.getProperty(StandardProperties.NODE_TYPE));
-        if (!type.equals(NodeType.coreServerNode) &&
-            appProperties.getProperty(StandardProperties.APP_LISTENER) != null) 
-        {
+        if (!type.equals(NodeType.coreServerNode)) {
             try {
                 if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(Level.CONFIG, "{0}: starting application",
@@ -1111,12 +1115,6 @@ class Kernel {
         } else {
             appProperties = findProperties(null);
         }
-        
-        // filter the properties with appropriate defaults
-        filterProperties(appProperties);
-        
-        // check the standard properties
-        checkProperties(appProperties);
         
         // boot the kernel
         new Kernel(appProperties);

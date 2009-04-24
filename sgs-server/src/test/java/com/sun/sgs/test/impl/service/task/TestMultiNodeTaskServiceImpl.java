@@ -341,8 +341,12 @@ public class TestMultiNodeTaskServiceImpl extends TestCase {
             server ?  NodeType.singleNode.name() : 
                       NodeType.appNode.name();
         
+        String dir = System.getProperty("java.io.tmpdir") +
+                                File.separator + appName;
+        
         return UtilProperties.createProperties(
             StandardProperties.APP_NAME, appName,
+            StandardProperties.APP_ROOT, dir,
             com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
                 Integer.toString(SgsTestNode.getNextUniquePort()),
             "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",

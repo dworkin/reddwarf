@@ -218,7 +218,7 @@ public class TestDataServiceConcurrency extends TestCase {
     /** A utility to get the properties for the node. */
     protected Properties getNodeProps() throws Exception {
 	Properties props =
-	    SgsTestNode.getDefaultProperties("TestDataServicePerformance",
+	    SgsTestNode.getDefaultProperties("TestDataServiceConcurrency",
 					     null, null);
 	props.setProperty("com.sun.sgs.impl.kernel.profile.level", "max");
 	props.setProperty("com.sun.sgs.impl.kernel.profile.listeners",

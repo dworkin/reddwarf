@@ -321,6 +321,7 @@ public class TestDataServiceImpl{
         Properties props =
             SgsTestNode.getDefaultProperties(APP_NAME, null, null);
 	props.remove(DataStoreImplClassName + ".directory");
+        props.remove(StandardProperties.APP_ROOT);   
 	try {
 	    createDataServiceImpl(props, componentRegistry, txnProxy);
 	    fail("Expected IllegalArgumentException");
@@ -4251,8 +4252,11 @@ public class TestDataServiceImpl{
     protected Properties getProperties() throws Exception {
         Properties p = SgsTestNode.getDefaultProperties(APP_NAME, null, null);
         p.setProperty("com.sun.sgs.node.type", "coreServerNode");
-        p.remove("com.sun.sgs.impl.service.data.DataServiceImpl." +
-                 "data.store.class");
+        p.setProperty("com.sun.sgs.impl.service.data.DataServiceImpl." +
+	              "data.store.class",
+	              "com.sun.sgs.impl.service.data.store.DataStoreImpl");
+//        p.remove("com.sun.sgs.impl.service.data.DataServiceImpl." +
+//                 "data.store.class");
   
         p.setProperty(
             DataServiceImplClassName + ".debug.check.interval", "0");
