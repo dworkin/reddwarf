@@ -62,7 +62,8 @@ import java.lang.reflect.Field;
 import java.util.MissingResourceException;
 import java.util.Properties;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.TestCase;
 
@@ -323,7 +324,7 @@ public class TestTaskServiceImpl extends TestCase {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
-                    Task task = new NonManagedTask();
+                    Task task = new NonManagedTask(taskOwner);
                     try {
                         taskService.scheduleTask(task);
                     } catch (Exception e) {
@@ -432,13 +433,13 @@ public class TestTaskServiceImpl extends TestCase {
         runImmediateTest(newOwner);
     }
 
-    private void runImmediateTest(Identity owner) throws Exception {
+    private void runImmediateTest(final Identity owner) throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
                     Counter counter = getClearedCounter();
                     for (int i = 0; i < 3; i++) {
-                        taskService.scheduleTask(new NonManagedTask());
+                        taskService.scheduleTask(new NonManagedTask(owner));
                         counter.increment();
                     }
                 }
@@ -507,14 +508,14 @@ public class TestTaskServiceImpl extends TestCase {
         runPendingTest(newOwner);
     }
 
-    private void runPendingTest(Identity owner) throws Exception {
+    private void runPendingTest(final Identity owner) throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
                     AppContext.getDataManager();
                     Counter counter = getClearedCounter();
                     for (long i = 0; i < 3; i++) {
-                        taskService.scheduleTask(new NonManagedTask(),
+                        taskService.scheduleTask(new NonManagedTask(owner),
                                                  i * 100L);
                         counter.increment();
                     }
@@ -536,7 +537,7 @@ public class TestTaskServiceImpl extends TestCase {
         runPeriodicTest(newOwner);
     }
 
-    public void runPeriodicTest(Identity owner) throws Exception {
+    public void runPeriodicTest(final Identity owner) throws Exception {
         txnScheduler.runTask(
             new TestAbstractKernelRunnable() {
                 public void run() {
@@ -544,7 +545,7 @@ public class TestTaskServiceImpl extends TestCase {
                     for (int i = 0; i < 3; i++) {
                         PeriodicTaskHandle handle =
                             taskService.schedulePeriodicTask(
-                                new NonManagedTask(), 20L * i, 500L);
+                                new NonManagedTask(owner), 20L * i, 500L);
                         dataService.setBinding("runHandle." + i,
                                                new ManagedHandle(handle));
                         counter.increment();
@@ -588,9 +589,9 @@ public class TestTaskServiceImpl extends TestCase {
                     }
 
                     // test the basic cancel operation, between transactions
-                    handle =
-                        taskService.schedulePeriodicTask(
-                                        new NonManagedTask(), 500L, 100L);
+                    handle = taskService.
+                        schedulePeriodicTask(new NonManagedTask(taskOwner),
+                                             500L, 100L);
                     dataService.setBinding("TestTaskServiceImpl.handle",
                                            new ManagedHandle(handle));
                 }
@@ -689,9 +690,9 @@ public class TestTaskServiceImpl extends TestCase {
                     }
 
                     // test the basic cancel operation, between transactions
-                    handle =
-                        taskService.schedulePeriodicTask(new NonManagedTask(),
-                                                         500L, 500L);
+                    handle = taskService.
+                        schedulePeriodicTask(new NonManagedTask(taskOwner),
+                                             500L, 500L);
                     dataService.setBinding("TestTaskServiceImpl.handle",
                                            new ManagedHandle(handle));
                 }
@@ -823,73 +824,83 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunImmediateNonDurableTasks() throws Exception {
-        final AtomicInteger count = new AtomicInteger(3);
+        final CountDownLatch latch = new CountDownLatch(3);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     KernelRunnable r = new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
-                                count.decrementAndGet();
+                                if (! txnProxy.getCurrentOwner().
+                                    equals(taskOwner)) {
+                                    throw new RuntimeException("New identity");
+                                }
+                                latch.countDown();
                             }
                         };
                     for (int i = 0; i < 3; i++)
                         taskService.scheduleNonDurableTask(r, false);
                 }
             }, taskOwner);
-
-        Thread.sleep(500L);
-        assertEquals(0, count.get());
+        assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
     public void testRunPendingNonDurableTasks() throws Exception {
-        final AtomicInteger count = new AtomicInteger(3);
+        final CountDownLatch latch = new CountDownLatch(3);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     KernelRunnable r = new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
-                                count.decrementAndGet();
+                                if (! txnProxy.getCurrentOwner().
+                                    equals(taskOwner)) {
+                                    throw new RuntimeException("New identity");
+                                }
+                                latch.countDown();
                             }
                         };
                     for (int i = 0; i < 3; i++)
                         taskService.scheduleNonDurableTask(r, i * 100L, false);
                 }
             }, taskOwner);
-
-        Thread.sleep(500L);
-        assertEquals(0, count.get());
+        assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
     public void testRunNonDurableTransactionalTasks() throws Exception {
-        final AtomicInteger count = new AtomicInteger(2);
+        final CountDownLatch latch = new CountDownLatch(2);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     KernelRunnable r = new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
+                                if (! txnProxy.getCurrentOwner().
+                                    equals(taskOwner)) {
+                                    throw new RuntimeException("New identity");
+                                }
                                 // make sure that we're run in a transaction
                                 serverNode.getProxy().getCurrentTransaction();
-                                count.decrementAndGet();
+                                latch.countDown();
                             }
                         };
                     taskService.scheduleNonDurableTask(r, true);
                     taskService.scheduleNonDurableTask(r, 100, true);
                 }
             }, taskOwner);
-
-        Thread.sleep(500L);
-        assertEquals(0, count.get());
+        assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
     public void testRunNonDurableNonTransactionalTasks() throws Exception {
-        final AtomicInteger count = new AtomicInteger(2);
+        final CountDownLatch latch = new CountDownLatch(2);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     KernelRunnable r = new TestAbstractKernelRunnable() {
                             public void run() throws Exception {
+                                if (! txnProxy.getCurrentOwner().
+                                    equals(taskOwner)) {
+                                    throw new RuntimeException("New identity");
+                                }
                                 try {
                                     serverNode.getProxy().
                                         getCurrentTransaction();
                                 } catch (TransactionNotActiveException tnae) {
                                     // make sure we're not in a transaction
-                                    count.decrementAndGet();
+                                    latch.countDown();
                                 }
                             }
                         };
@@ -897,9 +908,7 @@ public class TestTaskServiceImpl extends TestCase {
                     taskService.scheduleNonDurableTask(r, 100, false);
                 }
             }, taskOwner);
-
-        Thread.sleep(500L);
-        assertEquals(0, count.get());
+        assertTrue(latch.await(500L, TimeUnit.MILLISECONDS));
     }
 
     public void testRecoveryCleanup() throws Exception {
@@ -982,33 +991,29 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunNonDurableWithNewIdentity() throws Exception {
-        final AtomicInteger count = new AtomicInteger(1);
+        final CountDownLatch latch = new CountDownLatch(1);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Identity owner = txnProxy.getCurrentOwner();
                     KernelRunnable r =
-                        new NewIdentityKernelRunnable(owner, count);
+                        new NewIdentityKernelRunnable(owner, latch);
                     taskService.scheduleNonDurableTask(r, true);
                 }
             }, taskOwner);
-
-        Thread.sleep(100L);
-        assertEquals(0, count.get());
+        assertTrue(latch.await(100L, TimeUnit.MILLISECONDS));
     }
 
     public void testRunDelayedNonDurableWithNewIdentity() throws Exception {
-        final AtomicInteger count = new AtomicInteger(1);
+        final CountDownLatch latch = new CountDownLatch(1);
         txnScheduler.runTask(new TestAbstractKernelRunnable() {
                 public void run() throws Exception {
                     Identity owner = txnProxy.getCurrentOwner();
                     KernelRunnable r =
-                        new NewIdentityKernelRunnable(owner, count);
+                        new NewIdentityKernelRunnable(owner, latch);
                     taskService.scheduleNonDurableTask(r, 50L, true);
                 }
             }, taskOwner);
-
-        Thread.sleep(150L);
-        assertEquals(0, count.get());
+        assertTrue(latch.await(100L, TimeUnit.MILLISECONDS));
     }
 
     /**
@@ -1079,6 +1084,16 @@ public class TestTaskServiceImpl extends TestCase {
 
     public static class NonManagedTask extends AbstractTask {
         private static final long serialVersionUID = 1;
+        private final Identity expectedOwner;
+        public NonManagedTask(Identity assignedOwner) {
+            this.expectedOwner = assignedOwner;
+        }
+        public void run() throws Exception {
+            if (! txnProxy.getCurrentOwner().equals(expectedOwner)) {
+                throw new RuntimeException("Not running with same identity");
+            }
+            super.run();
+        }
     }
 
     public static class NonRetryNonManagedTask implements Task, Serializable {
@@ -1172,12 +1187,12 @@ public class TestTaskServiceImpl extends TestCase {
     @RunWithNewIdentity
     public static class NewIdentityKernelRunnable implements KernelRunnable {
         final Identity callingIdentity;
-        final AtomicInteger ai;
+        final CountDownLatch latch;
         public NewIdentityKernelRunnable(Identity callingIdentity,
-                                         AtomicInteger ai)
+                                         CountDownLatch latch)
         {
             this.callingIdentity = callingIdentity;
-            this.ai = ai;
+            this.latch = latch;
         }
         public String getBaseTaskType() {
             return "NewIdentityKernelRunnable";
@@ -1186,7 +1201,7 @@ public class TestTaskServiceImpl extends TestCase {
             if (callingIdentity.equals(txnProxy.getCurrentOwner())) {
                 throw new RuntimeException("Not run with new identity");
             }
-            ai.getAndDecrement();
+            latch.countDown();
         }
     }
 

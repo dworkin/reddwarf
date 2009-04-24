@@ -38,11 +38,10 @@ import java.io.Serializable;
  * is already managed, and it is up to the developer to remove it from
  * the <code>DataManager</code> when finished.
  * <p>
- * If the insance of <code>Task</code> provided to any of these methods
- * is an instance of a class that includes the <code>RunWithNewIdentity</code>
- * annotation then the task will be run with a new owning identity. For
- * periodic tasks there will be a new owning identity for the first iteration
- * which will also be the owner of all recurrences of that task. In
+ * If the instance of <code>Task</code> provided to any of these methods
+ * is an instance of a class that has the <code>RunWithNewIdentity</code>
+ * annotation then that task will be run with a new owning identity. Periodic
+ * tasks will use this same owning identity for all recurrences. In
  * practical terms, this means that the system will be able to recognize
  * these tasks as distinct behavior from other tasks in the system.
  * <p>
