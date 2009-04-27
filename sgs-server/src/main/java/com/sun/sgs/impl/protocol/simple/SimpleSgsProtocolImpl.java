@@ -284,7 +284,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		ByteBuffer buf =
 		    ByteBuffer.allocate(1 + redirectionData.length +
 					relocationKey.remaining());
-		buf.put(SimpleSgsProtocol.RELOCATE_SESSION).
+		buf.put(SimpleSgsProtocol.RELOCATE_NOTIFICATION).
 		    put(redirectionData).
 		    put(relocationKey).
 		    flip();

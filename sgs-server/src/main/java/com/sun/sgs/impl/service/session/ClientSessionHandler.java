@@ -1181,9 +1181,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * An action to move the associated client session from this node to
      * another node.
      */
-    class  MoveAction implements Action {
+    class MoveAction implements Action {
 
 	private final Node newNode;
+
+	private final ClientSessionServer server;
 
 	/**
 	 * Constructs an instance with the specified {@code newNode}.
@@ -1192,6 +1194,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 */
 	MoveAction(Node newNode) {
 	    this.newNode = newNode;
+	    this.server = sessionService.getClientSessionServer(newNode.getId());
 	}
 
 	/** {@inheritDoc} */
@@ -1200,8 +1203,6 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		return false;
 	    }
 	    
-	    ClientSessionServer server =
-		sessionService.getClientSessionServer(newNode.getId());
 	    try {
 		/*
 		 * Notify new node that session is being relocated there and

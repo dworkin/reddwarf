@@ -528,6 +528,11 @@ public final class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public void mappingRemoved(Identity id, final Node newNode) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "identity:{0} localNode:{1} newNode:{2}",
+			   id, localNodeId, newNode);
+	    }
 	    final ClientSessionHandler handler = loggedInIdentityMap.get(id);
 	    if (handler != null) {
 		// This identity corresponds to a client session, so move it.

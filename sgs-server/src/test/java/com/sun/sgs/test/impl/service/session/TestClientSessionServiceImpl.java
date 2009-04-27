@@ -37,6 +37,7 @@ import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.protocol.simple.SimpleSgsProtocolAcceptor;
+import com.sun.sgs.impl.service.nodemap.DirectiveNodeAssignmentPolicy;
 import com.sun.sgs.impl.service.session.ClientSessionServer;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionWrapper;
@@ -134,7 +135,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static final Properties serviceProps =
 	createProperties(
 	    StandardProperties.APP_NAME, APP_NAME,
-            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY, "20000");
+            com.sun.sgs.impl.transport.tcp.TcpTransport.LISTEN_PORT_PROPERTY,
+	    "20000");
 
     /** The node that creates the servers. */
     private SgsTestNode serverNode;
@@ -193,6 +195,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
         props.setProperty(StandardProperties.AUTHENTICATORS, 
                       "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
+	props.setProperty("com.sun.sgs.impl.service.nodemap.policy.class",
+			  DirectiveNodeAssignmentPolicy.class.getName());
 	serverNode = 
                 new SgsTestNode(APP_NAME, DummyAppListener.class, props, clean);
 
@@ -248,7 +252,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-
+    /*
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -1212,6 +1216,28 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
+    */
+    public void testRelocateClientSession() throws Exception {
+	final String name = "foo";
+	final String newNodeHost = "newNode";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort()).login();
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    System.err.println("moving identity from server node to host: " +
+			       newNodeHost);
+	    DirectiveNodeAssignmentPolicy.instance.
+		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	    System.err.println("(done) moving identity");
+	    System.err.println("waiting for relocation to client...");
+	    client.waitForRelocationNotification(newNode.getAppPort());
+	    
+	} finally {
+	    client.disconnect();
+	}
+    }
     
     /* -- other methods -- */
 
@@ -1329,6 +1355,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String relocateHost;
 	private int relocatePort;
 	private byte[] relocateKey = new byte[0];
+	private boolean relocateAck;
+	private boolean relocateSuccess;
+	private boolean relocateMessage;
 	
 	volatile boolean receivedDisconnectedCallback = false;
 	volatile boolean graceful = false;
@@ -1478,6 +1507,66 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	    return true;
+	}
+
+	void relocate(int newPort) {
+	    waitForRelocationNotification(newPort);
+	    disconnect();
+	    relocateAck = false;
+	    relocateSuccess = false;
+	    connect(relocatePort);
+	    ByteBuffer buf = ByteBuffer.allocate(2 + relocateKey.length);
+	    buf.put(SimpleSgsProtocol.RELOCATE_REQUEST).
+		put(SimpleSgsProtocol.VERSION).
+		put(relocateKey).
+		flip();
+	    try {
+		connection.sendBytes(buf.array());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+
+	    synchronized (lock) {
+		try {
+		    if (!relocateAck) {
+			lock.wait(WAIT_TIME);
+		    }
+		    if (!relocateAck) {
+			throw new RuntimeException(
+			    toString() + " relocate timed out");
+		    }
+		    if (!relocateSuccess) {
+			fail("relocation failed: " + relocateMessage);
+		    }
+		} catch (InterruptedException e) {
+		    throw new RuntimeException(
+			toString() + " relocate timed out", e);
+		}
+	    }
+	}
+
+	/**
+	 * Waits for client to receive a RELOCATE_NOTIFICATION message.
+	 * Throws a RuntimeException if the notification is not received
+	 * before the timeout period, or if the relocation port specified
+	 * in the notification does not match the specified {@code newPort}.
+	 */
+	void waitForRelocationNotification(int newPort) {
+	    synchronized (lock) {
+		try {
+		    if (relocateSession == false) {
+			lock.wait(WAIT_TIME);
+		    }
+		    if (relocateSession != true) {
+			throw new RuntimeException(
+			    toString() + " relocate notification timed out");
+		    }
+		    assertEquals(newPort, relocatePort);
+		} catch (InterruptedException e) {
+		    throw new RuntimeException(
+			toString() + " relocated timed out", e);
+		}
+	    }
 	}
 
 	/**
@@ -1657,7 +1746,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	// Returns true if disconnect occurred.
 	boolean waitForDisconnect() {
-	    synchronized(lock) {
+	    synchronized (lock) {
 		try {
 		    if (connected == true) {
 			lock.wait(WAIT_TIME);
@@ -1727,17 +1816,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 			lock.notifyAll();
 		    }
 		    break;
-
 		    
-		case SimpleSgsProtocol.RELOCATE_SESSION:
+		case SimpleSgsProtocol.RELOCATE_NOTIFICATION:
 		    relocateHost = buf.getString();
                     relocatePort = buf.getInt();
 		    relocateKey = buf.getBytes(buf.limit() - buf.position());
 		    synchronized (lock) {
 			relocateSession = true;
-			System.err.println("session to relocate: " + name +
-					   ", host:" + relocateHost +
-                                           ", port:" + relocatePort);
+			System.err.println(
+ 			    "session to relocate: " + name +
+			    ", host:" + relocateHost +
+			    ", port:" + relocatePort +
+			    ", key:" + HexDumper.toHexString(relocateKey));
 			lock.notifyAll();
 		    } break;
 
@@ -1963,6 +2053,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * This invocation handler adds a 100 ms delay before invoking any
+     * method on the underlying instance.
+     */
     private static class DelayingInvocationHandler
 	implements InvocationHandler, Serializable
     {
@@ -1992,7 +2086,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
+    /**
+     * This invocation handler prevents forwarding the {@code send} and
+     * {@code serviceEventQueue} methods to the underlying instance.
+     */
     private static class HungryInvocationHandler
 	implements InvocationHandler, Serializable
     {

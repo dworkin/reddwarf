@@ -133,13 +133,13 @@ public class SimpleTestIdentityAuthenticator implements IdentityAuthenticator {
     /**
      * Identity returned by the SimpleTestIdentityAuthenticator.
      */
-    private static class DummyIdentity implements Identity, Serializable {
+    public static class DummyIdentity implements Identity, Serializable {
 
         private static final long serialVersionUID = 1L;
 
         private final String name;
 
-        DummyIdentity(String name) {
+        public DummyIdentity(String name) {
             this.name = name;
         }
 
