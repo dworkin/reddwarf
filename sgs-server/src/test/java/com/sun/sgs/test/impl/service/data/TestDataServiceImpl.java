@@ -4255,8 +4255,6 @@ public class TestDataServiceImpl{
         p.setProperty("com.sun.sgs.impl.service.data.DataServiceImpl." +
 	              "data.store.class",
 	              "com.sun.sgs.impl.service.data.store.DataStoreImpl");
-//        p.remove("com.sun.sgs.impl.service.data.DataServiceImpl." +
-//                 "data.store.class");
   
         p.setProperty(
             DataServiceImplClassName + ".debug.check.interval", "0");
