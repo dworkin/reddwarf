@@ -147,8 +147,8 @@ public interface QuadTree<E> extends Iterable<E> {
      * <li>Index 2 corresponds to the largest X coordinate value.
      * <li>Index 3 corresponds to the largest Y coordinate value.
      * </ul>
-     * For example, getBoundingBox()[0] contains the smallest X coordinate
-     * value of the bounding box.
+     * For example, {@code getBoundingBox()[0]} contains the smallest X
+     * coordinate value of the bounding box.
      *
      * @return a {@code double} array representing the four coordinates
      * of the bounding box's four boundary values
