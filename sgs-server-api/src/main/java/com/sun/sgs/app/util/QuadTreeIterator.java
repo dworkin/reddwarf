@@ -84,17 +84,19 @@ public interface QuadTreeIterator<E> extends Iterator<E> {
      * @return the element that the cursor is pointing to
      * @throws IllegalStateException if neither the <tt>next()</tt> nor
      * <tt>nextNoReturn()</tt> method has yet been called or if the
-     * current element has been removed
+     * current element has been removed.
+     * @throws CurrentConcurrentRemovedException if the current element was
+     * concurrently removed by something else
      */
     E current();
 
     /**
-     * Checks if the current element the iterator is pointing to exists 
-     * (if removed from the {@code QuadTree} by the iterator or concurrently
-     * by something else). Used to check if calling {@code current()} will throw
+     * Checks if the current element the iterator is pointing to has been
+     * removed from the {@code QuadTree}.
+     * Used to check if calling {@code current()} will throw
      * {@code IllegalStateException} or
      * {@code CurrentConcurrentRemovedException}.
-     * @return {@code true} if the current element still exists in the
+     * @return {@code true} if the current element is still in the
      * {@code QuadTree} and {@code false} otherwise
      * */
     boolean hasCurrent();
