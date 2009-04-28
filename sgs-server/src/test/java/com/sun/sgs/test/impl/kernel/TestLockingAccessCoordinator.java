@@ -22,8 +22,9 @@ package com.sun.sgs.test.impl.kernel;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.LockingAccessCoordinator;
-import com.sun.sgs.impl.kernel.LockingAccessCoordinator.LockConflict;
-import com.sun.sgs.impl.kernel.LockingAccessCoordinator.LockConflictType;
+import com.sun.sgs.impl.kernel.LockingAccessCoordinator.TxnLocker;
+import com.sun.sgs.impl.util.lock.LockConflict;
+import com.sun.sgs.impl.util.lock.LockConflictType;
 import com.sun.sgs.kernel.AccessReporter;
 import com.sun.sgs.kernel.AccessReporter.AccessType;
 import com.sun.sgs.profile.AccessedObjectsDetail;
@@ -717,7 +718,7 @@ public class TestLockingAccessCoordinator
      * involved in the conflict.
      */
     static void assertInterrupted(
-	LockConflict conflict, Transaction... conflictingTxns)
+	LockConflict<?, TxnLocker> conflict, Transaction... conflictingTxns)
     {
 	assertDenied(LockConflictType.INTERRUPTED, conflict, conflictingTxns);
     }
@@ -729,7 +730,7 @@ public class TestLockingAccessCoordinator
      * involved in the conflict.
      */
     static void assertDeadlock(
-	LockConflict conflict, Transaction... conflictingTxns)
+	LockConflict<?, TxnLocker> conflict, Transaction... conflictingTxns)
     {
 	assertDenied(LockConflictType.DEADLOCK, conflict, conflictingTxns);
     }
@@ -740,7 +741,7 @@ public class TestLockingAccessCoordinator
      * involved in the conflict.
      */
     static void assertTimeout(
-	LockConflict conflict, Transaction... conflictingTxns)
+	LockConflict<?, TxnLocker> conflict, Transaction... conflictingTxns)
     {
 	assertDenied(LockConflictType.TIMEOUT, conflict, conflictingTxns);
     }
@@ -751,13 +752,14 @@ public class TestLockingAccessCoordinator
      * transactions that may have been involved in the conflict.
      */
     static void assertDenied(LockConflictType type,
-			     LockConflict conflict,
+			     LockConflict<?, TxnLocker> conflict,
 			     Transaction... conflictingTxns)
     {
 	if (conflict == null || conflict.getType() != type) {
 	    fail("Expected " + type + ": " + conflict);
 	}
-	assertMember(conflictingTxns, conflict.getConflictingTransaction());
+	assertMember(conflictingTxns,
+		     conflict.getConflictingLocker().getTransaction());
     }
 
     /**
@@ -776,7 +778,7 @@ public class TestLockingAccessCoordinator
     }
 
     /** Attempts to acquire a lock on behalf of a transaction. */
-    LockConflict acquireLock(
+    LockConflict<?, TxnLocker> acquireLock(
 	DummyTransaction txn, String source, Object objectId, boolean forWrite)
     {
 	return new AcquireLock(txn, source, objectId, forWrite).getResult();
@@ -786,12 +788,12 @@ public class TestLockingAccessCoordinator
      * A utility class for managing an attempt to acquire a lock.  Use an
      * instance of this class for attempts that block.
      */
-    class AcquireLock implements Callable<LockConflict> {
+    class AcquireLock implements Callable<LockConflict<?, TxnLocker>> {
 	private final DummyTransaction txn;
 	private final String source;
 	private final Object objectId;
 	private final boolean forWrite;
-	private final FutureTask<LockConflict> task;
+	private final FutureTask<LockConflict<?, TxnLocker>> task;
 	private final Thread thread;
 
 	/**
@@ -814,13 +816,13 @@ public class TestLockingAccessCoordinator
 	    this.source = source;
 	    this.objectId = objectId;
 	    this.forWrite = forWrite;
-	    task = new FutureTask<LockConflict>(this);
+	    task = new FutureTask<LockConflict<?, TxnLocker>>(this);
 	    thread = new Thread(task);
 	    thread.start();
 	}
 
-	public LockConflict call() {
-	    LockConflict conflict;
+	public LockConflict<?, TxnLocker> call() {
+	    LockConflict<?, TxnLocker> conflict;
 	    boolean wait = false;
 	    synchronized (this) {
 		started = true;
@@ -888,7 +890,7 @@ public class TestLockingAccessCoordinator
 	}
 
 	/** Returns the result of attempting to obtain the lock. */
-	LockConflict getResult() {
+	LockConflict<?, TxnLocker> getResult() {
 	    try {
 		return task.get(1, TimeUnit.SECONDS);
 	    } catch (RuntimeException e) {
