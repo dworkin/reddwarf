@@ -1175,6 +1175,11 @@ public class TestConcurrentQuadTree extends Assert {
                 iter = tree.iterator();
                 try {
                     iter.currentX();
+                    fail("Expecting IllegalStateException");
+                } catch (IllegalStateException ise) {
+                }
+
+                try {
                     iter.currentY();
                     fail("Expecting IllegalStateException");
                 } catch (IllegalStateException ise) {

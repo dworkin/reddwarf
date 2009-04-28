@@ -68,7 +68,7 @@ import com.sun.sgs.app.Task;
  * <p>
  * The tree also supports duplicate elements for which the equals() method
  * holds true (if {@code object1.equals(object2) == true}, the above example
- * is still legal), at the same coordinate location. For example, the following
+ * is still legal), at the same coordinate location. 
  *
  * Although it is legal to
  * place multiple elements at the same coordinate location, placing a large
@@ -214,13 +214,13 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * parameter passed in is {@code null}
      */
     public ConcurrentQuadTree(ConcurrentQuadTree<E> tree) {
-        boundingBox = tree.boundingBox;
-        bucketSize = tree.bucketSize;
-
         if (tree == null)
         {
             throw new NullPointerException("Cannot copy null tree.");
         }
+        boundingBox = tree.boundingBox;
+        bucketSize = tree.bucketSize;
+
         QuadTreeIterator<E> iter = tree.iterator();
         E element;
         while (iter.hasNext()) {
@@ -548,10 +548,13 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * Check if the current element was concurrently removed from the tree
          * without the iterator's knowledge.
          *
-         * @return {@code true} if the current element was concurrently removed
-         * from the tree and {@code false} otherwise
+         * @return {@code false} if the current element was concurrently removed
+         * from the tree and {@code true} otherwise
          */
         private boolean checkForConcurrentRemoval() {
+            assert accordingToIteratorCurrExists :
+                "Either next() or nextNoReturn() has been called yet or the " +
+                "iterator removed the current element already.";
             Node<E> currentNode;
             try {
                 currentNode = current.get();
@@ -603,9 +606,10 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * @param nextData NextElementData object containing the data regarding
          * the next element
          * @param valueRef {@code ManagedWrapper} containing a
+         * {@code ManagedReference} to the next element
          * @param isCheckingNext boolean variable used to determine the iterator
          * is just checking the next element or if it should advance itself
-         * {@code ManagedReference} to the next element
+         * 
          */
         private void setValues(NextElementData<E> nextData,
                 ManagedWrapper<E> valueRef, boolean isCheckingNext) {
@@ -795,8 +799,9 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * qualified point.
          * @param next the first leaf node which will be searched through for
          * a qualified point
-         * @param first point which will be considered when searching for the
-         * next qualified point
+         * @param nextPoint first point which will be considered when searching
+         * for the next qualified point, method will look at first point of
+         * {@code next} if {@code nextPoint} is {@code null}
          * @return data regarding the next possible element
          * including the next leaf node, the next point and the index of the
          * next element or {@code null} if there are no more qualified {@code
@@ -879,8 +884,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          */
         private boolean findNextElement(NextElementData<E> nextData,
                 boolean isCheckingNext) {
-            ManagedReference<Node<E>> next =
-                    uncheckedCast(nextData.getNextNode());
+            ManagedReference<Node<E>> next = nextData.getNextNode();
             Node<E> nextNode = next.get();
             Point nextPoint = nextData.getNextPoint();
             List<ManagedWrapper<E>> list =
@@ -903,7 +907,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
                 if (nextData != null) {
                     nextPoint = nextData.getNextPoint();
-                    next = uncheckedCast(nextData.getNextNode());
+                    next = nextData.getNextNode();
                     list = next.get().getValues().get(nextPoint);
                     setValues(nextData, list.get(nextData.getNextIndex()),
                             isCheckingNext);
@@ -1471,11 +1475,14 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
 
         /**
          * Compares the ManagedObjectId of the ManagedObject wrapped by this
-         * 
-         * @param otherWrapper the point which will be compared with this point
-         * @return 0 if two Points are equal, -1 if this Point is less than
-         *          the point passed in and 1 if this point is greather than
-         *          the poin passed in
+         * {@code ManagedWrapper} with another {@code ManagedWrapper}'s
+         * ManagedObject's Id
+         * @param otherWrapper the {@code ManagedWrapper} which will be compared
+         * with this {@code ManagedWrapper}
+         * @return 0 if the ManagedObjectId of the two wrapped ManagedObjects
+         * are equal, -1 if this ManagedObject's Id is less than the Id
+         * of the ManagedObject passed in and 1 if this ManagedObject's Id
+         * is greater than the Id of the ManagedObject passed in
          */
         public int compareTo(ManagedWrapper otherWrapper) {
             return manId.compareTo(otherWrapper.manId);
@@ -1508,7 +1515,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          */
         public int hashCode()
         {
-            return manId.intValue();
+            return manId.hashCode();
         }
 
     /**
@@ -1521,11 +1528,11 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
      * {@code ManagedWrapper} when the {@code remove()} or {@code get()} method
      * is called.
      */
-        static class ManSerialWrapper<E> extends ManagedSerializable<E> {
+       private static class ManSerialWrapper<E> extends ManagedSerializable<E> {
 
             private static final long serialVersionUID = 9L;
             
-            public ManSerialWrapper(E object) {
+            ManSerialWrapper(E object) {
                 super(object);
             }
         }
@@ -1644,7 +1651,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
             return (maxPoint.x >= otherBox.minPoint.x &&
                     maxPoint.y >= otherBox.minPoint.y &&
                     minPoint.x <= otherBox.maxPoint.x &&
-                    minPoint.x <= otherBox.maxPoint.x);
+                    minPoint.y <= otherBox.maxPoint.y);
         }
 
         /**
@@ -1888,7 +1895,7 @@ public class ConcurrentQuadTree<E> implements QuadTree<E>, Serializable,
          * if the x values are equal.
          * @param point the point which will be compared with this point
          * @return 0 if two Points are equal, -1 if this Point is less than
-         *          the point passed in and 1 if this point is greather than
+         *          the point passed in and 1 if this point is greater than
          *          the poin passed in
          */
         public int compareTo(Point point) {
