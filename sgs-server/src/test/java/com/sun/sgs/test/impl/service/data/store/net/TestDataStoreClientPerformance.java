@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -65,7 +65,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
 	DataStore store = new DataStoreProfileProducer(
-	    new DataStoreClient(props),
+	    new DataStoreClient(props, accessCoordinator),
 	    DummyProfileCoordinator.getCollector());
 	DummyProfileCoordinator.startProfiling();
 	return store;

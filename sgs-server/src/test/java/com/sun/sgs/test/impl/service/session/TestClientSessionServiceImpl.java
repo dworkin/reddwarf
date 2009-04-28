@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -1780,7 +1780,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public static class DummyAppListener implements AppListener, Serializable {
+    public static class DummyAppListener implements AppListener, 
+                                                    ManagedObject,
+                                                    Serializable {
 
 	private final static long serialVersionUID = 1L;
 

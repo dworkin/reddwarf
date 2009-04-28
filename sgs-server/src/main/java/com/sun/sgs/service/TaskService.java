@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2008 Sun Microsystems, Inc.
+ * Copyright 2007-2009 Sun Microsystems, Inc.
  *
  * This file is part of Project Darkstar Server.
  *
@@ -32,8 +32,14 @@ import com.sun.sgs.kernel.KernelRunnable;
  * <code>TaskManager</code> schedule durable, transactional tasks. The
  * <code>scheduleNonDurableTask</code> methods defined here are used to
  * schedule tasks that are not persisted by the <code>TaskService</code> but
- * optionally invoked in a transactional context. All tasks scheduled will
- * be owned by the current task's owner.
+ * optionally invoked in a transactional context.
+ * <p>
+ * By default all tasks scheduled will be owned by the calling task's
+ * owning identity. To create a new owning identity for a task use the
+ * <code>RunWithNewIdentity</code> annotation as described in the docs
+ * for <code>TaskManager</code>.
+ *
+ * @see TaskManager
  */
 public interface TaskService extends TaskManager, Service {
 
