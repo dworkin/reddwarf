@@ -391,9 +391,12 @@ class ClientSessionHandler implements SessionProtocolHandler {
      */
     void handleDisconnect(final boolean graceful, boolean closeConnection) {
 
-	logger.log(Level.FINEST, "handleDisconnect handler:{0}", this);
-	
 	synchronized (lock) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "handleDisconnect handler:{0} disconnectHandled:{1}",
+			   this, disconnectHandled);
+	    }
 	    if (disconnectHandled) {
 		return;
 	    }
@@ -465,6 +468,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	final boolean graceful, final boolean closeConnection)
     {
         synchronized (lock) {
+	    if (disconnectHandled) {
+		return;
+	    }
             if (state != State.DISCONNECTED) {
                 state = State.DISCONNECTING;
 	    }

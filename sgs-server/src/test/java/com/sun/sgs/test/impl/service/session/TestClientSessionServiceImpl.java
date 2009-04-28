@@ -1217,6 +1217,28 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.checkDisconnectedCallback(true);
     }
     */
+    public void testClientSessionReceiveRelocateNotification() throws Exception {
+	final String name = "foo";
+	final String newNodeHost = "newNode";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort()).login();
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    System.err.println("reassigning identity from server node to host: " +
+			       newNodeHost);
+	    DirectiveNodeAssignmentPolicy.instance.
+		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	    System.err.println("(done) reassigning identity");
+	    System.err.println("waiting for relocation to client...");
+	    client.waitForRelocationNotification(newNode.getAppPort());
+	    
+	} finally {
+	    client.disconnect();
+	}
+    }
+    
     public void testRelocateClientSession() throws Exception {
 	final String name = "foo";
 	final String newNodeHost = "newNode";
@@ -1226,13 +1248,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(serverNode.getAppPort()).login();
 	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	    System.err.println("moving identity from server node to host: " +
+	    System.err.println("reassigning identity from server node to host: " +
 			       newNodeHost);
 	    DirectiveNodeAssignmentPolicy.instance.
 		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	    System.err.println("(done) moving identity");
+	    System.err.println("(done) reassigning identity");
 	    System.err.println("waiting for relocation to client...");
-	    client.waitForRelocationNotification(newNode.getAppPort());
+	    client.relocate(newNode.getAppPort());
 	    
 	} finally {
 	    client.disconnect();
@@ -1831,6 +1853,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 			lock.notifyAll();
 		    } break;
 
+		case SimpleSgsProtocol.RELOCATE_SUCCESS:
+		    reconnectKey = buf.getBytes(buf.limit() - buf.position());
+		    dummyClients.put(
+			new BigInteger(1, reconnectKey), DummyClient.this);
+		    synchronized (lock) {
+			relocateAck = true;
+			relocateSuccess = true;
+			System.err.println("relocate succeeded: " + name);
+			lock.notifyAll();
+		    }
+		    sendMessage(new byte[0]);
+		    break;
+		    
 		case SimpleSgsProtocol.LOGOUT_SUCCESS:
                     synchronized (lock) {
                         logoutAck = true;
@@ -1876,6 +1911,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    public void disconnected(Connection conn) {
                 synchronized (lock) {
                     connected = false;
+		    connection = null;
                     lock.notifyAll();
                 }
 	    }

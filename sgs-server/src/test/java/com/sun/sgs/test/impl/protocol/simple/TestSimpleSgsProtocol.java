@@ -189,7 +189,7 @@ public class TestSimpleSgsProtocol {
         }
 
 	public void relocatedSession(
-	    ByteBuffer relocationKey, SessionProtocol protocol,
+	    BigInteger relocationKey, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 
 	{

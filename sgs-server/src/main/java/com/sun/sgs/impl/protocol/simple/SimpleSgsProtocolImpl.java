@@ -72,6 +72,10 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
     /** The default reason string returned for login failure. */
     private static final String DEFAULT_LOGIN_FAILED_REASON = "login refused";
 
+    /** The default reason string returned for relocation failure. */
+    private static final String DEFAULT_RELOCATE_FAILED_REASON =
+	"relocation refused";
+
     /** The default length of the reconnect key, in bytes.
      * TBD: the reconnection key length should be configurable.
      */
@@ -386,6 +390,43 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	acceptor.monitorDisconnection(this);
     }
 
+    /**
+     * Notifies the associated client that the previous relocation attempt
+     * was successful.
+     */
+    private void relocateSuccess() {
+	MessageBuffer buf = new MessageBuffer(1 + reconnectKey.length);
+	buf.putByte(SimpleSgsProtocol.RELOCATE_SUCCESS).
+	    putBytes(reconnectKey);
+	writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
+	flushMessageQueue();
+    }
+
+    /**
+     * Notifies the associated client that the previous relocation attempt
+     * was unsuccessful for the specified {@code reason}.  The specified
+     * {@code throwable}, if non-{@code null} is an exception that
+     * occurred while processing the relocation request.  The message
+     * channel should be careful not to reveal to the associated client
+     * sensitive data that may be present in the specified {@code
+     * throwable}.
+     *
+     * @param	reason a reason why the relocation was unsuccessful
+     * @param	throwable an exception that occurred while processing the
+     *		relocation request, or {@code null}
+     */
+    private void relocateFailure(String reason, Throwable ignore) {
+	// for now, override specified reason.
+	reason = DEFAULT_RELOCATE_FAILED_REASON;
+        MessageBuffer buf =
+	    new MessageBuffer(1 + MessageBuffer.getSize(reason));
+        buf.putByte(SimpleSgsProtocol.RELOCATE_FAILURE).
+            putString(reason);
+        writeToWriteHandler(ByteBuffer.wrap(buf.getBuffer()));
+	flushMessageQueue();
+	acceptor.monitorDisconnection(this);
+    }
+    
     /* -- Implement Channel -- */
     
     /** {@inheritDoc} */
@@ -728,6 +769,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 
 	    MessageBuffer msg = new MessageBuffer(buffer);
 	    byte opcode = msg.getByte();
+	    byte version;
 
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -740,7 +782,7 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
 
-	        byte version = msg.getByte();
+		version = msg.getByte();
 	        if (version != SimpleSgsProtocol.VERSION) {
 	            if (logger.isLoggable(Level.SEVERE)) {
 	                logger.log(Level.SEVERE,
@@ -751,8 +793,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	            break;
 	        }
 
-		final String name = msg.getString();
-		final String password = msg.getString();
+		String name = msg.getString();
+		String password = msg.getString();
 
 		try {
 		    identity = acceptor.authenticate(name, password);
@@ -772,6 +814,32 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 		read();
 
 		break;
+
+	    case SimpleSgsProtocol.RELOCATE_REQUEST:
+
+		version = msg.getByte();
+	        if (version != SimpleSgsProtocol.VERSION) {
+	            if (logger.isLoggable(Level.SEVERE)) {
+	                logger.log(Level.SEVERE,
+	                    "got protocol version:{0}, " +
+	                    "expected {1}", version, SimpleSgsProtocol.VERSION);
+	            }
+		    disconnect();
+	            break;
+	        }
+
+		byte[] keyBytes = msg.getBytes(msg.limit() - msg.position());
+		BigInteger relocationKey = new BigInteger(1, keyBytes);
+		
+		listener.relocatedSession(
+ 		    relocationKey, SimpleSgsProtocolImpl.this,
+		    new RelocateHandler());
+		
+                // Resume reading immediately
+		read();
+
+		break;
+		
 		
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
 		ByteBuffer clientMessage =
@@ -903,6 +971,64 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	}
     }
 
+    /**
+     * A completion handler that is notified when the associated relocate
+     * request has completed processing. 
+     */
+    private class RelocateHandler
+	implements RequestCompletionHandler<SessionProtocolHandler>
+    {
+	/** {@inheritDoc}
+	 *
+	 * <p>This implementation invokes the {@code get} method on the
+	 * specified {@code future} to obtain the session's protocol
+	 * handler.
+	 *
+	 * <p>If the relocate request completed successfully (without
+	 * throwing an exception), it sends a relocate success message to
+	 * the client.
+	 *
+	 * <p>Otherwise, if the {@code get} invocation throws an {@code
+	 * ExecutionException} and the exception's cause is a {@link
+	 * LoginRedirectException}, it sends a login redirect message to
+	 * the client with the redirection information obtained from the
+	 * exception.  If the {@code ExecutionException}'s cause is a
+	 * {@link LoginFailureException}, it sends a relocate failure
+	 * message to the client.
+	 *
+	 * <p>If the {@code get} method throws an exception other than
+	 * {@code ExecutionException}, or the {@code ExecutionException}'s
+	 * cause is not either a {@code LoginFailureException} or a {@code
+	 * LoginRedirectException}, then a relocate failed message is sent
+	 * to the client.
+	 */
+	public void completed(Future<SessionProtocolHandler> future) {
+	    try {
+		protocolHandler = future.get();
+		relocateSuccess();
+		
+	    } catch (ExecutionException e) {
+		// relocate failed
+		Throwable cause = e.getCause();
+		if (cause instanceof LoginRedirectException) {
+		    // redirect
+		    LoginRedirectException redirectException =
+			(LoginRedirectException) cause;
+		    
+                    loginRedirect(redirectException.getNode(),
+                                  redirectException.getProtocolDescriptors());
+		    
+		} else if (cause instanceof LoginFailureException) {
+		    relocateFailure(cause.getMessage(), cause.getCause());
+		} else {
+		    relocateFailure(e.getMessage(), e.getCause());
+		}
+	    } catch (Exception e) {
+		relocateFailure(e.getMessage(), e.getCause());
+	    }
+	}
+    }
+    
     /**
      * A completion handler that is notified when its associated request has
      * completed processing. 

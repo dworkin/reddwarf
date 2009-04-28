@@ -304,12 +304,26 @@ public class ClientSessionImpl
      * to {@code newNode}.  If the client session is no longer connected,
      * then this request is ignored because the session is disconnected.
      *
-     * @param	newNode the node to relocate to
+     * @param	newNode the node this session is relocating to
      */
-    void move(Node newNode) {
+    void addMoveEvent(Node newNode) {
 	if (isConnected()) {
 	    addEvent(new MoveEvent(newNode));
 	}
+    }
+
+    /**
+     * Updates this client session's node ID and bindings to reflect its
+     * reassignment to {@code newNode}.
+     *
+     * @param	newNode the node this session is relocating to
+     */
+    private void move(Node newNode) {
+	DataService dataService = sessionService.getDataService();
+	dataService.markForUpdate(this);
+	dataService.removeServiceBinding(getSessionNodeKey());
+	nodeId = newNode.getId();
+	dataService.setServiceBinding(getSessionNodeKey(), this);
     }
 
     /**
@@ -886,6 +900,9 @@ public class ClientSessionImpl
 			  ClientSessionServiceImpl sessionService,
 			  ClientSessionHandler handler)
 	{
+	    ClientSessionImpl sessionImpl = eventQueue.getClientSession();
+	    sessionImpl.move(newNode);
+	    
 	    sessionService.checkContext().addCommitAction(
 		eventQueue.getSessionRefId(),
  		handler.new MoveAction(newNode), false);

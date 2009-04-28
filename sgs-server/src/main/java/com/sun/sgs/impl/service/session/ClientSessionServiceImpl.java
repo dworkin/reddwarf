@@ -513,17 +513,33 @@ public final class ClientSessionServiceImpl
      * session, then the client session should be relocated to the new
      * node.<p>
      *
-     * If an identity is added to this node ({@link #mappingAdded}, then
-     * its corresponding client session (if any) is being moved to this
+     * If an identity is added to this node ({@link #mappingAdded}
+     * and the {@code oldNode} is non-{@code null}, then its
+     * corresponding client session (if any) may be moving to this
      * node from the old node.
      */
     private class NodeMappingListenerImpl implements NodeMappingListener {
 
 	/** {@inheritDoc} */
 	public void mappingAdded(Identity id, Node oldNode) {
-	    // TBD: Keep track of pending move to node and clean up
-	    // session if it doesn't relocate to the local node in a
-	    // timely fashion.
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "identity:{0} localNode:{1} oldNode:{2}",
+			   id, localNodeId, oldNode);
+	    }
+	    if (oldNode == null) {
+		// This indicates a new mapping, so a session
+		// can't be relocating.
+		return;
+	    } /* else if (addedIdentities.putIfAbsent(id, oldNode) == null) {
+		// TBD: Keep track of pending login or relocation to
+		// node and clean up session if it doesn't relocate
+		// to the local node in a timely fashion.
+		
+	    } else {
+		// TBD: what if the identity is already moving here?
+		}*/
+	    
 	}
 
 	/** {@inheritDoc} */
@@ -545,7 +561,7 @@ public final class ClientSessionServiceImpl
 			    if (session != null) {
 				// TBD: if session already moving, need to put off
 				// this move.
-				session.move(newNode);
+				session.addMoveEvent(newNode);
 			    }
 			}},
 		    id);
@@ -569,10 +585,20 @@ public final class ClientSessionServiceImpl
 
 	/** {@inheritDoc} */
 	public void relocatedSession(
-	    ByteBuffer relocationKey, SessionProtocol protocol,
+	    BigInteger relocationKey, SessionProtocol protocol,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
 	{
 	    RelocationInfo info = relocatingSessions.remove(relocationKey);
+	    if (info == null) {
+		// No information for specified relocation key.
+		// Session is already relocated, or it's a possible
+		// DOS attack, so close client connection.
+		try {
+		    protocol.close();
+		} catch (IOException ignore) {
+		}
+		return;
+	    }
 	    new ClientSessionHandler(
 		ClientSessionServiceImpl.this, dataService, protocol,
 		info.identity, completionHandler,
@@ -892,10 +918,19 @@ public final class ClientSessionServiceImpl
 		    logger.log(Level.FINEST, "sessionId:{0} oldNode:{1}",
 			       HexDumper.toHexString(sessionId), oldNode);
 		}
+		
+		// Cache relocation information.
 		byte[] relocationKey = getNextRelocationKey();
-		relocatingSessions.put(
- 		    new BigInteger(1, relocationKey),
-		    new RelocationInfo(identity, sessionId, oldNode));
+		RelocationInfo info =
+		    new RelocationInfo(identity, sessionId, oldNode);
+		BigInteger key = new BigInteger(1, relocationKey);
+		relocatingSessions.put(key, info);
+
+		// Schedule task to monitor relocation.
+		taskScheduler.scheduleTask(
+		    new MonitorRelocatingSessionTask(key, info),
+		    identity,
+		    System.currentTimeMillis() + 5000L);
 				      
 		return relocationKey;
 
@@ -1366,6 +1401,54 @@ public final class ClientSessionServiceImpl
 	    this.oldNode = oldNode;
 	}
     }
-    
+
+    /**
+     * A task (run after a delay) that checks to see if a client
+     * session with the associated relocation key has attempted to
+     * relocate to this node.  If not, the associated client session
+     * is cleaned up.
+     */
+    private class MonitorRelocatingSessionTask
+	extends AbstractKernelRunnable
+    {
+	final BigInteger relocationKey;
+	final RelocationInfo info;
+
+	/**
+	 * Constructs an instance with the specified relocation info.
+	 * @param	relocationKey a relocation key
+	 * @param	info a client session's relocation info
+	 */
+	MonitorRelocatingSessionTask(
+	    BigInteger relocationKey, RelocationInfo info)
+	{
+	    super(null);
+	    this.relocationKey = relocationKey;
+	    this.info = info;
+	}
+
+	/**
+	 * If the associated client doesn't attempt reestablish the
+	 * client session before this task runs, then clean up the
+	 * client session.  Either the original server failed to
+	 * inform the client that it should relocate or the client
+	 * session has failed.  In either case, the client session
+	 * needs to be removed.
+	 */
+	public void run() {
+	    if (relocatingSessions.remove(relocationKey) == null) {
+		return;
+	    }
+	    transactionScheduler.scheduleTask(
+ 		new AbstractKernelRunnable("RemoveNonrelocatedSession") {
+		    public void run() {
+			ClientSessionImpl sessionImpl =
+			    ClientSessionImpl.getSession(
+ 				dataService, new BigInteger(1, info.sessionId));
+			sessionImpl.notifyListenerAndRemoveSession(
+ 			    dataService, false, true);
+		    } }, info.identity);
+	}
+    }
 }
 
