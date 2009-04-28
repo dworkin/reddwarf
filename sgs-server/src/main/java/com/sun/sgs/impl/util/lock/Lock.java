@@ -91,9 +91,7 @@ final class Lock<K, L extends Locker<K, L>> {
      * @param	waiting whether the locker is already a waiter
      * @return	a {@code LockAttemptResult} or {@code null}
      */
-    LockAttemptResult<K, L> lock(
-	Locker<K, L> locker, boolean forWrite, boolean waiting)
-    {
+    LockAttemptResult<K, L> lock(L locker, boolean forWrite, boolean waiting) {
 	assert checkSync(locker.lockManager);
 	if (owners.isEmpty()) {
 	    LockRequest<K, L> request =
@@ -106,7 +104,7 @@ final class Lock<K, L extends Locker<K, L>> {
 	    return new LockAttemptResult<K, L>(request, null);
 	}
 	boolean upgrade = false;
-	Locker<K, L> conflict = null;
+	L conflict = null;
 	for (LockRequest<K, L> ownerRequest : owners) {
 	    if (locker == ownerRequest.locker) {
 		if (!forWrite || ownerRequest.getForWrite()) {
@@ -194,7 +192,7 @@ final class Lock<K, L extends Locker<K, L>> {
      *		releasing all ownership
      * @return	the newly added owners
      */
-    List<Locker<K, L>> release(Locker<K, L> locker, boolean downgrade) {
+    List<L> release(L locker, boolean downgrade) {
 	assert checkSync(locker.lockManager);
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "release {0}, downgrade:{1}, {2}",
@@ -218,7 +216,7 @@ final class Lock<K, L extends Locker<K, L>> {
 		break;
 	    }
 	}
-	List<Locker<K, L>> lockersToNotify = Collections.emptyList();
+	List<L> lockersToNotify = Collections.emptyList();
 	if (owned && !waiters.isEmpty()) {
 	    boolean found = false;
 	    for (int i = 0; i < waiters.size(); i++) {
@@ -243,7 +241,7 @@ final class Lock<K, L extends Locker<K, L>> {
 		i--;
 		if (!found) {
 		    found = true;
-		    lockersToNotify = new ArrayList<Locker<K, L>>();
+		    lockersToNotify = new ArrayList<L>();
 		}
 		lockersToNotify.add(waiter.locker);
 	    }
@@ -342,7 +340,7 @@ final class Lock<K, L extends Locker<K, L>> {
     }
 
     /** Removes a locker from the list of waiters for this lock. */
-    void flushWaiter(Locker<K, L> locker) {
+    void flushWaiter(L locker) {
 	assert checkSync(locker.lockManager);
 	for (Iterator<LockRequest<K, L>> iter = waiters.iterator();
 	     iter.hasNext(); )

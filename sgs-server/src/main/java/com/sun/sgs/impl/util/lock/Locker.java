@@ -28,7 +28,7 @@ import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
  * @param	<K> the type of key
  * @param	<L> the type of locker
  */
-public class Locker<K, L extends Locker<K, L>> {
+public abstract class Locker<K, L extends Locker<K, L>> {
 
     /** The lock manager for this locker. */
     final LockManager<K, L> lockManager;
@@ -104,11 +104,8 @@ public class Locker<K, L extends Locker<K, L>> {
      * @param	forWrite whether the request is for write
      * @param	upgrade whether the request is for an upgrade
      */
-    protected LockRequest<K, L> newLockRequest(
-	K key, boolean forWrite, boolean upgrade)
-    {
-	return new LockRequest<K, L>(this, key, forWrite, upgrade);
-    }
+    protected abstract LockRequest<K, L> newLockRequest(
+	K key, boolean forWrite, boolean upgrade);
 
     /**
      * Checks if there is a conflict that should cause this locker's

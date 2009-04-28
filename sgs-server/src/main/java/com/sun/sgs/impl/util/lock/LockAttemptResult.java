@@ -35,7 +35,7 @@ final class LockAttemptResult<K, L extends Locker<K, L>> {
      * A conflicting locker, if the request was not granted, or {@code
      * null}.
      */
-    final Locker<K, L> conflict;
+    final L conflict;
 
     /**
      * Creates an instance of this class.
@@ -43,7 +43,7 @@ final class LockAttemptResult<K, L extends Locker<K, L>> {
      * @param	request the lock request
      * @param	conflict a conflicting locker or {@code null}
      */
-    LockAttemptResult(LockRequest<K, L> request, Locker<K, L> conflict) {
+    LockAttemptResult(LockRequest<K, L> request, L conflict) {
 	assert request != null;
 	this.request = request;
 	this.conflict = conflict;
