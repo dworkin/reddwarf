@@ -865,6 +865,13 @@ public class ClientSessionImpl
 			  ClientSessionServiceImpl sessionService,
 			  ClientSessionHandler handler)
 	{
+	    if (eventQueue == null) {
+		throw new NullPointerException("null eventQueue");
+	    } else if (sessionService == null) {
+		throw new NullPointerException("null sessionService");
+	    } else if (handler == null) {
+		throw new NullPointerException("null handler");
+	    }
 	    sessionService.checkContext().addCommitAction(
  		eventQueue.getSessionRefId(),
 		handler.new SendMessageAction(this),

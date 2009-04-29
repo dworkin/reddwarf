@@ -252,7 +252,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    /*
+    ///*
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -1023,7 +1023,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			setBinding(counterName, new Counter());
 		}}, taskOwner);
 
-	    return client.waitForClientToRecieveExpectedMessages(
+	    return client.waitForClientToReceiveExpectedMessages(
 		expectedMessages);
 
 	} finally {
@@ -1089,19 +1089,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(serverNode.getAppPort());
 	    client.login();
 	    final int numMessages = 3;
-	    txnScheduler.runTask(new TestAbstractKernelRunnable() {
-		public void run() {
-		    ClientSession session = (ClientSession)
-			AppContext.getDataManager().getBinding(name);
-		    System.err.println("Sending messages");
-		    for (int i = 0; i < numMessages; i++) {
-			session.send(buf, delivery);
-		    }
-		}}, taskOwner);
+	    for (int i = 0; i < numMessages; i++) {
+		txnScheduler.runTask(new TestAbstractKernelRunnable() {
+			public void run() {
+			    ClientSession session = (ClientSession)
+				AppContext.getDataManager().getBinding(name);
+			    System.err.println("Sending messages");
+			    session.send(buf, delivery);
+			} }, taskOwner);
+	    }
 	
 	    System.err.println("waiting for client to receive messages");
 	    Queue<byte[]> messages =
-		client.waitForClientToRecieveExpectedMessages(numMessages);
+		client.waitForClientToReceiveExpectedMessages(numMessages);
 	    for (byte[] message : messages) {
 		if (message.length == 0) {
 		    fail("message buffer emtpy");
@@ -1216,7 +1216,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
-    */
+    //*/
     public void testClientSessionReceiveRelocateNotification() throws Exception {
 	final String name = "foo";
 	final String newNodeHost = "newNode";
@@ -1259,6 +1259,69 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} finally {
 	    client.disconnect();
 	}
+    }
+
+    public void testRelocateClientSessionAndSend() throws Exception {
+	final String name = "foo";
+	final String newNodeHost = "newNode";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	try {
+	    client.connect(serverNode.getAppPort()).login();
+	    System.err.println("reassigning identity from server node to host: " +
+			       newNodeHost);
+	    DirectiveNodeAssignmentPolicy.instance.
+		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	    System.err.println("(done) reassigning identity");
+	    System.err.println("waiting for relocation to client...");
+	    client.relocate(newNode.getAppPort());
+	    System.err.println("Sending messages from old node");
+	    sendMessagesFromNodeToClient(serverNode, client, 4, 0);
+	    sendMessagesFromNodeToClient(newNode, client, 4, 10);
+	    
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    private void sendMessagesFromNodeToClient(
+	SgsTestNode node, final DummyClient client, final int numMessages,
+	final int offset)
+	throws Exception
+    {
+        TransactionScheduler transactionScheduler = 
+            node.getSystemRegistry(). getComponent(TransactionScheduler.class);
+	for (int i = 0; i < numMessages; i++) {
+	    final int x = i + offset;
+	    transactionScheduler.runTask(new TestAbstractKernelRunnable() {
+		public void run() {
+		    ClientSession session = (ClientSession)
+			AppContext.getDataManager().getBinding(client.name);
+			ByteBuffer buf = ByteBuffer.allocate(4);
+			buf.putInt(x).flip();
+			session.send(buf, Delivery.RELIABLE);
+		    } }, taskOwner);
+	}
+
+	System.err.println("waiting for client to receive messages");
+	Queue<byte[]> messages =
+	    client.waitForClientToReceiveExpectedMessages(numMessages);
+	int expected = offset;
+	for (byte[] message : messages) {
+	    if (message.length != 4) {
+		fail("message buffer emtpy");
+	    }
+	    int x = ByteBuffer.wrap(message).getInt();
+	    if (x != expected) {
+		fail("expected: " + expected + ", received: " + x);
+	    } else {
+		System.err.println("received expected message: " + x);
+	    }
+	    expected++;
+	}
+	messages.clear();
     }
     
     /* -- other methods -- */
@@ -1646,23 +1709,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Waits until all messages have been received by this client, and
-	 * validates that the expected number of messages were received by the
-	 * client in the correct sequence.
-	 */
-	void checkMessagesReceived(int expectedMessages) {
-	    validateMessageSequence(listener.messageList, expectedMessages);
-	}
-
-	/**
 	 * Waits for this client to receive the number of messages sent from
 	 * the application.
 	 */
-	Queue<byte[]> waitForClientToRecieveExpectedMessages(
+	Queue<byte[]> waitForClientToReceiveExpectedMessages(
 	    int expectedMessages)
 	{
-	    waitForExpectedMessages(listener.messageList, expectedMessages);
-	    return listener.messageList;
+	    Queue<byte[]> messageList = listener.getMessageList();
+	    waitForExpectedMessages(messageList, expectedMessages);
+	    return messageList;
 	}
 
 	/**
@@ -1785,7 +1840,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	private class Listener implements ConnectionListener {
 
-	    Queue<byte[]> messageList = new LinkedList<byte[]>();
+	    Queue<byte[]> messageList = new ConcurrentLinkedQueue<byte[]>();
+
+	    Queue<byte[]> getMessageList() {
+		synchronized (lock) {
+		    Queue<byte[]> oldMessageList = messageList;
+		    //messageList = new LinkedList<byte[]>();
+		    return oldMessageList;
+		}
+	    }
 	    
             /** {@inheritDoc} */
 	    public void bytesReceived(Connection conn, byte[] buffer) {

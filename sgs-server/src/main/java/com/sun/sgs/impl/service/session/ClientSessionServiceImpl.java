@@ -513,7 +513,7 @@ public final class ClientSessionServiceImpl
      * session, then the client session should be relocated to the new
      * node.<p>
      *
-     * If an identity is added to this node ({@link #mappingAdded}
+     * If an identity is added to this node ({@link #mappingAdded})
      * and the {@code oldNode} is non-{@code null}, then its
      * corresponding client session (if any) may be moving to this
      * node from the old node.
@@ -607,6 +607,11 @@ public final class ClientSessionServiceImpl
 	    // TBD: this services at least one event, but need to ensure
 	    // that other events get serviced if serviceEventQueue
 	    // messages got missed while the session was relocating.
+	    // Also, the handler for this sessionId may not be stored yet
+	    // so this serviceEventQueue request will get dropped.  This
+	    // probably needs to be done when the client session handler
+	    // gets registered, and only if its associated session is
+	    // relocating. 
 	    serverImpl.serviceEventQueue(info.sessionId);
 	}
     }
