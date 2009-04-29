@@ -95,7 +95,7 @@ final class Lock<K, L extends Locker<K, L>> {
 	assert checkSync(locker.lockManager);
 	if (owners.isEmpty()) {
 	    LockRequest<K, L> request =
-		locker.newLockRequest(key, forWrite, false);
+		locker.createLockRequest(key, forWrite, false);
 	    owners.add(request);
 	    if (waiting) {
 		flushWaiter(locker);
@@ -121,7 +121,7 @@ final class Lock<K, L extends Locker<K, L>> {
 	    }
 	}
 	LockRequest<K, L> request =
-	    locker.newLockRequest(key, forWrite, upgrade);
+	    locker.createLockRequest(key, forWrite, upgrade);
 	if (conflict == null) {
 	    if (upgrade) {
 		boolean found = false;
@@ -209,7 +209,7 @@ final class Lock<K, L extends Locker<K, L>> {
 		    owned = true;
 		    if (downgrade) {
 			owners.add(
-			    locker.newLockRequest(
+			    locker.createLockRequest(
 				ownerRequest.key, false, false));
 		    }
 		}
@@ -335,7 +335,8 @@ final class Lock<K, L extends Locker<K, L>> {
 	if (owners.isEmpty()) {
 	    return uncheckedCast(NO_LOCK_REQUESTS);
 	} else {
-	    return uncheckedCast(owners.toArray());
+	    return uncheckedCast(
+		owners.toArray(new LockRequest[owners.size()]));
 	}
     }
 

@@ -392,6 +392,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	    }
 	    return null;
 	}
+	locker.noteNewLockRequest(result.request);
 	if (result.conflict == null) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,

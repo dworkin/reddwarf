@@ -415,18 +415,24 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	protected long getLockTimeoutTime(long now, long lockTimeoutTime) {
 	    return Math.min(
 		LockManager.addCheckOverflow(now, lockTimeoutTime),
-		txn.getCreationTime() + txn.getTimeout());
+		LockManager.addCheckOverflow(
+		    txn.getCreationTime(), txn.getTimeout()));
 	}
 
 	/** Record the new request and use a local class. */
 	@Override
-	protected LockRequest<Key, TxnLocker> newLockRequest(
+	protected LockRequest<Key, TxnLocker> createLockRequest(
 	    Key key, boolean forWrite, boolean upgrade)
 	{
-	    AccessedObjectImpl request =
-		new AccessedObjectImpl(this, key, forWrite, upgrade);
-	    requests.add(request);
-	    return request;
+	    return new AccessedObjectImpl(this, key, forWrite, upgrade);
+	}
+
+	/** Add the request to the list of requests. */
+	@Override
+	protected void noteNewLockRequest(
+	    LockRequest<Key, TxnLocker> request)
+	{
+	    requests.add((AccessedObjectImpl) request);
 	}
 
 	/** Release all locks. */
@@ -443,6 +449,11 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 	    return txn.toString();
 	}
 
+	/**
+	 * Returns the transaction associated with this request.
+	 *
+	 * @return	the transaction associated with this request
+	 */
 	public Transaction getTransaction() {
 	    return txn;
 	}
