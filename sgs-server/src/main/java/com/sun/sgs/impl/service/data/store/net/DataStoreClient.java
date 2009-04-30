@@ -30,6 +30,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
@@ -61,12 +62,6 @@ import java.util.logging.Logger;
  *	before it is a candidate for being aborted.  This value must be greater
  *	than {@code 0}. <p>
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.store.net.server.start
- *	</b></code><br>
- *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
- *	property, if present, else {@code true}
- *
  * <dd style="padding-top: .5em">Whether to run the server by creating an
  *	instance of {@link DataStoreServerImpl}, using the properties provided
  *	to this instance's constructor. <p>
@@ -89,9 +84,9 @@ import java.util.logging.Logger;
  * <dd style="padding-top: .5em">The network port for the {@code
  *	DataStoreServer}.  This value must be no less than {@code 0} and no
  *	greater than {@code 65535}.  The value {@code 0} can only be specified
- *	if the {@code com.sun.sgs.impl.service.data.store.net.server.start}
- *	property is {@code true}, and means that an anonymous port will be
- *	chosen for running the server. <p>
+ *      if the {@code com.sun.sgs.node.type} property is not {@code appNode}, 
+ *      and means that an anonymous port will be chosen for running the 
+ *      server. <p>
  *
  * </dl> <p>
  *
@@ -157,10 +152,6 @@ public final class DataStoreClient extends AbstractDataStore {
 
     /** The default maximum transaction timeout. */
     private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
-
-    /** The property that specifies to start the server. */
-    private static final String SERVER_START_PROPERTY =
-	PACKAGE + ".server.start";
 
     /** The server host name. */
     private final String serverHost;
@@ -237,10 +228,11 @@ public final class DataStoreClient extends AbstractDataStore {
 	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	boolean serverStart = wrappedProps.getBooleanProperty(
-	    SERVER_START_PROPERTY,
-	    wrappedProps.getBooleanProperty(
-		StandardProperties.SERVER_START, true));
+        NodeType nodeType = 
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
+        boolean serverStart = nodeType != NodeType.appNode;
         if (serverStart) {
             // we default to localHost;  this is useful for starting
             // single node systems

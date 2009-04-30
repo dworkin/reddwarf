@@ -2,6 +2,9 @@ Version 0.9.10:
 - Add a locking AccessCoordinator and add a configuration option for
   specifying the access coordinator (issue #138)
 - AppListener no longer extends ManagedObject (issue #108)
+- Service startup is modified so a guaranteed set of services is always
+  started, allowing services to use services that are started after them
+  (issue #145)
 - Also fix issues #5, #44, #48, #73, #82, #89, #98, #130, #131, #136, #142,
   #143, #144, #149, #151, #153, #154, #155, #158, #160
 

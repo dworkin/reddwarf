@@ -19,8 +19,10 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.test.impl.service.data.TestDataServiceConcurrency;
 import java.util.Properties;
 
@@ -73,13 +75,13 @@ public class TestDataServiceClientConcurrency
 	Properties props = super.getNodeProps();
 	String host = serverHost;
 	int port = serverPort;
+        String nodeType = NodeType.appNode.toString();
 	if (host == null) {
 	    host = "localhost";
 	    port = 0;
-	    props.setProperty(DataStoreNetPackage + ".server.start", "true");
-	} else {
-	    props.setProperty(DataStoreNetPackage + ".server.start", "false");
+	    nodeType = NodeType.coreServerNode.toString();
 	}
+        props.setProperty(StandardProperties.NODE_TYPE, nodeType);
 	props.setProperty(DataStoreNetPackage + ".server.host", host);
 	props.setProperty(DataStoreNetPackage + ".server.port",
 			  String.valueOf(port));
