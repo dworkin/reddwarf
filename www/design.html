@@ -34,6 +34,41 @@
 
   
   <h3>Client-Server Communication</h3>
+
+
+  <p>We designed client-server communication with the idea of game
+  states in mind.  Currently, a client can be in one of three game
+  states:
+    <ol>
+      <li>Creating a new character to play</li>
+      <li>In the lobby, deciding which dungeon to explore</li>
+      <li>In a dungeon, playing the game</li>
+    </ol>
+  For each of these game states, we have the following framework in
+  place.  The client will be connected to a channel used only by the
+  server to communicate updates to all player in that game state.  All
+  direct messages sent from the client to the server are handled by
+  game-state-specific classes that we refer to
+  as <tt>MessageHandler</tt>s.  The client receives all direct
+  server-to-client messages in its main class as well. </p>
+
+  <p>We use this model for several reasons.  Most importantly, we use
+  channels for broadcasting information to reduce the communication
+  overhead.  Sending the same message to all
+  player's <tt>ClientSession</tt> instances has huge overhead is not
+  the correct way to broadcast information in the Project Darkstar
+  model.  A good example of when to use the channels is that we
+  broadcast movement updates to all the players on a level.  Each
+  dungeon level has its own channel that it uses to send updates for
+  all the players connected.  Since all the players need to receive
+  the same information, channels are ideal for this communication.</p>
+
+  <p>However, we do send direct messages to the client using
+  the <tt>ClientSession</tt> when the server needs to send information
+  that only pertains to that one client instance.  A good example of
+  this is when the client is first creating a character.  No other
+  clients need to know about the state of the player's character, and
+  so this client-server communication is done using direct messages.</p>
   
   <p>The following diagram illustrates the core communication between
     the client and the server.  Each of the various numbers represents
@@ -91,21 +126,21 @@
     be broadcasted.  The Hack <tt>Client</tt> processes these messages
     as they are received.</li>
 
-    <li>The <tt>CreatorManager</tt> and <CreatorChannelListener</tt>
+    <li>The <tt>CreatorManager</tt> and <tt>CreatorChannelListener</tt>
     contain all the character creation logic on the client side.  The
     former sends all of the outgoing messages, while the latter is
     reponsible for processing all of the broadcasted updates on the
     creator channel.</li>
 
 
-    <li>The <tt>LobbyManager</tt> and <LobbyChannelListener</tt>
+    <li>The <tt>LobbyManager</tt> and <tt>LobbyChannelListener</tt>
     contain all the game-choosing logic on the client side.  The
     former sends all of the outgoing messages regarding which dungeon
     a client will join, while the latter is reponsible for processing
     all of the broadcasted updates on the lobby channel.</li>
 
 
-    <li>The <tt>GameManager</tt> and <DungeonChannelListener</tt>
+    <li>The <tt>GameManager</tt> and <tt>DungeonChannelListener</tt>
     contain all the dungeon-related logic on the client side, such as
     moving.  The former sends all of the outgoing messages, while the
     latter is reponsible for processing all of the broadcasted updates
@@ -135,6 +170,38 @@
     sent to the server on the dungeon channel.  When a player dies in
     a dungeon, they are sent back to the lobby state of the game by
     the <tt>Dungeon</tt>.</li>
+
+    <li>These classes contain all of the client side message handling
+    and generation.  Outgoing messages may originate from any class
+    with an arrow pointing out of the client box.  Likewise, any arrow
+    coming into the box denotes which class handles that message.</li>
+
+    <li>These classes contain all of the server side message handling.
+    All outgoing messages on the server-side, both
+    to <tt>Channel</tt>s and <tt>ClientSession</tt>s will go through
+    the <tt>Messages</tt> class.</li>
+
+    <li>The <tt>Client</tt> class is responsible for handling all of
+    messages sent from the server directly to
+    the <tt>ClientSession</tt>.  The <tt>Client</tt> logic will handle
+    all types of commands for all the game states.  This behavior
+    differs from the client channel listeners, which only handle
+    messages pertaining to a specific game state.
+    (e.g. the <tt>DungeonChannelListener</tt> only handles
+    dungeon-related messages).</li>
+
+    <li>The <tt>Commands</tt> class does not directly take part in the
+    communications process, but plays a very important role in what is
+    communicated.  The <tt>Commands.Command</tt> </tt>enum</tt>
+    contains all of the valid commands for the client and server, and
+    also provides methods for encoding these commands into
+    network-transmittable <tt>int</tt>s, and for decoding them back
+    into <tt>Commands.Command</tt> objects.  This has two major
+    advantages.  First, we are able to use enums in both the client
+    and server, which makes the code much cleaner and greatly aids in
+    debugging communication.  Secondly, since we transmit the commands
+    as <tt>int</tt> instead of Java objects, we allow for non-Java
+    clients.</li>
 
   </ol>
 

@@ -10,6 +10,7 @@ package com.sun.sgs.example.hack.share;
 
 import java.io.Serializable;
 
+import java.util.Arrays;
 
 /**
  * This represents a single space on a level. It encodes location and
@@ -22,11 +23,11 @@ public class BoardSpace implements Serializable {
     private static final long serialVersionUID = 1;
 
     // the location
-    private int x;
-    private int y;
+    private final int x;
+    private final int y;
 
     // the identifiers at the location
-    private int [] identifiers;
+    private final int [] identifiers;
 
     /**
      * Creates an instance of <code>BoardSpace</code>.
@@ -66,6 +67,10 @@ public class BoardSpace implements Serializable {
      */
     public int [] getIdentifiers() {
         return identifiers;
+    }
+
+    public String toString() {
+	return String.format("(%d,%d) = %s", x, y, Arrays.toString(identifiers));
     }
 
 }

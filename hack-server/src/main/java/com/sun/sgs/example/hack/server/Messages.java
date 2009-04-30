@@ -415,7 +415,7 @@ public final class Messages {
      */
     public static void broadcastBoardUpdate(Channel channel,
 					    Collection<BoardSpace> spaces) 
-    {					    
+    {
         broadcastToClients(channel, Command.UPDATE_BOARD_SPACES, spaces);
     }
 
@@ -427,7 +427,7 @@ public final class Messages {
      */
     public static void sendServerMessage(ClientSession session, String message) {
 
-        sendToClient(session, Command.NEW_SERVER_MESSAGE, message);
+        sendToClient(session, Command.NEW_SERVER_MESSAGE, message.toCharArray());
     }
 
     /*

@@ -94,12 +94,13 @@ public class Player
     }
 
     /**
-     * Gets the {@code Channel} associated with {@link #channelRef}.
+     * Returns the current {@code Channel} used to send commands to
+     * this player.
      *
      * @return the channel or {@code null} if {@code channelRef} is
      *         {@code null}.
      */
-    private Channel channel() {
+    Channel channel() {
         return channelRef == null ? null : channelRef.get();
     }
 
@@ -155,7 +156,7 @@ public class Player
      */
     public PlayerCharacterManager getCharacterManager() {
         return characterManagerRef.get();
-    }
+    }    
 
     /**
      * Sets the current {@code Session} for this {@code Player}, which
@@ -226,8 +227,7 @@ public class Player
             gameRef = AppContext.getDataManager().createReference(game);
 
             // ...and handle joining the new game
-            messageHandler = game.createMessageHandler();
-            game.join(this);
+            messageHandler = game.join(this);
         }
 
         // if we're no longer playing, then our user id is no longer valid

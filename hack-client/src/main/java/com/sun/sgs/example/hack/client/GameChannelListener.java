@@ -51,7 +51,7 @@ public abstract class GameChannelListener implements ClientChannelListener
     }
 
     /**
-     * Notifies the game that a player has either joined or left.
+     * Notifies the game that a player has joined.
      */
     protected void notifyJoin(ByteBuffer data) {
         byte [] bytes = new byte[data.remaining()];
@@ -61,7 +61,7 @@ public abstract class GameChannelListener implements ClientChannelListener
     }
 
     /**
-     * Notifies the game that a player has either joined or left.
+     * Notifies the game that a player has left.
      */
     protected void notifyLeave(ByteBuffer data) {
         byte [] bytes = new byte[data.remaining()];

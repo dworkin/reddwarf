@@ -9,6 +9,7 @@
 package com.sun.sgs.example.hack.server.level;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedReference;
 
 import com.sun.sgs.example.hack.server.CharacterManager;
@@ -25,12 +26,12 @@ import java.io.Serializable;
  * maintains the rule that only one character and one item may be on the
  * tile at any time.
  */
-public abstract class BasicTile implements Tile, Serializable {
+public abstract class BasicTile implements Tile {
 
     private static final long serialVersionUID = 1;
 
     // the id of this tile
-    private int id;
+    private int tileTypeId;
 
     // the character manager for any character that is currently on
     // this space
@@ -44,8 +45,8 @@ public abstract class BasicTile implements Tile, Serializable {
      *
      * @param id the tile's identifier
      */
-    protected BasicTile(int id) {
-        this.id = id;
+    protected BasicTile(int tileTypeId) {
+        this.tileTypeId = tileTypeId;
         this.mgrRef = null;
         this.itemRef = null;
     }
@@ -56,7 +57,7 @@ public abstract class BasicTile implements Tile, Serializable {
      * @return the tile's identifier
      */
     public int getID() {
-        return id;
+        return tileTypeId;
     }
 
     /**
@@ -76,9 +77,9 @@ public abstract class BasicTile implements Tile, Serializable {
         // if there's no item, create an array with just the tile's id,
         // otherwise put both in an array
         if (itemRef == null)
-            ids = new int [] {id};
+            ids = new int [] {tileTypeId};
         else
-            ids = new int [] {id, itemRef.get().getID()};
+            ids = new int [] {tileTypeId, itemRef.get().getID()};
 
         // if there is a character here, create a new array that's 1 index
         // bigger, and put the character at the end
@@ -131,7 +132,9 @@ public abstract class BasicTile implements Tile, Serializable {
         if (mgrRef != null)
             return false;
 
-        mgrRef = AppContext.getDataManager().createReference(mgr);
+	DataManager dm = AppContext.getDataManager();
+        mgrRef = dm.createReference(mgr);
+	dm.markForUpdate(this);
 
         return true;
     }
@@ -150,9 +153,10 @@ public abstract class BasicTile implements Tile, Serializable {
             return false;
         }
 
+	DataManager dm = AppContext.getDataManager();
+
         // make sure that the character here is the one being removed
-        if (! this.mgrRef.equals(AppContext.getDataManager().
-                                 createReference(mgr))) {
+        if (! this.mgrRef.equals(dm.createReference(mgr))) {
 	    // debugging output
             System.out.println("not equal on removal: " +
                                mgrRef.get().toString() +
@@ -161,6 +165,7 @@ public abstract class BasicTile implements Tile, Serializable {
         }
 
         this.mgrRef = null;
+	dm.markForUpdate(this);
 
         return true;
     }
@@ -178,7 +183,9 @@ public abstract class BasicTile implements Tile, Serializable {
         if (itemRef != null)
             return false;
 
-        itemRef = AppContext.getDataManager().createReference(item);
+	DataManager dm = AppContext.getDataManager();
+        itemRef = dm.createReference(item);
+	dm.markForUpdate(this);
 
         return true;
     }
@@ -196,12 +203,13 @@ public abstract class BasicTile implements Tile, Serializable {
         if (itemRef == null)
             return false;
 
+	DataManager dm = AppContext.getDataManager();
         // check that the item here is the once being removed
-        if (! itemRef.equals(AppContext.getDataManager().
-                             createReference(item)))
+        if (! itemRef.equals(dm.createReference(item)))
             return false;
 
         itemRef = null;
+	dm.markForUpdate(this);
 
         return true;
     }

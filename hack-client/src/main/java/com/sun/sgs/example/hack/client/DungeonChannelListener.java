@@ -98,7 +98,7 @@ public class DungeonChannelListener extends GameChannelListener
 	    case UPDATE_BOARD_SPACES:
 		// we got some selective space updates
 		@SuppressWarnings("unchecked")
-                    Collection<BoardSpace> spaces =
+                    Collection<BoardSpace> spaces =		    
 		    (Collection<BoardSpace>)(getObject(data));
 		BoardSpace [] s = new BoardSpace[spaces.size()];
 		blistener.updateSpaces(spaces.toArray(s));
@@ -106,7 +106,7 @@ public class DungeonChannelListener extends GameChannelListener
 
 	    default:
 		System.out.printf("Received unknown command %s (%d) on the " +
-				  "Creator channel%n", cmd, encodedCmd);	
+				  "Dungeon channel%n", cmd, encodedCmd);	
 	    }
 	} catch (IOException ioe) {
 	    // NOTE: this should probably handle the error a little more

@@ -121,7 +121,7 @@ public class AICharacterManager extends BasicCharacterManager implements Task {
      *
      * @param updates the updates to send
      */
-    public void sendUpdate(Collection<BoardSpace> updates) {
+    public void broadcastUpdates(Collection<BoardSpace> updates) {
         // not currently used
     }
 
