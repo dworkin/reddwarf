@@ -21,10 +21,13 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.NullAccessCoordinator;
+import com.sun.sgs.impl.service.data.store.BindingValue;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.service.Transaction;
@@ -42,6 +45,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
+import static java.util.logging.Level.FINEST;
 import java.util.logging.Logger;
 
 /**
@@ -543,7 +547,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/** Creates an instance. */
 	CustomDataStoreImpl(Properties properties) {
-	    super(properties);
+	    super(properties, new NullAccessCoordinator());
 	}
 
 	/**
@@ -592,6 +596,95 @@ public class DataStoreServerImpl implements DataStoreServer {
 			timeout);
 		}
 		throw e;
+	    }
+	}
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation does logging and checks that {@code name} is not
+	 * {@code null}, otherwise delegating to the superclass.
+	 */
+	protected BindingValue getBindingInternal(
+	    Transaction txn, String name)
+	{
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(FINEST, "getBinding txn:{0}, name:{1}", txn, name);
+	    }
+	    try {
+		checkNull("name", name);
+		BindingValue result = super.getBindingInternal(txn, name);
+		if (logger.isLoggable(FINEST)) {
+		    logger.log(FINEST,
+			       "getBinding txn:{0}, name:{1} returns " +
+			       "oid:{2,number,#}",
+			       txn, name, result.getObjectId());
+		}
+		return result;
+	    } catch (RuntimeException e) {
+		throw handleException(
+		    txn, FINEST, e,
+		    "getBinding txn:" + txn + ", name:" + name);
+	    }
+	}
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation does logging and checks that {@code name} is not
+	 * {@code null}, otherwise delegating to the superclass.
+	 */
+	protected BindingValue setBindingInternal(
+	    Transaction txn, String name, long oid)
+	{
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(
+		    FINEST, "setBinding txn:{0}, name:{1}, oid:{2,number,#}",
+		    txn, name, oid);
+	    }
+	    try {
+		checkNull("name", name);
+		BindingValue result = super.setBindingInternal(txn, name, oid);
+		if (logger.isLoggable(FINEST)) {
+		    logger.log(FINEST,
+			       "setBinding txn:{0}, name:{1}," +
+			       " oid:{2,number,#} returns",
+			       txn, name, oid);
+		}
+		return result;
+	    } catch (RuntimeException e) {
+		throw handleException(txn, FINEST, e,
+				      "setBinding txn:" + txn + ", name:" +
+				      name + ", oid:" + oid);
+	    }
+	}
+
+	/**
+	 * {@inheritDoc} <p>
+	 *
+	 * This implementation does logging and checks that {@code name} is not
+	 * {@code null}, otherwise delegating to the superclass.
+	 */
+	protected BindingValue removeBindingInternal(
+	    Transaction txn, String name)
+	{
+	    if (logger.isLoggable(FINEST)) {
+		logger.log(
+		    FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
+	    }
+	    try {
+		checkNull("name", name);
+		BindingValue result = super.removeBindingInternal(txn, name);
+		if (logger.isLoggable(FINEST)) {
+		    logger.log(FINEST,
+			       "removeBinding txn:{0}, name:{1} returns {2}",
+			       txn, name, result);
+		}
+		return result;
+	    } catch (RuntimeException e) {
+		throw handleException(txn, FINEST, e,
+				      "removeBinding txn:" + txn +
+				      ", name:" + name);
 	    }
 	}
     }
@@ -738,30 +831,30 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
-    public long getBinding(long tid, String name) {
+    public BindingValue getBinding(long tid, String name) {
 	Txn txn = getTxn(tid);
 	try {
-	    return store.getBinding(txn, name);
+	    return store.getBindingInternal(txn, name);
 	} finally {
 	    txnTable.notInUse(txn);
 	}
     }
 
     /** {@inheritDoc} */
-    public void setBinding(long tid, String name, long oid) {
+    public BindingValue setBinding(long tid, String name, long oid) {
 	Txn txn = getTxn(tid);
 	try {
-	    store.setBinding(txn, name, oid);
+	    return store.setBindingInternal(txn, name, oid);
 	} finally {
 	    txnTable.notInUse(txn);
 	}
     }
 
     /** {@inheritDoc} */
-    public void removeBinding(long tid, String name) {
+    public BindingValue removeBinding(long tid, String name) {
 	Txn txn = getTxn(tid);
 	try {
-	    store.removeBinding(txn, name);
+	    return store.removeBindingInternal(txn, name);
 	} finally {
 	    txnTable.notInUse(txn);
 	}

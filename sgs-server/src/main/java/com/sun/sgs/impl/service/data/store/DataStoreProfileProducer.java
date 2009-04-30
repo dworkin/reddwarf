@@ -210,6 +210,22 @@ public class DataStoreProfileProducer
 	return result;
     }
 
+    /** {@inheritDoc} */
+    public void setBindingDescription(
+	Transaction txn, String name, Object description)
+    {
+	/* No need for profiling here */
+	dataStore.setBindingDescription(txn, name, description);
+    }
+
+    /** {@inheritDoc} */
+    public void setObjectDescription(
+	Transaction txn, long oid, Object description)
+    {
+	/* No need for profiling here */
+	dataStore.setObjectDescription(txn, oid, description);
+    }
+
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */

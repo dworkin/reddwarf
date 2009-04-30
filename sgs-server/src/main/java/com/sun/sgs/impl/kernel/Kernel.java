@@ -194,7 +194,13 @@ class Kernel {
         throws Exception 
     {
         logger.log(Level.CONFIG, "Booting the Kernel");
-
+                
+        // filter the properties with appropriate defaults
+        filterProperties(appProperties);
+        
+        // check the standard properties
+        checkProperties(appProperties);
+        
         this.appProperties = appProperties;
 
         try {
@@ -450,41 +456,29 @@ class Kernel {
     {
         // before we start, figure out if we're running with only a sub-set
         // of services, in which case there should be no external services
-        String finalService =
-            appProperties.getProperty(StandardProperties.FINAL_SERVICE);
+        NodeType type = 
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
         StandardService finalStandardService = null;
         String externalServices =
             appProperties.getProperty(StandardProperties.SERVICES);
         String externalManagers =
             appProperties.getProperty(StandardProperties.MANAGERS);
-        if (finalService != null) {
-            if ((externalServices != null) || (externalManagers != null)) {
-                throw new IllegalArgumentException(
-                    "Cannot specify external services and a final service");
-            }
-
-            // validate the final service
-            try {
-                finalStandardService =
-                    Enum.valueOf(StandardService.class, finalService);
-            } catch (IllegalArgumentException iae) {
-                if (logger.isLoggable(Level.SEVERE)) {
-                    logger.logThrow(Level.SEVERE, iae, "Invalid final " +
-                                    "service name: {0}", finalService);
+        
+        switch (type) {
+            case appNode:
+            case singleNode:
+            default:
+                finalStandardService = StandardService.LAST_SERVICE;
+                break;
+            case coreServerNode:
+                if ((externalServices != null) || (externalManagers != null)) {
+                    throw new IllegalArgumentException(
+                        "Cannot specify external services for the core server");
                 }
-                throw iae;
-            }
 
-            // make sure we're not running with an application
-            if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
-                equals(StandardProperties.APP_LISTENER_NONE)) 
-            {
-                throw new IllegalArgumentException("Cannot specify an app " +
-                                                   "listener and a final " +
-                                                   "service");
-            }
-        } else {
-            finalStandardService = StandardService.LAST_SERVICE;
+                finalStandardService = StandardService.TaskService;
+                break;
         }
         
         final int finalServiceOrdinal = finalStandardService.ordinal();
@@ -681,8 +675,10 @@ class Kernel {
         // is to initialize the application by running a special
         // KernelRunnable in an unbounded transaction, unless we're
         // running without an application
-        if (!appProperties.getProperty(StandardProperties.APP_LISTENER).
-            equals(StandardProperties.APP_LISTENER_NONE)) {
+        NodeType type = 
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
+        if (!type.equals(NodeType.coreServerNode)) {
             try {
                 if (logger.isLoggable(Level.CONFIG)) {
                     logger.log(Level.CONFIG, "{0}: starting application",
@@ -817,45 +813,16 @@ class Kernel {
             if (value == null) {
                 // Default is single node
                 value = NodeType.singleNode.name();
+                properties.setProperty(StandardProperties.NODE_TYPE, value);
             }
 
-            NodeType type;
             // Throws IllegalArgumentException if not one of the enum types
             // but let's improve the error message
             try {
-                type = NodeType.valueOf(value);
+                NodeType.valueOf(value);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Illegal value for " +
                         StandardProperties.NODE_TYPE);
-            }
-            
-           
-            switch (type) {
-                case singleNode:
-                default:
-                    break;    // do nothing, this is the default
-                case coreServerNode:
-                    // Don't start an application
-                    properties.setProperty(
-                            StandardProperties.APP_LISTENER,
-                            StandardProperties.APP_LISTENER_NONE);
-                    // Only run basic services
-                    properties.setProperty(StandardProperties.FINAL_SERVICE,
-                                           "NodeMappingService");
-                    // Start servers for services
-                    properties.setProperty(StandardProperties.SERVER_START, 
-                                           "true");
-                    // Start the network server for the data store
-                    properties.setProperty(
-                        DataServiceImpl.DATA_STORE_CLASS_PROPERTY,
-                        "com.sun.sgs.impl.service.data." +
-                        "store.net.DataStoreClient");
-                    break;
-                case appNode:
-                    // Don't start the servers
-                    properties.setProperty(StandardProperties.SERVER_START, 
-                                           "false");
-                    break;
             }
 
             return properties;
@@ -895,14 +862,22 @@ class Kernel {
                        appName);
         }
         
-        if (appProperties.getProperty(StandardProperties.APP_LISTENER) == null) 
-        {
-            logger.log(Level.SEVERE, "Missing required property " +
+        NodeType type = 
+            NodeType.valueOf(
+                appProperties.getProperty(StandardProperties.NODE_TYPE));
+        if (!type.equals(NodeType.coreServerNode)) {
+            if (appProperties.getProperty(StandardProperties.APP_LISTENER) == 
+                null)
+            {
+                logger.log(Level.SEVERE, "Missing required property " +
                        StandardProperties.APP_LISTENER +
-                       "for application: " + appName);
-            throw new IllegalArgumentException("Missing required property " +
+                       " for application: " + appName);
+                throw new IllegalArgumentException(
+                       "Missing required property " +
                        StandardProperties.APP_LISTENER +
-                       "for application: " + appName);
+                       " for application: " + appName);
+                
+            }
         }
     }
     
@@ -1140,12 +1115,6 @@ class Kernel {
         } else {
             appProperties = findProperties(null);
         }
-        
-        // filter the properties with appropriate defaults
-        filterProperties(appProperties);
-        
-        // check the standard properties
-        checkProperties(appProperties);
         
         // boot the kernel
         new Kernel(appProperties);

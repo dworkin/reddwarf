@@ -32,6 +32,7 @@ import com.sun.sgs.impl.util.Exporter;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.NodeType;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.management.NodeMappingServiceMXBean;
 import com.sun.sgs.profile.ProfileCollector;
@@ -68,16 +69,6 @@ import javax.management.JMException;
  * <p>
  * <dl style="margin-left: 1em">
  *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.nodemap.server.start
- *	</b></code><br>
- *	<i>Default:</i> the value of the {@code com.sun.sgs.server.start}
- *	property, if present, else <code>true</code>
- *
- * <dd style="padding-top: .5em">Whether to run the server by creating an
- *	instance of {@link NodeMappingServerImpl}, using the properties provided
- *	to this instance's constructor. <p>
- *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.nodemap.server.host
  *	</b></code><br>
@@ -96,8 +87,8 @@ import javax.management.JMException;
  * <dd style="padding-top: .5em">The network port for the {@code
  *	NodeMappingServer}.  This value must be no less than {@code 0} and no
  *	greater than {@code 65535}.  The value {@code 0} can only be specified
- *	if the {@code com.sun.sgs.impl.service.nodemap.server.start} property
- *	is {@code true}, and means that an anonymous port will be chosen for
+ *	if the {@code com.sun.sgs.node.type} property is not {@code appNode},
+ *	and means that an anonymous port will be chosen for
  *	running the server. <p>
  *
  *  <dt> <i>Property:</i> <code><b>
@@ -293,12 +284,6 @@ public class NodeMappingServiceImpl
     /** Class name. */
     private static final String CLASSNAME = 
             NodeMappingServiceImpl.class.getName();
-    /**
-     * The property that specifies whether the server should be instantiated
-     * in this stack.  Also used by the unit tests.
-     */
-    private static final String SERVER_START_PROPERTY = 
-            PKG_NAME + ".server.start";
     
     /** The property name for the server host. */
     static final String SERVER_HOST_PROPERTY = PKG_NAME + ".server.host";
@@ -314,10 +299,6 @@ public class NodeMappingServiceImpl
     
     /** The default value of the server port. */
     private static final int DEFAULT_CLIENT_PORT = 0;
-    
-    /** The logger for this class. */
-    private static final LoggerWrapper logger =
-            new LoggerWrapper(Logger.getLogger(PKG_NAME));
     
     /** The watchdog service. */
     private final WatchdogService watchdogService;
@@ -357,11 +338,6 @@ public class NodeMappingServiceImpl
     
     /** The local node id, as determined from the watchdog */
     private final long localNodeId;
-    
-    /** Are we running an application?  If not, assume that we don't
-     *  have a full stack.
-     */
-    private final boolean fullStack;
 
     /** Our string representation, used by toString() and getName(). */
     private final String fullName;
@@ -400,7 +376,8 @@ public class NodeMappingServiceImpl
                                   TransactionProxy txnProxy)
         throws Exception
     {
-        super(properties, systemRegistry, txnProxy, logger);
+        super(properties, systemRegistry, txnProxy, 
+              new LoggerWrapper(Logger.getLogger(PKG_NAME)));
         
         logger.log(Level.CONFIG, 
                  "Creating NodeMappingServiceImpl properties:{0}", properties);
@@ -424,13 +401,14 @@ public class NodeMappingServiceImpl
 		    } },  taskOwner);
                     
             // Find or create our server.   
-            boolean instantiateServer =
-		wrappedProps.getBooleanProperty(
-		    SERVER_START_PROPERTY,
-		    wrappedProps.getBooleanProperty(
-			StandardProperties.SERVER_START, true));
             String localHost = 
-                    InetAddress.getLocalHost().getHostName();            
+                    InetAddress.getLocalHost().getHostName(); 
+            NodeType nodeType = 
+                wrappedProps.getEnumProperty(StandardProperties.NODE_TYPE, 
+                                             NodeType.class, 
+                                             NodeType.singleNode);
+            boolean instantiateServer = nodeType != NodeType.appNode;
+            
             String host;
             int port;
             
@@ -478,11 +456,7 @@ public class NodeMappingServiceImpl
             // Check if we're running on a full stack; if we are, register
             // with our server so our node is a candidate for identity
             // assignment.
-            String finalService =
-                properties.getProperty(StandardProperties.FINAL_SERVICE);
-            fullStack = (finalService == null) ? true :
-                !(properties.getProperty(StandardProperties.APP_LISTENER)
-                    .equals(StandardProperties.APP_LISTENER_NONE));
+            boolean fullStack = nodeType != NodeType.coreServerNode;
             if (fullStack) {
                 try {
                     server.registerNodeListener(changeNotifier, localNodeId);
@@ -571,10 +545,6 @@ public class NodeMappingServiceImpl
      * Code swiped from the data service.
      */
     private void checkState() {
-        if (!fullStack) {
-            throw 
-                new IllegalStateException("No application running");
-        }
         if (shuttingDown()) {
 	    throw new IllegalStateException("service shutting down");
         }

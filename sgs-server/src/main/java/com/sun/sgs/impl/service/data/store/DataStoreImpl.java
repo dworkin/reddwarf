@@ -19,12 +19,9 @@
 
 package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
-import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.ALLOCATION_BLOCK_SIZE;
@@ -44,7 +41,9 @@ import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
@@ -87,7 +86,8 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl(Properties) constructor} supports these public <a
+ * The {@link #DataStoreImpl(Properties, AccessCoordinator) constructor}
+ * supports these public <a
  * href="../../../../app/doc-files/config-properties.html#DataStore">
  * properties</a>. <p>
  *
@@ -113,9 +113,8 @@ import java.util.logging.Logger;
  * named {@code com.sun.sgs.impl.service.data.store.DataStoreImpl.abort}, to
  * make it easier to debug concurrency conflicts.
  */
-public class DataStoreImpl
-    implements DataStore, TransactionParticipant
-{
+public class DataStoreImpl extends AbstractDataStore {
+
     /** The name of this class. */
     private static final String CLASSNAME =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
@@ -767,30 +766,38 @@ public class DataStoreImpl
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  See the {@linkplain DataStoreImpl class documentation} for
-     * a list of supported properties.
+     * properties and access coordinator.  See the {@linkplain DataStoreImpl
+     * class documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
+     * @param	accessCoordinator the access coordinator
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if any of the properties are invalid,
      *		as specified in the class documentation
      */
-    public DataStoreImpl(Properties properties) {
-	this(properties, new BasicScheduler());
+    public DataStoreImpl(Properties properties,
+			 AccessCoordinator accessCoordinator)
+    {
+	this(properties, accessCoordinator, new BasicScheduler());
     }
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties and using the specified scheduler.  See the {@linkplain
+     * properties, access coordinator, and scheduler.  See the {@linkplain
      * DataStoreImpl class documentation} for a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
+     * @param	accessCoordinator the access coordinator
      * @param	scheduler the scheduler used to schedule periodic tasks
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if any of the properties are invalid,
      *		as specified in the class documentation}
      */
-    public DataStoreImpl(Properties properties, Scheduler scheduler) {
+    public DataStoreImpl(Properties properties, 
+			 AccessCoordinator accessCoordinator,
+			 Scheduler scheduler)
+    {
+	super(accessCoordinator, logger, abortLogger);
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -840,7 +847,7 @@ public class DataStoreImpl
 	    done = true;
 	    dbTxn.commit();
 	} catch (RuntimeException e) { 
-	    throw convertException(
+	    throw handleException(
 		null, Level.SEVERE, e, "DataStore initialization");
 	} catch (Error e) {
 	    logger.logThrow(
@@ -954,639 +961,387 @@ public class DataStoreImpl
 	}
     }
 
-    /* -- Implement DataStore -- */
+    /* -- Implement AbstractDataStore's DataStore methods -- */
 
     /** {@inheritDoc} */
-    public long createObject(Transaction txn) {
-	logger.log(Level.FINEST, "createObject txn:{0}", txn);
-	try {
-	    TxnInfo txnInfo = checkTxn(txn);
-	    ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
-	    if (objectIdInfo == null) {
-		logger.log(Level.FINE, "Allocate more object IDs");
-		long newNextObjectId;
-		long newLastObjectId;
-		DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
-		boolean done = false;
-		try {
-		    newNextObjectId = DataStoreHeader.getNextId(
-			NEXT_OBJ_ID_KEY, infoDb, dbTxn, ALLOCATION_BLOCK_SIZE);
-		    newLastObjectId =
-			newNextObjectId + ALLOCATION_BLOCK_SIZE - 1;
-		    maybeUpdateAllocationBlockPlaceholders(
-			dbTxn, newLastObjectId);
-		    done = true;
-		    dbTxn.commit();
-		} finally {
-		    if (!done) {
-			dbTxn.abort();
-		    }
+    protected long createObjectInternal(Transaction txn) {
+	TxnInfo txnInfo = checkTxn(txn);
+	ObjectIdInfo objectIdInfo = txnInfo.getObjectIdInfo();
+	if (objectIdInfo == null) {
+	    logger.log(Level.FINE, "Allocate more object IDs");
+	    long newNextObjectId;
+	    long newLastObjectId;
+	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
+	    boolean done = false;
+	    try {
+		newNextObjectId = DataStoreHeader.getNextId(
+		    NEXT_OBJ_ID_KEY, infoDb, dbTxn, ALLOCATION_BLOCK_SIZE);
+		newLastObjectId =
+		    newNextObjectId + ALLOCATION_BLOCK_SIZE - 1;
+		maybeUpdateAllocationBlockPlaceholders(
+		    dbTxn, newLastObjectId);
+		done = true;
+		dbTxn.commit();
+	    } finally {
+		if (!done) {
+		    dbTxn.abort();
 		}
-		objectIdInfo = txnInfo.createObjectIdInfo(
-		    newNextObjectId, newLastObjectId);
 	    }
-	    long result = objectIdInfo.next();
-	    if (useAllocationBlockPlaceholders &&
-		result == objectIdInfo.first())
-	    {
-		/*
-		 * Create the placeholder when using the first ID in the block.
-		 * Don't do this when storing the allocation and placeholder
-		 * information in the info database because this transaction
-		 * may already be holding a lock on the location in the OIDs
-		 * database.
-		 */
-		oidsDb.put(txnInfo.dbTxn,
-			   DataEncoding.encodeLong(objectIdInfo.last()),
-			   PLACEHOLDER_DATA);
-	    }
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "createObject txn:{0} returns oid:{1,number,#}",
-			   txn, result);
-	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINEST, e, "createObject txn:" + txn);
+	    objectIdInfo = txnInfo.createObjectIdInfo(
+		newNextObjectId, newLastObjectId);
 	}
+	long result = objectIdInfo.next();
+	if (useAllocationBlockPlaceholders && result == objectIdInfo.first()) {
+	    /*
+	     * Create the placeholder when using the first ID in the block.
+	     * Don't do this when storing the allocation and placeholder
+	     * information in the info database because this transaction may
+	     * already be holding a lock on the location in the OIDs database.
+	     */
+	    oidsDb.put(txnInfo.dbTxn,
+		       DataEncoding.encodeLong(objectIdInfo.last()),
+		       PLACEHOLDER_DATA);
+	}
+	return result;
     }
 
     /** {@inheritDoc} */
-    public void markForUpdate(Transaction txn, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	try {
-	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn);
-	    oidsDb.markForUpdate(txnInfo.dbTxn, DataEncoding.encodeLong(oid));
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
-			   txn, oid);
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINEST, e,
-		"markForUpdate txn:" + txn + ", oid:" + oid);
-	}
+    protected void markForUpdateInternal(Transaction txn, long oid) {
+	TxnInfo txnInfo = checkTxn(txn);
+	oidsDb.markForUpdate(txnInfo.dbTxn, DataEncoding.encodeLong(oid));
     }
 
     /** {@inheritDoc} */
-    public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST,
-		       "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2}",
-		       txn, oid, forUpdate);
+    protected byte[] getObjectInternal(
+	Transaction txn, long oid, boolean forUpdate)
+    {
+	TxnInfo txnInfo = checkTxn(txn);
+	byte[] result = oidsDb.get(
+	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
+	if (result == null || isPlaceholderValue(result)) {
+	    throw new ObjectNotFoundException("Object not found: " + oid);
 	}
-	try {
-	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn);
-	    byte[] result = oidsDb.get(
-		txnInfo.dbTxn, DataEncoding.encodeLong(oid), forUpdate);
-	    if (result == null || isPlaceholderValue(result)) {
-		throw new ObjectNotFoundException("Object not found: " + oid);
-	    }
-	    byte[] decodedResult = decodeValue(result);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2} " +
-		    "returns",
-		    txn, oid, forUpdate);
-	    }
-	    return decodedResult;
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINEST, e,
-				   "getObject txn:" + txn + ", oid:" + oid +
-				   ", forUpdate:" + forUpdate);
-	}
+	return decodeValue(result);
     }
 
     /** {@inheritDoc} */
-    public void setObject(Transaction txn, long oid, byte[] data) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "setObject txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	try {
-	    TxnInfo txnInfo = checkTxn(txn);
-	    setObjectInternal(txnInfo, oid, data);
-	    txnInfo.modified = true;
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "setObject txn:{0}, oid:{1,number,#} returns",
-			   txn, oid);
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINEST, e,
-				   "setObject txn:" + txn + ", oid:" + oid);
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
-	logger.log(Level.FINEST, "setObjects txn:{0}", txn);
-	long oid = -1;
-	boolean oidSet = false;
-	try {
-	    TxnInfo txnInfo = checkTxn(txn);
-	    int len = oids.length;
-	    if (len != dataArray.length) {
-		throw new IllegalArgumentException(
-		    "The oids and dataArray must be the same length");
-	    }
-	    for (int i = 0; i < len; i++) {
-		oid = oids[i];
-		oidSet = true;
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST,
-			       "setObjects txn:{0}, oid:{1,number,#}",
-			       txn, oid);
-		}
-		setObjectInternal(txnInfo, oid, dataArray[i]);
-	    }
-	    txnInfo.modified = true;
-	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINEST, e,
-		"setObjects txn:" + txn + (oidSet ? ", oid:" + oid : ""));
-	}
-    }
-
-    /**
-     * Store the value of a single object, without logging.  Don't check the
-     * transaction here, so we can use this method for setting multiple
-     * objects.
-     */
-    private void setObjectInternal(TxnInfo txnInfo, long oid, byte[] data) {
-	checkId(oid);
-	if (data == null) {
-	    throw new NullPointerException("The data must not be null");
-	}
+    protected void setObjectInternal(Transaction txn, long oid, byte[] data) {
+	TxnInfo txnInfo = checkTxn(txn);
 	oidsDb.put(
 	    txnInfo.dbTxn, DataEncoding.encodeLong(oid), encodeValue(data));
+	txnInfo.modified = true;
     }
 
     /** {@inheritDoc} */
-    public void removeObject(Transaction txn, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "removeObject txn:{0}, oid:{1,number,#}",
-		       txn, oid);
+    protected void setObjectsInternal(
+	Transaction txn, long[] oids, byte[][] dataArray)
+    {
+	TxnInfo txnInfo = checkTxn(txn);
+	for (int i = 0; i < oids.length; i++) {
+	    oidsDb.put(txnInfo.dbTxn, DataEncoding.encodeLong(oids[i]),
+		       encodeValue(dataArray[i]));
 	}
-	try {
-	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn);
-	    byte[] key = DataEncoding.encodeLong(oid);
-	    boolean found = oidsDb.delete(txnInfo.dbTxn, key);
-	    if (!found) {
-		throw new ObjectNotFoundException("Object not found: " + oid);
-	    }
+	txnInfo.modified = true;
+    }
+
+    /** {@inheritDoc} */
+    protected void removeObjectInternal(Transaction txn, long oid) {
+	TxnInfo txnInfo = checkTxn(txn);
+	byte[] key = DataEncoding.encodeLong(oid);
+	boolean found = oidsDb.delete(txnInfo.dbTxn, key);
+	if (!found) {
+	    throw new ObjectNotFoundException("Object not found: " + oid);
+	}
+	txnInfo.modified = true;
+    }
+
+    /** {@inheritDoc} */
+    protected BindingValue getBindingInternal(Transaction txn, String name) {
+	TxnInfo txnInfo = checkTxn(txn);
+	byte[] value = namesDb.get(
+	    txnInfo.dbTxn, DataEncoding.encodeString(name), false);
+	if (value == null) {
+	    return new BindingValue(-1, txnInfo.nextName(name, namesDb));
+	} else {
+	    return new BindingValue(DataEncoding.decodeLong(value), null);
+	}
+    }
+
+    /** {@inheritDoc} */
+    protected BindingValue setBindingInternal(
+	Transaction txn, String name, long oid)
+    {
+	TxnInfo txnInfo = checkTxn(txn);
+	byte[] key = DataEncoding.encodeString(name);
+	byte[] oldValue = namesDb.get(txnInfo.dbTxn, key, true);
+	namesDb.put(txnInfo.dbTxn, key, DataEncoding.encodeLong(oid));
+	txnInfo.modified = true;
+	if (oldValue != null) {
+	    return new BindingValue(1, null);
+	} else {
+	    return new BindingValue(-1, txnInfo.nextName(name, namesDb));
+	}
+    }
+
+    /** {@inheritDoc} */
+    protected BindingValue removeBindingInternal(
+	Transaction txn, String name)
+    {
+	TxnInfo txnInfo = checkTxn(txn);
+	boolean found = namesDb.delete(
+	    txnInfo.dbTxn, DataEncoding.encodeString(name));
+	if (found) {
 	    txnInfo.modified = true;
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "removeObject txn:{0}, oid:{1,number,#} returns",
-			   txn, oid);
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINEST, e,
-				   "removeObject txn:" + txn + ", oid:" + oid);
+	    return new BindingValue(1, txnInfo.nextName(name, namesDb));
+	} else {
+	    return new BindingValue(-1, txnInfo.nextName(name, namesDb));
 	}
     }
-
-    /** {@inheritDoc} */
-    public long getBinding(Transaction txn, String name) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "getBinding txn:{0}, name:{1}", txn, name);
-	}
-	try {
-	    if (name == null) {
-		throw new NullPointerException("Name must not be null");
-	    }
-	    TxnInfo txnInfo = checkTxn(txn);
-	    byte[] value = namesDb.get(
-		txnInfo.dbTxn, DataEncoding.encodeString(name), false);
-	    if (value == null) {
-		throw new NameNotBoundException("Name not bound: " + name);
-	    }
-	    long result = DataEncoding.decodeLong(value);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "getBinding txn:{0}, name:{1} returns oid:{2,number,#}",
-		    txn, name, result);
-	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINEST, e,
-				   "getBinding txn:" + txn + ", name:" + name);
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void setBinding(Transaction txn, String name, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "setBinding txn:{0}, name:{1}, oid:{2,number,#}",
-		txn, name, oid);
-	}
-	try {
-	    if (name == null) {
-		throw new NullPointerException("Name must not be null");
-	    }
-	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn);
-	    namesDb.put(txnInfo.dbTxn, DataEncoding.encodeString(name),
-			DataEncoding.encodeLong(oid));
-	    txnInfo.modified = true;
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "setBinding txn:{0}, name:{1}, oid:{2,number,#} returns",
-		    txn, name, oid);
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINEST, e,
-		"setBinding txn:" + txn + ", name:" + name + ", oid:" + oid);
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void removeBinding(Transaction txn, String name) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
-	}
-	try {
-	    if (name == null) {
-		throw new NullPointerException("Name must not be null");
-	    }
-	    TxnInfo txnInfo = checkTxn(txn);
-	    boolean found = namesDb.delete(
-		txnInfo.dbTxn, DataEncoding.encodeString(name));
-	    if (!found) {
-		throw new NameNotBoundException("Name not bound: " + name);
-	    }
-	    txnInfo.modified = true;
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "removeBinding txn:{0}, name:{1} returns",
-		    txn, name);
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINEST, e,
-		"removeBinding txn:" + txn + ", name:" + name);
-	}
-    }
-
+    
     /**
      * {@inheritDoc} <p>
      *
      * This implementation uses a single cursor, so it provides better
      * performance when used to iterate over names in order.
      */
-    public String nextBoundName(Transaction txn, String name) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(
-		Level.FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
-	}
-	try {
-	    TxnInfo txnInfo = checkTxn(txn);
-	    String result = txnInfo.nextName(name, namesDb);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "nextBoundName txn:{0}, name:{1} returns {2}",
-			   txn, name, result);
+    protected String nextBoundNameInternal(Transaction txn, String name) {
+	TxnInfo txnInfo = checkTxn(txn);
+	return txnInfo.nextName(name, namesDb);
+    }
+
+    /** {@inheritDoc} */
+    protected void shutdownInternal() {
+	synchronized (txnCountLock) {
+	    shuttingDown = true;
+	    while (txnCount > 0) {
+		try {
+		    logger.log(Level.FINEST,
+			       "shutdown waiting for {0} transactions",
+			       txnCount);
+		    txnCountLock.wait();
+		} catch (InterruptedException e) {
+		    // loop until shutdown is complete
+		    logger.log(Level.FINEST, "DataStore shutdown " +
+			       "interrupt ignored");
+		}
 	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINEST, e,
-		"nextBoundName txn:" + txn + ", name:" + name);
+	    if (txnCount < 0) {
+		return; // return silently
+	    }
+	    
+	    infoDb.close();
+	    classesDb.close();
+	    oidsDb.close();
+	    namesDb.close();
+	    env.close();
+	    txnCount = -1;
 	}
     }
 
     /** {@inheritDoc} */
-    public void shutdown() {
-	logger.log(Level.FINER, "shutdown");
+    protected int getClassIdInternal(Transaction txn, byte[] classInfo) {
+	checkTxn(txn);
+	byte[] hashKey = getKeyFromClassInfo(classInfo);
+	boolean done = false;
+	/*
+	 * Use a separate transaction when obtaining the class ID so that
+	 * the ID will be available for other transactions to use right
+	 * away.  This approach means that the class info will be
+	 * registered even if the main transaction fails.  If any
+	 * transaction wants to register a new class, though, it's very
+	 * likely that the class will be needed, even if that transaction
+	 * aborts, so it makes sense to commit this operation separately to
+	 * improve concurrency.  -tjb@sun.com (05/23/2007)
+	 *
+	 * Use full transaction isolation to insure consistency when
+	 * concurrently allocating new class IDs.  -tjb@sun.com (03/17/2009)
+	 */
+	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout(), true);
 	try {
-	    synchronized (txnCountLock) {
-		shuttingDown = true;
-		while (txnCount > 0) {
-		    try {
-			logger.log(Level.FINEST,
-				   "shutdown waiting for {0} transactions",
-				   txnCount);
-			txnCountLock.wait();
-		    } catch (InterruptedException e) {
-                        // loop until shutdown is complete
-			logger.log(Level.FINEST, "DataStore shutdown " +
-                                "interrupt ignored");
-		    }
-                }
-                if (txnCount < 0) {
-                    return; // return silently
-                }
-
-                infoDb.close();
-                classesDb.close();
-                oidsDb.close();
-                namesDb.close();
-                env.close();
-                txnCount = -1;
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(null, Level.FINER, e, "shutdown");
-	}
-    }
-
-    /** {@inheritDoc} */
-    public int getClassId(Transaction txn, byte[] classInfo) {
-	logger.log(Level.FINER, "getClassId txn:{0}", txn);
-	String operation = "getClassId txn:" + txn;
-	try {
-	    checkTxn(txn);
-	    if (classInfo == null) {
-		throw new NullPointerException(
-		    "The classInfo argument must not be null");
-	    }
-	    byte[] hashKey = getKeyFromClassInfo(classInfo);
 	    int result;
-	    boolean done = false;
-	    /*
-	     * Use a separate transaction when obtaining the class ID so that
-	     * the ID will be available for other transactions to use right
-	     * away.  This approach means that the class info will be
-	     * registered even if the main transaction fails.  If any
-	     * transaction wants to register a new class, though, it's very
-	     * likely that the class will be needed, even if that transaction
-	     * aborts, so it makes sense to commit this operation separately to
-	     * improve concurrency.  -tjb@sun.com (05/23/2007)
-	     */
-	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
-	    try {
-		byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
-		if (hashValue != null) {
-		    result = DataEncoding.decodeInt(hashValue);
-		} else {
-		    DbCursor cursor = classesDb.openCursor(dbTxn);
-		    try {
-			result = cursor.findLast()
-			    ? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
-			byte[] idKey = getKeyFromClassId(result);
-			boolean success =
-			    cursor.putNoOverwrite(idKey, classInfo);
-			if (!success) {
-			    throw new DataStoreException(
-				"Class ID key already present");
-			}
-		    } finally {
-			cursor.close();
-		    }
-		    boolean success = classesDb.putNoOverwrite(
-			dbTxn, hashKey, DataEncoding.encodeInt(result));
+	    byte[] hashValue = classesDb.get(dbTxn, hashKey, false);
+	    if (hashValue != null) {
+		result = DataEncoding.decodeInt(hashValue);
+	    } else {
+		DbCursor cursor = classesDb.openCursor(dbTxn);
+		try {
+		    result = cursor.findLast()
+			? getClassIdFromKey(cursor.getKey()) + 1 : 1; 
+		    byte[] idKey = getKeyFromClassId(result);
+		    boolean success =
+			cursor.putNoOverwrite(idKey, classInfo);
 		    if (!success) {
 			throw new DataStoreException(
-			    "Class hash already present");
+			    "Class ID key already present");
 		    }
+		} finally {
+		    cursor.close();
 		}
-		done = true;
-		dbTxn.commit();
-	    } finally {
-		if (!done) {
-		    dbTxn.abort();
+		boolean success = classesDb.putNoOverwrite(
+		    dbTxn, hashKey, DataEncoding.encodeInt(result));
+		if (!success) {
+		    throw new DataStoreException(
+			"Class hash already present");
 		}
 	    }
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "getClassId txn:{0} returns {1}",
-			   txn, result);
-	    }
+	    done = true;
+	    dbTxn.commit();
 	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINER, e, operation);
+	} finally {
+	    if (!done) {
+		dbTxn.abort();
+	    }
 	}
     }
 
     /** {@inheritDoc} */
-    public byte[] getClassInfo(Transaction txn, int classId)
+    protected byte[] getClassInfoInternal(Transaction txn, int classId)
 	throws ClassInfoNotFoundException
     {
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER,
-		       "getClassInfo txn:{0}, classId:{1,number,#}",
-		       txn, classId);
-	}
-	String operation = "getClassInfo txn:" + txn + ", classId:" + classId;
+	checkTxn(txn);
+	byte[] key = getKeyFromClassId(classId);
+	byte[] result;
+	boolean done = false;
+	DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
 	try {
-	    checkTxn(txn);
-	    if (classId < 1) {
-		throw new IllegalArgumentException(
-		    "The classId argument must greater than 0");
+	    result = classesDb.get(dbTxn, key, false);
+	    done = true;
+	    dbTxn.commit();
+	} finally {
+	    if (!done) {
+		dbTxn.abort();
 	    }
-	    byte[] key = getKeyFromClassId(classId);
-	    byte[] result;
-	    boolean done = false;
-	    DbTransaction dbTxn = env.beginTransaction(txn.getTimeout());
-	    try {
-		result = classesDb.get(dbTxn, key, false);
-		done = true;
-		dbTxn.commit();
-	    } finally {
-		if (!done) {
-		    dbTxn.abort();
-		}
-	    }
-	    if (result != null) {
-		logger.log(Level.FINER,
-			   "getClassInfo txn:{0} classId:{1,number,#} returns",
-			   txn, classId);
-		return result;
-	    } else {
-		ClassInfoNotFoundException e =
-		    new ClassInfoNotFoundException(
-			"No information found for class ID " + classId);
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.logThrow(Level.FINER, e, operation + " throws");
-		}
-		throw e;
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINER, e, operation);
 	}
-    }
-
-    /** {@inheritDoc} */
-    public long nextObjectId(Transaction txn, long oid) {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "nextObjectId txn:{0}, oid:{1,number,#}",
-		       txn, oid);
-	}
-	try {
-	    if (oid < -1) {
-		throw new IllegalArgumentException(
-		    "Invalid object ID: " + oid);
-	    }
-	    TxnInfo txnInfo = checkTxn(txn);
-	    long result = txnInfo.nextObjectId(oid, oidsDb);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "nextObjectId txn:{0}, oid:{1,number,#} " +
-			   "returns oid:{2,number,#}",
-			   txn, oid, result);
-	    }
+	if (result != null) {
 	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(txn, Level.FINEST, e,
-				   "nextObjectId txn:" + txn + ", oid:" + oid);
-	}
-    }
-
-    /* -- Implement TransactionParticipant -- */
-
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) {
-	logger.log(Level.FINER, "prepare txn:{0}", txn);
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    txn.checkTimeout();
-	    if (txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has already been prepared");
-	    }
-	    if (txnInfo.modified) {
-		byte[] tid = txn.getId();
-		/*
-		 * Berkeley DB requires transaction IDs to be at least 128
-		 * bytes long.  -tjb@sun.com (11/07/2006)
-		 */
-		byte[] gid = new byte[128];
-		/*
-		 * The current transaction implementation uses 8 byte
-		 * transaction IDs.  -tjb@sun.com (03/22/2007)
-		 */
-		assert tid.length < 128 : "Transaction ID is too long";
-		System.arraycopy(tid, 0, gid, 128 - tid.length, tid.length);
-		txnInfo.prepare(gid);
-		txnInfo.prepared = true;
-	    } else {
-		/*
-		 * Make sure to clear the transaction information, regardless
-		 * of whether the Berkeley DB commit operation succeeds, since
-		 * Berkeley DB doesn't permit operating on its transaction
-		 * object after commit is called.
-		 */
-		try {
-		    txnInfoTable.remove(txn);
-		    txnInfo.prepareAndCommit();
-		} finally {
-		    decrementTxnCount();
-		} 
-	    }
-	    boolean result = !txnInfo.modified;
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER, "prepare txn:{0} returns {1}", txn, result);
-	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINER, e, "prepare txn:" + txn);
+	} else {
+	    throw new ClassInfoNotFoundException(
+		"No information found for class ID " + classId);
 	}
     }
 
     /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	logger.log(Level.FINER, "commit txn:{0}", txn);
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    if (!txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has not been prepared");
-	    }
+    protected long nextObjectIdInternal(Transaction txn, long oid) {
+	TxnInfo txnInfo = checkTxn(txn);
+	return txnInfo.nextObjectId(oid, oidsDb);
+    }
+
+    /* -- Implement AbstractDataStore's TransactionParticipant methods -- */
+
+    /** {@inheritDoc} */
+    protected boolean prepareInternal(Transaction txn) {
+	TxnInfo txnInfo = checkTxnNoJoin(txn);
+	txn.checkTimeout();
+	if (txnInfo.prepared) {
+	    throw new IllegalStateException(
+		"Transaction has already been prepared");
+	}
+	if (txnInfo.modified) {
+	    byte[] tid = txn.getId();
+	    /*
+	     * Berkeley DB requires transaction IDs to be at least 128 bytes
+	     * long.  -tjb@sun.com (11/07/2006)
+	     */
+	    byte[] gid = new byte[128];
+	    /*
+	     * The current transaction implementation uses 8 byte transaction
+	     * IDs.  -tjb@sun.com (03/22/2007)
+	     */
+	    assert tid.length < 128 : "Transaction ID is too long";
+	    System.arraycopy(tid, 0, gid, 128 - tid.length, tid.length);
+	    txnInfo.prepare(gid);
+	    txnInfo.prepared = true;
+	} else {
 	    /*
 	     * Make sure to clear the transaction information, regardless of
 	     * whether the Berkeley DB commit operation succeeds, since
 	     * Berkeley DB doesn't permit operating on its transaction object
 	     * after commit is called.
 	     */
-	    txnInfoTable.remove(txn);
 	    try {
-		txnInfo.commit();
-		logger.log(Level.FINER, "commit txn:{0} returns", txn);
-		return;
-	    } finally {
-		decrementTxnCount();
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINER, e, "commit txn:" + txn);
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) {
-	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn);
-	    txn.checkTimeout();
-	    if (txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has already been prepared");
-	    }
-	    /*
-	     * Make sure to clear the transaction information, regardless of
-	     * whether the Berkeley DB commit operation succeeds, since
-	     * Berkeley DB doesn't permit operating on its transaction object
-	     * after commit is called.
-	     */
-	    txnInfoTable.remove(txn);
-	    try {
+		txnInfoTable.remove(txn);
 		txnInfo.prepareAndCommit();
-		logger.log(
-		    Level.FINER, "prepareAndCommit txn:{0} returns", txn);
-		return;
 	    } finally {
 		decrementTxnCount();
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINER, e, "prepareAndCommit txn:" + txn);
+	    } 
+	}
+	return !txnInfo.modified;
+    }
+
+    /** {@inheritDoc} */
+    protected void commitInternal(Transaction txn) {
+	TxnInfo txnInfo = checkTxnNoJoin(txn);
+	if (!txnInfo.prepared) {
+	    throw new IllegalStateException(
+		"Transaction has not been prepared");
+	}
+	/*
+	 * Make sure to clear the transaction information, regardless of
+	 * whether the Berkeley DB commit operation succeeds, since Berkeley DB
+	 * doesn't permit operating on its transaction object after commit is
+	 * called.
+	 */
+	txnInfoTable.remove(txn);
+	try {
+	    txnInfo.commit();
+	} finally {
+	    decrementTxnCount();
 	}
     }
 
     /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	logger.log(Level.FINER, "abort txn:{0}", txn);
+    protected void prepareAndCommitInternal(Transaction txn) {
+	TxnInfo txnInfo = checkTxnNoJoin(txn);
+	txn.checkTimeout();
+	if (txnInfo.prepared) {
+	    throw new IllegalStateException(
+		"Transaction has already been prepared");
+	}
+	/*
+	 * Make sure to clear the transaction information, regardless of
+	 * whether the Berkeley DB commit operation succeeds, since Berkeley DB
+	 * doesn't permit operating on its transaction object after commit is
+	 * called.
+	 */
+	txnInfoTable.remove(txn);
 	try {
-	    if (txn == null) {
-		throw new NullPointerException("Transaction must not be null");
-	    }
-	    TxnInfo txnInfo = txnInfoTable.remove(txn);
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    }
-	    try {
-		txnInfo.abort();
-		logger.log(Level.FINER, "abort txn:{0} returns", txn);
-		return;
-	    } finally {
-		decrementTxnCount();
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(
-		txn, Level.FINER, e, "abort txn:" + txn);
+	    txnInfo.prepareAndCommit();
+	} finally {
+	    decrementTxnCount();
+	}
+    }
+
+    /** {@inheritDoc} */
+    protected void abortInternal(Transaction txn) {
+	checkNull("txn", txn);
+	TxnInfo txnInfo = txnInfoTable.remove(txn);
+	if (txnInfo == null) {
+	    throw new IllegalStateException("Transaction is not active");
+	}
+	try {
+	    txnInfo.abort();
+	} finally {
+	    decrementTxnCount();
 	}
     }
     
-    /** {@inheritDoc} */
-    public String getTypeName() {
-        return  this.getClass().getName();
+    /* -- Other AbstractDataStore methods -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation converts {@link DbDatabaseException} to {@link
+     * DataStoreException}.
+     */
+    @Override
+    protected RuntimeException handleException(
+	Transaction txn, Level level, RuntimeException e, String operation)
+    {
+	if (e instanceof DbDatabaseException) {
+	    e = new DataStoreException(
+		operation + " failed: " + e.getMessage(), e);
+	}
+	return super.handleException(txn, level, e, operation);
     }
 
     /* -- Other public methods -- */
@@ -1627,7 +1382,7 @@ public class DataStoreImpl
 	try {
 	    return getNextId(DataStoreHeader.NEXT_TXN_ID_KEY, count, timeout);
 	} catch (RuntimeException e) {
-	    throw convertException(
+	    throw handleException(
 		null, Level.FINE, e, "getNextTxnId count:" + count);
 	}
     }
@@ -1641,20 +1396,12 @@ public class DataStoreImpl
 	try {
 	    joinTransaction(txn);
 	} catch (RuntimeException e) {
-	    throw convertException(
+	    throw handleException(
 		txn, Level.FINER, e, "joinNewTransaction txn:" + txn);
 	}
     }
 
     /* -- Private methods -- */
-
-    /** Checks that the object ID argument is not negative. */
-    private void checkId(long oid) {
-	if (oid < 0) {
-	    throw new IllegalArgumentException(
-		"Object ID must not be negative");
-	}
-    }
 
     /**
      * Checks that the correct transaction is in progress, and join if none is
@@ -1723,44 +1470,6 @@ public class DataStoreImpl
 	    throw new IllegalStateException("DataStore is shutting down");
 	}
 	return txnInfo;
-    }
-
-    /**
-     * Returns the correct exception for an exception thrown during an
-     * operation.  The txn argument, if non-null, is used to abort the
-     * transaction if a TransactionAbortedException is going to be thrown.  The
-     * level argument is used to log the exception.  The operation argument
-     * will be included in newly created exceptions and the log, and should
-     * describe the operation that was underway when the exception was thrown.
-     */
-    private RuntimeException convertException(
-	Transaction txn, Level level, RuntimeException e, String operation)
-    {
-	if (e instanceof TransactionTimeoutException) {
-	    /* Include the operation in the message */
-	    e = new TransactionTimeoutException(
-		operation + " failed: " + e.getMessage(), e);
-	} else if (e instanceof TransactionConflictException) {
-	    e = new TransactionConflictException(
-		operation + " failed: " + e.getMessage(), e);
-	} else if (e instanceof DbDatabaseException) {
-	    e = new DataStoreException(
-		operation + " failed: " + e.getMessage(), e);
-	}
-	/*
-	 * If we're throwing an exception saying that the transaction was
-	 * aborted, then make sure to abort the transaction now.
-	 */
-	if (e instanceof TransactionAbortedException &&
-	    txn != null &&
-	    !txn.isAborted())
-	{
-	    txn.abort(e);
-	}
-	LoggerWrapper thisLogger = e instanceof TransactionAbortedException
-	    ? abortLogger : logger;
-	thisLogger.logThrow(Level.FINEST, e, "{0} throws", operation);
-	return e;
     }
 
     /** Returns the current transaction count. */
