@@ -1,4 +1,5 @@
 package com.sun.sgs.impl.counters;
+
 /*
  * Copyright 2007-2008 Sun Microsystems, Inc.
  *
@@ -20,130 +21,140 @@ package com.sun.sgs.impl.counters;
 
 import java.io.Serializable;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedObjectRemoval;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.counters.Counter;
 
 /**
- * A scalable implementation of a simple integer counter.  This class
- * supports multiple concurrent write operations with minimal contention.
- * This includes calls to {@link #add(int)}, {@link #increment()}, and
- * {@link #decrement()}.  However, any read operation, such as a call to
- * {@link #get()}, made simultaneously with a write operation will always
- * cause contention.  Therefore, this class is best suited for scenarios
- * where frequent writes but infrequent reads are required.
+ * A scalable implementation of a simple integer counter. This class supports
+ * multiple concurrent write operations with minimal contention. This includes
+ * calls to {@link #add(int)}, {@link #increment()}, and {@link #decrement()}.
+ * However, any read operation, such as a call to {@link #get()}, made
+ * simultaneously with a write operation will always cause contention.
+ * Therefore, this class is best suited for scenarios where frequent writes but
+ * infrequent reads are required.
  */
-public class ScalableCounter extends Number 
-        implements Serializable, ManagedObjectRemoval {
-    
-    /** 
+public class PoolCounter extends Counter
+        implements Serializable, ManagedObjectRemoval
+{
+
+    /**
      * The version of the serialized form.
      */
     private static final long serialVersionUID = 1;
     /**
      * The default number of internal counters
      */
-    private static final int DEFAULT_NUM_COUNTERS = 10;
+    protected static final int DEFAULT_NUM_COUNTERS = 10;
     /**
      * Random number generator to randomly select an internal counter
      */
-    private static final Random random = new Random();
-    
+    protected static final Random random = new Random();
+
     /**
-     * Array of {@code InternalCounter} objects that when combined, 
-     * represent the actual value of this {@code ScalableCounter}.
+     * Array of {@code InternalCounter} objects that when combined, represent
+     * the actual value of this {@code ScalableCounter}.
      */
-    private final ManagedReference<InternalCounter>[] counters;
-    
+    protected final ManagedReference<InternalCounter>[] counters;
+
     /**
-     * Creates a new {@code ScalableCounter} with an initial value of
-     * {@code 0} and the number of {@code InternalCounter}s set to
-     * {@value ScalableCounter#DEFAULT_NUM_COUNTERS}.
+     * Creates a new {@code ScalableCounter} with an initial value of {@code 0}
+     * and the number of {@code InternalCounter}s set to
+     * {@value PoolCounter#DEFAULT_NUM_COUNTERS}.
      */
-    public ScalableCounter() {
+    public PoolCounter()
+    {
         this(0, DEFAULT_NUM_COUNTERS);
     }
 
     /**
      * Creates a new {@code ScalableCounter} with a configurable initial value
      * and the number of {@code InternalCounter}s set to
-     * {@value ScalableCounter#DEFAULT_NUM_COUNTERS}.
+     * {@value PoolCounter#DEFAULT_NUM_COUNTERS}.
      * 
      * @param initialValue the initial value of the {@code ScalableCounter}
      */
-    public ScalableCounter(int initialValue) {
+    public PoolCounter(int initialValue)
+    {
         this(initialValue, DEFAULT_NUM_COUNTERS);
     }
-    
+
     /**
      * Creates a new {@code ScalableCounter} with a configurable initial value
-     * and a configurable number of {@code InternalCounter}s.  Typically,
-     * a larger number of {@code InternalCounter} objects is desired when
-     * the ratio of writes to reads of the {@code ScalableCounter} is extremely
+     * and a configurable number of {@code InternalCounter}s. Typically, a
+     * larger number of {@code InternalCounter} objects is desired when the
+     * ratio of writes to reads of the {@code ScalableCounter} is extremely
      * high.
      * 
      * @param initialValue the initial value of the {@code ScalableCounter}
      * @param numCounters the number of {@code InternalCounter} objects to use
-     *        to track the value of the counter
+     *            to track the value of the counter
      */
     @SuppressWarnings("unchecked")
-    public ScalableCounter(int initialValue, int numCounters) {
-        if(numCounters < 1) {
+    public PoolCounter(int initialValue, int numCounters)
+    {
+        if (numCounters < 1) {
             throw new IllegalArgumentException(
                     "numCounters cannot be less than 1");
         }
-        
+
         counters = new ManagedReference[numCounters];
         counters[0] = AppContext.getDataManager().createReference(
                 new InternalCounter(initialValue));
-        for(int i = 1; i < numCounters; i++) {
+        for (int i = 1; i < numCounters; i++) {
             counters[i] = AppContext.getDataManager().createReference(
                     new InternalCounter(0));
         }
     }
-    
+
     /**
      * Adds the given value to this {@code ScalableCounter}.
      * 
      * @param value the value to add to the counter
      */
-    public void add(int value) {
+    public void add(int value)
+    {
         int counterIndex = random.nextInt(counters.length);
         counters[counterIndex].getForUpdate().add(value);
     }
-    
+
     /**
      * Increments the value of this {@code ScalableCounter} by {@code 1}.
      */
-    public void increment() {
+    @Override
+    public void inc()
+    {
         add(1);
     }
-    
+
     /**
      * Decrements the value of this {@code ScalableCounter} by {@code 1}.
      */
-    public void decrement() {
+    public void dec()
+    {
         add(-1);
     }
-    
+
     /**
-     * Returns the value of this {@code ScalableCounter}.  This operation
-     * (and other read operations like it)
-     * should be used sparingly in the presence of multiple concurrent
-     * modification operations including calls to {@link #add(int)},
-     * {@link #increment()}, and {@link #decrement()}.
+     * Returns the value of this {@code ScalableCounter}. This operation (and
+     * other read operations like it) should be used sparingly in the presence
+     * of multiple concurrent modification operations including calls to
+     * {@link #add(int)}, {@link #increment()}, and {@link #decrement()}.
      * 
      * @return the value of this {@code ScalableCounter}
      */
-    public int get() {
+    public int get()
+    {
         int value = 0;
-        for(ManagedReference<InternalCounter> c : counters) {
+        for (ManagedReference<InternalCounter> c : counters) {
             value += c.get().getValue();
         }
-        
+
         return value;
     }
 
@@ -152,9 +163,9 @@ public class ScalableCounter extends Number
      * 
      * @return the value of this {@code ScalableCounter} as a {@code double}.
      */
-    @Override
-    public double doubleValue() {
-        return (double)get();
+    public double doubleValue()
+    {
+        return (double) get();
     }
 
     /**
@@ -162,9 +173,9 @@ public class ScalableCounter extends Number
      * 
      * @return the value of this {@code ScalableCounter} as a {@code float}.
      */
-    @Override
-    public float floatValue() {
-        return (float)get();
+    public float floatValue()
+    {
+        return (float) get();
     }
 
     /**
@@ -172,8 +183,8 @@ public class ScalableCounter extends Number
      * 
      * @return the value of this {@code ScalableCounter} as a {@code int}.
      */
-    @Override
-    public int intValue() {
+    public int intValue()
+    {
         return get();
     }
 
@@ -182,9 +193,9 @@ public class ScalableCounter extends Number
      * 
      * @return the value of this {@code ScalableCounter} as a {@code long}.
      */
-    @Override
-    public long longValue() {
-        return (long)get();
+    public long longValue()
+    {
+        return (long) get();
     }
 
     /**
@@ -192,75 +203,57 @@ public class ScalableCounter extends Number
      * objects for asynchronous removal.
      */
     @Override
-    public void removingObject() {
+    public void removingObject()
+    {
         AppContext.getTaskManager().scheduleTask(
                 new RemoveInternalCountersTask());
     }
-    
+
     /**
      * Helper {@code Task} to asyncronously remove the {@code InternalCounter}
      * objects associated with this {@code ScalableCounter}.
      */
-    private class RemoveInternalCountersTask
-            implements Task, Serializable {
-        
+    private class RemoveInternalCountersTask implements Task, Serializable
+    {
+
         private static final long serialVersionUID = 1L;
 
         @Override
-        public void run() throws Exception {
-            for (int i = 0; i < ScalableCounter.this.counters.length; i++) {
+        public void run() throws Exception
+        {
+            for (int i = 0; i < PoolCounter.this.counters.length; i++) {
                 AppContext.getDataManager().removeObject(counters[i].get());
             }
         }
-        
+
     }
 
     /**
      * Represents a simple integer counter.
      */
-    private static class InternalCounter 
-            implements Serializable, ManagedObject {
-        
+    protected static class InternalCounter extends AtomicInteger
+        implements ManagedObject
+    {
+        /**
+         * 
+         */
         private static final long serialVersionUID = 1L;
-        /**
-         * The value of the counter
-         */
-        private int counter;
         
         /**
-         * Creates an {@code InternalCounter} with an initial 
-         * value of {@code 0}.
+         * Initializes the counter with an initial value.
+         * @param initialValue the initial value
          */
-        public InternalCounter() {
-            this(0);
+        public InternalCounter(int initialValue)
+        {
+            super(initialValue);
         }
         
-        /**
-         * Creates an {@code InternalCounter} with a configurable initial
-         * value.
-         * 
-         * @param initialValue the initial value of the {@code InternalCounter}
-         */
-        public InternalCounter(int initialValue) {
-            this.counter = initialValue;
-        }
-        
-        /**
-         * Adds an integer value to this {@code InternalCounter}.
-         * 
-         * @param value the value to add to the counter
-         */
         public void add(int value) {
-            this.counter += value;
+            this.addAndGet(value);
         }
         
-        /**
-         * Retrieves the value of this counter.
-         * 
-         * @return the value of the counter
-         */
         public int getValue() {
-            return counter;
+            return this.get();
         }
     }
 }
