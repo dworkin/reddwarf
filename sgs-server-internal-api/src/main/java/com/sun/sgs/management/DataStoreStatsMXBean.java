@@ -19,7 +19,7 @@
 
 package com.sun.sgs.management;
 
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+//import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.profile.AggregateProfileSample;
 
 /**

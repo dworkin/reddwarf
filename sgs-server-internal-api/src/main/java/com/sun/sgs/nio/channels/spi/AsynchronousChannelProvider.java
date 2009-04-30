@@ -37,7 +37,6 @@ import com.sun.sgs.nio.channels.Channels;
 import com.sun.sgs.nio.channels.ManagedChannelFactory;
 import com.sun.sgs.nio.channels.ProtocolFamily;
 import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
-import com.sun.sgs.impl.nio.DefaultAsyncChannelProvider;
 
 /**
  * Service-provider class for asynchronous channels.
@@ -68,10 +67,14 @@ import com.sun.sgs.impl.nio.DefaultAsyncChannelProvider;
  * NOT IMPLEMENTED: {@code openAsynchronousFileChannel}
  */
 public abstract class AsynchronousChannelProvider {
+    
+    /** Name of the system property to use to get the provider class. */
+    public static final String PROVIDER_PROPERTY = 
+            "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider";
 
     /** Mutex held while accessing the provider instance. */
     private static final Object lock = new Object();
-
+    
     /** The system-wide provider singleton instance. */
     private static AsynchronousChannelProvider provider = null;
 
@@ -96,8 +99,7 @@ public abstract class AsynchronousChannelProvider {
      * @return {@true} if the provider was loaded from the property
      */
     private static boolean loadProviderFromProperty() {
-        String cn = System.getProperty(
-            "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider");
+        String cn = System.getProperty(PROVIDER_PROPERTY);
         if (cn == null) {
             return false;
         }
@@ -161,8 +163,9 @@ public abstract class AsynchronousChannelProvider {
                         if (loadProviderFromProperty()) {
                             return provider;
                         }
-                        provider = DefaultAsyncChannelProvider.create();
-                        return provider;
+                        throw new ExceptionInInitializerError(
+                                "No provider specified with the" +
+                                " system property " + PROVIDER_PROPERTY);
                     }
                 });
         }
