@@ -2095,7 +2095,12 @@ public class TestDataServiceImpl{
                         error.set(t);
                         doneFlag.release();
                     }
-                    throw new Exception(t);
+                    if (t instanceof Exception) {
+                        throw (Exception) t;
+                    } else {
+                        throw (Error) t;
+                    } 
+                    
                 }
         }}, taskOwner);
 
@@ -2115,7 +2120,11 @@ public class TestDataServiceImpl{
                         doneFlag.release();
                         error.set(t);
                     }
-                    throw new Exception(t);
+                    if (t instanceof Exception) {
+                        throw (Exception) t;
+                    } else {
+                        throw (Error) t;
+                    } 
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new RuntimeException("abort"));
@@ -3261,7 +3270,11 @@ public class TestDataServiceImpl{
                         doneFlag.release();
                         error.set(t);
                     }
-                    throw new Exception(t);
+                    if (t instanceof Exception) {
+                        throw (Exception) t;
+                    } else {
+                        throw (Error) t;
+                    } 
                 }
         }}, taskOwner);
 
@@ -3281,7 +3294,11 @@ public class TestDataServiceImpl{
                         doneFlag.release();
                         error.set(t);
                     }
-                    throw new Exception(t);
+                    if (t instanceof Exception) {
+                        throw (Exception) t;
+                    } else {
+                        throw (Error) t;
+                    } 
                 }
                 Transaction txn = txnProxy.getCurrentTransaction();
                 txn.abort(new TestAbortedTransactionException("abort"));
