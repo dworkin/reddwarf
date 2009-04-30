@@ -29,6 +29,8 @@ import com.sun.sgs.app.util.ScalableHashMap;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
+import com.sun.sgs.impl.service.session.ClientSessionHandler.
+    LoginCompletionFuture;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -592,11 +594,11 @@ public final class ClientSessionServiceImpl
 	    if (info == null) {
 		// No information for specified relocation key.
 		// Session is already relocated, or it's a possible
-		// DOS attack, so close client connection.
-		try {
-		    protocol.close();
-		} catch (IOException ignore) {
-		}
+		// DOS attack, so notify completion handler of failure.
+		(new LoginCompletionFuture(null, completionHandler)).
+		    setException(new LoginFailureException(
+ 				    "relocation refused",
+				    LoginFailureException.FailureReason.OTHER));
 		return;
 	    }
 	    new ClientSessionHandler(
@@ -905,7 +907,12 @@ public final class ClientSessionServiceImpl
 		taskQueue.addTask(
 		  new AbstractKernelRunnable("ServiceEventQueue") {
 		    public void run() {
-			ClientSessionImpl.serviceEventQueue(sessionId);
+			if (getHandler(new BigInteger(1, sessionId)) != null) {
+			    // TBD: should the handler just be passsed here?
+			    ClientSessionImpl.serviceEventQueue(sessionId);
+			} else {
+			    // TBD: or else what?
+			}
 		    } }, taskOwner);
 	    } finally {
 		callFinished();
@@ -916,6 +923,7 @@ public final class ClientSessionServiceImpl
 	/** {@inheritDoc} */
 	public byte[] relocatingSession(
 	    Identity identity, byte[] sessionId, long oldNode)
+	// throws RelocationFailedException?
 	{
 	    callStarted();
 	    try {
@@ -923,6 +931,9 @@ public final class ClientSessionServiceImpl
 		    logger.log(Level.FINEST, "sessionId:{0} oldNode:{1}",
 			       HexDumper.toHexString(sessionId), oldNode);
 		}
+		// TBD: do we need to double-check to make sure that the
+		// node mapping service has really assigned this session
+		// here?
 		
 		// Cache relocation information.
 		byte[] relocationKey = getNextRelocationKey();
@@ -931,6 +942,27 @@ public final class ClientSessionServiceImpl
 		BigInteger key = new BigInteger(1, relocationKey);
 		relocatingSessions.put(key, info);
 
+		// Modify ClientSession's state to indicate that it has been
+		// relocated to the local node.
+		final BigInteger sessionRefId = new BigInteger(1, sessionId);
+		try {
+		    transactionScheduler.runTask(
+			new AbstractKernelRunnable(
+			    "RelocateSessionToLocalNode")
+			{
+			    public void run() {
+				ClientSessionImpl session =
+				    ClientSessionImpl.getSession(
+				        dataService, sessionRefId);
+				session.move(localNodeId);
+			    } },
+			taskOwner);
+		} catch (Exception e) {
+		    // TBD: this probably means that the client session is gone,
+		    // so throw an exception?
+		    throw new RuntimeException(e);
+		}
+		
 		// Schedule task to monitor relocation.
 		taskScheduler.scheduleTask(
 		    new MonitorRelocatingSessionTask(key, info),
@@ -1112,6 +1144,8 @@ public final class ClientSessionServiceImpl
     boolean validateUserLogin(Identity identity, ClientSessionHandler handler) {
 	ClientSessionHandler previousHandler =
 	    loggedInIdentityMap.putIfAbsent(identity, handler);
+	System.err.println("validateUserLogin: identity:" + identity +
+			    ", previousHandler:" + previousHandler);
 	if (previousHandler == null) {
 	    // No user logged in with the same idenity; allow login.
 	    return true;

@@ -145,6 +145,8 @@ public class TestClientSessionServiceImpl extends TestCase {
      * needing more than one node). */
     private Map<String,SgsTestNode> additionalNodes;
 
+    private boolean allowNewLogin = false;
+
     /** Version information from ClientSessionServiceImpl class. */
     private final String VERSION_KEY;
     private final int MAJOR_VERSION;
@@ -222,7 +224,14 @@ public class TestClientSessionServiceImpl extends TestCase {
         for (String host : hosts) {
             Properties props = SgsTestNode.getDefaultProperties(
                 APP_NAME, serverNode, DummyAppListener.class);
+	    props.setProperty(StandardProperties.AUTHENTICATORS, 
+                "com.sun.sgs.test.util.SimpleTestIdentityAuthenticator");
             props.put("com.sun.sgs.impl.service.watchdog.client.host", host);
+	    if (allowNewLogin) {
+		props.setProperty(
+		    "com.sun.sgs.impl.service.session.allow.new.login", "true");
+	    }
+	    
             SgsTestNode node =
                     new SgsTestNode(serverNode, DummyAppListener.class, props);
             additionalNodes.put(host, node);
@@ -252,7 +261,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     // -- Test constructor --
-    ///*
+    /*
     public void testConstructorNullProperties() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -1216,71 +1225,33 @@ public class TestClientSessionServiceImpl extends TestCase {
 	client.logout();
 	client.checkDisconnectedCallback(true);
     }
-    //*/
+    */
     public void testClientSessionReceiveRelocateNotification() throws Exception {
-	final String name = "foo";
-	final String newNodeHost = "newNode";
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	addNodes(newNodeHost);
-	DummyClient client = new DummyClient(name);
-	try {
-	    client.connect(serverNode.getAppPort()).login();
-	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	    System.err.println("reassigning identity from server node to host: " +
-			       newNodeHost);
-	    DirectiveNodeAssignmentPolicy.instance.
-		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	    System.err.println("(done) reassigning identity");
-	    System.err.println("waiting for relocation to client...");
-	    client.waitForRelocationNotification(newNode.getAppPort());
-	    
-	} finally {
-	    client.disconnect();
-	}
+	DummyClient client = createClientToRelocate("newNode");
+	client.disconnect();
     }
     
     public void testRelocateClientSession() throws Exception {
-	final String name = "foo";
-	final String newNodeHost = "newNode";
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	addNodes(newNodeHost);
-	DummyClient client = new DummyClient(name);
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
 	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	    System.err.println("reassigning identity from server node to host: " +
-			       newNodeHost);
-	    DirectiveNodeAssignmentPolicy.instance.
-		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	    System.err.println("(done) reassigning identity");
-	    System.err.println("waiting for relocation to client...");
-	    client.relocate(newNode.getAppPort());
-	    
+	    client.relocate(newNode.getAppPort(), true, true);
 	} finally {
 	    client.disconnect();
 	}
     }
 
     public void testRelocateClientSessionAndSend() throws Exception {
-	final String name = "foo";
-	final String newNodeHost = "newNode";
-	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
-	addNodes(newNodeHost);
-	SgsTestNode newNode = additionalNodes.get(newNodeHost);
-	DummyClient client = new DummyClient(name);
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
 	try {
-	    client.connect(serverNode.getAppPort()).login();
-	    System.err.println("reassigning identity from server node to host: " +
-			       newNodeHost);
-	    DirectiveNodeAssignmentPolicy.instance.
-		moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
-	    System.err.println("(done) reassigning identity");
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
 	    System.err.println("waiting for relocation to client...");
-	    client.relocate(newNode.getAppPort());
+	    client.relocate(newNode.getAppPort(), true, true);
 	    System.err.println("Sending messages from old node");
 	    sendMessagesFromNodeToClient(serverNode, client, 4, 0);
 	    sendMessagesFromNodeToClient(newNode, client, 4, 10);
-	    
 	} finally {
 	    client.disconnect();
 	}
@@ -1322,6 +1293,90 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    expected++;
 	}
 	messages.clear();
+    }
+
+    public void testRelocateInvalidRelocationKey()  throws Exception {
+	String newNodeHost = "new";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	try {
+	    SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	    client.relocate(newNode.getAppPort(), false, false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithInterveningClientLoginBlockingRelocate()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	DummyClient client = createClientToRelocate(newNodeHost);
+	DummyClient otherClient = new DummyClient("foo");
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	try {
+	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    otherClient.connect(newPort).login();
+	    client.relocate(newPort, true, false);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithInterveningClientLoginPreempted()
+	throws Exception
+    {
+	String newNodeHost = "newNode";
+	allowNewLogin = true;	// enable login preemption on new node
+	DummyClient client = createClientToRelocate(newNodeHost);
+	DummyClient otherClient = new DummyClient("foo");
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	try {
+	    int newPort = additionalNodes.get(newNodeHost).getAppPort();
+	    otherClient.connect(newPort).login();
+	    client.relocate(newPort, true, true);
+	} finally {
+	    client.disconnect();
+	}
+    }
+
+    public void testRelocateWithRedirect()
+	throws Exception
+    {
+	String host2 = "host2";
+	String host3 = "host3";
+	DummyClient client = createClientToRelocate(host2);
+	addNodes(host3);
+	SgsTestNode node2 = additionalNodes.get(host2);
+	SgsTestNode node3 = additionalNodes.get(host3);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity("foo", node2.getNodeId(),
+			 node3.getNodeId());
+	try {
+	    client.relocate(node2.getAppPort(), true, false);
+	} catch (Exception e) {
+	    // This should fail with a timeout exception for
+	    // now.
+	}
+	assertTrue(client.redirectPort == node3.getAppPort());
+    }
+    
+    private DummyClient createClientToRelocate(String newNodeHost)
+	throws Exception
+    {
+	final String name = "foo";
+	DirectiveNodeAssignmentPolicy.instance.setRoundRobin(false);
+	addNodes(newNodeHost);
+	DummyClient client = new DummyClient(name);
+	client.connect(serverNode.getAppPort()).login();
+	SgsTestNode newNode = additionalNodes.get(newNodeHost);
+	System.err.println("reassigning identity from server node to host: " +
+			   newNodeHost);
+	DirectiveNodeAssignmentPolicy.instance.
+	    moveIdentity(name, serverNode.getNodeId(), newNode.getNodeId());
+	System.err.println("(done) reassigning identity");
+	System.err.println("waiting for relocation to client...");
+	client.waitForRelocationNotification(newNode.getAppPort());
+	return client;
     }
     
     /* -- other methods -- */
@@ -1594,16 +1649,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    return true;
 	}
 
-	void relocate(int newPort) {
+	void relocate(int newPort, boolean useValidKey, boolean shouldSucceed) {
 	    waitForRelocationNotification(newPort);
 	    disconnect();
 	    relocateAck = false;
 	    relocateSuccess = false;
 	    connect(relocatePort);
-	    ByteBuffer buf = ByteBuffer.allocate(2 + relocateKey.length);
+	    byte[] key = useValidKey ? relocateKey : new byte[0];
+	    ByteBuffer buf = ByteBuffer.allocate(2 + key.length);
 	    buf.put(SimpleSgsProtocol.RELOCATE_REQUEST).
 		put(SimpleSgsProtocol.VERSION).
-		put(relocateKey).
+		put(key).
 		flip();
 	    try {
 		connection.sendBytes(buf.array());
@@ -1620,8 +1676,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 			throw new RuntimeException(
 			    toString() + " relocate timed out");
 		    }
-		    if (!relocateSuccess) {
-			fail("relocation failed: " + relocateMessage);
+		    if (shouldSucceed) {
+			if (!relocateSuccess) {
+			    fail("relocation failed: " + relocateMessage);
+			}
+		    } else if (relocateSuccess) {
+			fail("relocation succeeded");
 		    }
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
@@ -1927,6 +1987,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 			lock.notifyAll();
 		    }
 		    sendMessage(new byte[0]);
+		    break;
+		    
+		case SimpleSgsProtocol.RELOCATE_FAILURE:
+		    reason = buf.getString();
+		    synchronized (lock) {
+			relocateAck = true;
+			relocateSuccess = false;
+			System.err.println("relocate failed: " + name +
+					   ", reason:" + reason);
+			lock.notifyAll();
+		    }
 		    break;
 		    
 		case SimpleSgsProtocol.LOGOUT_SUCCESS:

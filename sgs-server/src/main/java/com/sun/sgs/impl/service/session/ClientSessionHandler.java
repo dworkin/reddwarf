@@ -645,7 +645,26 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    if (isNewSession) {
 		scheduleTask(new LoginTask());
 	    } else {
-		loginSuccess();
+		try {
+		    sessionService.runTransactionalTask(
+ 			new AbstractKernelRunnable("SetSessionRelocated") {
+			    public void run() {
+				ClientSessionImpl sessionImpl =
+				    ClientSessionImpl.getSession(
+ 				        dataService, sessionRefId);
+				sessionImpl.setRelocating(false);
+			    } }, identity);
+		    loginSuccess();
+		} catch (Exception e) {
+		    logger.logThrow(
+		        Level.WARNING, e,
+			"Relocating ClientSession for identity:{0} " +
+			"to local node:{1} throws",
+			identity, sessionService.getLocalNodeId());
+		    sendLoginFailureAndDisconnect(
+			new LoginFailureException(LOGIN_REFUSED_REASON, e));
+		    return;
+		}
 	    }
 	    
 	} else {
@@ -1028,7 +1047,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * This future is returned from the {@code ProtocolListener}'s
      * {@code newLogin} method.
      */
-    private static class LoginCompletionFuture
+    static class LoginCompletionFuture
 	extends AbstractCompletionFuture<SessionProtocolHandler>
     {
 	/** The session protocol handler. */
