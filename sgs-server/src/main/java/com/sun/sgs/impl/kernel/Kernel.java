@@ -55,8 +55,6 @@ import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
-import com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider;
-
 import com.sun.sgs.profile.ProfileCollector;
 import com.sun.sgs.profile.ProfileCollector.ProfileLevel;
 import com.sun.sgs.profile.ProfileListener;
@@ -151,10 +149,6 @@ class Kernel {
     private static final String DEFAULT_TASK_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfileTaskManager";
     
-    // the default channel provider for nio
-    private static final String DEFAULT_CHANNEL_PROVIDER =
-        "com.sun.sgs.impl.nio.DefaultAsyncChannelProvider";
-
     // default timeout the kernel's shutdown method (15 minutes)
     private static final int DEFAULT_SHUTDOWN_TIMEOUT = 15 * 600000;
     
@@ -207,8 +201,6 @@ class Kernel {
         // check the standard properties
         checkProperties(appProperties);
         this.appProperties = appProperties;
-        System.setProperty(AsynchronousChannelProvider.PROVIDER_PROPERTY,
-                DEFAULT_CHANNEL_PROVIDER);
 
         try {
             // See if we're doing any profiling.

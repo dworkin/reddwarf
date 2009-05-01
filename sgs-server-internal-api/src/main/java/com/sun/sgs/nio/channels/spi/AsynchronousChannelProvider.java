@@ -69,8 +69,12 @@ import com.sun.sgs.nio.channels.ShutdownChannelGroupException;
 public abstract class AsynchronousChannelProvider {
     
     /** Name of the system property to use to get the provider class. */
-    public static final String PROVIDER_PROPERTY = 
+    private static final String PROVIDER_PROPERTY = 
             "com.sun.sgs.nio.channels.spi.AsynchronousChannelProvider";
+    
+    /** Name of the default provider class to use. */
+    private static final String DEFAULT_PROVIDER = 
+            "com.sun.sgs.impl.nio.ReactiveAsyncChannelProvider";
 
     /** Mutex held while accessing the provider instance. */
     private static final Object lock = new Object();
@@ -98,16 +102,15 @@ public abstract class AsynchronousChannelProvider {
      * 
      * @return {@true} if the provider was loaded from the property
      */
-    private static boolean loadProviderFromProperty() {
+    private static void loadProviderFromProperty() {
         String cn = System.getProperty(PROVIDER_PROPERTY);
         if (cn == null) {
-            return false;
+            cn = DEFAULT_PROVIDER;
         }
         try {
             Class<?> c = Class.forName(cn, true,
                 ClassLoader.getSystemClassLoader());
             provider = (AsynchronousChannelProvider) c.newInstance();
-            return true;
         } catch (ClassNotFoundException x) {
             throw new ExceptionInInitializerError(x);
         } catch (IllegalAccessException x) {
@@ -160,12 +163,8 @@ public abstract class AsynchronousChannelProvider {
             return AccessController.doPrivileged(
                 new PrivilegedAction<AsynchronousChannelProvider>() {
                     public AsynchronousChannelProvider run() {
-                        if (loadProviderFromProperty()) {
-                            return provider;
-                        }
-                        throw new ExceptionInInitializerError(
-                                "No provider specified with the" +
-                                " system property " + PROVIDER_PROPERTY);
+                        loadProviderFromProperty();
+                        return provider;
                     }
                 });
         }
