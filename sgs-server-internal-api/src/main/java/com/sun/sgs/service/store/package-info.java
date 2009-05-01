@@ -18,7 +18,7 @@
  */
 
 /**
- * Provides interfaces and classes for pluggable data stores for
+ * Provides interfaces and classes for pluggable data stores of
  * {@link com.sun.sgs.service.DataService DataService} implementations.
  */
 package com.sun.sgs.service.store;
