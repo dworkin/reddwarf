@@ -33,12 +33,6 @@ import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.PLACEHOLDER_OBJ_VALUE;
 import static com.sun.sgs.impl.service.data.store.
     DataStoreHeader.QUOTE_OBJ_VALUE;
-import com.sun.sgs.impl.service.data.store.db.DbCursor;
-import com.sun.sgs.impl.service.data.store.db.DbDatabase;
-import com.sun.sgs.impl.service.data.store.db.DbDatabaseException;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
-import com.sun.sgs.impl.service.data.store.db.DbTransaction;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -46,6 +40,11 @@ import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.store.ClassInfoNotFoundException;
+import com.sun.sgs.service.store.db.DbCursor;
+import com.sun.sgs.service.store.db.DbDatabase;
+import com.sun.sgs.service.store.db.DbDatabaseException;
+import com.sun.sgs.service.store.db.DbEnvironment;
+import com.sun.sgs.service.store.db.DbTransaction;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.security.DigestException;
@@ -72,7 +71,7 @@ import java.util.logging.Logger;
 /**
  * Provides an implementation of <code>DataStore</code> based on the database
  * interface layer defined in the {@link
- * com.sun.sgs.impl.service.data.store.db} package. <p>
+ * com.sun.sgs.service.store.db} package. <p>
  *
  * Note that, although this class provides support for the {@link
  * TransactionParticipant#prepare TransactionParticipant.prepare} method, it

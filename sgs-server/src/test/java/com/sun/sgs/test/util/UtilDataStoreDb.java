@@ -19,11 +19,10 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
+import com.sun.sgs.impl.service.data.store.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.service.data.store.db.je.JeEnvironment;
-import com.sun.sgs.test.util.UtilReflection;
+import com.sun.sgs.service.store.db.DbEnvironment;
 import java.lang.reflect.Method;
 import java.util.Properties;
 

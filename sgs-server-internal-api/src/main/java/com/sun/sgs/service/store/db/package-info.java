@@ -18,7 +18,7 @@
  */
 
 /**
- * Provides a database abstraction layer for use by the {@link
- * com.sun.sgs.impl.service.data.store.DataStoreImpl} class.
+ * Provides a database abstraction layer for use by the default implementation
+ * of the {@link com.sun.sgs.service.store.DataStore} class.
  */
-package com.sun.sgs.impl.service.data.store.db;
+package com.sun.sgs.service.store.db;

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db;
+package com.sun.sgs.service.store.db;
 
 import java.io.FileNotFoundException;
 
@@ -57,8 +57,7 @@ public interface DbEnvironment {
     /**
      * Opens a database.  Relative database filenames will be interpreted
      * relative to whatever root directory was specified when this environment
-     * was created, typically the {@code directory} argument passed to {@link
-     * DbEnvironmentFactory#getEnvironment
+     * was created, typically the {@code directory} argument passed to {@code
      * DbEnvironmentFactory.getEnvironment}.
      *
      * @param	txn the transaction under which the database should be opened

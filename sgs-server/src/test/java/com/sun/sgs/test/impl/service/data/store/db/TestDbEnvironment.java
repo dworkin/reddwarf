@@ -19,11 +19,11 @@
 
 package com.sun.sgs.test.impl.service.data.store.db;
 
+import com.sun.sgs.impl.service.data.store.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.TaskHandle;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironment;
-import com.sun.sgs.impl.service.data.store.db.DbEnvironmentFactory;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
+import com.sun.sgs.service.store.db.DbEnvironment;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutMicros;
 import static com.sun.sgs.test.util.UtilDataStoreDb.getLockTimeoutPropertyName;
 import static com.sun.sgs.test.util.UtilProperties.createProperties;

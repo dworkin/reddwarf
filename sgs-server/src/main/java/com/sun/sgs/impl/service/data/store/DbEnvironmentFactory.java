@@ -17,11 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.impl.service.data.store.db;
+package com.sun.sgs.impl.service.data.store;
 
-import com.sun.sgs.impl.service.data.store.Scheduler;
 import com.sun.sgs.impl.service.data.store.db.bdb.BdbEnvironment;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.service.store.db.DbEnvironment;
 import java.util.Properties;
 
 /**
