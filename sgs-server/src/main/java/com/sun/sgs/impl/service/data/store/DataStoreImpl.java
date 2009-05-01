@@ -46,6 +46,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.AccessCoordinator;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.store.ClassInfoNotFoundException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.security.DigestException;

@@ -17,22 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sun.sgs.test.impl.service.data.store;
-
-import com.sun.sgs.service.store.DataStore;
-import com.sun.sgs.test.util.InMemoryDataStore;
-import com.sun.sgs.tools.test.FilteredNameRunner;
-import org.junit.runner.RunWith;
-
 /**
- * Tests the isolation that {@link AbstractDataStore} enforces between
- * transactions.
+ * Provides interfaces and classes for pluggable data stores for
+ * {@link com.sun.sgs.service.DataService DataService} implementations.
  */
-@RunWith(FilteredNameRunner.class)
-public class TestAbstractDataStoreTxnIsolation extends BasicTxnIsolationTest {
-
-    /** Creates an {@link InMemoryDataStore}. */
-    protected DataStore createDataStore() {
-	return new InMemoryDataStore(props, accessCoordinator);
-    }
-}
+package com.sun.sgs.service.store;
