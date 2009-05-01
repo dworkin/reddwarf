@@ -101,8 +101,8 @@ public class SimpleSgsProtocol {
      */
     public static final int MAX_PAYLOAD_LENGTH = 65532;
 
-    /** The version number, currently {@code 0x04}. */
-    public static final byte VERSION = 0x04;
+    /** The version number, currently {@code 0x05}. */
+    public static final byte VERSION = 0x05;
 
     /**
      * Login request from a client to a server. This message should only be sent
@@ -203,6 +203,84 @@ public class SimpleSgsProtocol {
      * {@link #LOGIN_REQUEST} to that node.
      */
     public static final byte LOGIN_REDIRECT = 0x13;
+
+    /**
+     * Relocate session notification. Server to client notification.
+     * <br>
+     * Opcode: {@code 0x14} <br>
+     * Payload:
+     * <ul>
+     * <li> (String) hostname
+     * <li> (int) port
+     * <li> (ByteArray) relocationKey
+     * </ul>
+     *
+     * This message notifies a client to relocate its session on the
+     * current node to a new node. The client receiving this request should
+     * shut down the connection to the original node and establish a
+     * connection to the node indicated by the {@code hostname} and {@code
+     * port} in the payload. The client should then attempt to reestablish
+     * the client session with the server (without logging in) using the
+     * {@code relocationKey} specified in the payload.
+     */
+    public static final byte RELOCATE_NOTIFICATION = 0x14;
+
+    /**
+     * Relocation request. Client requesting relocation to a server. <br>
+     * Opcode: {@code 0x15} <br>
+     * Payload:
+     * <ul>
+     * <li> (byte) protocol version
+     * <li> (ByteArray) relocationKey
+     * </ul>
+     *
+     * This message requests that the client's existing client session be
+     * relocated to (and re-established with) the server. The {@code
+     * relocationKey} must match the one that the client received in the
+     * previous {@link #RELOCATE_NOTIFICATION} message.  If relocation is
+     * successful, the server acknowledges the request with a {@link
+     * #RELOCATE_SUCCESS} message containing a {@code reconnectionKey} for
+     * reconnecting to the server. If relocation is not successful, a
+     * {@link #RELOCATE_FAILURE} message is sent to the client.  If the
+     * client receives a {@code RELOCATE_FAILURE} message, the client
+     * should disconnect from the server.
+     */
+    public static final byte RELOCATE_REQUEST = 0x15;
+
+    /**
+     * Relocation success. Server response to a client's {@link
+     * #RELOCATE_REQUEST}.
+     * <br>
+     * Opcode: {@code 0x16} <br>
+     * Payload:
+     * <ul>
+     * <li> (ByteArray) reconnectionKey
+     * </ul>
+     * The {@code reconnectionKey} is an opaque reference that can be held by
+     * the client for use in case the client is disconnected and wishes to
+     * reconnect to the server with the same identity using a
+     * {@link #RECONNECT_REQUEST}.
+     */
+    public static final byte RELOCATE_SUCCESS = 0x16;
+
+    /**
+     * Relocate failure. Server response to a client's {@link
+     * #RELOCATE_REQUEST}.
+     * <br>
+     * Opcode: {@code 0x17} <br>
+     * Payload:
+     * <ul>
+     * <li> (String) reason
+     * </ul>
+     * This message indicates that the server rejects the {@link
+     * #RELOCATE_REQUEST} for some reason, for example
+     * <ul>
+     * <li> session not relocating to the server
+     * <li> relocation key mismatch
+     * <li> a user with the same identity is already logged in
+     * </ul>
+     */
+    public static final byte RELOCATE_FAILURE = 0x17;
 
     /**
      * Reconnection request. Client requesting reconnect to a server. <br>
