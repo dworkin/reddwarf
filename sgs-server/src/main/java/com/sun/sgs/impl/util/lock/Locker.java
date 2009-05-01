@@ -98,24 +98,14 @@ public abstract class Locker<K, L extends Locker<K, L>> {
     }
 
     /**
-     * Creates an object to represent a new lock request.  Note that this
-     * method will be called even if an equivalent lock request has already
-     * been granted.
+     * Creates a new lock request.
      *
      * @param	key the key that identifies the lock
      * @param	forWrite whether the request is for write
      * @param	upgrade whether the request is for an upgrade
      */
-    protected abstract LockRequest<K, L> createLockRequest(
+    protected abstract LockRequest<K, L> newLockRequest(
 	K key, boolean forWrite, boolean upgrade);
-
-    /**
-     * Notifies the locker that there has been a request for a lock that has
-     * not been previously granted to this locker.
-     *
-     * @param	request the new lock request
-     */
-    protected void noteNewLockRequest(LockRequest<K, L> request) { }
 
     /**
      * Checks if there is a conflict that should cause this locker's

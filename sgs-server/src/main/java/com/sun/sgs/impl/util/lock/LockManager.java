@@ -295,6 +295,44 @@ public final class LockManager<K, L extends Locker<K, L>> {
     }
 
     /**
+     * Returns a possibly read-only list that contains a snapshot of the
+     * current owners of a lock, as identified by lock requests.
+     *
+     * @param	key the key identifying the lock
+     * @return	a list of the requests
+     */
+    public List<LockRequest<K, L>> getOwners(K key) {
+	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+	assert Lock.noteSync(this, key);
+	try {
+	    synchronized (keyMap) {
+		return getLock(key, keyMap).copyOwners(this);
+	    }
+	} finally {
+	    assert Lock.noteUnsync(this, key);
+	}
+    }
+
+    /**
+     * Returns a possibly read-only list that contains a snapshot of the
+     * current waiters for a lock, as identified by lock requests.
+     *
+     * @param	key the key identifying the lock
+     * @return	a list of the requests
+     */
+    public List<LockRequest<K, L>> getWaiters(K key) {
+	Map<K, Lock<K, L>> keyMap = getKeyMap(key);
+	assert Lock.noteSync(this, key);
+	try {
+	    synchronized (keyMap) {
+		return getLock(key, keyMap).copyWaiters(this);
+	    }
+	} finally {
+	    assert Lock.noteUnsync(this, key);
+	}
+    }
+
+    /**
      * A utility method that adds two non-negative longs, returning {@link
      * Long#MAX_VALUE} if the value would overflow.
      *
@@ -392,7 +430,6 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	    }
 	    return null;
 	}
-	locker.noteNewLockRequest(result.request);
 	if (result.conflict == null) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
@@ -703,7 +740,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	private WaiterInfo<K, L> getWaiterInfo(L locker) {
 	    WaiterInfo<K, L> waiterInfo = waiterMap.get(locker);
 	    if (waiterInfo == null) {
-		LockRequest<K, L>[] waitingFor;
+		List<LockRequest<K, L>> waitingFor;
 		LockAttemptResult<K, L> result = locker.getWaitingFor();
 		if (result == null || locker.getConflict() != null) {
 		    waitingFor = null;
@@ -769,7 +806,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	 * The requests the locker is waiting for, or {@code null} if not
 	 * waiting.
 	 */
-	LockRequest<K, L>[] waitingFor;
+	List<LockRequest<K, L>> waitingFor;
 
 	/**
 	 * The pass in which the locker was checked.  If we encounter an
@@ -782,7 +819,7 @@ public final class LockManager<K, L extends Locker<K, L>> {
 	 *
 	 * @param	waitingFor the requests the locker is waiting for
 	 */
-	WaiterInfo(LockRequest<K, L>[] waitingFor) {
+	WaiterInfo(List<LockRequest<K, L>> waitingFor) {
 	    this.waitingFor = waitingFor;
 	}
     }

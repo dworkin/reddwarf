@@ -100,7 +100,7 @@ public interface CachingDataStoreServer extends Remote {
     }
 
     /**
-      * Obtains write access to an object.
+     * Obtains write access to an object.
      *
      * @param	nodeId the ID of the requesting node
      * @param	timestamp the start time, in milliseconds, of the operation

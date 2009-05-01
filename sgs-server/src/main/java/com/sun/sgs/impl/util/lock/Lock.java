@@ -21,7 +21,6 @@ package com.sun.sgs.impl.util.lock;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import static com.sun.sgs.impl.sharedutil.Objects.checkNull;
-import static com.sun.sgs.impl.sharedutil.Objects.uncheckedCast;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -93,37 +92,26 @@ final class Lock<K, L extends Locker<K, L>> {
      */
     LockAttemptResult<K, L> lock(L locker, boolean forWrite, boolean waiting) {
 	assert checkSync(locker.lockManager);
-	if (owners.isEmpty()) {
-	    LockRequest<K, L> request =
-		locker.createLockRequest(key, forWrite, false);
-	    owners.add(request);
-	    if (waiting) {
-		flushWaiter(locker);
-	    }
-	    assert validateInUse();
-	    return new LockAttemptResult<K, L>(request, null);
-	}
-	boolean upgrade = false;
 	L conflict = null;
-	for (LockRequest<K, L> ownerRequest : owners) {
-	    if (locker == ownerRequest.locker) {
-		if (!forWrite || ownerRequest.getForWrite()) {
-		    if (waiting) {
-			flushWaiter(locker);
+	boolean upgrade = false;
+	if (!owners.isEmpty()) {
+	    for (LockRequest<K, L> ownerRequest : owners) {
+		if (locker == ownerRequest.locker) {
+		    if (forWrite && !ownerRequest.getForWrite()) {
+			upgrade = true;
+		    } else {
+			/* Already locked */
+			assert validateInUse();
+			return null;
 		    }
-		    assert validateInUse();
-		    return null;
-		} else {
-		    upgrade = true;
+		} else if (forWrite || ownerRequest.getForWrite()) {
+		    /* Found conflict */
+		    conflict = ownerRequest.locker;
+		    break;
 		}
-	    } else if (forWrite || ownerRequest.getForWrite()) {
-		conflict = ownerRequest.locker;
 	    }
-	}
-	LockRequest<K, L> request =
-	    locker.createLockRequest(key, forWrite, upgrade);
-	if (conflict == null) {
-	    if (upgrade) {
+	    if (conflict == null && upgrade) {
+		/* Remove read lock request */
 		boolean found = false;
 		for (Iterator<LockRequest<K, L>> i = owners.iterator();
 		     i.hasNext(); )
@@ -139,14 +127,13 @@ final class Lock<K, L extends Locker<K, L>> {
 		}
 		assert found : "Should own when upgrading";
 	    }
-	    owners.add(request);
-	    if (waiting) {
-		flushWaiter(locker);
-	    }
-	    assert validateInUse();
-	    return new LockAttemptResult<K, L>(request, null);
 	}
-	if (!waiting) {
+	LockRequest<K, L> request =
+	    (conflict == null && waiting) ? flushWaiter(locker)
+	    : locker.newLockRequest(key, forWrite, upgrade);
+	if (conflict == null) {
+	    owners.add(request);
+	} else if (!waiting) {
 	    addWaiter(request);
 	}
 	assert validateInUse();
@@ -209,7 +196,7 @@ final class Lock<K, L extends Locker<K, L>> {
 		    owned = true;
 		    if (downgrade) {
 			owners.add(
-			    locker.createLockRequest(
+			    locker.newLockRequest(
 				ownerRequest.key, false, false));
 		    }
 		}
@@ -329,19 +316,42 @@ final class Lock<K, L extends Locker<K, L>> {
 	return !owners.isEmpty() || !waiters.isEmpty();
     }
 
-    /** Returns a copy of the locker requests for the owners. */
-    LockRequest<K, L>[] copyOwners(LockManager<K, L> lockManager) {
+    /**
+     * Returns a possibly read-only copy of the lock requests for the owners.
+     */
+    List<LockRequest<K, L>> copyOwners(LockManager<K, L> lockManager) {
 	assert checkSync(lockManager);
-	if (owners.isEmpty()) {
-	    return uncheckedCast(NO_LOCK_REQUESTS);
+	return copyList(owners);
+    }
+
+    /**
+     * Returns a possibly read-only copy of the lock requests for the
+     * waiters.
+     */
+    List<LockRequest<K, L>> copyWaiters(LockManager<K, L> lockManager) {
+	assert checkSync(lockManager);
+	return copyList(waiters);
+    }
+
+    /**
+     * Returns a possibly read-only copy of a list, optimized to save space in
+     * the empty and single-element cases.
+     */
+    private static <E> List<E> copyList(List<E> list) {
+	if (list.isEmpty()) {
+	    return Collections.emptyList();
+	} else if (list.size() == 1) {
+	    return Collections.singletonList(list.get(0));
 	} else {
-	    return uncheckedCast(
-		owners.toArray(new LockRequest[owners.size()]));
+	    return new ArrayList<E>(list);
 	}
     }
 
-    /** Removes a locker from the list of waiters for this lock. */
-    void flushWaiter(L locker) {
+    /**
+     * Removes a locker from the list of waiters for this lock and returns the
+     * lock request, which must be present.
+     */
+    LockRequest<K, L> flushWaiter(L locker) {
 	assert checkSync(locker.lockManager);
 	for (Iterator<LockRequest<K, L>> iter = waiters.iterator();
 	     iter.hasNext(); )
@@ -349,9 +359,10 @@ final class Lock<K, L extends Locker<K, L>> {
 	    LockRequest<K, L> request = iter.next();
 	    if (request.locker == locker) {
 		iter.remove();
-		break;
+		return request;
 	    }
 	}
+	throw new AssertionError("Waiter was not found: " + locker);
     }
 
     /**

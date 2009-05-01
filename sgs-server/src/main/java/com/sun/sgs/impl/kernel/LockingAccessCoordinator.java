@@ -421,18 +421,13 @@ public class LockingAccessCoordinator extends AbstractAccessCoordinator {
 
 	/** Record the new request and use a local class. */
 	@Override
-	protected LockRequest<Key, TxnLocker> createLockRequest(
+	protected LockRequest<Key, TxnLocker> newLockRequest(
 	    Key key, boolean forWrite, boolean upgrade)
 	{
-	    return new AccessedObjectImpl(this, key, forWrite, upgrade);
-	}
-
-	/** Add the request to the list of requests. */
-	@Override
-	protected void noteNewLockRequest(
-	    LockRequest<Key, TxnLocker> request)
-	{
-	    requests.add((AccessedObjectImpl) request);
+	    AccessedObjectImpl request =
+		new AccessedObjectImpl(this, key, forWrite, upgrade);
+	    requests.add(request);
+	    return request;
 	}
 
 	/** Release all locks. */
