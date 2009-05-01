@@ -34,9 +34,9 @@ import static com.sun.sgs.impl.util.AbstractService.isRetryableException;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.protocol.LoginFailureException;
-import com.sun.sgs.protocol.LoginFailureException.FailureReason;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
+import com.sun.sgs.protocol.RelocateFailureException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -77,8 +77,11 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	new LoggerWrapper(Logger.getLogger(
 	    "com.sun.sgs.impl.service.session.handler"));
 
-    /** Message for indicating login/authentication failure. */
+    /** Message indicating login was refused for a non-specific reason. */
     private static final String LOGIN_REFUSED_REASON = "Login refused";
+
+    /** Message indicating relocation was refused for a non-specific reason. */
+    static final String RELOCATE_REFUSED_REASON = "Relocate refused";
 
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
@@ -115,8 +118,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
-    /** Login completion future for this handler. */
-    private final LoginCompletionFuture loginCompletionFuture;
+    /** Completion future for setting up the client session. */
+    private final SetupCompletionFuture setupCompletionFuture;
 
     /** The queue of tasks for notifying listeners of received messages. */
     private volatile TaskQueue taskQueue = null;
@@ -128,7 +131,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
      * @param	dataService the DataService instance
      * @param	sessionProtocol a session protocol
      * @param	identity an identity
-     * @param	completionHandler a completion handler for the login request
+     * @param	completionHandler a completion handler for the associated
+     *		request
      */
     ClientSessionHandler(
 	ClientSessionServiceImpl sessionService,
@@ -144,13 +148,15 @@ class ClientSessionHandler implements SessionProtocolHandler {
     /**
      * Constructs an handler for a client session.  If {@code sessionRefId}
      * is non-{@code null}, then the associated client session is relocating
-     * from another node, otherwise it is considered a new client session.
+     * from another node, otherwise it is considered a new client session
+     * logging in.
      *
      * @param	sessionService the ClientSessionService instance
      * @param	dataService the DataService instance
      * @param	sessionProtocol a session protocol
      * @param	identity an identity
-     * @param	completionHandler a completion handler for the login request
+     * @param	completionHandler a completion handler for the associated
+     *		request
      * @param	sessionRefId the client session ID, or {@code null}
      */
     ClientSessionHandler(
@@ -171,13 +177,14 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	this.protocol = sessionProtocol;
 	this.identity = identity;
 	this.sessionRefId = sessionRefId;
-	loginCompletionFuture =
-	    new LoginCompletionFuture(this, completionHandler);
-	
+	setupCompletionFuture =
+	    new SetupCompletionFuture(this, completionHandler);
+
+	final boolean loggingIn = sessionRefId == null;
 	scheduleNonTransactionalTask(
-	    new AbstractKernelRunnable("HandleLoginRequest") {
+	    new AbstractKernelRunnable("HandleLoginOrRelocateRequest") {
 		public void run() {
-		    handleLoginRequest();
+		    setupClientSession(loggingIn);
 		} });
 
 	if (logger.isLoggable(Level.FINEST)) {
@@ -327,31 +334,33 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Sends a login success message to the client, and sets local state
-     * indicating that the login request has been handled and the client is
-     * logged in.
+     * Notifies the "setup" future that the setup was successful so that it can
+     * send the appropriate success indication (either successful login
+     * or relocation) to the client, and sets local state indicating that
+     * the request has been handled and the client is logged in.
      */
-    private void loginSuccess() {
+    private void setupSuccess() {
 	synchronized (lock) {
 	    checkConnectedState();
 	    loggedIn = true;
-	    loginCompletionFuture.done();
+	    setupCompletionFuture.done();
 	    state = State.LOGIN_HANDLED;
 	}
     }
 	
     /**
-     * Sends a login failure message for the specified {@code reason} to
-     * the client, and sets local state indicating that the login request
-     * has been handled.
+     * Notifies the "setup" future that setup failed with the specified
+     * {@code exception} so that it can send the appropriate failure
+     * indication to the client, and sets local state indicating that
+     * request has been handled.
      *
      * @param	exception the login failure exception
      */
-    private void loginFailure(LoginFailureException exception) {
+    private void setupFailure(Exception exception) {
 	checkNull("exception", exception);
 	synchronized (lock) {
 	    checkConnectedState();
-	    loginCompletionFuture.setException(exception);
+	    setupCompletionFuture.setException(exception);
 	    state = State.LOGIN_HANDLED;
 	}
     }
@@ -570,13 +579,17 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Handles a login request, notifying the specified {@code future} when
+     * If {@code loggingIn} is {@code true} handles a login request to
+     * establish a client session); otherwise handles a relocate request
+     * to re-establish a client session.  In either case, this method
+     * notifies the completion handler specified during construction when
      * the request is completed.
      */
-    private void handleLoginRequest() {
+    private void setupClientSession(final boolean loggingIn) {
 	logger.log(
 	    Level.FINEST, 
-	    "handling login request for identity:{0}", identity);
+	    "setting up client session for identity:{0} loggingIn:{1}",
+	    identity, loggingIn);
 	
 	final Node node;
 	try {
@@ -597,34 +610,41 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    logger.logThrow(
 	        Level.WARNING, e,
 		"getting node assignment for identity:{0} throws", identity);
-	    sendLoginFailureAndDisconnect(
-		new LoginFailureException(LOGIN_REFUSED_REASON, e));
+	    notifySetupFailureAndDisconnect(
+		loggingIn ?
+		new LoginFailureException(LOGIN_REFUSED_REASON, e) :
+		new RelocateFailureException(RELOCATE_REFUSED_REASON, e));
 	    return;
 	}
 
 	long assignedNodeId = node.getId();
 	if (assignedNodeId == sessionService.getLocalNodeId()) {
 	    /*
-	     * Handle this login request locally: Validate that the
-	     * user is allowed to log in, store the client session in
-	     * the data store (which assigns it an ID--the ID of the
-	     * reference to the client session object), inform the
-	     * session service that this handler is available (by
-	     * invoking "addHandler"), and schedule a task to perform
-	     * client login (call the AppListener.loggedIn method).
+	     * Handle this login (or relocation) request locally.  First,
+	     * validate that the user is allowed to log in (or relocate).
 	     */
 	    if (!sessionService.validateUserLogin(
 		    identity, ClientSessionHandler.this))
 	    {
-		// This login request is not allowed to proceed.
-		sendLoginFailureAndDisconnect(
+		// This client session is not allowed to proceed.
+		notifySetupFailureAndDisconnect(
+		    loggingIn ?
 		    new LoginFailureException(
-			LOGIN_REFUSED_REASON, FailureReason.DUPLICATE_LOGIN));
+			LOGIN_REFUSED_REASON,
+			LoginFailureException.FailureReason.DUPLICATE_LOGIN) :
+		    new RelocateFailureException(
+ 			RELOCATE_REFUSED_REASON,
+			RelocateFailureException.
+			    FailureReason.DUPLICATE_LOGIN));
 		return;
 	    }
 	    taskQueue = sessionService.createTaskQueue();
-	    boolean isNewSession = sessionRefId == null;
-	    if (isNewSession) {
+	    /*
+	     * If logging in, store the client session in the data store
+	     * (which assigns it an ID--the ID of the reference to the
+	     * client session object).
+	     */
+	    if (loggingIn) {
 		CreateClientSessionTask createTask =
 		    new CreateClientSessionTask();
 		try {
@@ -634,15 +654,24 @@ class ClientSessionHandler implements SessionProtocolHandler {
 		        Level.WARNING, e,
 			"Storing ClientSession for identity:{0} throws",
 			identity);
-		    sendLoginFailureAndDisconnect(
+		    notifySetupFailureAndDisconnect(
 			new LoginFailureException(LOGIN_REFUSED_REASON, e));
 		    return;
 		}
 		sessionRefId = createTask.getId();
 	    }
+
+	    /*
+	     * Inform the session service that this handler is available
+	     * (by invoking "addHandler").  If logging in, schedule a task
+	     * to perform client login (which calls the AppListener.loggedIn
+	     * method), otherwise set the "relocating" flag in the client
+	     * session's state to false to indicate that relocation is
+	     * complete.
+	     */
 	    sessionService.addHandler(
 		sessionRefId, ClientSessionHandler.this);
-	    if (isNewSession) {
+	    if (loggingIn) {
 		scheduleTask(new LoginTask());
 	    } else {
 		try {
@@ -654,15 +683,16 @@ class ClientSessionHandler implements SessionProtocolHandler {
  				        dataService, sessionRefId);
 				sessionImpl.setRelocating(false);
 			    } }, identity);
-		    loginSuccess();
+		    setupSuccess();
 		} catch (Exception e) {
 		    logger.logThrow(
 		        Level.WARNING, e,
 			"Relocating ClientSession for identity:{0} " +
 			"to local node:{1} throws",
 			identity, sessionService.getLocalNodeId());
-		    sendLoginFailureAndDisconnect(
-			new LoginFailureException(LOGIN_REFUSED_REASON, e));
+		    notifySetupFailureAndDisconnect(
+			new RelocateFailureException(
+			    RELOCATE_REFUSED_REASON, e));
 		    return;
 		}
 	    }
@@ -686,7 +716,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
                             try {
                                 loginRedirect(node);
                             } catch (Exception ex) {
-                                loginFailure(
+                                setupFailure(
                                     new LoginFailureException("Redirect failed",
                                                               ex));
                             }
@@ -698,9 +728,9 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Sends a login redirect message for the specified {@code host} and
-     * {@code port} to the client, and sets local state indicating that
-     * the login request has been handled.
+     * Notifies the "setup" future that login has been redirected to the
+     * specified {@code node}, and sets local state indicating that the
+     * login request has been handled.
      *
      * @param	node a node
      */
@@ -709,7 +739,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    checkConnectedState();
 	    Set<ProtocolDescriptor> descriptors =
 		sessionService.getProtocolDescriptors(node.getId());
-	    loginCompletionFuture.setException(
+	    setupCompletionFuture.setException(
  		new LoginRedirectException(node, descriptors));
 	    state = State.LOGIN_HANDLED;
 	}
@@ -735,20 +765,18 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * Sends a login failure message to the client and
-     * disconnects the client session.
+     * Schedules a task to notify the "setup" future of failure and then
+     * disconnect the client session.
      *
-     * @param	throwable an exception that occurred while processing the
-     * 		login request, or {@code null}
+     * @param	throwable an exception that occurred while setting up the
+     *		client session, or {@code null}
      */
-    private void sendLoginFailureAndDisconnect(
- 	final LoginFailureException exception)
-    {
+    private void notifySetupFailureAndDisconnect(final Exception exception) {
 	scheduleNonTransactionalTask(
-	    new AbstractKernelRunnable("SendLoginFailureMessage") {
+	    new AbstractKernelRunnable("NotifySetupFailureAndDisconnect") {
 		public void run() {
 		    try {
-                        loginFailure(exception);
+                        setupFailure(exception);
                     } finally {
                         handleDisconnect(false, false);
                     }
@@ -920,7 +948,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 			"AppListener.loggedIn returned non-serializable " +
 			"ClientSessionListener:{0}", returnedListener);
 		    loginFailureEx = new LoginFailureException(
-			LOGIN_REFUSED_REASON, FailureReason.REJECTED_LOGIN);
+			LOGIN_REFUSED_REASON,
+			LoginFailureException.FailureReason.REJECTED_LOGIN);
 		} else if (!isRetryableException(ex)) {
 		    logger.logThrow(
 			Level.WARNING, ex,
@@ -1044,16 +1073,17 @@ class ClientSessionHandler implements SessionProtocolHandler {
     }
 
     /**
-     * This future is returned from the {@code ProtocolListener}'s
-     * {@code newLogin} method.
+     * This future is constructed with a {@link CompletionHandler} passed
+     * to one of the {@code ProtocolListener}'s methods: {@code newLogin}
+     * or {@code relocatedSession}.
      */
-    static class LoginCompletionFuture
+    static class SetupCompletionFuture
 	extends AbstractCompletionFuture<SessionProtocolHandler>
     {
 	/** The session protocol handler. */
 	private final SessionProtocolHandler protocolHandler;
 
-	/** The completion handler for the login request. */
+	/** The completion handler for the associated request. */
 	private final RequestCompletionHandler<SessionProtocolHandler>
 	    completionHandler;
 
@@ -1067,7 +1097,7 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	 * @param	protocolHandler a session protocol handler
 	 * @param	completionHandler a completionHandler
 	 */
-	LoginCompletionFuture(
+	SetupCompletionFuture(
 	    SessionProtocolHandler protocolHandler,
 	    RequestCompletionHandler<SessionProtocolHandler> completionHandler)
         {
@@ -1102,8 +1132,8 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	}
 
 	/**
-	 * Notifies the completion handler that the login request
-	 * processing is complete.
+	 * Notifies the completion handler that processing the associated
+	 * request is complete.
 	 */
 	void done() {
 	    super.done();
@@ -1158,10 +1188,10 @@ class ClientSessionHandler implements SessionProtocolHandler {
 	    if (!isConnected()) {
 		return false;
 	    } else if (loginSuccess) {
-		loginSuccess();
+		setupSuccess();
 		return true;
 	    } else {
-		loginFailure(loginException);
+		setupFailure(loginException);
 		return false;
 	    }
 	}

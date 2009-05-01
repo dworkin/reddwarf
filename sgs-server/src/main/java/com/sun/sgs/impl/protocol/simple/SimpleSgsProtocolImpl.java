@@ -34,6 +34,7 @@ import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.LoginRedirectException;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RelocateFailureException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -1010,15 +1011,8 @@ public class SimpleSgsProtocolImpl implements SessionProtocol {
 	    } catch (ExecutionException e) {
 		// relocate failed
 		Throwable cause = e.getCause();
-		if (cause instanceof LoginRedirectException) {
-		    // redirect
-		    LoginRedirectException redirectException =
-			(LoginRedirectException) cause;
-		    
-                    loginRedirect(redirectException.getNode(),
-                                  redirectException.getProtocolDescriptors());
-		    
-		} else if (cause instanceof LoginFailureException) {
+		if (cause instanceof LoginRedirectException ||
+		    cause instanceof RelocateFailureException) {
 		    relocateFailure(cause.getMessage(), cause.getCause());
 		} else {
 		    relocateFailure(e.getMessage(), e.getCause());

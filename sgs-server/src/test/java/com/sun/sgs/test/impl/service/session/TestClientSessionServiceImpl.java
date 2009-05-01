@@ -1351,13 +1351,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DirectiveNodeAssignmentPolicy.instance.
 	    moveIdentity("foo", node2.getNodeId(),
 			 node3.getNodeId());
-	try {
-	    client.relocate(node2.getAppPort(), true, false);
-	} catch (Exception e) {
-	    // This should fail with a timeout exception for
-	    // now.
-	}
-	assertTrue(client.redirectPort == node3.getAppPort());
+	client.relocate(node2.getAppPort(), true, false);
     }
     
     private DummyClient createClientToRelocate(String newNodeHost)

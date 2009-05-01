@@ -30,7 +30,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.ConfigManager;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.session.ClientSessionHandler.
-    LoginCompletionFuture;
+    SetupCompletionFuture;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     HandleNextDisconnectedSessionTask;
 import com.sun.sgs.impl.sharedutil.HexDumper;
@@ -46,10 +46,10 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.TaskScheduler;
-import com.sun.sgs.protocol.LoginFailureException;
 import com.sun.sgs.protocol.ProtocolAcceptor;
 import com.sun.sgs.protocol.ProtocolDescriptor;
 import com.sun.sgs.protocol.ProtocolListener;
+import com.sun.sgs.protocol.RelocateFailureException;
 import com.sun.sgs.protocol.RequestCompletionHandler;
 import com.sun.sgs.protocol.SessionProtocol;
 import com.sun.sgs.protocol.SessionProtocolHandler;
@@ -595,10 +595,11 @@ public final class ClientSessionServiceImpl
 		// No information for specified relocation key.
 		// Session is already relocated, or it's a possible
 		// DOS attack, so notify completion handler of failure.
-		(new LoginCompletionFuture(null, completionHandler)).
-		    setException(new LoginFailureException(
- 				    "relocation refused",
-				    LoginFailureException.FailureReason.OTHER));
+		(new SetupCompletionFuture(null, completionHandler)).
+		    setException(
+			new RelocateFailureException(
+ 			    ClientSessionHandler.RELOCATE_REFUSED_REASON,
+			    RelocateFailureException.FailureReason.OTHER));
 		return;
 	    }
 	    new ClientSessionHandler(
