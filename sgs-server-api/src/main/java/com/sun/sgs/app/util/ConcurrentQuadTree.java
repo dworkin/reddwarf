@@ -121,7 +121,7 @@ import com.sun.sgs.app.Task;
  * around an element which has been removed and added back to the same position
  * might also be ignored by the iterator. Elements in the tree which are not
  * added or removed while an iterator is iterating through the tree are
- * guaranteeded to not be missed or seen twice by that iterator.
+ * guaranteed to not be missed or seen twice by that iterator.
  *
  * @param <E> the type of element the {@code ConcurrentQuadTree} is to hold
  */
